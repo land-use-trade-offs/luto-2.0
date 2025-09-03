@@ -65,7 +65,7 @@ def get_settings_df(task_root_dir:str) -> pd.DataFrame:
 
 
 
-def get_grid_search_param_df(task_root_dir:str, grid_dict:dict) -> None:
+def get_grid_search_param_df(grid_dict:dict) -> None:
     '''
     Permutate the grid search parameters and save them to a datafram.
     '''
@@ -77,7 +77,6 @@ def get_grid_search_param_df(task_root_dir:str, grid_dict:dict) -> None:
     # Save the grid search parameters to the root task folder
     permutations_df = pd.DataFrame(permutations)
     permutations_df.insert(0, 'run_idx', [i for i in range(1, len(permutations_df) + 1)])
-    permutations_df.to_csv(f'{task_root_dir}/grid_search_parameters.csv', index=False)
 
     # Report the grid search parameters
     print(f'Grid search template has been created with {len(permutations_df)} permutations!')

@@ -27,7 +27,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = '../Custom_runs/20250828_RES3_NONAG_BELOW_5' # Do not include the trailing slash (/) in the end of the path
+TASK_ROOT_DIR = '../Custom_runs/20250902_RES3_NON_AG_2_5_10_15_20_25_30' # Do not include the trailing slash (/) in the end of the path
 
 
 # Set the grid search parameters
@@ -37,7 +37,7 @@ grid_search = {
     ###############################################################
     'MEM': ['96GB'],
     'NCPUS':[24],
-    'TIME': ['24:00:00'],
+    'TIME': ['12:00:00'],
     'QUEUE': ['normalsr'],                                                  # normalsr for CPU, hugemembw for memory intensive jobs
     
  
@@ -48,7 +48,7 @@ grid_search = {
     'RESFACTOR': [3],
     'SIM_YEARS': [range(2020, 2051, 5)],                                    # Years to run the model 
     'WRITE_THREADS': [2],
-    'WRITE_OUTPUT_GEOTIFFS': [True],                                       # True or False, if True will write geotiffs for the output
+    'WRITE_OUTPUT_GEOTIFFS': [False],                                       # True or False, if True will write geotiffs for the output
     
  
     ###############################################################
@@ -70,8 +70,8 @@ grid_search = {
     # --------------- Social license ---------------
     'EXCLUDE_NO_GO_LU': [False],                                            # True or False
     'REGIONAL_ADOPTION_CONSTRAINTS': ['off', 'NON_AG_UNIFORM'],             # 'off', 'on', 'NON_AG_UNIFORM'    
-    'REGIONAL_ADOPTION_NON_AG_UNIFORM': [2, 5, 10],                         # Only work under 'NON_AG_UNIFORM'; None or numbers between 0-100 (both inclusive);  E.g., 5 means each non-ag land can not exceed 5% adoption in every region
-    'REGIONAL_ADOPTION_ZONE': ['LGA_CODE'],                                 # One of 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
+    'REGIONAL_ADOPTION_NON_AG_UNIFORM': [2, 5, 10, 15, 20, 25, 30],         # Only work under 'NON_AG_UNIFORM'; None or numbers between 0-100 (both inclusive);  E.g., 5 means each non-ag land can not exceed 5% adoption in every region
+    'REGIONAL_ADOPTION_ZONE': ['NRM_CODE', 'NRM_CODE'],                     # One of 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
 
 
     # --------------- GHG settings ---------------
@@ -94,7 +94,7 @@ grid_search = {
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [20, 40],                # Percentage of degraded areas to cut in GBF2 priority areas
     
     # --------------- Biodiversity settings - GBF 2 ---------------
-    'BIODIVERSITY_TARGET_GBF_2': ['off', 'high'],                           # 'off', 'low', 'medium', 'high'
+    'BIODIVERSITY_TARGET_GBF_2': ['high'],                                  # 'off', 'low', 'medium', 'high'
     'GBF2_CONSTRAINT_TYPE': ['hard'],                                       # 'hard' or 'soft'
 
     # --------------- Biodiversity settings - GBF 3 ---------------
@@ -139,7 +139,7 @@ if __name__ == '__main__':
     
     # Create the grid settings parameters
     default_settings_df = get_settings_df(TASK_ROOT_DIR)
-    grid_search_param_df = get_grid_search_param_df(TASK_ROOT_DIR, grid_search)
+    grid_search_param_df = get_grid_search_param_df(grid_search)
     grid_search_settings_df = get_grid_search_settings_df(TASK_ROOT_DIR, default_settings_df, grid_search_param_df)
     
     # Remove unnecessary runs
@@ -150,8 +150,11 @@ if __name__ == '__main__':
                 rm_idx.append(row['run_idx'])
                 
     grid_search_param_df = grid_search_param_df[~grid_search_param_df['run_idx'].isin(rm_idx)]
-
+    grid_search_param_df.to_csv(f'{TASK_ROOT_DIR}/grid_search_parameters.csv', index=False)
     print(f'Removed {len(set(rm_idx))} unnecessary runs!')
+    
+    # Get full settings df
+    grid_search_settings_df = get_grid_search_settings_df(TASK_ROOT_DIR, default_settings_df, grid_search_param_df)
 
     # 1) Submit task to a single linux machine, and run simulations parallely
     # create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='single', n_workers=min(len(grid_search_param_df), 100))
