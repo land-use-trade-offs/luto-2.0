@@ -161,9 +161,6 @@ cd luto-2.0
 # Create and activate the LUTO environment
 conda env create -f luto/tools/create_task_runs/bash_scripts/conda_env.yml
 conda activate luto
-
-# Install additional pip dependencies
-pip install gurobipy==11.0.2 numpy_financial==1.0.0 tables==3.9.2
 ```
 
 #### Option B: pip install
@@ -215,16 +212,16 @@ import luto.simulation as sim
 import luto.settings as settings
 
 # Customize simulation settings
-settings.RESFACTOR = 10                             # 10 makes the spatial resolution to ~10km. 
+settings.RESFACTOR = 10                                 # 10 makes the spatial resolution to ~10km. 
 settings.SIM_YEARS = [2010, 2020, 2030, 2040, 2050]
 
-settings.WATER_LIMITS = 'on'                        # 'on' or 'off'. 
-settings.GHG_EMISSIONS_LIMITS = 'high'              # 'off', 'low', 'medium', or 'high'
-settings.BIODIVERSITY_TARGET_GBF_2 = 'high'         # 'off', 'low', 'medium', or 'high'
-settings.BIODIVERSITY_TARGET_GBF_3  = 'off'        # 'off', 'medium', 'high', or 'USER_DEFINED'   
-settings.BIODIVERSITY_TARGET_GBF_4_SNES =  'off'    # 'on' or 'off'.
-settings.BIODIVERSITY_TARGET_GBF_4_ECNES = 'off'    # 'on' or 'off'.
-settings.BIODIVERSITY_TARGET_GBF_8 = 'off'          # 'on' or 'off'.
+settings.WATER_LIMITS = 'on'                            # 'on' or 'off'. 
+settings.GHG_EMISSIONS_LIMITS = 'high'                  # 'off', 'low', 'medium', or 'high'
+settings.BIODIVERSITY_TARGET_GBF_2 = 'high'             # 'off', 'low', 'medium', or 'high'
+settings.BIODIVERSITY_TARGET_GBF_3  = 'off'             # 'off', 'medium', 'high', or 'USER_DEFINED'   
+settings.BIODIVERSITY_TARGET_GBF_4_SNES =  'off'        # 'on' or 'off'.
+settings.BIODIVERSITY_TARGET_GBF_4_ECNES = 'off'        # 'on' or 'off'.
+settings.BIODIVERSITY_TARGET_GBF_8 = 'off'              # 'on' or 'off'.
 
 # Load data with custom parameters
 data = sim.load_data()
