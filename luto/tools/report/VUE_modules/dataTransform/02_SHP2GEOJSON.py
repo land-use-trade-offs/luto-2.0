@@ -5,10 +5,7 @@ from shapely.ops import unary_union
 
 NRM_AUS = gpd.read_file('luto/tools/report/VUE_modules/assets/NRM_SIMPLIFY_FILTER/NRM_AUS_SIMPLIFIED.shp')
 NRM_AUS_crs = NRM_AUS.crs
-
 NRM_AUS = NRM_AUS.dissolve(by='NRM_REGION')[['geometry']].reset_index()
-NRM_AUS.loc[len(NRM_AUS)] = ['AUSTRALIA', unary_union(NRM_AUS.geometry.values)]
-NRM_AUS = NRM_AUS.set_crs(NRM_AUS_crs, allow_override=True)
 
 # Reproject to EPSG:4326 (WGS84 lat/lng) for Leaflet compatibility
 if NRM_AUS.crs.to_epsg() != 4326:
@@ -24,6 +21,8 @@ with open('luto/tools/report/VUE_modules/data/geo/NRM_AUS.js', 'w', encoding='ut
 
 
 # Save centroids and bounding box of NRM to JS object
+NRM_AUS.loc[len(NRM_AUS)] = ['AUSTRALIA', unary_union(NRM_AUS.geometry.values)]
+NRM_AUS = NRM_AUS.set_crs(NRM_AUS_crs, allow_override=True)
 NRM_AUS['centroid'] = NRM_AUS.geometry.centroid.apply(lambda p: [p.y, p.x])
 NRM_AUS['bounding_box'] = NRM_AUS.geometry.bounds.values.tolist()
 centroid_bbox = NRM_AUS.set_index('NRM_REGION')[['centroid', 'bounding_box']].to_dict(orient='index')

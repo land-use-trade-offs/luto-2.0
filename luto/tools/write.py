@@ -238,7 +238,7 @@ def write_mosaic_map(data: Data, yr_cal, path):
     non_ag_map_argmax = non_ag_map.argmax(dim='lu', skipna=False).where(non_ag_mask) + settings.NON_AGRICULTURAL_LU_BASE_CODE
     am_argmax = am_map.argmax(dim='am', skipna=False).where(am_mask)
 
-    ag_map_argmax = arr_to_xr(data, am_argmax)
+    ag_map_argmax = arr_to_xr(data, ag_map_argmax)
     non_ag_map_argmax = arr_to_xr(data, non_ag_map_argmax)
     am_argmax = arr_to_xr(data, am_argmax)
 
