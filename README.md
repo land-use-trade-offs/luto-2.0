@@ -46,23 +46,64 @@ luto/                                # Main package directory
 ├── helpers.py                       # Utility functions
 ├── economics/                       # Economic models and calculations
 │   ├── agricultural/                # Agricultural economics modules
+│   │   ├── biodiversity.py          # Biodiversity calculations
+│   │   ├── cost.py                  # Cost calculations
+│   │   ├── ghg.py                   # GHG emissions calculations
+│   │   ├── quantity.py              # Production quantity calculations
+│   │   ├── revenue.py               # Revenue calculations
+│   │   ├── transitions.py           # Land use transition costs
+│   │   └── water.py                 # Water yield calculations
 │   ├── non_agricultural/            # Non-agricultural economics modules
-│   └── off_land_commodity/          # Off-land commodity economics
+│   │   ├── biodiversity.py          # Non-ag biodiversity impacts
+│   │   ├── cost.py                  # Non-ag establishment costs
+│   │   ├── ghg.py                   # Non-ag GHG calculations
+│   │   ├── quantity.py              # Non-ag production quantities
+│   │   ├── revenue.py               # Non-ag revenue streams
+│   │   ├── transitions.py           # Non-ag transition costs
+│   │   └── water.py                 # Non-ag water impacts
+│   ├── off_land_commodity/          # Off-land commodity economics
+│   └── land_use_culling.py          # Land use optimization culling
 ├── solvers/                         # Optimization solvers and algorithms
+│   ├── input_data.py                # GUROBI solver input preparation
+│   └── solver.py                    # GUROBI solver interface
 ├── tests/                           # Unit and integration tests
 └── tools/                           # Utility tools and scripts
     ├── create_task_runs/            # Task execution and batch processing
+    │   ├── bash_scripts/            # Shell scripts and conda environment
+    │   ├── create_grid_search_tasks.py  # Grid search task generation
+    │   ├── helpers.py               # Task run utilities
+    │   └── parameters.py            # Task run parameters
     ├── Manual_jupyter_books/        # Documentation notebooks
-    ├── report/                      # Reporting and visualization tools
+    │   ├── helpers/                 # Notebook helper functions
+    │   └── asset/                   # Notebook assets and data descriptions
+    ├── report/                      # Reporting and visualization system
+    │   ├── VUE_modules/             # Vue.js 3 interactive reporting dashboard
+    │   │   ├── components/          # Reusable Vue components
+    │   │   ├── data/                # Chart data files (68 JS files)
+    │   │   │   ├── chart_option/    # Chart configuration options
+    │   │   │   ├── geo/             # Geographic boundary data
+    │   │   │   └── map_layers/      # Map layer data (24 JS files)
+    │   │   ├── dataTransform/       # Data transformation scripts
+    │   │   ├── lib/                 # JavaScript libraries (Vue, Leaflet, Highcharts)
+    │   │   ├── routes/              # Vue router configuration
+    │   │   ├── services/            # Data and map services
+    │   │   ├── views/               # Vue view components (11 modules)
+    │   │   ├── index.html           # Main HTML entry point
+    │   │   └── index.js             # Vue application entry
+    │   ├── Assets/                  # Color schemes and styling assets
     │   ├── data_tools/              # Data processing for reports
-    │   └── map_tools/               # Spatial visualization utilities
+    │   ├── map_tools/               # Spatial visualization utilities
+    │   ├── create_report_data.py    # Generate chart data files
+    │   └── create_report_layers.py  # Generate map layer files
     ├── plotmap.py                   # Mapping utilities
-    ├── spatializers.py              # Spatial data processing
+    ├── spatializers.py              # Spatial data processing and upsampling
     └── write.py                     # Output writing functions
 
 input/                               # Input data directory (requires separate download)
-output/                              # Simulation outputs directory
+output/                              # Simulation outputs with interactive HTML reports
 docs/                                # Documentation files
+requirements.txt                     # Python package dependencies
+pyproject.toml                       # Project configuration
 ```
 
 ## Troubleshooting
@@ -113,11 +154,26 @@ git clone https://github.com/land-use-trade-offs/luto-2.0.git
 cd luto-2.0
 ```
 
-### 2. Set Up Conda Environment
+### 2. Set Up Environment
+
+#### Option A: Conda Environment (Recommended)
 ```bash
 # Create and activate the LUTO environment
 conda env create -f luto/tools/create_task_runs/bash_scripts/conda_env.yml
 conda activate luto
+
+# Install additional pip dependencies
+pip install gurobipy==11.0.2 numpy_financial==1.0.0 tables==3.9.2
+```
+
+#### Option B: pip install
+```bash
+# Create virtual environment
+python -m venv luto_env
+source luto_env/bin/activate  # On Windows: luto_env\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
 ```
 
 ### 3. Configure GUROBI Solver
@@ -130,6 +186,15 @@ LUTO2 requires GUROBI for optimization. Follow these steps:
 ### 4. Obtain Input Data
 The LUTO2 input database is approximately 40 GB and contains sensitive data. 
 Please contact **b.bryan@deakin.edu.au** to request access to the input dataset.
+
+### 5. Run Tests (Optional)
+```bash
+# Run all tests using pytest
+python -m pytest
+
+# Run specific test modules
+python -m pytest luto/tests/
+```
 
 ## Running LUTO2
 
@@ -156,7 +221,7 @@ settings.SIM_YEARS = [2010, 2020, 2030, 2040, 2050]
 settings.WATER_LIMITS = 'on'                        # 'on' or 'off'. 
 settings.GHG_EMISSIONS_LIMITS = 'high'              # 'off', 'low', 'medium', or 'high'
 settings.BIODIVERSITY_TARGET_GBF_2 = 'high'         # 'off', 'low', 'medium', or 'high'
-settingsBIODIVERSITY_TARGET_GBF_3  = 'off'          # 'off', 'medium', 'high', or 'USER_DEFINED'   
+settings.BIODIVERSITY_TARGET_GBF_3  = 'off'        # 'off', 'medium', 'high', or 'USER_DEFINED'   
 settings.BIODIVERSITY_TARGET_GBF_4_SNES =  'off'    # 'on' or 'off'.
 settings.BIODIVERSITY_TARGET_GBF_4_ECNES = 'off'    # 'on' or 'off'.
 settings.BIODIVERSITY_TARGET_GBF_8 = 'off'          # 'on' or 'off'.
@@ -171,15 +236,27 @@ sim.run(data=data)
 ### Viewing Results
 After execution, results are saved in the `/output/<timestamp>/` directory:
 
-1. **Interactive HTML Report:** 
+1. **Interactive HTML Dashboard:** 
    ```
-   /output/<run_dir>/DATA_REPORT/REPORT_HTML/index.html
+   /output/<run_dir>/DATA_REPORT/index.html
    ```
-   This provides a comprehensive overview with interactive visualizations.
+   A Vue.js 3 based interactive dashboard featuring:
+   - **Multi-module Analysis:** Area, Economics, GHG, Production, Water, Biodiversity
+   - **Progressive Data Selection:** Region → Category → Water/AgMgt → Landuse hierarchies
+   - **Dual Visualization:** Charts (Highcharts) and Maps (Leaflet) for all data types
+   - **Dynamic Filtering:** Responsive dropdowns with cascading selection updates
+   - **Export Capabilities:** Chart and map export functionality
+   - **11 Specialized Views:** Individual modules for detailed analysis
 
-2. **Spatial Outputs:** GeoTIFF files for mapping and spatial analysis
-3. **Data Tables:** CSV files with detailed numerical results
-4. **Logs:** Execution logs for debugging and performance analysis
+2. **Raw Data Outputs:**
+   - **NetCDF Files:** Spatial datasets (`.nc`) for each year and variable
+   - **CSV Files:** Tabular data summaries for regional analysis
+   - **GeoTIFF Files:** Raster outputs for GIS integration
+
+3. **Execution Logs:** 
+   - `LUTO_RUN__stdout.log`: Standard output logs
+   - `LUTO_RUN__stderr.log`: Error and warning logs
+   - Memory usage logs for performance monitoring
 
 ## Configuration
 
