@@ -22,6 +22,15 @@ window['MapView'] = {
         const selectCategory = ref("");
         const selectLanduse = ref("");
 
+        // Previous selections memory
+        const previousSelections = ref({
+            "Land-use": { landuse: "" },
+            "Water-supply": { landuse: "" },
+            "Ag": { landuse: "" },
+            "Ag Mgt": { landuse: "" },
+            "Non-Ag": { landuse: "" }
+        });
+
         // UI state
         const dataLoaded = ref(false);
         const mapReady = computed(() => {
@@ -96,10 +105,23 @@ window['MapView'] = {
         });
 
         // Progressive selection watcher
-        watch(selectCategory, (newCategory) => {
+        watch(selectCategory, (newCategory, oldCategory) => {
+            // Save previous selections before switching
+            if (oldCategory) {
+                previousSelections.value[oldCategory] = { landuse: selectLanduse.value };
+            }
+
             if (newCategory && dvarMaps.value[newCategory]) {
                 availableLanduse.value = Object.keys(dvarMaps.value[newCategory] || {});
-                selectLanduse.value = availableLanduse.value[0] || '';
+                const prevLanduse = previousSelections.value[newCategory].landuse;
+                selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
+            }
+        });
+
+        watch(selectLanduse, (newLanduse) => {
+            // Save current landuse selection
+            if (selectCategory.value) {
+                previousSelections.value[selectCategory.value].landuse = newLanduse;
             }
         });
 
