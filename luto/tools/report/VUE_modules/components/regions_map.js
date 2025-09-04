@@ -1,33 +1,25 @@
 window.RegionsMap = {
 
   props: {
-    mapPathName: {
+    mapData: {
       type: String,
-      required: true
-    },
-    mapKey: {
-      type: Array,
       required: true
     },
   },
 
   setup(props) {
     const { ref, inject, onMounted, computed } = Vue;
-    const selectedRegion = inject('globalSelectedRegion');
     const globalMapViewpoint = inject('globalMapViewpoint');
+    const selectedRegion = inject('globalSelectedRegion');
 
     const map = ref(null);
     const boundingBox = ref(null);
-    const loadScript = window.loadScript;
+    const loadScript = window.loadScript;                       // DataConstructor has been registered in index.html [DataConstructor.js] [helpers.js]
     const selectedBaseMap = ref('OpenStreetMap');
     const tileLayers = ref({});
     const baseMapOptions = ref(['OpenStreetMap', 'Satellite', 'None']);
 
-    const mapData = ref({});
 
-
-    // Function to get current bounding box for the selected region
-    const getCurrentRegion = computed(() => window.NRM_AUS_centroid_bbox[selectedRegion.value]);
 
     const initMap = () => {
       // Initialize the map with saved viewpoint
@@ -125,9 +117,14 @@ window.RegionsMap = {
 
     // Add new elements to the map
     const addRegionLayer = () => {
+      // Skip adding region overlay for AUSTRALIA
+      if (selectedRegion.value === 'AUSTRALIA') {
+        return;
+      }
+
       // Find the actual region feature from NRM_AUS data
       const regionLayer = window.NRM_AUS.features.find(feature =>
-        feature.properties.NHT2NAME === selectedRegion.value
+        feature.properties.NRM_REGION === selectedRegion.value
       );
 
       // Add the actual region polygon with initial opacity 0
@@ -190,9 +187,9 @@ window.RegionsMap = {
 
         // Skip initial map data load - will be loaded by the watcher when props are populated
         // The watch handler will take care of loading map data when props are ready
-        
+
         // Update map if a region is already selected
-        if (selectedRegion.value && selectedRegion.value !== 'AUSTRALIA') {
+        if (selectedRegion.value) {
           updateMap();
         }
       } catch (error) {
@@ -201,53 +198,48 @@ window.RegionsMap = {
     });
 
     const loadMapData = async () => {
-      // Map data is already loaded in Area.js
-      if (!props.mapPathName || typeof props.mapPathName !== 'string') {
-        console.error('Invalid mapPathName:', props.mapPathName);
+
+      // Always remove existing overlays first
+      map.value.eachLayer((layer) => {
+        if (layer instanceof L.ImageOverlay) {
+          map.value.removeLayer(layer);
+        }
+      });
+
+      const data = props.mapData;
+
+      if (!data.img_str || !data.bounds) {
+        console.warn('Map data is missing required properties (img_str or bounds):', data);
+        // No overlay will be added - map shows base layer only
         return;
       }
-      const pathName = props.mapPathName.replace('window.', '');
-      mapData.value = props.mapKey.reduce((acc, key) => acc && acc[key], window[pathName]);
 
-      // Update the image overlay if map is already initialized
-      if (map.value && mapData.value && mapData.value.img_str && mapData.value.bounds) {
-        // Remove existing overlay if any
-        map.value.eachLayer((layer) => {
-          if (layer instanceof L.ImageOverlay) {
-            map.value.removeLayer(layer);
-          }
-        });
+      // Add new image overlay only if data is valid
+      const imageOverlay = L.imageOverlay(
+        data.img_str,
+        data.bounds,
+        {
+          className: 'crisp-image'
+        }
+      ).addTo(map.value);
 
-        // Add new image overlay
-        const imageOverlay = L.imageOverlay(
-          mapData.value.img_str,
-          mapData.value.bounds,
-          {
-            className: 'crisp-image'
-          }
-        ).addTo(map.value);
-
-        // Apply CSS to disable image interpolation
-        setTimeout(() => {
-          const imgElement = imageOverlay.getElement();
-          if (imgElement) {
-            imgElement.style.imageRendering = 'pixelated';
-            imgElement.style.imageRendering = '-moz-crisp-edges';
-            imgElement.style.imageRendering = 'crisp-edges';
-          }
-        }, 100);
-      }
+      // Apply CSS to disable image interpolation
+      setTimeout(() => {
+        const imgElement = imageOverlay.getElement();
+        if (imgElement) {
+          imgElement.style.imageRendering = 'pixelated';
+          imgElement.style.imageRendering = '-moz-crisp-edges';
+          imgElement.style.imageRendering = 'crisp-edges';
+        }
+      }, 100);
     };
 
-    Vue.watch(() => [props.mapPathName, props.mapKey], async (newVal) => {
-      const [newMapPathName, newMapKey] = newVal;
-      if (newMapPathName && typeof newMapPathName === 'string' && newMapKey && Array.isArray(newMapKey) && newMapKey.length > 0) {
-        await loadMapData();
-      }
-    }, { deep: true, immediate: true });
+    Vue.watch(() => props.mapData, (newVal) => {
+      loadMapData();
+    });
 
     Vue.watch(selectedRegion, (newValue, oldValue) => {
-      if (newValue && newValue !== 'AUSTRALIA') {
+      if (newValue) {
         // Only trigger animation if this is a real region change (not a page navigation)
         const forceAnimation = oldValue !== undefined && oldValue !== newValue;
         updateMap(forceAnimation);
@@ -281,7 +273,6 @@ window.RegionsMap = {
 
     return {
       selectedRegion,
-      getCurrentRegion,
       updateMap,
       selectedBaseMap,
       changeBaseMap,

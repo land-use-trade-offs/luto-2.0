@@ -51,6 +51,7 @@ import luto.economics.non_agricultural.water as non_ag_water
 def write_timestamp():
     timestamp = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
     timestamp_path = os.path.join(settings.OUTPUT_DIR, '.timestamp')
+        
     with open(timestamp_path, 'w') as f: f.write(timestamp)
     return timestamp
 
@@ -326,7 +327,7 @@ def get_ag_to_non_ag_water_delta_matrix(data, yr_idx, lumap, lmmap)->tuple[np.nd
     
     w_req_mrj = ag_water.get_wreq_matrices(data, yr_idx).astype(np.float32)     # <unit: ML/CELL>
     w_req_r = (w_req_mrj * l_mrj).sum(axis=0).sum(axis=1)
-    w_yield_r = non_ag_water.get_w_net_yield_matrix_env_planting(data, yr_idx)  # <unit: ML/CELL>
+    w_yield_r = non_ag_water.get_w_net_yield_env_planting(data, yr_idx)  # <unit: ML/CELL>
     w_delta_r = - (w_req_r + w_yield_r)
     
     w_license_cost_r = w_delta_r * data.WATER_LICENCE_PRICE * data.WATER_LICENSE_COST_MULTS[yr_cal] * settings.INCLUDE_WATER_LICENSE_COSTS     # <unit: $/CELL>
@@ -540,10 +541,23 @@ def plot_t_mat(t_mat:xr.DataArray):
                 rect = patches.Rectangle((j - 0.5, i - 0.5), 1, 1, hatch='////', fill=False, edgecolor='gray', linewidth=0.0)
                 ax.add_patch(rect)
 
+def set_path() -> str:
+        """Create a folder for storing outputs and return folder name."""
+        years = [i for i in settings.SIM_YEARS]
+        path = f"{settings.OUTPUT_DIR}/{read_timestamp()}_RF{settings.RESFACTOR}_{years[0]}-{years[-1]}"
+        paths = (
+            [path]
+            + [f"{path}/out_{yr}" for yr in years]
+            + [f"{path}/out_{yr}/lucc_separate" for yr in years[1:]]
+        )
 
+        for p in paths:
+            if not os.path.exists(p):
+                os.mkdir(p)
+  
 
 class LogToFile:
-    def __init__(self, log_path, mode:str='w'):
+    def __init__(self, log_path, mode:str='a'):
         self.log_path_stdout = f"{log_path}_stdout.log"
         self.log_path_stderr = f"{log_path}_stderr.log"
         self.mode = mode
@@ -551,7 +565,6 @@ class LogToFile:
     def __call__(self, func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            # Open files for writing here, ensuring they're only created upon function call
             with open(self.log_path_stdout, self.mode) as file_stdout, open(self.log_path_stderr, self.mode) as file_stderr:
                 original_stdout = sys.stdout
                 original_stderr = sys.stderr

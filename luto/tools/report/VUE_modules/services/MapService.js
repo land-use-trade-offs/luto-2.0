@@ -5,48 +5,54 @@ window.MapService = {
 
   mapCategories: {
     'Area': {
-      'Ag': 'data/map_layers/map_area_Ag.js',
-      'Ag Mgt': 'data/map_layers/map_area_Am.js',
-      'Non-Ag': 'data/map_layers/map_area_NonAg.js',
-    },
-    'Production': {
-      'Ag': 'data/map_layers/map_quantities_Ag.js',
-      'Ag Mgt': 'data/map_layers/map_quantities_Am.js',
-      'Non-Ag': 'data/map_layers/map_quantities_NonAg.js',
+      'Ag': { 'path': 'data/map_layers/map_area_Ag.js', 'name': 'map_area_Ag' },
+      'Ag Mgt': { 'path': 'data/map_layers/map_area_Am.js', 'name': 'map_area_Am' },
+      'Non-Ag': { 'path': 'data/map_layers/map_area_NonAg.js', 'name': 'map_area_NonAg' },
     },
     'Biodiversity': {
       'overall': {
-        'Ag': 'data/map_layers/map_bio_overall_Ag.js',
-        'Ag Mgt': 'data/map_layers/map_bio_overall_Am.js',
-        'Non-Ag': 'data/map_layers/map_bio_overall_NonAg.js',
+        'Ag': { 'path': 'data/map_layers/map_bio_overall_Ag.js', 'name': 'map_bio_overall_Ag' },
+        'Ag Mgt': { 'path': 'data/map_layers/map_bio_overall_Am.js', 'name': 'map_bio_overall_Am' },
+        'Non-Ag': { 'path': 'data/map_layers/map_bio_overall_NonAg.js', 'name': 'map_bio_overall_NonAg' },
       },
       'GBF2': {
-        'Ag': 'data/map_layers/map_bio_GBF2_Ag.js',
-        'Ag Mgt': 'data/map_layers/map_bio_GBF2_Am.js',
-        'Non-Ag': 'data/map_layers/map_bio_GBF2_NonAg.js',
+        'Ag': { 'path': 'data/map_layers/map_bio_GBF2_Ag.js', 'name': 'map_bio_GBF2_Ag' },
+        'Ag Mgt': { 'path': 'data/map_layers/map_bio_GBF2_Am.js', 'name': 'map_bio_GBF2_Am' },
+        'Non-Ag': { 'path': 'data/map_layers/map_bio_GBF2_NonAg.js', 'name': 'map_bio_GBF2_NonAg' },
       }
     },
     'Economics': {
       'Cost': {
-        'Ag': 'data/map_layers/map_cost_Ag.js',
-        'Ag Mgt': 'data/map_layers/map_cost_Am.js',
-        'Non-Ag': 'data/map_layers/map_cost_NonAg.js',
+        'Ag': { 'path': 'data/map_layers/map_cost_Ag.js', 'name': 'map_cost_Ag' },
+        'Ag Mgt': { 'path': 'data/map_layers/map_cost_Am.js', 'name': 'map_cost_Am' },
+        'Non-Ag': { 'path': 'data/map_layers/map_cost_NonAg.js', 'name': 'map_cost_NonAg' },
       },
       'Revenue': {
-        'Ag': 'data/map_layers/map_revenue_Ag.js',
-        'Ag Mgt': 'data/map_layers/map_revenue_Am.js',
-        'Non-Ag': 'data/map_layers/map_revenue_NonAg.js',
+        'Ag': { 'path': 'data/map_layers/map_revenue_Ag.js', 'name': 'map_revenue_Ag' },
+        'Ag Mgt': { 'path': 'data/map_layers/map_revenue_Am.js', 'name': 'map_revenue_Am' },
+        'Non-Ag': { 'path': 'data/map_layers/map_revenue_NonAg.js', 'name': 'map_revenue_NonAg' },
       },
     },
     'GHG': {
-      'Ag': 'data/map_layers/map_GHG_Ag.js',
-      'Ag Mgt': 'data/map_layers/map_GHG_Am.js',
-      'Non-Ag': 'data/map_layers/map_GHG_NonAg.js',
+      'Ag': { 'path': 'data/map_layers/map_GHG_Ag.js', 'name': 'map_GHG_Ag' },
+      'Ag Mgt': { 'path': 'data/map_layers/map_GHG_Am.js', 'name': 'map_GHG_Am' },
+      'Non-Ag': { 'path': 'data/map_layers/map_GHG_NonAg.js', 'name': 'map_GHG_NonAg' },
+    },
+    'Production': {
+      'Ag': { 'path': 'data/map_layers/map_quantities_Ag.js', 'name': 'map_quantities_Ag' },
+      'Ag Mgt': { 'path': 'data/map_layers/map_quantities_Am.js', 'name': 'map_quantities_Am' },
+      'Non-Ag': { 'path': 'data/map_layers/map_quantities_NonAg.js', 'name': 'map_quantities_NonAg' },
     },
     'Water': {
-      'Ag': 'data/map_layers/map_water_yield_Ag.js',
-      'Ag Mgt': 'data/map_layers/map_water_yield_Am.js',
-      'Non-Ag': 'data/map_layers/map_water_yield_NonAg.js',
+      'Ag': { 'path': 'data/map_layers/map_water_yield_Ag.js', 'name': 'map_water_yield_Ag' },
+      'Ag Mgt': { 'path': 'data/map_layers/map_water_yield_Am.js', 'name': 'map_water_yield_Am' },
+      'Non-Ag': { 'path': 'data/map_layers/map_water_yield_NonAg.js', 'name': 'map_water_yield_NonAg' },
+    },
+    'Dvar': {
+      'Ag': { 'path': 'data/map_layers/map_dvar_Ag.js', 'name': 'map_dvar_Ag' },
+      'Ag Mgt': { 'path': 'data/map_layers/map_dvar_Am.js', 'name': 'map_dvar_Am' },
+      'Non-Ag': { 'path': 'data/map_layers/map_dvar_NonAg.js', 'name': 'map_dvar_NonAg' },
+      'Mosaic': { 'path': 'data/map_layers/map_dvar_mosaic.js', 'name': 'map_dvar_mosaic' },
     }
   }
 }

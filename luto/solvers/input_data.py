@@ -678,7 +678,7 @@ def get_limits(data: Data, yr_cal: int, resale_factors) -> dict[str, Any]:
         limits['demand_rescale'] = limits['demand'] / resale_factors['Demand']
     
     if settings.WATER_LIMITS == 'on':
-        limits['water'] = ag_water.get_water_net_yield_limit_for_regions_inside_LUTO(data)
+        limits['water'] = data.WATER_YIELD_TARGETS
         limits['water_rescale'] = {k: v / resale_factors['Water'] for k, v in limits['water'].items()}
         
     if settings.GHG_EMISSIONS_LIMITS != 'off':
@@ -705,7 +705,7 @@ def get_limits(data: Data, yr_cal: int, resale_factors) -> dict[str, Any]:
         limits["GBF8"] = data.get_GBF8_target_inside_LUTO_by_yr(yr_cal)
         limits["GBF8_rescale"] = limits["GBF8"] / resale_factors['GBF8']
 
-    if settings.REGIONAL_ADOPTION_CONSTRAINTS == 'on':
+    if settings.REGIONAL_ADOPTION_CONSTRAINTS != 'off':
         ag_reg_adoption, non_ag_reg_adoption = ag_transition.get_regional_adoption_limits(data, yr_cal)
         limits["ag_regional_adoption"] = ag_reg_adoption
         limits["non_ag_regional_adoption"] = non_ag_reg_adoption
@@ -781,14 +781,21 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     
 
     ag_g_mrj = get_ag_g_mrj(data, target_index)
-    ag_w_mrj = get_ag_w_mrj(data, target_index, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)                             # Calculate water net yield matrices based on historical water yield layers
+    ag_w_mrj = (
+        get_ag_w_mrj(data, target_index) if settings.WATER_CLIMATE_CHANGE_IMPACT == 'on' 
+        else get_ag_w_mrj(data, target_index, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)
+    )
     ag_b_mrj = get_ag_b_mrj(data)
     ag_x_mrj = get_ag_x_mrj(data, base_year)
     ag_q_mrp = get_ag_q_mrp(data, target_index)
     ag_ghg_t_mrj = get_ag_ghg_t_mrj(data, base_year)
 
     non_ag_g_rk = get_non_ag_g_rk(data, ag_g_mrj, base_year)
-    non_ag_w_rk = get_non_ag_w_rk(data, ag_w_mrj, base_year, target_year, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)  # Calculate non-ag water yield matrices based on historical water yield layers
+    non_ag_w_rk = (
+        get_non_ag_w_rk(data, ag_w_mrj, base_year, target_year)   
+        if settings.WATER_CLIMATE_CHANGE_IMPACT == 'on' 
+        else get_non_ag_w_rk(data, ag_w_mrj, base_year, target_year, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)
+    )
     non_ag_b_rk = get_non_ag_b_rk(data, ag_b_mrj, base_year)
     non_ag_x_rk = get_non_ag_x_rk(data, base_year)
     non_ag_q_crk = get_non_ag_q_crk(data, ag_q_mrp, base_year)
@@ -829,9 +836,9 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         "Demand":        rescale_solver_input_data([ag_q_mrp, non_ag_q_crk, ag_man_q_mrp]),
         "Biodiversity":  rescale_solver_input_data([ag_b_mrj, non_ag_b_rk, ag_man_b_mrj]),
         "GHG":(
-          rescale_solver_input_data([ag_g_mrj, non_ag_g_rk, ag_man_g_mrj, ag_ghg_t_mrj])
-          if settings.GHG_EMISSIONS_LIMITS != 'off' 
-          else 1.0  
+            rescale_solver_input_data([ag_g_mrj, non_ag_g_rk, ag_man_g_mrj, ag_ghg_t_mrj])
+            if settings.GHG_EMISSIONS_LIMITS != 'off' 
+            else 1.0  
         ),        
         "Water":(
             rescale_solver_input_data([ag_w_mrj, non_ag_w_rk, ag_man_w_mrj])

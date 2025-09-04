@@ -32,16 +32,17 @@ from luto import tools
 import luto.settings as settings
 import luto.economics.agricultural.quantity as ag_quantity
 import luto.economics.non_agricultural.quantity as non_ag_quantity
+import luto.economics.agricultural.water as ag_water
+from luto.tools.spatializers import upsample_array
 
-from math import ceil
 from collections import defaultdict
-from dataclasses import dataclass
 from typing import Any, Literal, Optional
 from affine import Affine
 from scipy.interpolate import interp1d
+from math import ceil
+from dataclasses import dataclass
 from scipy.ndimage import distance_transform_edt
 
-from luto.tools.spatializers import upsample_array
 
 
 def dict2matrix(d, fromlist, tolist):
@@ -101,10 +102,11 @@ class Data:
         """
         # Path for write module - overwrite when provided with a base and target year
         self.path = None
-        
-        # Read the timestamp of simulation, which is created by `luto.simulation.load_data`
-        with open(os.path.join(settings.OUTPUT_DIR, '.timestamp'), 'r') as f:
-            self.timestamp = f.read().strip()
+
+        # The latest simulation year; 
+        #   For simulation between 2010-2050, if the run stops at 2030, then it will be 2030
+        #   The last_year is updated in the solve_timeseries.simulation module
+        self.last_year = None
 
         # Setup output containers
         self.lumaps = {}
@@ -489,15 +491,22 @@ class Data:
 
         
         ##################### Regional adoption zones
-        if settings.REGIONAL_ADOPTION_CONSTRAINTS != "on":
+        if settings.REGIONAL_ADOPTION_CONSTRAINTS == "off":
             self.REGIONAL_ADOPTION_ZONES = None
             self.REGIONAL_ADOPTION_TARGETS = None
         else:
             self.REGIONAL_ADOPTION_ZONES = pd.read_hdf(
                 os.path.join(settings.INPUT_DIR, "regional_adoption_zones.h5"), where=self.MASK
             )[settings.REGIONAL_ADOPTION_ZONE].to_numpy()
-        
+
             regional_adoption_targets = pd.read_excel(os.path.join(settings.INPUT_DIR, "regional_adoption_zones.xlsx"), sheet_name=settings.REGIONAL_ADOPTION_ZONE)
+
+            if (settings.REGIONAL_ADOPTION_CONSTRAINTS == 'NON_AG_UNIFORM') and (settings.REGIONAL_ADOPTION_NON_AG_UNIFORM is not None):
+                regional_adoption_targets.loc[
+                    regional_adoption_targets['TARGET_LANDUSE'].isin(settings.NON_AG_LAND_USES.keys()),
+                    ['ADOPTION_PERCENTAGE_2030', 'ADOPTION_PERCENTAGE_2050', 'ADOPTION_PERCENTAGE_2100']
+                ] = settings.REGIONAL_ADOPTION_NON_AG_UNIFORM
+
             self.REGIONAL_ADOPTION_TARGETS = regional_adoption_targets.iloc[
                 [idx for idx, row in regional_adoption_targets.iterrows() if
                     all([row['ADOPTION_PERCENTAGE_2030']>=0, 
@@ -505,6 +514,19 @@ class Data:
                         row['ADOPTION_PERCENTAGE_2100']>=0])
                 ]
             ]
+            
+            # Check missing zones due to high resfactor
+            if len(self.REGIONAL_ADOPTION_TARGETS) > 0:
+                lost_zones = np.setdiff1d(
+                    self.REGIONAL_ADOPTION_TARGETS[settings.REGIONAL_ADOPTION_ZONE].unique(),
+                    np.unique(self.REGIONAL_ADOPTION_ZONES)
+                )
+                
+                if len(lost_zones) > 0:
+                    print(f" 	    WARNING: {len(lost_zones)} regional adoption zones have no cells due to (RES{settings.RESFACTOR}). Please check if this is expected.")
+                    self.REGIONAL_ADOPTION_TARGETS = self.REGIONAL_ADOPTION_TARGETS.query(f"{settings.REGIONAL_ADOPTION_ZONE} not in {list(lost_zones)}").reset_index(drop=True)
+                
+            
 
 
 
@@ -886,36 +908,13 @@ class Data:
         # Spatially explicit costs of a water licence per ML.
         self.WATER_LICENCE_PRICE = np.nan_to_num(
                 pd.read_hdf(os.path.join(settings.INPUT_DIR, "water_licence_price.h5"), where=self.MASK).to_numpy()
-            )
+        )
 
         # Spatially explicit costs of water delivery per ML.
         self.WATER_DELIVERY_PRICE = np.nan_to_num(
                 pd.read_hdf(os.path.join(settings.INPUT_DIR, "water_delivery_price.h5"), where=self.MASK).to_numpy()
-            )
+        )
        
-
-        # River regions.
-        self.RIVREG_ID = pd.read_hdf(os.path.join(settings.INPUT_DIR, "rivreg_id.h5"), where=self.MASK).to_numpy()  # River region ID mapped.
- 
-        rr = pd.read_hdf(os.path.join(settings.INPUT_DIR, "rivreg_lut.h5"))
-        self.RIVREG_DICT = dict(
-            zip(rr.HR_RIVREG_ID, rr.HR_RIVREG_NAME)
-        )  # River region ID to Name lookup table
-        self.RIVREG_HIST_LEVEL = dict(
-            zip(rr.HR_RIVREG_ID, rr.WATER_YIELD_HIST_BASELINE_ML)
-        )  # River region ID and water use limits
-
-        # Drainage divisions
-        self.DRAINDIV_ID = pd.read_hdf(os.path.join(settings.INPUT_DIR, "draindiv_id.h5"), where=self.MASK).to_numpy()  # Drainage div ID mapped.
-
-        dd = pd.read_hdf(os.path.join(settings.INPUT_DIR, "draindiv_lut.h5"))
-        self.DRAINDIV_DICT = dict(
-            zip(dd.HR_DRAINDIV_ID, dd.HR_DRAINDIV_NAME)
-        )  # Drainage div ID to Name lookup table
-        self.DRAINDIV_HIST_LEVEL = dict(
-            zip(dd.HR_DRAINDIV_ID, dd.WATER_YIELD_HIST_BASELINE_ML)
-        )  # Drainage div ID and water use limits
-
 
         # Water yields -- run off from a cell into catchment by deep-rooted, shallow-rooted, and natural land
         water_yield_baselines = pd.read_hdf(os.path.join(settings.INPUT_DIR, "water_yield_baselines.h5"), where=self.MASK)
@@ -933,63 +932,26 @@ class Data:
         self.WATER_YIELD_DR_FILE = pd.read_hdf(wyield_fname_dr, where=self.MASK).T.values
         self.WATER_YIELD_SR_FILE = pd.read_hdf(wyield_fname_sr, where=self.MASK).T.values
         
-
+        
         # Water yield from outside LUTO study area.
-        water_yield_oustide_luto_hist = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'water_yield_outside_LUTO_study_area_hist_1970_2000.h5'))
-        
-        if settings.WATER_REGION_DEF == 'River Region':
-            rr_outside_luto = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'water_yield_outside_LUTO_study_area_2010_2100_rr_ml.h5'))
-            rr_outside_luto = rr_outside_luto.loc[:, pd.IndexSlice[:, settings.SSP]]
-            rr_outside_luto.columns = rr_outside_luto.columns.droplevel('ssp')
-
-            rr_natural_land = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'water_yield_natural_land_2010_2100_rr_ml.h5'))
-            rr_natural_land = rr_natural_land.loc[:, pd.IndexSlice[:, settings.SSP]]
-            rr_natural_land.columns = rr_natural_land.columns.droplevel('ssp')
-
-            self.WATER_OUTSIDE_LUTO_RR = rr_outside_luto
-            self.WATER_OUTSIDE_LUTO_RR_HIST = water_yield_oustide_luto_hist.query('Region_Type == "River Region"').set_index('Region_ID')['Water Yield (ML)'].to_dict()
-            self.WATER_UNDER_NATURAL_LAND_RR = rr_natural_land
-
-        if settings.WATER_REGION_DEF == 'Drainage Division':
-            dd_outside_luto = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'water_yield_outside_LUTO_study_area_2010_2100_dd_ml.h5'))
-            dd_outside_luto = dd_outside_luto.loc[:, pd.IndexSlice[:, settings.SSP]]
-            dd_outside_luto.columns = dd_outside_luto.columns.droplevel('ssp')
-
-            dd_natural_land = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'water_yield_natural_land_2010_2100_dd_ml.h5'))
-            dd_natural_land = dd_natural_land.loc[:, pd.IndexSlice[:, settings.SSP]]
-            dd_natural_land.columns = dd_natural_land.columns.droplevel('ssp')
-
-            self.WATER_OUTSIDE_LUTO_DD = dd_outside_luto
-            self.WATER_OUTSIDE_LUTO_DD_HIST = water_yield_oustide_luto_hist.query('Region_Type == "Drainage Division"').set_index('Region_ID')['Water Yield (ML)'].to_dict()
-            self.WATER_UNDER_NATURAL_LAND_DD = dd_natural_land
-        
-        
-        # Get historical yields of regions
-        if settings.WATER_REGION_DEF == 'River Region':
-            self.WATER_REGION_NAMES = self.RIVREG_DICT
-            self.WATER_REGION_HIST_LEVEL = self.RIVREG_HIST_LEVEL
-            self.WATER_REGION_ID = self.RIVREG_ID
-            
-        elif settings.WATER_REGION_DEF == 'Drainage Division':
-            self.WATER_REGION_NAMES = self.DRAINDIV_DICT
-            self.WATER_REGION_HIST_LEVEL = self.DRAINDIV_HIST_LEVEL
-            self.WATER_REGION_ID = self.DRAINDIV_ID
-            
-
-        # Get the water region index for each region
-        self.WATER_REGION_INDEX_R = {k:(self.WATER_REGION_ID == k) for k in self.WATER_REGION_NAMES.keys()}
-
-
-        # Place holder for Water Yield to avoid recalculating it every time.
-        self.water_yield_regions_BASE_YR = None
+        self.WATER_YIELD_OUTSIDE_LUTO_HIST = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'water_yield_outside_LUTO_study_area_hist_1970_2000.h5'))
         
         # Water use for domestic and industrial sectors.
         water_use_domestic = pd.read_csv(os.path.join(settings.INPUT_DIR, "Water_Use_Domestic.csv")).query('REGION_TYPE == @settings.WATER_REGION_DEF')
         self.WATER_USE_DOMESTIC = water_use_domestic.set_index('REGION_ID')['DOMESTIC_INDUSTRIAL_WATER_USE_ML'].to_dict()
-        
-        
 
+        # Call the function to create watershed components
+        self.VALID_WATERSHED_IDS = self.get_watershed_yield_components()
+
+        # Get the water region index for each region
+        self.WATER_REGION_INDEX_R = {k:(self.WATER_REGION_ID == k) for k in self.WATER_REGION_NAMES.keys()}
+
+        # Place holder for Water Yield to avoid recalculating it every time.
+        self.water_yield_regions_BASE_YR = None
         
+        # Water yield targets for each region
+        self.WATER_YIELD_TARGETS, self.WATER_RELAXED_REGION_RAW_TARGETS = ag_water.get_water_target_inside_LUTO_by_CCI(self)
+
         ###############################################################
         # Carbon sequestration by natural lands.
         ###############################################################
@@ -1490,28 +1452,6 @@ class Data:
         """
         self.ag_man_dvars[yr] = ag_man_dvars
         
-        
-    def get_exact_resfactored_lumap_mrj(self):
-        """
-        Rather than picking the center cell when resfactoring the lumap, this function
-        calculate the exact value of each land-use cell based from lumap to create dvars.
-        
-        E.g., given a resfactor of 5, then each resfactored dvar cell will cover a 5x5 area.
-        If there are 9 Apple cells in the 5x5 area, then the dvar cell for it will be 9/25. 
-        
-        """
-        if settings.RESFACTOR == 1:
-            return tools.lumap2ag_l_mrj(self.LUMAP_NO_RESFACTOR, self.LMMAP_NO_RESFACTOR)[:, self.MASK, :]
-
-
-        lumap_resample_avg = np.zeros((len(self.LANDMANS), self.NCELLS, self.N_AG_LUS), dtype=np.float32)  
-        for idx_lu in self.DESC2AGLU.values():
-            for idx_w, _ in enumerate(self.LANDMANS):
-                arr_lu_lm = self.LUMAP_NO_RESFACTOR * self.LMMAP_NO_RESFACTOR
-                lumap_resample_avg[idx_w, :, idx_lu] = self.get_exact_resfactored_average_arr_consider_lu_mask(arr_lu_lm)
-                
-        return lumap_resample_avg
-    
     
     def get_exact_resfactored_lumap_mrj(self):
         """
@@ -1601,6 +1541,72 @@ class Data:
         )
       
         return lumap_resfactored[*nearst_ind]
+    
+    
+    def get_watershed_yield_components(self, valid_watershed_id:list[int] = None):
+        """
+        Get the water yield components for the specified watersheds.
+        """
+        if settings.WATER_REGION_DEF == 'River Region':
+
+            self.WATER_REGION_ID = pd.read_hdf(os.path.join(settings.INPUT_DIR, "rivreg_id.h5"), where=self.MASK).to_numpy()
+
+            rr = pd.read_hdf(os.path.join(settings.INPUT_DIR, "rivreg_lut.h5"))
+            self.WATER_REGION_NAMES = dict(zip(rr['HR_RIVREG_ID'], rr['HR_RIVREG_NAME']))  
+            self.WATER_REGION_HIST_LEVEL = dict(zip(rr['HR_RIVREG_ID'], rr['WATER_YIELD_HIST_BASELINE_ML']))  
+            
+            rr_outside_luto = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'water_yield_outside_LUTO_study_area_2010_2100_rr_ml.h5'))
+            rr_outside_luto = rr_outside_luto.loc[:, pd.IndexSlice[:, settings.SSP]]
+            rr_outside_luto.columns = rr_outside_luto.columns.droplevel('ssp')
+
+            rr_natural_land = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'water_yield_natural_land_2010_2100_rr_ml.h5'))
+            rr_natural_land = rr_natural_land.loc[:, pd.IndexSlice[:, settings.SSP]]
+            rr_natural_land.columns = rr_natural_land.columns.droplevel('ssp')
+            rr_outside_luto = rr_outside_luto.reindex(columns=sorted(rr_outside_luto.columns))
+
+            self.WATER_OUTSIDE_LUTO_BY_CCI = rr_outside_luto
+            self.WATER_OUTSIDE_LUTO_HIST = self.WATER_YIELD_OUTSIDE_LUTO_HIST.query('Region_Type == "River Region"').set_index('Region_ID')['Water Yield (ML)'].to_dict()
+
+        elif settings.WATER_REGION_DEF == 'Drainage Division':
+            
+            self.WATER_REGION_ID = pd.read_hdf(os.path.join(settings.INPUT_DIR, "draindiv_id.h5"), where=self.MASK).to_numpy()  # Drainage div ID mapped.
+
+            dd = pd.read_hdf(os.path.join(settings.INPUT_DIR, "draindiv_lut.h5"))
+            self.WATER_REGION_NAMES = dict(zip(dd['HR_DRAINDIV_ID'], dd['HR_DRAINDIV_NAME']))
+            self.WATER_REGION_HIST_LEVEL = dict(zip(dd['HR_DRAINDIV_ID'], dd['WATER_YIELD_HIST_BASELINE_ML']))
+
+            dd_outside_luto = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'water_yield_outside_LUTO_study_area_2010_2100_dd_ml.h5'))
+            dd_outside_luto = dd_outside_luto.loc[:, pd.IndexSlice[:, settings.SSP]]
+            dd_outside_luto.columns = dd_outside_luto.columns.droplevel('ssp')
+
+            dd_natural_land = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'water_yield_natural_land_2010_2100_dd_ml.h5'))
+            dd_natural_land = dd_natural_land.loc[:, pd.IndexSlice[:, settings.SSP]]
+            dd_natural_land.columns = dd_natural_land.columns.droplevel('ssp')
+            dd_natural_land = dd_natural_land.reindex(columns=sorted(dd_natural_land.columns))
+
+            self.WATER_OUTSIDE_LUTO_BY_CCI = dd_outside_luto
+            self.WATER_OUTSIDE_LUTO_HIST = self.WATER_YIELD_OUTSIDE_LUTO_HIST.query('Region_Type == "Drainage Division"').set_index('Region_ID')['Water Yield (ML)'].to_dict()
+            
+        else:
+            raise ValueError(f"Unknown water region definition: {settings.WATER_REGION_DEF}. "
+                        f"Must be either 'River Region' or 'Drainage Division'.")
+            
+            
+        # Using high res factor will make some small river regions disappear; hence we update the data with validated river region ids
+        if valid_watershed_id is None:
+            valid_watershed_id = np.unique(self.WATER_REGION_ID)
+        self.WATERSHED_DISAPPEARING = [self.WATER_REGION_NAMES[i] for i in set(self.WATER_REGION_NAMES.keys()) - set(valid_watershed_id)]
+        
+        if self.WATERSHED_DISAPPEARING:
+            print(f"    WARNING! {len(self.WATERSHED_DISAPPEARING)} river regions are disappearing due to using high resolution factors.")
+            [print(f"       - {list(i)}") for i in np.array_split(self.WATERSHED_DISAPPEARING, len(self.WATERSHED_DISAPPEARING)//3)]
+            self.WATER_REGION_NAMES = {k: v for k, v in self.WATER_REGION_NAMES.items() if k in valid_watershed_id}
+            self.WATER_REGION_HIST_LEVEL = {k: v for k, v in self.WATER_REGION_HIST_LEVEL.items() if k in valid_watershed_id}
+            self.WATER_OUTSIDE_LUTO_BY_CCI = self.WATER_OUTSIDE_LUTO_BY_CCI.loc[:, self.WATER_OUTSIDE_LUTO_BY_CCI.columns.isin(valid_watershed_id)]
+            self.WATER_OUTSIDE_LUTO_HIST = {k: v for k, v in self.WATER_OUTSIDE_LUTO_HIST.items() if k in valid_watershed_id}
+            self.WATER_USE_DOMESTIC = {k: v for k, v in self.WATER_USE_DOMESTIC.items() if k in valid_watershed_id}
+
+        return valid_watershed_id
     
     
     def get_GBF2_target_for_yr_cal(self, yr_cal:int) -> float:
@@ -1835,7 +1841,7 @@ class Data:
         - the adoption percentage.
         
         """
-        if settings.REGIONAL_ADOPTION_CONSTRAINTS != "on":
+        if settings.REGIONAL_ADOPTION_CONSTRAINTS == "off":
             return ()
         
         reg_adop_limits = []
@@ -1859,7 +1865,7 @@ class Data:
         - landuse name,
         - the adoption area (ha).
         """
-        if settings.REGIONAL_ADOPTION_CONSTRAINTS != "on":
+        if settings.REGIONAL_ADOPTION_CONSTRAINTS == "off":
             return ()
         
         reg_adop_limits = self.get_regional_adoption_percent_by_year(yr)
@@ -1893,28 +1899,6 @@ class Data:
         Safely save objective value for a given year to the Data object
         """
         self.obj_vals[yr] = obj_val
-
-    def set_path(self) -> str:
-        """Create a folder for storing outputs and return folder name."""
-
-        # Create path name
-        years = [i for i in settings.SIM_YEARS if i<=self.last_year]
-        self.path = f"{settings.OUTPUT_DIR}/{self.timestamp}_RF{settings.RESFACTOR}_{years[0]}-{years[-1]}"
-        
-        # Get all paths
-        paths = (
-            [self.path]
-            + [f"{self.path}/out_{yr}" for yr in years]
-            + [f"{self.path}/out_{yr}/lucc_separate" for yr in years[1:]]
-        )  # Skip creating lucc_separate for base year
-
-
-        # Create all paths
-        for p in paths:
-            if not os.path.exists(p):
-                os.mkdir(p)
-
-        return self.path
 
     def get_production(self) -> np.ndarray:
         """
@@ -1993,7 +1977,7 @@ class Data:
         water_sr_yield: Optional[np.ndarray] = None,
     ) -> np.ndarray:
         """
-        Get the net land water yield array, inclusive of all cells that LUTO does not look at.
+        Get the net land water yield array, ? inclusive of all cells that LUTO does not look at.?
 
         Returns
         -------

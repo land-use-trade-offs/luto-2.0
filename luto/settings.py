@@ -142,9 +142,8 @@ the model sensitive to variations in input data.
 # ---------------------------------------------------------------------------- #
 # Geographical raster writing parameters
 # ---------------------------------------------------------------------------- #
-WRITE_OUTPUT_GEOTIFFS = False               # Write GeoTiffs to output directory: True or False
 PARALLEL_WRITE = True                       # If to use parallel processing to write GeoTiffs: True or False
-WRITE_THREADS = min(32, os.cpu_count())     # The Threads to use for map making, only work with PARALLEL_WRITE = True
+WRITE_THREADS = min(10, os.cpu_count())     # The Threads to use for map making, only work with PARALLEL_WRITE = True
 
 # ---------------------------------------------------------------------------- #
 # Gurobi parameters
@@ -193,8 +192,10 @@ Land-use and vector file pairs to exclude land-use from being utilised in that a
  - The value is the path to the ESRI shapefile.
 '''
 
-REGIONAL_ADOPTION_CONSTRAINTS = 'off'  # 'on' or 'off'
-REGIONAL_ADOPTION_ZONE = 'ABARES_AAGIS'   # One of 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
+REGIONAL_ADOPTION_CONSTRAINTS = 'NON_AG_UNIFORM'    # 'off', 'on', 'NON_AG_UNIFORM'
+REGIONAL_ADOPTION_NON_AG_UNIFORM = 15                # None or numbers between 0-100 (both inclusive); Only work under 'NON_AG_UNIFORM'!
+                                                    #   E.g., 5 means each non-ag land can not exceed 5% adoption in every region
+REGIONAL_ADOPTION_ZONE = 'NRM_CODE'                 # 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
 '''
 The regional adoption zone is the spatial unit used to enforce regional adoption constraints.
 The options are:
@@ -473,7 +474,8 @@ The weight of the deviations from target in the objective function.
 
 
 # Water use yield and parameters *******************************
-WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
+WATER_LIMITS = 'on'                     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
+WATER_CLIMATE_CHANGE_IMPACT = 'on'      # 'on' or 'off'. 'off' will turn off climate change impact on water yields.
 
 WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
 # WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)

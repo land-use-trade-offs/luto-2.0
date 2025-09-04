@@ -1,11 +1,11 @@
 window.SettingsView = {
   setup(props, { emit }) {
     const { ref, onMounted, watch, computed } = Vue;
-    const loadScript = window.loadScript;
+    const loadScript = window.loadScript;                       // DataConstructor has been registered in index.html [DataConstructor.js] [helpers.js]
 
     // Tab management
     const activeTab = ref('settings');
-    
+
     // Settings related reactive variables
     const searchTerm = ref('');
     const activeFilter = ref('all');
@@ -99,9 +99,9 @@ window.SettingsView = {
 
       parameters.forEach(param => {
         let assigned = false;
-        
+
         for (const [categoryName, categoryData] of Object.entries(categories)) {
-          if (categoryData.keywords.some(keyword => 
+          if (categoryData.keywords.some(keyword =>
             param.parameter.toUpperCase().includes(keyword.toUpperCase())
           )) {
             categorized[categoryName].push(param);
@@ -109,7 +109,7 @@ window.SettingsView = {
             break;
           }
         }
-        
+
         if (!assigned) {
           uncategorized.push(param);
         }
@@ -138,14 +138,14 @@ window.SettingsView = {
       let filtered = modelRunSettings.value;
 
       if (searchTerm.value) {
-        filtered = filtered.filter(param => 
+        filtered = filtered.filter(param =>
           param.parameter.toLowerCase().includes(searchTerm.value.toLowerCase()) ||
           param.val.toString().toLowerCase().includes(searchTerm.value.toLowerCase())
         );
       }
 
       if (activeFilter.value && activeFilter.value !== 'all') {
-        filtered = filtered.filter(param => 
+        filtered = filtered.filter(param =>
           param.parameter.includes(activeFilter.value)
         );
       }
@@ -168,7 +168,7 @@ window.SettingsView = {
       const totalParams = filteredParameters.value.length;
       const activeCategories = filteredCategories.value.length;
       const biodiversityParams = filteredParameters.value.filter(p => p.parameter.includes('BIO_')).length;
-      const enabledFeatures = filteredParameters.value.filter(p => 
+      const enabledFeatures = filteredParameters.value.filter(p =>
         p.val === 'on' || p.val === 'True' || p.val === 'true'
       ).length;
 

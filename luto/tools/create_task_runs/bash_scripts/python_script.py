@@ -31,11 +31,9 @@ sim.run(data=data)
 
 
 # Set up report directory and archive path
-report_dir = f"{data.path}/DATA_REPORT"
-archive_path ='./DATA_REPORT.zip'
+report_dir = f"{data.path}"
+archive_path ='./Run_Archive.zip'
 
-data = None  # Clear the data object to free memory
-sim = None   # Clear the simulation module to free memory
 
 # Zip the output directory, and remove the original directory
 with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
@@ -45,14 +43,15 @@ with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
             rel_path = os.path.relpath(abs_path, start=report_dir)
             zipf.write(abs_path, arcname=rel_path)
 
-# Remove all files except the report directory
+
+# Remove all files after archiving
 for item in os.listdir('.'):
-    if item != 'DATA_REPORT.zip':
+    if item != 'Run_Archive.zip':
         try:
             if os.path.isfile(item) or os.path.islink(item):
-                os.unlink(item)  # Remove the file or link
+                os.unlink(item)  
             elif os.path.isdir(item):
-                shutil.rmtree(item)  # Remove the directory
+                shutil.rmtree(item) 
         except Exception as e:
             print(f"Failed to delete {item}. Reason: {e}")
             

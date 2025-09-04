@@ -1,6 +1,5 @@
 group_code,lu_code,lu_desc,lu_color_HEX,Note
--1,-1,Non-Agricultural Land,#e1e1e1,
--1,-2,Non-Agricultural Land,#e1e1e1,
+-1,-1,Non-Agricultural Land,#e1e100,
 1,0,Crops,#7a8ef5,
 1,3,Crops,#7a8ef5,
 1,4,Crops,#7a8ef5,

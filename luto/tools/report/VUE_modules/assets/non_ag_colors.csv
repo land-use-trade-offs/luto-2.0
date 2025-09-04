@@ -1,5 +1,5 @@
 lu_code,lu_desc,lu_color_HEX,Note
--1,Non-Agricultural Land,#e1e1e1,
+-1,Non-Agricultural Land,#e1e100,
 0,Other Agricultural Land,#ffebbe,
 100,Environmental plantings,#abcd66,
 101,Riparian Plantings,#005ce6,

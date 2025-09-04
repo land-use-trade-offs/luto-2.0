@@ -6,7 +6,6 @@ const app = createApp({
         const { ref, provide } = Vue;
         const isCollapsed = ref(false);
         const globalSelectedRegion = ref('AUSTRALIA');
-        const globalSelectedDataType = ref('Area');
         const globalMapViewpoint = ref({
             center: [-26, 126.5],
             zoom: 5,
@@ -19,14 +18,12 @@ const app = createApp({
 
         provide('isCollapsed', isCollapsed);
         provide('globalSelectedRegion', globalSelectedRegion);
-        provide('globalSelectedDataType', globalSelectedDataType);
         provide('globalMapViewpoint', globalMapViewpoint);
 
         return {
             updateSidebarCollapsed,
             isCollapsed,
             globalSelectedRegion,
-            globalSelectedDataType,
             globalMapViewpoint,
         };
     },
