@@ -47,6 +47,12 @@ window.MapService = {
       'Ag': { 'path': 'data/map_layers/map_water_yield_Ag.js', 'name': 'map_water_yield_Ag' },
       'Ag Mgt': { 'path': 'data/map_layers/map_water_yield_Am.js', 'name': 'map_water_yield_Am' },
       'Non-Ag': { 'path': 'data/map_layers/map_water_yield_NonAg.js', 'name': 'map_water_yield_NonAg' },
+    },
+    'Dvar': {
+      'Ag': { 'path': 'data/map_layers/map_dvar_Ag.js', 'name': 'map_dvar_Ag' },
+      'Ag Mgt': { 'path': 'data/map_layers/map_dvar_Am.js', 'name': 'map_dvar_Am' },
+      'Non-Ag': { 'path': 'data/map_layers/map_dvar_NonAg.js', 'name': 'map_dvar_NonAg' },
+      'Mosaic': { 'path': 'data/map_layers/map_dvar_mosaic.js', 'name': 'map_dvar_mosaic' },
     }
   }
 }
