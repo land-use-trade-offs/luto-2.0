@@ -117,6 +117,11 @@ window.RegionsMap = {
 
     // Add new elements to the map
     const addRegionLayer = () => {
+      // Skip adding region overlay for AUSTRALIA
+      if (selectedRegion.value === 'AUSTRALIA') {
+        return;
+      }
+
       // Find the actual region feature from NRM_AUS data
       const regionLayer = window.NRM_AUS.features.find(feature =>
         feature.properties.NRM_REGION === selectedRegion.value
@@ -184,7 +189,7 @@ window.RegionsMap = {
         // The watch handler will take care of loading map data when props are ready
 
         // Update map if a region is already selected
-        if (selectedRegion.value && selectedRegion.value !== 'AUSTRALIA') {
+        if (selectedRegion.value) {
           updateMap();
         }
       } catch (error) {
@@ -234,7 +239,7 @@ window.RegionsMap = {
     });
 
     Vue.watch(selectedRegion, (newValue, oldValue) => {
-      if (newValue && newValue !== 'AUSTRALIA') {
+      if (newValue) {
         // Only trigger animation if this is a real region change (not a page navigation)
         const forceAnimation = oldValue !== undefined && oldValue !== newValue;
         updateMap(forceAnimation);

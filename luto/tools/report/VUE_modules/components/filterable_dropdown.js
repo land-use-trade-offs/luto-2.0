@@ -38,7 +38,9 @@ window.FilterableDropdown = {
       } else {
         // Legacy behavior for regions
         await window.loadScript("./data/geo/NRM_AUS.js", 'NRM_AUS');
-        items.value = window.NRM_AUS.features.map(feature => feature.properties.NRM_REGION).sort();
+        const regions = window.NRM_AUS.features.map(feature => feature.properties.NRM_REGION);
+        const otherRegions = regions.filter(region => region !== 'AUSTRALIA').sort();
+        items.value = ['AUSTRALIA', ...otherRegions];
         selectedItem.value = globalSelectedRegion?.value || '';
       }
     });
