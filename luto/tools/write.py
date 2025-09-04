@@ -160,7 +160,7 @@ def write_output_single_year(data: Data, yr_cal, path_yr):
         
     tasks = [
         delayed(write_files)(data, yr_cal, path_yr),
-        delayed(write_files_separate)(data, yr_cal, path_yr),
+        delayed(write_mosaic_map)(data, yr_cal, path_yr),
         delayed(write_dvar_area)(data, yr_cal, path_yr),
         delayed(write_crosstab)(data, yr_cal, path_yr),
         delayed(write_quantity)(data, yr_cal, path_yr),
@@ -214,71 +214,40 @@ def write_files(data: Data, yr_cal, path):
     return f"Decision variables written for year {yr_cal}"
 
 
-def write_files_separate(data: Data, yr_cal, path):
+def write_mosaic_map(data: Data, yr_cal, path):
     
-    # Collapse the land management dimension (m -> [dry, irr])
-    ag_dvar_rj = np.einsum('mrj -> rj', data.ag_dvars[yr_cal])    
-    ag_dvar_rm = np.einsum('mrj -> rm', data.ag_dvars[yr_cal])    
-    non_ag_rk = np.einsum('rk -> rk', data.non_ag_dvars[yr_cal])  
-    ag_man_rj_dict = {am: np.einsum('mrj -> rj', ammap) for am, ammap in data.ag_man_dvars[yr_cal].items()}
+    # Individual maps
+    ag_map = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]).sum('lm').chunk({'cell': min(1024, data.NCELLS)})
+    non_ag_map = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]).chunk({'cell': min(1024, data.NCELLS)})
+    am_map = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]).sum(['lm','lu']).transpose('cell','am').chunk({'cell': min(1024, data.NCELLS)})
 
-    # Get the spatial data
-    geo_meta = arr_to_xr(data, np.zeros(data.NCELLS, dtype=np.float32))
-    geo_crs = geo_meta['spatial_ref'].attrs['crs_wkt']
-    mask = np.isin(data.LUMAP_2D_RESFACTORED, [data.MASK_LU_CODE, data.NODATA], invert=True)[None,...]
+    ag_mask = (ag_map.sum('lu') > 0.01).values
+    non_ag_mask = (non_ag_map.sum('lu') > 0.01).values
+    am_mask = (am_map.sum('am') > 0.01).values
 
-    # Create xarray DataArrays for the maps
-    ag_dvar_map = xr.DataArray(
-        data=np.stack([arr_to_xr(data, arr) for arr in ag_dvar_rj.T]),
-        dims=['lu', 'y', 'x'],
-        coords={
-            'lu': data.AGRICULTURAL_LANDUSES, 
-            'y': geo_meta['y'],
-            'x': geo_meta['x']
-        }
-    ).where(mask).chunk('auto')
-    non_ag_dvar_map = xr.DataArray(
-        data=np.stack([arr_to_xr(data, arr) for arr in non_ag_rk.T]),
-        dims=['lu', 'y', 'x'],
-        coords={
-            'lu': data.NON_AGRICULTURAL_LANDUSES, 
-            'y': geo_meta['y'],
-            'x': geo_meta['x']}
-    ).where(mask).chunk('auto')
-    lm_dvar_map = xr.DataArray(
-        data=np.stack([arr_to_xr(data, arr) for arr in ag_dvar_rm.T]),
-        dims=['lm', 'y', 'x'],
-        coords={
-            'lm': data.LANDMANS, 
-            'y': geo_meta['y'],
-            'x': geo_meta['x']}
-    ).where(mask).chunk('auto')
+    ag_map = ag_map.where(ag_mask[:, None])                # Sum of ag land that is < 1% is set to NA
+    non_ag_map = non_ag_map.where(non_ag_mask[:, None])    # Sum of non-ag land that is < 1% is set to NA
+    am_map = am_map.where(am_mask[:, None])   
 
-    am_maps = []
-    for am, am_dvar in ag_man_rj_dict.items():
-        am_map = arr_to_xr(data, am_dvar.sum(axis=1)
-            ).expand_dims('am'
-            ).assign_coords(am=[am]
-            ).transpose('am', 'y', 'x') 
-        am_maps.append(am_map)
-    am_maps = xr.concat(am_maps, dim='am').where(mask).chunk('auto')
+    save2nc(ag_map, os.path.join(path, f'xr_map_ag_{yr_cal}.nc'))
+    save2nc(non_ag_map, os.path.join(path, f'xr_map_non_ag_{yr_cal}.nc'))
+    save2nc(am_map, os.path.join(path, f'xr_map_am_{yr_cal}.nc'))
 
-    # Create intergerized maps
-    ag_map_argmax = ag_dvar_map.argmax(dim='lu', skipna=False).where(mask[0])
-    non_ag_map_argmax = non_ag_dvar_map.argmax(dim='lu', skipna=False).where(mask[0]) + settings.NON_AGRICULTURAL_LU_BASE_CODE
-    am_argmax = am_maps.argmax(dim='am', skipna=False).where(mask[0])
+    # Mosaic maps
+    ag_map_argmax = ag_map.argmax(dim='lu', skipna=False).where(ag_mask)
+    non_ag_map_argmax = non_ag_map.argmax(dim='lu', skipna=False).where(non_ag_mask) + settings.NON_AGRICULTURAL_LU_BASE_CODE
+    am_argmax = am_map.argmax(dim='am', skipna=False).where(am_mask)
 
-    # Save to disk
-    save2nc(ag_dvar_map, os.path.join(path, f'xr_map_ag_{yr_cal}.nc'))
-    save2nc(non_ag_dvar_map, os.path.join(path, f'xr_map_non_ag_{yr_cal}.nc'))
-    save2nc(lm_dvar_map, os.path.join(path, f'xr_map_lm_{yr_cal}.nc'))
-    save2nc(am_maps, os.path.join(path, f'xr_map_am_{yr_cal}.nc'))
+    ag_map_argmax = arr_to_xr(data, am_argmax)
+    non_ag_map_argmax = arr_to_xr(data, non_ag_map_argmax)
+    am_argmax = arr_to_xr(data, am_argmax)
 
-    ag_map_argmax.rio.write_crs(geo_crs).to_netcdf(os.path.join(path, f'xr_map_ag_argmax_{yr_cal}.nc'))
-    non_ag_map_argmax.rio.write_crs(geo_crs).to_netcdf(os.path.join(path, f'xr_map_non_ag_argmax_{yr_cal}.nc'))
-    am_argmax.rio.write_crs(geo_crs).to_netcdf(os.path.join(path, f'xr_map_am_argmax_{yr_cal}.nc'))
+    ag_map_argmax.to_netcdf(os.path.join(path, f'xr_map_ag_argmax_{yr_cal}.nc'))            # Save directly to netcdf to keep the crs
+    non_ag_map_argmax.to_netcdf(os.path.join(path, f'xr_map_non_ag_argmax_{yr_cal}.nc'))
+    am_argmax.to_netcdf(os.path.join(path, f'xr_map_am_argmax_{yr_cal}.nc'))
 
-    return f"Separate files written for year {yr_cal}"
+    return f"Mosaic maps written for year {yr_cal}"
+
 
 
 def write_quantity(data: Data, yr_cal, path):

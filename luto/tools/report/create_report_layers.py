@@ -206,7 +206,7 @@ def get_map_obj_float(data:Data, files_df:pd.DataFrame, save_path:str, workers:i
     # Loop through each year
     task = []
     for _,row in files_df.iterrows():
-        xr_arr = xr.load_dataarray(row.path)
+        xr_arr = xr.load_dataarray(row['path'])
         _year = row['Year']
         
         for sel in loop_sel:
