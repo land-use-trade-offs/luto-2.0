@@ -10,6 +10,7 @@ const routes = [
   { path: "/water", component: window.WaterView },
   { path: "/biodiversity", component: window.BiodiversityView },
   { path: "/settings", component: window.SettingsView },
+  { path: "/map", component: window.MapView },
   { path: "/:pathMatch(.*)*", component: window.NotFound },
 ];
 

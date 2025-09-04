@@ -85,7 +85,7 @@ def get_color_legend(data:Data) -> dict:
             },
         'Agricultural Management': {
             'color_csv': color_csvs['am'],
-            'legend': pd.read_csv(color_csvs['am']).query('lu_desc in @data.AG_MAN_DESC').set_index('lu_code')['lu_color_HEX'].to_dict()
+            'legend': pd.read_csv(color_csvs['am']).query('lu_desc in @data.AG_MAN_DESC').set_index('lu_desc')['lu_color_HEX'].to_dict()
         }
     }
 

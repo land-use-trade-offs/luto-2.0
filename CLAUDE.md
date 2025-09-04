@@ -226,12 +226,29 @@ All reporting views follow the progressive selection pattern:
   - `map_bio_GBF2_NonAg`: `Landuse → Year → {img_str, bounds, min_max}` (simplified, no Water level)
   - `map_bio_overall_*`: Similar structures for overview maps
 
+#### DVAR MODULE (Decision Variables - Map-Only Module)
+- **Map Data (Simplified Hierarchy)**:
+  - `map_dvar_Ag`: `Landuse → Year → {img_str, bounds, min_max}` (direct landuse access)
+  - `map_dvar_Am`: `AgMgt → Year → {img_str, bounds, min_max}` (direct agmgt access)  
+  - `map_dvar_NonAg`: `Landuse → Year → {img_str, bounds, min_max}` (direct landuse access)
+  - `map_dvar_mosaic`: Contains overview categories:
+    - `"Land-use"`: `Year → {img_str, bounds, min_max}`
+    - `"Water-supply"`: `Year → {img_str, bounds, min_max}` 
+    - `"Agricultural Land-use"`: `Year → {img_str, bounds, min_max}`
+    - `"Agricultural Management"`: `Year → {img_str, bounds, min_max}`
+    - `"Non-agricultural Land-use"`: `Year → {img_str, bounds, min_max}`
+- **Composite Structure**: Map.js creates combined structure:
+  - Categories: `"Land-use"`, `"Water-supply"`, `"Ag"`, `"Ag Mgt"`, `"Non-Ag"`
+  - Each category combines "ALL" from mosaic + individual items from specific files
+  - Final hierarchy: `Category → Landuse/AgMgt → Year → {img_str, bounds, min_max}`
+
 ### Key Patterns
 
 #### Progressive Selection Hierarchies
 1. **Standard Full**: Category → AgMgt → Water → Landuse
 2. **Standard Simple**: Category → Water → Landuse  
 3. **NonAg Simplified**: Category → Landuse (no Water/AgMgt levels)
+4. **DVAR Simplified**: Category → Landuse/AgMgt → Year (map-only, direct access)
 
 #### Water Level Options
 - **Ag/AgMgt**: `"ALL"`, `"Dryland"`, `"Irrigated"`
