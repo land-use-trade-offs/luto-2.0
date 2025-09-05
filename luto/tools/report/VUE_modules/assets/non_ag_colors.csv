@@ -1,12 +1,10 @@
 lu_code,lu_desc,lu_color_HEX
--1,Non-Agricultural Land,#e1e100
-0,Other Agricultural Land,#ffebbe
-100,Environmental plantings,#28E10A
-101,Riparian Plantings,#0500C7
-102,Sheep Agroforestry,#FF8019
-103,Beef Agroforestry,#FAE603
-104,Carbon Plantings (Block),#3BB5FF
-105,Sheep Carbon Plantings (Belt),#FF8019
-106,Beef Carbon Plantings (Belt),#DE00ED
-107,BECCS,#F00314
-108,Destocked - natural land,#2a1a1f
+100,Environmental plantings,#267300ff
+101,Riparian Plantings,#005ce6
+102,Sheep Agroforestry,#DE00ED
+103,Beef Agroforestry,#DE00ED
+104,Carbon Plantings (Block),#48ea9cff
+105,Sheep Carbon Plantings (Belt),#A02DB6
+106,Beef Carbon Plantings (Belt),#A02DB6
+107,BECCS,#686868
+108,Destocked - natural land,#ffe699ff
