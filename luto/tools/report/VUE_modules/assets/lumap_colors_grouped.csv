@@ -32,8 +32,8 @@ group_code,lu_code,lu_desc,lu_color_HEX,Note
 5,101,Riparian Plantings,#005ce6,
 5,102,Sheep Agroforestry,#c500ff,
 5,103,Beef Agroforestry,#ff0000,
-5,104,Carbon Plantings (Block),#267300,
-5,105,Carbon Plantings (Block),#267300,"105 is ""Sheep Carbon Plantings (Belt)"", which occupiying 1/3 of the cell and will  be ignored in an intergerized map. So here just make it the same as 104"
-5,106,Carbon Plantings (Block),#267300,"106 is ""Beef Carbon Plantings (Belt)"", which occupiying 1/3 of the cell and will  be ignored in an intergerized map. So here just make it the same as 104"
+5,104,Carbon Plantings (Block),#3BB5FF,
+5,105,Sheep Carbon Plantings (Belt),#FF8019,
+5,106,Beef Carbon Plantings (Belt),#DE00ED,
 5,107,BECCS,#686868,
-5,108,Destocked - natural land,#e0e048,
+5,108,Destocked - natural land,#7ece7e,

@@ -169,7 +169,7 @@ def write_output_single_year(data: Data, yr_cal, path_yr):
         delayed(write_revenue_cost_ag_man)(data, yr_cal, path_yr),
         delayed(write_revenue_cost_non_ag)(data, yr_cal, path_yr),
         delayed(write_transition_cost_ag2ag)(data, yr_cal, path_yr),
-        delayed(write_transition_cost_to_ag2nonag)(data, yr_cal, path_yr),
+        delayed(write_transition_cost_ag2nonag)(data, yr_cal, path_yr),
         delayed(write_transition_cost_nonag2ag)(data, yr_cal, path_yr),
         delayed(write_transition_cost_apply_ag_man)(data),
         delayed(write_water)(data, yr_cal, path_yr),
@@ -205,7 +205,7 @@ def write_files(data: Data, yr_cal, path):
     save2nc(dvar_non_ag, os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc'))
     save2nc(dvar_ag_man, os.path.join(path, f'xr_dvar_ag_man_{yr_cal}.nc'))
 
-    # Write out raw numpy arrays for land-use and land management
+    # Write out raw xarrays for land-use and land management
     lumap_xr = arr_to_xr(data, data.lumaps[yr_cal]).chunk('auto')
     lmmap_xr = arr_to_xr(data, data.lmmaps[yr_cal]).chunk('auto')
     lumap_xr.to_netcdf(os.path.join(path, f'xr_map_lumap_{yr_cal}.nc'))
@@ -221,13 +221,15 @@ def write_mosaic_map(data: Data, yr_cal, path):
     non_ag_map = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]).chunk({'cell': min(1024, data.NCELLS)})
     am_map = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]).sum(['lm','lu']).transpose('cell','am').chunk({'cell': min(1024, data.NCELLS)})
 
+    # Sum of cell across all landuse/ag-mgt is < 1% is set to NA
     ag_mask = (ag_map.sum('lu') > 0.01).values
     non_ag_mask = (non_ag_map.sum('lu') > 0.01).values
     am_mask = (am_map.sum('am') > 0.01).values
 
-    ag_map = ag_map.where(ag_mask[:, None])                # Sum of ag land that is < 1% is set to NA
-    non_ag_map = non_ag_map.where(non_ag_mask[:, None])    # Sum of non-ag land that is < 1% is set to NA
-    am_map = am_map.where(am_mask[:, None])   
+    # Reindex to ensure all land-uses/managements (even excluded in settings) are present
+    ag_map = ag_map.where(ag_mask[:, None]).reindex(lu=data.AGRICULTURAL_LANDUSES)
+    non_ag_map = non_ag_map.where(non_ag_mask[:, None]).reindex(lu=settings.NON_AG_LAND_USES, fill_value=0)
+    am_map = am_map.where(am_mask[:, None]).reindex(am=settings.AG_MANAGEMENTS, fill_value=0)   
 
     save2nc(ag_map, os.path.join(path, f'xr_map_ag_{yr_cal}.nc'))
     save2nc(non_ag_map, os.path.join(path, f'xr_map_non_ag_{yr_cal}.nc'))
@@ -765,7 +767,7 @@ def write_transition_cost_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 
 
 
-def write_transition_cost_to_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
+def write_transition_cost_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     """Calculate transition cost."""
 
     

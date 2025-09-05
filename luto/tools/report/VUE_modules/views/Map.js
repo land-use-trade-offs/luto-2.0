@@ -54,14 +54,14 @@ window['MapView'] = {
             if (!mapReady.value) {
                 return {};
             }
-            
+
             // Check if the currently selected map object has a legend
             const currentMapData = dvarMaps.value[selectCategory.value][selectLanduse.value][selectYear.value];
-            
+
             if (currentMapData && currentMapData.legend) {
                 return currentMapData.legend;
             }
-            
+
             // No legend available for this map object
             return {};
         });
@@ -206,7 +206,7 @@ window['MapView'] = {
         </regions-map>
 
         <!-- Legend -->
-        <div v-if="selectLegend && Object.keys(selectLegend).length > 0" class="absolute top-[20px] right-[20px] z-[1001] bg-white/70 p-3 rounded-lg max-w-[250px]">
+        <div v-if="selectLegend && Object.keys(selectLegend).length > 0" class="absolute top-[20px] right-[20px] z-[1001] bg-white/70 p-3 rounded-lg max-w-[300px]">
             <div class="font-bold text-sm mb-2 text-gray-600">{{ selectCategory }}</div>
             <div class="flex flex-col space-y-1">
                 <div v-for="(color, label) in selectLegend" :key="label" class="flex items-center">
