@@ -44,21 +44,26 @@ window.HomeView = {
 
     //  Reactive data
     const selectChartData = computed(() => {
+      let seriesData = {};
       if (window['Chart_default_options'] && selectChartCategory.value && selectChartSubCategory.value) {
-        return {
-          ...window['Chart_default_options'],
-          chart: {
-            height: 440,
-          },
-          yAxis: {
-            title: {
-              text: availableUnit[selectChartCategory.value]
-            }
-          },
-          series: ChartData.value[selectChartCategory.value][selectChartSubCategory.value][selectRegion.value],
-          colors: window['Supporting_info'].colors,
-        };
+        // Create a deep copy to prevent mutation and cache issues
+        const originalData = ChartData.value?.[selectChartCategory.value]?.[selectChartSubCategory.value]?.[selectRegion.value];
+        seriesData = originalData ? JSON.parse(JSON.stringify(originalData)) : {};
       }
+
+      return {
+        ...window['Chart_default_options'],
+        chart: {
+          height: 440,
+        },
+        yAxis: {
+          title: {
+            text: availableUnit[selectChartCategory.value]
+          }
+        },
+        series: seriesData,
+        colors: window['Supporting_info'].colors,
+      };
     });
 
 
@@ -76,7 +81,7 @@ window.HomeView = {
     });
 
 
-    // Process flag
+    // Data loaded flag
     const dataLoaded = ref(false);
 
 
@@ -161,7 +166,7 @@ window.HomeView = {
 
 
 
-      //  Set initial values AFTER dataLoaded = true
+      //  Set initial values
       availableYears.value = window['Supporting_info']['years'];
       selectYear.value = availableYears.value[0];
 
@@ -172,9 +177,7 @@ window.HomeView = {
       selectRankingSubCategory.value = Object.keys(rankingData.value[selectChartCategory.value][selectRegion.value])[0];
       colorsRanking.value = window.Supporting_info.colors_ranking;
 
-      await nextTick(() => {
-        dataLoaded.value = true;
-      });
+      await nextTick(() => { dataLoaded.value = true; });
 
 
     });
@@ -191,10 +194,8 @@ window.HomeView = {
     });
 
     watch(selectRegion, (newRegion) => {
-      if (rankingData.value[selectChartCategory.value] && rankingData.value[selectChartCategory.value][newRegion]) {
-        availableRankSubcategories.value = Object.keys(rankingData.value[selectChartCategory.value][newRegion]).filter(key => key !== "Total");
-        selectRankingSubCategory.value = availableRankSubcategories.value[0];
-      }
+      availableRankSubcategories.value = Object.keys(rankingData.value[selectChartCategory.value][newRegion]).filter(key => key !== "Total");
+      selectRankingSubCategory.value = availableRankSubcategories.value[0];
     });
 
     watch([selectYear, selectRankingSubCategory], (newValues, oldValues) => {

@@ -88,6 +88,7 @@ window.AreaView = {
       if (!chartReady.value) {
         return {};
       }
+      let seriesData;
       if (selectCategory.value === "Ag") {
         seriesData = chartData.value[selectWater.value];
       }
