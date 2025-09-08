@@ -66,26 +66,39 @@ def get_color_legend(data:Data) -> dict:
         'am': 'luto/tools/report/VUE_modules/assets/ammap_colors.csv',
     }
     
+    rm_lus = [i for i in settings.NON_AG_LAND_USES if not settings.NON_AG_LAND_USES[i]]
+    rm_ams = [i for i in settings.AG_MANAGEMENTS if not settings.AG_MANAGEMENTS[i]]
+    rm_items = rm_lus + rm_ams
+    
     return {
         'Land-use': {
             'color_csv': color_csvs['lumap'], 
-            'legend': pd.read_csv(color_csvs['lumap']).query('lu_code in @data.AGLU2DESC').set_index('lu_desc')['lu_color_HEX'].to_dict()
-            },
+            'legend': {
+                RENAME_AM_NON_AG.get(k,k):v for k,v in pd.read_csv(color_csvs['lumap']).set_index('lu_desc')['lu_color_HEX'].to_dict().items() 
+                if k not in rm_items
+            }
+        },
         'Water-supply': {
             'color_csv': color_csvs['lm'],
             'legend': pd.read_csv(color_csvs['lm']).set_index('lu_desc')['lu_color_HEX'].to_dict()
-            },
+        },
         'Agricultural Land-use': {
             'color_csv': color_csvs['ag'],
-            'legend': pd.read_csv(color_csvs['ag']).query('lu_code in @data.AGLU2DESC').set_index('lu_desc')['lu_color_HEX'].to_dict()
-            },
+            'legend': pd.read_csv(color_csvs['ag']).set_index('lu_desc')['lu_color_HEX'].to_dict()
+        },
         'Non-agricultural Land-use': {
             'color_csv': color_csvs['non_ag'],
-            'legend': pd.read_csv(color_csvs['non_ag']).query('lu_code in @data.NONAGLU2DESC').set_index('lu_desc')['lu_color_HEX'].to_dict()
-            },
+            'legend': {
+                RENAME_AM_NON_AG.get(k,k):v for k,v in pd.read_csv(color_csvs['non_ag']).set_index('lu_desc')['lu_color_HEX'].to_dict().items() 
+                if k not in rm_items
+            }
+        },
         'Agricultural Management': {
             'color_csv': color_csvs['am'],
-            'legend': pd.read_csv(color_csvs['am']).query('lu_desc in @data.AG_MAN_DESC').set_index('lu_desc')['lu_color_HEX'].to_dict()
+            'legend': {
+                RENAME_AM_NON_AG.get(k,k):v for k,v in pd.read_csv(color_csvs['am']).set_index('lu_desc')['lu_color_HEX'].to_dict().items() 
+                if k not in rm_items
+            }
         }
     }
 
@@ -328,21 +341,20 @@ def get_map_obj_interger(files_df:pd.DataFrame, save_path:str, colors_legend, wo
 
 
 
-def save_report_layer(data:Data, raw_data_dir:str):
+def save_report_layer(data:Data):
     """
     Saves the report data in the specified directory.
 
     Parameters
     ----------
     data (Data): The Data object containing the metadata and settings.
-    raw_data_dir (str): The directory where the raw data is stored.
     
     Returns
     -------
     None
     """
     
-    SAVE_DIR = f'{raw_data_dir}/DATA_REPORT/data'
+    SAVE_DIR = f'{data.path}/DATA_REPORT/data'
     years = sorted(settings.SIM_YEARS)
 
     # Create the directory if it does not exist
@@ -350,7 +362,7 @@ def save_report_layer(data:Data, raw_data_dir:str):
         os.makedirs(f'{SAVE_DIR}/map_layers', exist_ok=True)
 
     # Get all LUTO output files and store them in a dataframe
-    files = get_all_files(raw_data_dir).query('category == "xarray_layer"')
+    files = get_all_files(data.path).query('category == "xarray_layer"')
     files['Year'] = files['Year'].astype(int)
     files = files.query('Year.isin(@years)')
     

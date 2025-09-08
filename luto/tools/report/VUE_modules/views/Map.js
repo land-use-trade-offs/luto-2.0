@@ -22,6 +22,15 @@ window['MapView'] = {
         const selectCategory = ref("");
         const selectLanduse = ref("");
 
+        // Previous selections memory
+        const previousSelections = ref({
+            "Land-use": { landuse: "" },
+            "Water-supply": { landuse: "" },
+            "Ag": { landuse: "" },
+            "Ag Mgt": { landuse: "" },
+            "Non-Ag": { landuse: "" }
+        });
+
         // UI state
         const dataLoaded = ref(false);
         const mapReady = computed(() => {
@@ -45,14 +54,14 @@ window['MapView'] = {
             if (!mapReady.value) {
                 return {};
             }
-            
+
             // Check if the currently selected map object has a legend
             const currentMapData = dvarMaps.value[selectCategory.value][selectLanduse.value][selectYear.value];
-            
+
             if (currentMapData && currentMapData.legend) {
                 return currentMapData.legend;
             }
-            
+
             // No legend available for this map object
             return {};
         });
@@ -96,10 +105,23 @@ window['MapView'] = {
         });
 
         // Progressive selection watcher
-        watch(selectCategory, (newCategory) => {
+        watch(selectCategory, (newCategory, oldCategory) => {
+            // Save previous selections before switching
+            if (oldCategory) {
+                previousSelections.value[oldCategory] = { landuse: selectLanduse.value };
+            }
+
             if (newCategory && dvarMaps.value[newCategory]) {
                 availableLanduse.value = Object.keys(dvarMaps.value[newCategory] || {});
-                selectLanduse.value = availableLanduse.value[0] || '';
+                const prevLanduse = previousSelections.value[newCategory].landuse;
+                selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
+            }
+        });
+
+        watch(selectLanduse, (newLanduse) => {
+            // Save current landuse selection
+            if (selectCategory.value) {
+                previousSelections.value[selectCategory.value].landuse = newLanduse;
             }
         });
 
@@ -184,7 +206,7 @@ window['MapView'] = {
         </regions-map>
 
         <!-- Legend -->
-        <div v-if="selectLegend && Object.keys(selectLegend).length > 0" class="absolute top-[20px] right-[20px] z-[1001] bg-white/70 p-3 rounded-lg max-w-[250px]">
+        <div v-if="selectLegend && Object.keys(selectLegend).length > 0" class="absolute top-[20px] right-[20px] z-[1001] bg-white/70 p-3 rounded-lg max-w-[300px]">
             <div class="font-bold text-sm mb-2 text-gray-600">{{ selectCategory }}</div>
             <div class="flex flex-col space-y-1">
                 <div v-for="(color, label) in selectLegend" :key="label" class="flex items-center">

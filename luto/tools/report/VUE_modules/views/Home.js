@@ -190,6 +190,13 @@ window.HomeView = {
       selectRankingSubCategory.value = availableRankSubcategories.value[0];
     });
 
+    watch(selectRegion, (newRegion) => {
+      if (rankingData.value[selectChartCategory.value] && rankingData.value[selectChartCategory.value][newRegion]) {
+        availableRankSubcategories.value = Object.keys(rankingData.value[selectChartCategory.value][newRegion]).filter(key => key !== "Total");
+        selectRankingSubCategory.value = availableRankSubcategories.value[0];
+      }
+    });
+
     watch([selectYear, selectRankingSubCategory], (newValues, oldValues) => {
       const [newYear, newSubCategory] = newValues;
       selectRankingColors.value = Object.fromEntries(
