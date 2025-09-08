@@ -44,13 +44,10 @@ window.HomeView = {
 
     //  Reactive data
     const selectChartData = computed(() => {
-      let seriesData = {};
-      if (window['Chart_default_options'] && selectChartCategory.value && selectChartSubCategory.value) {
-        // Create a deep copy to prevent mutation and cache issues
-        const originalData = ChartData.value?.[selectChartCategory.value]?.[selectChartSubCategory.value]?.[selectRegion.value];
-        seriesData = originalData ? JSON.parse(JSON.stringify(originalData)) : {};
-      }
-
+      const originalData = ChartData.value?.[selectChartCategory.value]?.[selectChartSubCategory.value]?.[selectRegion.value];
+      const seriesData = originalData ? JSON.parse(JSON.stringify(originalData)) : [];
+      const seriesColors = seriesData.map(serie => serie.color).filter(color => color);
+      const colors = seriesColors.length > 0 ? seriesColors : window['Supporting_info']?.colors || [];
       return {
         ...window['Chart_default_options'],
         chart: {
@@ -62,7 +59,33 @@ window.HomeView = {
           }
         },
         series: seriesData,
-        colors: window['Supporting_info'].colors,
+        colors: colors,
+      };
+    });
+
+
+    const selectRanking = computed(() => {
+      const currentRegion = selectRegion.value;
+      const currentYear = selectYear.value;
+      return {
+        economicTotal: rankingData.value['Economics']?.[currentRegion]?.['Total']?.['value']?.[currentYear] || 'N/A',
+        economicCost: rankingData.value['Economics']?.[currentRegion]?.['Cost']?.['value']?.[currentYear] || 'N/A',
+        economicRevenue: rankingData.value['Economics']?.[currentRegion]?.['Revenue']?.['value']?.[currentYear] || 'N/A',
+        areaTotal: rankingData.value['Area']?.[currentRegion]?.['Total']?.['value']?.[currentYear] || 'N/A',
+        areaAgLand: rankingData.value['Area']?.[currentRegion]?.['Agricultural Landuse']?.['value']?.[currentYear] || 'N/A',
+        areaAgMgt: rankingData.value['Area']?.[currentRegion]?.['Agricultural Management']?.['value']?.[currentYear] || 'N/A',
+        areaNonAg: rankingData.value['Area']?.[currentRegion]?.['Non-Agricultural Landuse']?.['value']?.[currentYear] || 'N/A',
+        ghgTotal: rankingData.value['GHG']?.[currentRegion]?.['Total']?.['value']?.[currentYear] || 'N/A',
+        ghgEmissions: rankingData.value['GHG']?.[currentRegion]?.['GHG emissions']?.['value']?.[currentYear] || 'N/A',
+        ghgReduction: rankingData.value['GHG']?.[currentRegion]?.['GHG sequestrations']?.['value']?.[currentYear] || 'N/A',
+        waterTotal: rankingData.value['Water']?.[currentRegion]?.['Total']?.['value']?.[currentYear] || 'N/A',
+        waterAgLand: rankingData.value['Water']?.[currentRegion]?.['Agricultural Landuse']?.['value']?.[currentYear] || 'N/A',
+        waterAgMgt: rankingData.value['Water']?.[currentRegion]?.['Agricultural Management']?.['value']?.[currentYear] || 'N/A',
+        waterNonAg: rankingData.value['Water']?.[currentRegion]?.['Non-Agricultural Landuse']?.['value']?.[currentYear] || 'N/A',
+        biodiversityTotal: rankingData.value['Biodiversity']?.[currentRegion]?.['Total']?.['value']?.[currentYear] || 'N/A',
+        biodiversityAgLand: rankingData.value['Biodiversity']?.[currentRegion]?.['Agricultural Landuse']?.['value']?.[currentYear] || 'N/A',
+        biodiversityAgMgt: rankingData.value['Biodiversity']?.[currentRegion]?.['Agricultural Management']?.['value']?.[currentYear] || 'N/A',
+        biodiversityNonAg: rankingData.value['Biodiversity']?.[currentRegion]?.['Non-Agricultural land-use']?.['value']?.[currentYear] || 'N/A'
       };
     });
 
@@ -174,7 +197,8 @@ window.HomeView = {
       selectChartCategory.value = availableChartCategories.value[0];
 
       selectChartSubCategory.value = Object.keys(ChartData.value[selectChartCategory.value])[0];
-      selectRankingSubCategory.value = Object.keys(rankingData.value[selectChartCategory.value][selectRegion.value])[0];
+      const rankingKeys = Object.keys(rankingData.value?.[selectChartCategory.value]?.[selectRegion.value] || {}).filter(key => key !== "Total");
+      selectRankingSubCategory.value = rankingKeys[0] || 'N/A';
       colorsRanking.value = window.Supporting_info.colors_ranking;
 
       await nextTick(() => { dataLoaded.value = true; });
@@ -188,22 +212,18 @@ window.HomeView = {
 
     watch(selectChartCategory, (newCategory) => {
       availableChartSubCategories.value = Object.keys(ChartData.value[selectChartCategory.value])
-      availableRankSubcategories.value = Object.keys(rankingData.value[selectChartCategory.value][selectRegion.value]).filter(key => key !== "Total");
+      availableRankSubcategories.value = Object.keys(rankingData.value?.[selectChartCategory.value]?.[selectRegion.value] || {}).filter(key => key !== "Total");
       selectChartSubCategory.value = availableChartSubCategories.value[0];
-      selectRankingSubCategory.value = availableRankSubcategories.value[0];
-    });
-
-    watch(selectRegion, (newRegion) => {
-      availableRankSubcategories.value = Object.keys(rankingData.value[selectChartCategory.value][newRegion]).filter(key => key !== "Total");
-      selectRankingSubCategory.value = availableRankSubcategories.value[0];
+      selectRankingSubCategory.value = availableRankSubcategories.value[0] || 'N/A';
     });
 
     watch([selectYear, selectRankingSubCategory], (newValues, oldValues) => {
       const [newYear, newSubCategory] = newValues;
+      const categoryData = rankingData.value?.[selectChartCategory.value];
       selectRankingColors.value = Object.fromEntries(
-        Object.entries(rankingData.value[selectChartCategory.value] || {}).map(([region, values]) => [
+        Object.entries(categoryData).map(([region, values]) => [
           region,
-          values[newSubCategory]?.['color']?.[newYear] || {}
+          values?.[newSubCategory]?.['color']?.[newYear] || {}
         ])
       );
     });
@@ -230,6 +250,7 @@ window.HomeView = {
       selectRankingSubCategory,
       selectChartData,
       selectRankingColors,
+      selectRanking,
     };
   },
 
@@ -243,9 +264,7 @@ window.HomeView = {
         <p class="text-[#505051] font-bold p-1 pt-8"> SSP - {{ runScenario.SSP }} | GHG - {{ runScenario.GHG }} | Biodiversity - {{ runScenario.BIO_GBF2 }}</p>
         <div class="mb-4 mr-4">
           <ranking-cards 
-            :rankingData="rankingData"
-            :selectRegion="selectRegion"
-            :selectYear="selectYear">
+            :selectRankingData="selectRanking">
           </ranking-cards>
         </div>
 

@@ -25,6 +25,7 @@ window.Highchart = {
     const chartElement = ref(null);
     const isLoading = ref(true);
     const ChartInstance = ref(null);
+    const chartColor = ref(null);
     const position = ref({ x: 0, y: 0 });
     const isDragging = ref(false);
     const dragStartPos = ref({ x: 0, y: 0 });
@@ -58,14 +59,20 @@ window.Highchart = {
     const createChart = () => {
       isLoading.value = true;
 
+      // Store colors first to prevent mutations
+      if (props.chartData?.colors) {
+        chartColor.value = JSON.parse(JSON.stringify(props.chartData.colors));
+      }
+
       // Apply highlighting to chart data before creating chart
       const processedChartData = applyHighlighting(props.chartData);
 
-      // Create new chart with explicit responsive options
+      // Create new chart with our stored colors
       ChartInstance.value = Highcharts.chart(
         chartElement.value,
         {
           ...processedChartData,
+          colors: chartColor.value,
           chart: (processedChartData.chart || {}),
         }
       );
@@ -124,57 +131,51 @@ window.Highchart = {
 
     // Function to update the chart with new series data
     const updateChart = (chart, newChartData) => {
-      try {
-        // Apply highlighting before updating
-        const processedData = applyHighlighting(newChartData);
-        
-        // Make a deep copy of the processed chart data to avoid reference issues
-        const newData = JSON.parse(JSON.stringify(processedData));
+      // Apply highlighting before updating
+      const processedData = applyHighlighting(newChartData);
 
-        // Update the chart configuration options first (except series)
-        for (const key in newData) {
-          if (key !== 'series') {
-            chart.update({ [key]: newData[key] }, false);
-          }
+      // Make a deep copy of the processed chart data to avoid reference issues
+      const newData = JSON.parse(JSON.stringify(processedData));
+
+      // Update the chart configuration options first (except series and colors)
+      for (const key in newData) {
+        if (key !== 'series' && key !== 'colors') {
+          chart.update({ [key]: newData[key] }, false);
         }
-
-        // Handle series data updates safely
-        if (newData.series && Array.isArray(newData.series)) {
-          // Step 1: Remove excess series if there are more in the chart than in new data
-          while (chart.series.length > newData.series.length) {
-            if (chart.series[chart.series.length - 1]) {
-              chart.series[chart.series.length - 1].remove(false);
-            }
-          }
-
-          // Step 2: Update existing series or add new ones
-          newData.series.forEach((seriesConfig, index) => {
-            if (index < chart.series.length) {
-              // Series exists, update it safely
-              if (chart.series[index]) {
-                // Simple setData approach to avoid removePoint errors
-                chart.series[index].setData(seriesConfig.data || [], false);
-
-                // Update other properties but not the data (already updated)
-                const { data, ...otherProps } = seriesConfig;
-                chart.series[index].update(otherProps, false);
-              }
-            } else {
-              // Series doesn't exist, add it
-              chart.addSeries(seriesConfig, false);
-            }
-          });
-        }
-
-        // Final redraw to apply all changes with animation
-        chart.redraw();
-      } catch (error) {
-        console.error("Error updating chart:", error);
-        // Fallback to complete recreation if update fails
-        createChart();
       }
-    }
 
+      // Handle series data updates safely
+      if (newData.series && Array.isArray(newData.series)) {
+        // Step 1: Remove excess series if there are more in the chart than in new data
+        while (chart.series.length > newData.series.length) {
+          if (chart.series[chart.series.length - 1]) {
+            chart.series[chart.series.length - 1].remove(false);
+          }
+        }
+
+        // Step 2: Update existing series or add new ones
+        newData.series.forEach((seriesConfig, index) => {
+          if (index < chart.series.length) {
+            // Series exists, update it safely
+            if (chart.series[index]) {
+              chart.series[index].setData(seriesConfig.data || [], false);
+            }
+          } else {
+            // Series doesn't exist, add it
+            chart.addSeries(seriesConfig, false);
+          }
+        });
+      }
+
+      // Apply our stored colors LAST to prevent them being overwritten
+      if (chartColor.value) {
+        chart.update({ colors: chartColor.value }, true);
+      }
+
+      // Final redraw to apply all changes with animation
+      chart.redraw();
+
+    };
     onMounted(() => {
       createChart();
       window.addEventListener('resize', handleResize);
@@ -190,22 +191,26 @@ window.Highchart = {
 
     // Watch for changes in chart data with infinite loop prevention
     let isUpdating = false;
-    watch(() => props.chartData, (newValue) => { 
+    watch(() => props.chartData, (newValue) => {
       // Prevent infinite loops
       if (isUpdating) {
         return;
       }
-      
+
       isUpdating = true;
-      
-      try {
-        updateChart(ChartInstance.value, newValue);
-      } finally {
-        // Reset flag after a delay to ensure all reactive updates complete
-        setTimeout(() => {
-          isUpdating = false;
-        }, 100);
+
+      // First, store a fresh copy of colors before any chart updates
+      if (newValue?.colors) {
+        chartColor.value = JSON.parse(JSON.stringify(newValue.colors));
       }
+
+      // Then update the chart
+      updateChart(ChartInstance.value, newValue);
+
+      // Reset flag after a delay to ensure all reactive updates complete
+      setTimeout(() => {
+        isUpdating = false;
+      }, 100);
     }, { deep: true });
 
     // Watch for sidebar collapsed state changes via inject
