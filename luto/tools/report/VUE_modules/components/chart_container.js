@@ -156,9 +156,9 @@ window.Highchart = {
         // Step 2: Update existing series or add new ones
         newData.series.forEach((seriesConfig, index) => {
           if (index < chart.series.length) {
-            // Series exists, update it safely
+            // Series exists, update it completely including name and all properties
             if (chart.series[index]) {
-              chart.series[index].setData(seriesConfig.data || [], false);
+              chart.series[index].update(seriesConfig, false);
             }
           } else {
             // Series doesn't exist, add it
