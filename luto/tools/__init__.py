@@ -545,12 +545,8 @@ def set_path() -> str:
         """Create a folder for storing outputs and return folder name."""
         years = [i for i in settings.SIM_YEARS]
         path = f"{settings.OUTPUT_DIR}/{read_timestamp()}_RF{settings.RESFACTOR}_{years[0]}-{years[-1]}"
-        paths = (
-            [path]
-            + [f"{path}/out_{yr}" for yr in years]
-            + [f"{path}/out_{yr}/lucc_separate" for yr in years[1:]]
-        )
-
+        paths = [path] + [f"{path}/out_{yr}" for yr in years]
+        
         for p in paths:
             if not os.path.exists(p):
                 os.mkdir(p)

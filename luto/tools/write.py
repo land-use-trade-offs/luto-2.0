@@ -35,7 +35,6 @@ from luto import tools
 from luto.data import Data
 from luto.tools.Manual_jupyter_books.helpers import arr_to_xr
 from luto.tools.report.data_tools.parameters import GHG_NAMES
-from luto.tools.spatializers import create_2d_map
 from luto.tools.report.create_report_layers import save_report_layer
 from luto.tools.report.create_report_data import save_report_data
 
@@ -132,7 +131,7 @@ def create_report(data: Data):
         print(' --| Creating chart data...')
         save_report_data(data.path)
         print(' --| Creating map data...')
-        save_report_layer(data, data.path)
+        save_report_layer(data)
         print(' --| Report created successfully!')
     
     return _create_report()
@@ -369,12 +368,14 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
     )
 
     ag_man_q_mrp_xr = xr.DataArray(
-        np.stack([arr for arr in ag_quantity.get_agricultural_management_quantity_matrices(data, ag_q_mrp_xr, yr_idx).values()]),
+        np.stack(list(ag_quantity.get_agricultural_management_quantity_matrices(data, ag_q_mrp_xr, yr_idx).values())),
         dims=['am', 'lm', 'cell', 'product'],
-        coords={'am': data.AG_MAN_DESC,
-                'lm': data.LANDMANS,
-                'cell': np.arange(data.NCELLS),
-                'product': data.PRODUCTS}
+        coords={
+            'am': data.AG_MAN_DESC,
+            'lm': data.LANDMANS,
+            'cell': np.arange(data.NCELLS),
+            'product': data.PRODUCTS
+        }
     ).assign_coords(
         region=('cell', data.REGION_NRM_NAME),
     )
@@ -383,6 +384,7 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
     ag_X_mrj_xr = xr.concat([ag_X_mrj_xr, ag_X_mrj_xr.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
     ag_man_X_mrj_xr = xr.concat([ag_man_X_mrj_xr, ag_man_X_mrj_xr.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
     ag_man_X_mrj_xr = xr.concat([ag_man_X_mrj_xr, ag_man_X_mrj_xr.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
+    
     ag_q_mrp_xr = xr.concat([ag_q_mrp_xr, ag_q_mrp_xr.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
     ag_man_q_mrp_xr = xr.concat([ag_man_q_mrp_xr, ag_man_q_mrp_xr.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
     ag_man_q_mrp_xr = xr.concat([ag_man_q_mrp_xr, ag_man_q_mrp_xr.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
@@ -781,8 +783,8 @@ def write_transition_cost_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None
     yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1] if yr_cal_sim_pre is None else yr_cal_sim_pre
 
     # Get the non-agricultural decision variable
-    ag_dvar_base = tools.ag_mrj_to_xr(data, (tools.lumap2ag_l_mrj(data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre])
-        ).assign_coords(region=('cell', data.REGION_NRM_NAME)))
+    ag_dvar_base = tools.ag_mrj_to_xr(data, (tools.lumap2ag_l_mrj(data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre]))
+        ).assign_coords(region=('cell', data.REGION_NRM_NAME))
     non_ag_dvar_target = tools.non_ag_rk_to_xr(data, tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
 
@@ -1502,7 +1504,7 @@ def write_water(data: Data, yr_cal, path):
     elif settings.WATER_CLIMATE_CHANGE_IMPACT == 'off':
         ag_w_mrj_base = tools.ag_mrj_to_xr(data, ag_water.get_water_net_yield_matrices(data, 0, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR))
         ag_w_mrj_base = xr.concat([ag_w_mrj_base, ag_w_mrj_base.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-        wny_outside_luto_study_area_base = np.array(list(data.WATER_OUTSIDE_LUTO_HIST.to_dict().values()))
+        wny_outside_luto_study_area_base = np.array(list(data.WATER_OUTSIDE_LUTO_HIST.values()))
 
     ag_w_mrj_CCI = ag_w_mrj - ag_w_mrj_base
     wny_outside_luto_study_area_CCI = wny_outside_luto_study_area - wny_outside_luto_study_area_base
