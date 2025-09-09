@@ -19,7 +19,6 @@
 
 import os
 import json
-import re
 import pandas as pd
 import numpy as np
 from luto import settings
@@ -668,49 +667,49 @@ def save_report_data(raw_data_dir:str):
     revenue_ag_df = files.query('base_name == "revenue_ag"').reset_index(drop=True)
     revenue_ag_df = pd.concat([pd.read_csv(path) for path in revenue_ag_df['path']], ignore_index=True)
     revenue_ag_df = revenue_ag_df.replace(RENAME_AM_NON_AG).assign(Source='Agricultural land-use (revenue)')
+    revenue_ag_df_non_all = revenue_ag_df.query('Water_supply != "ALL" and Type != "ALL"')
     
     cost_ag_df = files.query('base_name == "cost_ag"').reset_index(drop=True)
     cost_ag_df = pd.concat([pd.read_csv(path) for path in cost_ag_df['path']], ignore_index=True)
     cost_ag_df = cost_ag_df.replace(RENAME_AM_NON_AG).assign(Source='Agricultural land-use (cost)')
     cost_ag_df['Value ($)'] = cost_ag_df['Value ($)'] * -1          # Convert cost to negative value
+    cost_ag_df_non_all = cost_ag_df.query('Water_supply != "ALL" and Type != "ALL"')
     
     revenue_am_df = files.query('base_name == "revenue_agricultural_management"').reset_index(drop=True)
     revenue_am_df = pd.concat([pd.read_csv(path) for path in revenue_am_df['path']], ignore_index=True)
     revenue_am_df = revenue_am_df.replace(RENAME_AM_NON_AG).assign(Source='Agricultural Management (revenue)')
+    revenue_am_df_non_all = revenue_am_df.query('Water_supply != "ALL" and `Management Type` != "ALL"')
     
     cost_am_df = files.query('base_name == "cost_agricultural_management"').reset_index(drop=True)
     cost_am_df = pd.concat([pd.read_csv(path) for path in cost_am_df['path']], ignore_index=True)
     cost_am_df = cost_am_df.replace(RENAME_AM_NON_AG).assign(Source='Agricultural Management (cost)')
     cost_am_df['Value ($)'] = cost_am_df['Value ($)'] * -1          # Convert cost to negative value
+    cost_am_df_non_all = cost_am_df.query('Water_supply != "ALL" and `Management Type` != "ALL"')
 
     revenue_non_ag_df = files.query('base_name == "revenue_non_ag"').reset_index(drop=True)
     revenue_non_ag_df = pd.concat([pd.read_csv(path) for path in revenue_non_ag_df['path']], ignore_index=True)
     revenue_non_ag_df = revenue_non_ag_df.replace(RENAME_AM_NON_AG).assign(Source='Non-agricultural land-use (revenue)')
-    revenue_non_ag_df['Water_supply'] = 'NA'
 
     cost_non_ag_df = files.query('base_name == "cost_non_ag"').reset_index(drop=True)
     cost_non_ag_df = pd.concat([pd.read_csv(path) for path in cost_non_ag_df['path']], ignore_index=True)
     cost_non_ag_df = cost_non_ag_df.replace(RENAME_AM_NON_AG).assign(Source='Non-agricultural land-use (cost)')
     cost_non_ag_df['Value ($)'] = cost_non_ag_df['Value ($)'] * -1  # Convert cost to negative value
-    cost_non_ag_df['Water_supply'] = 'NA'
     
     cost_transition_ag2ag_df = files.query('base_name == "cost_transition_ag2ag"').reset_index(drop=True)
     cost_transition_ag2ag_df = pd.concat([pd.read_csv(path) for path in cost_transition_ag2ag_df['path'] if not pd.read_csv(path).empty], ignore_index=True)
     cost_transition_ag2ag_df = cost_transition_ag2ag_df.replace(RENAME_AM_NON_AG).assign(Source='Transition cost (Ag2Ag)')
     cost_transition_ag2ag_df['Value ($)'] = cost_transition_ag2ag_df['Cost ($)']  * -1          # Convert cost to negative value
-    cost_transition_ag2ag_df['Water_supply'] = 'NA'
+    
 
     cost_transition_ag2non_ag_df = files.query('base_name == "cost_transition_ag2non_ag"').reset_index(drop=True)
     cost_transition_ag2non_ag_df = pd.concat([pd.read_csv(path) for path in cost_transition_ag2non_ag_df['path'] if not pd.read_csv(path).empty], ignore_index=True)
     cost_transition_ag2non_ag_df = cost_transition_ag2non_ag_df.replace(RENAME_AM_NON_AG).assign(Source='Transition cost (Ag2Non-Ag)')
     cost_transition_ag2non_ag_df['Value ($)'] = cost_transition_ag2non_ag_df['Cost ($)'] * -1   # Convert cost to negative value
-    cost_transition_ag2non_ag_df['Water_supply'] = 'NA'
 
     cost_transition_non_ag2ag_df = files.query('base_name == "cost_transition_non_ag2_ag"').reset_index(drop=True)
     cost_transition_non_ag2ag_df = pd.concat([pd.read_csv(path) for path in cost_transition_non_ag2ag_df['path'] if not pd.read_csv(path).empty], ignore_index=True)
     cost_transition_non_ag2ag_df = cost_transition_non_ag2ag_df.replace(RENAME_AM_NON_AG).assign(Source='Transition cost (Non-Ag2Ag)').dropna(subset=['Cost ($)'])
     cost_transition_non_ag2ag_df['Value ($)'] = cost_transition_non_ag2ag_df['Cost ($)'] * -1   # Convert cost to negative value
-    cost_transition_non_ag2ag_df['Water_supply'] = 'NA'
 
     economics_df = pd.concat(
             [
@@ -719,6 +718,22 @@ def save_report_data(raw_data_dir:str):
                 revenue_non_ag_df,
                 cost_ag_df, 
                 cost_am_df, 
+                cost_non_ag_df,
+                cost_transition_ag2ag_df, 
+                cost_transition_ag2non_ag_df,
+                cost_transition_non_ag2ag_df
+            ]
+        ).round({'Value ($)': 2}
+        ).query('abs(`Value ($)`) > 1e-6'
+        ).reset_index(drop=True)
+        
+    economics_df_non_all = pd.concat(
+            [
+                revenue_ag_df_non_all, 
+                revenue_am_df_non_all, 
+                revenue_non_ag_df,
+                cost_ag_df_non_all, 
+                cost_am_df_non_all, 
                 cost_non_ag_df,
                 cost_transition_ag2ag_df, 
                 cost_transition_ag2non_ag_df,
@@ -743,31 +758,36 @@ def save_report_data(raw_data_dir:str):
 
 
     # -------------------- Economic ranking --------------------
-    revenue_df = pd.concat([revenue_ag_df, revenue_am_df, revenue_non_ag_df]
+    revenue_df = pd.concat([revenue_ag_df_non_all, revenue_am_df_non_all, revenue_non_ag_df]
         ).groupby(['Year', 'region']
         )[['Value ($)']].sum(numeric_only=True
         ).reset_index(
         ).sort_values(['Year', 'Value ($)'], ascending=[True, False]
         ).assign(Rank=lambda x: x.groupby(['Year']).cumcount()
-        ).assign(Source='Revenue'
-        ).round({'Percent': 2})
-    cost_df = pd.concat([cost_ag_df, cost_am_df, cost_non_ag_df]
+        ).assign(Source='Revenue')
+    cost_df = pd.concat(
+        [
+            cost_ag_df_non_all, 
+            cost_am_df_non_all, 
+            cost_non_ag_df,
+            cost_transition_ag2ag_df, 
+            cost_transition_ag2non_ag_df, 
+            cost_transition_non_ag2ag_df
+        ]
         ).groupby(['Year', 'region']
         )[['Value ($)']].sum(numeric_only=True
         ).reset_index(
         ).assign(**{'Value ($)': lambda x: abs(x['Value ($)'])}
         ).sort_values(['Year', 'Value ($)'], ascending=[True, False]
         ).assign(Rank=lambda x: x.groupby(['Year']).cumcount()
-        ).assign(Source='Cost'
-        ).round({ 'Percent': 2}) 
+        ).assign(Source='Cost')
     profit_df = revenue_df.merge(
         cost_df, on=['Year', 'region'], suffixes=('_revenue', '_cost')
-        ).assign(**{'Value ($)': lambda x: x['Value ($)_revenue'] - x['Value ($)_cost']}
+        ).assign(**{'Value ($)': lambda x: x['Value ($)_revenue'] - x['Value ($)_cost'] - x['Transition cost ($)']}
         ).drop(columns=['Value ($)_revenue', 'Value ($)_cost']
         ).sort_values(['Year', 'Value ($)'], ascending=[True, False]
         ).assign(Rank=lambda x: x.groupby(['Year']).cumcount()
-        ).assign(Source='Total'
-        ).round({'Value ($)': 2})
+        ).assign(Source='Total')
 
     ranking_df = pd.concat([revenue_df, cost_df, profit_df]).assign(color= lambda x: x['Rank'].map(get_rank_color))
         
@@ -794,7 +814,7 @@ def save_report_data(raw_data_dir:str):
     # -------------------- Economy overview --------------------
 
     # Overview: sum of revenue, cost, and profit by region
-    rev_cost_net_region = economics_df.groupby(['region', 'Source', 'Year']
+    rev_cost_net_region = economics_df_non_all.groupby(['region', 'Source', 'Year']
         )[['Value ($)']].sum(numeric_only=True
         ).reset_index()
         
@@ -833,7 +853,7 @@ def save_report_data(raw_data_dir:str):
     
     
     # Overview: ag cost/revenue by type
-    economics_ag = pd.concat([revenue_ag_df, cost_ag_df])\
+    economics_ag = pd.concat([revenue_ag_df_non_all, cost_ag_df_non_all])\
         .query('Type != "ALL" and abs(`Value ($)`) > 1')\
         .groupby(['region', 'Type', 'Water_supply','Year'])['Value ($)']\
         .sum()\
@@ -869,9 +889,11 @@ def save_report_data(raw_data_dir:str):
         
     
     # Overview: ag-man cost/revenue by type
-    economics_am = pd.concat([
-            revenue_am_df.assign(Rev_Cost='Revenue'), 
-            cost_am_df.assign(Rev_Cost='Cost'),]
+    economics_am = pd.concat(
+        [
+            revenue_am_df_non_all.assign(Rev_Cost='Revenue'), 
+            cost_am_df_non_all.assign(Rev_Cost='Cost')
+        ]
         ).query('`Management Type` != "ALL" and abs(`Value ($)`) > 1'
         ).round({'Value ($)': 2}
         ).groupby(['region', 'Management Type', 'Water_supply', 'Rev_Cost', 'Year'])[['Value ($)']

@@ -14,7 +14,7 @@ window.RankingCards = {
     <div class="flex flex-wrap gap-4 justify-between h-[230px]">
       <!-- Economics Card -->
       <div class="flex-1 rounded-lg p-3 shadow-md flex flex-col bg-gradient-to-r from-[#e6ba7f] to-[#eacca2]" >
-        <h4 class="text-white text-center text-lg mb-2">Economics</h4>
+        <h4 class="text-white text-center text-lg mb-2">Profit</h4>
         <div class="text-2xl text-center font-bold text-white mb-1">{{ selectRankingData.economicTotal }}</div>
         <div class="text-white/80 text-center text-[12px] mb-4">Australian Dollar</div>
         <div class="mt-auto">

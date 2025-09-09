@@ -117,10 +117,10 @@ window.HomeView = {
 
       // Overview chart data
       const chartOverview_area = chartRegister['Area']['overview'];
-      const chartOverview_economics = chartRegister['Economics']['overview'];
-      const chartOverview_economics_ag = chartRegister['Economics']['Ag'];
-      const chartOverview_economics_agMgt = chartRegister['Economics']['Ag Mgt'];
-      const chartOverview_economics_Nonag = chartRegister['Economics']['Non-Ag'];
+      const chartOverview_economics = chartRegister['Economics']['overview']['sum'];
+      const chartOverview_economics_ag = chartRegister['Economics']['overview']['Ag'];
+      const chartOverview_economics_agMgt = chartRegister['Economics']['overview']['Ag Mgt'];
+      const chartOverview_economics_Nonag = chartRegister['Economics']['overview']['Non-Ag'];
       const chartOverview_ghg = chartRegister['GHG']['overview'];
       const chartOverview_ghg_ag = chartRegister['GHG']['Ag'];
       const chartOverview_ghg_agMgt = chartRegister['GHG']['Ag Mgt'];
@@ -136,7 +136,7 @@ window.HomeView = {
       await loadScript(chartOverview_area['Source']['path'], chartOverview_area['Source']['name']);
       await loadScript(chartOverview_area['Category']['path'], chartOverview_area['Category']['name']);
       await loadScript(chartOverview_area['Land-use']['path'], chartOverview_area['Land-use']['name']);
-      await loadScript(chartOverview_economics['sum']['path'], chartOverview_economics['sum']['name']);
+      await loadScript(chartOverview_economics['path'], chartOverview_economics['name']);
       await loadScript(chartOverview_economics_ag['path'], chartOverview_economics_ag['name']);
       await loadScript(chartOverview_economics_agMgt['path'], chartOverview_economics_agMgt['name']);
       await loadScript(chartOverview_economics_Nonag['path'], chartOverview_economics_Nonag['name']);
@@ -160,7 +160,7 @@ window.HomeView = {
           'Land-use': window[chartOverview_area['Land-use']['name']],
         },
         'Economics': {
-          'Overview': window[chartOverview_economics['sum']['name']],
+          'Overview': window[chartOverview_economics['name']],
           'Ag': window[chartOverview_economics_ag['name']],
           'Ag Mgt': window[chartOverview_economics_agMgt['name']],
           'Non-Ag': window[chartOverview_economics_Nonag['name']],

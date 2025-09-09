@@ -21,7 +21,7 @@ window.Chart_default_options = {
         verticalAlign: "middle",
         itemMarginTop: 0,
         itemMarginBottom: 1,
-        width: 180,
+        width: 230,
     },
     tooltip: {
         formatter: function () {

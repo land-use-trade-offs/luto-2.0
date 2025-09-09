@@ -503,50 +503,48 @@ def write_revenue_cost_ag(data: Data, yr_cal, path):
     xr_ag_cost = ag_dvar_mrj * ag_cost_rjms
     
     # Regional level aggregation
-    ag_rev_jms_region = xr_ag_rev.groupby('region').sum(dim='cell').to_dataframe('Value ($)').reset_index()
-    ag_cost_jms_region = xr_ag_cost.groupby('region').sum(dim='cell').to_dataframe('Value ($)').reset_index()
-
-    ag_rev_jms_region = ag_rev_jms_region.rename(columns={
-            'lu': 'Land-use',
-            'lm': 'Water_supply',
-            'source': 'Type'
-        }).replace({
-            'dry': 'Dryland',
-            'irr': 'Irrigated'
-        }).assign(Year=yr_cal)
-    ag_cost_jms_region = ag_cost_jms_region.rename(columns={
-            'lu': 'Land-use',
-            'lm': 'Water_supply',
-            'source': 'Type'
-        }).replace({
-            'dry': 'Dryland',
-            'irr': 'Irrigated'
-        }).assign(Year=yr_cal)
+    ag_rev_jms_region = xr_ag_rev.groupby('region'
+        ).sum(dim='cell'
+        ).to_dataframe('Value ($)'
+        ).reset_index(
+        ).assign(Year=yr_cal)
+    ag_rev_jms_AUS = xr_ag_rev.sum(dim='cell'
+        ).to_dataframe('Value ($)'
+        ).reset_index(
+        ).assign(Year=yr_cal, region='AUSTRALIA')
         
-    # Australia level aggregation
-    ag_rev_jms_AUS = xr_ag_rev.sum(dim='cell').to_dataframe('Value ($)').reset_index()
-    ag_cost_jms_AUS = xr_ag_cost.sum(dim='cell').to_dataframe('Value ($)').reset_index()
-
-    ag_rev_jms_AUS = ag_rev_jms_AUS.rename(columns={
-            'lu': 'Land-use',
-            'lm': 'Water_supply',
-            'source': 'Type'
-        }).replace({
-            'dry': 'Dryland',
-            'irr': 'Irrigated'
-        }).assign(Year=yr_cal, region='AUSTRALIA')
-    ag_cost_jms_AUS = ag_cost_jms_AUS.rename(columns={
-            'lu': 'Land-use',
-            'lm': 'Water_supply',
-            'source': 'Type'
-        }).replace({
-            'dry': 'Dryland',
-            'irr': 'Irrigated'
-        }).assign(Year=yr_cal, region='AUSTRALIA')
-        
+    ag_cost_jms_region = xr_ag_cost.groupby('region'
+        ).sum(dim='cell'
+        ).to_dataframe('Value ($)'
+        ).reset_index(
+        ).assign(Year=yr_cal)
+    ag_cost_jms_AUS = xr_ag_cost.sum(dim='cell'
+        ).to_dataframe('Value ($)'
+        ).reset_index(
+        ).assign(Year=yr_cal, region='AUSTRALIA')
+   
     # Save to disk
-    pd.concat([ag_rev_jms_AUS, ag_rev_jms_region]).to_csv(os.path.join(path, f'revenue_ag_{yr_cal}.csv'), index=False)
-    pd.concat([ag_cost_jms_AUS, ag_cost_jms_region]).to_csv(os.path.join(path, f'cost_ag_{yr_cal}.csv'), index=False)
+    ag_rev_jms = pd.concat([ag_rev_jms_AUS, ag_rev_jms_region]
+        ).rename(columns={
+            'lu': 'Land-use',
+            'lm': 'Water_supply',
+            'source': 'Type'
+        }).replace({
+            'dry': 'Dryland',
+            'irr': 'Irrigated'
+        })
+    ag_cost_jms = pd.concat([ag_cost_jms_AUS, ag_cost_jms_region]
+        ).rename(columns={
+            'lu': 'Land-use',
+            'lm': 'Water_supply',
+            'source': 'Type'
+        }).replace({
+            'dry': 'Dryland',
+            'irr': 'Irrigated'
+        })
+        
+    ag_rev_jms.to_csv(os.path.join(path, f'revenue_ag_{yr_cal}.csv'), index=False)
+    ag_cost_jms.to_csv(os.path.join(path, f'cost_ag_{yr_cal}.csv'), index=False)
     
     save2nc(xr_ag_rev, os.path.join(path, f'xr_revenue_ag_{yr_cal}.nc'))
     save2nc(xr_ag_cost, os.path.join(path, f'xr_cost_ag_{yr_cal}.nc'))
@@ -590,57 +588,42 @@ def write_revenue_cost_ag_man(data: Data, yr_cal, path):
         ).to_dataframe('Value ($)'
         ).reset_index(
         ).assign(Year = yr_cal
-        ).rename(
-            columns={
-                'lu': 'Land-use',
-                'lm': 'Water_supply',
-                'am': 'Management Type'
-        }).replace(
-            {'dry': 'Dryland', 'irr': 'Irrigated'}
         )
     cost_am_df_region = xr_cost_am.groupby('region'
         ).sum(dim='cell'
         ).to_dataframe('Value ($)'
         ).reset_index(
-        ).assign(Year = yr_cal
-        ).rename(
-            columns={
-                'lu': 'Land-use',
-                'lm': 'Water_supply',
-                'am': 'Management Type'
-        }).replace(
-            {'dry': 'Dryland', 'irr': 'Irrigated'}
-        )
+        ).assign(Year = yr_cal)
 
     # Australia level aggregation
     revenue_am_df_AUS = xr_revenue_am.sum(dim='cell'
         ).to_dataframe('Value ($)'
         ).reset_index(
         ).assign(Year = yr_cal, region='AUSTRALIA'
-        ).rename(
-            columns={
-                'lu': 'Land-use',
-                'lm': 'Water_supply',
-                'am': 'Management Type'
-        }).replace(
-            {'dry': 'Dryland', 'irr': 'Irrigated'}
         )
     cost_am_df_AUS = xr_cost_am.sum(dim='cell'
         ).to_dataframe('Value ($)'
         ).reset_index(
-        ).assign(Year = yr_cal, region='AUSTRALIA'
+        ).assign(Year = yr_cal, region='AUSTRALIA')
+        
+    revenue_am_df = pd.concat([revenue_am_df_AUS, revenue_am_df_region]
         ).rename(
             columns={
                 'lu': 'Land-use',
                 'lm': 'Water_supply',
                 'am': 'Management Type'
-        }).replace(
-            {'dry': 'Dryland', 'irr': 'Irrigated'}
-        )
+        }).replace({'dry': 'Dryland', 'irr': 'Irrigated'})
+    cost_am_df = pd.concat([cost_am_df_AUS, cost_am_df_region]
+        ).rename(
+            columns={
+                'lu': 'Land-use',
+                'lm': 'Water_supply',
+                'am': 'Management Type'
+        }).replace({'dry': 'Dryland', 'irr': 'Irrigated'})
 
     # Save to disk
-    pd.concat([revenue_am_df_AUS, revenue_am_df_region]).to_csv(os.path.join(path, f'revenue_agricultural_management_{yr_cal}.csv'), index=False)
-    pd.concat([cost_am_df_AUS, cost_am_df_region]).to_csv(os.path.join(path, f'cost_agricultural_management_{yr_cal}.csv'), index=False)
+    revenue_am_df.to_csv(os.path.join(path, f'revenue_agricultural_management_{yr_cal}.csv'), index=False)
+    cost_am_df.to_csv(os.path.join(path, f'cost_agricultural_management_{yr_cal}.csv'), index=False)
     
     save2nc(xr_revenue_am, os.path.join(path, f'xr_revenue_agricultural_management_{yr_cal}.nc'))
     save2nc(xr_cost_am, os.path.join(path, f'xr_cost_agricultural_management_{yr_cal}.nc'))
@@ -725,11 +708,11 @@ def write_transition_cost_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     ag_dvar_mrj_base = tools.ag_mrj_to_xr(data, (tools.lumap2ag_l_mrj(data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre])))
 
     ag_dvar_mrj_target = ag_dvar_mrj_target.rename({'lm': 'To water-supply', 'lu': 'To land-use'}
-        ).assign_coords( region=('cell', data.REGION_NRM_NAME)
+        ).assign_coords(region=('cell', data.REGION_NRM_NAME)
         ).chunk({'cell': min(1024, data.NCELLS)})
 
     ag_dvar_mrj_base = ag_dvar_mrj_base.rename({'lm': 'From water-supply', 'lu': 'From land-use'}
-        ).assign_coords( region=('cell', data.REGION_NRM_NAME)
+        ).assign_coords(region=('cell', data.REGION_NRM_NAME)
         ).chunk({'cell': min(1024, data.NCELLS)})
 
     # Get the transition cost matrices for agricultural land-use
@@ -750,13 +733,18 @@ def write_transition_cost_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     )
 
     cost_xr = ag_dvar_mrj_base * ag_dvar_mrj_target * ag_transitions_cost_mat
-    cost_df = cost_xr.groupby('region'
+    cost_df_region = cost_xr.groupby('region'
         ).sum(dim='cell'
         ).to_dataframe('Cost ($)'
         ).reset_index(
-        ).assign(
-            Year=yr_cal
+        ).assign(Year=yr_cal
         ).query('abs(`Cost ($)`) > 0')
+    cost_df_AUS = cost_xr.sum(dim='cell'
+        ).to_dataframe('Cost ($)'
+        ).reset_index(
+        ).assign(Year=yr_cal, region='AUSTRALIA'
+        ).query('abs(`Cost ($)`) > 0')
+    cost_df = pd.concat([cost_df_AUS, cost_df_region]).reset_index(drop=True)
                 
 
     # Save the cost DataFrames
@@ -820,13 +808,18 @@ def write_transition_cost_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None
     )
 
     cost_xr = ag_dvar_base * non_ag_transitions_flat.unstack('lu_source') * non_ag_dvar_target
-    cost_df = cost_xr.groupby('region'
+    cost_df_region = cost_xr.groupby('region'
             ).sum(dim='cell'
             ).to_dataframe('Cost ($)'
             ).reset_index(
-            ).assign(
-                Year=yr_cal
+            ).assign(Year=yr_cal
             ).query('abs(`Cost ($)`) > 0')
+    cost_df_AUS = cost_xr.sum(dim='cell'
+            ).to_dataframe('Cost ($)'
+            ).reset_index(
+            ).assign(Year=yr_cal, region='AUSTRALIA'
+            ).query('abs(`Cost ($)`) > 0')
+    cost_df = pd.concat([cost_df_AUS, cost_df_region]).reset_index(drop=True)
     cost_df = cost_df.replace({'dry':'Dryland', 'irr':'Irrigated'})    
     cost_df.to_csv(os.path.join(path, f'cost_transition_ag2non_ag_{yr_cal}.csv'), index=False)
     
