@@ -38,6 +38,7 @@ from luto.tools.report.data_tools.parameters import (
     COLORS_LU,
     COMMODITIES_ALL,
     COMMODITIES_OFF_LAND,
+    COMMIDOTY_GROUP,
     GHG_CATEGORY,
     GHG_NAMES,
     LANDUSE_ALL_RENAMED,
@@ -101,6 +102,7 @@ def save_report_data(raw_data_dir:str):
             formatted = f"{int(round(x))}"
         return f"{formatted} {suffixes[magnitude]}"
     
+    
     # Land-use group and colors
     lu_group_raw = pd.read_csv('luto/tools/report/VUE_modules/assets/lu_group.csv')
     colors_lu_category = lu_group_raw.set_index('Category')['color_HEX'].to_dict()
@@ -121,13 +123,13 @@ def save_report_data(raw_data_dir:str):
     ag_dvar_area['Source'] = 'Agricultural Landuse'
     ag_dvar_area['Category'] = ag_dvar_area['Land-use'].apply(lu_group.set_index('Land-use')['Category'].to_dict().get)
     ag_dvar_area['Area (ha)'] = ag_dvar_area['Area (ha)'].round(2)
+    ag_dvar_area_non_all = ag_dvar_area.query('Water_supply != "ALL"').copy()
 
     non_ag_dvar_dfs = area_dvar_paths.query('base_name == "area_non_agricultural_landuse"').reset_index(drop=True)
     non_ag_dvar_area = pd.concat([pd.read_csv(path) for path in non_ag_dvar_dfs['path'] if not pd.read_csv(path).empty], ignore_index=True)
     non_ag_dvar_area['Land-use'] = non_ag_dvar_area['Land-use'].replace(RENAME_NON_AG)
     non_ag_dvar_area['Category'] = non_ag_dvar_area['Land-use'].apply(lu_group.set_index('Land-use')['Category'].to_dict().get)
     non_ag_dvar_area['Source'] = 'Non-Agricultural Landuse'
-    non_ag_dvar_area['Water_supply'] = 'NA'
     non_ag_dvar_area['Area (ha)'] = non_ag_dvar_area['Area (ha)'].round(2)
 
     am_dvar_dfs = area_dvar_paths.query('base_name == "area_agricultural_management"').reset_index(drop=True)
@@ -135,10 +137,11 @@ def save_report_data(raw_data_dir:str):
     am_dvar_area = am_dvar_area.replace(RENAME_AM_NON_AG)
     am_dvar_area['Source'] = 'Agricultural Management'
     am_dvar_area['Area (ha)'] = am_dvar_area['Area (ha)'].round(2)
+    am_dvar_area_non_all = am_dvar_area.query('Water_supply != "ALL" and Type != "ALL"').copy()
     
 
     # -------------------- Area ranking --------------------
-    area_ranking_raw = pd.concat([ag_dvar_area, non_ag_dvar_area, am_dvar_area])
+    area_ranking_raw = pd.concat([ag_dvar_area_non_all, non_ag_dvar_area, am_dvar_area_non_all])
     
     area_ranking_type = area_ranking_raw\
         .groupby(['Year', 'region', 'Source'])[['Area (ha)']]\
@@ -149,7 +152,6 @@ def save_report_data(raw_data_dir:str):
         .round({'Area (ha)': 2})
          
     area_ranking_total = area_ranking_raw\
-        .query('Water_supply.isin(["ALL", "NA"])')\
         .groupby(['Year', 'region'])[["Area (ha)"]]\
         .sum(numeric_only=True)\
         .reset_index()\
@@ -192,16 +194,15 @@ def save_report_data(raw_data_dir:str):
     # -------------------- Area overview --------------------
     
     area_df = pd.concat([
-        ag_dvar_area, 
+        ag_dvar_area_non_all, 
         non_ag_dvar_area, 
-        am_dvar_area.assign(**{'Land-use':'Agri-Management', 'Category':'Agri-Management'})
+        am_dvar_area_non_all.assign(**{'Land-use':'Agri-Management', 'Category':'Agri-Management'})
         ], ignore_index=True)
     
     group_cols = ['Land-use', 'Category', 'Source']
     for idx, col in enumerate(group_cols):
  
         df_region = area_df\
-            .query('Water_supply != "ALL"')\
             .groupby(['Year', 'region', col])[['Area (ha)']]\
             .sum()\
             .reset_index()\
@@ -433,24 +434,21 @@ def save_report_data(raw_data_dir:str):
     #                   2) Production                  #
     ####################################################
     
-    demand_files = files.query('category == "quantity"')
-    
-    quantity_LUTO = demand_files\
-        .query('base_name == "quantity_production_t_separate"')\
-        .reset_index(drop=True)
-    quantity_LUTO = pd.concat(
-            [pd.read_csv(path).assign(Year=Year) for Year,path in quantity_LUTO[['Year','path']].values.tolist()],
-            ignore_index=True)\
-        .assign(Commodity= lambda x: x['Commodity'].str.capitalize())\
+    quantity_df = files.query('base_name == "quantity_production_t_separate"')
+    quantity_df = pd.concat([pd.read_csv(path) for path in quantity_df['path']])\
+        .assign(Commodity = lambda x: x['Commodity'].str.capitalize())\
         .replace({'Sheep lexp': 'Sheep live export', 'Beef lexp': 'Beef live export'})\
+        .assign(group = lambda x: x['Commodity'].map(COMMIDOTY_GROUP.get))\
         .replace(RENAME_AM_NON_AG)\
-        .query('Year.isin(@years) and abs(`Production (t/KL)`) > 1e-6')\
+        .query('Year.isin(@years) and abs(`Production (t/KL)`) > 1')\
         .round({'`Production (t/KL)`': 2})
-    quantity_LUTO.loc[
-        quantity_LUTO['Type'] == 'Non-Agricultural',
-        'Water_supply'
-    ] = 'NA'
-    
+        
+    quantity_ag = quantity_df.query('Type == "Agricultural"').copy()    
+    quantity_am = quantity_df.query('Type == "Agricultural Management"').copy()
+    quantity_non_ag = quantity_df.query('Type == "Non-Agricultural"').copy()
+
+    quantity_ag_non_all = quantity_ag.query('Water_supply != "ALL"').copy()
+    quantity_am_non_all = quantity_am.query('Type != "ALL"').copy()
     
 
     # # -------------------- Demand --------------------
@@ -513,26 +511,59 @@ def save_report_data(raw_data_dir:str):
     #     demand_limit_wide.to_json(f, orient='records', indent=2)
     #     f.write(';\n')
 
-
-
     # -------------------- Overview: sum of commodity production --------------------
-    df_wide = quantity_LUTO\
-        .query('Water_supply != "ALL" and am != "ALL"')\
-        .groupby(['region', 'Commodity'])[['Year', 'Production (t/KL)']]\
-        .apply(lambda x: x[['Year','Production (t/KL)']].values.tolist())\
-        .reset_index()
-    df_wide.columns = ['region', 'name', 'data']
-    df_wide['type'] = 'column'
-    df_wide['color'] = df_wide['name'].apply(lambda x: COLORS_COMMODITIES[x])
-    df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
-    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+    
+    quantity_rank = pd.concat([quantity_ag_non_all, quantity_non_ag, quantity_am_non_all])\
+        .groupby(['Year', 'region', 'group'])[['Production (t/KL)']]\
+        .sum(numeric_only=True)\
+        .reset_index()\
+        .sort_values(['Year', 'group', 'Production (t/KL)'], ascending=[True, True, False])\
+        .assign(Rank=lambda x: x.groupby(['Year', 'group']).cumcount())\
+        .assign(color=lambda x: x['Rank'].map(get_rank_color))\
+        .assign(Year=lambda x: x['Year'].astype(int))\
+        .round({'Production (t/KL)': 2})
 
     out_dict = {}
-    for region, df in df_wide.groupby('region'):
+    for (region, group), df in quantity_rank.groupby(['region', 'group']):
+        df = df.drop(['region'], axis=1)
+        
+        if region not in out_dict:
+            out_dict[region] = {}
+        if group not in out_dict[region]:
+            out_dict[region][group] = {}
+
+        out_dict[region][group]['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
+        out_dict[region][group]['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
+        out_dict[region][group]['value'] = df.set_index('Year')['Production (t/KL)'].apply( lambda x: format_with_suffix(x)).to_dict()
+
+    filename = 'Production_ranking'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
+    
+
+    # -------------------- Overview: sum of commodity production --------------------
+    
+    quantity_overview = pd.concat([quantity_ag_non_all, quantity_non_ag, quantity_am_non_all])\
+        .groupby(['Year', 'region', 'group'])[['Production (t/KL)']]\
+        .sum(numeric_only=True)\
+        .reset_index()\
+        .rename(columns={'Production (t/KL)': 'Value (t)'})\
+        .round({'Production (t/KL)': 2})
+        
+    quantity_overview_wide = quantity_overview.groupby(['region', 'group'])[['Year','Value (t)']]\
+        .apply(lambda x: x[['Year','Value (t)']].values.tolist())\
+        .reset_index()
+    quantity_overview_wide.columns = ['region', 'name','data']
+    quantity_overview_wide['type'] = 'column'
+    
+    out_dict = {}
+    for region, df in quantity_overview_wide.groupby('region'):
         df = df.drop('region', axis=1)
         out_dict[region] = df.to_dict(orient='records')
         
-    filename = f'Production_overview_sum'
+    filename = 'Production_overview_sum'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
         json.dump(out_dict, f, separators=(',', ':'), indent=2)
@@ -542,7 +573,7 @@ def save_report_data(raw_data_dir:str):
 
 
     # -------------------- Overview: Australia production achievement (%) --------------------
-    quantity_diff = demand_files.query('base_name == "quantity_comparison"').reset_index(drop=True)
+    quantity_diff = files.query('base_name == "quantity_comparison"').reset_index(drop=True)
     quantity_diff = pd.concat([pd.read_csv(path) for path in quantity_diff['path']], ignore_index=True)
     quantity_diff = quantity_diff.replace({'Sheep lexp': 'Sheep live export', 'Beef lexp': 'Beef live export'})
     quantity_diff = quantity_diff[['Year','Commodity','Prop_diff (%)']].rename(columns={'Prop_diff (%)': 'Demand Achievement (%)'})
@@ -553,7 +584,7 @@ def save_report_data(raw_data_dir:str):
     quantity_diff_AUS = quantity_diff[mask_AUS].copy()
     quantity_diff_wide_AUS = quantity_diff_AUS\
         .groupby(['Commodity'])[['Year','Demand Achievement (%)']]\
-        .apply(lambda x: list(map(list,zip(x['Year'], x['Demand Achievement (%)']))))\
+        .apply(lambda x: x[['Year','Demand Achievement (%)']].values.tolist())\
         .reset_index()
         
     quantity_diff_wide_AUS['type'] = 'line'
@@ -572,7 +603,7 @@ def save_report_data(raw_data_dir:str):
     
     
     # -------------------- Commodity production for ag --------------------
-    df_wide = quantity_LUTO\
+    df_wide = quantity_df\
         .query(f'Type == "Agricultural"')\
         .groupby(['region', 'Water_supply', 'Commodity'])[['Year','Production (t/KL)']]\
         .apply(lambda x: x[['Year','Production (t/KL)']].values.tolist())\
@@ -600,7 +631,7 @@ def save_report_data(raw_data_dir:str):
         f.write(';\n')
         
     # -------------------- Commodity production for ag-man --------------------
-    df_wide = quantity_LUTO\
+    df_wide = quantity_df\
         .query(f'Type == "Agricultural Management"')\
         .groupby(['region', 'am', 'Water_supply', 'Commodity'])[['Year','Production (t/KL)']]\
         .apply(lambda x: x[['Year','Production (t/KL)']].values.tolist())\
@@ -631,7 +662,7 @@ def save_report_data(raw_data_dir:str):
         
         
     # -------------------- Commodity production for non-ag --------------------
-    df_wide = quantity_LUTO\
+    df_wide = quantity_df\
         .query(f'Type == "Non-Agricultural"')\
         .groupby(['region', 'Commodity'])[['Year','Production (t/KL)']]\
         .apply(lambda x: x[['Year','Production (t/KL)']].values.tolist())\
@@ -783,7 +814,7 @@ def save_report_data(raw_data_dir:str):
         ).assign(Source='Cost')
     profit_df = revenue_df.merge(
         cost_df, on=['Year', 'region'], suffixes=('_revenue', '_cost')
-        ).assign(**{'Value ($)': lambda x: x['Value ($)_revenue'] - x['Value ($)_cost'] - x['Transition cost ($)']}
+        ).assign(**{'Value ($)': lambda x: x['Value ($)_revenue'] - x['Value ($)_cost']}
         ).drop(columns=['Value ($)_revenue', 'Value ($)_cost']
         ).sort_values(['Year', 'Value ($)'], ascending=[True, False]
         ).assign(Rank=lambda x: x.groupby(['Year']).cumcount()

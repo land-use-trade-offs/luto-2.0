@@ -24,6 +24,7 @@ window.HomeView = {
       'GHG': 'Mt CO2e',
       'Water': 'ML',
       'Biodiversity': 'Relative Percentage (Pre-1750 = 100%)',
+      'Production': 'Relative to target (%)',
     };
     const RankSubcategoriesRename = {
       'Agricultural Landuse': 'Ag',
@@ -117,6 +118,7 @@ window.HomeView = {
 
       // Overview chart data
       const chartOverview_area = chartRegister['Area']['overview'];
+      const chartOverview_bio_GBF2 = chartRegister['Biodiversity']['GBF2']['overview'];
       const chartOverview_economics = chartRegister['Economics']['overview']['sum'];
       const chartOverview_economics_ag = chartRegister['Economics']['overview']['Ag'];
       const chartOverview_economics_agMgt = chartRegister['Economics']['overview']['Ag Mgt'];
@@ -125,15 +127,18 @@ window.HomeView = {
       const chartOverview_ghg_ag = chartRegister['GHG']['Ag'];
       const chartOverview_ghg_agMgt = chartRegister['GHG']['Ag Mgt'];
       const chartOverview_ghg_Nonag = chartRegister['GHG']['Non-Ag'];
+      const chartOverview_production = chartRegister['Production']['overview']['achieve'];
       const chartOverview_water = chartRegister['Water']['NRM']['overview'];
-      const chartOverview_bio_GBF2 = chartRegister['Biodiversity']['GBF2']['overview'];
+
       const rankingArea = chartRegister['Area']['ranking'];
       const rankingEconomics = chartRegister['Economics']['ranking'];
       const rankingGHG = chartRegister['GHG']['ranking'];
+      const rankingProduction = chartRegister['Production']['ranking'];
       const rankingWater = chartRegister['Water']['NRM']['ranking'];
       const rankingBiodiversity = chartRegister['Biodiversity']['ranking'];
 
       await loadScript(chartOverview_area['Source']['path'], chartOverview_area['Source']['name']);
+      await loadScript(chartOverview_bio_GBF2['path'], chartOverview_bio_GBF2['name']);
       await loadScript(chartOverview_area['Category']['path'], chartOverview_area['Category']['name']);
       await loadScript(chartOverview_area['Land-use']['path'], chartOverview_area['Land-use']['name']);
       await loadScript(chartOverview_economics['path'], chartOverview_economics['name']);
@@ -144,11 +149,13 @@ window.HomeView = {
       await loadScript(chartOverview_ghg_ag['path'], chartOverview_ghg_ag['name']);
       await loadScript(chartOverview_ghg_agMgt['path'], chartOverview_ghg_agMgt['name']);
       await loadScript(chartOverview_ghg_Nonag['path'], chartOverview_ghg_Nonag['name']);
+      await loadScript(chartOverview_production['path'], chartOverview_production['name']);
       await loadScript(chartOverview_water['Type']['path'], chartOverview_water['Type']['name']);
-      await loadScript(chartOverview_bio_GBF2['path'], chartOverview_bio_GBF2['name']);
+
       await loadScript(rankingArea['path'], rankingArea['name']);
       await loadScript(rankingEconomics['path'], rankingEconomics['name']);
       await loadScript(rankingGHG['path'], rankingGHG['name']);
+      await loadScript(rankingProduction['path'], rankingProduction['name']);
       await loadScript(rankingWater['path'], rankingWater['name']);
       await loadScript(rankingBiodiversity['path'], rankingBiodiversity['name']);
 
@@ -158,6 +165,9 @@ window.HomeView = {
           'Source': window[chartOverview_area['Source']['name']],
           'Category': window[chartOverview_area['Category']['name']],
           'Land-use': window[chartOverview_area['Land-use']['name']],
+        },
+        'Biodiversity': {
+          'GBF2': window[chartOverview_bio_GBF2['name']],
         },
         'Economics': {
           'Overview': window[chartOverview_economics['name']],
@@ -171,11 +181,11 @@ window.HomeView = {
           'Ag Mgt': window[chartOverview_ghg_agMgt['name']],
           'Non-Ag': window[chartOverview_ghg_Nonag['name']],
         },
+        'Production': {
+          'Achievement': window[chartOverview_production['name']],
+        },
         'Water': {
           'Type': window[chartOverview_water['Type']['name']],
-        },
-        'Biodiversity': {
-          'GBF2': window[chartOverview_bio_GBF2['name']],
         },
       };
 
@@ -183,6 +193,7 @@ window.HomeView = {
         'Area': window[rankingArea['name']],
         'Economics': window[rankingEconomics['name']],
         'GHG': window[rankingGHG['name']],
+        'Production': window[rankingProduction['name']],
         'Water': window[rankingWater['name']],
         'Biodiversity': window[rankingBiodiversity['name']],
       };
@@ -226,6 +237,7 @@ window.HomeView = {
           values?.[newSubCategory]?.['color']?.[newYear] || {}
         ])
       );
+
     });
 
     return {
@@ -288,7 +300,7 @@ window.HomeView = {
               <div class="flex items-center space-x-1 justify-end p-2">
                 <button v-for="(data, key) in availableChartCategories" :key="key"
                   @click="selectChartCategory = data"
-                  class="bg-[#e8eaed] text-[#1f1f1f] text-[0.8rem] px-1 py-1 rounded"
+                  class="bg-[#e8eaed] text-[#1f1f1f] text-[0.7rem] px-1 py-1 rounded"
                   :class="{'bg-sky-500 text-white': selectChartCategory === data}">
                   {{ data }}
                 </button>
@@ -353,7 +365,7 @@ window.HomeView = {
             <div class="absolute flex flex-row space-x-1 mr-4 top-[9px] left-[10px] z-10">
               <button v-for="cat in availableChartSubCategories" :key="cat"
                 @click="selectChartSubCategory = cat"
-                class="bg-[#e8eaed] text-[#1f1f1f] text-[0.8rem] px-1 py-1 rounded"
+                class="bg-[#e8eaed] text-[#1f1f1f] text-[0.7rem] px-1 py-1 rounded"
                 :class="{'bg-sky-500 text-white': selectChartSubCategory === cat}">
                 {{ cat }}
               </button>

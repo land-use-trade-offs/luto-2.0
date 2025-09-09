@@ -171,6 +171,10 @@ window.DataService = {
           name: "Production_overview_sum",
         },
       },
+      ranking: {
+        path: "data/Production_ranking.js",
+        name: "Production_ranking",
+      },
     },
     Water: {
       NRM: {

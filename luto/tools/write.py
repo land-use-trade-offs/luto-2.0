@@ -25,7 +25,6 @@ import shutil
 import threading
 import numpy as np
 import pandas as pd
-import rasterio
 import xarray as xr
 
 from joblib import Parallel, delayed
@@ -33,6 +32,7 @@ from joblib import Parallel, delayed
 from luto import settings
 from luto import tools
 from luto.data import Data
+
 from luto.tools.Manual_jupyter_books.helpers import arr_to_xr
 from luto.tools.report.data_tools.parameters import GHG_NAMES
 from luto.tools.report.create_report_layers import save_report_layer
