@@ -140,8 +140,22 @@ window.DataService = {
         name: "GHG_NonAg",
       },
       overview: {
-        path: "data/GHG_overview.js",
-        name: "GHG_overview",
+        sum: {
+          path: "data/GHG_overview_sum.js",
+          name: "GHG_overview_sum",
+        },
+        Ag: {
+          path: "data/GHG_overview_Ag.js",
+          name: "GHG_overview_Ag",
+        },
+        "Ag Mgt": {
+          path: "data/GHG_overview_Am.js",
+          name: "GHG_overview_Am",
+        },
+        "Non-Ag": {
+          path: "data/GHG_overview_NonAg.js",
+          name: "GHG_overview_NonAg",
+        },
       },
       ranking: {
         path: "data/GHG_ranking.js",
@@ -167,8 +181,8 @@ window.DataService = {
           name: "Production_overview_AUS_achive_percent",
         },
         sum: {
-          path: "data/Production_overview_sum.js",
-          name: "Production_overview_sum",
+          path: "data/Production_overview_demand.js",
+          name: "Production_overview_demand",
         },
       },
       ranking: {

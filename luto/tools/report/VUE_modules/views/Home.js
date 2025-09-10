@@ -45,22 +45,46 @@ window.HomeView = {
 
     //  Reactive data
     const selectChartData = computed(() => {
+
+      let seriesData, drilldown, yAxisTitle;
+
       const originalData = ChartData.value?.[selectChartCategory.value]?.[selectChartSubCategory.value]?.[selectRegion.value];
-      const seriesData = originalData ? JSON.parse(JSON.stringify(originalData)) : [];
-      const seriesColors = seriesData.map(serie => serie.color).filter(color => color);
+      if (Array.isArray(originalData) && originalData) {
+        seriesData = JSON.parse(JSON.stringify(originalData));
+      } else { // in this case, the data structure is { "AUSTRALIA": { series: [], drilldown: {} } }
+        seriesData = JSON.parse(JSON.stringify(originalData?.series)) || [];
+        drilldown = JSON.parse(JSON.stringify(originalData?.drilldown)) || [];
+        yAxisTitle = 'Quantity (tonnes, KL)'
+      }
+
+      const seriesColors = seriesData.map(serie => serie.color).filter(color => color) || [];
       const colors = seriesColors.length > 0 ? seriesColors : window['Supporting_info']?.colors || [];
+
       return {
         ...window['Chart_default_options'],
         chart: {
           height: 440,
+          events: {
+            drilldown: function (e) {
+              this.xAxis[0].update({
+                type: "category",
+              })
+            },
+            drillup: function (e) {
+              this.xAxis[0].update({
+                type: "linear",
+              })
+            },
+          },
         },
         yAxis: {
           title: {
-            text: availableUnit[selectChartCategory.value]
+            text: yAxisTitle || availableUnit[selectChartCategory.value]
           }
         },
         series: seriesData,
         colors: colors,
+        drilldown: { series: drilldown || [] }
       };
     });
 
@@ -119,15 +143,16 @@ window.HomeView = {
       // Overview chart data
       const chartOverview_area = chartRegister['Area']['overview'];
       const chartOverview_bio_GBF2 = chartRegister['Biodiversity']['GBF2']['overview'];
-      const chartOverview_economics = chartRegister['Economics']['overview']['sum'];
+      const chartOverview_economics_sum = chartRegister['Economics']['overview']['sum'];
       const chartOverview_economics_ag = chartRegister['Economics']['overview']['Ag'];
       const chartOverview_economics_agMgt = chartRegister['Economics']['overview']['Ag Mgt'];
       const chartOverview_economics_Nonag = chartRegister['Economics']['overview']['Non-Ag'];
-      const chartOverview_ghg = chartRegister['GHG']['overview'];
-      const chartOverview_ghg_ag = chartRegister['GHG']['Ag'];
-      const chartOverview_ghg_agMgt = chartRegister['GHG']['Ag Mgt'];
-      const chartOverview_ghg_Nonag = chartRegister['GHG']['Non-Ag'];
-      const chartOverview_production = chartRegister['Production']['overview']['achieve'];
+      const chartOverview_ghg_sum = chartRegister['GHG']['overview']['sum'];
+      const chartOverview_ghg_ag = chartRegister['GHG']['overview']['Ag'];
+      const chartOverview_ghg_agMgt = chartRegister['GHG']['overview']['Ag Mgt'];
+      const chartOverview_ghg_Nonag = chartRegister['GHG']['overview']['Non-Ag'];
+      const chartOverview_prod_achieve = chartRegister['Production']['overview']['achieve'];
+      const chartOverview_prod_overview = chartRegister['Production']['overview']['sum'];
       const chartOverview_water = chartRegister['Water']['NRM']['overview'];
 
       const rankingArea = chartRegister['Area']['ranking'];
@@ -141,15 +166,16 @@ window.HomeView = {
       await loadScript(chartOverview_bio_GBF2['path'], chartOverview_bio_GBF2['name']);
       await loadScript(chartOverview_area['Category']['path'], chartOverview_area['Category']['name']);
       await loadScript(chartOverview_area['Land-use']['path'], chartOverview_area['Land-use']['name']);
-      await loadScript(chartOverview_economics['path'], chartOverview_economics['name']);
+      await loadScript(chartOverview_economics_sum['path'], chartOverview_economics_sum['name']);
       await loadScript(chartOverview_economics_ag['path'], chartOverview_economics_ag['name']);
       await loadScript(chartOverview_economics_agMgt['path'], chartOverview_economics_agMgt['name']);
       await loadScript(chartOverview_economics_Nonag['path'], chartOverview_economics_Nonag['name']);
-      await loadScript(chartOverview_ghg['path'], chartOverview_ghg['name']);
+      await loadScript(chartOverview_ghg_sum['path'], chartOverview_ghg_sum['name']);
       await loadScript(chartOverview_ghg_ag['path'], chartOverview_ghg_ag['name']);
       await loadScript(chartOverview_ghg_agMgt['path'], chartOverview_ghg_agMgt['name']);
       await loadScript(chartOverview_ghg_Nonag['path'], chartOverview_ghg_Nonag['name']);
-      await loadScript(chartOverview_production['path'], chartOverview_production['name']);
+      await loadScript(chartOverview_prod_achieve['path'], chartOverview_prod_achieve['name']);
+      await loadScript(chartOverview_prod_overview['path'], chartOverview_prod_overview['name']);
       await loadScript(chartOverview_water['Type']['path'], chartOverview_water['Type']['name']);
 
       await loadScript(rankingArea['path'], rankingArea['name']);
@@ -170,19 +196,25 @@ window.HomeView = {
           'GBF2': window[chartOverview_bio_GBF2['name']],
         },
         'Economics': {
-          'Overview': window[chartOverview_economics['name']],
+          'Overview': window[chartOverview_economics_sum['name']],
           'Ag': window[chartOverview_economics_ag['name']],
           'Ag Mgt': window[chartOverview_economics_agMgt['name']],
           'Non-Ag': window[chartOverview_economics_Nonag['name']],
         },
         'GHG': {
-          'Overview': window[chartOverview_ghg['name']],
+          'Overview': window[chartOverview_ghg_sum['name']],
           'Ag': window[chartOverview_ghg_ag['name']],
           'Ag Mgt': window[chartOverview_ghg_agMgt['name']],
           'Non-Ag': window[chartOverview_ghg_Nonag['name']],
         },
         'Production': {
-          'Achievement': window[chartOverview_production['name']],
+          'Off-target achievement': window[chartOverview_prod_achieve['name']],
+          'Overview': {
+            "AUSTRALIA": {
+              series: window[chartOverview_prod_overview['name']]['Main'],
+              drilldown: window[chartOverview_prod_overview['name']]['Drilldown']
+            },
+          },
         },
         'Water': {
           'Type': window[chartOverview_water['Type']['name']],

@@ -59,11 +59,14 @@ COMMIDOTY_GROUP = {
    "Cotton": "Crops",
    "Sugar": "Crops",
    "Other non-cereal crops": "Crops",
-   "Hay": "Hay"
+   "Hay": "Hay",
+   "Aquaculture": "Off-land Products",
+   "Chicken": "Off-land Products",
+   "Eggs": "Off-land Products",
+   "Pork": "Off-land Products"
 }
 
 COMMODITIES_OFF_LAND = ['Aquaculture', 'Chicken', 'Eggs', 'Pork' ]
-
 COMMODITIES_ALL = COMMODITIES_ON_LAND + COMMODITIES_OFF_LAND
 
 
