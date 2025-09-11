@@ -1,11 +1,14 @@
 window.EconomicsView = {
   setup() {
-    const { ref, onMounted, inject, computed, watch, nextTick } = Vue;
+    const { ref, onMounted, onUnmounted, inject, computed, watch, nextTick } = Vue;
 
     // Data|Map service
     const chartRegister = window.DataService.chartCategories["Economics"];
     const mapRegister = window.MapService.mapCategories["Economics"];
-    const loadScript = window.loadScript;
+    const loadScript = window.loadScriptWithTracking;
+    
+    // View identification for memory management
+    const VIEW_NAME = "Economics";
 
     // Global selection state
     const yearIndex = ref(0);
@@ -130,19 +133,19 @@ window.EconomicsView = {
     });
 
     onMounted(async () => {
-      await loadScript("./data/Supporting_info.js", "Supporting_info");
-      await loadScript("./data/chart_option/Chart_default_options.js", "Chart_default_options");
+      await loadScript("./data/Supporting_info.js", "Supporting_info", VIEW_NAME);
+      await loadScript("./data/chart_option/Chart_default_options.js", "Chart_default_options", VIEW_NAME);
 
       // Load data
-      await loadScript(mapRegister["Cost"]["Ag"]["path"], mapRegister["Cost"]["Ag"]["name"]);
-      await loadScript(mapRegister["Cost"]["Ag Mgt"]["path"], mapRegister["Cost"]["Ag Mgt"]["name"]);
-      await loadScript(mapRegister["Cost"]["Non-Ag"]["path"], mapRegister["Cost"]["Non-Ag"]["name"]);
-      await loadScript(mapRegister["Revenue"]["Ag"]["path"], mapRegister["Revenue"]["Ag"]["name"]);
-      await loadScript(mapRegister["Revenue"]["Ag Mgt"]["path"], mapRegister["Revenue"]["Ag Mgt"]["name"]);
-      await loadScript(mapRegister["Revenue"]["Non-Ag"]["path"], mapRegister["Revenue"]["Non-Ag"]["name"]);
-      await loadScript(chartRegister["Ag"]["path"], chartRegister["Ag"]["name"]);
-      await loadScript(chartRegister["Ag Mgt"]["path"], chartRegister["Ag Mgt"]["name"]);
-      await loadScript(chartRegister["Non-Ag"]["path"], chartRegister["Non-Ag"]["name"]);
+      await loadScript(mapRegister["Cost"]["Ag"]["path"], mapRegister["Cost"]["Ag"]["name"], VIEW_NAME);
+      await loadScript(mapRegister["Cost"]["Ag Mgt"]["path"], mapRegister["Cost"]["Ag Mgt"]["name"], VIEW_NAME);
+      await loadScript(mapRegister["Cost"]["Non-Ag"]["path"], mapRegister["Cost"]["Non-Ag"]["name"], VIEW_NAME);
+      await loadScript(mapRegister["Revenue"]["Ag"]["path"], mapRegister["Revenue"]["Ag"]["name"], VIEW_NAME);
+      await loadScript(mapRegister["Revenue"]["Ag Mgt"]["path"], mapRegister["Revenue"]["Ag Mgt"]["name"], VIEW_NAME);
+      await loadScript(mapRegister["Revenue"]["Non-Ag"]["path"], mapRegister["Revenue"]["Non-Ag"]["name"], VIEW_NAME);
+      await loadScript(chartRegister["Ag"]["path"], chartRegister["Ag"]["name"], VIEW_NAME);
+      await loadScript(chartRegister["Ag Mgt"]["path"], chartRegister["Ag Mgt"]["name"], VIEW_NAME);
+      await loadScript(chartRegister["Non-Ag"]["path"], chartRegister["Non-Ag"]["name"], VIEW_NAME);
 
       // Initial selections
       availableYears.value = window.Supporting_info.years;
@@ -262,6 +265,11 @@ window.EconomicsView = {
       } else if (selectCategory.value === "Non-Ag") {
         previousSelections.value["Non-Ag"].landuse = newLanduse;
       }
+    });
+
+    // Memory cleanup on component unmount
+    onUnmounted(() => {
+      window.MemoryService.cleanupViewData(VIEW_NAME);
     });
 
     return {

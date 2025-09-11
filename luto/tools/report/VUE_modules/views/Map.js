@@ -1,10 +1,13 @@
 window['MapView'] = {
     setup() {
-        const { inject, ref, watch, onMounted, computed, nextTick } = Vue;
+        const { inject, ref, watch, onMounted, onUnmounted, computed, nextTick } = Vue;
 
         // Data|Map service
         const mapRegister = window.MapService.mapCategories["Dvar"];        // MapService was registered in the index.html        [MapService.js]
-        const loadScript = window.loadScript;                               // DataConstructor has been registered in index.html  [helpers.js]
+        const loadScript = window.loadScriptWithTracking;
+        
+        // View identification for memory management
+        const VIEW_NAME = "Map";                               // DataConstructor has been registered in index.html  [helpers.js]
 
         // Global selection state
         const yearIndex = ref(0);
@@ -67,11 +70,11 @@ window['MapView'] = {
         });
 
         onMounted(async () => {
-            await loadScript("./data/Supporting_info.js", "Supporting_info");
-            await loadScript(mapRegister["Ag"]['path'], mapRegister["Ag"]['name']);
-            await loadScript(mapRegister["Ag Mgt"]['path'], mapRegister["Ag Mgt"]['name']);
-            await loadScript(mapRegister["Non-Ag"]['path'], mapRegister["Non-Ag"]['name']);
-            await loadScript(mapRegister["Mosaic"]['path'], mapRegister["Mosaic"]['name']);
+            await loadScript("./data/Supporting_info.js", "Supporting_info", VIEW_NAME);
+            await loadScript(mapRegister["Ag"]['path'], mapRegister["Ag"]['name'], VIEW_NAME);
+            await loadScript(mapRegister["Ag Mgt"]['path'], mapRegister["Ag Mgt"]['name'], VIEW_NAME);
+            await loadScript(mapRegister["Non-Ag"]['path'], mapRegister["Non-Ag"]['name'], VIEW_NAME);
+            await loadScript(mapRegister["Mosaic"]['path'], mapRegister["Mosaic"]['name'], VIEW_NAME);
 
             dvarMaps.value = {
                 'Land-use': { 'Land-use': window[mapRegister["Mosaic"]['name']]['Land-use'] },
@@ -123,6 +126,30 @@ window['MapView'] = {
             if (selectCategory.value) {
                 previousSelections.value[selectCategory.value].landuse = newLanduse;
             }
+        });
+
+        return {
+            yearIndex,
+            selectYear,
+            selectRegion,
+
+            availableYears,
+            availableCategories,
+            availableLanduse,
+
+            selectCategory,
+            selectLanduse,
+
+            selectMapData,
+            selectLegend,
+
+            dataLoaded,
+            mapReady,
+        };
+
+        // Memory cleanup on component unmount
+        onUnmounted(() => {
+            window.MemoryService.cleanupViewData(VIEW_NAME);
         });
 
         return {

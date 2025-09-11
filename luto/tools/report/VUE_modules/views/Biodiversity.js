@@ -1,11 +1,14 @@
 window.BiodiversityView = {
   setup() {
-    const { ref, onMounted, inject, computed, watch, nextTick } = Vue;
+    const { ref, onMounted, onUnmounted, inject, computed, watch, nextTick } = Vue;
 
     // Data|Map service - Only use GBF2 data as requested
     const chartRegister = window.DataService.chartCategories["Biodiversity"]["GBF2"];
     const mapRegister = window.MapService.mapCategories["Biodiversity"]["GBF2"];
-    const loadScript = window.loadScript;
+    const loadScript = window.loadScriptWithTracking;
+    
+    // View identification for memory management
+    const VIEW_NAME = "Biodiversity";
 
     // Global selection state
     const yearIndex = ref(0);
@@ -125,18 +128,23 @@ window.BiodiversityView = {
       };
     });
 
+    // Memory cleanup on component unmount
+    onUnmounted(() => {
+      window.MemoryService.cleanupViewData(VIEW_NAME);
+    });
+
     onMounted(async () => {
-      await loadScript("./data/Supporting_info.js", "Supporting_info");
-      await loadScript("./data/chart_option/Chart_default_options.js", "Chart_default_options");
+      await loadScript("./data/Supporting_info.js", "Supporting_info", VIEW_NAME);
+      await loadScript("./data/chart_option/Chart_default_options.js", "Chart_default_options", VIEW_NAME);
 
       // Load GBF2 data only (as requested - ignore quality data)
-      await loadScript(mapRegister["Ag"]["path"], mapRegister["Ag"]["name"]);
-      await loadScript(mapRegister["Ag Mgt"]["path"], mapRegister["Ag Mgt"]["name"]);
-      await loadScript(mapRegister["Non-Ag"]["path"], mapRegister["Non-Ag"]["name"]);
-      await loadScript(chartRegister["Ag"]["path"], chartRegister["Ag"]["name"]);
+      await loadScript(mapRegister["Ag"]["path"], mapRegister["Ag"]["name"], VIEW_NAME);
+      await loadScript(mapRegister["Ag Mgt"]["path"], mapRegister["Ag Mgt"]["name"], VIEW_NAME);
+      await loadScript(mapRegister["Non-Ag"]["path"], mapRegister["Non-Ag"]["name"], VIEW_NAME);
+      await loadScript(chartRegister["Ag"]["path"], chartRegister["Ag"]["name"], VIEW_NAME);
       // Load Ag Mgt Landuse chart dataset (for series highlighting with landuse selection)
-      await loadScript(chartRegister["Ag Mgt"]["Landuse"]["path"], chartRegister["Ag Mgt"]["Landuse"]["name"]);
-      await loadScript(chartRegister["Non-Ag"]["path"], chartRegister["Non-Ag"]["name"]);
+      await loadScript(chartRegister["Ag Mgt"]["Landuse"]["path"], chartRegister["Ag Mgt"]["Landuse"]["name"], VIEW_NAME);
+      await loadScript(chartRegister["Non-Ag"]["path"], chartRegister["Non-Ag"]["name"], VIEW_NAME);
 
       // Initial selections
       availableYears.value = window.Supporting_info.years;

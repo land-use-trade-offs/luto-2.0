@@ -57,6 +57,12 @@ window.Highchart = {
     // Function to handle dataset loading and chart creation
     const createChart = () => {
       isLoading.value = true;
+      
+      // CRITICAL: Destroy existing chart before creating new one
+      if (ChartInstance.value) {
+        ChartInstance.value.destroy();
+        ChartInstance.value = null;
+      }
 
       // Apply highlighting to chart data before creating chart
       const processedChartData = applyHighlighting(props.chartData);
@@ -69,7 +75,6 @@ window.Highchart = {
           chart: (processedChartData.chart || {}),
         }
       );
-
       isLoading.value = false;
     };
 
@@ -180,6 +185,13 @@ window.Highchart = {
     });
 
     onUnmounted(() => {
+      // CRITICAL: Destroy Highcharts instance to prevent memory leaks
+      if (ChartInstance.value) {
+        ChartInstance.value.destroy();
+        ChartInstance.value = null;
+      }
+      
+      // Remove event listeners
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('mousemove', onDrag);
       window.removeEventListener('mouseup', stopDrag);

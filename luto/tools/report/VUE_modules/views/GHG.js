@@ -1,11 +1,14 @@
 window.GHGView = {
   setup() {
-    const { ref, onMounted, inject, computed, watch, nextTick } = Vue;
+    const { ref, onMounted, onUnmounted, inject, computed, watch, nextTick } = Vue;
 
     // Data|Map service
     const chartRegister = window.DataService.chartCategories["GHG"];
     const mapRegister = window.MapService.mapCategories["GHG"];
-    const loadScript = window.loadScript;
+    const loadScript = window.loadScriptWithTracking;
+
+    // View identification for memory management
+    const VIEW_NAME = "GHG";
 
     // Global selection state
     const yearIndex = ref(0);
@@ -123,17 +126,22 @@ window.GHGView = {
       };
     });
 
+    // Memory cleanup on component unmount
+    onUnmounted(() => {
+      window.MemoryService.cleanupViewData(VIEW_NAME);
+    });
+
     onMounted(async () => {
-      await loadScript("./data/Supporting_info.js", "Supporting_info");
-      await loadScript("./data/chart_option/Chart_default_options.js", "Chart_default_options");
+      await loadScript("./data/Supporting_info.js", "Supporting_info", VIEW_NAME);
+      await loadScript("./data/chart_option/Chart_default_options.js", "Chart_default_options", VIEW_NAME);
 
       // Load data
-      await loadScript(mapRegister["Ag"]["path"], mapRegister["Ag"]["name"]);
-      await loadScript(mapRegister["Ag Mgt"]["path"], mapRegister["Ag Mgt"]["name"]);
-      await loadScript(mapRegister["Non-Ag"]["path"], mapRegister["Non-Ag"]["name"]);
-      await loadScript(chartRegister["Ag"]["path"], chartRegister["Ag"]["name"]);
-      await loadScript(chartRegister["Ag Mgt"]["path"], chartRegister["Ag Mgt"]["name"]);
-      await loadScript(chartRegister["Non-Ag"]["path"], chartRegister["Non-Ag"]["name"]);
+      await loadScript(mapRegister["Ag"]["path"], mapRegister["Ag"]["name"], VIEW_NAME);
+      await loadScript(mapRegister["Ag Mgt"]["path"], mapRegister["Ag Mgt"]["name"], VIEW_NAME);
+      await loadScript(mapRegister["Non-Ag"]["path"], mapRegister["Non-Ag"]["name"], VIEW_NAME);
+      await loadScript(chartRegister["Ag"]["path"], chartRegister["Ag"]["name"], VIEW_NAME);
+      await loadScript(chartRegister["Ag Mgt"]["path"], chartRegister["Ag Mgt"]["name"], VIEW_NAME);
+      await loadScript(chartRegister["Non-Ag"]["path"], chartRegister["Non-Ag"]["name"], VIEW_NAME);
 
       // Initial selections
       availableYears.value = window.Supporting_info.years;
@@ -219,7 +227,7 @@ window.GHGView = {
       // Save current agMgt selection
       if (selectCategory.value === "Ag Mgt") {
         previousSelections.value["Ag Mgt"].agMgt = newAgMgt;
-        
+
         // Handle ALL downstream variables with cascading pattern
         // Get water options from chart data for GHG Am
         const chartDataName = chartRegister["Ag Mgt"]?.["name"];

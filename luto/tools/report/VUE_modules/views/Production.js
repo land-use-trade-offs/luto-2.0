@@ -1,11 +1,14 @@
 window.ProductionView = {
   setup() {
-    const { ref, onMounted, inject, computed, watch, nextTick } = Vue;
+    const { ref, onMounted, onUnmounted, inject, computed, watch, nextTick } = Vue;
 
     // Data|Map service
     const chartRegister = window.DataService.chartCategories["Production"];
     const mapRegister = window.MapService.mapCategories["Production"];
-    const loadScript = window.loadScript;
+    const loadScript = window.loadScriptWithTracking;
+    
+    // View identification for memory management
+    const VIEW_NAME = "Production";
 
     // Global selection state
     const yearIndex = ref(0);
@@ -135,16 +138,16 @@ window.ProductionView = {
     });
 
     onMounted(async () => {
-      await loadScript("./data/Supporting_info.js", "Supporting_info");
-      await loadScript("./data/chart_option/Chart_default_options.js", "Chart_default_options");
+      await loadScript("./data/Supporting_info.js", "Supporting_info", VIEW_NAME);
+      await loadScript("./data/chart_option/Chart_default_options.js", "Chart_default_options", VIEW_NAME);
 
       // Load data
-      await loadScript(mapRegister["Ag"]["path"], mapRegister["Ag"]["name"]);
-      await loadScript(mapRegister["Ag Mgt"]["path"], mapRegister["Ag Mgt"]["name"]);
-      await loadScript(mapRegister["Non-Ag"]["path"], mapRegister["Non-Ag"]["name"]);
-      await loadScript(chartRegister["Ag"]["path"], chartRegister["Ag"]["name"]);
-      await loadScript(chartRegister["Ag Mgt"]["path"], chartRegister["Ag Mgt"]["name"]);
-      await loadScript(chartRegister["Non-Ag"]["path"], chartRegister["Non-Ag"]["name"]);
+      await loadScript(mapRegister["Ag"]["path"], mapRegister["Ag"]["name"], VIEW_NAME);
+      await loadScript(mapRegister["Ag Mgt"]["path"], mapRegister["Ag Mgt"]["name"], VIEW_NAME);
+      await loadScript(mapRegister["Non-Ag"]["path"], mapRegister["Non-Ag"]["name"], VIEW_NAME);
+      await loadScript(chartRegister["Ag"]["path"], chartRegister["Ag"]["name"], VIEW_NAME);
+      await loadScript(chartRegister["Ag Mgt"]["path"], chartRegister["Ag Mgt"]["name"], VIEW_NAME);
+      await loadScript(chartRegister["Non-Ag"]["path"], chartRegister["Non-Ag"]["name"], VIEW_NAME);
 
       // Initial selections
       availableYears.value = window.Supporting_info.years;
@@ -258,6 +261,35 @@ window.ProductionView = {
       } else if (selectCategory.value === "Non-Ag") {
         previousSelections.value["Non-Ag"].landuse = newLanduse;
       }
+    });
+
+    return {
+      yearIndex,
+      selectYear,
+      selectRegion,
+
+      availableYears,
+      availableCategories,
+      availableAgMgt,
+      availableWater,
+      availableLanduse,
+
+      selectCategory,
+      selectAgMgt,
+      selectWater,
+      selectLanduse,
+
+      selectMapData,
+      selectChartData,
+
+      dataLoaded,
+      isDrawerOpen,
+      toggleDrawer,
+    };
+
+    // Memory cleanup on component unmount
+    onUnmounted(() => {
+      window.MemoryService.cleanupViewData(VIEW_NAME);
     });
 
     return {

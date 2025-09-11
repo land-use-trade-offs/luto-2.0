@@ -2,11 +2,14 @@ window.HomeView = {
 
   setup() {
 
-    const { ref, onMounted, watch, computed, inject, nextTick } = Vue;
+    const { ref, onMounted, onUnmounted, watch, computed, inject, nextTick } = Vue;
 
     // Data service
     const chartRegister = window.DataService.chartCategories;   // DataService has been registered in index.html      [DataService.js]
-    const loadScript = window.loadScript;                       // DataConstructor has been registered in index.html  [helpers.js]
+    const loadScript = window.loadScriptWithTracking;
+    
+    // View identification for memory management
+    const VIEW_NAME = "Home";                       // DataConstructor has been registered in index.html  [helpers.js]
 
     // Global variables
     const selectRegion = inject('globalSelectedRegion');
@@ -119,9 +122,9 @@ window.HomeView = {
     onMounted(async () => {
 
       // Load required data
-      await loadScript("./data/Supporting_info.js", 'Supporting_info');
-      await loadScript("./data/chart_option/Chart_default_options.js", 'Chart_default_options');
-      await loadScript("./data/geo/NRM_AUS.js", 'NRM_AUS');
+      await loadScript("./data/Supporting_info.js", 'Supporting_info', VIEW_NAME);
+      await loadScript("./data/chart_option/Chart_default_options.js", 'Chart_default_options', VIEW_NAME);
+      await loadScript("./data/geo/NRM_AUS.js", 'NRM_AUS', VIEW_NAME);
 
       // Overview chart data
       const chartOverview_area = chartRegister['Area']['overview'];
@@ -153,35 +156,35 @@ window.HomeView = {
       const rankingWater = chartRegister['Water']['NRM']['ranking'];
       const rankingBiodiversity = chartRegister['Biodiversity']['ranking'];
 
-      await loadScript(chartOverview_area['Source']['path'], chartOverview_area['Source']['name']);
-      await loadScript(chartOverview_bio_GBF2['path'], chartOverview_bio_GBF2['name']);
-      await loadScript(chartOverview_area['Category']['path'], chartOverview_area['Category']['name']);
-      await loadScript(chartOverview_area['Land-use']['path'], chartOverview_area['Land-use']['name']);
-      await loadScript(chartOverview_economics_sum['path'], chartOverview_economics_sum['name']);
-      await loadScript(chartOverview_economics_ag['path'], chartOverview_economics_ag['name']);
-      await loadScript(chartOverview_economics_agMgt['path'], chartOverview_economics_agMgt['name']);
-      await loadScript(chartOverview_economics_Nonag['path'], chartOverview_economics_Nonag['name']);
-      await loadScript(chartOverview_ghg_sum['path'], chartOverview_ghg_sum['name']);
-      await loadScript(chartOverview_ghg_ag['path'], chartOverview_ghg_ag['name']);
-      await loadScript(chartOverview_ghg_agMgt['path'], chartOverview_ghg_agMgt['name']);
-      await loadScript(chartOverview_ghg_Nonag['path'], chartOverview_ghg_Nonag['name']);
-      await loadScript(chartOverview_prod_achieve['path'], chartOverview_prod_achieve['name']);
-      await loadScript(chartOverview_prod_overview['path'], chartOverview_prod_overview['name']);
-      await loadScript(chartOverview_prod_domestic['path'], chartOverview_prod_domestic['name']);
-      await loadScript(chartOverview_prod_export['path'], chartOverview_prod_export['name']);
-      await loadScript(chartOverview_prod_import['path'], chartOverview_prod_import['name']);
-      await loadScript(chartOverview_prod_feed['path'], chartOverview_prod_feed['name']);
-      await loadScript(chartOverview_water_sum['path'], chartOverview_water_sum['name']);
-      await loadScript(chartOverview_water_ag['path'], chartOverview_water_ag['name']);
-      await loadScript(chartOverview_water_agMgt['path'], chartOverview_water_agMgt['name']);
-      await loadScript(chartOverview_water_Nonag['path'], chartOverview_water_Nonag['name']);
+      await loadScript(chartOverview_area['Source']['path'], chartOverview_area['Source']['name'], VIEW_NAME);
+      await loadScript(chartOverview_bio_GBF2['path'], chartOverview_bio_GBF2['name'], VIEW_NAME);
+      await loadScript(chartOverview_area['Category']['path'], chartOverview_area['Category']['name'], VIEW_NAME);
+      await loadScript(chartOverview_area['Land-use']['path'], chartOverview_area['Land-use']['name'], VIEW_NAME);
+      await loadScript(chartOverview_economics_sum['path'], chartOverview_economics_sum['name'], VIEW_NAME);
+      await loadScript(chartOverview_economics_ag['path'], chartOverview_economics_ag['name'], VIEW_NAME);
+      await loadScript(chartOverview_economics_agMgt['path'], chartOverview_economics_agMgt['name'], VIEW_NAME);
+      await loadScript(chartOverview_economics_Nonag['path'], chartOverview_economics_Nonag['name'], VIEW_NAME);
+      await loadScript(chartOverview_ghg_sum['path'], chartOverview_ghg_sum['name'], VIEW_NAME);
+      await loadScript(chartOverview_ghg_ag['path'], chartOverview_ghg_ag['name'], VIEW_NAME);
+      await loadScript(chartOverview_ghg_agMgt['path'], chartOverview_ghg_agMgt['name'], VIEW_NAME);
+      await loadScript(chartOverview_ghg_Nonag['path'], chartOverview_ghg_Nonag['name'], VIEW_NAME);
+      await loadScript(chartOverview_prod_achieve['path'], chartOverview_prod_achieve['name'], VIEW_NAME);
+      await loadScript(chartOverview_prod_overview['path'], chartOverview_prod_overview['name'], VIEW_NAME);
+      await loadScript(chartOverview_prod_domestic['path'], chartOverview_prod_domestic['name'], VIEW_NAME);
+      await loadScript(chartOverview_prod_export['path'], chartOverview_prod_export['name'], VIEW_NAME);
+      await loadScript(chartOverview_prod_import['path'], chartOverview_prod_import['name'], VIEW_NAME);
+      await loadScript(chartOverview_prod_feed['path'], chartOverview_prod_feed['name'], VIEW_NAME);
+      await loadScript(chartOverview_water_sum['path'], chartOverview_water_sum['name'], VIEW_NAME);
+      await loadScript(chartOverview_water_ag['path'], chartOverview_water_ag['name'], VIEW_NAME);
+      await loadScript(chartOverview_water_agMgt['path'], chartOverview_water_agMgt['name'], VIEW_NAME);
+      await loadScript(chartOverview_water_Nonag['path'], chartOverview_water_Nonag['name'], VIEW_NAME);
 
-      await loadScript(rankingArea['path'], rankingArea['name']);
-      await loadScript(rankingEconomics['path'], rankingEconomics['name']);
-      await loadScript(rankingGHG['path'], rankingGHG['name']);
-      await loadScript(rankingProduction['path'], rankingProduction['name']);
-      await loadScript(rankingWater['path'], rankingWater['name']);
-      await loadScript(rankingBiodiversity['path'], rankingBiodiversity['name']);
+      await loadScript(rankingArea['path'], rankingArea['name'], VIEW_NAME);
+      await loadScript(rankingEconomics['path'], rankingEconomics['name'], VIEW_NAME);
+      await loadScript(rankingGHG['path'], rankingGHG['name'], VIEW_NAME);
+      await loadScript(rankingProduction['path'], rankingProduction['name'], VIEW_NAME);
+      await loadScript(rankingWater['path'], rankingWater['name'], VIEW_NAME);
+      await loadScript(rankingBiodiversity['path'], rankingBiodiversity['name'], VIEW_NAME);
 
 
       ChartData.value = {
@@ -270,6 +273,11 @@ window.HomeView = {
         ])
       );
 
+    });
+
+    // Memory cleanup on component unmount
+    onUnmounted(() => {
+      window.MemoryService.cleanupViewData(VIEW_NAME);
     });
 
     return {
