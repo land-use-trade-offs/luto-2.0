@@ -56,7 +56,6 @@ window.HomeView = {
 
       const seriesColors = seriesData.map(serie => serie.color).filter(color => color) || [];
       const colors = seriesColors.length > 0 ? seriesColors : window['Supporting_info']?.colors || [];
-
       return {
         ...window['Chart_default_options'],
         chart: {

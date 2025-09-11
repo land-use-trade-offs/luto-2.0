@@ -25,7 +25,6 @@ window.Highchart = {
     const chartElement = ref(null);
     const isLoading = ref(true);
     const ChartInstance = ref(null);
-    const chartColor = ref(null);
     const position = ref({ x: 0, y: 0 });
     const isDragging = ref(false);
     const dragStartPos = ref({ x: 0, y: 0 });
@@ -59,11 +58,6 @@ window.Highchart = {
     const createChart = () => {
       isLoading.value = true;
 
-      // Store colors first to prevent mutations
-      if (props.chartData?.colors) {
-        chartColor.value = JSON.parse(JSON.stringify(props.chartData.colors));
-      }
-
       // Apply highlighting to chart data before creating chart
       const processedChartData = applyHighlighting(props.chartData);
 
@@ -72,7 +66,6 @@ window.Highchart = {
         chartElement.value,
         {
           ...processedChartData,
-          colors: chartColor.value,
           chart: (processedChartData.chart || {}),
         }
       );
@@ -168,8 +161,11 @@ window.Highchart = {
       }
 
       // Apply our stored colors LAST to prevent them being overwritten
-      if (chartColor.value) {
-        chart.update({ colors: chartColor.value }, true);
+      if (props.chartData.colors) {
+        chart.series.forEach((series, index) => {
+          const colorIndex = index % props.chartData.colors.length;
+          series.update({ color: props.chartData.colors[colorIndex] }, false);
+        });
       }
 
       // Final redraw to apply all changes with animation
@@ -198,11 +194,6 @@ window.Highchart = {
       }
 
       isUpdating = true;
-
-      // First, store a fresh copy of colors before any chart updates
-      if (newValue?.colors) {
-        chartColor.value = JSON.parse(JSON.stringify(newValue.colors));
-      }
 
       // Then update the chart
       updateChart(ChartInstance.value, newValue);
