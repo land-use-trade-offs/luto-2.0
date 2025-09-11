@@ -205,9 +205,21 @@ window.DataService = {
           name: "Water_NonAg_NRM",
         },
         overview: {
-          Type: {
-            path: "data/Water_overview_NRM_Type.js",
-            name: "Water_overview_NRM_Type",
+          Ag: {
+            path: "data/Water_overview_NRM_Ag.js",
+            name: "Water_overview_NRM_Ag",
+          },
+          "Ag Mgt": {
+            path: "data/Water_overview_NRM_Am.js",
+            name: "Water_overview_NRM_Am",
+          },
+          "Non-Ag": {
+            path: "data/Water_overview_NRM_NonAg.js",
+            name: "Water_overview_NRM_NonAg",
+          },
+          'sum': {
+            path: "data/Water_overview_NRM_sum.js",
+            name: "Water_overview_NRM_sum",
           },
         },
         ranking: {

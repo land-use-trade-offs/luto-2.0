@@ -51,10 +51,12 @@ window.HomeView = {
       const originalData = ChartData.value?.[selectChartCategory.value]?.[selectChartSubCategory.value]?.[selectRegion.value];
       if (Array.isArray(originalData) && originalData) {
         seriesData = JSON.parse(JSON.stringify(originalData));
-      } else { // in this case, the data structure is { "AUSTRALIA": { series: [], drilldown: {} } }
-        seriesData = JSON.parse(JSON.stringify(originalData?.series)) || [];
-        drilldown = JSON.parse(JSON.stringify(originalData?.drilldown)) || [];
+      } else if (originalData?.series) { // Production data structure: { "AUSTRALIA": { series: [], drilldown: {} } }
+        seriesData = JSON.parse(JSON.stringify(originalData.series)) || [];
+        drilldown = JSON.parse(JSON.stringify(originalData.drilldown)) || [];
         yAxisTitle = 'Quantity (tonnes, KL)'
+      } else {
+        seriesData = [];
       }
 
       const seriesColors = seriesData.map(serie => serie.color).filter(color => color) || [];
@@ -153,7 +155,11 @@ window.HomeView = {
       const chartOverview_ghg_Nonag = chartRegister['GHG']['overview']['Non-Ag'];
       const chartOverview_prod_achieve = chartRegister['Production']['overview']['achieve'];
       const chartOverview_prod_overview = chartRegister['Production']['overview']['sum'];
-      const chartOverview_water = chartRegister['Water']['NRM']['overview'];
+      const chartOverview_water_sum = chartRegister['Water']['NRM']['overview']['sum'];
+      const chartOverview_water_ag = chartRegister['Water']['NRM']['overview']['Ag'];
+      const chartOverview_water_agMgt = chartRegister['Water']['NRM']['overview']['Ag Mgt'];
+      const chartOverview_water_Nonag = chartRegister['Water']['NRM']['overview']['Non-Ag'];
+      // Ranking chart data
 
       const rankingArea = chartRegister['Area']['ranking'];
       const rankingEconomics = chartRegister['Economics']['ranking'];
@@ -176,7 +182,10 @@ window.HomeView = {
       await loadScript(chartOverview_ghg_Nonag['path'], chartOverview_ghg_Nonag['name']);
       await loadScript(chartOverview_prod_achieve['path'], chartOverview_prod_achieve['name']);
       await loadScript(chartOverview_prod_overview['path'], chartOverview_prod_overview['name']);
-      await loadScript(chartOverview_water['Type']['path'], chartOverview_water['Type']['name']);
+      await loadScript(chartOverview_water_sum['path'], chartOverview_water_sum['name']);
+      await loadScript(chartOverview_water_ag['path'], chartOverview_water_ag['name']);
+      await loadScript(chartOverview_water_agMgt['path'], chartOverview_water_agMgt['name']);
+      await loadScript(chartOverview_water_Nonag['path'], chartOverview_water_Nonag['name']);
 
       await loadScript(rankingArea['path'], rankingArea['name']);
       await loadScript(rankingEconomics['path'], rankingEconomics['name']);
@@ -217,7 +226,10 @@ window.HomeView = {
           },
         },
         'Water': {
-          'Type': window[chartOverview_water['Type']['name']],
+          'Overview': window[chartOverview_water_sum['name']],
+          'Ag': window[chartOverview_water_ag['name']],
+          'Ag Mgt': window[chartOverview_water_agMgt['name']],
+          'Non-Ag': window[chartOverview_water_Nonag['name']],
         },
       };
 

@@ -158,16 +158,9 @@ def save_report_data(raw_data_dir:str):
         .assign(Rank=lambda x: x.groupby(['Year']).cumcount(), Source='Total')\
         .round({'Area (ha)': 2})
         
-    area_ranking = pd.concat([area_ranking_type, area_ranking_total], ignore_index=True)
-
-    area_ranking = area_ranking.set_index(['Year', 'region', 'Source'])\
-        .reindex(
-            index=pd.MultiIndex.from_product(
-                [years, area_ranking['region'].unique(), area_ranking['Source'].unique()],
-                names=['Year', 'region', 'source']), fill_value=None 
-         )\
-        .reset_index()\
+    area_ranking = pd.concat([area_ranking_type, area_ranking_total], ignore_index=True)\
         .assign(color=lambda x: x['Rank'].map(get_rank_color))
+
         
 
     out_dict = {}
@@ -1742,9 +1735,17 @@ def save_report_data(raw_data_dir:str):
     ####################################################
     
     water_files = files.query('category == "water"').reset_index(drop=True)
+    
+    ############ Watershed level  ##############
 
-    water_net_yield_watershed = water_files.query('base_name == "water_yield_separate_watershed"')
-    water_net_yield_watershed = pd.concat([pd.read_csv(path) for path in water_net_yield_watershed['path']], ignore_index=True)
+    water_net_yield_watershed_region = water_files.query('base_name == "water_yield_separate_watershed"')
+    water_net_yield_watershed_region = pd.concat([pd.read_csv(path) for path in water_net_yield_watershed_region['path']], ignore_index=True)
+    water_net_yield_watershed_AUS = water_net_yield_watershed_region\
+        .groupby(['Water Supply',  'Landuse', 'Type', 'Agri-Management', 'Year'], dropna=False)[['Water Net Yield (ML)']]\
+        .sum(numeric_only=True)\
+        .reset_index()\
+        .assign(Region='AUSTRALIA')
+    water_net_yield_watershed = pd.concat([water_net_yield_watershed_region, water_net_yield_watershed_AUS], ignore_index=True)
     water_net_yield_watershed = water_net_yield_watershed\
         .replace(RENAME_AM_NON_AG)\
         .query('abs(`Water Net Yield (ML)`) > 1e-6')\
@@ -1754,206 +1755,162 @@ def save_report_data(raw_data_dir:str):
         .reset_index(drop=True)
 
 
-    water_net_yield_NRM_region = water_files.query('base_name == "water_yield_separate_NRM"')
-    water_net_yield_NRM_region = pd.concat([pd.read_csv(path) for path in water_net_yield_NRM_region['path']], ignore_index=True)
-    water_net_yield_NRM_region = water_net_yield_NRM_region\
-        .replace(RENAME_AM_NON_AG)\
-        .query('abs(`Water Net Yield (ML)`) > 1e-6')\
-        .rename(columns={'Water Net Yield (ML)': 'Value (ML)'})
-    water_net_yield_NRM_region_non_all = water_net_yield_NRM_region\
-        .query('`Water Supply` != "ALL" and `Agri-Management` != "ALL"')\
-        .reset_index(drop=True)
-        
-
     hist_and_public_wny_water_region = water_files.query('base_name == "water_yield_limits_and_public_land"')
     hist_and_public_wny_water_region = pd.concat([pd.read_csv(path) for path in hist_and_public_wny_water_region['path']], ignore_index=True)
-
+    
     water_outside_LUTO = hist_and_public_wny_water_region[['Year','Region', 'Water yield outside LUTO (ML)']].rename(
-        columns={'Water yield outside LUTO (ML)': 'Value (ML)'}
-    )
+        columns={'Water yield outside LUTO (ML)': 'Value (ML)'} )
+    water_outside_LUTO = pd.concat([
+        water_outside_LUTO,
+        water_outside_LUTO.groupby(['Year'])[['Value (ML)']].sum(numeric_only=True).assign(Region='AUSTRALIA').reset_index()
+    ], ignore_index=True)
+    
     water_climate_change_impact = hist_and_public_wny_water_region[['Year','Region', 'Climate Change Impact (ML)']].rename(
-        columns={'Climate Change Impact (ML)': 'Value (ML)'}
-    )
-    water_domestic_use = hist_and_public_wny_water_region[['Year','Region', 'Domestic Water Use (ML)']].rename(
-        columns={'Domestic Water Use (ML)': 'Value (ML)'})
+        columns={'Climate Change Impact (ML)': 'Value (ML)'})
+    water_climate_change_impact = pd.concat([
+        water_climate_change_impact,
+        water_climate_change_impact.groupby(['Year'])[['Value (ML)']].sum(numeric_only=True).assign(Region='AUSTRALIA').reset_index()
+    ], ignore_index=True)
+    
+    water_domestic_use = hist_and_public_wny_water_region[['Year','Region', 'Domestic Water Use (ML)']]\
+        .rename(columns={'Domestic Water Use (ML)': 'Value (ML)'})
     water_domestic_use['Value (ML)'] *= -1  # Domestic water use is negative, indicating a water loss (consumption)
+    water_domestic_use = pd.concat([
+        water_domestic_use,
+        water_domestic_use.groupby(['Year'])[['Value (ML)']].sum(numeric_only=True).assign(Region='AUSTRALIA').reset_index()
+    ], ignore_index=True)
     
     water_yield_limit = hist_and_public_wny_water_region[['Year','Region', 'Water Yield Limit (ML)']].rename(
-        columns={'Water Yield Limit (ML)': 'Value (ML)'}
-    )
+        columns={'Water Yield Limit (ML)': 'Value (ML)'})
+    water_yield_limit = pd.concat([
+        water_yield_limit,
+        water_yield_limit.groupby(['Year'])[['Value (ML)']].sum(numeric_only=True).assign(Region='AUSTRALIA').reset_index()
+    ], ignore_index=True)
+    
     water_net_yield = hist_and_public_wny_water_region[['Year','Region', 'Water Net Yield (ML)']].rename(
-        columns={'Water Net Yield (ML)': 'Value (ML)'}
-    )
+        columns={'Water Net Yield (ML)': 'Value (ML)'})
+    water_net_yield = pd.concat([
+        water_net_yield,
+        water_net_yield.groupby(['Year'])[['Value (ML)']].sum(numeric_only=True).assign(Region='AUSTRALIA').reset_index()
+    ], ignore_index=True)
     
-
     water_targets_before_relaxation = water_files.query('base_name == "water_yield_relaxed_region_raw"')
-    water_targets_before_relaxation = pd.concat([pd.read_csv(path) for path in water_targets_before_relaxation['path']], ignore_index=True)
+    water_targets_before_relaxation = pd.concat([pd.read_csv(path) for path in water_targets_before_relaxation['path']])\
+        .drop(columns=['Region Id'])\
+        .rename(columns={'Region Name': 'Region', 'Target': 'Value (ML)'})
 
 
-
-    # -------------------- Water yield overview for Australia --------------------
-    water_inside_LUTO_sum = water_net_yield_watershed\
-        .query('`Water Supply` != "ALL" and `Agri-Management` != "ALL"')\
-        .groupby(['Year','Type'])[['Value (ML)']]\
+    # -------------------- Water yield overview --------------------
+    water_inside_LUTO_wide = water_net_yield_watershed_non_all\
+        .groupby(['Region', 'Year'])[['Value (ML)']]\
         .sum(numeric_only=True)\
         .round({'Value (ML)': 2})\
-        .reset_index()
-    water_inside_LUTO_sum_wide = water_inside_LUTO_sum\
-        .groupby('Type')[['Year','Value (ML)']]\
-        .apply(lambda x: list(map(list,zip(x['Year'],x['Value (ML)']))))\
         .reset_index()\
-        .round({'Value (ML)': 2})
-    water_inside_LUTO_sum_wide.columns = ['name','data']
-    water_inside_LUTO_sum_wide['type'] = 'column'
+        .groupby(['Region'])[['Year','Value (ML)']]\
+        .apply(lambda x: x[['Year','Value (ML)']].values.tolist())\
+        .reset_index()
+    water_outside_LUTO_wide = water_outside_LUTO\
+        .groupby(['Region'])[['Year','Value (ML)']]\
+        .apply(lambda x: x[['Year','Value (ML)']].values.tolist())\
+        .reset_index()
+    water_CCI_wide = water_climate_change_impact\
+        .groupby('Region')[['Year','Value (ML)']]\
+        .apply(lambda x: x[['Year','Value (ML)']].values.tolist())\
+        .reset_index()
+    water_domestic_wide = water_domestic_use\
+        .groupby('Region')[['Year','Value (ML)']]\
+        .apply(lambda x: x[['Year','Value (ML)']].values.tolist())\
+        .reset_index()
+    water_net_yield_wide = water_net_yield\
+        .groupby('Region')[['Year','Value (ML)']]\
+        .apply(lambda x: x[['Year','Value (ML)']].values.tolist())\
+        .reset_index()
+    water_limit_wide = water_yield_limit\
+        .groupby('Region')[['Year','Value (ML)']]\
+        .apply(lambda x: x[['Year','Value (ML)']].values.tolist())\
+        .reset_index()
     
-        
-    water_outside_LUTO_total = water_outside_LUTO\
-        .groupby('Year')\
-        .sum(numeric_only=True)\
-        .round({'Value (ML)': 2})\
-        .reset_index()[['Year','Value (ML)']].values.tolist()
-    water_CCI = water_climate_change_impact\
-        .groupby('Year')\
-        .sum(numeric_only=True)\
-        .round({'Value (ML)': 2})\
-        .reset_index()[['Year','Value (ML)']].values.tolist()
-    water_domestic = water_domestic_use\
-        .groupby('Year')\
-        .sum(numeric_only=True)\
-        .round({'Value (ML)': 2})\
-        .reset_index()[['Year','Value (ML)']].values.tolist()
-    water_net_yield_sum = water_net_yield\
-        .groupby('Year')\
-        .sum(numeric_only=True)\
-        .round({'Value (ML)': 2})\
-        .reset_index()[['Year','Value (ML)']].values.tolist()
-    water_limit = water_yield_limit\
-        .groupby('Year')\
-        .sum(numeric_only=True)\
-        .round({'Value (ML)': 2})\
-        .reset_index()[['Year','Value (ML)']].values.tolist()
-  
-    water_yield_df_AUS = water_inside_LUTO_sum_wide.copy()
-    water_yield_df_AUS.loc[len(water_yield_df_AUS)] = ['Outside LUTO Study Area', water_outside_LUTO_total,  'column']
-    water_yield_df_AUS.loc[len(water_yield_df_AUS)] = ['Climate Change Impact', water_CCI,  'column']
-    water_yield_df_AUS.loc[len(water_yield_df_AUS)] = ['Domestic Water Use', water_domestic,  'column']
-    water_yield_df_AUS.loc[len(water_yield_df_AUS)] = ['Water Net Yield', water_net_yield_sum, 'line']
-    water_yield_df_AUS.loc[len(water_yield_df_AUS)] = ['Water Limit', water_limit, 'line']
-
-    water_yield_AUS = {
-        'AUSTRALIA': json.loads(water_yield_df_AUS.to_json(orient='records'))
-    }
-
-    # -------------------- Water yield overview for watershed region --------------------
+    # -------------------- Water yield overview --------------------
     water_yield_region = {}
     for reg_name in water_net_yield['Region'].unique():
-
-        water_inside_LUTO_region = water_net_yield.query('Region == @reg_name').copy()
-        water_inside_yield_wide = water_inside_LUTO_region[['Year','Value (ML)']].values.tolist()
-
-        water_outside_LUTO_region = water_outside_LUTO.query('Region == @reg_name').copy()
-        water_outside_yield_wide = water_outside_LUTO_region[['Year','Value (ML)']].values.tolist()
-
-        water_CCI = water_climate_change_impact.query('Region == @reg_name').copy()
-        water_CCI_wide = water_CCI[['Year','Value (ML)']].values.tolist()
         
-        water_domestic = water_domestic_use.query('Region == @reg_name').copy()
-        water_domestic_wide = water_domestic[['Year','Value (ML)']].values.tolist()
-
-        water_net_yield_sum = water_net_yield.query('Region == @reg_name').copy()
-        water_net_yield_sum_wide = water_net_yield_sum[['Year','Value (ML)']].values.tolist()
-
-        water_limit = water_yield_limit.query('Region == @reg_name').copy()
-        water_limit_wide = water_limit[['Year','Value (ML)']].values.tolist()
-
+        water_inside = water_inside_LUTO_wide.query('Region == @reg_name').values.flatten().tolist()[1]
+        water_outside = water_outside_LUTO_wide.query('Region == @reg_name').values.flatten().tolist()[1]
+        water_CCI = water_CCI_wide.query('Region == @reg_name').values.flatten().tolist()[1]
+        water_domestic = water_domestic_wide.query('Region == @reg_name').values.flatten().tolist()[1]
+        water_net_yield_sum = water_net_yield_wide.query('Region == @reg_name').values.flatten().tolist()[1]
+        water_limit = water_limit_wide.query('Region == @reg_name').values.flatten().tolist()[1]
+        
         water_df = pd.DataFrame([
-            ['Water Yield Inside LUTO Study Area', water_inside_yield_wide, 'column', None, None],
-            ['Water Yield Outside LUTO Study Area', water_outside_yield_wide, 'column', None, None],
-            ['Climate Change Impact', water_CCI_wide, 'column', None, None],
-            ['Domestic Water Use', water_domestic_wide, 'column', None, None],
-            ['Water Net Yield', water_net_yield_sum_wide, 'line', None, None],
-            ['Water Limit (model)', water_limit_wide, 'line', 'black', None],
+            ['Water Yield Inside LUTO Study Area', water_inside, 'column', None, None],
+            ['Water Yield Outside LUTO Study Area', water_outside, 'column', None, None],
+            ['Climate Change Impact', water_CCI, 'column', None, None],
+            ['Domestic Water Use', water_domestic, 'column', None, None],
+            ['Water Net Yield', water_net_yield_sum, 'line', None, None],
+            ['Water Limit (model)', water_limit, 'line', 'black', None],
         ],
-            columns=['name','data','type','color','dashStyle']
+            columns=['name', 'data','type','color','dashStyle']
         )
         
         # Add historical water limit if it exists for this region
-        if reg_name in water_targets_before_relaxation['Region Name'].values:
-            raw_targets = water_targets_before_relaxation.query('`Region Name` == @reg_name')[['Year','Target']].values.tolist()
+        if reg_name in water_targets_before_relaxation['Region'].values:
+            raw_targets = water_targets_before_relaxation.query('`Region` == @reg_name')[['Year','Value (ML)']].values.tolist()
             water_df.loc[len(water_df)] = ['Water Limit (historical level)', raw_targets, 'line', '#2176cc', 'Dash']
 
         water_yield_region[reg_name] = water_df.to_dict(orient='records')
         
-        
-    # Combine Australia and regions
-    water_yield_region = {**water_yield_AUS, **water_yield_region}
-    
-    
     filename = 'Water_overview_watershed'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as outfile:
         outfile.write(f'window["{filename}"] = ')
         json.dump(water_yield_region, outfile, separators=(',', ':'), indent=2)
         outfile.write(';\n')
         
-   
-
-    # -------------------- Water yield ranking by NRM --------------------
-    water_ranking_type_region = water_net_yield_NRM_region\
-        .query('`Water Supply` != "ALL" and `Agri-Management` != "ALL"')\
-        .groupby(['Year', 'region_NRM', 'Type'])[['Value (ML)']]\
+        
+    ############ NRM region level  ##############  
+       
+    water_net_yield_NRM_region_region = water_files.query('base_name == "water_yield_separate_NRM"')
+    water_net_yield_NRM_region_region = pd.concat([pd.read_csv(path) for path in water_net_yield_NRM_region_region['path']], ignore_index=True)
+    water_net_yield_NRM_region_AUS = water_net_yield_NRM_region_region\
+        .groupby(['Water Supply', 'Landuse',  'Type', 'Agri-Management', 'Year'], dropna=False)[['Water Net Yield (ML)']]\
         .sum(numeric_only=True)\
         .reset_index()\
-        .sort_values(['Year', 'Type', 'Value (ML)'], ascending=[True, True, False])
-    water_ranking_type_AUS = water_net_yield_NRM_region\
-        .groupby(['Year', 'Type'])[['Value (ML)']]\
+        .assign(region_NRM='AUSTRALIA')
+    water_net_yield_NRM_region = pd.concat([water_net_yield_NRM_region_region, water_net_yield_NRM_region_AUS])\
+        .replace(RENAME_AM_NON_AG)\
+        .query('abs(`Water Net Yield (ML)`) > 1e-6')\
+        .rename(columns={'Water Net Yield (ML)': 'Value (ML)'})
+    water_net_yield_NRM_region_non_all = water_net_yield_NRM_region\
+        .query('`Water Supply` != "ALL" and `Agri-Management` != "ALL"')\
+        .reset_index(drop=True)
+
+
+    # -------------------- Water yield ranking by NRM --------------------
+    water_ranking_type = water_net_yield_NRM_region_non_all\
+        .groupby(['region_NRM', 'Type', 'Year'])[['Value (ML)']]\
         .sum(numeric_only=True)\
         .reset_index()\
         .sort_values(['Year', 'Type', 'Value (ML)'], ascending=[True, True, False])\
-        .assign(Rank=0,  region_NRM='AUSTRALIA')
+        .assign(Rank=lambda x: x.groupby('Year').cumcount())
         
-        
-    water_ranking_net_region = water_net_yield_NRM_region\
-        .query('`Water Supply` != "ALL" and `Agri-Management` != "ALL"')\
-        .groupby(['Year', 'region_NRM'])[['Value (ML)']]\
+    water_ranking_total = water_net_yield_NRM_region_non_all\
+        .groupby(['region_NRM', 'Year'])[['Value (ML)']]\
         .sum(numeric_only=True)\
         .reset_index()\
         .sort_values(['Year', 'Value (ML)'], ascending=[True, False])\
-        .assign(Rank=lambda x: x.groupby('Year').cumcount() + 1)\
+        .assign(Rank=lambda x: x.groupby('Year').cumcount())\
         .assign(Type='Total')
-    water_ranking_net_AUS = water_net_yield_NRM_region\
-        .query('`Water Supply` != "ALL" and `Agri-Management` != "ALL"')\
-        .groupby(['Year'])[['Value (ML)']]\
-        .sum(numeric_only=True)\
-        .reset_index()\
-        .sort_values(['Year', 'Value (ML)'], ascending=[True, False])\
-        .assign(Rank=0, Type='Total', region_NRM='AUSTRALIA')
         
-    
-    water_ranking = pd.concat([
-        water_ranking_type_region, 
-        water_ranking_type_AUS, 
-        water_ranking_net_region, 
-        water_ranking_net_AUS
-        ], axis=0, ignore_index=True).reset_index(drop=True)
-    water_ranking = water_ranking\
-        .set_index(['region_NRM', 'Year', 'Type'])\
-        .reindex(
-            index=pd.MultiIndex.from_product(
-                [water_ranking['region_NRM'].unique(), water_ranking['Year'].unique(), water_ranking['Type'].unique()],
-                names=['region_NRM', 'Year', 'Type']), fill_value=None)\
-        .reset_index()\
-        .assign(color=lambda x: x['Rank'].map(get_rank_color))\
-        .round({'Percent': 2, 'Value (ML)': 2})
+    water_ranking = pd.concat([water_ranking_type, water_ranking_total], axis=0, ignore_index=True)\
+        .round({'Value (ML)':2})\
+        .assign(color=lambda x: x['Rank'].map(get_rank_color))
 
- 
     out_dict = {}
     for (region, w_type), df in water_ranking.groupby(['region_NRM', 'Type']):
+        df = df.drop(columns='region_NRM')
         if region not in out_dict:
             out_dict[region] = {}
         if w_type not in out_dict[region]:
-            out_dict[region][w_type] = {}
-
-        df = df.drop(columns='region_NRM')
+            out_dict[region][w_type] = {} 
         out_dict[region][w_type]['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
         out_dict[region][w_type]['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
         out_dict[region][w_type]['value'] = df.set_index('Year')['Value (ML)'].apply( lambda x: format_with_suffix(x)).to_dict()
@@ -1966,34 +1923,113 @@ def save_report_data(raw_data_dir:str):
 
 
 
-    # -------------------- Water yield overview by NRM region --------------------
-    group_cols = ['Landuse', 'Type']
-    out_dict = {region: [] for region in water_net_yield_NRM_region['region_NRM'].unique()}
-    out_dict['AUSTRALIA'] = water_yield_df_AUS.to_dict(orient='records')
-    for idx, col in enumerate(group_cols):
+    # -------------------- Overview  --------------------
+    
+    # sum
+    water_sum = water_net_yield_NRM_region_non_all\
+        .groupby(['region_NRM', 'Type', 'Year'])[['Value (ML)']]\
+        .sum(numeric_only=True)\
+        .reset_index()\
+        .round({'Value (ML)': 2})\
+        .groupby(['region_NRM', 'Type'])[['Year','Value (ML)']]\
+        .apply(lambda x: x[['Year','Value (ML)']].values.tolist())\
+        .reset_index()
+        
+    water_sum.columns = ['region', 'name','data']
+    water_sum['type'] = 'column'
+    
+    out_dict = {}
+    for region, df in water_sum.groupby('region'):
+        df = df.drop(columns=['region'])
+        out_dict[region] = df.to_dict(orient='records')
+        
+    filename = f'Water_overview_NRM_sum'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
+        
+        
+    
+    # Ag
+    water_ag = water_net_yield_NRM_region_non_all.query('Type == "Agricultural Landuse"')
+    
+    water_overview_ag = water_ag\
+        .groupby(['region_NRM', 'Landuse', 'Year'])[['Value (ML)']]\
+        .sum(numeric_only=True)\
+        .reset_index()\
+        .round({'Value (ML)': 2})\
+        .groupby(['region_NRM', 'Landuse'])[['Year','Value (ML)']]\
+        .apply(lambda x: x[['Year','Value (ML)']].values.tolist())\
+        .reset_index()
+        
+    water_overview_ag.columns = ['region', 'name','data']
+    water_overview_ag['type'] = 'column'
+    water_overview_ag['color'] = water_overview_ag.apply(lambda x: COLORS_LU[x['name']], axis=1)
 
-        df_region = water_net_yield_NRM_region\
-            .query('`Water Supply` != "ALL" and `Agri-Management` != "ALL"')\
-            .groupby(['Year', 'region_NRM', col])\
-            .sum()\
-            .reset_index()\
-            .round({'Value (ML)': 2})
-        df_region_wide = df_region.groupby([col, 'region_NRM'])[['Year','Value (ML)']]\
-            .apply(lambda x: x[['Year', 'Value (ML)']].values.tolist())\
-            .reset_index()
-        df_region_wide.columns = ['name', 'region_NRM', 'data']
-        df_region_wide['type'] = 'column'
-        if col == 'Landuse':
-            df_region_wide['color'] = df_region_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
-            df_region_wide['name_order'] = df_region_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
-            df_region_wide = df_region_wide.sort_values('name_order').drop(columns=['name_order'])
         
-        
-        for region, df in df_region_wide.groupby('region_NRM'):
-            df = df.drop(['region_NRM'], axis=1)
-            out_dict[region] = df.to_dict(orient='records')
+    out_dict = {}
+    for region, df in water_overview_ag.groupby('region'):
+        df = df.drop(columns=['region'])
+        out_dict[region] = df.to_dict(orient='records')
+
             
-    filename = f'Water_overview_NRM_{col.replace(" ", "_")}'
+    filename = f'Water_overview_NRM_Ag'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
+        
+    # Am
+    water_am = water_net_yield_NRM_region_non_all.query('Type == "Agricultural Management"')
+    
+    water_overview_am = water_am\
+        .groupby(['region_NRM', 'Agri-Management', 'Year'])[['Value (ML)']]\
+        .sum(numeric_only=True)\
+        .reset_index()\
+        .round({'Value (ML)': 2})\
+        .groupby(['region_NRM', 'Agri-Management'])[['Year','Value (ML)']]\
+        .apply(lambda x: x[['Year','Value (ML)']].values.tolist())\
+        .reset_index()
+
+    water_overview_am.columns = ['region', 'name', 'data']
+    water_overview_am['type'] = 'column'
+    water_overview_am['color'] = water_overview_am.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
+
+    out_dict = {}
+    for region, df in water_overview_am.groupby('region'):
+        df = df.drop(columns='region')
+        out_dict[region] = df.to_dict(orient='records')
+
+    filename = f'Water_overview_NRM_Am'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
+        
+        
+    # Non-Ag
+    water_nonag = water_net_yield_NRM_region_non_all.query('Type == "Non-Agricultural Landuse"')
+
+    water_overview_nonag = water_nonag\
+        .groupby(['region_NRM', 'Landuse', 'Year'])[['Value (ML)']]\
+        .sum(numeric_only=True)\
+        .reset_index()\
+        .round({'Value (ML)': 2})\
+        .groupby(['region_NRM', 'Landuse'])[['Year','Value (ML)']]\
+        .apply(lambda x: x[['Year','Value (ML)']].values.tolist())\
+        .reset_index()
+
+    water_overview_nonag.columns = ['region', 'name', 'data']
+    water_overview_nonag['type'] = 'column'
+    water_overview_nonag['color'] = water_overview_nonag.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
+
+    out_dict = {}
+    for region, df in water_overview_nonag.groupby('region'):
+        df = df.drop(columns='region')
+        out_dict[region] = df.to_dict(orient='records')
+
+    filename = f'Water_overview_NRM_NonAg'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
         json.dump(out_dict, f, separators=(',', ':'), indent=2)
@@ -2182,19 +2218,7 @@ def save_report_data(raw_data_dir:str):
         .assign(Rank='N.A.', Percent=100, Type='Total', region='AUSTRALIA')\
         .round({'Percent': 2, 'Area Weighted Score (ha)': 2})
 
-
-    bio_rank = pd.concat([
-        bio_rank_type_region,
-        bio_rank_total_region,
-        bio_rank_type_AUS,
-        bio_rank_total_AUS], axis=0, ignore_index=True).reset_index(drop=True)
-    bio_rank = bio_rank\
-        .set_index(['region', 'Year', 'Type'])\
-        .reindex(
-            index=pd.MultiIndex.from_product(
-                [bio_rank['region'].unique(), bio_rank['Year'].unique(), bio_rank['Type'].unique()],
-                names=['region', 'Year', 'Type']),fill_value=None)\
-        .reset_index()\
+    bio_rank = pd.concat([ bio_rank_type_region, bio_rank_total_region, bio_rank_type_AUS, bio_rank_total_AUS])\
         .assign(color=lambda x: x['Rank'].map(get_rank_color))
 
             
