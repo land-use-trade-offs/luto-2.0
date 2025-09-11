@@ -179,7 +179,6 @@ window.BiodiversityView = {
 
       // Handle ALL downstream variables with cascading pattern
       if (newCategory === "Ag Mgt") {
-        // Data hierarchy: AgMgt → Water → Landuse → Year
         availableAgMgt.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]] || {});
         const prevAgMgt = previousSelections.value["Ag Mgt"].agMgt;
         selectAgMgt.value = (prevAgMgt && availableAgMgt.value.includes(prevAgMgt)) ? prevAgMgt : (availableAgMgt.value[0] || '');
@@ -192,9 +191,6 @@ window.BiodiversityView = {
         const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
         selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
       } else if (newCategory === "Ag") {
-        // Clear AgMgt selections when switching away from Ag Mgt
-        availableAgMgt.value = [];
-        selectAgMgt.value = '';
         availableWater.value = Object.keys(window[mapRegister["Ag"]["name"]] || {});
         const prevWater = previousSelections.value["Ag"].water;
         selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
@@ -203,31 +199,9 @@ window.BiodiversityView = {
         const prevLanduse = previousSelections.value["Ag"].landuse;
         selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
       } else if (newCategory === "Non-Ag") {
-        // Clear both AgMgt and Water selections for Non-Ag
-        availableAgMgt.value = [];
-        selectAgMgt.value = '';
-        availableWater.value = [];
-        selectWater.value = '';
         availableLanduse.value = Object.keys(window[mapRegister["Non-Ag"]["name"]] || {});
         const prevLanduse = previousSelections.value["Non-Ag"].landuse;
         selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
-      }
-    });
-
-    watch(selectAgMgt, (newAgMgt) => {
-      // Save current agMgt selection
-      if (selectCategory.value === "Ag Mgt") {
-        previousSelections.value["Ag Mgt"].agMgt = newAgMgt;
-        
-        // Handle ALL downstream variables with cascading pattern
-        // Data hierarchy: AgMgt → Water → Landuse → Year
-        availableWater.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][newAgMgt] || {});
-        const prevWater = previousSelections.value["Ag Mgt"].water;
-        selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
-        
-        availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][newAgMgt][selectWater.value] || {});
-        const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
-        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
       }
     });
 
@@ -239,16 +213,30 @@ window.BiodiversityView = {
         previousSelections.value["Ag Mgt"].water = newWater;
       }
 
-      // Handle downstream variables for Ag Mgt
-      // Data hierarchy: AgMgt → Water → Landuse → Year
-      if (selectCategory.value === "Ag Mgt") {
-        availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value][newWater] || {});
-        const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
-        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
-      } else if (selectCategory.value === "Ag") {
-        // Handle Ag category: Water → Landuse → Year
+      // Handle ALL downstream variables
+      if (selectCategory.value === "Ag") {
         availableLanduse.value = Object.keys(window[mapRegister["Ag"]["name"]][newWater] || {});
         const prevLanduse = previousSelections.value["Ag"].landuse;
+        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
+      } else if (selectCategory.value === "Ag Mgt") {
+        availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value][newWater] || {});
+        const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
+        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
+      }
+    });
+
+    watch(selectAgMgt, (newAgMgt) => {
+      // Save current agMgt selection
+      if (selectCategory.value === "Ag Mgt") {
+        previousSelections.value["Ag Mgt"].agMgt = newAgMgt;
+        
+        // Handle ALL downstream variables with cascading pattern
+        availableWater.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][newAgMgt] || {});
+        const prevWater = previousSelections.value["Ag Mgt"].water;
+        selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
+        
+        availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][newAgMgt][selectWater.value] || {});
+        const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
         selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
       }
     });

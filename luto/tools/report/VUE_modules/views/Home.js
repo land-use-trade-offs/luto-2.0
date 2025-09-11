@@ -7,9 +7,7 @@ window.HomeView = {
     // Data service
     const chartRegister = window.DataService.chartCategories;   // DataService has been registered in index.html      [DataService.js]
     const loadScript = window.loadScriptWithTracking;
-    
-    // View identification for memory management
-    const VIEW_NAME = "Home";                       // DataConstructor has been registered in index.html  [helpers.js]
+    const VIEW_NAME = "Home";                                   // DataConstructor has been registered in index.html  [helpers.js]
 
     // Global variables
     const selectRegion = inject('globalSelectedRegion');
@@ -126,7 +124,6 @@ window.HomeView = {
       await loadScript("./data/chart_option/Chart_default_options.js", 'Chart_default_options', VIEW_NAME);
       await loadScript("./data/geo/NRM_AUS.js", 'NRM_AUS', VIEW_NAME);
 
-      // Overview chart data
       const chartOverview_area = chartRegister['Area']['overview'];
       const chartOverview_bio_GBF2 = chartRegister['Biodiversity']['GBF2']['overview'];
       const chartOverview_economics_sum = chartRegister['Economics']['overview']['sum'];
@@ -147,7 +144,6 @@ window.HomeView = {
       const chartOverview_water_ag = chartRegister['Water']['NRM']['overview']['Ag'];
       const chartOverview_water_agMgt = chartRegister['Water']['NRM']['overview']['Ag Mgt'];
       const chartOverview_water_Nonag = chartRegister['Water']['NRM']['overview']['Non-Ag'];
-      // Ranking chart data
 
       const rankingArea = chartRegister['Area']['ranking'];
       const rankingEconomics = chartRegister['Economics']['ranking'];
@@ -248,7 +244,6 @@ window.HomeView = {
       colorsRanking.value = window.Supporting_info.colors_ranking;
 
       await nextTick(() => { dataLoaded.value = true; });
-
 
     });
 

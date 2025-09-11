@@ -174,42 +174,24 @@ window.GHGView = {
         }
       }
 
-      // Reset AgMgt array when not in Ag Mgt category
-      if (newCategory !== "Ag Mgt") {
-        availableAgMgt.value = [];
-        selectAgMgt.value = "";
-      }
-
       // Handle ALL downstream variables with cascading pattern
       if (newCategory === "Ag Mgt") {
-        // Get AgMgt options from chart data for GHG Am
-        const chartDataName = chartRegister["Ag Mgt"]?.["name"];
-        if (window[chartDataName] && selectRegion.value) {
-          availableAgMgt.value = Object.keys(window[chartDataName][selectRegion.value] || {});
-          const prevAgMgt = previousSelections.value["Ag Mgt"].agMgt;
-          selectAgMgt.value = (prevAgMgt && availableAgMgt.value.includes(prevAgMgt)) ? prevAgMgt : (availableAgMgt.value[0] || '');
-          // Get water options from chart data
-          if (selectAgMgt.value) {
-            availableWater.value = Object.keys(window[chartDataName][selectRegion.value][selectAgMgt.value] || {});
-            const prevWater = previousSelections.value["Ag Mgt"].water;
-            selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || 'ALL');
-          }
-        }
-        // Map data for landuse - need to go through water level first
-        if (selectAgMgt.value && selectWater.value) {
-          availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value]?.[selectWater.value] || {});
-          const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
-          selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
-        }
+        availableAgMgt.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]] || {});
+        const prevAgMgt = previousSelections.value["Ag Mgt"].agMgt;
+        selectAgMgt.value = (prevAgMgt && availableAgMgt.value.includes(prevAgMgt)) ? prevAgMgt : (availableAgMgt.value[0] || '');
+        
+        availableWater.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value] || {});
+        const prevWater = previousSelections.value["Ag Mgt"].water;
+        selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
+        
+        availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value][selectWater.value] || {});
+        const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
+        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
       } else if (newCategory === "Ag") {
-        // GHG Ag chart data: Region → "ALL" → Water, so get water options from chart data
-        const chartDataName = chartRegister["Ag"]?.["name"];
-        if (window[chartDataName] && selectRegion.value) {
-          availableWater.value = Object.keys(window[chartDataName][selectRegion.value]["ALL"] || {});
-          const prevWater = previousSelections.value["Ag"].water;
-          selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || 'ALL');
-        }
-        // Map data still follows standard pattern
+        availableWater.value = Object.keys(window[mapRegister["Ag"]["name"]] || {});
+        const prevWater = previousSelections.value["Ag"].water;
+        selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
+        
         availableLanduse.value = Object.keys(window[mapRegister["Ag"]["name"]][selectWater.value] || {});
         const prevLanduse = previousSelections.value["Ag"].landuse;
         selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
@@ -217,9 +199,6 @@ window.GHGView = {
         availableLanduse.value = Object.keys(window[mapRegister["Non-Ag"]["name"]] || {});
         const prevLanduse = previousSelections.value["Non-Ag"].landuse;
         selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
-        // Clear water for Non-Ag since it doesn't use water
-        availableWater.value = [];
-        selectWater.value = '';
       }
     });
 
@@ -227,21 +206,15 @@ window.GHGView = {
       // Save current agMgt selection
       if (selectCategory.value === "Ag Mgt") {
         previousSelections.value["Ag Mgt"].agMgt = newAgMgt;
-
+        
         // Handle ALL downstream variables with cascading pattern
-        // Get water options from chart data for GHG Am
-        const chartDataName = chartRegister["Ag Mgt"]?.["name"];
-        if (window[chartDataName] && selectRegion.value && newAgMgt) {
-          availableWater.value = Object.keys(window[chartDataName][selectRegion.value][newAgMgt] || {});
-          const prevWater = previousSelections.value["Ag Mgt"].water;
-          selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || 'ALL');
-        }
-        // Map data follows AgMgt → Water → Landuse pattern
-        if (selectWater.value) {
-          availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][newAgMgt]?.[selectWater.value] || {});
-          const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
-          selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
-        }
+        availableWater.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][newAgMgt] || {});
+        const prevWater = previousSelections.value["Ag Mgt"].water;
+        selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
+        
+        availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][newAgMgt][selectWater.value] || {});
+        const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
+        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
       }
     });
 
@@ -259,12 +232,9 @@ window.GHGView = {
         const prevLanduse = previousSelections.value["Ag"].landuse;
         selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
       } else if (selectCategory.value === "Ag Mgt") {
-        // For Ag Mgt, update landuse options when water changes
-        if (selectAgMgt.value) {
-          availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value]?.[newWater] || {});
-          const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
-          selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
-        }
+        availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value][newWater] || {});
+        const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
+        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
       }
     });
 

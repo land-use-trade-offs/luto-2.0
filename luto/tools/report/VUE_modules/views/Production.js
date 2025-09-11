@@ -194,25 +194,17 @@ window.ProductionView = {
         const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
         selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
       } else if (newCategory === "Ag") {
-        // Clear Ag Mgt data when switching to Ag
-        availableAgMgt.value = [];
-        selectAgMgt.value = '';
         availableWater.value = Object.keys(window[mapRegister["Ag"]["name"]] || {});
         const prevWater = previousSelections.value["Ag"].water;
         selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
         
         availableLanduse.value = Object.keys(window[mapRegister["Ag"]["name"]][selectWater.value] || {});
         const prevLanduse = previousSelections.value["Ag"].landuse;
-        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
+        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
       } else if (newCategory === "Non-Ag") {
-        // Non-Ag has no Water level - clear both Ag Mgt and Water data
-        availableAgMgt.value = [];
-        selectAgMgt.value = '';
-        availableWater.value = [];
-        selectWater.value = '';
         availableLanduse.value = Object.keys(window[mapRegister["Non-Ag"]["name"]] || {});
         const prevLanduse = previousSelections.value["Non-Ag"].landuse;
-        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
+        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
       }
     });
 

@@ -264,13 +264,173 @@ All reporting views follow the progressive selection pattern:
 ### Implementation Guidelines
 
 1. **Data Validation**: Always check data readiness at each hierarchy level before accessing
-2. **Progressive Watchers**: Use cascading watchers that clear downstream selections when upstream changes
+2. **Progressive Watchers**: Use the standardized cascade pattern (see "Progressive Selection Cascade Watchers" section below)
+   - Follow the exact watcher implementation pattern from Area.js
+   - Never manually clear selections - let the cascade pattern handle it automatically
 3. **Special Cases**:
-   - Economics: Handle dual Cost/Revenue series in same array
+   - Economics: Handle dual Cost/Revenue series in same array with combined watcher pattern
    - NonAg: Handle simplified structures without Water/AgMgt levels
    - Biodiversity: Mixed structures - most use simplified `Region → [series]`, but `BIO_*_Am_2_Agri-Management` files have AgMgt categories; map data follows standard patterns with some NonAg files simplified
 4. **UI Conditions**: Use proper `v-if` conditions based on category selections
 5. **Data Access**: Use optional chaining (`?.`) for safe property access
+6. **Code Consistency**: All views must follow the same cascade watcher pattern for maintainability
+
+### Progressive Selection Cascade Watchers
+
+All Vue.js reporting views implement a standardized cascade pattern for progressive selection that automatically handles downstream option updates when upstream selections change.
+
+#### Core Pattern (Area.js, Biodiversity.js, GHG.js, Production.js, Water.js)
+
+**Watch Order**: `selectCategory` → `selectWater` → `selectAgMgt` → `selectLanduse`
+
+```javascript
+// 1. Category watcher handles ALL downstream cascading
+watch(selectCategory, (newCategory, oldCategory) => {
+  // Save previous selections before switching
+  if (oldCategory) {
+    if (oldCategory === "Ag") {
+      previousSelections.value["Ag"] = { water: selectWater.value, landuse: selectLanduse.value };
+    } else if (oldCategory === "Ag Mgt") {
+      previousSelections.value["Ag Mgt"] = { agMgt: selectAgMgt.value, water: selectWater.value, landuse: selectLanduse.value };
+    } else if (oldCategory === "Non-Ag") {
+      previousSelections.value["Non-Ag"] = { landuse: selectLanduse.value };
+    }
+  }
+
+  // Handle ALL downstream variables with cascading pattern
+  if (newCategory === "Ag Mgt") {
+    availableAgMgt.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]] || {});
+    const prevAgMgt = previousSelections.value["Ag Mgt"].agMgt;
+    selectAgMgt.value = (prevAgMgt && availableAgMgt.value.includes(prevAgMgt)) ? prevAgMgt : (availableAgMgt.value[0] || '');
+    
+    availableWater.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value] || {});
+    const prevWater = previousSelections.value["Ag Mgt"].water;
+    selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
+    
+    availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value][selectWater.value] || {});
+    const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
+    selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
+  } else if (newCategory === "Ag") {
+    availableWater.value = Object.keys(window[mapRegister["Ag"]["name"]] || {});
+    const prevWater = previousSelections.value["Ag"].water;
+    selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
+    
+    availableLanduse.value = Object.keys(window[mapRegister["Ag"]["name"]][selectWater.value] || {});
+    const prevLanduse = previousSelections.value["Ag"].landuse;
+    selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
+  } else if (newCategory === "Non-Ag") {
+    availableLanduse.value = Object.keys(window[mapRegister["Non-Ag"]["name"]] || {});
+    const prevLanduse = previousSelections.value["Non-Ag"].landuse;
+    selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
+  }
+});
+
+// 2. Water watcher handles downstream landuse cascading
+watch(selectWater, (newWater) => {
+  // Save current water selection
+  if (selectCategory.value === "Ag") {
+    previousSelections.value["Ag"].water = newWater;
+  } else if (selectCategory.value === "Ag Mgt") {
+    previousSelections.value["Ag Mgt"].water = newWater;
+  }
+
+  // Handle ALL downstream variables
+  if (selectCategory.value === "Ag") {
+    availableLanduse.value = Object.keys(window[mapRegister["Ag"]["name"]][newWater] || {});
+    const prevLanduse = previousSelections.value["Ag"].landuse;
+    selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
+  } else if (selectCategory.value === "Ag Mgt") {
+    availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value][newWater] || {});
+    const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
+    selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
+  }
+});
+
+// 3. AgMgt watcher handles downstream water + landuse cascading  
+watch(selectAgMgt, (newAgMgt) => {
+  // Save current agMgt selection
+  if (selectCategory.value === "Ag Mgt") {
+    previousSelections.value["Ag Mgt"].agMgt = newAgMgt;
+    
+    // Handle ALL downstream variables with cascading pattern
+    availableWater.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][newAgMgt] || {});
+    const prevWater = previousSelections.value["Ag Mgt"].water;
+    selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
+    
+    availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][newAgMgt][selectWater.value] || {});
+    const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
+    selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
+  }
+});
+
+// 4. Landuse watcher only saves selection (no downstream)
+watch(selectLanduse, (newLanduse) => {
+  // Save current landuse selection
+  if (selectCategory.value === "Ag") {
+    previousSelections.value["Ag"].landuse = newLanduse;
+  } else if (selectCategory.value === "Ag Mgt") {
+    previousSelections.value["Ag Mgt"].landuse = newLanduse;
+  } else if (selectCategory.value === "Non-Ag") {
+    previousSelections.value["Non-Ag"].landuse = newLanduse;
+  }
+});
+```
+
+#### Special Pattern (Economics.js)
+
+Economics uses a combined watcher pattern due to its dual Cost/Revenue structure:
+
+```javascript
+// Combined watcher for Cost/Revenue + Category changes
+watch([selectCostRevenue, selectCategory], ([newCostRevenue, newCategory], [oldCostRevenue, oldCategory]) => {
+  if (!newCategory) return;
+
+  // Save previous selections before switching (only when category changes)
+  if (oldCategory && oldCategory !== newCategory) {
+    // ... save previous selections
+  }
+  
+  // Handle cascading based on current Cost/Revenue selection
+  if (newCategory === "Ag Mgt") {
+    const currentMapData = window[mapRegister[newCostRevenue]["Ag Mgt"]["name"]];
+    // ... cascade all downstream selections using currentMapData
+  }
+  // ... other categories
+}, { immediate: true });
+```
+
+#### Key Principles
+
+1. **No Manual Clearing**: NEVER manually clear arrays or selections (e.g., `availableAgMgt.value = []`)
+   - The progressive pattern handles this automatically
+   - Manual clearing creates unnecessary complexity
+
+2. **Cascading Flow**: Each watcher handles ALL its downstream selections
+   - `selectCategory` → handles AgMgt, Water, Landuse
+   - `selectAgMgt` → handles Water, Landuse  
+   - `selectWater` → handles Landuse
+   - `selectLanduse` → no downstream (just saves)
+
+3. **Previous Selection Memory**: Always try to restore previous valid selections
+   ```javascript
+   const prevSelection = previousSelections.value[category].field;
+   selectField.value = (prevSelection && availableOptions.includes(prevSelection)) 
+     ? prevSelection 
+     : (availableOptions[0] || 'ALL');
+   ```
+
+4. **Data Structure Consistency**: Use the map data structure as the source of truth for available options
+   ```javascript
+   availableOptions.value = Object.keys(window[mapRegister[category]["name"]] || {});
+   ```
+
+#### Benefits
+
+- **Maintainable**: Consistent pattern across all views
+- **Memory Efficient**: No unnecessary data structures or operations
+- **User Friendly**: Preserves user selections when switching between categories
+- **Robust**: Handles edge cases with fallback selections
+- **Clean**: Eliminates complex conditional clearing logic
 
 ### File Structure
 - **Views**: `/luto/tools/report/VUE_modules/views/` - Main view components
