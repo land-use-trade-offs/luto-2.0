@@ -181,8 +181,24 @@ window.DataService = {
           name: "Production_overview_AUS_achive_percent",
         },
         sum: {
-          path: "data/Production_overview_demand.js",
-          name: "Production_overview_demand",
+          path: "data/Production_overview_demand_type.js",
+          name: "Production_overview_demand_type",
+        },
+        'Domestic': {
+          path: "data/Production_overview_Domestic.js",
+          name: "Production_overview_Domestic",
+        },
+        'Exports': {
+          path: "data/Production_overview_Exports.js",
+          name: "Production_overview_Exports",
+        },
+        'Imports': {
+          path: "data/Production_overview_Imports.js",
+          name: "Production_overview_Imports",
+        },
+        'Feed': {
+          path: "data/Production_overview_Feed.js",
+          name: "Production_overview_Feed",
         },
       },
       ranking: {

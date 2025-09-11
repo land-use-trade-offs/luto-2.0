@@ -445,8 +445,8 @@ def save_report_data(raw_data_dir:str):
 
     # -------------------- Demand --------------------
     
-    DEMAND_DATA_long = get_demand_df()\
-        .query('Year.isin(@years) and Type != "Production" and abs(`Quantity (tonnes, KL)`) > 1')\
+    DEMAND_DATA = get_demand_df()\
+        .query('Year.isin(@years) and abs(`Quantity (tonnes, KL)`) > 1')\
         .replace({'Beef lexp': 'Beef live export', 'Sheep lexp': 'Sheep live export'})\
         .set_index(['Commodity', 'Type', 'Year'])\
         .reindex(COMMODITIES_ALL, level=0)\
@@ -455,7 +455,10 @@ def save_report_data(raw_data_dir:str):
         .assign(group = lambda x: x['Commodity'].map(COMMIDOTY_GROUP.get))
     
     # Convert imports to negative values, making it below zero in the stacked column chart
+    DEMAND_DATA_long = DEMAND_DATA.query('Type != "Production" ')
     DEMAND_DATA_long.loc[DEMAND_DATA_long['Type'] == 'Imports', 'Quantity (tonnes, KL)'] *= -1
+    
+    DEMAND_target = DEMAND_DATA.query('Type == "Production"')
 
 
 
@@ -492,24 +495,54 @@ def save_report_data(raw_data_dir:str):
         f.write(';\n')
     
 
-    # -------------------- Overview: sum of commodity production --------------------
+    # -------------------- Overview --------------------
     
-    # Main plot showing total demand by type
-    demand_type = DEMAND_DATA_long\
+    # sum
+    demand_type_wide = DEMAND_DATA_long\
         .groupby(['Year', 'Type'])[['Quantity (tonnes, KL)']]\
         .sum(numeric_only=True)\
         .reset_index()\
-        .round({'Quantity (tonnes, KL)': 2})
-        
-    demand_type.columns = ['x', 'name', 'y']
-    demand_type['drilldown'] = demand_type['name'] + '_' + demand_type['x'].astype(str)
-
-    demand_type_wide = demand_type.groupby(['name'])[['x','y', 'drilldown']]\
-        .apply(lambda x: x[['x','y', 'drilldown']].to_dict('records'))\
+        .round({'Quantity (tonnes, KL)': 2})\
+        .groupby(['Type'])[['Year', 'Quantity (tonnes, KL)']]\
+        .apply(lambda x: x[['Year', 'Quantity (tonnes, KL)']].values.tolist())\
         .reset_index()
-        
-    demand_type_wide.columns = ['name','data']
+    demand_type_wide.columns = ['name', 'data']
     demand_type_wide['type'] = 'column'
+        
+    out_dict = {'AUSTRALIA': demand_type_wide.to_dict(orient='records')}
+        
+    filename = 'Production_overview_demand_type'
+    with open(fr'{SAVE_DIR}\{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
+
+    # seperate plot data
+    for _type in ['Domestic', 'Exports', 'Imports', 'Feed']:
+        demand_group = DEMAND_DATA_long\
+            .query('Type == @_type')\
+            .groupby(['Year', 'Type', 'group'])[['Quantity (tonnes, KL)']]\
+            .sum(numeric_only=True)\
+            .reset_index()\
+            .round({'Quantity (tonnes, KL)': 2})\
+            .groupby(['Type', 'group'])[['Year', 'Quantity (tonnes, KL)']]\
+            .apply(lambda x: x[['Year', 'Quantity (tonnes, KL)']].values.tolist())\
+            .reset_index()
+        
+        demand_group = demand_group.drop(columns=['Type'])
+        demand_group.columns = ['name', 'data']
+        demand_group['type'] = 'column'
+        
+        out_dict = {'AUSTRALIA': demand_group.to_dict(orient='records')}
+        
+        filename = f'Production_overview_{_type}'
+        with open(fr'{SAVE_DIR}\{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
+
+        
+
  
  
     # Drilldown plot showing demand by commodity within each type
@@ -1890,7 +1923,7 @@ def save_report_data(raw_data_dir:str):
         .sum(numeric_only=True)\
         .reset_index()\
         .sort_values(['Year', 'Type', 'Value (ML)'], ascending=[True, True, False])\
-        .assign(Rank=lambda x: x.groupby('Year').cumcount())
+        .assign(Rank=lambda x: x.groupby(['Year','Type']).cumcount())
         
     water_ranking_total = water_net_yield_NRM_region_non_all\
         .groupby(['region_NRM', 'Year'])[['Value (ML)']]\

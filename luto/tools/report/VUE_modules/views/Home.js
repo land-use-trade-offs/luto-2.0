@@ -24,7 +24,7 @@ window.HomeView = {
       'GHG': 'Mt CO2e',
       'Water': 'ML',
       'Biodiversity': 'Relative Percentage (Pre-1750 = 100%)',
-      'Production': 'Relative to target (%)',
+      'Production': 'Tonnes or KL',
     };
     const RankSubcategoriesRename = {
       'Agricultural Landuse': 'Ag',
@@ -46,17 +46,12 @@ window.HomeView = {
     //  Reactive data
     const selectChartData = computed(() => {
 
-      let seriesData, drilldown, yAxisTitle;
+      let seriesData, yAxisTitle = null;
+      const originalData = ChartData.value?.[selectChartCategory.value]?.[selectChartSubCategory.value]?.[selectRegion.value] || [];
+      seriesData = JSON.parse(JSON.stringify(originalData));
 
-      const originalData = ChartData.value?.[selectChartCategory.value]?.[selectChartSubCategory.value]?.[selectRegion.value];
-      if (Array.isArray(originalData) && originalData) {
-        seriesData = JSON.parse(JSON.stringify(originalData));
-      } else if (originalData?.series) { // Production data structure: { "AUSTRALIA": { series: [], drilldown: {} } }
-        seriesData = JSON.parse(JSON.stringify(originalData.series)) || [];
-        drilldown = JSON.parse(JSON.stringify(originalData.drilldown)) || [];
-        yAxisTitle = 'Quantity (tonnes, KL)'
-      } else {
-        seriesData = [];
+      if (selectChartSubCategory.value === 'Off-target achievement') {
+        yAxisTitle = 'Achievement (%)';
       }
 
       const seriesColors = seriesData.map(serie => serie.color).filter(color => color) || [];
@@ -66,18 +61,6 @@ window.HomeView = {
         ...window['Chart_default_options'],
         chart: {
           height: 440,
-          events: {
-            drilldown: function (e) {
-              this.xAxis[0].update({
-                type: "category",
-              })
-            },
-            drillup: function (e) {
-              this.xAxis[0].update({
-                type: "linear",
-              })
-            },
-          },
         },
         yAxis: {
           title: {
@@ -86,7 +69,6 @@ window.HomeView = {
         },
         series: seriesData,
         colors: colors,
-        drilldown: { series: drilldown || [] }
       };
     });
 
@@ -155,6 +137,10 @@ window.HomeView = {
       const chartOverview_ghg_Nonag = chartRegister['GHG']['overview']['Non-Ag'];
       const chartOverview_prod_achieve = chartRegister['Production']['overview']['achieve'];
       const chartOverview_prod_overview = chartRegister['Production']['overview']['sum'];
+      const chartOverview_prod_domestic = chartRegister['Production']['overview']['Domestic'];
+      const chartOverview_prod_export = chartRegister['Production']['overview']['Exports'];
+      const chartOverview_prod_import = chartRegister['Production']['overview']['Imports'];
+      const chartOverview_prod_feed = chartRegister['Production']['overview']['Feed'];
       const chartOverview_water_sum = chartRegister['Water']['NRM']['overview']['sum'];
       const chartOverview_water_ag = chartRegister['Water']['NRM']['overview']['Ag'];
       const chartOverview_water_agMgt = chartRegister['Water']['NRM']['overview']['Ag Mgt'];
@@ -182,6 +168,10 @@ window.HomeView = {
       await loadScript(chartOverview_ghg_Nonag['path'], chartOverview_ghg_Nonag['name']);
       await loadScript(chartOverview_prod_achieve['path'], chartOverview_prod_achieve['name']);
       await loadScript(chartOverview_prod_overview['path'], chartOverview_prod_overview['name']);
+      await loadScript(chartOverview_prod_domestic['path'], chartOverview_prod_domestic['name']);
+      await loadScript(chartOverview_prod_export['path'], chartOverview_prod_export['name']);
+      await loadScript(chartOverview_prod_import['path'], chartOverview_prod_import['name']);
+      await loadScript(chartOverview_prod_feed['path'], chartOverview_prod_feed['name']);
       await loadScript(chartOverview_water_sum['path'], chartOverview_water_sum['name']);
       await loadScript(chartOverview_water_ag['path'], chartOverview_water_ag['name']);
       await loadScript(chartOverview_water_agMgt['path'], chartOverview_water_agMgt['name']);
@@ -197,7 +187,7 @@ window.HomeView = {
 
       ChartData.value = {
         'Area': {
-          'Source': window[chartOverview_area['Source']['name']],
+          'Overview': window[chartOverview_area['Source']['name']],
           'Category': window[chartOverview_area['Category']['name']],
           'Land-use': window[chartOverview_area['Land-use']['name']],
         },
@@ -218,12 +208,11 @@ window.HomeView = {
         },
         'Production': {
           'Off-target achievement': window[chartOverview_prod_achieve['name']],
-          'Overview': {
-            "AUSTRALIA": {
-              series: window[chartOverview_prod_overview['name']]['Main'],
-              drilldown: window[chartOverview_prod_overview['name']]['Drilldown']
-            },
-          },
+          'Overview': window[chartOverview_prod_overview['name']],
+          'Domestic': window[chartOverview_prod_domestic['name']],
+          'Exports': window[chartOverview_prod_export['name']],
+          'Imports': window[chartOverview_prod_import['name']],
+          'Feed': window[chartOverview_prod_feed['name']],
         },
         'Water': {
           'Overview': window[chartOverview_water_sum['name']],
@@ -415,6 +404,7 @@ window.HomeView = {
               </button>
             </div>
 
+            <!-- Chart -->
             <chart-container
               class="w-full h-full pt-[50px]"
               :chartData="selectChartData">
