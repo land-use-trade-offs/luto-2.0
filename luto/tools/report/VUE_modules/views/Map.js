@@ -5,9 +5,9 @@ window['MapView'] = {
         // Data|Map service
         const mapRegister = window.MapService.mapCategories["Dvar"];        // MapService was registered in the index.html        [MapService.js]
         const loadScript = window.loadScriptWithTracking;
-        
+
         // View identification for memory management
-        const VIEW_NAME = "Map";                               // DataConstructor has been registered in index.html  [helpers.js]
+        const VIEW_NAME = "Map";
 
         // Global selection state
         const yearIndex = ref(0);

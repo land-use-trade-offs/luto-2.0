@@ -7,7 +7,7 @@ window.HomeView = {
     // Data service
     const chartRegister = window.DataService.chartCategories;   // DataService has been registered in index.html      [DataService.js]
     const loadScript = window.loadScriptWithTracking;
-    const VIEW_NAME = "Home";                                   // DataConstructor has been registered in index.html  [helpers.js]
+    const VIEW_NAME = "Home";
 
     // Global variables
     const selectRegion = inject('globalSelectedRegion');

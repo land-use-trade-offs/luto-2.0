@@ -164,7 +164,7 @@ def save_report_data(raw_data_dir:str):
         
 
     out_dict = {}
-    for (region, source), df in area_ranking.groupby(['region', 'source']):
+    for (region, source), df in area_ranking.groupby(['region', 'Source']):
         df = df.drop(['region'], axis=1)
         
         if region not in out_dict:

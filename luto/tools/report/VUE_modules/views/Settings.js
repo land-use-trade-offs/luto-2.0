@@ -1,7 +1,7 @@
 window.SettingsView = {
   setup(props, { emit }) {
     const { ref, onMounted, watch, computed } = Vue;
-    const loadScript = window.loadScript;                       // DataConstructor has been registered in index.html [DataConstructor.js] [helpers.js]
+    const loadScript = window.loadScript;
 
     // Tab management
     const activeTab = ref('settings');
