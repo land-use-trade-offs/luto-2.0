@@ -196,9 +196,9 @@ def write_decision_variables(data: Data, yr_cal, path):
     dvar_ag_man = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]).chunk({'cell': min(1024, data.NCELLS)})
     
     # Expand dimension
-    dvar_ag = xr.concat([dvar_ag, dvar_ag.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    dvar_ag_man = xr.concat([dvar_ag_man, dvar_ag_man.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    dvar_ag_man = xr.concat([dvar_ag_man, dvar_ag_man.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
+    dvar_ag = xr.concat([dvar_ag.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), dvar_ag], dim='lm')
+    dvar_ag_man = xr.concat([dvar_ag_man.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), dvar_ag_man], dim='lm')
+    dvar_ag_man = xr.concat([dvar_ag_man.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), dvar_ag_man], dim='am')
     
     save2nc(dvar_ag, os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc'))
     save2nc(dvar_non_ag, os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc'))
@@ -381,13 +381,13 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
     )
 
     # Expand dimension
-    ag_X_mrj_xr = xr.concat([ag_X_mrj_xr, ag_X_mrj_xr.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    ag_man_X_mrj_xr = xr.concat([ag_man_X_mrj_xr, ag_man_X_mrj_xr.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    ag_man_X_mrj_xr = xr.concat([ag_man_X_mrj_xr, ag_man_X_mrj_xr.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
+    ag_X_mrj_xr = xr.concat([ag_X_mrj_xr.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_X_mrj_xr], dim='lm')
+    ag_man_X_mrj_xr = xr.concat([ag_man_X_mrj_xr.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_man_X_mrj_xr], dim='lm')
+    ag_man_X_mrj_xr = xr.concat([ag_man_X_mrj_xr.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), ag_man_X_mrj_xr], dim='am')
     
-    ag_q_mrp_xr = xr.concat([ag_q_mrp_xr, ag_q_mrp_xr.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    ag_man_q_mrp_xr = xr.concat([ag_man_q_mrp_xr, ag_man_q_mrp_xr.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    ag_man_q_mrp_xr = xr.concat([ag_man_q_mrp_xr, ag_man_q_mrp_xr.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
+    ag_q_mrp_xr = xr.concat([ag_q_mrp_xr.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_q_mrp_xr], dim='lm')
+    ag_man_q_mrp_xr = xr.concat([ag_man_q_mrp_xr.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_man_q_mrp_xr], dim='lm')
+    ag_man_q_mrp_xr = xr.concat([ag_man_q_mrp_xr.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), ag_man_q_mrp_xr], dim='am')
 
     # Calculate the commodity production 
     ag_q_rc = (((ag_X_mrj_xr * lu2pr_xr).sum(dim=['lu']) * ag_q_mrp_xr) * pr2cm_xr).sum(dim='product')
@@ -492,11 +492,11 @@ def write_revenue_cost_ag(data: Data, yr_cal, path):
 
 
     # Expand dimension
-    ag_dvar_mrj = xr.concat([ag_dvar_mrj, ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    ag_rev_rjms = xr.concat([ag_rev_rjms, ag_rev_rjms.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    ag_rev_rjms = xr.concat([ag_rev_rjms, ag_rev_rjms.sum(dim='source', keepdims=True).assign_coords(source=['ALL'])], dim='source')
-    ag_cost_rjms = xr.concat([ag_cost_rjms, ag_cost_rjms.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    ag_cost_rjms = xr.concat([ag_cost_rjms, ag_cost_rjms.sum(dim='source', keepdims=True).assign_coords(source=['ALL'])], dim='source')
+    ag_dvar_mrj = xr.concat([ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_dvar_mrj], dim='lm')
+    ag_rev_rjms = xr.concat([ag_rev_rjms.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_rev_rjms], dim='lm')
+    ag_rev_rjms = xr.concat([ag_rev_rjms.sum(dim='source', keepdims=True).assign_coords(source=['ALL']), ag_rev_rjms], dim='source')
+    ag_cost_rjms = xr.concat([ag_cost_rjms.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_cost_rjms], dim='lm')
+    ag_cost_rjms = xr.concat([ag_cost_rjms.sum(dim='source', keepdims=True).assign_coords(source=['ALL']), ag_cost_rjms], dim='source')
 
     # Multiply the ag_dvar_mrj with the ag_rev_mrj to get the ag_rev_jm
     xr_ag_rev = ag_dvar_mrj * ag_rev_rjms
@@ -571,12 +571,12 @@ def write_revenue_cost_ag_man(data: Data, yr_cal, path):
     am_cost_mat = tools.am_mrj_to_xr(data, ag_cost.get_agricultural_management_cost_matrices(data, ag_cost_mrj, yr_idx))
     
     # Expand dimension
-    am_dvar_mrj = xr.concat([am_dvar_mrj, am_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    am_dvar_mrj = xr.concat([am_dvar_mrj, am_dvar_mrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
-    am_revenue_mat = xr.concat([am_revenue_mat, am_revenue_mat.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    am_revenue_mat = xr.concat([am_revenue_mat, am_revenue_mat.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
-    am_cost_mat = xr.concat([am_cost_mat, am_cost_mat.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    am_cost_mat = xr.concat([am_cost_mat, am_cost_mat.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
+    am_dvar_mrj = xr.concat([am_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), am_dvar_mrj], dim='lm')
+    am_dvar_mrj = xr.concat([am_dvar_mrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), am_dvar_mrj], dim='am')
+    am_revenue_mat = xr.concat([am_revenue_mat.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), am_revenue_mat], dim='lm')
+    am_revenue_mat = xr.concat([am_revenue_mat.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), am_revenue_mat], dim='am')
+    am_cost_mat = xr.concat([am_cost_mat.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), am_cost_mat], dim='lm')
+    am_cost_mat = xr.concat([am_cost_mat.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), am_cost_mat], dim='am')
 
     # Multiply the am_dvar_mrj with the am_revenue_mat to get the revenue and cost
     xr_revenue_am = am_dvar_mrj * am_revenue_mat
@@ -932,9 +932,9 @@ def write_dvar_area(data: Data, yr_cal, path):
         ).chunk({'cell': min(1024, data.NCELLS)})
         
     # Expand dimension
-    ag_dvar_mrj = xr.concat([ag_dvar_mrj, ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    am_dvar_mrj = xr.concat([am_dvar_mrj, am_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    am_dvar_mrj = xr.concat([am_dvar_mrj, am_dvar_mrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
+    ag_dvar_mrj = xr.concat([ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_dvar_mrj], dim='lm')
+    am_dvar_mrj = xr.concat([am_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), am_dvar_mrj], dim='lm')
+    am_dvar_mrj = xr.concat([am_dvar_mrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), am_dvar_mrj], dim='am')
 
     # Calculate the real area in hectares
     real_area_r = xr.DataArray(data.REAL_AREA, dims=['cell'], coords={'cell': range(data.NCELLS)})
@@ -1167,9 +1167,9 @@ def write_ghg_separate(data: Data, yr_cal, path):
     ag_g_rsmj['GHG_source'] = ag_g_rsmj['GHG_source'].to_series().replace(GHG_NAMES)
     
     # Expand dimension
-    ag_dvar_mrj = xr.concat([ag_dvar_mrj, ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    ag_g_rsmj = xr.concat([ag_g_rsmj, ag_g_rsmj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    ag_g_rsmj = xr.concat([ag_g_rsmj, ag_g_rsmj.sum(dim='GHG_source', keepdims=True).assign_coords(GHG_source=['ALL'])], dim='GHG_source')
+    ag_dvar_mrj = xr.concat([ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_dvar_mrj], dim='lm')
+    ag_g_rsmj = xr.concat([ag_g_rsmj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_g_rsmj], dim='lm')
+    ag_g_rsmj = xr.concat([ag_g_rsmj.sum(dim='GHG_source', keepdims=True).assign_coords(GHG_source=['ALL']), ag_g_rsmj], dim='GHG_source')
 
     ghg_e = ag_g_rsmj * ag_dvar_mrj 
     
@@ -1260,10 +1260,10 @@ def write_ghg_separate(data: Data, yr_cal, path):
     )
 
     # Expand dimension
-    ag_man_dvar_mrj = xr.concat([ag_man_dvar_mrj, ag_man_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    ag_man_dvar_mrj = xr.concat([ag_man_dvar_mrj, ag_man_dvar_mrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
-    ag_man_g_mrj = xr.concat([ag_man_g_mrj, ag_man_g_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    ag_man_g_mrj = xr.concat([ag_man_g_mrj, ag_man_g_mrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
+    ag_man_dvar_mrj = xr.concat([ag_man_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_man_dvar_mrj], dim='lm')
+    ag_man_dvar_mrj = xr.concat([ag_man_dvar_mrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), ag_man_dvar_mrj], dim='am')
+    ag_man_g_mrj = xr.concat([ag_man_g_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_man_g_mrj], dim='lm')
+    ag_man_g_mrj = xr.concat([ag_man_g_mrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), ag_man_g_mrj], dim='am')
 
     # Calculate GHG emissions for agricultural management
     xr_ghg_ag_man = ag_man_dvar_mrj * ag_man_g_mrj
@@ -1400,9 +1400,9 @@ def write_water(data: Data, yr_cal, path):
     )
 
     # Expand dimension
-    ag_dvar_mrj = xr.concat([ag_dvar_mrj, ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    am_dvar_mrj = xr.concat([am_dvar_mrj, am_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    am_dvar_mrj = xr.concat([am_dvar_mrj, am_dvar_mrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
+    ag_dvar_mrj = xr.concat([ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_dvar_mrj], dim='lm')
+    am_dvar_mrj = xr.concat([am_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), am_dvar_mrj], dim='lm')
+    am_dvar_mrj = xr.concat([am_dvar_mrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), am_dvar_mrj], dim='am')
 
 
     # ------------------------------- Get water yield without CCI -----------------------------------
@@ -1438,9 +1438,9 @@ def write_water(data: Data, yr_cal, path):
         raise ValueError("Invalid setting for WATER_CLIMATE_CHANGE_IMPACT, only 'on' or 'off' allowed.")
 
     # Expand dimension
-    ag_w_mrj = xr.concat([ag_w_mrj, ag_w_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    ag_man_w_mrj = xr.concat([ag_man_w_mrj, ag_man_w_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    ag_man_w_mrj = xr.concat([ag_man_w_mrj, ag_man_w_mrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
+    ag_w_mrj = xr.concat([ag_w_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_w_mrj], dim='lm')
+    ag_man_w_mrj = xr.concat([ag_man_w_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_man_w_mrj], dim='lm')
+    ag_man_w_mrj = xr.concat([ag_man_w_mrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), ag_man_w_mrj], dim='am')
 
 
     # Calculate water net yield inside LUTO study region
@@ -1492,11 +1492,11 @@ def write_water(data: Data, yr_cal, path):
     # Get CCI matrix
     if settings.WATER_CLIMATE_CHANGE_IMPACT == 'on':
         ag_w_mrj_base = tools.ag_mrj_to_xr(data, ag_water.get_water_net_yield_matrices(data, 0))
-        ag_w_mrj_base = xr.concat([ag_w_mrj_base, ag_w_mrj_base.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
+        ag_w_mrj_base = xr.concat([ag_w_mrj_base.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_w_mrj_base], dim='lm')
         wny_outside_luto_study_area_base = np.array(list(data.WATER_OUTSIDE_LUTO_BY_CCI.loc[data.YR_CAL_BASE].to_dict().values()))
     elif settings.WATER_CLIMATE_CHANGE_IMPACT == 'off':
         ag_w_mrj_base = tools.ag_mrj_to_xr(data, ag_water.get_water_net_yield_matrices(data, 0, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR))
-        ag_w_mrj_base = xr.concat([ag_w_mrj_base, ag_w_mrj_base.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
+        ag_w_mrj_base = xr.concat([ag_w_mrj_base.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_w_mrj_base], dim='lm')
         wny_outside_luto_study_area_base = np.array(list(data.WATER_OUTSIDE_LUTO_HIST.values()))
 
     ag_w_mrj_CCI = ag_w_mrj - ag_w_mrj_base
@@ -1509,7 +1509,7 @@ def write_water(data: Data, yr_cal, path):
     #   because the CCI calculated with base year (previouse year) 
     #   dvar_mrj includes wny from land-use change
     xr_ag_dvar_BASE = tools.ag_mrj_to_xr(data, data.AG_L_MRJ).assign_coords(region_water=('cell', data.WATER_REGION_ID), region_NRM=('cell', data.REGION_NRM_NAME))
-    xr_ag_dvar_BASE = xr.concat([xr_ag_dvar_BASE, xr_ag_dvar_BASE.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
+    xr_ag_dvar_BASE = xr.concat([xr_ag_dvar_BASE.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), xr_ag_dvar_BASE], dim='lm')
 
     xr_ag_wny_CCI = xr_ag_dvar_BASE * ag_w_mrj_CCI
 
@@ -1636,12 +1636,12 @@ def write_biodiversity_overall_quanlity_scores(data: Data, yr_cal, path):
     base_yr_score = np.einsum('mrj,mrj->', bio_ag_priority_mrj, data.AG_L_MRJ)
     
     # Expand dimension
-    ag_dvar_mrj = xr.concat([ag_dvar_mrj, ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    ag_mam_dvar_mrj = xr.concat([ag_mam_dvar_mrj, ag_mam_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    ag_mam_dvar_mrj = xr.concat([ag_mam_dvar_mrj, ag_mam_dvar_mrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
-    bio_ag_priority_mrj = xr.concat([bio_ag_priority_mrj, bio_ag_priority_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    bio_am_priority_amrj = xr.concat([bio_am_priority_amrj, bio_am_priority_amrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    bio_am_priority_amrj = xr.concat([bio_am_priority_amrj, bio_am_priority_amrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
+    ag_dvar_mrj = xr.concat([ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_dvar_mrj], dim='lm')
+    ag_mam_dvar_mrj = xr.concat([ag_mam_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_mam_dvar_mrj], dim='lm')
+    ag_mam_dvar_mrj = xr.concat([ag_mam_dvar_mrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), ag_mam_dvar_mrj], dim='am')
+    bio_ag_priority_mrj = xr.concat([bio_ag_priority_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), bio_ag_priority_mrj], dim='lm')
+    bio_am_priority_amrj = xr.concat([bio_am_priority_amrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), bio_am_priority_amrj], dim='lm')
+    bio_am_priority_amrj = xr.concat([bio_am_priority_amrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), bio_am_priority_amrj], dim='am')
 
     # Calculate xarray biodiversity scores
     xr_priority_ag = ag_dvar_mrj * bio_ag_priority_mrj
@@ -1741,10 +1741,10 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
     ).unstack()
 
     # Expand dimension
-    ag_dvar_mrj = xr.concat([ag_dvar_mrj, ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    am_dvar_amrj = xr.concat([am_dvar_amrj, am_dvar_amrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
-    am_dvar_amrj = xr.concat([am_dvar_amrj, am_dvar_amrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    am_impact_raj = xr.concat([am_impact_raj, am_impact_raj.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
+    ag_dvar_mrj = xr.concat([ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_dvar_mrj], dim='lm')
+    am_dvar_amrj = xr.concat([am_dvar_amrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), am_dvar_amrj], dim='am')
+    am_dvar_amrj = xr.concat([am_dvar_amrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), am_dvar_amrj], dim='lm')
+    am_impact_raj = xr.concat([am_impact_raj.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), am_impact_raj], dim='am')
 
 
     # Get the total area of the priority degraded areas
@@ -1860,9 +1860,9 @@ def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
     
     # Expand dimension
-    ag_dvar_mrj = xr.concat([ag_dvar_mrj, ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    am_dvar_amrj = xr.concat([am_dvar_amrj, am_dvar_amrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
-    am_dvar_amrj = xr.concat([am_dvar_amrj, am_dvar_amrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
+    ag_dvar_mrj = xr.concat([ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_dvar_mrj], dim='lm')
+    am_dvar_amrj = xr.concat([am_dvar_amrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), am_dvar_amrj], dim='am')
+    am_dvar_amrj = xr.concat([am_dvar_amrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), am_dvar_amrj], dim='lm')
 
 
     # Get vegetation matrices for the year
@@ -1892,7 +1892,7 @@ def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
     ).unstack()
 
     # Expand dimension
-    am_impact_amr = xr.concat([am_impact_amr, am_impact_amr.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
+    am_impact_amr = xr.concat([am_impact_amr.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), am_impact_amr], dim='am')
     
     # Get the base year biodiversity scores
     veg_base_score_score = pd.DataFrame({
@@ -2014,9 +2014,9 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
     
     # Expand dimension
-    ag_dvar_mrj = xr.concat([ag_dvar_mrj, ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    am_dvar_amrj = xr.concat([am_dvar_amrj, am_dvar_amrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
-    am_dvar_amrj = xr.concat([am_dvar_amrj, am_dvar_amrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
+    ag_dvar_mrj = xr.concat([ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_dvar_mrj], dim='lm')
+    am_dvar_amrj = xr.concat([am_dvar_amrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), am_dvar_amrj], dim='am')
+    am_dvar_amrj = xr.concat([am_dvar_amrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), am_dvar_amrj], dim='lm')
 
     # Get the biodiversity scores for the year
     bio_snes_sr = xr.DataArray(
@@ -2045,7 +2045,7 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
     ).unstack()
 
     # Expand dimension
-    am_impact_amr = xr.concat([am_impact_amr, am_impact_amr.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
+    am_impact_amr = xr.concat([am_impact_amr.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), am_impact_amr], dim='am')
 
     # Get the base year biodiversity scores
     bio_snes_scores = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF4_TARGET_SNES.csv')
@@ -2170,9 +2170,9 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
     
     # Expand dimension
-    ag_dvar_mrj = xr.concat([ag_dvar_mrj, ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    am_dvar_amrj = xr.concat([am_dvar_amrj, am_dvar_amrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
-    am_dvar_amrj = xr.concat([am_dvar_amrj, am_dvar_amrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
+    ag_dvar_mrj = xr.concat([ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_dvar_mrj], dim='lm')
+    am_dvar_amrj = xr.concat([am_dvar_amrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), am_dvar_amrj], dim='am')
+    am_dvar_amrj = xr.concat([am_dvar_amrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), am_dvar_amrj], dim='lm')
 
     # Get the biodiversity scores for the year
     bio_ecnes_sr = xr.DataArray(
@@ -2202,7 +2202,7 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
     ).unstack()
 
     # Expand dimension
-    am_impact_amr = xr.concat([am_impact_amr, am_impact_amr.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
+    am_impact_amr = xr.concat([am_impact_amr.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), am_impact_amr], dim='am')
 
     # Get the base year biodiversity scores
     bio_ecnes_scores = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF4_TARGET_ECNES.csv')
@@ -2323,9 +2323,9 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
     
     # Expand dimension
-    ag_dvar_mrj = xr.concat([ag_dvar_mrj, ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    am_dvar_amrj = xr.concat([am_dvar_amrj, am_dvar_amrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
-    am_dvar_amrj = xr.concat([am_dvar_amrj, am_dvar_amrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
+    ag_dvar_mrj = xr.concat([ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_dvar_mrj], dim='lm')
+    am_dvar_amrj = xr.concat([am_dvar_amrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), am_dvar_amrj], dim='am')
+    am_dvar_amrj = xr.concat([am_dvar_amrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), am_dvar_amrj], dim='lm')
 
     # Get biodiversity scores for selected species
     bio_scores_sr = xr.DataArray(
@@ -2356,7 +2356,7 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
     ).unstack()
 
     # Expand dimension
-    am_impact_amr = xr.concat([am_impact_amr, am_impact_amr.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
+    am_impact_amr = xr.concat([am_impact_amr.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), am_impact_amr], dim='am')
 
     # Get the base year biodiversity scores
     base_yr_score = pd.DataFrame({
@@ -2475,9 +2475,9 @@ def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
     
     # Expand dimension
-    ag_dvar_mrj = xr.concat([ag_dvar_mrj, ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    am_dvar_amrj = xr.concat([am_dvar_amrj, am_dvar_amrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
-    am_dvar_amrj = xr.concat([am_dvar_amrj, am_dvar_amrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
+    ag_dvar_mrj = xr.concat([ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_dvar_mrj], dim='lm')
+    am_dvar_amrj = xr.concat([am_dvar_amrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), am_dvar_amrj], dim='am')
+    am_dvar_amrj = xr.concat([am_dvar_amrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), am_dvar_amrj], dim='lm')
 
     # Get biodiversity scores for selected species
     bio_scores_sr = xr.DataArray(
@@ -2508,7 +2508,7 @@ def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
     ).unstack()
 
     # Expand dimension
-    am_impact_amr = xr.concat([am_impact_amr, am_impact_amr.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
+    am_impact_amr = xr.concat([am_impact_amr.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), am_impact_amr], dim='am')
 
     # Get the base year biodiversity scores
     base_yr_score = pd.DataFrame({
