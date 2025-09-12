@@ -6,6 +6,7 @@ window.EconomicsView = {
     const chartRegister = window.DataService.chartCategories["Economics"];
     const mapRegister = window.MapService.mapCategories["Economics"];
     const loadScript = window.loadScriptWithTracking;
+    const mosaicMap = window.MapService.mapCategories["Dvar"]["Mosaic"];
     
     // View identification for memory management
     const VIEW_NAME = "Economics";
@@ -49,44 +50,35 @@ window.EconomicsView = {
     // UI state
     const dataLoaded = ref(false);
     const isDrawerOpen = ref(false);
-    const mapReady = computed(() => {
-      if (!selectCategory.value || !selectCostRevenue.value) {
-        return false;
-      }
-      if (selectCategory.value === "Non-Ag") {
-        return selectLanduse.value && mapRegister[selectCostRevenue.value]?.[selectCategory.value]?.name && window[mapRegister[selectCostRevenue.value][selectCategory.value].name];
-      }
-      if (!selectWater.value || !selectLanduse.value) {
-        return false;
-      }
-      if (selectCategory.value === "Ag Mgt" && !selectAgMgt.value) {
-        return false;
-      }
-      const dataName = mapRegister[selectCostRevenue.value]?.[selectCategory.value]?.name;
-      return dataName && window[dataName];
-    });
-    const chartReady = computed(() => {
-      if (!selectCategory.value || !selectRegion.value) {
-        return false;
-      }
-      if (selectCategory.value === "Non-Ag") {
-        const dataName = chartRegister[selectCategory.value]?.name;
-        return dataName && window[dataName] && window[dataName][selectRegion.value];
-      }
-      if (selectCategory.value === "Ag" || selectCategory.value === "Ag Mgt") {
-        // Both Ag and Ag Mgt charts use aggregated data, don't need Water/Landuse/AgMgt selections
-        const dataName = chartRegister[selectCategory.value]?.name;
-        return dataName && window[dataName] && window[dataName][selectRegion.value];
-      }
-      const dataName = chartRegister[selectCategory.value]?.name;
-      return dataName && window[dataName] && window[dataName][selectRegion.value];
-    });
 
     // Reactive data
-    const mapData = computed(() => window[mapRegister[selectCostRevenue.value][selectCategory.value]?.name]);
+    const mapData = computed(() => {
+      if (!dataLoaded.value) {
+        return {};
+      }
+      let mapDataWithALL = JSON.parse(JSON.stringify(window[mapRegister[selectCostRevenue.value][selectCategory.value]?.name]));
+      let mapDataWithMosaic = JSON.parse(JSON.stringify(window[mosaicMap['name']]));
+      if (selectCategory.value === "Ag") {
+        mapDataWithALL[selectWater.value] = {
+          "ALL": mapDataWithMosaic['Agricultural Land-use'],
+          ...mapDataWithALL[selectWater.value]
+        }
+      } else if (selectCategory.value === "Ag Mgt") {
+        mapDataWithALL[selectAgMgt.value][selectWater.value] = {
+          "ALL": mapDataWithMosaic['Agricultural Management'],
+          ...mapDataWithALL[selectAgMgt.value][selectWater.value]
+        }
+      } else if (selectCategory.value === "Non-Ag") {
+        mapDataWithALL = {
+          "ALL": mapDataWithMosaic['Non-agricultural Land-use'],
+          ...mapDataWithALL
+        }
+      }
+      return mapDataWithALL;
+    });
     const chartData = computed(() => window[chartRegister[selectCategory.value]?.name]?.[selectRegion.value]);
     const selectMapData = computed(() => {
-      if (!mapReady.value) {
+      if (!dataLoaded.value) {
         return {};
       }
       if (selectCategory.value === "Ag") {
@@ -101,7 +93,7 @@ window.EconomicsView = {
       return {};
     });
     const selectChartData = computed(() => {
-      if (!chartReady.value) {
+      if (!dataLoaded.value) {
         return {};
       }
       let seriesData;
@@ -135,6 +127,7 @@ window.EconomicsView = {
     onMounted(async () => {
       await loadScript("./data/Supporting_info.js", "Supporting_info", VIEW_NAME);
       await loadScript("./data/chart_option/Chart_default_options.js", "Chart_default_options", VIEW_NAME);
+      await loadScript(mosaicMap['path'], mosaicMap['name'], VIEW_NAME);
 
       // Load data
       await loadScript(mapRegister["Cost"]["Ag"]["path"], mapRegister["Cost"]["Ag"]["name"], VIEW_NAME);
@@ -196,9 +189,9 @@ window.EconomicsView = {
           const prevWater = previousSelections.value["Ag Mgt"].water;
           selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
           
-          availableLanduse.value = Object.keys(currentMapData[selectAgMgt.value][selectWater.value] || {});
+          availableLanduse.value = ["ALL", ...Object.keys(currentMapData[selectAgMgt.value][selectWater.value] || {})];
           const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
-          selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
+          selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
         }
       } else if (newCategory === "Ag") {
         const currentMapData = window[mapRegister[newCostRevenue]["Ag"]["name"]];
@@ -206,14 +199,14 @@ window.EconomicsView = {
         const prevWater = previousSelections.value["Ag"].water;
         selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
         
-        availableLanduse.value = Object.keys(currentMapData[selectWater.value] || {});
+        availableLanduse.value = ["ALL", ...Object.keys(currentMapData[selectWater.value] || {})];
         const prevLanduse = previousSelections.value["Ag"].landuse;
-        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
+        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
       } else if (newCategory === "Non-Ag") {
         const currentMapData = window[mapRegister[newCostRevenue]["Non-Ag"]["name"]];
-        availableLanduse.value = Object.keys(currentMapData || {});
+        availableLanduse.value = ["ALL", ...Object.keys(currentMapData || {})];
         const prevLanduse = previousSelections.value["Non-Ag"].landuse;
-        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
+        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
       }
     }, { immediate: true });
 
@@ -228,9 +221,9 @@ window.EconomicsView = {
         const prevWater = previousSelections.value["Ag Mgt"].water;
         selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
         
-        availableLanduse.value = Object.keys(currentMapData[newAgMgt][selectWater.value] || {});
+        availableLanduse.value = ["ALL", ...Object.keys(currentMapData[newAgMgt][selectWater.value] || {})];
         const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
-        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
+        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
       }
     });
 
@@ -245,14 +238,14 @@ window.EconomicsView = {
       // Handle downstream variables
       if (selectCategory.value === "Ag") {
         const currentMapData = window[mapRegister[selectCostRevenue.value]["Ag"]["name"]];
-        availableLanduse.value = Object.keys(currentMapData[newWater] || {});
+        availableLanduse.value = ["ALL", ...Object.keys(currentMapData[newWater] || {})];
         const prevLanduse = previousSelections.value["Ag"].landuse;
-        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
+        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
       } else if (selectCategory.value === "Ag Mgt") {
         const currentMapData = window[mapRegister[selectCostRevenue.value]["Ag Mgt"]["name"]];
-        availableLanduse.value = Object.keys(currentMapData[selectAgMgt.value][newWater] || {});
+        availableLanduse.value = ["ALL", ...Object.keys(currentMapData[selectAgMgt.value][newWater] || {})];
         const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
-        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
+        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
       }
     });
 
@@ -431,7 +424,6 @@ window.EconomicsView = {
           }">
           <chart-container 
             :chartData="selectChartData" 
-            :selectedLanduse="selectLanduse"
             :draggable="true"
             :zoomable="true"
             style="width: 100%; height: 200px;">

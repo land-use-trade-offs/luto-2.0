@@ -4,10 +4,6 @@ window.Highchart = {
       type: Object,
       required: true,
     },
-    selectedLanduse: {
-      type: String,
-      default: 'ALL',
-    },
     draggable: {
       type: Boolean,
       default: false,
@@ -31,28 +27,6 @@ window.Highchart = {
     const scale = ref(1);
     const zoomStep = 0.1;
 
-    // Apply landuse highlighting to chart data
-    const applyHighlighting = (chartData) => {
-      if (!props.selectedLanduse || props.selectedLanduse === 'ALL' || !chartData.series) {
-        return chartData;
-      }
-
-      const highlightedSeries = chartData.series.map(series => ({
-        ...series,
-        color: series.name === props.selectedLanduse
-          ? series.color
-          : (typeof Highcharts !== 'undefined' && Highcharts.color
-            ? Highcharts.color(series.color).setOpacity(0.3).get()
-            : series.color),
-        borderWidth: series.name === props.selectedLanduse ? 2 : 0,
-        borderColor: series.name === props.selectedLanduse ? '#1f2937' : 'transparent'
-      }));
-
-      return {
-        ...chartData,
-        series: highlightedSeries
-      };
-    };
 
     // Function to handle dataset loading and chart creation
     const createChart = () => {
@@ -64,15 +38,12 @@ window.Highchart = {
         ChartInstance.value = null;
       }
 
-      // Apply highlighting to chart data before creating chart
-      const processedChartData = applyHighlighting(props.chartData);
-
-      // Create new chart with our stored colors
+      // Create new chart with chart data
       ChartInstance.value = Highcharts.chart(
         chartElement.value,
         {
-          ...processedChartData,
-          chart: (processedChartData.chart || {}),
+          ...props.chartData,
+          chart: (props.chartData.chart || {}),
         }
       );
       isLoading.value = false;
@@ -129,11 +100,8 @@ window.Highchart = {
 
     // Function to update the chart with new series data
     const updateChart = (chart, newChartData) => {
-      // Apply highlighting before updating
-      const processedData = applyHighlighting(newChartData);
-
-      // Make a deep copy of the processed chart data to avoid reference issues
-      const newData = JSON.parse(JSON.stringify(processedData));
+      // Make a deep copy of the chart data to avoid reference issues
+      const newData = JSON.parse(JSON.stringify(newChartData));
 
       // Update the chart configuration options first (except series and colors)
       for (const key in newData) {
@@ -223,12 +191,6 @@ window.Highchart = {
       }, 300); // Wait for sidebar animation to complete
     });
 
-    // Watch for selectedLanduse changes to re-apply highlighting
-    watch(() => props.selectedLanduse, () => {
-      if (ChartInstance.value && props.chartData) {
-        updateChart(ChartInstance.value, props.chartData);
-      }
-    });
 
     return {
       chartElement,

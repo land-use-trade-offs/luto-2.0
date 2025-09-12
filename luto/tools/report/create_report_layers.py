@@ -316,7 +316,7 @@ def get_map_obj_interger(files_df:pd.DataFrame, save_path:str, colors_legend, wo
         )
 
     output = {}
-    for res in Parallel(n_jobs=settings.WRITE_THREADS, return_as='generator')(task):
+    for res in Parallel(n_jobs=workers, return_as='generator')(task):
         if res is None:continue
         (_type, _year, legend), val = res
         if _type not in output:
