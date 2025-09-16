@@ -2378,7 +2378,7 @@ def save_report_data(raw_data_dir:str):
             out_dict[region][b_type]['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
             out_dict[region][b_type]['value'] = df.set_index('Year')['Area Weighted Score (ha)'].apply( lambda x: format_with_suffix(x)).to_dict()
             
-        filename = 'Biodiversity_GBF2_ranking'
+        filename = 'BIO_GBF2_ranking'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
@@ -2630,7 +2630,7 @@ def save_report_data(raw_data_dir:str):
             out_dict[region][b_type]['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
             out_dict[region][b_type]['value'] = df.set_index('Year')['Area Weighted Score (ha)'].apply(lambda x: format_with_suffix(x)).to_dict()
 
-        filename = 'Biodiversity_GBF3_ranking'
+        filename = 'BIO_GBF3_ranking'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
@@ -2886,7 +2886,7 @@ def save_report_data(raw_data_dir:str):
             out_dict[region][b_type]['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
             out_dict[region][b_type]['value'] = df.set_index('Year')['Value (%)'].apply(lambda x: format_with_suffix(x)).to_dict()
 
-        filename = 'Biodiversity_GBF4_SNES_ranking'
+        filename = 'BIO_GBF4_SNES_ranking'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
@@ -3087,8 +3087,7 @@ def save_report_data(raw_data_dir:str):
         
         filter_str = '''
             category == "biodiversity" 
-            
-            and base_name.str.contains("biodiversity_GBF4_ECNES_scores")
+            and base_name.str.contains("Biodiversity_GBF4_ECNES_scores")
         '''.strip().replace('\n', '')
         
         bio_paths = files.query(filter_str).reset_index(drop=True)
@@ -3136,7 +3135,7 @@ def save_report_data(raw_data_dir:str):
             out_dict[region][b_type]['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
             out_dict[region][b_type]['value'] = df.set_index('Year')['Value (%)'].apply(lambda x: format_with_suffix(x)).to_dict()
 
-        filename = 'Biodiversity_GBF4_ECNES_ranking'
+        filename = 'BIO_GBF4_ECNES_ranking'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
@@ -3339,7 +3338,7 @@ def save_report_data(raw_data_dir:str):
         filter_str = '''
             category == "biodiversity" 
             
-            and base_name.str.contains("biodiversity_GBF8_species_scores")
+            and base_name.str.contains("Biodiversity_GBF8_species_scores")
         '''.strip().replace('\n','')
         
         bio_paths = files.query(filter_str).reset_index(drop=True)
@@ -3386,7 +3385,7 @@ def save_report_data(raw_data_dir:str):
             out_dict[region][b_type]['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
             out_dict[region][b_type]['value'] = df.set_index('Year')['Value (%)'].apply(lambda x: format_with_suffix(x)).to_dict()
 
-        filename = 'Biodiversity_GBF8_SPECIES_ranking'
+        filename = 'BIO_GBF8_SPECIES_ranking'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
@@ -3588,7 +3587,7 @@ def save_report_data(raw_data_dir:str):
         filter_str = '''
             category == "biodiversity" 
             
-            and base_name.str.contains("biodiversity_GBF8_groups_scores")
+            and base_name.str.contains("Biodiversity_GBF8_groups_scores")
         '''.strip().replace('\n','')
         
         bio_paths = files.query(filter_str).reset_index(drop=True)
@@ -3635,7 +3634,7 @@ def save_report_data(raw_data_dir:str):
             out_dict[region][b_type]['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
             out_dict[region][b_type]['value'] = df.set_index('Year')['Value (%)'].apply(lambda x: format_with_suffix(x)).to_dict()
 
-        filename = 'Biodiversity_GBF8_GROUP_ranking'
+        filename = 'BIO_GBF8_GROUP_ranking'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
