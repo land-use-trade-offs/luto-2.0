@@ -3085,12 +3085,7 @@ def save_report_data(raw_data_dir:str):
             
     if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == 'on':
         
-        filter_str = '''
-            category == "biodiversity" 
-            and base_name.str.contains("Biodiversity_GBF4_ECNES_scores")
-        '''.strip().replace('\n', '')
-        
-        bio_paths = files.query(filter_str).reset_index(drop=True)
+        bio_paths = files.query('base_name.str.contains("biodiversity_GBF4_ECNES_scores")')
         bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
         bio_df = bio_df.replace(RENAME_AM_NON_AG)\
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)'})\
@@ -3338,7 +3333,7 @@ def save_report_data(raw_data_dir:str):
         filter_str = '''
             category == "biodiversity" 
             
-            and base_name.str.contains("Biodiversity_GBF8_species_scores")
+            and base_name.str.contains("biodiversity_GBF8_species_scores")
         '''.strip().replace('\n','')
         
         bio_paths = files.query(filter_str).reset_index(drop=True)
@@ -3581,16 +3576,9 @@ def save_report_data(raw_data_dir:str):
             f.write(';\n')
         
         
-        
-        
-        
-        filter_str = '''
-            category == "biodiversity" 
-            
-            and base_name.str.contains("Biodiversity_GBF8_groups_scores")
-        '''.strip().replace('\n','')
-        
-        bio_paths = files.query(filter_str).reset_index(drop=True)
+    
+        # ---------------- (GBF8 GROUP)  ----------------
+        bio_paths = files.query('base_name.str.contains("biodiversity_GBF8_groups_scores")')
         bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
         bio_df = bio_df.replace(RENAME_AM_NON_AG)\
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)', 'Group':'species'})\
