@@ -68,7 +68,7 @@ window.GHGView = {
         }
       } else if (selectCategory.value === "Non-Ag") {
         mapDataWithALL = {
-          "ALL": mapDataWithMosaic['Non-agricultural Land-use'],
+          "ALL": mapDataWithMosaic['Non-Agricultural Land-use'],
           ...mapDataWithALL
         }
       }
@@ -181,11 +181,11 @@ window.GHGView = {
         availableAgMgt.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]] || {});
         const prevAgMgt = previousSelections.value["Ag Mgt"].agMgt;
         selectAgMgt.value = (prevAgMgt && availableAgMgt.value.includes(prevAgMgt)) ? prevAgMgt : (availableAgMgt.value[0] || '');
-        
+
         availableWater.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value] || {});
         const prevWater = previousSelections.value["Ag Mgt"].water;
         selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
-        
+
         availableLanduse.value = ["ALL", ...Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value][selectWater.value] || {})];
         const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
         selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
@@ -193,7 +193,7 @@ window.GHGView = {
         availableWater.value = Object.keys(window[mapRegister["Ag"]["name"]] || {});
         const prevWater = previousSelections.value["Ag"].water;
         selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
-        
+
         availableLanduse.value = ["ALL", ...Object.keys(window[mapRegister["Ag"]["name"]][selectWater.value] || {})];
         const prevLanduse = previousSelections.value["Ag"].landuse;
         selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
@@ -208,12 +208,12 @@ window.GHGView = {
       // Save current agMgt selection
       if (selectCategory.value === "Ag Mgt") {
         previousSelections.value["Ag Mgt"].agMgt = newAgMgt;
-        
+
         // Handle ALL downstream variables with cascading pattern
         availableWater.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][newAgMgt] || {});
         const prevWater = previousSelections.value["Ag Mgt"].water;
         selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
-        
+
         availableLanduse.value = ["ALL", ...Object.keys(window[mapRegister["Ag Mgt"]["name"]][newAgMgt][selectWater.value] || {})];
         const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
         selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');

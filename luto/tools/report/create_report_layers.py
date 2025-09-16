@@ -86,7 +86,7 @@ def get_color_legend(data:Data) -> dict:
             'color_csv': color_csvs['ag'],
             'legend': pd.read_csv(color_csvs['ag']).set_index('lu_desc')['lu_color_HEX'].to_dict()
         },
-        'Non-agricultural Land-use': {
+        'Non-Agricultural Land-use': {
             'color_csv': color_csvs['non_ag'],
             'legend': {
                 RENAME_AM_NON_AG.get(k,k):v for k,v in pd.read_csv(color_csvs['non_ag']).set_index('lu_desc')['lu_color_HEX'].to_dict().items() 
@@ -286,9 +286,9 @@ def get_map_obj_interger(files_df:pd.DataFrame, save_path:str, colors_legend, wo
         )
     map_mosaic_non_ag = files_df.query('base_name == "xr_map_non_ag_argmax"'
         ).assign(
-            _type='Non-agricultural Land-use',
-            color_csv=colors_legend['Non-agricultural Land-use']['color_csv'],
-            legend_info=str(colors_legend['Non-agricultural Land-use']['legend'])
+            _type='Non-Agricultural Land-use',
+            color_csv=colors_legend['Non-Agricultural Land-use']['color_csv'],
+            legend_info=str(colors_legend['Non-Agricultural Land-use']['legend'])
         )
     map_mosaic_am = files_df.query('base_name == "xr_map_am_argmax"'
         ).assign(

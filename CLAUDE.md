@@ -213,7 +213,7 @@ All reporting views follow the progressive selection pattern:
 
 #### BIODIVERSITY MODULE
 - **Chart Data**:
-  - `BIO_GBF2_overview_1_Type`: `Region → [series]` (simplified overview - Agricultural Landuse, Agricultural Management, Non-Agricultural land-use)
+  - `BIO_GBF2_overview_1_Type`: `Region → [series]` (simplified overview - Agricultural Landuse, Agricultural Management, Non-Agricultural Land-use)
   - `BIO_GBF2_split_Ag_1_Landuse`: `Region → [series]` (simplified, no Water/AgMgt levels)
   - `BIO_GBF2_split_Am_1_Landuse`: `Region → [series]` (simplified, no Water/AgMgt levels) 
   - `BIO_GBF2_split_Am_2_Agri-Management`: `Region → [series]` with AgMgt categories: `"ALL"`, `"Early dry-season savanna burning"`, `"Human-induced regeneration (Beef)"`, `"Human-induced regeneration (Sheep)"`
@@ -236,7 +236,7 @@ All reporting views follow the progressive selection pattern:
     - `"Water-supply"`: `Year → {img_str, bounds, min_max}` 
     - `"Agricultural Land-use"`: `Year → {img_str, bounds, min_max}`
     - `"Agricultural Management"`: `Year → {img_str, bounds, min_max}`
-    - `"Non-agricultural Land-use"`: `Year → {img_str, bounds, min_max}`
+    - `"Non-Agricultural Land-use"`: `Year → {img_str, bounds, min_max}`
 - **Composite Structure**: Map.js creates combined structure:
   - Categories: `"Land-use"`, `"Water-supply"`, `"Ag"`, `"Ag Mgt"`, `"Non-Ag"`
   - Each category combines "ALL" from mosaic + individual items from specific files

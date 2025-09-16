@@ -70,7 +70,7 @@ window.AreaView = {
         }
       } else if (selectCategory.value === "Non-Ag") {
         mapDataWithALL = {
-          "ALL": mapDataWithMosaic['Non-agricultural Land-use'],
+          "ALL": mapDataWithMosaic['Non-Agricultural Land-use'],
           ...mapDataWithALL
         }
       }

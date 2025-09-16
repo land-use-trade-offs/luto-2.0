@@ -280,7 +280,7 @@ def create_new_dataset():
     # Read in ag-landuse, which is a lexicographically ordered list
     ag_landuses = pd.read_csv(outpath + 'ag_landuses.csv', header = None)[0].to_list()
 
-    # Create a non-agricultural landuses file
+    # Create a Non-Agricultural Land-uses file
     non_ag_landuses = list(settings.NON_AG_LAND_USES.keys())
 
 

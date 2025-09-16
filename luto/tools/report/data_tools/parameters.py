@@ -103,7 +103,7 @@ AM_NON_AG_REMOVED_DESC = AM_DESELECT + NON_AG_DESELECT
 # Define the file name patterns for each category
 GHG_FNAME2TYPE = {'GHG_emissions_separate_agricultural_landuse': 'Agricultural Landuse',
                   'GHG_emissions_separate_agricultural_management': 'Agricultural Management',
-                  'GHG_emissions_separate_no_ag_reduction': 'Non-Agricultural Landuse',
+                  'GHG_emissions_separate_no_ag_reduction': 'Non-Agricultural Land-use',
                   'GHG_emissions_separate_transition_penalty': 'Transition Penalty',
                   'GHG_emissions_offland_commodity': 'Offland Commodity',}
 
@@ -144,17 +144,8 @@ RENAME_AM_NON_AG = {**RENAME_AM, **RENAME_NON_AG}
 # Read the land uses from the file
 with open(f'{settings.INPUT_DIR}/ag_landuses.csv') as f:
     AG_LANDUSE = [line.strip() for line in f]
+  
     
-    
-# This will be used in the HTML for reporting spatial maps
-SPATIAL_MAP_DICT = {
-    'Int_Map': ['lumap', 'non_ag', 'ammap', 'lmmap'],       # Each cell is an integer, representing a land-use for [AG, AM, Non-AG]
-    'Ag_LU': AG_LANDUSE,                                    # Percentage of Agricultural Landuse to a cell
-    'Ag_Mgt': list(settings.AG_MANAGEMENTS.keys()),         # Percentage of Agricultural Management to a cell                 
-    'Non-Ag_LU': list(settings.NON_AG_LAND_USES.keys())     # Percentage of Non-Agricultural Landuse to a cell
-}
-
-
 # Get the non-agricultural land uses raw names
 NON_AG_LANDUSE_RAW = list(settings.NON_AG_LAND_USES.keys())
 NON_AG_LANDUSE_RAW = [i for i in NON_AG_LANDUSE_RAW if settings.NON_AG_LAND_USES[i]]
@@ -191,7 +182,7 @@ GHG_NAMES = {
     'TCO2E_Asparagopsis taxiformis': 'Asparagopsis taxiformis', 
     'TCO2E_Precision Agriculture': 'Precision Agriculture',
     'TCO2E_Ecological Grazing': 'Ecological Grazing',
-    # Non-Agricultural Landuse
+    # Non-Agricultural Land-use
     'TCO2E_Agroforestry': 'Agroforestry', 
     'TCO2E_Environmental Plantings': 'Environmental Plantings',
     'TCO2E_Riparian Plantings': 'Riparian Plantings',

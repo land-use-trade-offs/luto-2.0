@@ -30,8 +30,7 @@ window.HomeView = {
     const RankSubcategoriesRename = {
       'Agricultural Landuse': 'Ag',
       'Agricultural Management': 'Ag Mgt',
-      'Non-Agricultural Landuse': 'Non-Ag',
-      'Non-Agricultural land-use': 'Non-Ag',
+      'Non-Agricultural Land-use': 'Non-Ag',
     };
     const availableRankSubcategories = ref([]);
 
@@ -83,18 +82,18 @@ window.HomeView = {
         areaTotal: rankingData.value['Area']?.[currentRegion]?.['Total']?.['value']?.[currentYear] || 'N/A',
         areaAgLand: rankingData.value['Area']?.[currentRegion]?.['Agricultural Landuse']?.['value']?.[currentYear] || 'N/A',
         areaAgMgt: rankingData.value['Area']?.[currentRegion]?.['Agricultural Management']?.['value']?.[currentYear] || 'N/A',
-        areaNonAg: rankingData.value['Area']?.[currentRegion]?.['Non-Agricultural Landuse']?.['value']?.[currentYear] || 'N/A',
+        areaNonAg: rankingData.value['Area']?.[currentRegion]?.['Non-Agricultural Land-use']?.['value']?.[currentYear] || 'N/A',
         ghgTotal: rankingData.value['GHG']?.[currentRegion]?.['Total']?.['value']?.[currentYear] || 'N/A',
         ghgEmissions: rankingData.value['GHG']?.[currentRegion]?.['GHG emissions']?.['value']?.[currentYear] || 'N/A',
         ghgReduction: rankingData.value['GHG']?.[currentRegion]?.['GHG sequestrations']?.['value']?.[currentYear] || 'N/A',
         waterTotal: rankingData.value['Water']?.[currentRegion]?.['Total']?.['value']?.[currentYear] || 'N/A',
         waterAgLand: rankingData.value['Water']?.[currentRegion]?.['Agricultural Landuse']?.['value']?.[currentYear] || 'N/A',
         waterAgMgt: rankingData.value['Water']?.[currentRegion]?.['Agricultural Management']?.['value']?.[currentYear] || 'N/A',
-        waterNonAg: rankingData.value['Water']?.[currentRegion]?.['Non-Agricultural Landuse']?.['value']?.[currentYear] || 'N/A',
+        waterNonAg: rankingData.value['Water']?.[currentRegion]?.['Non-Agricultural Land-use']?.['value']?.[currentYear] || 'N/A',
         biodiversityTotal: rankingData.value['Biodiversity']?.[currentRegion]?.['Total']?.['value']?.[currentYear] || 'N/A',
         biodiversityAgLand: rankingData.value['Biodiversity']?.[currentRegion]?.['Agricultural Landuse']?.['value']?.[currentYear] || 'N/A',
         biodiversityAgMgt: rankingData.value['Biodiversity']?.[currentRegion]?.['Agricultural Management']?.['value']?.[currentYear] || 'N/A',
-        biodiversityNonAg: rankingData.value['Biodiversity']?.[currentRegion]?.['Non-Agricultural land-use']?.['value']?.[currentYear] || 'N/A'
+        biodiversityNonAg: rankingData.value['Biodiversity']?.[currentRegion]?.['Non-Agricultural Land-use']?.['value']?.[currentYear] || 'N/A'
       };
     });
 

@@ -88,7 +88,7 @@ window['MapView'] = {
                     ...window[mapRegister["Ag Mgt"]['name']]
                 },
                 'Non-Ag': {
-                    'ALL': window[mapRegister["Mosaic"]['name']]['Non-agricultural Land-use'],
+                    'ALL': window[mapRegister["Mosaic"]['name']]['Non-Agricultural Land-use'],
                     ...window[mapRegister["Non-Ag"]['name']]
                 }
             };
