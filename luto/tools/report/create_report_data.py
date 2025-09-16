@@ -2823,6 +2823,8 @@ def save_report_data(raw_data_dir:str):
         out_dict = {}
         for (region, species), df in df_wide.groupby(['region', 'species']):
             df = df.drop(['region', 'species'], axis=1)
+            if region not in out_dict:
+                out_dict[region] = {}
             out_dict[region][species] = df.to_dict(orient='records')
 
         filename = f'BIO_GBF3_NonAg'
@@ -2832,9 +2834,7 @@ def save_report_data(raw_data_dir:str):
             f.write(';\n')
             
             
-            
-            
-    
+
     if settings.BIODIVERSITY_TARGET_GBF_4_SNES == 'on':
         
         filter_str = '''
