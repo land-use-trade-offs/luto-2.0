@@ -2209,7 +2209,7 @@ def save_report_data(raw_data_dir:str):
         out_dict[region][b_type]['value'] = df.set_index('Year')['Value (%)'].apply( lambda x: format_with_suffix(x)).to_dict()
 
         
-    filename = 'Biodiversity_ranking'
+    filename = 'BIO_quality_ranking'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
         json.dump(out_dict, f, separators=(',', ':'), indent=2)
