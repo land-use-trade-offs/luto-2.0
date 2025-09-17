@@ -1110,18 +1110,12 @@ def write_crosstab(data: Data, yr_cal, path):
 
 
 def write_ghg(data: Data, yr_cal, path):
-    """Calculate total GHG emissions from on-land agricultural sector.
-        Takes a simulation object, a target calendar year (e.g., 2030),
-        and an output path as input."""
-
-    if settings.GHG_EMISSIONS_LIMITS == 'off':
-        return 'GHG emissions calculation skipped as GHG_EMISSIONS_LIMITS is set to "off"'
-
-    
+    """GHG is written to disk no matter if GHG_EMISSIONS_LIMITS is 'off' or 'on'"""
+ 
     yr_idx = yr_cal - data.YR_CAL_BASE
 
     # Get GHG emissions limits used as constraints in model
-    ghg_limits = data.GHG_TARGETS[yr_cal]
+    ghg_limits = 0 if settings.GHG_EMISSIONS_LIMITS == 'off' else data.GHG_TARGETS[yr_cal]
 
     # Get GHG emissions from model
     if yr_cal >= data.YR_CAL_BASE + 1:
@@ -1137,7 +1131,10 @@ def write_ghg(data: Data, yr_cal, path):
     df['Year'] = yr_cal
     df.to_csv(os.path.join(path, f'GHG_emissions_{yr_cal}.csv'), index=False)
     
-    return f"GHG emissions written for year {yr_cal}"
+    if settings.GHG_EMISSIONS_LIMITS == 'off':
+        return 'WARNING: GHG emissions (total) calculated as `GHG_EMISSIONS_LIMITS` is set to "off"'
+    else:
+        return f"GHG emissions written for year {yr_cal}"
 
 
 

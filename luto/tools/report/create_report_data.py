@@ -2166,11 +2166,11 @@ def save_report_data(raw_data_dir:str):
     bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])\
         .replace(RENAME_AM_NON_AG)\
         .rename(columns={'Contribution Relative to Base Year Level (%)': 'Value (%)'})\
-        .query('abs(`Value (%)`) > 1e-4')\
+        .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
         .round({'Value (%)': 6})
     bio_df_non_all = bio_df.query('Water_supply != "ALL" and `Agri-Management` != "ALL"')
     bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural Landuse"').copy()
-    bio_df_am_non_all = bio_df_am.query('Water_supply != "ALL" and `Agri-Management` != "ALL"')
+    bio_df_am_non_all = bio_df_non_all.query('Type == "Agricultural Management"').copy()
     bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"').copy()
     
     # ---------------- Overall quality - Ranking -----------------
@@ -2252,7 +2252,7 @@ def save_report_data(raw_data_dir:str):
         .groupby(['Year', 'region', 'Landuse'])\
         .sum(numeric_only=True)\
         .reset_index()\
-        .query('abs(`Value (%)`) > 1e-4')
+        .query('abs(`Area Weighted Score (ha)`) > 1e-4')
     df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Value (%)']]\
         .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
         .reset_index()
@@ -2279,7 +2279,7 @@ def save_report_data(raw_data_dir:str):
         .groupby(['Year', 'region', "Agri-Management"])\
         .sum(numeric_only=True)\
         .reset_index()\
-        .query('abs(`Value (%)`) > 1e-4')
+        .query('abs(`Area Weighted Score (ha)`) > 1e-4')
     df_wide = df_region.groupby(["Agri-Management", 'region'])[['Year','Value (%)']]\
         .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
         .reset_index()
@@ -2305,7 +2305,7 @@ def save_report_data(raw_data_dir:str):
         .groupby(['Year', 'region', 'Landuse'])\
         .sum(numeric_only=True)\
         .reset_index()\
-        .query('abs(`Value (%)`) > 1e-4')
+        .query('abs(`Area Weighted Score (ha)`) > 1e-4')
     df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Value (%)']]\
         .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
         .reset_index()
@@ -2414,7 +2414,7 @@ def save_report_data(raw_data_dir:str):
         bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
         bio_df = bio_df.replace(RENAME_AM_NON_AG)\
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)'})\
-            .query('abs(`Value (%)`) > 1e-4')\
+            .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
             .round({'Value (%)': 2})
             
         bio_df_non_all = bio_df.query('Water_supply != "ALL" and `Agri-Management` != "ALL"')
@@ -2451,7 +2451,7 @@ def save_report_data(raw_data_dir:str):
             .groupby(['Year', 'region', 'Type'])\
             .sum(numeric_only=True)\
             .reset_index()\
-            .query('abs(`Value (%)`) > 1e-4')
+            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
         df_wide = df_region.groupby(['Type', 'region'])[['Year','Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
             .reset_index()
@@ -2478,7 +2478,7 @@ def save_report_data(raw_data_dir:str):
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
             .reset_index()\
-            .query('abs(`Value (%)`) > 1e-4')
+            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
         df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
             .reset_index()
@@ -2506,7 +2506,7 @@ def save_report_data(raw_data_dir:str):
             .groupby(['Year', 'region', 'Agri-Management'])\
             .sum(numeric_only=True)\
             .reset_index()\
-            .query('abs(`Value (%)`) > 1e-4')
+            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
         df_wide = df_region.groupby(['Agri-Management', 'region'])[['Year','Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
             .reset_index()
@@ -2530,7 +2530,7 @@ def save_report_data(raw_data_dir:str):
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
             .reset_index()\
-            .query('abs(`Value (%)`) > 1e-4')
+            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
         df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
             .reset_index()
@@ -2613,7 +2613,7 @@ def save_report_data(raw_data_dir:str):
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
             .reset_index()\
-            .query('abs(`Value (%)`) > 1e-4')
+            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
         df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
             .reset_index()
@@ -2648,7 +2648,7 @@ def save_report_data(raw_data_dir:str):
         bio_df = pd.concat([pd.read_csv(path, low_memory=False) for path in bio_paths['path']])
         bio_df = bio_df.replace(RENAME_AM_NON_AG)\
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)', 'Vegetation Group': 'species'})\
-            .query('abs(`Value (%)`) > 1e-4')\
+            .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
             .round(6)
         bio_df_non_all = bio_df.query('Water_supply != "ALL" and `Agri-Management` != "ALL"')
         bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural Landuse"')
@@ -2885,7 +2885,7 @@ def save_report_data(raw_data_dir:str):
         bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
         bio_df = bio_df.replace(RENAME_AM_NON_AG)\
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)'})\
-            .query('abs(`Value (%)`) > 1e-4')\
+            .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
             .round(6)
         bio_df_non_all = bio_df.query('Water_supply != "ALL" and `Agri-Management` != "ALL"')
         bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural Landuse"')
@@ -2920,7 +2920,7 @@ def save_report_data(raw_data_dir:str):
             .groupby(['Year', 'region', 'Type'])\
             .sum(numeric_only=True)\
             .reset_index()\
-            .query('abs(`Value (%)`) > 1e-4')
+            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
         df_wide = df_region.groupby(['Type', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -2943,7 +2943,7 @@ def save_report_data(raw_data_dir:str):
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
             .reset_index()\
-            .query('abs(`Value (%)`) > 1e-4')
+            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
         df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -2970,7 +2970,7 @@ def save_report_data(raw_data_dir:str):
             .groupby(['Year', 'region', 'Agri-Management'])\
             .sum(numeric_only=True)\
             .reset_index()\
-            .query('abs(`Value (%)`) > 1e-4')
+            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
         df_wide = df_region.groupby(['Agri-Management', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -2993,7 +2993,7 @@ def save_report_data(raw_data_dir:str):
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
             .reset_index()\
-            .query('abs(`Value (%)`) > 1e-4')
+            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
         df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -3110,7 +3110,7 @@ def save_report_data(raw_data_dir:str):
         bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
         bio_df = bio_df.replace(RENAME_AM_NON_AG)\
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)'})\
-            .query('abs(`Value (%)`) > 1e-4')\
+            .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
             .round(6)
 
         bio_df_non_all = bio_df.query('Water_supply != "ALL" and `Agri-Management` != "ALL"')
@@ -3145,7 +3145,7 @@ def save_report_data(raw_data_dir:str):
             .groupby(['Year', 'region', 'Type'])\
             .sum(numeric_only=True)\
             .reset_index()\
-            .query('abs(`Value (%)`) > 1e-4')
+            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
         df_wide = df_region.groupby(['Type', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -3168,7 +3168,7 @@ def save_report_data(raw_data_dir:str):
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
             .reset_index()\
-            .query('abs(`Value (%)`) > 1e-4')
+            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
         df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -3195,7 +3195,7 @@ def save_report_data(raw_data_dir:str):
             .groupby(['Year', 'region', 'Agri-Management'])\
             .sum(numeric_only=True)\
             .reset_index()\
-            .query('abs(`Value (%)`) > 1e-4')
+            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
         df_wide = df_region.groupby(['Agri-Management', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -3218,7 +3218,7 @@ def save_report_data(raw_data_dir:str):
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
             .reset_index()\
-            .query('abs(`Value (%)`) > 1e-4')
+            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
         df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -3342,7 +3342,7 @@ def save_report_data(raw_data_dir:str):
         bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
         bio_df = bio_df.replace(RENAME_AM_NON_AG)\
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)', 'Species':'species'})\
-            .query('abs(`Value (%)`) > 1e-4')\
+            .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
             .round(6)
 
         bio_df_non_all = bio_df.query('Water_supply != "ALL" and `Agri-Management` != "ALL"')
@@ -3376,7 +3376,7 @@ def save_report_data(raw_data_dir:str):
             .groupby(['Year', 'region', 'Type'])\
             .sum(numeric_only=True)\
             .reset_index()\
-            .query('abs(`Value (%)`) > 1e-4')
+            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
         df_wide = df_region.groupby(['Type', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -3399,7 +3399,7 @@ def save_report_data(raw_data_dir:str):
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
             .reset_index()\
-            .query('abs(`Value (%)`) > 1e-4')
+            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
         df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -3426,7 +3426,7 @@ def save_report_data(raw_data_dir:str):
             .groupby(['Year', 'region', 'Agri-Management'])\
             .sum(numeric_only=True)\
             .reset_index()\
-            .query('abs(`Value (%)`) > 1e-4')
+            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
         df_wide = df_region.groupby(['Agri-Management', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -3449,7 +3449,7 @@ def save_report_data(raw_data_dir:str):
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
             .reset_index()\
-            .query('abs(`Value (%)`) > 1e-4')
+            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
         df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -3565,7 +3565,7 @@ def save_report_data(raw_data_dir:str):
         bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
         bio_df = bio_df.replace(RENAME_AM_NON_AG)\
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)', 'Group':'species'})\
-            .query('abs(`Value (%)`) > 1e-4')\
+            .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
             .round(6)
 
         bio_df_non_all = bio_df.query('Water_supply != "ALL" and `Agri-Management` != "ALL"')
@@ -3599,7 +3599,7 @@ def save_report_data(raw_data_dir:str):
             .groupby(['Year', 'region', 'Type'])\
             .sum(numeric_only=True)\
             .reset_index()\
-            .query('abs(`Value (%)`) > 1e-4')
+            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
         df_wide = df_region.groupby(['Type', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -3622,7 +3622,7 @@ def save_report_data(raw_data_dir:str):
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
             .reset_index()\
-            .query('abs(`Value (%)`) > 1e-4')
+            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
         df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -3649,7 +3649,7 @@ def save_report_data(raw_data_dir:str):
             .groupby(['Year', 'region', 'Agri-Management'])\
             .sum(numeric_only=True)\
             .reset_index()\
-            .query('abs(`Value (%)`) > 1e-4')
+            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
         df_wide = df_region.groupby(['Agri-Management', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -3672,7 +3672,7 @@ def save_report_data(raw_data_dir:str):
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
             .reset_index()\
-            .query('abs(`Value (%)`) > 1e-4')
+            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
         df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -3798,7 +3798,7 @@ def save_report_data(raw_data_dir:str):
         settings_dict = [{'parameter': k, 'val': v} for k, v in settings_dict.items()]
         
     with open(f'{raw_data_dir}/RES_{settings.RESFACTOR}_mem_log.txt', 'r', encoding='utf-8') as src_file:
-        mem_logs = src_file.readlines()
+        mem_logs = [i for i in src_file.readlines() if i != '\n']
         mem_logs = [i.split('\t') for i in mem_logs]
         mem_logs = [{'time': i[0], 'mem (GB)': i[1].strip()} for i in mem_logs]
         mem_logs_df = pd.DataFrame(mem_logs)
