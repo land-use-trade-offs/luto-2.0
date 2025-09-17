@@ -13,7 +13,9 @@ window.HomeView = {
     const selectRegion = inject('globalSelectedRegion');
     const ChartData = ref({});
     const rankingData = ref({});
-    const colorsRanking = ref({});
+    const rankingColors = ref({});
+    const runScenario = ref({});
+    const dataLoaded = ref(false);
 
     // Available selections
     const availableYears = ref([]);
@@ -40,8 +42,6 @@ window.HomeView = {
     const selectChartCategory = ref('');
     const selectChartSubCategory = ref('');
     const selectRankingSubCategory = ref('');
-    const selectRankingColors = ref({});
-
 
     //  Reactive data
     const selectChartData = computed(() => {
@@ -52,6 +52,8 @@ window.HomeView = {
 
       if (selectChartSubCategory.value === 'Off-target achievement') {
         yAxisTitle = 'Achievement (%)';
+      } else if (['GBF3', 'GBF4 (SNES)', 'GBF4 (ECNES)', 'GBF8 (SPECIES)', 'GBF8 (GROUP)'].includes(selectChartSubCategory.value)) {
+        yAxisTitle = 'Priority Weighted Hectares';
       }
 
       const seriesColors = seriesData.map(serie => serie.color).filter(color => color) || [];
@@ -97,23 +99,15 @@ window.HomeView = {
       };
     });
 
-
-    const runScenario = computed(() => {
-      return !window.Supporting_info ? {} : {
-        'SSP': window.Supporting_info.model_run_settings.filter(item => item.parameter === "SSP")[0]['val'],
-        'GHG': window.Supporting_info.model_run_settings.filter(item => item.parameter === "GHG_EMISSIONS_LIMITS")[0]['val'],
-        'BIO_CUT': window.Supporting_info.model_run_settings.filter(item => item.parameter === "GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT")[0]['val'],
-        'BIO_GBF2': window.Supporting_info.model_run_settings.filter(item => item.parameter === "BIODIVERSITY_TARGET_GBF_2")[0]['val'],
-        'BIO_GBF3': window.Supporting_info.model_run_settings.filter(item => item.parameter === "BIODIVERSITY_TARGET_GBF_3")[0]['val'],
-        'BIO_GBF4_SNES': window.Supporting_info.model_run_settings.filter(item => item.parameter === "BIODIVERSITY_TARGET_GBF_4_SNES")[0]['val'],
-        'BIO_GBF4_ECNES': window.Supporting_info.model_run_settings.filter(item => item.parameter === "BIODIVERSITY_TARGET_GBF_4_ECNES")[0]['val'],
-        'BIODIVERSITY_TARGET_GBF_8': window.Supporting_info.model_run_settings.filter(item => item.parameter === "BIODIVERSITY_TARGET_GBF_8")[0]['val'],
-      };
+    const selectRankingColors = computed(() => {
+      if (!dataLoaded.value) { return {} }
+      return Object.fromEntries(
+        Object.entries(rankingData.value[selectChartCategory.value]).map(([region, values]) => [
+          region,
+          values?.[selectRankingSubCategory.value]?.['color']?.[selectYear.value] || {}
+        ])
+      );
     });
-
-
-    // Data loaded flag
-    const dataLoaded = ref(false);
 
 
     onMounted(async () => {
@@ -123,8 +117,18 @@ window.HomeView = {
       await loadScript("./data/chart_option/Chart_default_options.js", 'Chart_default_options', VIEW_NAME);
       await loadScript("./data/geo/NRM_AUS.js", 'NRM_AUS', VIEW_NAME);
 
-      const chartOverview_area = chartRegister['Area']['overview'];
-      const chartOverview_bio_GBF2 = chartRegister['Biodiversity']['GBF2']['overview'];
+      runScenario.value = Object.fromEntries(window['Supporting_info']['model_run_settings'].map(item => [item.parameter, item.val]));
+
+      const chartOverview_area_source = chartRegister['Area']['overview']['Source'];
+      const chartOverview_area_category = chartRegister['Area']['overview']['Category'];
+      const chartOverview_area_landuse = chartRegister['Area']['overview']['Land-use'];
+      const chartOverview_bio_quality = chartRegister['Biodiversity']['quality']['overview']['sum'];
+      const chartOverview_bio_GBF2 = chartRegister['Biodiversity']['GBF2']['overview']['sum'];
+      const chartOverview_bio_GBF3 = chartRegister['Biodiversity']['GBF3']['overview']['sum'];
+      const chartOverview_bio_GBF4_SNES = chartRegister['Biodiversity']['GBF4_SNES']['overview']['sum'];
+      const chartOverview_bio_GBF4_ECNES = chartRegister['Biodiversity']['GBF4_ECNES']['overview']['sum'];
+      const chartOverview_bio_GBF8_SPECIES = chartRegister['Biodiversity']['GBF8_SPECIES']['overview']['sum'];
+      const chartOverview_bio_GBF8_GROUP = chartRegister['Biodiversity']['GBF8_GROUP']['overview']['sum'];
       const chartOverview_economics_sum = chartRegister['Economics']['overview']['sum'];
       const chartOverview_economics_ag = chartRegister['Economics']['overview']['Ag'];
       const chartOverview_economics_agMgt = chartRegister['Economics']['overview']['Ag Mgt'];
@@ -149,12 +153,18 @@ window.HomeView = {
       const rankingGHG = chartRegister['GHG']['ranking'];
       const rankingProduction = chartRegister['Production']['ranking'];
       const rankingWater = chartRegister['Water']['NRM']['ranking'];
-      const rankingBiodiversity = chartRegister['Biodiversity']['ranking'];
+      const rankingBiodiversity = chartRegister['Biodiversity']['quality']['ranking'];
 
-      await loadScript(chartOverview_area['Source']['path'], chartOverview_area['Source']['name'], VIEW_NAME);
+      await loadScript(chartOverview_area_source['path'], chartOverview_area_source['name'], VIEW_NAME);
+      await loadScript(chartOverview_area_category['path'], chartOverview_area_category['name'], VIEW_NAME);
+      await loadScript(chartOverview_area_landuse['path'], chartOverview_area_landuse['name'], VIEW_NAME);
+      await loadScript(chartOverview_bio_quality['path'], chartOverview_bio_quality['name'], VIEW_NAME);
       await loadScript(chartOverview_bio_GBF2['path'], chartOverview_bio_GBF2['name'], VIEW_NAME);
-      await loadScript(chartOverview_area['Category']['path'], chartOverview_area['Category']['name'], VIEW_NAME);
-      await loadScript(chartOverview_area['Land-use']['path'], chartOverview_area['Land-use']['name'], VIEW_NAME);
+      await loadScript(chartOverview_bio_GBF3['path'], chartOverview_bio_GBF3['name'], VIEW_NAME);
+      await loadScript(chartOverview_bio_GBF4_SNES['path'], chartOverview_bio_GBF4_SNES['name'], VIEW_NAME);
+      await loadScript(chartOverview_bio_GBF4_ECNES['path'], chartOverview_bio_GBF4_ECNES['name'], VIEW_NAME);
+      await loadScript(chartOverview_bio_GBF8_SPECIES['path'], chartOverview_bio_GBF8_SPECIES['name'], VIEW_NAME);
+      await loadScript(chartOverview_bio_GBF8_GROUP['path'], chartOverview_bio_GBF8_GROUP['name'], VIEW_NAME);
       await loadScript(chartOverview_economics_sum['path'], chartOverview_economics_sum['name'], VIEW_NAME);
       await loadScript(chartOverview_economics_ag['path'], chartOverview_economics_ag['name'], VIEW_NAME);
       await loadScript(chartOverview_economics_agMgt['path'], chartOverview_economics_agMgt['name'], VIEW_NAME);
@@ -184,12 +194,18 @@ window.HomeView = {
 
       ChartData.value = {
         'Area': {
-          'Overview': window[chartOverview_area['Source']['name']],
-          'Category': window[chartOverview_area['Category']['name']],
-          'Land-use': window[chartOverview_area['Land-use']['name']],
+          'Overview': window[chartOverview_area_source['name']],
+          'Category': window[chartOverview_area_category['name']],
+          'Land-use': window[chartOverview_area_landuse['name']],
         },
         'Biodiversity': {
+          'Quality': window[chartOverview_bio_quality['name']],
           'GBF2': window[chartOverview_bio_GBF2['name']],
+          'GBF3': window[chartOverview_bio_GBF3['name']],
+          'GBF4 (SNES)': window[chartOverview_bio_GBF4_SNES['name']],
+          'GBF4 (ECNES)': window[chartOverview_bio_GBF4_ECNES['name']],
+          'GBF8 (SPECIES)': window[chartOverview_bio_GBF8_SPECIES['name']],
+          'GBF8 (GROUP)': window[chartOverview_bio_GBF8_GROUP['name']],
         },
         'Economics': {
           'Overview': window[chartOverview_economics_sum['name']],
@@ -240,7 +256,7 @@ window.HomeView = {
       selectChartSubCategory.value = Object.keys(ChartData.value[selectChartCategory.value])[0];
       const rankingKeys = Object.keys(rankingData.value?.[selectChartCategory.value]?.[selectRegion.value] || {}).filter(key => key !== "Total");
       selectRankingSubCategory.value = rankingKeys[0] || 'N/A';
-      colorsRanking.value = window.Supporting_info.colors_ranking;
+      rankingColors.value = window.Supporting_info.colors_ranking;
 
       await nextTick(() => { dataLoaded.value = true; });
 
@@ -257,22 +273,8 @@ window.HomeView = {
       selectRankingSubCategory.value = availableRankSubcategories.value[0] || 'N/A';
     });
 
-    watch([selectYear, selectRankingSubCategory], (newValues, oldValues) => {
-      const [newYear, newSubCategory] = newValues;
-      const categoryData = rankingData.value?.[selectChartCategory.value];
-      selectRankingColors.value = Object.fromEntries(
-        Object.entries(categoryData).map(([region, values]) => [
-          region,
-          values?.[newSubCategory]?.['color']?.[newYear] || {}
-        ])
-      );
-
-    });
-
     // Memory cleanup on component unmount
-    onUnmounted(() => {
-      window.MemoryService.cleanupViewData(VIEW_NAME);
-    });
+    onUnmounted(() => { window.MemoryService.cleanupViewData(VIEW_NAME); });
 
     return {
       yearIndex,
@@ -282,7 +284,7 @@ window.HomeView = {
       ChartData,
       rankingData,
       RankSubcategoriesRename,
-      colorsRanking,
+      rankingColors,
 
       availableYears,
       availableChartCategories,
@@ -303,60 +305,79 @@ window.HomeView = {
   // This template is a fallback that will be replaced by the loaded template
   template: `
     <div v-if="dataLoaded">
-
       <div class="flex flex-col">
 
-        <!-- Rank cards -->
-        <p class="text-[#505051] font-bold p-1 pt-8"> SSP - {{ runScenario.SSP }} | GHG - {{ runScenario.GHG }} | Biodiversity - {{ runScenario.BIO_GBF2 }}</p>
+        <!-- Scenario Information Header -->
+        <p class="text-[#505051] font-bold p-1 pt-8">
+          SSP - {{ runScenario.SSP }} |
+          GHG - {{ runScenario.GHG_EMISSIONS_LIMITS }} |
+          Biodiversity - {{ runScenario.BIODIVERSITY_TARGET_GBF_2 }}
+        </p>
+
+        <!-- Ranking Cards Section -->
         <div class="mb-4 mr-4">
-          <ranking-cards 
-            :selectRankingData="selectRanking">
-          </ranking-cards>
+          <ranking-cards :selectRankingData="selectRanking" />
         </div>
 
-
-        <!-- Title for map and chart -->
+        <!-- Section Headers -->
         <div class="flex items-center justify-between">
-          <p class="text-[#505051] w-[500px] text font-bold p-1 pt-8">Map and Statistics</p>
-          <p class="flex-1 text-[#505051] font-bold ml-4 p-1 pt-8">{{ selectChartCategory }} overview for {{ selectRegion }}</p>
+          <p class="text-[#505051] w-[500px] font-bold p-1 pt-8">
+            Map and Statistics
+          </p>
+          <p class="flex-1 text-[#505051] font-bold ml-4 p-1 pt-8">
+            {{ selectChartCategory }} overview for {{ selectRegion }}
+          </p>
         </div>
 
-        <!-- Container for Map and Chart -->
+        <!-- Main Content Container -->
         <div class="flex mr-4 gap-4 mb-4 flex-row">
 
-
-          <!-- Map, chart buttons, and year scroll -->
+          <!-- Left Panel: Map Section -->
           <div class="flex flex-col rounded-[10px] bg-white shadow-md w-[500px] h-[500px] relative">
 
             <!-- Chart Primary Category Buttons -->
             <div class="flex items-center justify-between w-full">
-              <p class="text-[0.8rem] ml-2">Region: <strong>{{ selectRegion }}</strong></p>
+              <!-- Region Display -->
+              <p class="text-[0.8rem] ml-2">
+                Region: <strong>{{ selectRegion }}</strong>
+              </p>
+
+              <!-- Chart Category Buttons -->
               <div class="flex items-center space-x-1 justify-end p-2">
-                <button v-for="(data, key) in availableChartCategories" :key="key"
+                <button
+                  v-for="(data, key) in availableChartCategories"
+                  :key="key"
                   @click="selectChartCategory = data"
                   class="bg-[#e8eaed] text-[#1f1f1f] text-[0.7rem] px-1 py-1 rounded"
-                  :class="{'bg-sky-500 text-white': selectChartCategory === data}">
+                  :class="{'bg-sky-500 text-white': selectChartCategory === data}"
+                >
                   {{ data }}
                 </button>
               </div>
             </div>
 
-            <!-- Horizontal Divider -->
+            <!-- Divider -->
             <hr class="border-gray-300 z-[100]">
 
-            <!-- Ranking Subcategory Buttons -->
+            <!-- Ranking Subcategory Buttons (Absolute Positioned) -->
             <div class="flex items-center space-x-1 justify-end absolute top-[55px] left-[220px] z-[100]">
-              <button v-for="(data, key) in availableRankSubcategories" :key="key"
+              <button
+                v-for="(data, key) in availableRankSubcategories"
+                :key="key"
                 @click="selectRankingSubCategory = data"
                 class="bg-[#e8eaed] text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded"
-                :class="{'bg-sky-500 text-white': selectRankingSubCategory === data}">
+                :class="{'bg-sky-500 text-white': selectRankingSubCategory === data}"
+              >
                 {{ RankSubcategoriesRename[data] || data }}
               </button>
             </div>
 
-            <!-- Year scroll -->
+            <!-- Year Slider (Absolute Positioned) -->
             <div class="flex flex-col absolute top-[50px] left-[10px] w-[200px] z-[100]">
-              <p class="text-[0.8rem]">Year: <strong>{{ selectYear }}</strong></p>
+              <p class="text-[0.8rem]">
+                Year: <strong>{{ selectYear }}</strong>
+              </p>
+
               <el-slider
                 v-if="availableYears.length > 0"
                 class="flex-1 max-w-[150px] pt-2 pl-2"
@@ -372,51 +393,60 @@ window.HomeView = {
               />
             </div>
 
-            <!-- Map -->
-            <map-geojson 
+            <!-- Map Component -->
+            <map-geojson
               class="absolute top-[50px] left-0 w-full z-[10]"
               :height="'430px'"
-              :selectRankingColors="selectRankingColors">
-            </map-geojson>
+              :selectRankingColors="selectRankingColors"
+            />
 
-            <!-- Legend -->
-            <div v-if="colorsRanking" class="absolute bottom-[20px] left-[35px] z-[100]">
-              <div class="font-bold text-sm mb-2 text-gray-600">Ranking</div>
+            <!-- Map Legend -->
+            <div
+              v-if="rankingColors"
+              class="absolute bottom-[20px] left-[35px] z-[100]"
+            >
+              <div class="font-bold text-sm mb-2 text-gray-600">
+                Ranking
+              </div>
               <div class="flex flex-row items-center">
-                <div v-for="(color, label) in colorsRanking" :key="label" class="flex items-center mr-4 mb-1">
-                    <span class="inline-block w-[12px] h-[12px] mr-[3px]" :style="{ backgroundColor: color }"></span>
-                    <span class="text-sm text-gray-600">{{ label }}</span>
+                <div
+                  v-for="(color, label) in rankingColors"
+                  :key="label"
+                  class="flex items-center mr-4 mb-1"
+                >
+                  <span
+                    class="inline-block w-[12px] h-[12px] mr-[3px]"
+                    :style="{ backgroundColor: color }"
+                  ></span>
+                  <span class="text-sm text-gray-600">{{ label }}</span>
                 </div>
               </div>
             </div>
-
           </div>
 
-
+          <!-- Right Panel: Chart Section -->
           <div class="relative flex flex-1 rounded-[10px] bg-white shadow-md h-[500px]">
 
-            <!-- Chart subcategory buttons -->
+            <!-- Chart Subcategory Buttons -->
             <div class="absolute flex flex-row space-x-1 mr-4 top-[9px] left-[10px] z-10">
-              <button v-for="cat in availableChartSubCategories" :key="cat"
+              <button
+                v-for="cat in availableChartSubCategories"
+                :key="cat"
                 @click="selectChartSubCategory = cat"
                 class="bg-[#e8eaed] text-[#1f1f1f] text-[0.7rem] px-1 py-1 rounded"
-                :class="{'bg-sky-500 text-white': selectChartSubCategory === cat}">
+                :class="{'bg-sky-500 text-white': selectChartSubCategory === cat}"
+              >
                 {{ cat }}
               </button>
             </div>
 
-            <!-- Chart -->
+            <!-- Chart Component -->
             <chart-container
               class="w-full h-full pt-[50px]"
-              :chartData="selectChartData">
-            </chart-container>
-
+              :chartData="selectChartData"
+            />
           </div>
-
-
         </div>
-
-        
       </div>
     </div>
   `,

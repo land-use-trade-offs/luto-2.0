@@ -89,10 +89,10 @@ window.RankingCards = {
       </div>
       
       <!-- Biodiversity Card -->
-      <div class="flex-1  rounded-lg p-3 shadow-md flex flex-col bg-gradient-to-r from-[#918be9] to-[#e2cbfa]" >
+      <div class="flex-1 rounded-lg p-3 shadow-md flex flex-col bg-gradient-to-r from-[#918be9] to-[#e2cbfa]" >
         <h4 class="text-white text-center text-lg mb-2">Biodiversity</h4>
-        <div class="text-2xl text-center font-bold text-white mb-1">{{ selectRankingData.biodiversityTotal }}</div>
-        <div class="text-white/80 text-center text-[12px] mb-4">Priority Weighted Hectares</div>
+        <div class="text-2xl text-center font-bold text-white mb-1">{{ selectRankingData.biodiversityTotal }} %</div>
+        <div class="text-white/80 text-center text-[12px] mb-4">Relative percent to pre-1750 level</div>
         <div class="mt-auto">
           <div class="flex justify-between text-white text-[14px] py-1 border-t border-white/20">
             <span>Ag Land</span>
