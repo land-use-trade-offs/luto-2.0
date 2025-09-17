@@ -2154,6 +2154,7 @@ def save_report_data(raw_data_dir:str):
     #                   6) Biodiversity                     #
     #########################################################
 
+    bio_rank_dict = {}
     
     # ---------------- Overall quality ----------------
     filter_str = '''
@@ -2168,12 +2169,9 @@ def save_report_data(raw_data_dir:str):
         .query('abs(`Value (%)`) > 1e-4')\
         .round({'Value (%)': 6})
     bio_df_non_all = bio_df.query('Water_supply != "ALL" and `Agri-Management` != "ALL"')
-        
-    bio_df_ag = bio_df.query('Type == "Agricultural Landuse"')
-    bio_df_non_all = bio_df.query('Water_supply != "ALL"')
-    bio_df_am = bio_df.query('Type == "Agricultural Management"')
-    bio_df_non_all_am = bio_df_am.query('Water_supply != "ALL" and `Agri-Management` != "ALL"')
-    bio_df_nonag = bio_df.query('Type == "Non-Agricultural Land-use"')
+    bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural Landuse"').copy()
+    bio_df_am_non_all = bio_df_am.query('Water_supply != "ALL" and `Agri-Management` != "ALL"')
+    bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"').copy()
     
     # ---------------- Overall quality - Ranking -----------------
     bio_rank_type = bio_df_non_all\
@@ -2181,7 +2179,7 @@ def save_report_data(raw_data_dir:str):
         .sum(numeric_only=True)\
         .reset_index()\
         .sort_values(['Year', 'Type', 'Value (%)'], ascending=[True, True, False])\
-        .assign(Rank=lambda x: x.groupby(['Year', 'Type']).cumcount())\
+        .assign(Rank=lambda x: x.groupby(['Year','Type']).cumcount())\
         .assign(color=lambda x: x['Rank'].map(get_rank_color))
     bio_rank_total = bio_df_non_all\
         .groupby(['Year', 'region'])\
@@ -2189,31 +2187,38 @@ def save_report_data(raw_data_dir:str):
         .reset_index()\
         .sort_values(['Year', 'Value (%)'], ascending=[True, False])\
         .assign(Rank=lambda x: x.groupby(['Year']).cumcount())\
-        .assign(Type='Total')\
-        .round({'Value (%)': 2})
-
-    bio_rank = pd.concat([ bio_rank_type, bio_rank_total])\
-        .assign(color=lambda x: x['Rank'].map(get_rank_color))
-
-            
-    out_dict = {}
-    for (region, b_type), df in bio_rank.groupby(['region', 'Type']):
-        if region not in out_dict:
-            out_dict[region] = {}
-        if b_type not in out_dict[region]:
-            out_dict[region][b_type] = {}
+        .assign(color=lambda x: x['Rank'].map(get_rank_color))\
+        .assign(Type='Total')
+    bio_rank = pd.concat([bio_rank_type, bio_rank_total], axis=0, ignore_index=True)
+    
+    
+    for region, df in bio_rank_total.groupby('region'):
+        if region not in bio_rank_dict:
+            bio_rank_dict[region] = {}
+            bio_rank_dict[region]['Quality'] = {}
 
         df = df.drop(columns='region')
-        out_dict[region][b_type]['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
-        out_dict[region][b_type]['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
-        out_dict[region][b_type]['value'] = df.set_index('Year')['Value (%)'].apply( lambda x: format_with_suffix(x)).to_dict()
+        bio_rank_dict[region]['Quality']['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
+        bio_rank_dict[region]['Quality']['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
+        bio_rank_dict[region]['Quality']['value'] = df.set_index('Year')['Value (%)'].apply( lambda x: format_with_suffix(x)).to_dict()
 
+
+    out_dict = {}
+    for (region, _type), df in bio_rank.groupby(['region', 'Type']):
+        if region not in out_dict:
+            out_dict[region] = {}
+        if _type not in out_dict[region]:
+            out_dict[region][_type] = {}
+        out_dict[region][_type]['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
+        out_dict[region][_type]['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
+        out_dict[region][_type]['value'] = df.set_index('Year')['Value (%)'].apply( lambda x: format_with_suffix(x)).to_dict()
         
     filename = 'BIO_quality_ranking'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
         json.dump(out_dict, f, separators=(',', ':'), indent=2)
         f.write(';\n')
+
 
 
 
@@ -2243,9 +2248,7 @@ def save_report_data(raw_data_dir:str):
     
     
     # ag
-    bio_df_ag = bio_df_non_all.query('Type == "Agricultural Landuse"').copy()
-
-    df_region = bio_df_ag\
+    df_region = bio_df_ag_non_all\
         .groupby(['Year', 'region', 'Landuse'])\
         .sum(numeric_only=True)\
         .reset_index()\
@@ -2272,9 +2275,7 @@ def save_report_data(raw_data_dir:str):
         f.write(';\n')
             
     # am
-    bio_df_am = bio_df_non_all.query('Type == "Agricultural Management"').copy()
-    
-    df_region = bio_df_am\
+    df_region = bio_df_am_non_all\
         .groupby(['Year', 'region', "Agri-Management"])\
         .sum(numeric_only=True)\
         .reset_index()\
@@ -2300,8 +2301,6 @@ def save_report_data(raw_data_dir:str):
 
 
     # non-ag
-    bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"').copy()
-
     df_region = bio_df_nonag\
         .groupby(['Year', 'region', 'Landuse'])\
         .sum(numeric_only=True)\
@@ -2404,7 +2403,6 @@ def save_report_data(raw_data_dir:str):
     
     
         
-    
     if settings.BIODIVERSITY_TARGET_GBF_2 != 'off':
 
         filter_str = '''
@@ -2425,41 +2423,24 @@ def save_report_data(raw_data_dir:str):
         bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"')
         
         # ---------------- (GBF2) ranking  ----------------
-        bio_rank_type = bio_df_non_all\
-            .groupby(['Year', 'region', 'Type'])\
-            .sum(numeric_only=True)\
-            .reset_index()\
-            .sort_values(['Year', 'Type', 'Area Weighted Score (ha)'], ascending=[True, True, False])\
-            .assign(Rank=lambda x: x.groupby(['Year', 'Type']).cumcount())
         bio_rank_total = bio_df_non_all\
             .groupby(['Year', 'region'])\
             .sum(numeric_only=True)\
             .reset_index()\
             .sort_values(['Year', 'Area Weighted Score (ha)'], ascending=[True, False])\
             .assign(Rank=lambda x: x.groupby(['Year']).cumcount())\
-            .assign(Type='Total')
-        bio_rank = pd.concat([ bio_rank_type, bio_rank_total])\
             .assign(color=lambda x: x['Rank'].map(get_rank_color))
-            
-        out_dict = {}
-        for (region, b_type), df in bio_rank.groupby(['region', 'Type']):
-            if region not in out_dict:
-                out_dict[region] = {}
-            if b_type not in out_dict[region]:
-                out_dict[region][b_type] = {}
 
+        for region, df in bio_rank_total.groupby('region'):
             df = df.drop(columns='region')
-            out_dict[region][b_type]['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
-            out_dict[region][b_type]['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
-            out_dict[region][b_type]['value'] = df.set_index('Year')['Area Weighted Score (ha)'].apply( lambda x: format_with_suffix(x)).to_dict()
+            if 'GBF2' not in bio_rank_dict[region]:
+                bio_rank_dict[region]['GBF2'] = {}
+
+            bio_rank_dict[region]['GBF2']['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
+            bio_rank_dict[region]['GBF2']['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
+            bio_rank_dict[region]['GBF2']['value'] = df.set_index('Year')['Area Weighted Score (ha)'].apply( lambda x: format_with_suffix(x)).to_dict()
             
-        filename = 'BIO_GBF2_ranking'
-        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-            f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
-            f.write(';\n')
-        
-        
+
         # ---------------- (GBF2) overview  ----------------
         
         # sum
@@ -2573,6 +2554,7 @@ def save_report_data(raw_data_dir:str):
             
             
         # ---------------- (GBF2) Ag  ----------------
+        bio_df_ag = bio_df.query('Type == "Agricultural Landuse"').copy()
         df_region = bio_df_ag\
             .groupby(['region', 'Water_supply', 'Landuse'])[['Year', 'Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
@@ -2600,6 +2582,7 @@ def save_report_data(raw_data_dir:str):
             
         
         # ---------------- (GBF2) Ag-Mgt  ----------------
+        bio_df_am = bio_df.query('Type == "Agricultural Management"').copy()
         df_region = bio_df_am\
             .groupby(['region', 'Water_supply', 'Agri-Management'])[['Year', 'Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
@@ -2625,6 +2608,7 @@ def save_report_data(raw_data_dir:str):
             
             
         # ---------------- (GBF2) Non-Ag  ----------------
+        bio_df_nonag = bio_df.query('Type == "Non-Agricultural Land-use"').copy()
         df_region = bio_df_nonag\
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
@@ -2666,7 +2650,6 @@ def save_report_data(raw_data_dir:str):
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)', 'Vegetation Group': 'species'})\
             .query('abs(`Value (%)`) > 1e-4')\
             .round(6)
-
         bio_df_non_all = bio_df.query('Water_supply != "ALL" and `Agri-Management` != "ALL"')
         bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural Landuse"')
         bio_df_am_non_all = bio_df_non_all.query('Type == "Agricultural Management"')
@@ -2674,13 +2657,6 @@ def save_report_data(raw_data_dir:str):
         
         
         # ---------------- (GBF3) Ranking  ----------------
-        bio_rank_type = bio_df_non_all\
-            .groupby(['Year', 'region', 'Type'])\
-            .sum(numeric_only=True)\
-            .reset_index()\
-            .sort_values(['Year', 'Type', 'Area Weighted Score (ha)'], ascending=[True, True, False])\
-            .assign(Rank=lambda x: x.groupby(['Year', 'Type']).cumcount())\
-            .assign(color=lambda x: x['Rank'].map(get_rank_color))
         bio_rank_total = bio_df_non_all\
             .groupby(['Year', 'region'])\
             .sum(numeric_only=True)\
@@ -2688,29 +2664,16 @@ def save_report_data(raw_data_dir:str):
             .sort_values(['Year', 'Area Weighted Score (ha)'], ascending=[True, False])\
             .assign(Rank=lambda x: x.groupby(['Year']).cumcount())\
             .assign(Type='Total')\
-            .round({'Area Weighted Score (ha)': 2})
-
-        bio_rank = pd.concat([bio_rank_type, bio_rank_total])\
             .assign(color=lambda x: x['Rank'].map(get_rank_color))
-
-        out_dict = {}
-        for (region, b_type), df in bio_rank.groupby(['region', 'Type']):
+            
+        for region, df in bio_rank_total.groupby('region'):
             df = df.drop(columns='region')
-            if region not in out_dict:
-                out_dict[region] = {}
-            if b_type not in out_dict[region]:
-                out_dict[region][b_type] = {}
+            if 'GBF3' not in bio_rank_dict[region]:
+                bio_rank_dict[region]['GBF3'] = {}
                 
-            out_dict[region][b_type]['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
-            out_dict[region][b_type]['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
-            out_dict[region][b_type]['value'] = df.set_index('Year')['Area Weighted Score (ha)'].apply(lambda x: format_with_suffix(x)).to_dict()
-
-        filename = 'BIO_GBF3_ranking'
-        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-            f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
-            f.write(';\n')
-
+            bio_rank_dict[region]['GBF3']['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
+            bio_rank_dict[region]['GBF3']['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
+            bio_rank_dict[region]['GBF3']['value'] = df.set_index('Year')['Area Weighted Score (ha)'].apply(lambda x: format_with_suffix(x)).to_dict()
 
 
         # ---------------- (GBF3) Overview  ----------------
@@ -2885,6 +2848,7 @@ def save_report_data(raw_data_dir:str):
             
         # ---------------- (GBF3) - Non-Ag  ----------------
         bio_df_nonag = bio_df.query('Type == "Non-Agricultural Land-use"').copy()
+        
         df_wide = bio_df_nonag\
             .groupby(['region', 'species', 'Landuse'])[['Year', 'Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
@@ -2923,20 +2887,12 @@ def save_report_data(raw_data_dir:str):
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)'})\
             .query('abs(`Value (%)`) > 1e-4')\
             .round(6)
-
         bio_df_non_all = bio_df.query('Water_supply != "ALL" and `Agri-Management` != "ALL"')
         bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural Landuse"')
         bio_df_am_non_all = bio_df_non_all.query('Type == "Agricultural Management"')
         bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"')
 
         # ---------------- (GBF4 SNES) Ranking  ----------------
-        bio_rank_type = bio_df_non_all\
-            .groupby(['Year', 'region', 'Type'])\
-            .sum(numeric_only=True)\
-            .reset_index()\
-            .sort_values(['Year', 'Type', 'Value (%)'], ascending=[True, True, False])\
-            .assign(Rank=lambda x: x.groupby(['Year', 'Type']).cumcount())\
-            .assign(color=lambda x: x['Rank'].map(get_rank_color))
         bio_rank_total = bio_df_non_all\
             .groupby(['Year', 'region'])\
             .sum(numeric_only=True)\
@@ -2944,28 +2900,18 @@ def save_report_data(raw_data_dir:str):
             .sort_values(['Year', 'Value (%)'], ascending=[True, False])\
             .assign(Rank=lambda x: x.groupby(['Year']).cumcount())\
             .assign(Type='Total')\
-            .round({'Value (%)': 2})
-
-        bio_rank = pd.concat([bio_rank_type, bio_rank_total])\
             .assign(color=lambda x: x['Rank'].map(get_rank_color))
-
-        out_dict = {}
-        for (region, b_type), df in bio_rank.groupby(['region', 'Type']):
+            
+        for region, df in bio_rank_total.groupby('region'):
             df = df.drop(columns='region')
-            if region not in out_dict:
-                out_dict[region] = {}
-            if b_type not in out_dict[region]:
-                out_dict[region][b_type] = {}
+            if 'GBF4 (SNES)' not in bio_rank_dict[region]:
+                bio_rank_dict[region]['GBF4 (SNES)'] = {}
 
-            out_dict[region][b_type]['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
-            out_dict[region][b_type]['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
-            out_dict[region][b_type]['value'] = df.set_index('Year')['Value (%)'].apply(lambda x: format_with_suffix(x)).to_dict()
+            bio_rank_dict[region]['GBF4 (SNES)']['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
+            bio_rank_dict[region]['GBF4 (SNES)']['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
+            bio_rank_dict[region]['GBF4 (SNES)']['value'] = df.set_index('Year')['Value (%)'].apply(lambda x: format_with_suffix(x)).to_dict()
 
-        filename = 'BIO_GBF4_SNES_ranking'
-        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-            f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
-            f.write(';\n')
+
 
         # ---------------- (GBF4 SNES) Overview  ----------------
 
@@ -2975,8 +2921,8 @@ def save_report_data(raw_data_dir:str):
             .sum(numeric_only=True)\
             .reset_index()\
             .query('abs(`Value (%)`) > 1e-4')
-        df_wide = df_region.groupby(['Type', 'region'])[['Year','Value (%)']]\
-            .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+        df_wide = df_region.groupby(['Type', 'region'])[['Year','Area Weighted Score (ha)']]\
+            .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
         df_wide.columns = ['name', 'region', 'data']
         df_wide['type'] = 'column'
@@ -2998,8 +2944,8 @@ def save_report_data(raw_data_dir:str):
             .sum(numeric_only=True)\
             .reset_index()\
             .query('abs(`Value (%)`) > 1e-4')
-        df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Value (%)']]\
-            .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+        df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Area Weighted Score (ha)']]\
+            .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
         df_wide.columns = ['name', 'region', 'data']
         df_wide['type'] = 'column'
@@ -3025,8 +2971,8 @@ def save_report_data(raw_data_dir:str):
             .sum(numeric_only=True)\
             .reset_index()\
             .query('abs(`Value (%)`) > 1e-4')
-        df_wide = df_region.groupby(['Agri-Management', 'region'])[['Year','Value (%)']]\
-            .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+        df_wide = df_region.groupby(['Agri-Management', 'region'])[['Year','Area Weighted Score (ha)']]\
+            .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
         df_wide.columns = ['name', 'region', 'data']
         df_wide['type'] = 'column'
@@ -3048,8 +2994,8 @@ def save_report_data(raw_data_dir:str):
             .sum(numeric_only=True)\
             .reset_index()\
             .query('abs(`Value (%)`) > 1e-4')
-        df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Value (%)']]\
-            .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+        df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Area Weighted Score (ha)']]\
+            .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
         df_wide.columns = ['name', 'region', 'data']
         df_wide['type'] = 'column'
@@ -3174,13 +3120,6 @@ def save_report_data(raw_data_dir:str):
 
 
         # ---------------- (GBF4 ECNES) Ranking  ----------------
-        bio_rank_type = bio_df_non_all\
-            .groupby(['Year', 'region', 'Type'])\
-            .sum(numeric_only=True)\
-            .reset_index()\
-            .sort_values(['Year', 'Type', 'Value (%)'], ascending=[True, True, False])\
-            .assign(Rank=lambda x: x.groupby(['Year', 'Type']).cumcount())\
-            .assign(color=lambda x: x['Rank'].map(get_rank_color))
         bio_rank_total = bio_df_non_all\
             .groupby(['Year', 'region'])\
             .sum(numeric_only=True)\
@@ -3188,28 +3127,16 @@ def save_report_data(raw_data_dir:str):
             .sort_values(['Year', 'Value (%)'], ascending=[True, False])\
             .assign(Rank=lambda x: x.groupby(['Year']).cumcount())\
             .assign(Type='Total')\
-            .round({'Value (%)': 2})
-
-        bio_rank = pd.concat([bio_rank_type, bio_rank_total])\
             .assign(color=lambda x: x['Rank'].map(get_rank_color))
 
-        out_dict = {}
-        for (region, b_type), df in bio_rank.groupby(['region', 'Type']):
+        for region, df in bio_rank_total.groupby('region'):
             df = df.drop(columns='region')
-            if region not in out_dict:
-                out_dict[region] = {}
-            if b_type not in out_dict[region]:
-                out_dict[region][b_type] = {}
+            if 'GBF4 (ECNES)' not in bio_rank_dict[region]:
+                bio_rank_dict[region]['GBF4 (ECNES)'] = {}
 
-            out_dict[region][b_type]['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
-            out_dict[region][b_type]['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
-            out_dict[region][b_type]['value'] = df.set_index('Year')['Value (%)'].apply(lambda x: format_with_suffix(x)).to_dict()
-
-        filename = 'BIO_GBF4_ECNES_ranking'
-        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-            f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
-            f.write(';\n')
+            bio_rank_dict[region]['GBF4 (ECNES)']['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
+            bio_rank_dict[region]['GBF4 (ECNES)']['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
+            bio_rank_dict[region]['GBF4 (ECNES)']['value'] = df.set_index('Year')['Value (%)'].apply(lambda x: format_with_suffix(x)).to_dict()
 
         # ---------------- (GBF4 ECNES) Overview  ----------------
 
@@ -3219,8 +3146,8 @@ def save_report_data(raw_data_dir:str):
             .sum(numeric_only=True)\
             .reset_index()\
             .query('abs(`Value (%)`) > 1e-4')
-        df_wide = df_region.groupby(['Type', 'region'])[['Year','Value (%)']]\
-            .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+        df_wide = df_region.groupby(['Type', 'region'])[['Year','Area Weighted Score (ha)']]\
+            .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
         df_wide.columns = ['name', 'region', 'data']
         df_wide['type'] = 'column'
@@ -3242,8 +3169,8 @@ def save_report_data(raw_data_dir:str):
             .sum(numeric_only=True)\
             .reset_index()\
             .query('abs(`Value (%)`) > 1e-4')
-        df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Value (%)']]\
-            .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+        df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Area Weighted Score (ha)']]\
+            .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
         df_wide.columns = ['name', 'region', 'data']
         df_wide['type'] = 'column'
@@ -3269,8 +3196,8 @@ def save_report_data(raw_data_dir:str):
             .sum(numeric_only=True)\
             .reset_index()\
             .query('abs(`Value (%)`) > 1e-4')
-        df_wide = df_region.groupby(['Agri-Management', 'region'])[['Year','Value (%)']]\
-            .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+        df_wide = df_region.groupby(['Agri-Management', 'region'])[['Year','Area Weighted Score (ha)']]\
+            .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
         df_wide.columns = ['name', 'region', 'data']
         df_wide['type'] = 'column'
@@ -3292,8 +3219,8 @@ def save_report_data(raw_data_dir:str):
             .sum(numeric_only=True)\
             .reset_index()\
             .query('abs(`Value (%)`) > 1e-4')
-        df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Value (%)']]\
-            .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+        df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Area Weighted Score (ha)']]\
+            .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
         df_wide.columns = ['name', 'region', 'data']
         df_wide['type'] = 'column'
@@ -3424,13 +3351,6 @@ def save_report_data(raw_data_dir:str):
         bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"')
 
         # ---------------- (GBF8 SPECIES) Ranking  ----------------
-        bio_rank_type = bio_df_non_all\
-            .groupby(['Year', 'region', 'Type'])\
-            .sum(numeric_only=True)\
-            .reset_index()\
-            .sort_values(['Year', 'Type', 'Value (%)'], ascending=[True, True, False])\
-            .assign(Rank=lambda x: x.groupby(['Year', 'Type']).cumcount())\
-            .assign(color=lambda x: x['Rank'].map(get_rank_color))
         bio_rank_total = bio_df_non_all\
             .groupby(['Year', 'region'])\
             .sum(numeric_only=True)\
@@ -3438,28 +3358,16 @@ def save_report_data(raw_data_dir:str):
             .sort_values(['Year', 'Value (%)'], ascending=[True, False])\
             .assign(Rank=lambda x: x.groupby(['Year']).cumcount())\
             .assign(Type='Total')\
-            .round({'Value (%)': 2})
-
-        bio_rank = pd.concat([bio_rank_type, bio_rank_total])\
             .assign(color=lambda x: x['Rank'].map(get_rank_color))
 
-        out_dict = {}
-        for (region, b_type), df in bio_rank.groupby(['region', 'Type']):
+        for region, df in bio_rank_total.groupby('region'):
             df = df.drop(columns='region')
-            if region not in out_dict:
-                out_dict[region] = {}
-            if b_type not in out_dict[region]:
-                out_dict[region][b_type] = {}
+            if 'GBF8 (SPECIES)' not in bio_rank_dict[region]:
+                bio_rank_dict[region]['GBF8 (SPECIES)'] = {}
 
-            out_dict[region][b_type]['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
-            out_dict[region][b_type]['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
-            out_dict[region][b_type]['value'] = df.set_index('Year')['Value (%)'].apply(lambda x: format_with_suffix(x)).to_dict()
-
-        filename = 'BIO_GBF8_SPECIES_ranking'
-        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-            f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
-            f.write(';\n')
+            bio_rank_dict[region]['GBF8 (SPECIES)']['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
+            bio_rank_dict[region]['GBF8 (SPECIES)']['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
+            bio_rank_dict[region]['GBF8 (SPECIES)']['value'] = df.set_index('Year')['Value (%)'].apply(lambda x: format_with_suffix(x)).to_dict()
 
         # ---------------- (GBF8 SPECIES) Overview  ----------------
 
@@ -3469,8 +3377,8 @@ def save_report_data(raw_data_dir:str):
             .sum(numeric_only=True)\
             .reset_index()\
             .query('abs(`Value (%)`) > 1e-4')
-        df_wide = df_region.groupby(['Type', 'region'])[['Year','Value (%)']]\
-            .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+        df_wide = df_region.groupby(['Type', 'region'])[['Year','Area Weighted Score (ha)']]\
+            .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
         df_wide.columns = ['name', 'region', 'data']
         df_wide['type'] = 'column'
@@ -3492,8 +3400,8 @@ def save_report_data(raw_data_dir:str):
             .sum(numeric_only=True)\
             .reset_index()\
             .query('abs(`Value (%)`) > 1e-4')
-        df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Value (%)']]\
-            .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+        df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Area Weighted Score (ha)']]\
+            .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
         df_wide.columns = ['name', 'region', 'data']
         df_wide['type'] = 'column'
@@ -3519,8 +3427,8 @@ def save_report_data(raw_data_dir:str):
             .sum(numeric_only=True)\
             .reset_index()\
             .query('abs(`Value (%)`) > 1e-4')
-        df_wide = df_region.groupby(['Agri-Management', 'region'])[['Year','Value (%)']]\
-            .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+        df_wide = df_region.groupby(['Agri-Management', 'region'])[['Year','Area Weighted Score (ha)']]\
+            .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
         df_wide.columns = ['name', 'region', 'data']
         df_wide['type'] = 'column'
@@ -3542,8 +3450,8 @@ def save_report_data(raw_data_dir:str):
             .sum(numeric_only=True)\
             .reset_index()\
             .query('abs(`Value (%)`) > 1e-4')
-        df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Value (%)']]\
-            .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+        df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Area Weighted Score (ha)']]\
+            .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
         df_wide.columns = ['name', 'region', 'data']
         df_wide['type'] = 'column'
@@ -3666,13 +3574,6 @@ def save_report_data(raw_data_dir:str):
         bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"')
 
         # ---------------- (GBF8 GROUP) Ranking  ----------------
-        bio_rank_type = bio_df_non_all\
-            .groupby(['Year', 'region', 'Type'])\
-            .sum(numeric_only=True)\
-            .reset_index()\
-            .sort_values(['Year', 'Type', 'Value (%)'], ascending=[True, True, False])\
-            .assign(Rank=lambda x: x.groupby(['Year', 'Type']).cumcount())\
-            .assign(color=lambda x: x['Rank'].map(get_rank_color))
         bio_rank_total = bio_df_non_all\
             .groupby(['Year', 'region'])\
             .sum(numeric_only=True)\
@@ -3680,28 +3581,16 @@ def save_report_data(raw_data_dir:str):
             .sort_values(['Year', 'Value (%)'], ascending=[True, False])\
             .assign(Rank=lambda x: x.groupby(['Year']).cumcount())\
             .assign(Type='Total')\
-            .round({'Value (%)': 2})
-
-        bio_rank = pd.concat([bio_rank_type, bio_rank_total])\
             .assign(color=lambda x: x['Rank'].map(get_rank_color))
 
-        out_dict = {}
-        for (region, b_type), df in bio_rank.groupby(['region', 'Type']):
+        for region, df in bio_rank_total.groupby('region'):
             df = df.drop(columns='region')
-            if region not in out_dict:
-                out_dict[region] = {}
-            if b_type not in out_dict[region]:
-                out_dict[region][b_type] = {}
+            if 'GBF8 (GROUP)' not in bio_rank_dict[region]:
+                bio_rank_dict[region]['GBF8 (GROUP)'] = {}
 
-            out_dict[region][b_type]['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
-            out_dict[region][b_type]['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
-            out_dict[region][b_type]['value'] = df.set_index('Year')['Value (%)'].apply(lambda x: format_with_suffix(x)).to_dict()
-
-        filename = 'BIO_GBF8_GROUP_ranking'
-        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-            f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
-            f.write(';\n')
+            bio_rank_dict[region]['GBF8 (GROUP)']['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
+            bio_rank_dict[region]['GBF8 (GROUP)']['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
+            bio_rank_dict[region]['GBF8 (GROUP)']['value'] = df.set_index('Year')['Value (%)'].apply(lambda x: format_with_suffix(x)).to_dict()
 
         # ---------------- (GBF8 GROUP) Overview  ----------------
 
@@ -3711,8 +3600,8 @@ def save_report_data(raw_data_dir:str):
             .sum(numeric_only=True)\
             .reset_index()\
             .query('abs(`Value (%)`) > 1e-4')
-        df_wide = df_region.groupby(['Type', 'region'])[['Year','Value (%)']]\
-            .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+        df_wide = df_region.groupby(['Type', 'region'])[['Year','Area Weighted Score (ha)']]\
+            .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
         df_wide.columns = ['name', 'region', 'data']
         df_wide['type'] = 'column'
@@ -3734,8 +3623,8 @@ def save_report_data(raw_data_dir:str):
             .sum(numeric_only=True)\
             .reset_index()\
             .query('abs(`Value (%)`) > 1e-4')
-        df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Value (%)']]\
-            .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+        df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Area Weighted Score (ha)']]\
+            .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
         df_wide.columns = ['name', 'region', 'data']
         df_wide['type'] = 'column'
@@ -3761,8 +3650,8 @@ def save_report_data(raw_data_dir:str):
             .sum(numeric_only=True)\
             .reset_index()\
             .query('abs(`Value (%)`) > 1e-4')
-        df_wide = df_region.groupby(['Agri-Management', 'region'])[['Year','Value (%)']]\
-            .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+        df_wide = df_region.groupby(['Agri-Management', 'region'])[['Year','Area Weighted Score (ha)']]\
+            .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
         df_wide.columns = ['name', 'region', 'data']
         df_wide['type'] = 'column'
@@ -3784,8 +3673,8 @@ def save_report_data(raw_data_dir:str):
             .sum(numeric_only=True)\
             .reset_index()\
             .query('abs(`Value (%)`) > 1e-4')
-        df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Value (%)']]\
-            .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+        df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Area Weighted Score (ha)']]\
+            .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
         df_wide.columns = ['name', 'region', 'data']
         df_wide['type'] = 'column'
@@ -3891,12 +3780,18 @@ def save_report_data(raw_data_dir:str):
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
-                
-  
 
-    
+
+    # Save unified bio ranking data
+    filename = 'BIO_ranking'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(bio_rank_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
+
+
     #########################################################
-    # Supporting information               
+    # Supporting information
     #########################################################       
     with open(f'{raw_data_dir}/model_run_settings.txt', 'r', encoding='utf-8') as src_file:
         settings_dict = {i.split(':')[0].strip(): ''.join(i.split(':')[1:]).strip() for i in src_file.readlines()}

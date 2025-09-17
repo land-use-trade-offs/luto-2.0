@@ -75,27 +75,25 @@ window.HomeView = {
 
 
     const selectRanking = computed(() => {
-      const currentRegion = selectRegion.value;
-      const currentYear = selectYear.value;
       return {
-        economicTotal: rankingData.value['Economics']?.[currentRegion]?.['Total']?.['value']?.[currentYear] || 'N/A',
-        economicCost: rankingData.value['Economics']?.[currentRegion]?.['Cost']?.['value']?.[currentYear] || 'N/A',
-        economicRevenue: rankingData.value['Economics']?.[currentRegion]?.['Revenue']?.['value']?.[currentYear] || 'N/A',
-        areaTotal: rankingData.value['Area']?.[currentRegion]?.['Total']?.['value']?.[currentYear] || 'N/A',
-        areaAgLand: rankingData.value['Area']?.[currentRegion]?.['Agricultural Landuse']?.['value']?.[currentYear] || 'N/A',
-        areaAgMgt: rankingData.value['Area']?.[currentRegion]?.['Agricultural Management']?.['value']?.[currentYear] || 'N/A',
-        areaNonAg: rankingData.value['Area']?.[currentRegion]?.['Non-Agricultural Land-use']?.['value']?.[currentYear] || 'N/A',
-        ghgTotal: rankingData.value['GHG']?.[currentRegion]?.['Total']?.['value']?.[currentYear] || 'N/A',
-        ghgEmissions: rankingData.value['GHG']?.[currentRegion]?.['GHG emissions']?.['value']?.[currentYear] || 'N/A',
-        ghgReduction: rankingData.value['GHG']?.[currentRegion]?.['GHG sequestrations']?.['value']?.[currentYear] || 'N/A',
-        waterTotal: rankingData.value['Water']?.[currentRegion]?.['Total']?.['value']?.[currentYear] || 'N/A',
-        waterAgLand: rankingData.value['Water']?.[currentRegion]?.['Agricultural Landuse']?.['value']?.[currentYear] || 'N/A',
-        waterAgMgt: rankingData.value['Water']?.[currentRegion]?.['Agricultural Management']?.['value']?.[currentYear] || 'N/A',
-        waterNonAg: rankingData.value['Water']?.[currentRegion]?.['Non-Agricultural Land-use']?.['value']?.[currentYear] || 'N/A',
-        biodiversityTotal: rankingData.value['Biodiversity']?.[currentRegion]?.['Total']?.['value']?.[currentYear] || 'N/A',
-        biodiversityAgLand: rankingData.value['Biodiversity']?.[currentRegion]?.['Agricultural Landuse']?.['value']?.[currentYear] || 'N/A',
-        biodiversityAgMgt: rankingData.value['Biodiversity']?.[currentRegion]?.['Agricultural Management']?.['value']?.[currentYear] || 'N/A',
-        biodiversityNonAg: rankingData.value['Biodiversity']?.[currentRegion]?.['Non-Agricultural Land-use']?.['value']?.[currentYear] || 'N/A'
+        economicTotal: rankingData.value['Economics']?.[selectRegion.value]?.['Total']?.['value']?.[selectYear.value] || 'N/A',
+        economicCost: rankingData.value['Economics']?.[selectRegion.value]?.['Cost']?.['value']?.[selectYear.value] || 'N/A',
+        economicRevenue: rankingData.value['Economics']?.[selectRegion.value]?.['Revenue']?.['value']?.[selectYear.value] || 'N/A',
+        areaTotal: rankingData.value['Area']?.[selectRegion.value]?.['Total']?.['value']?.[selectYear.value] || 'N/A',
+        areaAgLand: rankingData.value['Area']?.[selectRegion.value]?.['Agricultural Landuse']?.['value']?.[selectYear.value] || 'N/A',
+        areaAgMgt: rankingData.value['Area']?.[selectRegion.value]?.['Agricultural Management']?.['value']?.[selectYear.value] || 'N/A',
+        areaNonAg: rankingData.value['Area']?.[selectRegion.value]?.['Non-Agricultural Land-use']?.['value']?.[selectYear.value] || 'N/A',
+        ghgTotal: rankingData.value['GHG']?.[selectRegion.value]?.['Total']?.['value']?.[selectYear.value] || 'N/A',
+        ghgEmissions: rankingData.value['GHG']?.[selectRegion.value]?.['GHG emissions']?.['value']?.[selectYear.value] || 'N/A',
+        ghgReduction: rankingData.value['GHG']?.[selectRegion.value]?.['GHG sequestrations']?.['value']?.[selectYear.value] || 'N/A',
+        waterTotal: rankingData.value['Water']?.[selectRegion.value]?.['Total']?.['value']?.[selectYear.value] || 'N/A',
+        waterAgLand: rankingData.value['Water']?.[selectRegion.value]?.['Agricultural Landuse']?.['value']?.[selectYear.value] || 'N/A',
+        waterAgMgt: rankingData.value['Water']?.[selectRegion.value]?.['Agricultural Management']?.['value']?.[selectYear.value] || 'N/A',
+        waterNonAg: rankingData.value['Water']?.[selectRegion.value]?.['Non-Agricultural Land-use']?.['value']?.[selectYear.value] || 'N/A',
+        biodiversityTotal: rankingData.value['Biodiversity (Quality)']?.[selectRegion.value]?.['Total']?.['value']?.[selectYear.value] || 'N/A',
+        biodiversityAgLand: rankingData.value['Biodiversity (Quality)']?.[selectRegion.value]?.['Agricultural Landuse']?.['value']?.[selectYear.value] || 'N/A',
+        biodiversityAgMgt: rankingData.value['Biodiversity (Quality)']?.[selectRegion.value]?.['Agricultural Management']?.['value']?.[selectYear.value] || 'N/A',
+        biodiversityNonAg: rankingData.value['Biodiversity (Quality)']?.[selectRegion.value]?.['Non-Agricultural Land-use']?.['value']?.[selectYear.value] || 'N/A'
       };
     });
 
@@ -153,7 +151,8 @@ window.HomeView = {
       const rankingGHG = chartRegister['GHG']['ranking'];
       const rankingProduction = chartRegister['Production']['ranking'];
       const rankingWater = chartRegister['Water']['NRM']['ranking'];
-      const rankingBiodiversity = chartRegister['Biodiversity']['quality']['ranking'];
+      const rankingBiodiversityQuality = chartRegister['Biodiversity']['quality']['ranking'];
+      const rankingBiodiversityAll = chartRegister['Biodiversity']['ranking'];
 
       await loadScript(chartOverview_area_source['path'], chartOverview_area_source['name'], VIEW_NAME);
       await loadScript(chartOverview_area_category['path'], chartOverview_area_category['name'], VIEW_NAME);
@@ -189,7 +188,8 @@ window.HomeView = {
       await loadScript(rankingGHG['path'], rankingGHG['name'], VIEW_NAME);
       await loadScript(rankingProduction['path'], rankingProduction['name'], VIEW_NAME);
       await loadScript(rankingWater['path'], rankingWater['name'], VIEW_NAME);
-      await loadScript(rankingBiodiversity['path'], rankingBiodiversity['name'], VIEW_NAME);
+      await loadScript(rankingBiodiversityQuality['path'], rankingBiodiversityQuality['name'], VIEW_NAME);
+      await loadScript(rankingBiodiversityAll['path'], rankingBiodiversityAll['name'], VIEW_NAME);
 
 
       ChartData.value = {
@@ -241,7 +241,8 @@ window.HomeView = {
         'GHG': window[rankingGHG['name']],
         'Production': window[rankingProduction['name']],
         'Water': window[rankingWater['name']],
-        'Biodiversity': window[rankingBiodiversity['name']],
+        'Biodiversity (Quality)': window[rankingBiodiversityQuality['name']],
+        'Biodiversity': window[rankingBiodiversityAll['name']],
       };
 
 
@@ -360,12 +361,12 @@ window.HomeView = {
             <hr class="border-gray-300 z-[100]">
 
             <!-- Ranking Subcategory Buttons (Absolute Positioned) -->
-            <div class="flex items-center space-x-1 justify-end absolute top-[55px] left-[220px] z-[100]">
+            <div class="flex items-center space-x-1 justify-end absolute top-[55px] left-[180px] z-[100]">
               <button
                 v-for="(data, key) in availableRankSubcategories"
                 :key="key"
                 @click="selectRankingSubCategory = data"
-                class="bg-[#e8eaed] text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded"
+                class="bg-[#e8eaed] text-[#1f1f1f] text-[0.57rem] px-1 py-1 rounded"
                 :class="{'bg-sky-500 text-white': selectRankingSubCategory === data}"
               >
                 {{ RankSubcategoriesRename[data] || data }}

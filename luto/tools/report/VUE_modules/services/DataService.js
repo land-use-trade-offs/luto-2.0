@@ -68,10 +68,6 @@ window.DataService = {
             "name": "BIO_GBF2_overview_sum",
           },
         },
-        "ranking": {
-          "path": "data/BIO_GBF2_ranking.js",
-          "name": "BIO_GBF2_ranking",
-        },
       },
       "GBF3": {
         "Ag": {
@@ -103,10 +99,6 @@ window.DataService = {
             "path": "data/BIO_GBF3_overview_sum.js",
             "name": "BIO_GBF3_overview_sum",
           },
-        },
-        "ranking": {
-          "path": "data/BIO_GBF3_ranking.js",
-          "name": "BIO_GBF3_ranking",
         },
       },
       "GBF4_SNES": {
@@ -140,10 +132,6 @@ window.DataService = {
             "name": "BIO_GBF4_SNES_overview_sum",
           },
         },
-        "ranking": {
-          "path": "data/BIO_GBF4_SNES_ranking.js",
-          "name": "BIO_GBF4_SNES_ranking",
-        },
       },
       "GBF4_ECNES": {
         "Ag": {
@@ -175,10 +163,6 @@ window.DataService = {
             "path": "data/BIO_GBF4_ECNES_overview_sum.js",
             "name": "BIO_GBF4_ECNES_overview_sum",
           },
-        },
-        "ranking": {
-          "path": "data/BIO_GBF4_ECNES_ranking.js",
-          "name": "BIO_GBF4_ECNES_ranking",
         },
       },
       "GBF8_GROUP": {
@@ -212,10 +196,6 @@ window.DataService = {
             "name": "BIO_GBF8_GROUP_overview_sum",
           },
         },
-        "ranking": {
-          "path": "data/BIO_GBF8_GROUP_ranking.js",
-          "name": "BIO_GBF8_GROUP_ranking",
-        },
       },
       "GBF8_SPECIES": {
         "Ag": {
@@ -247,10 +227,6 @@ window.DataService = {
             "path": "data/BIO_GBF8_SPECIES_overview_sum.js",
             "name": "BIO_GBF8_SPECIES_overview_sum",
           },
-        },
-        "ranking": {
-          "path": "data/BIO_GBF8_SPECIES_ranking.js",
-          "name": "BIO_GBF8_SPECIES_ranking",
         },
       },
       "quality": {
@@ -288,6 +264,10 @@ window.DataService = {
           "path": "data/BIO_quality_ranking.js",
           "name": "BIO_quality_ranking",
         },
+      },
+      "ranking": {
+        "path": "data/BIO_ranking.js",
+        "name": "BIO_ranking",
       },
     },
     "Economics": {
