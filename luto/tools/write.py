@@ -393,12 +393,12 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
     ag_man_q_mrp_xr = xr.concat([ag_man_q_mrp_xr.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), ag_man_q_mrp_xr], dim='am')
 
     # Calculate the commodity production 
-    ag_q_rc = (((ag_X_mrj_xr * lu2pr_xr).sum(dim=['lu']) * ag_q_mrp_xr) * pr2cm_xr).sum(dim='product')
+    ag_q_mrc = (((ag_X_mrj_xr * lu2pr_xr).sum(dim=['lu']) * ag_q_mrp_xr) * pr2cm_xr).sum(dim='product')
     non_ag_p_rc = (non_ag_X_rk_xr * non_ag_crk_xr).sum(dim=['lu'])
-    am_p_rc = (((ag_man_X_mrj_xr * lu2pr_xr).sum(['lu']) * ag_man_q_mrp_xr) * pr2cm_xr).sum('product')
+    am_p_amrc = (((ag_man_X_mrj_xr * lu2pr_xr).sum(['lu']) * ag_man_q_mrp_xr) * pr2cm_xr).sum('product')
 
     # Regional level aggregation
-    ag_q_rc_df_region = ag_q_rc.groupby('region'
+    ag_q_mrc_df_region = ag_q_mrc.groupby('region'
         ).sum('cell'
         ).to_dataframe('Production (t/KL)'
         ).reset_index(
@@ -411,7 +411,7 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
         ).to_dataframe('Production (t/KL)'
         ).assign(Year=yr_cal, Type='Non-Agricultural'
         ).reset_index()
-    am_p_rc_df_region = am_p_rc.groupby('region'
+    am_p_amrc_df_region = am_p_amrc.groupby('region'
         ).sum('cell'
         ).to_dataframe('Production (t/KL)'
         ).reset_index(
@@ -421,7 +421,7 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
         ).replace({'dry':'Dryland', 'irr':'Irrigated'})
     
     # Australia level aggregation
-    ag_q_rc_df_AUS = ag_q_rc.sum('cell'
+    ag_q_mrc_df_AUS = ag_q_mrc.sum('cell'
         ).to_dataframe('Production (t/KL)'
         ).reset_index(
         ).assign(Type='Agricultural'
@@ -432,7 +432,7 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
         ).to_dataframe('Production (t/KL)'
         ).assign(Year=yr_cal, Type='Non-Agricultural', region='AUSTRALIA'
         ).reset_index()
-    am_p_rc_df_AUS = am_p_rc.sum('cell'
+    am_p_amrc_df_AUS = am_p_amrc.sum('cell'
         ).to_dataframe('Production (t/KL)'
         ).reset_index(
         ).assign(Type='Agricultural Management'
@@ -441,13 +441,13 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
         ).replace({'dry':'Dryland', 'irr':'Irrigated'})
     
     # Save the production dataframes to csv
-    quantity_df_AUS = pd.concat([ag_q_rc_df_AUS, non_ag_p_rc_df_AUS, am_p_rc_df_AUS], ignore_index=True).query('abs(`Production (t/KL)`) > 1')
-    quantity_df_region = pd.concat([ag_q_rc_df_region, non_ag_p_rc_df_region, am_p_rc_df_region], ignore_index=True).query('abs(`Production (t/KL)`) > 1')
+    quantity_df_AUS = pd.concat([ag_q_mrc_df_AUS, non_ag_p_rc_df_AUS, am_p_amrc_df_AUS], ignore_index=True).query('abs(`Production (t/KL)`) > 1')
+    quantity_df_region = pd.concat([ag_q_mrc_df_region, non_ag_p_rc_df_region, am_p_amrc_df_region], ignore_index=True).query('abs(`Production (t/KL)`) > 1')
     pd.concat([quantity_df_AUS, quantity_df_region]).to_csv(os.path.join(path, f'quantity_production_t_separate_{yr_cal}.csv'), index=False)
     
-    save2nc(ag_q_rc, os.path.join(path, f'xr_quantities_agricultural_{yr_cal}.nc'))
+    save2nc(ag_q_mrc, os.path.join(path, f'xr_quantities_agricultural_{yr_cal}.nc'))
     save2nc(non_ag_p_rc, os.path.join(path, f'xr_quantities_non_agricultural_{yr_cal}.nc'))
-    save2nc(am_p_rc, os.path.join(path, f'xr_quantities_agricultural_management_{yr_cal}.nc'))
+    save2nc(am_p_amrc, os.path.join(path, f'xr_quantities_agricultural_management_{yr_cal}.nc'))
 
     return f"Separate quantity production written for year {yr_cal}"
 

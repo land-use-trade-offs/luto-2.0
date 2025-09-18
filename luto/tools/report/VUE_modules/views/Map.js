@@ -200,29 +200,25 @@ window['MapView'] = {
         <div class="absolute top-[285px] left-[20px] w-[320px] z-[1001] flex flex-col space-y-3 bg-white/70 p-2 rounded-lg">
 
             <!-- Category buttons -->
-            <div class="flex items-center">
-                <div class="flex space-x-1">
-                    <span class="text-[0.8rem] mr-1 font-medium">Category:</span>
-                    <button v-for="(val, key) in availableCategories" :key="key"
-                        @click="selectCategory = val"
-                        class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded"
-                        :class="{'bg-sky-500 text-white': selectCategory === val}">
-                        {{ val }}
-                    </button>
-                </div>
+            <div class="flex space-x-1">
+                <span class="text-[0.8rem] mr-1 font-medium">Category:</span>
+                <button v-for="(val, key) in availableCategories" :key="key"
+                    @click="selectCategory = val"
+                    class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded"
+                    :class="{'bg-sky-500 text-white': selectCategory === val}">
+                    {{ val }}
+                </button>
             </div>
 
             <!-- Landuse options -->
-            <div class="flex items-start border-t border-white/10 pt-1">
-                <div v-if="dataLoaded && availableLanduse.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
-                    <span class="text-[0.8rem] mr-1 font-medium">{{ selectCategory === 'Ag Mgt' ? 'Ag Mgt' : 'Landuse' }}:</span>
-                    <button v-for="(val, key) in availableLanduse" :key="key"
-                        @click="selectLanduse = val"
-                        class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
-                        :class="{'bg-sky-500 text-white': selectLanduse === val}">
-                        {{ val }}
-                    </button>
-                </div>
+            <div v-if="dataLoaded && availableLanduse.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
+                <span class="text-[0.8rem] mr-1 font-medium">{{ selectCategory === 'Ag Mgt' ? 'Ag Mgt' : 'Landuse' }}:</span>
+                <button v-for="(val, key) in availableLanduse" :key="key"
+                    @click="selectLanduse = val"
+                    class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
+                    :class="{'bg-sky-500 text-white': selectLanduse === val}">
+                    {{ val }}
+                </button>
             </div>
         </div>
 

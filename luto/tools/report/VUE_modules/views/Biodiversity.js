@@ -2,9 +2,9 @@ window.BiodiversityView = {
   setup() {
     const { ref, onMounted, onUnmounted, inject, computed, watch, nextTick } = Vue;
 
-    // Data|Map service - Only use GBF2 data as requested
-    const chartRegister = window.DataService.chartCategories["Biodiversity"]["GBF2"];
-    const mapRegister = window.MapService.mapCategories["Biodiversity"]["GBF2"];
+    // Data|Map service
+    const chartRegister = window.ChartService.chartCategories["Biodiversity"]["quality"];
+    const mapRegister = window.MapService.mapCategories["Biodiversity"]["quality"];
     const loadScript = window.loadScriptWithTracking;
     const mosaicMap = window.MapService.mapCategories["Dvar"]["Mosaic"];
 
@@ -76,11 +76,9 @@ window.BiodiversityView = {
     });
     const chartData = computed(() => {
       if (selectCategory.value === "Ag Mgt") {
-        // For Ag Mgt, use the "Landuse" dataset so chart series names match landuse selections for highlighting
-        const datasetName = chartRegister["Ag Mgt"]["Landuse"]["name"];
+        const datasetName = chartRegister["Ag Mgt"]["name"];
         return window[datasetName][selectRegion.value];
       } else {
-        // For Ag and Non-Ag, use the direct dataset
         const datasetName = chartRegister[selectCategory.value]["name"];
         return window[datasetName][selectRegion.value];
       }
@@ -93,7 +91,6 @@ window.BiodiversityView = {
         return mapData.value[selectWater.value][selectLanduse.value][selectYear.value];
       }
       else if (selectCategory.value === "Ag Mgt") {
-        // Data hierarchy: AgMgt → Water → Landuse → Year
         return mapData.value?.[selectAgMgt.value][selectWater.value][selectLanduse.value][selectYear.value];
       }
       else if (selectCategory.value === "Non-Ag") {
@@ -104,16 +101,7 @@ window.BiodiversityView = {
       if (!dataLoaded.value) {
         return {};
       }
-      // According to CLAUDE.md, biodiversity chart data follows simplified Region → [series] structure
       let seriesData = chartData.value || [];
-
-      // Filter series based on landuse selection
-      if (selectCategory.value === "Ag Mgt") {
-        // For Ag Mgt, filter by landuse selection
-        seriesData = seriesData.filter(serie => (selectLanduse.value === "ALL" || serie.name === selectLanduse.value));
-      }
-      // For Ag and Non-Ag, series are aggregated so no filtering needed
-
       return {
         ...window["Chart_default_options"],
         chart: {
@@ -139,13 +127,12 @@ window.BiodiversityView = {
       await loadScript("./data/chart_option/Chart_default_options.js", "Chart_default_options", VIEW_NAME);
       await loadScript(mosaicMap['path'], mosaicMap['name'], VIEW_NAME);
 
-      // Load GBF2 data only (as requested - ignore quality data)
       await loadScript(mapRegister["Ag"]["path"], mapRegister["Ag"]["name"], VIEW_NAME);
       await loadScript(mapRegister["Ag Mgt"]["path"], mapRegister["Ag Mgt"]["name"], VIEW_NAME);
       await loadScript(mapRegister["Non-Ag"]["path"], mapRegister["Non-Ag"]["name"], VIEW_NAME);
+
       await loadScript(chartRegister["Ag"]["path"], chartRegister["Ag"]["name"], VIEW_NAME);
-      // Load Ag Mgt Landuse chart dataset (for series highlighting with landuse selection)
-      await loadScript(chartRegister["Ag Mgt"]["Landuse"]["path"], chartRegister["Ag Mgt"]["Landuse"]["name"], VIEW_NAME);
+      await loadScript(chartRegister["Ag Mgt"]["path"], chartRegister["Ag Mgt"]["name"], VIEW_NAME);
       await loadScript(chartRegister["Non-Ag"]["path"], chartRegister["Non-Ag"]["name"], VIEW_NAME);
 
       // Initial selections
@@ -308,58 +295,47 @@ window.BiodiversityView = {
       <div class="absolute top-[285px] left-[20px] w-[320px] z-[1001] flex flex-col space-y-3 bg-white/70 p-2 rounded-lg">
 
         <!-- Category buttons (always visible) -->
-        <div class="flex items-center">
-          <div class="flex space-x-1">
-            <span class="text-[0.8rem] mr-1 font-medium">Category:</span>
-            <button v-for="(val, key) in availableCategories" :key="key"
-              @click="selectCategory = val"
-              class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded"
-              :class="{'bg-sky-500 text-white': selectCategory === val}">
-              {{ val }}
-            </button>
-          </div>
+        <div class="flex space-x-1">
+          <span class="text-[0.8rem] mr-1 font-medium">Category:</span>
+          <button v-for="(val, key) in availableCategories" :key="key"
+            @click="selectCategory = val"
+            class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded"
+            :class="{'bg-sky-500 text-white': selectCategory === val}">
+            {{ val }}
+          </button>
         </div>
 
         <!-- Ag Mgt options (only for Ag Mgt category) -->
-        <div v-if="selectCategory === 'Ag Mgt'" 
-          class="flex items-start border-t border-white/10 pt-1">
-          <div v-if="dataLoaded && availableAgMgt.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
-            <span class="text-[0.8rem] mr-1 font-medium">Ag Mgt:</span>
-            <button v-for="(val, key) in availableAgMgt" :key="key"
-              @click="selectAgMgt = val"
-              class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
-              :class="{'bg-sky-500 text-white': selectAgMgt === val}">
-              {{ val }}
-            </button>
-          </div>
+        <div v-if="selectCategory === 'Ag Mgt' && dataLoaded && availableAgMgt.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
+          <span class="text-[0.8rem] mr-1 font-medium">Ag Mgt:</span>
+          <button v-for="(val, key) in availableAgMgt" :key="key"
+            @click="selectAgMgt = val"
+            class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
+            :class="{'bg-sky-500 text-white': selectAgMgt === val}">
+            {{ val }}
+          </button>
         </div>
 
         <!-- Water options (only for Ag and Ag Mgt) - comes before Landuse for Ag Mgt hierarchy: AgMgt → Water → Landuse -->
-        <div v-if="selectCategory === 'Ag' || selectCategory === 'Ag Mgt'" 
-          class="flex items-start border-t border-white/10 pt-1">
-          <div v-if="dataLoaded && availableWater.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
-            <span class="text-[0.8rem] mr-1 font-medium">Water:</span>
-            <button v-for="(val, key) in availableWater" :key="key"
-              @click="selectWater = val"
-              class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
-              :class="{'bg-sky-500 text-white': selectWater === val}">
-              {{ val }}
-            </button>
-          </div>
+        <div v-if="(selectCategory === 'Ag' || selectCategory === 'Ag Mgt') && dataLoaded && availableWater.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
+          <span class="text-[0.8rem] mr-1 font-medium">Water:</span>
+          <button v-for="(val, key) in availableWater" :key="key"
+            @click="selectWater = val"
+            class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
+            :class="{'bg-sky-500 text-white': selectWater === val}">
+            {{ val }}
+          </button>
         </div>
 
         <!-- Landuse options -->
-        <div 
-          class="flex items-start border-t border-white/10 pt-1">
-          <div v-if="dataLoaded" class="flex flex-wrap gap-1 max-w-[300px]">
-            <span class="text-[0.8rem] mr-1 font-medium">Landuse:</span>
-            <button v-for="(val, key) in availableLanduse" :key="key"
-              @click="selectLanduse = val"
-              class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
-              :class="{'bg-sky-500 text-white': selectLanduse === val}">
-              {{ val }}
-            </button>
-          </div>
+        <div v-if="dataLoaded" class="flex flex-wrap gap-1 max-w-[300px]">
+          <span class="text-[0.8rem] mr-1 font-medium">Landuse:</span>
+          <button v-for="(val, key) in availableLanduse" :key="key"
+            @click="selectLanduse = val"
+            class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
+            :class="{'bg-sky-500 text-white': selectLanduse === val}">
+            {{ val }}
+          </button>
         </div>
       </div>
 

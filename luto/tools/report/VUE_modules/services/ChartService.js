@@ -1,7 +1,7 @@
 // Chart Data Service
 // This service provides data about charts for different metrics and categories
 
-window.DataService = {
+window.ChartService = {
 
   "chartCategories": {
     "Area": {

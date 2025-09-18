@@ -10,7 +10,7 @@ window.MapService = {
       'Non-Ag': { 'path': 'data/map_layers/map_area_NonAg.js', 'name': 'map_area_NonAg' },
     },
     'Biodiversity': {
-      'overall': {
+      'quality': {
         'Ag': { 'path': 'data/map_layers/map_bio_overall_Ag.js', 'name': 'map_bio_overall_Ag' },
         'Ag Mgt': { 'path': 'data/map_layers/map_bio_overall_Am.js', 'name': 'map_bio_overall_Am' },
         'Non-Ag': { 'path': 'data/map_layers/map_bio_overall_NonAg.js', 'name': 'map_bio_overall_NonAg' },

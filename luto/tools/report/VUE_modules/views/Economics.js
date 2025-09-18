@@ -3,7 +3,7 @@ window.EconomicsView = {
     const { ref, onMounted, onUnmounted, inject, computed, watch, nextTick } = Vue;
 
     // Data|Map service
-    const chartRegister = window.DataService.chartCategories["Economics"];
+    const chartRegister = window.ChartService.chartCategories["Economics"];
     const mapRegister = window.MapService.mapCategories["Economics"];
     const loadScript = window.loadScriptWithTracking;
     const mosaicMap = window.MapService.mapCategories["Dvar"]["Mosaic"];
@@ -321,71 +321,58 @@ window.EconomicsView = {
       <div class="absolute top-[285px] left-[20px] w-[320px] z-[1001] flex flex-col space-y-3 bg-white/70 p-2 rounded-lg">
 
         <!-- Cost/Revenue buttons (always visible, affects MAP only) -->
-        <div class="flex items-center">
-          <div class="flex space-x-1">
-            <span class="text-[0.8rem] mr-1 font-medium">Map Type:</span>
-            <button v-for="(val, key) in availableCostRevenue" :key="key"
-              @click="selectCostRevenue = val"
-              class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded"
-              :class="{'bg-sky-500 text-white': selectCostRevenue === val}">
-              {{ val }}
-            </button>
-          </div>
+        <div class="flex space-x-1">
+          <span class="text-[0.8rem] mr-1 font-medium">Map Type:</span>
+          <button v-for="(val, key) in availableCostRevenue" :key="key"
+            @click="selectCostRevenue = val"
+            class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded"
+            :class="{'bg-sky-500 text-white': selectCostRevenue === val}">
+            {{ val }}
+          </button>
         </div>
 
         <!-- Category buttons (always visible) -->
-        <div class="flex items-center border-t border-white/10 pt-1">
-          <div class="flex space-x-1">
-            <span class="text-[0.8rem] mr-1 font-medium">Category:</span>
-            <button v-for="(val, key) in availableCategories" :key="key"
-              @click="selectCategory = val"
-              class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded"
-              :class="{'bg-sky-500 text-white': selectCategory === val}">
-              {{ val }}
-            </button>
-          </div>
+        <div class="flex space-x-1">
+          <span class="text-[0.8rem] mr-1 font-medium">Category:</span>
+          <button v-for="(val, key) in availableCategories" :key="key"
+            @click="selectCategory = val"
+            class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded"
+            :class="{'bg-sky-500 text-white': selectCategory === val}">
+            {{ val }}
+          </button>
         </div>
 
         <!-- Ag Mgt options (only for Ag Mgt category) -->
-        <div v-if="selectCategory === 'Ag Mgt'"
-          class="flex items-start border-t border-white/10 pt-1">
-          <div v-if="dataLoaded && availableAgMgt.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
-            <span class="text-[0.8rem] mr-1 font-medium">Ag Mgt:</span>
-            <button v-for="(val, key) in availableAgMgt" :key="key"
-              @click="selectAgMgt = val"
-              class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
-              :class="{'bg-sky-500 text-white': selectAgMgt === val}">
-              {{ val }}
-            </button>
-          </div>
+        <div v-if="selectCategory === 'Ag Mgt' && dataLoaded && availableAgMgt.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
+          <span class="text-[0.8rem] mr-1 font-medium">Ag Mgt:</span>
+          <button v-for="(val, key) in availableAgMgt" :key="key"
+            @click="selectAgMgt = val"
+            class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
+            :class="{'bg-sky-500 text-white': selectAgMgt === val}">
+            {{ val }}
+          </button>
         </div>
 
         <!-- Water options -->
-        <div 
-          class="flex items-start border-t border-white/10 pt-1">
-          <div v-if="selectCategory !== 'Non-Ag' && dataLoaded && availableWater.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
-            <span class="text-[0.8rem] mr-1 font-medium">Water:</span>
-            <button v-for="(val, key) in availableWater" :key="key"
-              @click="selectWater = val"
-              class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
-              :class="{'bg-sky-500 text-white': selectWater === val}">
-              {{ val }}
-            </button>
-          </div>
+        <div v-if="selectCategory !== 'Non-Ag' && dataLoaded && availableWater.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
+          <span class="text-[0.8rem] mr-1 font-medium">Water:</span>
+          <button v-for="(val, key) in availableWater" :key="key"
+            @click="selectWater = val"
+            class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
+            :class="{'bg-sky-500 text-white': selectWater === val}">
+            {{ val }}
+          </button>
         </div>
 
         <!-- Landuse options -->
-        <div 
-          class="flex items-start border-t border-white/10 pt-1">
-          <div v-if="dataLoaded" class="flex flex-wrap gap-1 max-w-[300px]">
-            <span class="text-[0.8rem] mr-1 font-medium">Landuse:</span>
-            <button v-for="(val, key) in availableLanduse" :key="key"
-              @click="selectLanduse = val"
-              class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
-              :class="{'bg-sky-500 text-white': selectLanduse === val}">
-              {{ val }}
-            </button>
-          </div>
+        <div v-if="dataLoaded" class="flex flex-wrap gap-1 max-w-[300px]">
+          <span class="text-[0.8rem] mr-1 font-medium">Landuse:</span>
+          <button v-for="(val, key) in availableLanduse" :key="key"
+            @click="selectLanduse = val"
+            class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
+            :class="{'bg-sky-500 text-white': selectLanduse === val}">
+            {{ val }}
+          </button>
         </div>
       </div>
 

@@ -53,7 +53,7 @@ VUE_LUTO/
 │   ├── Test.js                         # Test view for development
 │   └── NotFound.js                     # 404 error page
 ├── services/                           # Service modules
-│   ├── DataService.js                  # Data handling service
+│   ├── ChartService.js                  # Data handling service
 │   └── MapService.js                   # Map data and interactions service
 ├── routes/                             # Routing configuration
 │   └── route.js                        # Vue Router setup
@@ -225,7 +225,7 @@ The application uses a custom script loading system (`helpers.js`) that:
 - **Ranking Cards** (`ranking_cards.js`): Comparative ranking visualization component
 
 ### Service Layer
-- **DataService** (`services/DataService.js`): Chart data registration and management
+- **ChartService** (`services/ChartService.js`): Chart data registration and management
 - **MapService** (`services/MapService.js`): Map layer data registration and spatial data handling
 - **Helpers** (`components/helpers.js`): Utility functions for dynamic script loading and data management
 
@@ -372,7 +372,7 @@ This project is part of the LUTO (Land Use Trade-Offs) model system. Please refe
 - **Data Structure Expansion**: Enhanced data organization with 80+ chart files and comprehensive map layer support
 - **Economics Module Specialization**: Implemented dual cost/revenue visualization with separate map layers and combined chart data
 - **Memory Preservation**: Added intelligent selection memory across category switching for improved user experience
-- **Service Layer**: Separated DataService and MapService for better data management and registration
+- **Service Layer**: Separated ChartService and MapService for better data management and registration
 - **UI Component Expansion**: Added filterable dropdowns and ranking cards for enhanced data interaction
 
 ### Architecture Highlights

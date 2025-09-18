@@ -143,7 +143,7 @@ The LUTO reporting system uses Vue.js 3 with a progressive selection pattern for
 
 All reporting views follow the progressive selection pattern:
 
-1. **Data Loading**: Use `chartRegister`/`mapRegister` from `DataService`/`MapService`
+1. **Data Loading**: Use `chartRegister`/`mapRegister` from `ChartService`/`MapService`
 2. **Progressive Buttons**: Dynamic buttons generated from data structure keys
 3. **Cascading Watchers**: Downstream selections auto-update when upstream changes
 4. **Reactive Data**: `selectMapData`/`selectChartData` computed properties
@@ -461,5 +461,5 @@ watch([selectCostRevenue, selectCategory], ([newCostRevenue, newCategory], [oldC
 - **Views**: `/luto/tools/report/VUE_modules/views/` - Main view components
 - **Chart Data**: `/luto/tools/report/VUE_modules/data/` - Chart data files (68 total)
 - **Map Data**: `/luto/tools/report/VUE_modules/data/map_layers/` - Map layer files
-- **Services**: `/luto/tools/report/VUE_modules/services/` - DataService/MapService registrations
+- **Services**: `/luto/tools/report/VUE_modules/services/` - ChartService/MapService registrations
 - **Routes**: `/luto/tools/report/VUE_modules/routes/route.js` - Vue router configuration

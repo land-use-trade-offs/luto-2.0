@@ -5,7 +5,7 @@ window.HomeView = {
     const { ref, onMounted, onUnmounted, watch, computed, inject, nextTick } = Vue;
 
     // Data service
-    const chartRegister = window.DataService.chartCategories;   // DataService has been registered in index.html      [DataService.js]
+    const chartRegister = window.ChartService.chartCategories;   // ChartService has been registered in index.html      [ChartService.js]
     const loadScript = window.loadScriptWithTracking;
     const VIEW_NAME = "Home";
 
