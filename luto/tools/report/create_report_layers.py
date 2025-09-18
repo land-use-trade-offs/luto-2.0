@@ -415,17 +415,7 @@ def save_report_layer(data:Data):
     ####################################################
 
     files_bio = files.query('base_name.str.contains("biodiversity")')
-
-    # GBF2
-    bio_GBF2_ag = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_ag"')
-    get_map_obj_float(data, bio_GBF2_ag, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Ag.js')
-
-    bio_GBF2_am = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_ag_management"')
-    get_map_obj_float(data, bio_GBF2_am, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Am.js')
-
-    bio_GBF2_nonag = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_non_ag"')
-    get_map_obj_float(data, bio_GBF2_nonag, f'{SAVE_DIR}/map_layers/map_bio_GBF2_NonAg.js')
-
+    
     # Overall priority
     bio_overall_ag = files_bio.query('base_name == "xr_biodiversity_overall_priority_ag"')
     get_map_obj_float(data, bio_overall_ag, f'{SAVE_DIR}/map_layers/map_bio_overall_Ag.js')
@@ -436,6 +426,72 @@ def save_report_layer(data:Data):
     bio_overall_nonag = files_bio.query('base_name == "xr_biodiversity_overall_priority_non_ag"')
     get_map_obj_float(data, bio_overall_nonag, f'{SAVE_DIR}/map_layers/map_bio_overall_NonAg.js')
 
+
+    # GBF2
+    if settings.BIODIVERSITY_TARGET_GBF_2 != 'off':
+        bio_GBF2_ag = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_ag"')
+        get_map_obj_float(data, bio_GBF2_ag, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Ag.js')
+
+        bio_GBF2_am = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_ag_management"')
+        get_map_obj_float(data, bio_GBF2_am, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Am.js')
+
+        bio_GBF2_nonag = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_non_ag"')
+        get_map_obj_float(data, bio_GBF2_nonag, f'{SAVE_DIR}/map_layers/map_bio_GBF2_NonAg.js')
+        
+    # GBF3
+    if settings.BIODIVERSITY_TARGET_GBF_3 != 'off':
+        bio_GBF3_ag = files_bio.query('base_name == "xr_biodiversity_GBF3_vegetation_ag"')
+        get_map_obj_float(data, bio_GBF3_ag, f'{SAVE_DIR}/map_layers/map_bio_GBF3_Ag.js')
+
+        bio_GBF3_am = files_bio.query('base_name == "xr_biodiversity_GBF3_vegetation_ag_management"')
+        get_map_obj_float(data, bio_GBF3_am, f'{SAVE_DIR}/map_layers/map_bio_GBF3_Am.js')
+
+        bio_GBF3_nonag = files_bio.query('base_name == "xr_biodiversity_GBF3_vegetation_non_ag"')
+        get_map_obj_float(data, bio_GBF3_nonag, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NonAg.js')
+    
+    # GBF4-SNES
+    if settings.BIODIVERSITY_TARGET_GBF_4_SNES != 'off':
+        bio_GBF4_SNES_ag = files_bio.query('base_name == "xr_biodiversity_GBF4_SNES_ag"')
+        get_map_obj_float(data, bio_GBF4_SNES_ag, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_Ag.js')
+
+        bio_GBF4_SNES_am = files_bio.query('base_name == "xr_biodiversity_GBF4_SNES_ag_management"')
+        get_map_obj_float(data, bio_GBF4_SNES_am, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_Am.js')
+
+        bio_GBF4_SNES_nonag = files_bio.query('base_name == "xr_biodiversity_GBF4_SNES_non_ag"')
+        get_map_obj_float(data, bio_GBF4_SNES_nonag, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_NonAg.js')
+        
+    # GBF4_ECNES
+    if settings.BIODIVERSITY_TARGET_GBF_4_ECNES != 'off':
+        bio_GBF4_ECNES_ag = files_bio.query('base_name == "xr_biodiversity_GBF4_ECNES_ag"')
+        get_map_obj_float(data, bio_GBF4_ECNES_ag, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_Ag.js')
+
+        bio_GBF4_ECNES_am = files_bio.query('base_name == "xr_biodiversity_GBF4_ECNES_ag_management"')
+        get_map_obj_float(data, bio_GBF4_ECNES_am, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_Am.js')
+
+        bio_GBF4_ECNES_nonag = files_bio.query('base_name == "xr_biodiversity_GBF4_ECNES_non_ag"')
+        get_map_obj_float(data, bio_GBF4_ECNES_nonag, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_NonAg.js')
+        
+    # GBF8
+    if settings.BIODIVERSITY_TARGET_GBF_8 != 'off':
+        bio_GBF8_ag = files_bio.query('base_name == "xr_biodiversity_GBF8_species_ag"')
+        get_map_obj_float(data, bio_GBF8_ag, f'{SAVE_DIR}/map_layers/map_bio_GBF8_Ag.js')
+
+        bio_GBF8_am = files_bio.query('base_name == "xr_biodiversity_GBF8_species_ag_management"')
+        get_map_obj_float(data, bio_GBF8_am, f'{SAVE_DIR}/map_layers/map_bio_GBF8_Am.js')
+
+        bio_GBF8_nonag = files_bio.query('base_name == "xr_biodiversity_GBF8_species_non_ag"')
+        get_map_obj_float(data, bio_GBF8_nonag, f'{SAVE_DIR}/map_layers/map_bio_GBF8_NonAg.js')
+        
+        bio_GBF8_ag_group = files_bio.query('base_name == "xr_biodiversity_GBF8_groups_ag"')
+        get_map_obj_float(data, bio_GBF8_ag_group, f'{SAVE_DIR}/map_layers/map_bio_GBF8_groups_Ag.js')
+        
+        bio_GBF8_am_group = files_bio.query('base_name == "xr_biodiversity_GBF8_groups_ag_management"')
+        get_map_obj_float(data, bio_GBF8_am_group, f'{SAVE_DIR}/map_layers/map_bio_GBF8_groups_Am.js')
+        
+        bio_GBF8_nonag_group = files_bio.query('base_name == "xr_biodiversity_GBF8_groups_non_ag"')
+        get_map_obj_float(data, bio_GBF8_nonag_group, f'{SAVE_DIR}/map_layers/map_bio_GBF8_groups_NonAg.js')
+
+    
 
 
     ####################################################
