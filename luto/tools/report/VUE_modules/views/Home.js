@@ -158,12 +158,23 @@ window.HomeView = {
       await loadScript(chartOverview_area_category['path'], chartOverview_area_category['name'], VIEW_NAME);
       await loadScript(chartOverview_area_landuse['path'], chartOverview_area_landuse['name'], VIEW_NAME);
       await loadScript(chartOverview_bio_quality['path'], chartOverview_bio_quality['name'], VIEW_NAME);
-      await loadScript(chartOverview_bio_GBF2['path'], chartOverview_bio_GBF2['name'], VIEW_NAME);
-      await loadScript(chartOverview_bio_GBF3['path'], chartOverview_bio_GBF3['name'], VIEW_NAME);
-      await loadScript(chartOverview_bio_GBF4_SNES['path'], chartOverview_bio_GBF4_SNES['name'], VIEW_NAME);
-      await loadScript(chartOverview_bio_GBF4_ECNES['path'], chartOverview_bio_GBF4_ECNES['name'], VIEW_NAME);
-      await loadScript(chartOverview_bio_GBF8_SPECIES['path'], chartOverview_bio_GBF8_SPECIES['name'], VIEW_NAME);
-      await loadScript(chartOverview_bio_GBF8_GROUP['path'], chartOverview_bio_GBF8_GROUP['name'], VIEW_NAME);
+      // Conditional biodiversity script loading based on runScenario
+      if (runScenario.value['BIODIVERSITY_TARGET_GBF_2'] !== 'off') {
+        await loadScript(chartOverview_bio_GBF2['path'], chartOverview_bio_GBF2['name'], VIEW_NAME);
+      }
+      if (runScenario.value['BIODIVERSITY_TARGET_GBF_3'] !== 'off') {
+        await loadScript(chartOverview_bio_GBF3['path'], chartOverview_bio_GBF3['name'], VIEW_NAME);
+      }
+      if (runScenario.value['BIODIVERSITY_TARGET_GBF_4_SNES'] !== 'off') {
+        await loadScript(chartOverview_bio_GBF4_SNES['path'], chartOverview_bio_GBF4_SNES['name'], VIEW_NAME);
+      }
+      if (runScenario.value['BIODIVERSITY_TARGET_GBF_4_ECNES'] !== 'off') {
+        await loadScript(chartOverview_bio_GBF4_ECNES['path'], chartOverview_bio_GBF4_ECNES['name'], VIEW_NAME);
+      }
+      if (runScenario.value['BIODIVERSITY_TARGET_GBF_8'] !== 'off') {
+        await loadScript(chartOverview_bio_GBF8_SPECIES['path'], chartOverview_bio_GBF8_SPECIES['name'], VIEW_NAME);
+        await loadScript(chartOverview_bio_GBF8_GROUP['path'], chartOverview_bio_GBF8_GROUP['name'], VIEW_NAME);
+      }
       await loadScript(chartOverview_economics_sum['path'], chartOverview_economics_sum['name'], VIEW_NAME);
       await loadScript(chartOverview_economics_ag['path'], chartOverview_economics_ag['name'], VIEW_NAME);
       await loadScript(chartOverview_economics_agMgt['path'], chartOverview_economics_agMgt['name'], VIEW_NAME);
@@ -192,6 +203,20 @@ window.HomeView = {
       await loadScript(rankingBiodiversityAll['path'], rankingBiodiversityAll['name'], VIEW_NAME);
 
 
+
+      rankingData.value = {
+        'Area': window[rankingArea['name']],
+        'Economics': window[rankingEconomics['name']],
+        'GHG': window[rankingGHG['name']],
+        'Production': window[rankingProduction['name']],
+        'Water': window[rankingWater['name']],
+        'Biodiversity (Quality)': window[rankingBiodiversityQuality['name']],
+        'Biodiversity': window[rankingBiodiversityAll['name']],
+      };
+
+
+
+      // Create base ChartData structure without GBF data
       ChartData.value = {
         'Area': {
           'Overview': window[chartOverview_area_source['name']],
@@ -200,12 +225,6 @@ window.HomeView = {
         },
         'Biodiversity': {
           'Quality': window[chartOverview_bio_quality['name']],
-          'GBF2': window[chartOverview_bio_GBF2['name']],
-          'GBF3': window[chartOverview_bio_GBF3['name']],
-          'GBF4 (SNES)': window[chartOverview_bio_GBF4_SNES['name']],
-          'GBF4 (ECNES)': window[chartOverview_bio_GBF4_ECNES['name']],
-          'GBF8 (SPECIES)': window[chartOverview_bio_GBF8_SPECIES['name']],
-          'GBF8 (GROUP)': window[chartOverview_bio_GBF8_GROUP['name']],
         },
         'Economics': {
           'Overview': window[chartOverview_economics_sum['name']],
@@ -235,17 +254,23 @@ window.HomeView = {
         },
       };
 
-      rankingData.value = {
-        'Area': window[rankingArea['name']],
-        'Economics': window[rankingEconomics['name']],
-        'GHG': window[rankingGHG['name']],
-        'Production': window[rankingProduction['name']],
-        'Water': window[rankingWater['name']],
-        'Biodiversity (Quality)': window[rankingBiodiversityQuality['name']],
-        'Biodiversity': window[rankingBiodiversityAll['name']],
-      };
-
-
+      // Dynamically add GBF data based on what was loaded
+      if (runScenario.value['BIODIVERSITY_TARGET_GBF_2'] !== 'off') {
+        ChartData.value['Biodiversity']['GBF2'] = window[chartOverview_bio_GBF2['name']];
+      }
+      if (runScenario.value['BIODIVERSITY_TARGET_GBF_3'] !== 'off') {
+        ChartData.value['Biodiversity']['GBF3'] = window[chartOverview_bio_GBF3['name']];
+      }
+      if (runScenario.value['BIODIVERSITY_TARGET_GBF_4_SNES'] !== 'off') {
+        ChartData.value['Biodiversity']['GBF4 (SNES)'] = window[chartOverview_bio_GBF4_SNES['name']];
+      }
+      if (runScenario.value['BIODIVERSITY_TARGET_GBF_4_ECNES'] !== 'off') {
+        ChartData.value['Biodiversity']['GBF4 (ECNES)'] = window[chartOverview_bio_GBF4_ECNES['name']];
+      }
+      if (runScenario.value['BIODIVERSITY_TARGET_GBF_8'] !== 'off') {
+        ChartData.value['Biodiversity']['GBF8 (SPECIES)'] = window[chartOverview_bio_GBF8_SPECIES['name']];
+        ChartData.value['Biodiversity']['GBF8 (GROUP)'] = window[chartOverview_bio_GBF8_GROUP['name']];
+      }
 
       //  Set initial values
       availableYears.value = window['Supporting_info']['years'];
@@ -361,7 +386,7 @@ window.HomeView = {
             <hr class="border-gray-300 z-[100]">
 
             <!-- Ranking Subcategory Buttons (Absolute Positioned) -->
-            <div class="flex items-center space-x-1 justify-end absolute top-[55px] left-[180px] z-[100]">
+            <div class="flex items-center space-x-1 justify-end absolute top-[55px] left-[180px] z-[101]">
               <button
                 v-for="(data, key) in availableRankSubcategories"
                 :key="key"
