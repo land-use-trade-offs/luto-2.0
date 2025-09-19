@@ -630,7 +630,7 @@ class Data:
         self.SOIL_CARBON_AVG_T_CO2_HA = (
             pd.read_hdf(os.path.join(settings.INPUT_DIR, "soil_carbon_t_ha.h5"), where=self.MASK).to_numpy(dtype=np.float32) 
             * (44 / 12) 
-            / settings.SOC_AMORTISATION
+            / settings.CARBON_EFFECTS_WINDOW
         )
 
 
@@ -747,41 +747,41 @@ class Data:
         fire_risk = fr_df[fr_dict[settings.FIRE_RISK]]
 
         # Load environmental plantings (block) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
-        ep_df = pd.read_hdf(os.path.join(settings.INPUT_DIR, "ep_block_avg_t_co2_ha_yr.h5"), where=self.MASK)
+        ep_df = pd.read_hdf(os.path.join(settings.INPUT_DIR, "ep_block_t_co2_ha.h5"), where=self.MASK)
         self.EP_BLOCK_AVG_T_CO2_HA = (
-            ep_df.EP_BLOCK_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
-            + ep_df.EP_BLOCK_BG_AVG_T_CO2_HA_YR
-        ).to_numpy(dtype=np.float32)
+            ep_df.EP_BLOCK_AG_T_CO2_HA * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
+            + ep_df.EP_BLOCK_BG_T_CO2_HA
+        ).to_numpy(dtype=np.float32) / settings.CARBON_EFFECTS_WINDOW
 
 
         # Load environmental plantings (belt) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
-        ep_df = pd.read_hdf(os.path.join(settings.INPUT_DIR, "ep_belt_avg_t_co2_ha_yr.h5"), where=self.MASK)
+        ep_df = pd.read_hdf(os.path.join(settings.INPUT_DIR, "ep_belt_t_co2_ha.h5"), where=self.MASK)
         self.EP_BELT_AVG_T_CO2_HA = (
-            (ep_df.EP_BELT_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL))
-            + ep_df.EP_BELT_BG_AVG_T_CO2_HA_YR
-        ).to_numpy(dtype=np.float32)
+            (ep_df.EP_BELT_AG_T_CO2_HA * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL))
+            + ep_df.EP_BELT_BG_T_CO2_HA
+        ).to_numpy(dtype=np.float32) / settings.CARBON_EFFECTS_WINDOW
 
         # Load environmental plantings (riparian) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
-        ep_df = pd.read_hdf(os.path.join(settings.INPUT_DIR, "ep_rip_avg_t_co2_ha_yr.h5"), where=self.MASK)
+        ep_df = pd.read_hdf(os.path.join(settings.INPUT_DIR, "ep_rip_t_co2_ha.h5"), where=self.MASK)
         self.EP_RIP_AVG_T_CO2_HA = (
-            (ep_df.EP_RIP_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL))
-            + ep_df.EP_RIP_BG_AVG_T_CO2_HA_YR
-        ).to_numpy(dtype=np.float32)
+            (ep_df.EP_RIP_AG_T_CO2_HA * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL))
+            + ep_df.EP_RIP_BG_T_CO2_HA
+        ).to_numpy(dtype=np.float32) / settings.CARBON_EFFECTS_WINDOW
 
         # Load carbon plantings (block) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
-        cp_df = pd.read_hdf(os.path.join(settings.INPUT_DIR, "cp_block_avg_t_co2_ha_yr.h5"), where=self.MASK)
+        cp_df = pd.read_hdf(os.path.join(settings.INPUT_DIR, "cp_block_t_co2_ha.h5"), where=self.MASK)
         self.CP_BLOCK_AVG_T_CO2_HA = (
-            (cp_df.CP_BLOCK_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL))
-            + cp_df.CP_BLOCK_BG_AVG_T_CO2_HA_YR
-        ).to_numpy(dtype=np.float32)
+            (cp_df.CP_BLOCK_AG_T_CO2_HA * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL))
+            + cp_df.CP_BLOCK_BG_T_CO2_HA
+        ).to_numpy(dtype=np.float32) / settings.CARBON_EFFECTS_WINDOW
 
 
         # Load farm forestry [i.e. carbon plantings (belt)] GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
-        cp_df = pd.read_hdf(os.path.join(settings.INPUT_DIR, "cp_belt_avg_t_co2_ha_yr.h5"), where=self.MASK)
+        cp_df = pd.read_hdf(os.path.join(settings.INPUT_DIR, "cp_belt_t_co2_ha.h5"), where=self.MASK)
         self.CP_BELT_AVG_T_CO2_HA = (
-            (cp_df.CP_BELT_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL))
-            + cp_df.CP_BELT_BG_AVG_T_CO2_HA_YR
-        ).to_numpy(dtype=np.float32)
+            (cp_df.CP_BELT_AG_T_CO2_HA * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL))
+            + cp_df.CP_BELT_BG_T_CO2_HA
+        ).to_numpy(dtype=np.float32) / settings.CARBON_EFFECTS_WINDOW
 
         # Agricultural land use to plantings raw transition costs:
         self.AG2EP_TRANSITION_COSTS_HA = np.load(

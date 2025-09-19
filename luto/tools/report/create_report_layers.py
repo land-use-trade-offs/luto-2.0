@@ -200,7 +200,7 @@ def map2base64_float(rxr_path:str, arr_lyr:xr.DataArray, attrs:tuple) -> dict|No
     
     
 
-def get_map_obj_float(data:Data, files_df:pd.DataFrame, save_path:str, workers:int=settings.WRITE_THREADS) -> dict:
+def get_map_obj_float(data:Data, files_df:pd.DataFrame, save_path:str, workers:int=max(settings.WRITE_THREADS, 16)) -> dict:
 
     # Get an template rio-xarray, it will be used to convert 1D array to its 2D map format
     template_xr = f'{data.path}/out_{sorted(settings.SIM_YEARS)[0]}/xr_map_lumap_{sorted(settings.SIM_YEARS)[0]}.nc'
@@ -264,7 +264,7 @@ def get_map_obj_float(data:Data, files_df:pd.DataFrame, save_path:str, workers:i
         f.write(';\n')
         
 
-def get_map_obj_interger(files_df:pd.DataFrame, save_path:str, colors_legend, workers:int=settings.WRITE_THREADS) -> dict:
+def get_map_obj_interger(files_df:pd.DataFrame, save_path:str, colors_legend, workers:int=max(settings.WRITE_THREADS, 16)) -> dict:
     
     map_mosaic_lumap = files_df.query('base_name == "xr_map_lumap"'
         ).assign(

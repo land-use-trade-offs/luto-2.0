@@ -805,41 +805,41 @@ def create_new_dataset():
     s.to_hdf(outpath + 'natural_land_t_co2_ha.h5', key='natural_land_t_co2_ha', mode='w', format='table', index=False, complevel=9)
 
     # Average annual carbon sequestration by Environmental Plantings (block plantings) and save to file
-    s = pd.DataFrame(columns=['EP_BLOCK_AG_AVG_T_CO2_HA_YR', 'EP_BLOCK_BG_AVG_T_CO2_HA_YR'])
-    s['EP_BLOCK_AG_AVG_T_CO2_HA_YR'] = bioph.eval('EP_BLOCK_TREES_AVG_T_CO2_HA_YR + EP_BLOCK_DEBRIS_AVG_T_CO2_HA_YR')
-    s['EP_BLOCK_BG_AVG_T_CO2_HA_YR'] = bioph['EP_BLOCK_SOIL_AVG_T_CO2_HA_YR']
-    s.to_hdf(outpath + 'ep_block_avg_t_co2_ha_yr.h5', key='ep_block_avg_t_co2_ha_yr', mode='w', format='table', index=False, complevel=9)
+    s = pd.DataFrame(columns=['EP_BLOCK_AG_T_CO2_HA', 'EP_BLOCK_BG_T_CO2_HA'])
+    s['EP_BLOCK_AG_T_CO2_HA'] = bioph.eval('EP_BLOCK_TREES_T_CO2_HA + EP_BLOCK_DEBRIS_T_CO2_HA')
+    s['EP_BLOCK_BG_T_CO2_HA'] = bioph['EP_BLOCK_SOIL_T_CO2_HA']
+    s.to_hdf(outpath + 'ep_block_t_co2_ha.h5', key='ep_block_t_co2_ha', mode='w', format='table', index=False, complevel=9)
 
     # Average annual carbon sequestration by Environmental Plantings (belt plantings) and save to file
-    s = pd.DataFrame(columns=['EP_BELT_AG_AVG_T_CO2_HA_YR', 'EP_BELT_BG_AVG_T_CO2_HA_YR'])
-    s['EP_BELT_AG_AVG_T_CO2_HA_YR'] = bioph.eval('EP_BELT_TREES_AVG_T_CO2_HA_YR + EP_BELT_DEBRIS_AVG_T_CO2_HA_YR')
-    s['EP_BELT_BG_AVG_T_CO2_HA_YR'] = bioph['EP_BELT_SOIL_AVG_T_CO2_HA_YR']
-    s.to_hdf(outpath + 'ep_belt_avg_t_co2_ha_yr.h5', key='ep_belt_avg_t_co2_ha_yr', mode='w', format='table', index=False, complevel=9)
+    s = pd.DataFrame(columns=['EP_BELT_AG_T_CO2_HA', 'EP_BELT_BG_T_CO2_HA'])
+    s['EP_BELT_AG_T_CO2_HA'] = bioph.eval('EP_BELT_TREES_T_CO2_HA + EP_BELT_DEBRIS_T_CO2_HA')
+    s['EP_BELT_BG_T_CO2_HA'] = bioph['EP_BELT_SOIL_T_CO2_HA']
+    s.to_hdf(outpath + 'ep_belt_t_co2_ha.h5', key='ep_belt_t_co2_ha', mode='w', format='table', index=False, complevel=9)
 
     # Average annual carbon sequestration by Environmental Plantings (riparian plantings) and save to file
-    s = pd.DataFrame(columns=['EP_RIP_AG_AVG_T_CO2_HA_YR', 'EP_RIP_BG_AVG_T_CO2_HA_YR'])
-    s['EP_RIP_AG_AVG_T_CO2_HA_YR'] = bioph.eval('EP_RIP_TREES_AVG_T_CO2_HA_YR + EP_RIP_DEBRIS_AVG_T_CO2_HA_YR')
-    s['EP_RIP_BG_AVG_T_CO2_HA_YR'] = bioph['EP_RIP_SOIL_AVG_T_CO2_HA_YR']
-    s.to_hdf(outpath + 'ep_rip_avg_t_co2_ha_yr.h5', key='ep_rip_avg_t_co2_ha_yr', mode='w', format='table', index=False, complevel=9)
+    s = pd.DataFrame(columns=['EP_RIP_AG_T_CO2_HA', 'EP_RIP_BG_T_CO2_HA'])
+    s['EP_RIP_AG_T_CO2_HA'] = bioph.eval('EP_RIP_TREES_T_CO2_HA + EP_RIP_DEBRIS_T_CO2_HA')
+    s['EP_RIP_BG_T_CO2_HA'] = bioph['EP_RIP_SOIL_T_CO2_HA']
+    s.to_hdf(outpath + 'ep_rip_t_co2_ha.h5', key='ep_rip_t_co2_ha', mode='w', format='table', index=False, complevel=9)
 
 
     # Average annual carbon sequestration by Hardwood Plantings (block plantings) and save to file
-    s = pd.DataFrame(columns=['CP_BLOCK_AG_AVG_T_CO2_HA_YR', 'CP_BLOCK_BG_AVG_T_CO2_HA_YR'])
-    s['CP_BLOCK_AG_AVG_T_CO2_HA_YR'] = bioph.eval('CP_BLOCK_TREES_AVG_T_CO2_HA_YR + CP_BLOCK_DEBRIS_AVG_T_CO2_HA_YR')
-    s['CP_BLOCK_BG_AVG_T_CO2_HA_YR'] = bioph['CP_BLOCK_SOIL_AVG_T_CO2_HA_YR']
-    s.to_hdf(outpath + 'cp_block_avg_t_co2_ha_yr.h5', key='cp_block_avg_t_co2_ha_yr', mode='w', format='table', index=False, complevel=9)
+    s = pd.DataFrame(columns=['CP_BLOCK_AG_T_CO2_HA', 'CP_BLOCK_BG_T_CO2_HA'])
+    s['CP_BLOCK_AG_T_CO2_HA'] = bioph.eval('CP_BLOCK_TREES_T_CO2_HA + CP_BLOCK_DEBRIS_T_CO2_HA')
+    s['CP_BLOCK_BG_T_CO2_HA'] = bioph['CP_BLOCK_SOIL_T_CO2_HA']
+    s.to_hdf(outpath + 'cp_block_t_co2_ha.h5', key='cp_block_t_co2_ha', mode='w', format='table', index=False, complevel=9)
 
     # Average annual carbon sequestration by Hardwood Plantings (belt plantings) and save to file
-    s = pd.DataFrame(columns=['CP_BELT_AG_AVG_T_CO2_HA_YR', 'CP_BELT_BG_AVG_T_CO2_HA_YR'])
-    s['CP_BELT_AG_AVG_T_CO2_HA_YR'] = bioph.eval('CP_BELT_TREES_AVG_T_CO2_HA_YR + CP_BELT_DEBRIS_AVG_T_CO2_HA_YR')
-    s['CP_BELT_BG_AVG_T_CO2_HA_YR'] = bioph['CP_BELT_SOIL_AVG_T_CO2_HA_YR']
-    s.to_hdf(outpath + 'cp_belt_avg_t_co2_ha_yr.h5', key='cp_belt_avg_t_co2_ha_yr', mode='w', format='table', index=False, complevel=9)
+    s = pd.DataFrame(columns=['CP_BELT_AG_T_CO2_HA', 'CP_BELT_BG_T_CO2_HA'])
+    s['CP_BELT_AG_T_CO2_HA'] = bioph.eval('CP_BELT_TREES_T_CO2_HA + CP_BELT_DEBRIS_T_CO2_HA')
+    s['CP_BELT_BG_T_CO2_HA'] = bioph['CP_BELT_SOIL_T_CO2_HA']
+    s.to_hdf(outpath + 'cp_belt_t_co2_ha.h5', key='cp_belt_t_co2_ha', mode='w', format='table', index=False, complevel=9)
     
     # Average annual carbon sequestration by Human Induced Regrowth (block plantings) and save to file
-    s = pd.DataFrame(columns=['HIR_BLOCK_AG_AVG_T_CO2_HA_YR', 'HIR_BLOCK_BG_AVG_T_CO2_HA_YR'])
-    s['HIR_BLOCK_AG_AVG_T_CO2_HA_YR'] = bioph.eval('HIR_BLOCK_TREES_AVG_T_CO2_HA_YR + HIR_BLOCK_DEBRIS_AVG_T_CO2_HA_YR')
-    s['HIR_BLOCK_BG_AVG_T_CO2_HA_YR'] = bioph['HIR_BLOCK_SOIL_AVG_T_CO2_HA_YR']
-    s.to_hdf(outpath + 'hir_block_avg_t_co2_ha_yr.h5', key='hir_block_avg_t_co2_ha_yr', mode='w', format='table', index=False, complevel=9)
+    s = pd.DataFrame(columns=['HIR_BLOCK_AG_T_CO2_HA', 'HIR_BLOCK_BG_T_CO2_HA'])
+    s['HIR_BLOCK_AG_T_CO2_HA'] = bioph.eval('HIR_BLOCK_TREES_T_CO2_HA + HIR_BLOCK_DEBRIS_T_CO2_HA')
+    s['HIR_BLOCK_BG_T_CO2_HA'] = bioph['HIR_BLOCK_SOIL_T_CO2_HA']
+    s.to_hdf(outpath + 'hir_block_t_co2_ha.h5', key='hir_block_t_co2_ha', mode='w', format='table', index=False, complevel=9)
     
 
     # # MASK for Human Induced Regrowth; stop using HIR mask at 2025-06-16 after meeting with Carbon Market Institute (CMI)
