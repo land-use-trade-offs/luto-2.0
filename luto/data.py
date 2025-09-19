@@ -631,7 +631,6 @@ class Data:
             pd.read_hdf(os.path.join(settings.INPUT_DIR, "soil_carbon_t_ha.h5"), where=self.MASK).to_numpy(dtype=np.float32) 
             * (44 / 12) 
             / settings.CARBON_EFFECTS_WINDOW
-            / settings.CARBON_EFFECTS_WINDOW
         )
 
 
