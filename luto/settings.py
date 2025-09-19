@@ -71,6 +71,10 @@ FEED_EFFICIENCY = 'BAU'             # 'BAU' or 'High'
 # Add CO2 fertilisation effects on agricultural production from GAEZ v4
 CO2_FERT = 'off'   # or 'off'
 
+# Number of years over which to spread (average) soil carbon accumulation (from Mosnier et al. 2022 and Johnson et al. 2021)
+CARBON_EFFECTS_WINDOW = 91
+
+
 # Fire impacts on carbon sequestration
 RISK_OF_REVERSAL = 0.05  # Risk of reversal buffer under ERF (reasonable values range from 0.05 [100 years] to 0.25 [25 years]) https://www.cleanenergyregulator.gov.au/ERF/Choosing-a-project-type/Opportunities-for-the-land-sector/Risk-of-reversal-buffer
 FIRE_RISK = 'med'   # Options are 'low', 'med', 'high'. Determines whether to take the 5th, 50th, or 95th percentile of modelled fire impacts.
@@ -386,8 +390,6 @@ HIR_PRODUCTIVITY_CONTRIBUTION = 0.5
 BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 0
 SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 0
 
-# HIR effecting years
-HIR_EFFECT_YEARS = 91
 
 
 
@@ -424,8 +426,6 @@ GHG_EMISSIONS_LIMITS = 'high'        # 'off', 'low', 'medium', or 'high'
 '''
   	  	  
 
-
-
 # Carbon price scenario: either 'AS_GHG', 'Default', '100', or 'CONSTANT', or NONE.
 # Setting to None falls back to the 'Default' scenario.
 CARBON_PRICES_FIELD = 'CONSTANT'
@@ -450,9 +450,6 @@ indirect emissions such as fertiliser, irrigation, land management, etc.
 CROP_GHG_SCOPE_1 = ['CO2E_KG_HA_SOIL']
 LVSTK_GHG_SCOPE_1 = ['CO2E_KG_HEAD_DUNG_URINE', 'CO2E_KG_HEAD_ENTERIC', 'CO2E_KG_HEAD_IND_LEACH_RUNOFF', 'CO2E_KG_HEAD_MANURE_MGT']
 
-
-# Number of years over which to spread (average) soil carbon accumulation (from Mosnier et al. 2022 and Johnson et al. 2021)
-SOC_AMORTISATION = 91   # (2025/05/05) Change from 15 -> 91; This makes sure BIO_CHAR has the same GHG effect span as HIR
 
 GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (linear programming approach)
 # GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)

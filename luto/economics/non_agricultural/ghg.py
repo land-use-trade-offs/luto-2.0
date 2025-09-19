@@ -337,7 +337,7 @@ def get_ghg_destocked_land(
             data.CO2E_STOCK_UNALL_NATURAL[lumap_BASE_YR == from_lu]
             * (data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[from_lu] - 1)
             * data.REAL_AREA[lumap_BASE_YR == from_lu]
-            / settings.HIR_EFFECT_YEARS    # Annualise carbon sequestration capacity to align the full grwoth span of a tree
+            / settings.CARBON_EFFECTS_WINDOW    # Annualise carbon sequestration capacity to align the full grwoth span of a tree
         )
 
     if aggregate==True:
