@@ -533,7 +533,7 @@ def get_ecological_grazing_effect_g_mrj(data:Data, yr_idx):
                     data.SOIL_CARBON_AVG_T_CO2_HA
                     * soil_multiplier
                     * data.REAL_AREA  # adjust for resfactor
-                    / settings.SOC_AMORTISATION # annualise the soil carbon sequestration
+                    / settings.CARBON_EFFECTS_WINDOW # annualise the soil carbon sequestration
                 )
                 new_g_mrj[m, :, lu_idx] -= soil_reduction_amnt
 
@@ -695,7 +695,7 @@ def get_biochar_effect_g_mrj(data:Data, yr_idx):
                     data.SOIL_CARBON_AVG_T_CO2_HA
                     * soil_multiplier
                     * data.REAL_AREA  # adjust for resfactor
-                    / settings.SOC_AMORTISATION # annualise the soil carbon sequestration 
+                    / settings.CARBON_EFFECTS_WINDOW # annualise the soil carbon sequestration 
                 )
                 new_g_mrj[m, :, lu_idx] -= soil_reduction_amnt
 
@@ -712,7 +712,7 @@ def get_beef_hir_effect_g_mrj(data: Data, yr_idx):
             data.CO2E_STOCK_UNALL_NATURAL      
             * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[data.DESC2AGLU[lu]])
             * data.REAL_AREA
-            / settings.HIR_EFFECT_YEARS    
+            / settings.CARBON_EFFECTS_WINDOW    
         )
 
     # GHG abatement from livestock density reduction
@@ -733,7 +733,7 @@ def get_sheep_hir_effect_g_mrj(data: Data, yr_idx):
             data.CO2E_STOCK_UNALL_NATURAL      
             * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[data.DESC2AGLU[lu]])
             * data.REAL_AREA
-            / settings.HIR_EFFECT_YEARS    # Annualise carbon sequestration capacity to align the full growth span of a tree
+            / settings.CARBON_EFFECTS_WINDOW    # Annualise carbon sequestration capacity to align the full growth span of a tree
         )
         
     # GHG abatement from livestock density reduction

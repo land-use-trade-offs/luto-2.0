@@ -28,7 +28,7 @@ window.SettingsView = {
       },
       'Risk & Environmental': {
         icon: '⚠️',
-        keywords: ['RISK_OF_REVERSAL', 'FIRE_RISK', 'CO2_FERT', 'SOC_AMORTISATION']
+        keywords: ['RISK_OF_REVERSAL', 'FIRE_RISK', 'CO2_FERT', 'CARBON_EFFECTS_WINDOW']
       },
       'Biodiversity & Conservation': {
         icon: '🌿',
