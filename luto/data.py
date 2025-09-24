@@ -1157,11 +1157,18 @@ class Data:
             case _:
                 print(f"WARNING!! Invalid habitat condition source: {settings.HABITAT_CONDITION}, must be one of [10, 25, 50, 75, 90], or 'USER_DEFINED'")
         
-        self.BIO_HABITAT_CONTRIBUTION_LOOK_UP = {j: round(x, settings.ROUND_DECMIALS) for j, x in bio_HCAS_contribution_lookup.items()}             # Round to the specified decimal places to avoid numerical issues in the GUROBI solver
+        self.BIO_HABITAT_CONTRIBUTION_LOOK_UP = {j: round(x, settings.ROUND_DECMIALS) for j, x in bio_HCAS_contribution_lookup.items()}                 # Round to the specified decimal places to avoid numerical issues in the GUROBI solver
         
         
         # Get the biodiversity contribution score 
-        bio_contribution_raw = biodiv_raw[f'BIODIV_PRIORITY_SSP{settings.SSP}'].values
+        if settings.BIO_QUALITY_LAYER == 'Suitability':
+            bio_contribution_raw = biodiv_raw[f'BIODIV_PRIORITY_SSP{settings.SSP}'].values
+        elif 'NES' in settings.BIO_QUALITY_LAYER:
+            bio_contribution_raw = xr.open_dataarray(f"{settings.INPUT_DIR}/bio_NES_Zonation.nc").sel(layer=settings.BIO_QUALITY_LAYER).compute().values
+            bio_contribution_raw = bio_contribution_raw[self.MASK]
+        else:
+            raise ValueError(f"Invalid biodiversity quality layer: {settings.BIO_QUALITY_LAYER}, must be 'Suitability' or contain '*NES_likely|may' layers")
+
         self.BIO_CONNECTIVITY_RAW = bio_contribution_raw * connectivity_score                                          
         self.BIO_CONNECTIVITY_LDS = np.where(                                                                     
             self.SAVBURN_ELIGIBLE, 
@@ -1172,10 +1179,17 @@ class Data:
   
         # ------------------ Habitat condition impacts for habitat conservation (GBF2) in 'priority degraded areas' regions ---------------
         if settings.BIODIVERSITY_TARGET_GBF_2 != 'off':
-        
+            
+            if settings.BIO_QUALITY_LAYER == 'Suitability':
+                performance_sheet = f'ssp{settings.SSP}'
+            elif 'NES' in settings.BIO_QUALITY_LAYER:
+                performance_sheet = settings.BIO_QUALITY_LAYER
+            else:
+                raise ValueError(f"Invalid biodiversity quality layer: {settings.BIO_QUALITY_LAYER}, must be 'Suitability' or contain '*NES_likely|may' layers")
+
             # Get the mask of 'priority degraded areas' for habitat conservation
-            conservation_performance_curve = pd.read_excel(os.path.join(settings.INPUT_DIR, 'BIODIVERSITY_GBF2_conservation_performance.xlsx'), sheet_name=f'ssp{settings.SSP}'
-            ).set_index('AREA_COVERAGE_PERCENT')['PRIORITY_RANK'].to_dict()
+            conservation_performance_curve = pd.read_excel(os.path.join(settings.INPUT_DIR, 'BIODIVERSITY_GBF2_conservation_performance.xlsx'), sheet_name=performance_sheet
+                ).set_index('AREA_COVERAGE_PERCENT')['PRIORITY_RANK'].to_dict()
             
             priority_degraded_areas_mask = bio_contribution_raw >= conservation_performance_curve[settings.GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT]
             
@@ -1232,7 +1246,7 @@ class Data:
             
             
             # Read in vegetation layer data
-            NVIS_layers = xr.open_dataarray(settings.INPUT_DIR + f"/NVIS_{settings.GBF3_TARGET_CLASS.split('_')[0]}.nc").sel(group=self.GBF3_GROUPS_SEL)
+            NVIS_layers = xr.open_dataarray(settings.INPUT_DIR + f"/bio_GBF3_NVIS_{settings.GBF3_TARGET_CLASS}.nc").sel(group=self.GBF3_GROUPS_SEL)
             NVIS_layers = np.array([self.get_exact_resfactored_average_arr_without_lu_mask(arr) for arr in NVIS_layers], dtype=np.float32) / 100.0  # divide by 100 to get the percentage of the area in each cell that is covered by the vegetation type
 
             # Apply Savanna Burning penalties
@@ -1278,7 +1292,7 @@ class Data:
             likely_maybe_union = set(self.BIO_GBF4_SNES_LIKELY_SEL).intersection(self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL)
             if likely_maybe_union:
                 print(f"\tWARNING: {len(likely_maybe_union)} duplicate SNE species targets found, using 'LIKELY' targets only:")
-                print("\n".join(f"    {idx+1}) {name}" for idx, name in enumerate(likely_maybe_union)))
+                [print(f"    {idx+1}) {name}") for idx, name in enumerate(likely_maybe_union)]
                 self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL = list(set(self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL) - likely_maybe_union)
                 
             self.BIO_GBF4_SNES_SEL_ALL = self.BIO_GBF4_SNES_LIKELY_SEL + self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL
@@ -1315,7 +1329,7 @@ class Data:
             likely_maybe_union = set(self.BIO_GBF4_ECNES_LIKELY_SEL).intersection(self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL)
             if likely_maybe_union:
                 print(f"\tWARNING: {len(likely_maybe_union)} duplicate ECNES species targets found, using 'LIKELY' targets only:")
-                print("\n".join(f"    {idx+1}) {name}" for idx, name in enumerate(likely_maybe_union)))
+                [print(f"    {idx+1}) {name}") for idx, name in enumerate(likely_maybe_union)]
                 self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL = list(set(self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL) - likely_maybe_union)
                  
             self.BIO_GBF4_ECNES_SEL_ALL = self.BIO_GBF4_ECNES_LIKELY_SEL + self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL

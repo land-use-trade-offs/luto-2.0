@@ -547,7 +547,7 @@ in order to enhance biodiversity and ecosystem functions and services, ecologica
 '''
 
 
-GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 20
+GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 40
 '''
 Based on Zonation alogrithm, the biodiversity feature coverage (an indicator of overall biodiversity benifits) is 
 more attached to high rank cells (rank is an indicator of importance/priority in biodiversity conservation). 
@@ -559,7 +559,33 @@ the area and biodiversity benefits between 0-100, and use the `GBF2_PRIORITY_DEG
 to identify the priority degraded areas that should be conserved to achieve the biodiversity target.
 
 If set to 0, no cells will be considered as priority degraded areas, equal to not setting any GBF2 target.
-If set to 100, all cells will be considered as priority degraded areas, equal to setting the GBF2 to the LUTO study area.
+If set to 100, all cells will be considered as priority degraded areas, equal to setting GBF2 target covering the whole LUTO study area.
+'''
+
+
+# Biodiversity quality options
+BIO_QUALITY_LAYER = 'MNES_likely_may' # 'Suitability', 'ECNES_likely_may', 'ECNES_likely', 'SNES_likely_may', 'SNES_likely', 'MNES_likely_may', 'MNES_likely'              
+'''
+One of 'Suitability', 'ECNES_likely_may', 'ECNES_likely', 'SNES_likely_may', 'SNES_likely', 'MNES_likely_may', 'MNES_likely'.
+    - 'Suitability': use the Zonation algorith to compute quanlity score over 10k species.
+    - '*NES_likely|may': use the Zonation algorith to compute quanlity score over the SNES/ECNES species community.
+
+Essentially, the biodiversity quality layer determines how important (0-100) a cell is to the overall biodiversity value. 
+    - By choosing 'Suitability' layer, you assume that the overal biodiversity is determined by considering all species (plants, 
+      mamals, amphibians, birds, reptiles, etc). 
+    - If choosing one of the 'SNES_likely|may' layers, you assume that the overal biodiversity is determined by species species 
+      related to the Environment Protection and Biodiversity Conservation Act 1999 (EPBC Act). 
+    - If choosing one of the 'ECNES_likely|may' layers, you assume that the overal biodiversity is determined by ecological
+      communities related to the Environment Protection and Biodiversity Conservation Act 1999 (EPBC Act).
+
+The MNES is a merge (simple concatenating) of the SNES and ECNES species communities. 
+
+To understand the 'Suitability' layer, refer to 
+    https://academic.oup.com/gigascience/article/doi/10.1093/gigascience/giae002/7619364
+To understand the 'SNES_likely|may' and 'ECNES_likely|may' layers, refer to 
+    https://www.dcceew.gov.au/environment/environmental-information-data/databases-applications/snes
+    https://www.dcceew.gov.au/environment/environmental-information-data/databases-applications/ecnes
+
 '''
 
 
@@ -622,6 +648,10 @@ GBF3_TARGET_CLASS  = 'MVS'                  # 'MVG', 'MVS', 'MVG_IBRA', 'MVS_IBR
 '''
 The National Vegetation Information System (NVIS) provides the 100m resolution information on
 the distribution of vegetation (~30 primary group layers, or ~90 subgroup layers) across Australia.
+
+We resampled the 100m NVIS layers to 1km resolution by calculating the percentage of each vegetation type in 
+each 1km cell. Therefore, the original 100m sigle layer is converted to a n-bands (n=number of vegetation types)
+raster layer, with each band representing the percentage of that vegetation type in each 1km cell.
 
 - If 'MVG/MVS' is selected, use need to define conservation target for each NVIS group across the whole study area.
 - If 'MVS_IBRA/MVG_IBRA' is selected, use need to define conservation target for each NVIS group for selected the IBRA region.
