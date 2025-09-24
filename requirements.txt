@@ -10,8 +10,6 @@ pytables==3.9.2
 hypothesis==6.102.4
 lxml==5.2.2
 folium==0.16.0
-contextily==1.6.0
-imageio==2.34.1
 geopandas==0.14.4
 ipython==8.24.0
 rioxarray==0.15.5

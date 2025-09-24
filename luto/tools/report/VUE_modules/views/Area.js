@@ -1,11 +1,15 @@
 window.AreaView = {
   setup() {
-    const { ref, onMounted, inject, computed, watch, nextTick } = Vue;
+    const { ref, onMounted, onUnmounted, inject, computed, watch, nextTick } = Vue;
 
     // Data|Map service
-    const chartRegister = window.DataService.chartCategories["Area"];   // DataService has been registered in index.html      [DataService.js]
+    const chartRegister = window.ChartService.chartCategories["Area"];   // ChartService has been registered in index.html      [ChartService.js]
     const mapRegister = window.MapService.mapCategories["Area"];        // MapService was registered in the index.html        [MapService.js]
-    const loadScript = window.loadScript;                               // DataConstructor has been registered in index.html  [helpers.js]
+    const loadScript = window.loadScriptWithTracking;                   // Enhanced loadScript with memory tracking         [helpers.js]
+    const mosaicMap = window.MapService.mapCategories["Dvar"]["Mosaic"];
+
+    // View identification for memory management
+    const VIEW_NAME = "Area";
 
     // Global selection state
     const yearIndex = ref(0);
@@ -45,33 +49,36 @@ window.AreaView = {
     // UI state
     const dataLoaded = ref(false);
     const isDrawerOpen = ref(false);
-    const mapReady = computed(() => {
-      if (!selectCategory.value || !selectWater.value || !selectLanduse.value) {
-        return false;
-      }
-      if (selectCategory.value === "Ag Mgt" && !selectAgMgt.value) {
-        return false;
-      }
-      const dataName = mapRegister[selectCategory.value]?.["name"];
-      return dataName && window[dataName];
-    });
-    const chartReady = computed(() => {
-      if (!selectCategory.value || !selectRegion.value || !selectWater.value || !selectLanduse.value) {
-        return false;
-      }
-      if (selectCategory.value === "Ag Mgt" && !selectAgMgt.value) {
-        return false;
-      }
-      const dataName = chartRegister[selectCategory.value]?.["name"];
-      return dataName && window[dataName] && window[dataName][selectRegion.value];
-    });
 
 
     //  Reactive data
-    const mapData = computed(() => window[mapRegister[selectCategory.value]["name"]])
-    const chartData = computed(() => window[chartRegister[selectCategory.value]["name"]][selectRegion.value])
+    const mapData = computed(() => {
+      if (!dataLoaded.value) {
+        return {};
+      }
+      let mapDataWithALL = JSON.parse(JSON.stringify(window[mapRegister[selectCategory.value]["name"]]));
+      let mapDataWithMosaic = JSON.parse(JSON.stringify(window[mosaicMap['name']]));
+      if (selectCategory.value === "Ag") {
+        mapDataWithALL[selectWater.value] = {
+          "ALL": mapDataWithMosaic['Agricultural Land-use'],
+          ...mapDataWithALL[selectWater.value]
+        }
+      } else if (selectCategory.value === "Ag Mgt") {
+        mapDataWithALL[selectAgMgt.value][selectWater.value] = {
+          "ALL": mapDataWithMosaic['Agricultural Management'],
+          ...mapDataWithALL[selectAgMgt.value][selectWater.value]
+        }
+      } else if (selectCategory.value === "Non-Ag") {
+        mapDataWithALL = {
+          "ALL": mapDataWithMosaic['Non-Agricultural Land-use'],
+          ...mapDataWithALL
+        }
+      }
+      return mapDataWithALL;
+    });
+
     const selectMapData = computed(() => {
-      if (!mapReady.value) {
+      if (!dataLoaded.value) {
         return {};
       }
       if (selectCategory.value === "Ag") {
@@ -84,10 +91,14 @@ window.AreaView = {
         return mapData.value[selectLanduse.value][selectYear.value];
       }
     });
+
+    const chartData = computed(() => window[chartRegister[selectCategory.value]["name"]][selectRegion.value])
+
     const selectChartData = computed(() => {
-      if (!chartReady.value) {
+      if (!dataLoaded.value) {
         return {};
       }
+      let seriesData;
       if (selectCategory.value === "Ag") {
         seriesData = chartData.value[selectWater.value];
       }
@@ -96,7 +107,7 @@ window.AreaView = {
       } else if (selectCategory.value === "Non-Ag") {
         seriesData = chartData.value
       }
-
+      seriesData = seriesData.filter(serie => (selectLanduse.value === "ALL" || serie.name === selectLanduse.value));
       return {
         ...window["Chart_default_options"],
         chart: {
@@ -114,24 +125,23 @@ window.AreaView = {
 
 
     onMounted(async () => {
-      await loadScript("./data/Supporting_info.js", "Supporting_info");
-      await loadScript("./data/chart_option/Chart_default_options.js", "Chart_default_options");
+      await loadScript("./data/Supporting_info.js", "Supporting_info", VIEW_NAME);
+      await loadScript("./data/chart_option/Chart_default_options.js", "Chart_default_options", VIEW_NAME);
+      await loadScript(mosaicMap['path'], mosaicMap['name'], VIEW_NAME);
 
       // Load data
-      await loadScript(mapRegister["Ag"]["path"], mapRegister["Ag"]["name"]);
-      await loadScript(mapRegister["Ag Mgt"]["path"], mapRegister["Ag Mgt"]["name"]);
-      await loadScript(mapRegister["Non-Ag"]["path"], mapRegister["Non-Ag"]["name"]);
-      await loadScript(chartRegister["Ag"]["path"], chartRegister["Ag"]["name"]);
-      await loadScript(chartRegister["Ag Mgt"]["path"], chartRegister["Ag Mgt"]["name"]);
-      await loadScript(chartRegister["Non-Ag"]["path"], chartRegister["Non-Ag"]["name"]);
+      await loadScript(mapRegister["Ag"]["path"], mapRegister["Ag"]["name"], VIEW_NAME);
+      await loadScript(mapRegister["Ag Mgt"]["path"], mapRegister["Ag Mgt"]["name"], VIEW_NAME);
+      await loadScript(mapRegister["Non-Ag"]["path"], mapRegister["Non-Ag"]["name"], VIEW_NAME);
+      await loadScript(chartRegister["Ag"]["path"], chartRegister["Ag"]["name"], VIEW_NAME);
+      await loadScript(chartRegister["Ag Mgt"]["path"], chartRegister["Ag Mgt"]["name"], VIEW_NAME);
+      await loadScript(chartRegister["Non-Ag"]["path"], chartRegister["Non-Ag"]["name"], VIEW_NAME);
 
       // Initial selections
       availableYears.value = window.Supporting_info.years;
       selectCategory.value = availableCategories[0];
 
-      await nextTick(() => {
-        dataLoaded.value = true;
-      });
+      await nextTick(() => { dataLoaded.value = true; });
 
     });
 
@@ -160,30 +170,31 @@ window.AreaView = {
 
       // Handle ALL downstream variables with cascading pattern
       if (newCategory === "Ag Mgt") {
-        availableAgMgt.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]] || {});
+        availableAgMgt.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]]);
         const prevAgMgt = previousSelections.value["Ag Mgt"].agMgt;
         selectAgMgt.value = (prevAgMgt && availableAgMgt.value.includes(prevAgMgt)) ? prevAgMgt : (availableAgMgt.value[0] || '');
-        
-        availableWater.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value] || {});
+
+        availableWater.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value]);
         const prevWater = previousSelections.value["Ag Mgt"].water;
         selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
-        
-        availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value][selectWater.value] || {});
+
+        availableLanduse.value = ["ALL", ...Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value][selectWater.value])];
         const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
         selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
       } else if (newCategory === "Ag") {
-        availableWater.value = Object.keys(window[mapRegister["Ag"]["name"]] || {});
+        availableWater.value = Object.keys(window[mapRegister["Ag"]["name"]]);
         const prevWater = previousSelections.value["Ag"].water;
         selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
-        
-        availableLanduse.value = Object.keys(window[mapRegister["Ag"]["name"]][selectWater.value] || {});
+
+        availableLanduse.value = ["ALL", ...Object.keys(window[mapRegister["Ag"]["name"]][selectWater.value])];
         const prevLanduse = previousSelections.value["Ag"].landuse;
         selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
       } else if (newCategory === "Non-Ag") {
-        availableLanduse.value = Object.keys(window[mapRegister["Non-Ag"]["name"]] || {});
+        availableLanduse.value = ["ALL", ...Object.keys(window[mapRegister["Non-Ag"]["name"]])];
         const prevLanduse = previousSelections.value["Non-Ag"].landuse;
         selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
       }
+
     });
 
 
@@ -197,11 +208,11 @@ window.AreaView = {
 
       // Handle ALL downstream variables
       if (selectCategory.value === "Ag") {
-        availableLanduse.value = Object.keys(window[mapRegister["Ag"]["name"]][newWater] || {});
+        availableLanduse.value = ["ALL", ...Object.keys(window[mapRegister["Ag"]["name"]][newWater])];
         const prevLanduse = previousSelections.value["Ag"].landuse;
         selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
       } else if (selectCategory.value === "Ag Mgt") {
-        availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value][newWater] || {});
+        availableLanduse.value = ["ALL", ...Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value][newWater])];
         const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
         selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
       }
@@ -211,13 +222,13 @@ window.AreaView = {
       // Save current agMgt selection
       if (selectCategory.value === "Ag Mgt") {
         previousSelections.value["Ag Mgt"].agMgt = newAgMgt;
-        
+
         // Handle ALL downstream variables with cascading pattern
-        availableWater.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][newAgMgt] || {});
+        availableWater.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][newAgMgt]);
         const prevWater = previousSelections.value["Ag Mgt"].water;
         selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
-        
-        availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][newAgMgt][selectWater.value] || {});
+
+        availableLanduse.value = ["ALL", ...Object.keys(window[mapRegister["Ag Mgt"]["name"]][newAgMgt][selectWater.value])];
         const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
         selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
       }
@@ -234,7 +245,10 @@ window.AreaView = {
       }
     });
 
-
+    // Memory cleanup on component unmount
+    onUnmounted(() => {
+      window.MemoryService.cleanupViewData(VIEW_NAME);
+    });
 
     return {
       yearIndex,
@@ -291,60 +305,52 @@ window.AreaView = {
       <div class="absolute top-[285px] left-[20px] w-[320px] z-[1001] flex flex-col space-y-3 bg-white/70 p-2 rounded-lg">
 
         <!-- Category buttons (always visible) -->
-        <div class="flex items-center">
-          <div class="flex space-x-1">
-            <span class="text-[0.8rem] mr-1 font-medium">Category:</span>
-            <button v-for="(val, key) in availableCategories" :key="key"
-              @click="selectCategory = val"
-              class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded"
-              :class="{'bg-sky-500 text-white': selectCategory === val}">
-              {{ val }}
-            </button>
-          </div>
+        <div class="flex space-x-1">
+          <span class="text-[0.8rem] mr-1 font-medium">Category:</span>
+          <button v-for="(val, key) in availableCategories" :key="key"
+            @click="selectCategory = val"
+            class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded"
+            :class="{'bg-sky-500 text-white': selectCategory === val}">
+            {{ val }}
+          </button>
         </div>
+
 
         <!-- Ag Mgt options (only for Ag Mgt category) -->
-        <div 
-          class="flex items-start border-t border-white/10 pt-1">
-          <div v-if="selectCategory === 'Ag Mgt' && dataLoaded && availableAgMgt.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
-            <span class="text-[0.8rem] mr-1 font-medium">Ag Mgt:</span>
-            <button v-for="(val, key) in availableAgMgt" :key="key"
-              @click="selectAgMgt = val"
-              class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
-              :class="{'bg-sky-500 text-white': selectAgMgt === val}">
-              {{ val }}
-            </button>
-          </div>
+        <div v-if="selectCategory === 'Ag Mgt' && dataLoaded && availableAgMgt.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
+          <span class="text-[0.8rem] mr-1 font-medium">Ag Mgt:</span>
+          <button v-for="(val, key) in availableAgMgt" :key="key"
+            @click="selectAgMgt = val"
+            class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
+            :class="{'bg-sky-500 text-white': selectAgMgt === val}">
+            {{ val }}
+          </button>
         </div>
+        
 
         <!-- Water options -->
-        <div 
-          class="flex items-start border-t border-white/10 pt-1">
-          <div v-if="selectCategory !== 'Non-Ag' && dataLoaded && availableWater.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
-            <span class="text-[0.8rem] mr-1 font-medium">Water:</span>
-            <button v-for="(val, key) in availableWater" :key="key"
-              @click="selectWater = val"
-              class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
-              :class="{'bg-sky-500 text-white': selectWater === val}">
-              {{ val }}
-            </button>
-          </div>
+        <div v-if="selectCategory !== 'Non-Ag' && dataLoaded && availableWater.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
+          <span class="text-[0.8rem] mr-1 font-medium">Water:</span>
+          <button v-for="(val, key) in availableWater" :key="key"
+            @click="selectWater = val"
+            class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
+            :class="{'bg-sky-500 text-white': selectWater === val}">
+            {{ val }}
+          </button>
         </div>
 
         <!-- Landuse options -->
-        <div 
-          class="flex items-start border-t border-white/10 pt-1">
-          <div v-if="dataLoaded" class="flex flex-wrap gap-1 max-w-[300px]">
-            <span class="text-[0.8rem] mr-1 font-medium">Landuse:</span>
-            <button v-for="(val, key) in availableLanduse" :key="key"
-              @click="selectLanduse = val"
-              class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
-              :class="{'bg-sky-500 text-white': selectLanduse === val}">
-              {{ val }}
-            </button>
-          </div>
+        <div v-if="dataLoaded" class="flex flex-wrap gap-1 max-w-[300px]">
+          <span class="text-[0.8rem] mr-1 font-medium">Landuse:</span>
+          <button v-for="(val, key) in availableLanduse" :key="key"
+            @click="selectLanduse = val"
+            class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
+            :class="{'bg-sky-500 text-white': selectLanduse === val}">
+            {{ val }}
+          </button>
         </div>
-      </div>
+
+        </div>
 
       
 
@@ -384,7 +390,6 @@ window.AreaView = {
           }">
           <chart-container 
             :chartData="selectChartData" 
-            :selectedLanduse="selectLanduse"
             :draggable="true"
             :zoomable="true"
             style="width: 100%; height: 200px;">

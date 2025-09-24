@@ -86,7 +86,7 @@ def get_color_legend(data:Data) -> dict:
             'color_csv': color_csvs['ag'],
             'legend': pd.read_csv(color_csvs['ag']).set_index('lu_desc')['lu_color_HEX'].to_dict()
         },
-        'Non-agricultural Land-use': {
+        'Non-Agricultural Land-use': {
             'color_csv': color_csvs['non_ag'],
             'legend': {
                 RENAME_AM_NON_AG.get(k,k):v for k,v in pd.read_csv(color_csvs['non_ag']).set_index('lu_desc')['lu_color_HEX'].to_dict().items() 
@@ -200,7 +200,7 @@ def map2base64_float(rxr_path:str, arr_lyr:xr.DataArray, attrs:tuple) -> dict|No
     
     
 
-def get_map_obj_float(data:Data, files_df:pd.DataFrame, save_path:str, workers:int=settings.WRITE_THREADS) -> dict:
+def get_map_obj_float(data:Data, files_df:pd.DataFrame, save_path:str, workers:int=max(settings.WRITE_THREADS, 16)) -> dict:
 
     # Get an template rio-xarray, it will be used to convert 1D array to its 2D map format
     template_xr = f'{data.path}/out_{sorted(settings.SIM_YEARS)[0]}/xr_map_lumap_{sorted(settings.SIM_YEARS)[0]}.nc'
@@ -264,7 +264,7 @@ def get_map_obj_float(data:Data, files_df:pd.DataFrame, save_path:str, workers:i
         f.write(';\n')
         
 
-def get_map_obj_interger(files_df:pd.DataFrame, save_path:str, colors_legend, workers:int=settings.WRITE_THREADS) -> dict:
+def get_map_obj_interger(files_df:pd.DataFrame, save_path:str, colors_legend, workers:int=max(settings.WRITE_THREADS, 16)) -> dict:
     
     map_mosaic_lumap = files_df.query('base_name == "xr_map_lumap"'
         ).assign(
@@ -286,9 +286,9 @@ def get_map_obj_interger(files_df:pd.DataFrame, save_path:str, colors_legend, wo
         )
     map_mosaic_non_ag = files_df.query('base_name == "xr_map_non_ag_argmax"'
         ).assign(
-            _type='Non-agricultural Land-use',
-            color_csv=colors_legend['Non-agricultural Land-use']['color_csv'],
-            legend_info=str(colors_legend['Non-agricultural Land-use']['legend'])
+            _type='Non-Agricultural Land-use',
+            color_csv=colors_legend['Non-Agricultural Land-use']['color_csv'],
+            legend_info=str(colors_legend['Non-Agricultural Land-use']['legend'])
         )
     map_mosaic_am = files_df.query('base_name == "xr_map_am_argmax"'
         ).assign(
@@ -316,7 +316,7 @@ def get_map_obj_interger(files_df:pd.DataFrame, save_path:str, colors_legend, wo
         )
 
     output = {}
-    for res in Parallel(n_jobs=settings.WRITE_THREADS, return_as='generator')(task):
+    for res in Parallel(n_jobs=workers, return_as='generator')(task):
         if res is None:continue
         (_type, _year, legend), val = res
         if _type not in output:
@@ -415,17 +415,7 @@ def save_report_layer(data:Data):
     ####################################################
 
     files_bio = files.query('base_name.str.contains("biodiversity")')
-
-    # GBF2
-    bio_GBF2_ag = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_ag"')
-    get_map_obj_float(data, bio_GBF2_ag, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Ag.js')
-
-    bio_GBF2_am = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_ag_management"')
-    get_map_obj_float(data, bio_GBF2_am, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Am.js')
-
-    bio_GBF2_nonag = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_non_ag"')
-    get_map_obj_float(data, bio_GBF2_nonag, f'{SAVE_DIR}/map_layers/map_bio_GBF2_NonAg.js')
-
+    
     # Overall priority
     bio_overall_ag = files_bio.query('base_name == "xr_biodiversity_overall_priority_ag"')
     get_map_obj_float(data, bio_overall_ag, f'{SAVE_DIR}/map_layers/map_bio_overall_Ag.js')
@@ -436,6 +426,72 @@ def save_report_layer(data:Data):
     bio_overall_nonag = files_bio.query('base_name == "xr_biodiversity_overall_priority_non_ag"')
     get_map_obj_float(data, bio_overall_nonag, f'{SAVE_DIR}/map_layers/map_bio_overall_NonAg.js')
 
+
+    # GBF2
+    if settings.BIODIVERSITY_TARGET_GBF_2 != 'off':
+        bio_GBF2_ag = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_ag"')
+        get_map_obj_float(data, bio_GBF2_ag, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Ag.js')
+
+        bio_GBF2_am = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_ag_management"')
+        get_map_obj_float(data, bio_GBF2_am, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Am.js')
+
+        bio_GBF2_nonag = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_non_ag"')
+        get_map_obj_float(data, bio_GBF2_nonag, f'{SAVE_DIR}/map_layers/map_bio_GBF2_NonAg.js')
+        
+    # GBF3
+    if settings.BIODIVERSITY_TARGET_GBF_3 != 'off':
+        bio_GBF3_ag = files_bio.query('base_name == "xr_biodiversity_GBF3_vegetation_ag"')
+        get_map_obj_float(data, bio_GBF3_ag, f'{SAVE_DIR}/map_layers/map_bio_GBF3_Ag.js')
+
+        bio_GBF3_am = files_bio.query('base_name == "xr_biodiversity_GBF3_vegetation_ag_management"')
+        get_map_obj_float(data, bio_GBF3_am, f'{SAVE_DIR}/map_layers/map_bio_GBF3_Am.js')
+
+        bio_GBF3_nonag = files_bio.query('base_name == "xr_biodiversity_GBF3_vegetation_non_ag"')
+        get_map_obj_float(data, bio_GBF3_nonag, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NonAg.js')
+    
+    # GBF4-SNES
+    if settings.BIODIVERSITY_TARGET_GBF_4_SNES != 'off':
+        bio_GBF4_SNES_ag = files_bio.query('base_name == "xr_biodiversity_GBF4_SNES_ag"')
+        get_map_obj_float(data, bio_GBF4_SNES_ag, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_Ag.js')
+
+        bio_GBF4_SNES_am = files_bio.query('base_name == "xr_biodiversity_GBF4_SNES_ag_management"')
+        get_map_obj_float(data, bio_GBF4_SNES_am, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_Am.js')
+
+        bio_GBF4_SNES_nonag = files_bio.query('base_name == "xr_biodiversity_GBF4_SNES_non_ag"')
+        get_map_obj_float(data, bio_GBF4_SNES_nonag, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_NonAg.js')
+        
+    # GBF4_ECNES
+    if settings.BIODIVERSITY_TARGET_GBF_4_ECNES != 'off':
+        bio_GBF4_ECNES_ag = files_bio.query('base_name == "xr_biodiversity_GBF4_ECNES_ag"')
+        get_map_obj_float(data, bio_GBF4_ECNES_ag, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_Ag.js')
+
+        bio_GBF4_ECNES_am = files_bio.query('base_name == "xr_biodiversity_GBF4_ECNES_ag_management"')
+        get_map_obj_float(data, bio_GBF4_ECNES_am, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_Am.js')
+
+        bio_GBF4_ECNES_nonag = files_bio.query('base_name == "xr_biodiversity_GBF4_ECNES_non_ag"')
+        get_map_obj_float(data, bio_GBF4_ECNES_nonag, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_NonAg.js')
+        
+    # GBF8
+    if settings.BIODIVERSITY_TARGET_GBF_8 != 'off':
+        bio_GBF8_ag = files_bio.query('base_name == "xr_biodiversity_GBF8_species_ag"')
+        get_map_obj_float(data, bio_GBF8_ag, f'{SAVE_DIR}/map_layers/map_bio_GBF8_Ag.js')
+
+        bio_GBF8_am = files_bio.query('base_name == "xr_biodiversity_GBF8_species_ag_management"')
+        get_map_obj_float(data, bio_GBF8_am, f'{SAVE_DIR}/map_layers/map_bio_GBF8_Am.js')
+
+        bio_GBF8_nonag = files_bio.query('base_name == "xr_biodiversity_GBF8_species_non_ag"')
+        get_map_obj_float(data, bio_GBF8_nonag, f'{SAVE_DIR}/map_layers/map_bio_GBF8_NonAg.js')
+        
+        bio_GBF8_ag_group = files_bio.query('base_name == "xr_biodiversity_GBF8_groups_ag"')
+        get_map_obj_float(data, bio_GBF8_ag_group, f'{SAVE_DIR}/map_layers/map_bio_GBF8_groups_Ag.js')
+        
+        bio_GBF8_am_group = files_bio.query('base_name == "xr_biodiversity_GBF8_groups_ag_management"')
+        get_map_obj_float(data, bio_GBF8_am_group, f'{SAVE_DIR}/map_layers/map_bio_GBF8_groups_Am.js')
+        
+        bio_GBF8_nonag_group = files_bio.query('base_name == "xr_biodiversity_GBF8_groups_non_ag"')
+        get_map_obj_float(data, bio_GBF8_nonag_group, f'{SAVE_DIR}/map_layers/map_bio_GBF8_groups_NonAg.js')
+
+    
 
 
     ####################################################

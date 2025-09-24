@@ -1,11 +1,15 @@
 window.BiodiversityView = {
   setup() {
-    const { ref, onMounted, inject, computed, watch, nextTick } = Vue;
+    const { ref, onMounted, onUnmounted, inject, computed, watch, nextTick } = Vue;
 
-    // Data|Map service - Only use GBF2 data as requested
-    const chartRegister = window.DataService.chartCategories["Biodiversity"]["GBF2"];
-    const mapRegister = window.MapService.mapCategories["Biodiversity"]["GBF2"];
-    const loadScript = window.loadScript;
+    // Data|Map service
+    const chartRegister = window.ChartService.chartCategories["Biodiversity"]["quality"];
+    const mapRegister = window.MapService.mapCategories["Biodiversity"]["quality"];
+    const loadScript = window.loadScriptWithTracking;
+    const mosaicMap = window.MapService.mapCategories["Dvar"]["Mosaic"];
+
+    // View identification for memory management
+    const VIEW_NAME = "Biodiversity";
 
     // Global selection state
     const yearIndex = ref(0);
@@ -44,59 +48,49 @@ window.BiodiversityView = {
     // UI state
     const dataLoaded = ref(false);
     const isDrawerOpen = ref(false);
-    const mapReady = computed(() => {
-      if (!selectCategory.value || !selectLanduse.value) {
-        return false;
-      }
-      if (selectCategory.value === "Non-Ag") {
-        const dataName = mapRegister[selectCategory.value]?.["name"];
-        return dataName && window[dataName];
-      }
-      if (!selectWater.value) {
-        return false;
-      }
-      if (selectCategory.value === "Ag Mgt" && !selectAgMgt.value) {
-        return false;
-      }
-      const dataName = mapRegister[selectCategory.value]?.["name"];
-      return dataName && window[dataName];
-    });
-    const chartReady = computed(() => {
-      if (!selectCategory.value || !selectRegion.value) {
-        return false;
-      }
-      // Biodiversity chart data uses simplified Region → [series] structure
-      let dataName;
-      if (selectCategory.value === "Ag Mgt") {
-        dataName = chartRegister["Ag Mgt"]["Landuse"]["name"];
-      } else {
-        dataName = chartRegister[selectCategory.value]?.["name"];
-      }
-      return dataName && window[dataName] && window[dataName][selectRegion.value];
-    });
 
     // Reactive data
-    const mapData = computed(() => window[mapRegister[selectCategory.value]["name"]]);
+    const mapData = computed(() => {
+      if (!dataLoaded.value) {
+        return {};
+      }
+      let mapDataWithALL = JSON.parse(JSON.stringify(window[mapRegister[selectCategory.value]["name"]]));
+      let mapDataWithMosaic = JSON.parse(JSON.stringify(window[mosaicMap['name']]));
+      if (selectCategory.value === "Ag") {
+        mapDataWithALL[selectWater.value] = {
+          "ALL": mapDataWithMosaic['Agricultural Land-use'],
+          ...mapDataWithALL[selectWater.value]
+        }
+      } else if (selectCategory.value === "Ag Mgt") {
+        mapDataWithALL[selectAgMgt.value][selectWater.value] = {
+          "ALL": mapDataWithMosaic['Agricultural Management'],
+          ...mapDataWithALL[selectAgMgt.value][selectWater.value]
+        }
+      } else if (selectCategory.value === "Non-Ag") {
+        mapDataWithALL = {
+          "ALL": mapDataWithMosaic['Non-Agricultural Land-use'],
+          ...mapDataWithALL
+        }
+      }
+      return mapDataWithALL;
+    });
     const chartData = computed(() => {
       if (selectCategory.value === "Ag Mgt") {
-        // For Ag Mgt, use the "Landuse" dataset so chart series names match landuse selections for highlighting
-        const datasetName = chartRegister["Ag Mgt"]["Landuse"]["name"];
+        const datasetName = chartRegister["Ag Mgt"]["name"];
         return window[datasetName][selectRegion.value];
       } else {
-        // For Ag and Non-Ag, use the direct dataset
         const datasetName = chartRegister[selectCategory.value]["name"];
         return window[datasetName][selectRegion.value];
       }
     });
     const selectMapData = computed(() => {
-      if (!mapReady.value) {
+      if (!dataLoaded.value) {
         return {};
       }
       if (selectCategory.value === "Ag") {
         return mapData.value[selectWater.value][selectLanduse.value][selectYear.value];
       }
       else if (selectCategory.value === "Ag Mgt") {
-        // Data hierarchy: AgMgt → Water → Landuse → Year
         return mapData.value?.[selectAgMgt.value][selectWater.value][selectLanduse.value][selectYear.value];
       }
       else if (selectCategory.value === "Non-Ag") {
@@ -104,12 +98,10 @@ window.BiodiversityView = {
       }
     });
     const selectChartData = computed(() => {
-      if (!chartReady.value) {
+      if (!dataLoaded.value) {
         return {};
       }
-      // According to CLAUDE.md, biodiversity chart data follows simplified Region → [series] structure
       let seriesData = chartData.value || [];
-
       return {
         ...window["Chart_default_options"],
         chart: {
@@ -125,18 +117,23 @@ window.BiodiversityView = {
       };
     });
 
-    onMounted(async () => {
-      await loadScript("./data/Supporting_info.js", "Supporting_info");
-      await loadScript("./data/chart_option/Chart_default_options.js", "Chart_default_options");
+    // Memory cleanup on component unmount
+    onUnmounted(() => {
+      window.MemoryService.cleanupViewData(VIEW_NAME);
+    });
 
-      // Load GBF2 data only (as requested - ignore quality data)
-      await loadScript(mapRegister["Ag"]["path"], mapRegister["Ag"]["name"]);
-      await loadScript(mapRegister["Ag Mgt"]["path"], mapRegister["Ag Mgt"]["name"]);
-      await loadScript(mapRegister["Non-Ag"]["path"], mapRegister["Non-Ag"]["name"]);
-      await loadScript(chartRegister["Ag"]["path"], chartRegister["Ag"]["name"]);
-      // Load Ag Mgt Landuse chart dataset (for series highlighting with landuse selection)
-      await loadScript(chartRegister["Ag Mgt"]["Landuse"]["path"], chartRegister["Ag Mgt"]["Landuse"]["name"]);
-      await loadScript(chartRegister["Non-Ag"]["path"], chartRegister["Non-Ag"]["name"]);
+    onMounted(async () => {
+      await loadScript("./data/Supporting_info.js", "Supporting_info", VIEW_NAME);
+      await loadScript("./data/chart_option/Chart_default_options.js", "Chart_default_options", VIEW_NAME);
+      await loadScript(mosaicMap['path'], mosaicMap['name'], VIEW_NAME);
+
+      await loadScript(mapRegister["Ag"]["path"], mapRegister["Ag"]["name"], VIEW_NAME);
+      await loadScript(mapRegister["Ag Mgt"]["path"], mapRegister["Ag Mgt"]["name"], VIEW_NAME);
+      await loadScript(mapRegister["Non-Ag"]["path"], mapRegister["Non-Ag"]["name"], VIEW_NAME);
+
+      await loadScript(chartRegister["Ag"]["path"], chartRegister["Ag"]["name"], VIEW_NAME);
+      await loadScript(chartRegister["Ag Mgt"]["path"], chartRegister["Ag Mgt"]["name"], VIEW_NAME);
+      await loadScript(chartRegister["Non-Ag"]["path"], chartRegister["Non-Ag"]["name"], VIEW_NAME);
 
       // Initial selections
       availableYears.value = window.Supporting_info.years;
@@ -171,55 +168,29 @@ window.BiodiversityView = {
 
       // Handle ALL downstream variables with cascading pattern
       if (newCategory === "Ag Mgt") {
-        // Data hierarchy: AgMgt → Water → Landuse → Year
         availableAgMgt.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]] || {});
         const prevAgMgt = previousSelections.value["Ag Mgt"].agMgt;
         selectAgMgt.value = (prevAgMgt && availableAgMgt.value.includes(prevAgMgt)) ? prevAgMgt : (availableAgMgt.value[0] || '');
-        
+
         availableWater.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value] || {});
         const prevWater = previousSelections.value["Ag Mgt"].water;
         selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
-        
-        availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value][selectWater.value] || {});
+
+        availableLanduse.value = ["ALL", ...Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value][selectWater.value] || {})];
         const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
-        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
+        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
       } else if (newCategory === "Ag") {
-        // Clear AgMgt selections when switching away from Ag Mgt
-        availableAgMgt.value = [];
-        selectAgMgt.value = '';
         availableWater.value = Object.keys(window[mapRegister["Ag"]["name"]] || {});
         const prevWater = previousSelections.value["Ag"].water;
         selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
-        
-        availableLanduse.value = Object.keys(window[mapRegister["Ag"]["name"]][selectWater.value] || {});
+
+        availableLanduse.value = ["ALL", ...Object.keys(window[mapRegister["Ag"]["name"]][selectWater.value] || {})];
         const prevLanduse = previousSelections.value["Ag"].landuse;
         selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
       } else if (newCategory === "Non-Ag") {
-        // Clear both AgMgt and Water selections for Non-Ag
-        availableAgMgt.value = [];
-        selectAgMgt.value = '';
-        availableWater.value = [];
-        selectWater.value = '';
-        availableLanduse.value = Object.keys(window[mapRegister["Non-Ag"]["name"]] || {});
+        availableLanduse.value = ["ALL", ...Object.keys(window[mapRegister["Non-Ag"]["name"]] || {})];
         const prevLanduse = previousSelections.value["Non-Ag"].landuse;
         selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
-      }
-    });
-
-    watch(selectAgMgt, (newAgMgt) => {
-      // Save current agMgt selection
-      if (selectCategory.value === "Ag Mgt") {
-        previousSelections.value["Ag Mgt"].agMgt = newAgMgt;
-        
-        // Handle ALL downstream variables with cascading pattern
-        // Data hierarchy: AgMgt → Water → Landuse → Year
-        availableWater.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][newAgMgt] || {});
-        const prevWater = previousSelections.value["Ag Mgt"].water;
-        selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
-        
-        availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][newAgMgt][selectWater.value] || {});
-        const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
-        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
       }
     });
 
@@ -231,16 +202,30 @@ window.BiodiversityView = {
         previousSelections.value["Ag Mgt"].water = newWater;
       }
 
-      // Handle downstream variables for Ag Mgt
-      // Data hierarchy: AgMgt → Water → Landuse → Year
-      if (selectCategory.value === "Ag Mgt") {
-        availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value][newWater] || {});
-        const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
-        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
-      } else if (selectCategory.value === "Ag") {
-        // Handle Ag category: Water → Landuse → Year
-        availableLanduse.value = Object.keys(window[mapRegister["Ag"]["name"]][newWater] || {});
+      // Handle ALL downstream variables
+      if (selectCategory.value === "Ag") {
+        availableLanduse.value = ["ALL", ...Object.keys(window[mapRegister["Ag"]["name"]][newWater] || {})];
         const prevLanduse = previousSelections.value["Ag"].landuse;
+        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
+      } else if (selectCategory.value === "Ag Mgt") {
+        availableLanduse.value = ["ALL", ...Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value][newWater] || {})];
+        const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
+        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
+      }
+    });
+
+    watch(selectAgMgt, (newAgMgt) => {
+      // Save current agMgt selection
+      if (selectCategory.value === "Ag Mgt") {
+        previousSelections.value["Ag Mgt"].agMgt = newAgMgt;
+
+        // Handle ALL downstream variables with cascading pattern
+        availableWater.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][newAgMgt] || {});
+        const prevWater = previousSelections.value["Ag Mgt"].water;
+        selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
+
+        availableLanduse.value = ["ALL", ...Object.keys(window[mapRegister["Ag Mgt"]["name"]][newAgMgt][selectWater.value] || {})];
+        const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
         selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
       }
     });
@@ -310,58 +295,47 @@ window.BiodiversityView = {
       <div class="absolute top-[285px] left-[20px] w-[320px] z-[1001] flex flex-col space-y-3 bg-white/70 p-2 rounded-lg">
 
         <!-- Category buttons (always visible) -->
-        <div class="flex items-center">
-          <div class="flex space-x-1">
-            <span class="text-[0.8rem] mr-1 font-medium">Category:</span>
-            <button v-for="(val, key) in availableCategories" :key="key"
-              @click="selectCategory = val"
-              class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded"
-              :class="{'bg-sky-500 text-white': selectCategory === val}">
-              {{ val }}
-            </button>
-          </div>
+        <div class="flex space-x-1">
+          <span class="text-[0.8rem] mr-1 font-medium">Category:</span>
+          <button v-for="(val, key) in availableCategories" :key="key"
+            @click="selectCategory = val"
+            class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded"
+            :class="{'bg-sky-500 text-white': selectCategory === val}">
+            {{ val }}
+          </button>
         </div>
 
         <!-- Ag Mgt options (only for Ag Mgt category) -->
-        <div v-if="selectCategory === 'Ag Mgt'" 
-          class="flex items-start border-t border-white/10 pt-1">
-          <div v-if="dataLoaded && availableAgMgt.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
-            <span class="text-[0.8rem] mr-1 font-medium">Ag Mgt:</span>
-            <button v-for="(val, key) in availableAgMgt" :key="key"
-              @click="selectAgMgt = val"
-              class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
-              :class="{'bg-sky-500 text-white': selectAgMgt === val}">
-              {{ val }}
-            </button>
-          </div>
+        <div v-if="selectCategory === 'Ag Mgt' && dataLoaded && availableAgMgt.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
+          <span class="text-[0.8rem] mr-1 font-medium">Ag Mgt:</span>
+          <button v-for="(val, key) in availableAgMgt" :key="key"
+            @click="selectAgMgt = val"
+            class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
+            :class="{'bg-sky-500 text-white': selectAgMgt === val}">
+            {{ val }}
+          </button>
         </div>
 
         <!-- Water options (only for Ag and Ag Mgt) - comes before Landuse for Ag Mgt hierarchy: AgMgt → Water → Landuse -->
-        <div v-if="selectCategory === 'Ag' || selectCategory === 'Ag Mgt'" 
-          class="flex items-start border-t border-white/10 pt-1">
-          <div v-if="dataLoaded && availableWater.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
-            <span class="text-[0.8rem] mr-1 font-medium">Water:</span>
-            <button v-for="(val, key) in availableWater" :key="key"
-              @click="selectWater = val"
-              class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
-              :class="{'bg-sky-500 text-white': selectWater === val}">
-              {{ val }}
-            </button>
-          </div>
+        <div v-if="(selectCategory === 'Ag' || selectCategory === 'Ag Mgt') && dataLoaded && availableWater.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
+          <span class="text-[0.8rem] mr-1 font-medium">Water:</span>
+          <button v-for="(val, key) in availableWater" :key="key"
+            @click="selectWater = val"
+            class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
+            :class="{'bg-sky-500 text-white': selectWater === val}">
+            {{ val }}
+          </button>
         </div>
 
         <!-- Landuse options -->
-        <div 
-          class="flex items-start border-t border-white/10 pt-1">
-          <div v-if="dataLoaded" class="flex flex-wrap gap-1 max-w-[300px]">
-            <span class="text-[0.8rem] mr-1 font-medium">Landuse:</span>
-            <button v-for="(val, key) in availableLanduse" :key="key"
-              @click="selectLanduse = val"
-              class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
-              :class="{'bg-sky-500 text-white': selectLanduse === val}">
-              {{ val }}
-            </button>
-          </div>
+        <div v-if="dataLoaded" class="flex flex-wrap gap-1 max-w-[300px]">
+          <span class="text-[0.8rem] mr-1 font-medium">Landuse:</span>
+          <button v-for="(val, key) in availableLanduse" :key="key"
+            @click="selectLanduse = val"
+            class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
+            :class="{'bg-sky-500 text-white': selectLanduse === val}">
+            {{ val }}
+          </button>
         </div>
       </div>
 
@@ -399,7 +373,6 @@ window.BiodiversityView = {
           }">
           <chart-container 
             :chartData="selectChartData" 
-            :selectedLanduse="selectLanduse"
             :draggable="true"
             :zoomable="true"
             style="width: 100%; height: 200px;">

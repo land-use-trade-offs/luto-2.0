@@ -71,6 +71,10 @@ FEED_EFFICIENCY = 'BAU'             # 'BAU' or 'High'
 # Add CO2 fertilisation effects on agricultural production from GAEZ v4
 CO2_FERT = 'off'   # or 'off'
 
+# Number of years over which to spread (average) soil carbon accumulation (from Mosnier et al. 2022 and Johnson et al. 2021)
+CARBON_EFFECTS_WINDOW = 91
+
+
 # Fire impacts on carbon sequestration
 RISK_OF_REVERSAL = 0.05  # Risk of reversal buffer under ERF (reasonable values range from 0.05 [100 years] to 0.25 [25 years]) https://www.cleanenergyregulator.gov.au/ERF/Choosing-a-project-type/Opportunities-for-the-land-sector/Risk-of-reversal-buffer
 FIRE_RISK = 'med'   # Options are 'low', 'med', 'high'. Determines whether to take the 5th, 50th, or 95th percentile of modelled fire impacts.
@@ -192,10 +196,14 @@ Land-use and vector file pairs to exclude land-use from being utilised in that a
  - The value is the path to the ESRI shapefile.
 '''
 
-REGIONAL_ADOPTION_CONSTRAINTS = 'NON_AG_UNIFORM'    # 'off', 'on', 'NON_AG_UNIFORM'
-REGIONAL_ADOPTION_NON_AG_UNIFORM = 15                # None or numbers between 0-100 (both inclusive); Only work under 'NON_AG_UNIFORM'!
-                                                    #   E.g., 5 means each non-ag land can not exceed 5% adoption in every region
-REGIONAL_ADOPTION_ZONE = 'NRM_CODE'                 # 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
+REGIONAL_ADOPTION_CONSTRAINTS = 'off'            # 'off', 
+                                                 # 'on', user needs to set the percentage targets in 'input/regional_adoption_zones.xlsx'
+                                                 # 'NON_AG_UNIFORM', each of the non-ag land uses can not exceed a certain percentage (REGIONAL_ADOPTION_NON_AG_UNIFORM) in every region
+
+REGIONAL_ADOPTION_NON_AG_UNIFORM = 15            # None or numbers between 0-100 (both inclusive); Only work under 'REGIONAL_ADOPTION_CONSTRAINTS = NON_AG_UNIFORM'
+                                                 #   E.g., 5 means each non-ag land can not exceed 5% adoption in every region
+                                        
+REGIONAL_ADOPTION_ZONE = 'NRM_CODE'              # 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
 '''
 The regional adoption zone is the spatial unit used to enforce regional adoption constraints.
 The options are:
@@ -383,11 +391,10 @@ AGRICULTURAL_MANAGEMENT_USE_THRESHOLD = 0.1
 HIR_PRODUCTIVITY_CONTRIBUTION = 0.5
 
 # Maintainace cost for HIR
-BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 0
-SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 0
+BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
+SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
 
-# HIR effecting years
-HIR_EFFECT_YEARS = 91
+
 
 
 
@@ -424,8 +431,6 @@ GHG_EMISSIONS_LIMITS = 'high'        # 'off', 'low', 'medium', or 'high'
 '''
   	  	  
 
-
-
 # Carbon price scenario: either 'AS_GHG', 'Default', '100', or 'CONSTANT', or NONE.
 # Setting to None falls back to the 'Default' scenario.
 CARBON_PRICES_FIELD = 'CONSTANT'
@@ -450,9 +455,6 @@ indirect emissions such as fertiliser, irrigation, land management, etc.
 CROP_GHG_SCOPE_1 = ['CO2E_KG_HA_SOIL']
 LVSTK_GHG_SCOPE_1 = ['CO2E_KG_HEAD_DUNG_URINE', 'CO2E_KG_HEAD_ENTERIC', 'CO2E_KG_HEAD_IND_LEACH_RUNOFF', 'CO2E_KG_HEAD_MANURE_MGT']
 
-
-# Number of years over which to spread (average) soil carbon accumulation (from Mosnier et al. 2022 and Johnson et al. 2021)
-SOC_AMORTISATION = 91   # (2025/05/05) Change from 15 -> 91; This makes sure BIO_CHAR has the same GHG effect span as HIR
 
 GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (linear programming approach)
 # GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)
@@ -550,7 +552,7 @@ in order to enhance biodiversity and ecosystem functions and services, ecologica
 '''
 
 
-GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 20
+GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 40
 '''
 Based on Zonation alogrithm, the biodiversity feature coverage (an indicator of overall biodiversity benifits) is 
 more attached to high rank cells (rank is an indicator of importance/priority in biodiversity conservation). 
@@ -562,7 +564,33 @@ the area and biodiversity benefits between 0-100, and use the `GBF2_PRIORITY_DEG
 to identify the priority degraded areas that should be conserved to achieve the biodiversity target.
 
 If set to 0, no cells will be considered as priority degraded areas, equal to not setting any GBF2 target.
-If set to 100, all cells will be considered as priority degraded areas, equal to setting the GBF2 to the LUTO study area.
+If set to 100, all cells will be considered as priority degraded areas, equal to setting GBF2 target covering the whole LUTO study area.
+'''
+
+
+# Biodiversity quality options
+BIO_QUALITY_LAYER = 'MNES_likely_may' # 'Suitability', 'ECNES_likely_may', 'ECNES_likely', 'SNES_likely_may', 'SNES_likely', 'MNES_likely_may', 'MNES_likely'              
+'''
+One of 'Suitability', 'ECNES_likely_may', 'ECNES_likely', 'SNES_likely_may', 'SNES_likely', 'MNES_likely_may', 'MNES_likely'.
+    - 'Suitability': use the Zonation algorith to compute quanlity score over 10k species.
+    - '*NES_likely|may': use the Zonation algorith to compute quanlity score over the SNES/ECNES species community.
+
+Essentially, the biodiversity quality layer determines how important (0-100) a cell is to the overall biodiversity value. 
+    - By choosing 'Suitability' layer, you assume that the overal biodiversity is determined by considering all species (plants, 
+      mamals, amphibians, birds, reptiles, etc). 
+    - If choosing one of the 'SNES_likely|may' layers, you assume that the overal biodiversity is determined by species species 
+      related to the Environment Protection and Biodiversity Conservation Act 1999 (EPBC Act). 
+    - If choosing one of the 'ECNES_likely|may' layers, you assume that the overal biodiversity is determined by ecological
+      communities related to the Environment Protection and Biodiversity Conservation Act 1999 (EPBC Act).
+
+The MNES is a merge (simple concatenating) of the SNES and ECNES species communities. 
+
+To understand the 'Suitability' layer, refer to 
+    https://academic.oup.com/gigascience/article/doi/10.1093/gigascience/giae002/7619364
+To understand the 'SNES_likely|may' and 'ECNES_likely|may' layers, refer to 
+    https://www.dcceew.gov.au/environment/environmental-information-data/databases-applications/snes
+    https://www.dcceew.gov.au/environment/environmental-information-data/databases-applications/ecnes
+
 '''
 
 
@@ -626,6 +654,10 @@ GBF3_TARGET_CLASS  = 'MVS'                  # 'MVG', 'MVS', 'MVG_IBRA', 'MVS_IBR
 The National Vegetation Information System (NVIS) provides the 100m resolution information on
 the distribution of vegetation (~30 primary group layers, or ~90 subgroup layers) across Australia.
 
+We resampled the 100m NVIS layers to 1km resolution by calculating the percentage of each vegetation type in 
+each 1km cell. Therefore, the original 100m sigle layer is converted to a n-bands (n=number of vegetation types)
+raster layer, with each band representing the percentage of that vegetation type in each 1km cell.
+
 - If 'MVG/MVS' is selected, use need to define conservation target for each NVIS group across the whole study area.
 - If 'MVS_IBRA/MVG_IBRA' is selected, use need to define conservation target for each NVIS group for selected the IBRA region.
 '''
@@ -637,7 +669,7 @@ GBF3_TARGETS_DICT = {
     'USER_DEFINED': None
 }
 
-BIODIVERSITY_TARGET_GBF_3  = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
+BIODIVERSITY_TARGET_GBF_3  = 'medium'           # 'off', 'medium', 'high', or 'USER_DEFINED'
 '''
 Target 3 of the Kunming-Montreal Global Biodiversity Framework:
 protect and manage 30% of the world's land, water, and coastal areas by 2030.
@@ -651,8 +683,8 @@ protect and manage 30% of the world's land, water, and coastal areas by 2030.
 
 
 # ------------------------------- Species parameters -------------------------------
-BIODIVERSITY_TARGET_GBF_4_SNES =  'off'           # 'on' or 'off'.
-BIODIVERSITY_TARGET_GBF_4_ECNES = 'off'           # 'on' or 'off'.
+BIODIVERSITY_TARGET_GBF_4_SNES =  'on'           # 'on' or 'off'.
+BIODIVERSITY_TARGET_GBF_4_ECNES = 'on'           # 'on' or 'off'.
 
 '''
 Target 4 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 
@@ -663,7 +695,7 @@ and manage human-wildlife interactions
 
 
 # -------------------------------- Climate change impacts on biodiversity -------------------------------
-BIODIVERSITY_TARGET_GBF_8 = 'off'           # 'on' or 'off'.
+BIODIVERSITY_TARGET_GBF_8 = 'on'           # 'on' or 'off'.
 '''
 Target 8 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 
 reduce the impacts of climate change on biodiversity and ecosystems.

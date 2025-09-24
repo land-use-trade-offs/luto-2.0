@@ -1,10 +1,13 @@
 window['MapView'] = {
     setup() {
-        const { inject, ref, watch, onMounted, computed, nextTick } = Vue;
+        const { inject, ref, watch, onMounted, onUnmounted, computed, nextTick } = Vue;
 
         // Data|Map service
         const mapRegister = window.MapService.mapCategories["Dvar"];        // MapService was registered in the index.html        [MapService.js]
-        const loadScript = window.loadScript;                               // DataConstructor has been registered in index.html  [helpers.js]
+        const loadScript = window.loadScriptWithTracking;
+
+        // View identification for memory management
+        const VIEW_NAME = "Map";
 
         // Global selection state
         const yearIndex = ref(0);
@@ -67,11 +70,11 @@ window['MapView'] = {
         });
 
         onMounted(async () => {
-            await loadScript("./data/Supporting_info.js", "Supporting_info");
-            await loadScript(mapRegister["Ag"]['path'], mapRegister["Ag"]['name']);
-            await loadScript(mapRegister["Ag Mgt"]['path'], mapRegister["Ag Mgt"]['name']);
-            await loadScript(mapRegister["Non-Ag"]['path'], mapRegister["Non-Ag"]['name']);
-            await loadScript(mapRegister["Mosaic"]['path'], mapRegister["Mosaic"]['name']);
+            await loadScript("./data/Supporting_info.js", "Supporting_info", VIEW_NAME);
+            await loadScript(mapRegister["Ag"]['path'], mapRegister["Ag"]['name'], VIEW_NAME);
+            await loadScript(mapRegister["Ag Mgt"]['path'], mapRegister["Ag Mgt"]['name'], VIEW_NAME);
+            await loadScript(mapRegister["Non-Ag"]['path'], mapRegister["Non-Ag"]['name'], VIEW_NAME);
+            await loadScript(mapRegister["Mosaic"]['path'], mapRegister["Mosaic"]['name'], VIEW_NAME);
 
             dvarMaps.value = {
                 'Land-use': { 'Land-use': window[mapRegister["Mosaic"]['name']]['Land-use'] },
@@ -85,7 +88,7 @@ window['MapView'] = {
                     ...window[mapRegister["Ag Mgt"]['name']]
                 },
                 'Non-Ag': {
-                    'ALL': window[mapRegister["Mosaic"]['name']]['Non-agricultural Land-use'],
+                    'ALL': window[mapRegister["Mosaic"]['name']]['Non-Agricultural Land-use'],
                     ...window[mapRegister["Non-Ag"]['name']]
                 }
             };
@@ -143,6 +146,30 @@ window['MapView'] = {
             dataLoaded,
             mapReady,
         };
+
+        // Memory cleanup on component unmount
+        onUnmounted(() => {
+            window.MemoryService.cleanupViewData(VIEW_NAME);
+        });
+
+        return {
+            yearIndex,
+            selectYear,
+            selectRegion,
+
+            availableYears,
+            availableCategories,
+            availableLanduse,
+
+            selectCategory,
+            selectLanduse,
+
+            selectMapData,
+            selectLegend,
+
+            dataLoaded,
+            mapReady,
+        };
     },
     template: `
     <div class="relative w-full h-screen">
@@ -173,29 +200,25 @@ window['MapView'] = {
         <div class="absolute top-[285px] left-[20px] w-[320px] z-[1001] flex flex-col space-y-3 bg-white/70 p-2 rounded-lg">
 
             <!-- Category buttons -->
-            <div class="flex items-center">
-                <div class="flex space-x-1">
-                    <span class="text-[0.8rem] mr-1 font-medium">Category:</span>
-                    <button v-for="(val, key) in availableCategories" :key="key"
-                        @click="selectCategory = val"
-                        class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded"
-                        :class="{'bg-sky-500 text-white': selectCategory === val}">
-                        {{ val }}
-                    </button>
-                </div>
+            <div class="flex space-x-1">
+                <span class="text-[0.8rem] mr-1 font-medium">Category:</span>
+                <button v-for="(val, key) in availableCategories" :key="key"
+                    @click="selectCategory = val"
+                    class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded"
+                    :class="{'bg-sky-500 text-white': selectCategory === val}">
+                    {{ val }}
+                </button>
             </div>
 
             <!-- Landuse options -->
-            <div class="flex items-start border-t border-white/10 pt-1">
-                <div v-if="dataLoaded && availableLanduse.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
-                    <span class="text-[0.8rem] mr-1 font-medium">{{ selectCategory === 'Ag Mgt' ? 'Ag Mgt' : 'Landuse' }}:</span>
-                    <button v-for="(val, key) in availableLanduse" :key="key"
-                        @click="selectLanduse = val"
-                        class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
-                        :class="{'bg-sky-500 text-white': selectLanduse === val}">
-                        {{ val }}
-                    </button>
-                </div>
+            <div v-if="dataLoaded && availableLanduse.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
+                <span class="text-[0.8rem] mr-1 font-medium">{{ selectCategory === 'Ag Mgt' ? 'Ag Mgt' : 'Landuse' }}:</span>
+                <button v-for="(val, key) in availableLanduse" :key="key"
+                    @click="selectLanduse = val"
+                    class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
+                    :class="{'bg-sky-500 text-white': selectLanduse === val}">
+                    {{ val }}
+                </button>
             </div>
         </div>
 

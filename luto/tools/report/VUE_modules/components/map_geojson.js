@@ -56,7 +56,7 @@ window.map_geojson = {
                 const regionName = feature.properties.NRM_REGION;
                 let style = { ...defaultStyle };
 
-                if (props.selectRankingColors && props.selectRankingColors[regionName]) {
+                if (props.selectRankingColors && props.selectRankingColors[regionName] && typeof props.selectRankingColors[regionName] === 'string') {
                     style.fillColor = props.selectRankingColors[regionName];
                 }
 
@@ -166,7 +166,7 @@ window.map_geojson = {
 
                 // Update style with new colors
                 let style = { ...defaultStyle };
-                if (props.selectRankingColors && props.selectRankingColors[regionName]) {
+                if (props.selectRankingColors && props.selectRankingColors[regionName] && typeof props.selectRankingColors[regionName] === 'string') {
                     style.fillColor = props.selectRankingColors[regionName];
                 }
 

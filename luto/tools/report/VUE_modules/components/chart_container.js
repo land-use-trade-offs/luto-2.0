@@ -4,10 +4,6 @@ window.Highchart = {
       type: Object,
       required: true,
     },
-    selectedLanduse: {
-      type: String,
-      default: 'ALL',
-    },
     draggable: {
       type: Boolean,
       default: false,
@@ -31,45 +27,25 @@ window.Highchart = {
     const scale = ref(1);
     const zoomStep = 0.1;
 
-    // Apply landuse highlighting to chart data
-    const applyHighlighting = (chartData) => {
-      if (!props.selectedLanduse || props.selectedLanduse === 'ALL' || !chartData.series) {
-        return chartData;
-      }
-
-      const highlightedSeries = chartData.series.map(series => ({
-        ...series,
-        color: series.name === props.selectedLanduse
-          ? series.color
-          : (typeof Highcharts !== 'undefined' && Highcharts.color
-            ? Highcharts.color(series.color).setOpacity(0.3).get()
-            : series.color),
-        borderWidth: series.name === props.selectedLanduse ? 2 : 0,
-        borderColor: series.name === props.selectedLanduse ? '#1f2937' : 'transparent'
-      }));
-
-      return {
-        ...chartData,
-        series: highlightedSeries
-      };
-    };
 
     // Function to handle dataset loading and chart creation
     const createChart = () => {
       isLoading.value = true;
+      
+      // CRITICAL: Destroy existing chart before creating new one
+      if (ChartInstance.value) {
+        ChartInstance.value.destroy();
+        ChartInstance.value = null;
+      }
 
-      // Apply highlighting to chart data before creating chart
-      const processedChartData = applyHighlighting(props.chartData);
-
-      // Create new chart with explicit responsive options
+      // Create new chart with chart data
       ChartInstance.value = Highcharts.chart(
         chartElement.value,
         {
-          ...processedChartData,
-          chart: (processedChartData.chart || {}),
+          ...props.chartData,
+          chart: (props.chartData.chart || {}),
         }
       );
-
       isLoading.value = false;
     };
 
@@ -124,57 +100,51 @@ window.Highchart = {
 
     // Function to update the chart with new series data
     const updateChart = (chart, newChartData) => {
-      try {
-        // Apply highlighting before updating
-        const processedData = applyHighlighting(newChartData);
-        
-        // Make a deep copy of the processed chart data to avoid reference issues
-        const newData = JSON.parse(JSON.stringify(processedData));
+      // Make a deep copy of the chart data to avoid reference issues
+      const newData = JSON.parse(JSON.stringify(newChartData));
 
-        // Update the chart configuration options first (except series)
-        for (const key in newData) {
-          if (key !== 'series') {
-            chart.update({ [key]: newData[key] }, false);
-          }
+      // Update the chart configuration options first (except series and colors)
+      for (const key in newData) {
+        if (key !== 'series' && key !== 'colors') {
+          chart.update({ [key]: newData[key] }, false);
         }
-
-        // Handle series data updates safely
-        if (newData.series && Array.isArray(newData.series)) {
-          // Step 1: Remove excess series if there are more in the chart than in new data
-          while (chart.series.length > newData.series.length) {
-            if (chart.series[chart.series.length - 1]) {
-              chart.series[chart.series.length - 1].remove(false);
-            }
-          }
-
-          // Step 2: Update existing series or add new ones
-          newData.series.forEach((seriesConfig, index) => {
-            if (index < chart.series.length) {
-              // Series exists, update it safely
-              if (chart.series[index]) {
-                // Simple setData approach to avoid removePoint errors
-                chart.series[index].setData(seriesConfig.data || [], false);
-
-                // Update other properties but not the data (already updated)
-                const { data, ...otherProps } = seriesConfig;
-                chart.series[index].update(otherProps, false);
-              }
-            } else {
-              // Series doesn't exist, add it
-              chart.addSeries(seriesConfig, false);
-            }
-          });
-        }
-
-        // Final redraw to apply all changes with animation
-        chart.redraw();
-      } catch (error) {
-        console.error("Error updating chart:", error);
-        // Fallback to complete recreation if update fails
-        createChart();
       }
-    }
 
+      // Handle series data updates safely
+      if (newData.series && Array.isArray(newData.series)) {
+        // Step 1: Remove excess series if there are more in the chart than in new data
+        while (chart.series.length > newData.series.length) {
+          if (chart.series[chart.series.length - 1]) {
+            chart.series[chart.series.length - 1].remove(false);
+          }
+        }
+
+        // Step 2: Update existing series or add new ones
+        newData.series.forEach((seriesConfig, index) => {
+          if (index < chart.series.length) {
+            // Series exists, update it completely including name and all properties
+            if (chart.series[index]) {
+              chart.series[index].update(seriesConfig, false);
+            }
+          } else {
+            // Series doesn't exist, add it
+            chart.addSeries(seriesConfig, false);
+          }
+        });
+      }
+
+      // Apply our stored colors LAST to prevent them being overwritten
+      if (props.chartData.colors) {
+        chart.series.forEach((series, index) => {
+          const colorIndex = index % props.chartData.colors.length;
+          series.update({ color: props.chartData.colors[colorIndex] }, false);
+        });
+      }
+
+      // Final redraw to apply all changes with animation
+      chart.redraw();
+
+    };
     onMounted(() => {
       createChart();
       window.addEventListener('resize', handleResize);
@@ -183,6 +153,13 @@ window.Highchart = {
     });
 
     onUnmounted(() => {
+      // CRITICAL: Destroy Highcharts instance to prevent memory leaks
+      if (ChartInstance.value) {
+        ChartInstance.value.destroy();
+        ChartInstance.value = null;
+      }
+      
+      // Remove event listeners
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('mousemove', onDrag);
       window.removeEventListener('mouseup', stopDrag);
@@ -190,22 +167,21 @@ window.Highchart = {
 
     // Watch for changes in chart data with infinite loop prevention
     let isUpdating = false;
-    watch(() => props.chartData, (newValue) => { 
+    watch(() => props.chartData, (newValue) => {
       // Prevent infinite loops
       if (isUpdating) {
         return;
       }
-      
+
       isUpdating = true;
-      
-      try {
-        updateChart(ChartInstance.value, newValue);
-      } finally {
-        // Reset flag after a delay to ensure all reactive updates complete
-        setTimeout(() => {
-          isUpdating = false;
-        }, 100);
-      }
+
+      // Then update the chart
+      updateChart(ChartInstance.value, newValue);
+
+      // Reset flag after a delay to ensure all reactive updates complete
+      setTimeout(() => {
+        isUpdating = false;
+      }, 100);
     }, { deep: true });
 
     // Watch for sidebar collapsed state changes via inject
@@ -215,12 +191,6 @@ window.Highchart = {
       }, 300); // Wait for sidebar animation to complete
     });
 
-    // Watch for selectedLanduse changes to re-apply highlighting
-    watch(() => props.selectedLanduse, () => {
-      if (ChartInstance.value && props.chartData) {
-        updateChart(ChartInstance.value, props.chartData);
-      }
-    });
 
     return {
       chartElement,

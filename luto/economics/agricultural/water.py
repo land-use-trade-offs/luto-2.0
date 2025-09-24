@@ -540,7 +540,7 @@ def get_water_target_inside_LUTO_by_CCI(data):
 
         if wny_extreme_CCI < wny_hist_target:
             print(
-                f"       target ({settings.WATER_REGION_DEF}) relaxed to ({wny_extreme_CCI:10,.0f} ML) from ({wny_hist_target:10,.0f} ML) for {data.WATER_REGION_NAMES[reg_idx]}."
+                f"       target ({settings.WATER_REGION_DEF}) relaxed to ({wny_extreme_CCI:12,.0f} ML) from ({wny_hist_target:12,.0f} ML) for {data.WATER_REGION_NAMES[reg_idx]}."
             )
             wny_inside_LUTO_targets[reg_idx] = wny_extreme_CCI - wny_outside_LUTO
             wny_relaxed_region_raw_targets[reg_idx] = wny_hist_target

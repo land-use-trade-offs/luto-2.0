@@ -178,7 +178,7 @@ def get_cost_lvstk(data:Data, lu, lm, yr_idx):
 
     costs = np.stack([costs_a, costs_flc, costs_foc, costs_fdc, costs_w, costs_q]).T
 
-    # Return costs as numpy array.
+    # Return costs 
     return pd.DataFrame(
         costs,
         columns=pd.MultiIndex.from_product(
@@ -484,18 +484,28 @@ def get_beef_hir_effect_c_mrj(data: Data, yr_idx: int):
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef']
     c_mrj_effects = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
-    # Cost reduction due to reduced livestock density
+    yr_cal = data.YR_CAL_BASE + yr_idx
+    all_yrs = [2010] + settings.SIM_YEARS if 2010 not in settings.SIM_YEARS else settings.SIM_YEARS
+    base_yr_idx = all_yrs.index(yr_cal) - 1
+    base_yr = all_yrs[base_yr_idx]
+    if base_yr_idx < 0:
+        raise ValueError("The base year index for HIR - Sheep is out of range. Are you calculating HIR cost for the BASE year?")
+
+    # Cost reduction due to reduced livestock density; assume all costs (Area, Fixed, Quantity ...) are reduced proportionally
     for m, lm in enumerate(data.LANDMANS):
         for j_idx, lu in enumerate(land_uses):
-            # Quantity costs are reduced by `HIR_PRODUCTIVITY_CONTRIBUTION` under HIR
-            lvstype, vegtype = lvs_veg_types(lu)
-            lvstype_capital = lvstype.capitalize()
-            yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
+            
+            ag_cost_r = get_cost_lvstk(data, lu, lm, yr_idx).values.sum(axis=1)
+            c_mrj_effects[m, :, j_idx] += (settings.HIR_PRODUCTIVITY_CONTRIBUTION - 1) * ag_cost_r
 
-            q_costs = data.AGEC_LVSTK['QC', lvstype] * yield_pot * data.QC_COST_MULTS.loc[yr_cal, lvstype_capital] * data.REAL_AREA
-            c_mrj_effects[m, :, j_idx] += (settings.HIR_PRODUCTIVITY_CONTRIBUTION - 1) * q_costs
+    # Maintenance cost per hectare
+    mainten_cost_r = (settings.SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR * data.REAL_AREA)[:,None] * (1 - settings.HIR_PRODUCTIVITY_CONTRIBUTION)
+    base_lu_idx = data.lumaps[base_yr] == data.DESC2AGLU[lu]
+    cost_mrj = c_mrj_effects + mainten_cost_r
 
-    return c_mrj_effects + (settings.BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR * data.REAL_AREA)[:,None]
+    cost_mrj[:, ~base_lu_idx, :] = 0  # Only apply maintenance cost to cells that were in the base land-use.
+    
+    return cost_mrj
 
 
 def get_sheep_hir_effect_c_mrj(data: Data, yr_idx: int):
@@ -513,18 +523,30 @@ def get_sheep_hir_effect_c_mrj(data: Data, yr_idx: int):
     yr_cal = data.YR_CAL_BASE + yr_idx
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep']
     c_mrj_effects = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+    
+    yr_cal = data.YR_CAL_BASE + yr_idx
+    all_yrs = [2010] + settings.SIM_YEARS if 2010 not in settings.SIM_YEARS else settings.SIM_YEARS
+    base_yr_idx = all_yrs.index(yr_cal) - 1
+    base_yr = all_yrs[base_yr_idx]
+    if base_yr_idx < 0:
+        raise ValueError("The base year index for HIR - Sheep is out of range. Are you calculating HIR cost for the BASE year?")
 
+    # Cost reduction due to reduced livestock density; assume all costs (Area, Fixed, Quantity ...) are reduced proportionally
     for m, lm in enumerate(data.LANDMANS):
         for j_idx, lu in enumerate(land_uses):
-            # Quantity costs are reduced by 50% under HIR
-            lvstype, vegtype = lvs_veg_types(lu)
-            lvstype_capital = lvstype.capitalize()
-            yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
+            
+            ag_cost_r = get_cost_lvstk(data, lu, lm, yr_idx).values.sum(axis=1)
+            c_mrj_effects[m, :, j_idx] += (settings.HIR_PRODUCTIVITY_CONTRIBUTION - 1) * ag_cost_r
 
-            q_costs = data.AGEC_LVSTK['QC', lvstype] * yield_pot * data.QC_COST_MULTS.loc[yr_cal, lvstype_capital] * data.REAL_AREA
-            c_mrj_effects[m, :, j_idx] += (settings.HIR_PRODUCTIVITY_CONTRIBUTION - 1) * q_costs
+    # Maintenance cost per hectare
+    mainten_cost_r = (settings.SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR * data.REAL_AREA)[:,None] * (1 - settings.HIR_PRODUCTIVITY_CONTRIBUTION)
+    base_lu_idx = data.lumaps[base_yr] == data.DESC2AGLU[lu]
 
-    return c_mrj_effects + (settings.SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR * data.REAL_AREA)[:,None]
+    # Only apply maintenance cost to cells that were in the base land-use.
+    cost_mrj = c_mrj_effects + mainten_cost_r
+    cost_mrj[:, ~base_lu_idx, :] = 0  
+    
+    return cost_mrj
 
 
 def get_agricultural_management_cost_matrices(data: Data, c_mrj, yr_idx):
