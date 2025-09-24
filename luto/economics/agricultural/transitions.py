@@ -247,12 +247,12 @@ def get_biochar_effect_t_mrj(data):
     return np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
 
-def get_beef_hir_effect_t_mrj(data):
+def get_beef_hir_effect_t_mrj(data, yr_cal):
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef']
     return np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
 
-def get_sheep_hir_effect_t_mrj(data):
+def get_sheep_hir_effect_t_mrj(data, yr_cal):
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep']
     return np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 

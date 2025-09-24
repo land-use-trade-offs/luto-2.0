@@ -434,7 +434,7 @@ def get_destocked_from_ag(
     yr_cal = data.YR_CAL_BASE + yr_idx
     cells = np.isin(lumap, data.LU_LVSTK_NATURAL)
             
-    # Establishment costs; If destocking brings 30% of bio/GHG benefits, then it takes 30% of establishment costs as Environmental Plantings
+    # Restoration costs; E.g., if destocking brings 30% of bio/GHG benefits, then it takes 30% of establishment costs as Environmental Plantings
     HCAS_benefit_mult = {lu:1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[lu] for lu in data.LU_LVSTK_NATURAL}
     removal_cost_r = np.vectorize(HCAS_benefit_mult.get, otypes=[np.float32])(lumap) * data.EP_EST_COST_HA
     removal_cost_r = np.nan_to_num(removal_cost_r)
