@@ -196,10 +196,14 @@ Land-use and vector file pairs to exclude land-use from being utilised in that a
  - The value is the path to the ESRI shapefile.
 '''
 
-REGIONAL_ADOPTION_CONSTRAINTS = 'off'    # 'off', 'on', 'NON_AG_UNIFORM'
-REGIONAL_ADOPTION_NON_AG_UNIFORM = 15               # None or numbers between 0-100 (both inclusive); Only work under 'NON_AG_UNIFORM'!
-                                                    #   E.g., 5 means each non-ag land can not exceed 5% adoption in every region
-REGIONAL_ADOPTION_ZONE = 'NRM_CODE'                 # 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
+REGIONAL_ADOPTION_CONSTRAINTS = 'off'            # 'off', 
+                                                 # 'on', user needs to set the percentage targets in 'input/regional_adoption_zones.xlsx'
+                                                 # 'NON_AG_UNIFORM', each of the non-ag land uses can not exceed a certain percentage (REGIONAL_ADOPTION_NON_AG_UNIFORM) in every region
+
+REGIONAL_ADOPTION_NON_AG_UNIFORM = 15            # None or numbers between 0-100 (both inclusive); Only work under 'REGIONAL_ADOPTION_CONSTRAINTS = NON_AG_UNIFORM'
+                                                 #   E.g., 5 means each non-ag land can not exceed 5% adoption in every region
+                                        
+REGIONAL_ADOPTION_ZONE = 'NRM_CODE'              # 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
 '''
 The regional adoption zone is the spatial unit used to enforce regional adoption constraints.
 The options are:
@@ -387,8 +391,9 @@ AGRICULTURAL_MANAGEMENT_USE_THRESHOLD = 0.1
 HIR_PRODUCTIVITY_CONTRIBUTION = 0.5
 
 # Maintainace cost for HIR
-BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 0
-SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 0
+BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
+SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
+
 
 
 
