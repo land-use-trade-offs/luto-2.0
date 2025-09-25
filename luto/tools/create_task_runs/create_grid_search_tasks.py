@@ -27,7 +27,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = '../Custom_runs/20250904_RES1_HIGH_HIGH' # Do not include the trailing slash (/) in the end of the path
+TASK_ROOT_DIR = '../Custom_runs/20250924_RES5_HIGH_HIGH' # Do not include the trailing slash (/) in the end of the path
 
 
 # Set the grid search parameters
@@ -35,9 +35,9 @@ grid_search = {
     ###############################################################
     # Task run settings for submitting the job to the cluster
     ###############################################################
-    'MEM': ['300GB'],
-    'NCPUS':[75],
-    'TIME': ['24:00:00'],
+    'MEM': ['60GB'],
+    'NCPUS':[15],
+    'TIME': ['5:00:00'],
     'QUEUE': ['normalsr'],                                                  # normalsr for CPU, hugemembw for memory intensive jobs
     
  
@@ -45,8 +45,8 @@ grid_search = {
     # Working settings for the model run
     ###############################################################
     'OBJECTIVE': ['maxprofit'],                                             # 'maxprofit' or 'mincost'
-    'RESFACTOR': [1],
-    'SIM_YEARS': [[2020, 2050]],                                    # Years to run the model 
+    'RESFACTOR': [5],
+    'SIM_YEARS': [list(range(2020,2051,5))],                                    # Years to run the model 
     'WRITE_THREADS': [2],
     
  
@@ -58,6 +58,9 @@ grid_search = {
     # --------------- Scenarios ---------------
     'SSP': ['245'],                                                         #'126', '245', '370', '585'
     
+    # --------------- Economics ---------------
+    'BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR': [10, 20, 30, 50, 100, 200],  # AUD/ha/year       
+    'SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR':[10, 20, 30, 50, 100, 200],  # AUD/ha/year  
 
     # --------------- Target deviation weight ---------------
     'SOLVER_WEIGHT_DEMAND': [1], 
