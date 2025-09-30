@@ -152,7 +152,7 @@ def create_new_dataset():
     shutil.copyfile(luto_1D_inpath + '20240918_Bundle_BC.xlsx', outpath + '20240918_Bundle_BC.xlsx')
     
     # Copy biodiversity HACS data from DCCEEW
-    shutil.copyfile(bio_HACS_inpath + 'HABITAT_CONDITION.csv', outpath + 'bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv')
+    shutil.copyfile(bio_HACS_inpath + 'CONTRIBUTION_PERCENTILE.csv', outpath + 'bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv')
     
     # Copy biodiversity GBF-2 files
     shutil.copyfile(bio_GBF2_inpath + 'GBF2_conserve_performance.xlsx', outpath + 'BIODIVERSITY_GBF2_conservation_performance.xlsx')

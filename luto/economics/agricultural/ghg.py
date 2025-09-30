@@ -89,10 +89,10 @@ def get_ghg_crop(data:Data, lu, lm, aggregate):
 
 
 def get_ghg_lvstk( data:Data    # Data object.
-                 , lu          # Land use.
-                 , lm          # Land management.
-                 , yr_idx      # Number of years post base-year ('YR_CAL_BASE').
-                 , aggregate): # GHG calculated as a total (for the solver) or by individual source (for writing outputs)
+                 , lu           # Land use.
+                 , lm           # Land management.
+                 , yr_idx       # Number of years post base-year ('YR_CAL_BASE').
+                 , aggregate):  # GHG calculated as a total (for the solver) or by individual source (for writing outputs)
     """Return livestock GHG emissions <unit: t/cell>  of `lu`+`lm` in `yr_idx`
             as (np array|pd.DataFrame) depending on aggregate (True|False).
 
@@ -186,9 +186,9 @@ def get_ghg(data:Data, lu, lm, yr_idx, aggregate):
         return get_ghg_lvstk(data, lu, lm, yr_idx, aggregate)
     elif lu in data.AGRICULTURAL_LANDUSES:
         if aggregate:
-            return np.zeros(data.NCELLS)
+            return np.zeros(data.NCELLS, dtype=np.float32)
         else:
-            return pd.DataFrame({('CO2E_KG_HA_CHEM_APPL', lm, lu): np.zeros(data.NCELLS)})
+            return pd.DataFrame({('CO2E_KG_HA_CHEM_APPL', lm, lu): np.zeros(data.NCELLS, dtype=np.float32)})
     else:
         raise KeyError(f"Land use '{lu}' not found in data.LANDUSES")
 
@@ -210,7 +210,7 @@ def get_ghg_matrix(data:Data, lm, yr_idx, aggregate):
 
     """
     if aggregate == True: 
-        g_rj = np.zeros((data.NCELLS, len(data.AGRICULTURAL_LANDUSES)))
+        g_rj = np.zeros((data.NCELLS, len(data.AGRICULTURAL_LANDUSES)), dtype=np.float32)
         for j, lu in enumerate(data.AGRICULTURAL_LANDUSES):
             g_rj[:, j] = get_ghg(data, lu, lm, yr_idx, aggregate)
             
@@ -273,7 +273,7 @@ def get_ghg_unall_natural_to_lvstk_natural(data:Data, lumap) -> np.ndarray:
     for to_lu in data.LU_LVSTK_NATURAL:
 
         ghg_unall_natural_to_lvstk_natural_r = (
-            data.CO2E_STOCK_UNALL_NATURAL[lumap == un_allow_code] 
+            data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA[lumap == un_allow_code] 
             * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[to_lu])
             * data.REAL_AREA[lumap == un_allow_code]
         ) 
@@ -302,7 +302,7 @@ def get_ghg_lvstk_natural_to_modified(data:Data, lumap) -> np.ndarray:
         for to_lu in data.LU_MODIFIED_LAND:
             # Get GHG penalties from current land use to future land use
             ghg_lvstk_natural_to_modified_r = (
-                data.CO2E_STOCK_UNALL_NATURAL[lumap == from_lu] 
+                data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA[lumap == from_lu] 
                 * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[to_lu])
                 * data.REAL_AREA[lumap == from_lu]
             ) 
@@ -331,7 +331,7 @@ def get_ghg_unall_natural_to_modified(data:Data, lumap) -> np.ndarray:
     for to_lu in data.LU_MODIFIED_LAND:
         # Get GHG penalties from current land use to future land use
         ghg_unall_natural_to_modified_r = (
-            data.CO2E_STOCK_UNALL_NATURAL[lumap == un_allow_code] 
+            data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA[lumap == un_allow_code] 
             * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[to_lu])
             * data.REAL_AREA[lumap == un_allow_code]
         ) 
@@ -357,7 +357,7 @@ def get_ghg_transition_emissions(data:Data, lumap, separate=False) -> np.ndarray
       GHG penalties (dict[np.ndarray]|np.ndarray): The greenhouse gas transition penalties.
     """
    
-    ghg_lvstck_natural_to_unall_natural = np.zeros_like(data.AG_L_MRJ)   # No land can transited to unall-natural, here use a full zero array for consistency
+    ghg_lvstck_natural_to_unall_natural = np.zeros_like(data.AG_L_MRJ, dtype=np.float32)   # No land can transited to unall-natural, here use a full zero array for consistency
     ghg_lvstck_natural_to_modified = get_ghg_lvstk_natural_to_modified(data, lumap)
     ghg_unall_natural_to_lvstck_natural = get_ghg_unall_natural_to_lvstk_natural(data, lumap)
     ghg_unall_natural_to_modified = get_ghg_unall_natural_to_modified(data, lumap)
@@ -399,7 +399,7 @@ def get_asparagopsis_effect_g_mrj(data:Data, yr_idx):
     yr_cal = data.YR_CAL_BASE + yr_idx
 
     # Set up the effects matrix
-    new_g_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+    new_g_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
 
     if not settings.AG_MANAGEMENTS['Asparagopsis taxiformis']:
         return new_g_mrj
@@ -704,16 +704,20 @@ def get_biochar_effect_g_mrj(data:Data, yr_idx):
 
 def get_beef_hir_effect_g_mrj(data: Data, yr_idx):
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef']
-    g_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses)))
+    g_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
     
     # GHG abatement from Land Use Change 
     for j_idx, lu in enumerate(land_uses):
         g_mrj_effect[:, :, j_idx] -= (
-            data.CO2E_STOCK_UNALL_NATURAL      
-            * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[data.DESC2AGLU[lu]])
-            * data.REAL_AREA
-            / settings.CARBON_EFFECTS_WINDOW    
-        )
+            (
+                data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA
+                * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[data.DESC2AGLU[lu]])
+            )
+            - (
+                data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA
+                * (1 - settings.HIR_CEILING_PERCENTAGE)
+            )
+        ) * data.REAL_AREA / settings.CARBON_EFFECTS_WINDOW 
 
     # GHG abatement from livestock density reduction
     for lm_idx, lm in enumerate(data.LANDMANS):         
@@ -725,16 +729,20 @@ def get_beef_hir_effect_g_mrj(data: Data, yr_idx):
 
 def get_sheep_hir_effect_g_mrj(data: Data, yr_idx):
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep']
-    g_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses)))
+    g_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
     
     # GHG abatement from Land Use Change
     for j_idx, lu in enumerate(land_uses):
         g_mrj_effect[:, :, j_idx] -= (
-            data.CO2E_STOCK_UNALL_NATURAL      
-            * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[data.DESC2AGLU[lu]])
-            * data.REAL_AREA
-            / settings.CARBON_EFFECTS_WINDOW    # Annualise carbon sequestration capacity to align the full growth span of a tree
-        )
+            (
+                data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA
+                * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[data.DESC2AGLU[lu]])
+            )
+            - (
+                data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA
+                * (1 - settings.HIR_CEILING_PERCENTAGE)
+            )
+        ) * data.REAL_AREA / settings.CARBON_EFFECTS_WINDOW 
         
     # GHG abatement from livestock density reduction
     for lm_idx, lm in enumerate(data.LANDMANS):

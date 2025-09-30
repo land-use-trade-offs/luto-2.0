@@ -91,7 +91,7 @@ grid_search = {
     'INCLUDE_WATER_LICENSE_COSTS': [1],
     
     # --------------- Biodiversity overall ---------------
-    'HABITAT_CONDITION': ['USER_DEFINED'],                                  # One of [10, 25, 50, 75, 90], or 'USER_DEFINED'              
+    'CONTRIBUTION_PERCENTILE': ['USER_DEFINED'],                                  # One of [10, 25, 50, 75, 90], or 'USER_DEFINED'              
     'CONNECTIVITY_SOURCE': ['NCI'],
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [40],                    # Percentage of degraded areas to cut in GBF2 priority areas
     

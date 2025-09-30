@@ -480,30 +480,20 @@ def get_beef_hir_effect_c_mrj(data: Data, yr_idx: int):
     Returns
     - c_mrj_effects: The updated cost data <unit: $/cell>.
     """
-    yr_cal = data.YR_CAL_BASE + yr_idx
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef']
     c_mrj_effects = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
-    yr_cal = data.YR_CAL_BASE + yr_idx
-    all_yrs = [2010] + settings.SIM_YEARS if 2010 not in settings.SIM_YEARS else settings.SIM_YEARS
-    base_yr_idx = all_yrs.index(yr_cal) - 1
-    base_yr = all_yrs[base_yr_idx]
-    if base_yr_idx < 0:
-        raise ValueError("The base year index for HIR - Sheep is out of range. Are you calculating HIR cost for the BASE year?")
-
-    # Cost reduction due to reduced livestock density; assume all costs (Area, Fixed, Quantity ...) are reduced proportionally
+    # Cost reduction due to reduced livestock density; all costs (Area, Fixed, Quantity ...) are reduced proportionally
     for m, lm in enumerate(data.LANDMANS):
         for j_idx, lu in enumerate(land_uses):
-            
-            ag_cost_r = get_cost_lvstk(data, lu, lm, yr_idx).values.sum(axis=1)
+            # ag_cost_r = get_cost_lvstk(data, lu, lm, yr_idx)[(lu, lm, 'Quantity cost')].values
+            ag_cost_r = get_cost_lvstk(data, lu, lm, yr_idx).values.sum(axis=1)  # This is all costs, not just quantity cost
             c_mrj_effects[m, :, j_idx] += (settings.HIR_PRODUCTIVITY_CONTRIBUTION - 1) * ag_cost_r
 
     # Maintenance cost per hectare
-    mainten_cost_r = (settings.SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR * data.REAL_AREA)[:,None] * (1 - settings.HIR_PRODUCTIVITY_CONTRIBUTION)
-    base_lu_idx = data.lumaps[base_yr] == data.DESC2AGLU[lu]
-    cost_mrj = c_mrj_effects + mainten_cost_r
+    mainten_cost_rj = (settings.BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR * data.REAL_AREA)[:,None] * (1 - settings.HIR_PRODUCTIVITY_CONTRIBUTION)
+    cost_mrj = c_mrj_effects + mainten_cost_rj
 
-    cost_mrj[:, ~base_lu_idx, :] = 0  # Only apply maintenance cost to cells that were in the base land-use.
     
     return cost_mrj
 
@@ -520,31 +510,19 @@ def get_sheep_hir_effect_c_mrj(data: Data, yr_idx: int):
     Returns
     - c_mrj_effects: The updated cost data <unit: $/cell>.
     """
-    yr_cal = data.YR_CAL_BASE + yr_idx
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep']
     c_mrj_effects = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
     
-    yr_cal = data.YR_CAL_BASE + yr_idx
-    all_yrs = [2010] + settings.SIM_YEARS if 2010 not in settings.SIM_YEARS else settings.SIM_YEARS
-    base_yr_idx = all_yrs.index(yr_cal) - 1
-    base_yr = all_yrs[base_yr_idx]
-    if base_yr_idx < 0:
-        raise ValueError("The base year index for HIR - Sheep is out of range. Are you calculating HIR cost for the BASE year?")
-
-    # Cost reduction due to reduced livestock density; assume all costs (Area, Fixed, Quantity ...) are reduced proportionally
+    # Cost reduction due to reduced livestock density; all costs (Area, Fixed, Quantity ...) are reduced proportionally
     for m, lm in enumerate(data.LANDMANS):
         for j_idx, lu in enumerate(land_uses):
-            
-            ag_cost_r = get_cost_lvstk(data, lu, lm, yr_idx).values.sum(axis=1)
+            # ag_cost_r = get_cost_lvstk(data, lu, lm, yr_idx)[(lu, lm, 'Quantity cost')].values
+            ag_cost_r = get_cost_lvstk(data, lu, lm, yr_idx).values.sum(axis=1)  # This is all costs, not just quantity cost
             c_mrj_effects[m, :, j_idx] += (settings.HIR_PRODUCTIVITY_CONTRIBUTION - 1) * ag_cost_r
 
     # Maintenance cost per hectare
-    mainten_cost_r = (settings.SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR * data.REAL_AREA)[:,None] * (1 - settings.HIR_PRODUCTIVITY_CONTRIBUTION)
-    base_lu_idx = data.lumaps[base_yr] == data.DESC2AGLU[lu]
-
-    # Only apply maintenance cost to cells that were in the base land-use.
-    cost_mrj = c_mrj_effects + mainten_cost_r
-    cost_mrj[:, ~base_lu_idx, :] = 0  
+    mainten_cost_rj = (settings.SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR * data.REAL_AREA)[:,None] * (1 - settings.HIR_PRODUCTIVITY_CONTRIBUTION)
+    cost_mrj = c_mrj_effects + mainten_cost_rj
     
     return cost_mrj
 

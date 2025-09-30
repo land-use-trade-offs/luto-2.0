@@ -358,17 +358,17 @@ def get_beef_hir_effect_w_mrj(data, yr_idx):
     for lu_idx, lu in enumerate(land_uses):
         j = data.DESC2AGLU[lu]
 
-        multiplier = 1 - settings.HIR_PRODUCTIVITY_CONTRIBUTION
+        multiplier = settings.HIR_PRODUCTIVITY_CONTRIBUTION - 1 # Negative value, indicating reduction in water requirements
 
         # Reduce water requirements due to drop in yield potential (increase in net yield)
         if lu in data.LU_LVSTK:
             lvs, veg = lvs_veg_types(lu)
 
             w_mrj_effects[0, :, lu_idx] = (
-                (multiplier - 1) * base_w_req_mrj[0, :, j] * get_yield_pot(data, lvs, veg, 'dry', yr_idx)
+                multiplier * base_w_req_mrj[0, :, j] * get_yield_pot(data, lvs, veg, 'dry', yr_idx)
             )
             w_mrj_effects[1, :, lu_idx] = (
-                (multiplier - 1) * base_w_req_mrj[1, :, j] * get_yield_pot(data, lvs, veg, 'irr', 0)
+                multiplier * base_w_req_mrj[1, :, j] * get_yield_pot(data, lvs, veg, 'irr', 0)
             )
 
     return w_mrj_effects
@@ -395,7 +395,7 @@ def get_sheep_hir_effect_w_mrj(data, yr_idx):
     for lu_idx, lu in enumerate(land_uses):
         j = data.DESC2AGLU[lu]
 
-        multiplier = 1 - settings.HIR_PRODUCTIVITY_CONTRIBUTION
+        multiplier = settings.HIR_PRODUCTIVITY_CONTRIBUTION - 1 # Negative value, indicating reduction in water requirements
 
         # Reduce water requirements due to drop in yield potential (increase in net yield)
         if lu in data.LU_LVSTK:

@@ -772,7 +772,7 @@ class LutoSolver:
         self.ghg_expr = self._get_total_ghg_expr()
 
         if settings.GHG_CONSTRAINT_TYPE == "hard":
-            print(f"    |__ Adding constraints <hard> for GHG emissions: {ghg_limit_raw:,.0f} tCO2e")
+            print(f"    |__ Adding <hard> constraints for GHG emissions: {ghg_limit_raw:,.0f} tCO2e")
             self.ghg_consts_ub = self.gurobi_model.addConstr(
                 self.ghg_expr <= ghg_limit_rescale,
                 name="ghg_emissions_limit_ub",
@@ -817,16 +817,16 @@ class LutoSolver:
         bio_non_ag_exprs = []
         
         for j in range(self._input_data.n_ag_lus):
-            ind_dry = np.intersect1d(self._input_data.ag_lu2cells[0, j], self._input_data.priority_degraded_mask_idx)
-            ind_irr = np.intersect1d(self._input_data.ag_lu2cells[1, j], self._input_data.priority_degraded_mask_idx)
+            ind_dry = np.intersect1d(self._input_data.ag_lu2cells[0, j], self._input_data.GBF2_mask_idx)
+            ind_irr = np.intersect1d(self._input_data.ag_lu2cells[1, j], self._input_data.GBF2_mask_idx)
             bio_ag_exprs.append(
                 gp.quicksum(
-                    self._input_data.GBF2_raw_priority_degraded_area_r[ind_dry]
+                    self._input_data.GBF2_mask_area_r[ind_dry]
                     * self._input_data.biodiv_contr_ag_j[j]
                     * self.X_ag_dry_vars_jr[j, ind_dry]
                 )
                 + gp.quicksum(
-                    self._input_data.GBF2_raw_priority_degraded_area_r[ind_irr]
+                    self._input_data.GBF2_mask_area_r[ind_irr]
                     * self._input_data.biodiv_contr_ag_j[j]
                     * self.X_ag_irr_vars_jr[j, ind_irr]
                 ) 
@@ -836,23 +836,24 @@ class LutoSolver:
                 continue
             for j_idx in range(len(am_j_list)):
                 
-                ind_dry = np.intersect1d(self._input_data.ag_lu2cells[0, j_idx], self._input_data.priority_degraded_mask_idx)
-                ind_irr = np.intersect1d(self._input_data.ag_lu2cells[1, j_idx], self._input_data.priority_degraded_mask_idx)
+                ind_dry = np.intersect1d(self._input_data.ag_lu2cells[0, j_idx], self._input_data.GBF2_mask_idx)
+                ind_irr = np.intersect1d(self._input_data.ag_lu2cells[1, j_idx], self._input_data.GBF2_mask_idx)
                 bio_ag_man_exprs.append(
-                    gp.quicksum(self._input_data.GBF2_raw_priority_degraded_area_r[ind_dry]
+                    gp.quicksum(
+                        self._input_data.GBF2_mask_area_r[ind_dry]
                         * self._input_data.biodiv_contr_ag_man[am][j_idx][ind_dry]
                         * self.X_ag_man_dry_vars_jr[am][j_idx, ind_dry])
                     + gp.quicksum(
-                        self._input_data.GBF2_raw_priority_degraded_area_r[ind_irr]
+                        self._input_data.GBF2_mask_area_r[ind_irr]
                         * self._input_data.biodiv_contr_ag_man[am][j_idx][ind_irr]
                         * self.X_ag_man_irr_vars_jr[am][j_idx, ind_irr]
                     )
                 )  
         for k in range(self._input_data.n_non_ag_lus):
-            ind = np.intersect1d(self._input_data.non_ag_lu2cells[k], self._input_data.priority_degraded_mask_idx)
+            ind = np.intersect1d(self._input_data.non_ag_lu2cells[k], self._input_data.GBF2_mask_idx)
             bio_non_ag_exprs.append(
                 gp.quicksum(
-                    self._input_data.GBF2_raw_priority_degraded_area_r[ind]
+                    self._input_data.GBF2_mask_area_r[ind]
                     * self._input_data.biodiv_contr_non_ag_k[k]
                     * self.X_non_ag_vars_kr[k, ind]
                 )
@@ -893,7 +894,7 @@ class LutoSolver:
                 continue
             
             ind = v_ind[v]
-            MVG_raw_area_r = self._input_data.GBF3_raw_MVG_area_vr[v, ind]
+            MVG_raw_area_r = self._input_data.GBF3_contribution_area_vr[v, ind]
 
             ag_contr = gp.quicksum(
                 gp.quicksum(
@@ -955,7 +956,7 @@ class LutoSolver:
         
         for x, x_area_lb_rescale in enumerate(x_limits):
             x_area_lb_raw = x_area_lb_rescale * self._input_data.scale_factors['GBF4_SNES']
-            ind = np.where(self._input_data.GBF4_SNES_xr[x] > 0)[0]
+            ind = np.where(self._input_data.GBF4_SNES_contribution_area_sr[x] > 0)[0]
 
             if ind.size == 0:
                 print(
@@ -964,12 +965,12 @@ class LutoSolver:
             
             ag_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.GBF4_SNES_xr[x, ind]
+                    self._input_data.GBF4_SNES_contribution_area_sr[x, ind]
                     * self._input_data.biodiv_contr_ag_j[j]
                     * self.X_ag_dry_vars_jr[j, ind]
                 )  # Dryland agriculture contribution
                 + gp.quicksum(
-                    self._input_data.GBF4_SNES_xr[x, ind]
+                    self._input_data.GBF4_SNES_contribution_area_sr[x, ind]
                     * self._input_data.biodiv_contr_ag_j[j]
                     * self.X_ag_irr_vars_jr[j, ind]
                 )  # Irrigated agriculture contribution
@@ -978,12 +979,12 @@ class LutoSolver:
 
             ag_man_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.GBF4_SNES_xr[x, ind]
+                    self._input_data.GBF4_SNES_contribution_area_sr[x, ind]
                     * self._input_data.biodiv_contr_ag_man[am][j_idx][ind]
                     * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
                 )  # Dryland alt. ag. management contributions
                 + gp.quicksum(
-                    self._input_data.GBF4_SNES_xr[x, ind]
+                    self._input_data.GBF4_SNES_contribution_area_sr[x, ind]
                     * self._input_data.biodiv_contr_ag_man[am][j_idx][ind]
                     * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
                 )  # Irrigated alt. ag. management contributions
@@ -993,7 +994,7 @@ class LutoSolver:
 
             non_ag_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.GBF4_SNES_xr[x, ind]
+                    self._input_data.GBF4_SNES_contribution_area_sr[x, ind]
                     * self._input_data.biodiv_contr_non_ag_k[k]
                     * self.X_non_ag_vars_kr[k, ind]
                 )  # Non-agricultural contribution
@@ -1020,7 +1021,7 @@ class LutoSolver:
         
         for x, x_area_lb_rescale in enumerate(x_limits):
             x_area_lb_raw = x_area_lb_rescale * self._input_data.scale_factors['GBF4_ECNES']
-            ind = np.where(self._input_data.GBF4_ECNES_xr[x] > 0)[0]
+            ind = np.where(self._input_data.GBF4_ECNES_contribution_area_sr[x] > 0)[0]
 
             if ind.size == 0:
                 print(
@@ -1029,12 +1030,12 @@ class LutoSolver:
             
             ag_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.GBF4_ECNES_xr[x, ind]
+                    self._input_data.GBF4_ECNES_contribution_area_sr[x, ind]
                     * self._input_data.biodiv_contr_ag_j[j]
                     * self.X_ag_dry_vars_jr[j, ind]
                 )  # Dryland agriculture contribution
                 + gp.quicksum(
-                    self._input_data.GBF4_ECNES_xr[x, ind]
+                    self._input_data.GBF4_ECNES_contribution_area_sr[x, ind]
                     * self._input_data.biodiv_contr_ag_j[j]
                     * self.X_ag_irr_vars_jr[j, ind]
                 )  # Irrigated agriculture contribution
@@ -1043,12 +1044,12 @@ class LutoSolver:
 
             ag_man_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.GBF4_ECNES_xr[x, ind]
+                    self._input_data.GBF4_ECNES_contribution_area_sr[x, ind]
                     * self._input_data.biodiv_contr_ag_man[am][j_idx][ind]
                     * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
                 )  # Dryland alt. ag. management contributions
                 + gp.quicksum(
-                    self._input_data.GBF4_ECNES_xr[x, ind]
+                    self._input_data.GBF4_ECNES_contribution_area_sr[x, ind]
                     * self._input_data.biodiv_contr_ag_man[am][j_idx][ind]
                     * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
                 )  # Irrigated alt. ag. management contributions
@@ -1058,7 +1059,7 @@ class LutoSolver:
 
             non_ag_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.GBF4_ECNES_xr[x, ind]
+                    self._input_data.GBF4_ECNES_contribution_area_sr[x, ind]
                     * self._input_data.biodiv_contr_non_ag_k[k]
                     * self.X_non_ag_vars_kr[k, ind]
                 )  # Non-agricultural contribution
@@ -1091,7 +1092,7 @@ class LutoSolver:
             
             ind = s_ind[s]
             s_area_lb_raw = s_area_lb_rescale * self._input_data.scale_factors['GBF8']
-            GBF8_raw_area_r = self._input_data.GBF8_raw_species_area_sr[s, ind]
+            GBF8_raw_area_r = self._input_data.GBF8_contribution_area_sr[s, ind]
             
             ag_contr = gp.quicksum(
                 gp.quicksum(

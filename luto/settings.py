@@ -78,10 +78,12 @@ CARBON_EFFECTS_WINDOW = 91
 # Fire impacts on carbon sequestration
 RISK_OF_REVERSAL = 0.05  # Risk of reversal buffer under ERF (reasonable values range from 0.05 [100 years] to 0.25 [25 years]) https://www.cleanenergyregulator.gov.au/ERF/Choosing-a-project-type/Opportunities-for-the-land-sector/Risk-of-reversal-buffer
 FIRE_RISK = 'med'   # Options are 'low', 'med', 'high'. Determines whether to take the 5th, 50th, or 95th percentile of modelled fire impacts.
-""" Mean FIRE_RISK cell values (%)
-    FD_RISK_PERC_5TH    80.3967
-    FD_RISK_MEDIAN      89.2485
-    FD_RISK_PERC_95TH   93.2735 """
+""" 
+Mean FIRE_RISK cell values (%)
+- FD_RISK_PERC_5TH    80.3967
+- FD_RISK_MEDIAN      89.2485
+- FD_RISK_PERC_95TH   93.2735 
+"""
 
 
 # ---------------------------------------------------------------------------- #
@@ -107,7 +109,7 @@ AMORTISATION_PERIOD = 30 # years
 RESFACTOR = 13      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-SIM_YEARS = list(range(2020,2051,5)) # range(2020,2050)
+SIM_YEARS =  [2010, 2050] # list(range(2020,2051,5))
 
 
 # Define the objective function
@@ -320,9 +322,9 @@ AG_MANAGEMENTS_TO_LAND_USES = {
     
     'Ecological Grazing':       ['Beef - modified land', 'Sheep - modified land', 'Dairy - modified land'],
     
-    'Savanna Burning': [        'Beef - natural land', 'Dairy - natural land', 'Sheep - natural land', 'Unallocated - natural land'],
+    'Savanna Burning':          ['Beef - natural land', 'Dairy - natural land', 'Sheep - natural land', 'Unallocated - natural land'],
     
-    'AgTech EI': [              # Cropping:
+    'AgTech EI':                [# Cropping:
                                 'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
                                 # Intensive Cropping:
                                 'Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables',
@@ -389,6 +391,9 @@ AGRICULTURAL_MANAGEMENT_USE_THRESHOLD = 0.1
 
 # Productivity contribution of HIR compared to not implementing HIR
 HIR_PRODUCTIVITY_CONTRIBUTION = 0.5
+
+# HIR celling factor, assuming HIR achienves x% of bio/GHG benefits of the Destocked - natural land land use
+HIR_CEILING_PERCENTAGE = 0.9
 
 # Maintainace cost for HIR
 BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
@@ -569,7 +574,7 @@ If set to 100, all cells will be considered as priority degraded areas, equal to
 
 
 # Biodiversity quality options
-BIO_QUALITY_LAYER = 'MNES_likely_may' # 'Suitability', 'ECNES_likely_may', 'ECNES_likely', 'SNES_likely_may', 'SNES_likely', 'MNES_likely_may', 'MNES_likely'              
+BIO_QUALITY_LAYER = 'Suitability' # 'Suitability', 'ECNES_likely_may', 'ECNES_likely', 'SNES_likely_may', 'SNES_likely', 'MNES_likely_may', 'MNES_likely'              
 '''
 One of 'Suitability', 'ECNES_likely_may', 'ECNES_likely', 'SNES_likely_may', 'SNES_likely', 'MNES_likely_may', 'MNES_likely'.
     - 'Suitability': use the Zonation algorith to compute quanlity score over 10k species.
@@ -578,7 +583,7 @@ One of 'Suitability', 'ECNES_likely_may', 'ECNES_likely', 'SNES_likely_may', 'SN
 Essentially, the biodiversity quality layer determines how important (0-100) a cell is to the overall biodiversity value. 
     - By choosing 'Suitability' layer, you assume that the overal biodiversity is determined by considering all species (plants, 
       mamals, amphibians, birds, reptiles, etc). 
-    - If choosing one of the 'SNES_likely|may' layers, you assume that the overal biodiversity is determined by species species 
+    - If choosing one of the 'SNES_likely|may' layers, you assume that the overal biodiversity is determined by species 
       related to the Environment Protection and Biodiversity Conservation Act 1999 (EPBC Act). 
     - If choosing one of the 'ECNES_likely|may' layers, you assume that the overal biodiversity is determined by ecological
       communities related to the Environment Protection and Biodiversity Conservation Act 1999 (EPBC Act).
@@ -615,7 +620,7 @@ I.e., the lower bound of the connectivity score for weighting the raw biodiversi
 
 
 # Habitat condition data source
-HABITAT_CONDITION = 'USER_DEFINED'                  # One of [10, 25, 50, 75, 90], or 'USER_DEFINED'
+CONTRIBUTION_PERCENTILE = 'USER_DEFINED'                  # One of [10, 25, 50, 75, 90], or 'USER_DEFINED'
 '''
 Different land-use types have different biodiversity degradation impacts. We calculated the percentiles values of HCAS (indicating the
 suitability for wild animals ranging between 0-1) for each land-use type.Avaliable percentiles is one of [10, 25, 50, 75, 90].
@@ -669,7 +674,7 @@ GBF3_TARGETS_DICT = {
     'USER_DEFINED': None
 }
 
-BIODIVERSITY_TARGET_GBF_3  = 'medium'           # 'off', 'medium', 'high', or 'USER_DEFINED'
+BIODIVERSITY_TARGET_GBF_3  = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
 '''
 Target 3 of the Kunming-Montreal Global Biodiversity Framework:
 protect and manage 30% of the world's land, water, and coastal areas by 2030.
@@ -683,8 +688,8 @@ protect and manage 30% of the world's land, water, and coastal areas by 2030.
 
 
 # ------------------------------- Species parameters -------------------------------
-BIODIVERSITY_TARGET_GBF_4_SNES =  'on'           # 'on' or 'off'.
-BIODIVERSITY_TARGET_GBF_4_ECNES = 'on'           # 'on' or 'off'.
+BIODIVERSITY_TARGET_GBF_4_SNES =  'off'           # 'on' or 'off'.
+BIODIVERSITY_TARGET_GBF_4_ECNES = 'off'           # 'on' or 'off'.
 
 '''
 Target 4 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 
@@ -695,7 +700,7 @@ and manage human-wildlife interactions
 
 
 # -------------------------------- Climate change impacts on biodiversity -------------------------------
-BIODIVERSITY_TARGET_GBF_8 = 'on'           # 'on' or 'off'.
+BIODIVERSITY_TARGET_GBF_8 = 'off'           # 'on' or 'off'.
 '''
 Target 8 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 
 reduce the impacts of climate change on biodiversity and ecosystems.

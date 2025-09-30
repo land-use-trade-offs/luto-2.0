@@ -970,7 +970,7 @@ class Data:
         nat_land_CO2 = pd.read_hdf(os.path.join(settings.INPUT_DIR, "natural_land_t_co2_ha.h5"), where=self.MASK)
         
         # Get the carbon stock of unallowcated natural land
-        self.CO2E_STOCK_UNALL_NATURAL = np.array(
+        self.CO2E_STOCK_UNALL_NATURAL_TCO2_HA = np.array(
             nat_land_CO2['NATURAL_LAND_TREES_DEBRIS_SOIL_TCO2_HA'] - (nat_land_CO2['NATURAL_LAND_AGB_DEBRIS_TCO2_HA'] * (100 - fire_risk).to_numpy() / 100),  # everyting minus the fire DAMAGE
         )
         
@@ -1125,11 +1125,24 @@ class Data:
         in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
         """
 
-        biodiv_raw = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'bio_OVERALL_PRIORITY_RANK_AND_AREA_CONNECTIVITY.h5'), where=self.MASK)
+        
         biodiv_contribution_lookup = pd.read_csv(os.path.join(settings.INPUT_DIR, 'bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv'))                              
         
 
         # ------------- Biodiversity priority scores for maximising overall biodiversity conservation in Australia ----------------------------
+        
+        biodiv_raw = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'bio_OVERALL_PRIORITY_RANK_AND_AREA_CONNECTIVITY.h5'), where=self.MASK)
+        
+        # Get the biodiversity quality score 
+        if settings.BIO_QUALITY_LAYER == 'Suitability':
+            bio_quality_raw = biodiv_raw[f'BIODIV_PRIORITY_SSP{settings.SSP}'].values
+            performance_sheet = f'ssp{settings.SSP}'
+        elif 'NES' in settings.BIO_QUALITY_LAYER:
+            bio_quality_raw = xr.open_dataarray(f"{settings.INPUT_DIR}/bio_NES_Zonation.nc").sel(layer=settings.BIO_QUALITY_LAYER).compute().values[self.MASK]
+            performance_sheet = settings.BIO_QUALITY_LAYER
+        else:
+            raise ValueError(f"Invalid biodiversity quality layer: {settings.BIO_QUALITY_LAYER}, must be 'Suitability' or contain '*NES_likely|may' layers")
+
         
         # Get connectivity score
         match settings.CONNECTIVITY_SOURCE:
@@ -1144,68 +1157,54 @@ class Data:
             case _:
                 raise ValueError(f"Invalid connectivity source: {settings.CONNECTIVITY_SOURCE}, must be 'NCI', 'DWI' or 'NONE'")
             
-        self.CONNECTIVITY_SCORE = connectivity_score
 
         # Get the HCAS contribution scale (0-1)
-        match settings.HABITAT_CONDITION:
+        match settings.CONTRIBUTION_PERCENTILE:
             case 10 | 25 | 50 | 75 | 90:
-                bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')[f'PERCENTILE_{settings.HABITAT_CONDITION}'].to_dict()         # Get the biodiversity degradation score at specified percentile (pd.DataFrame)
+                bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')[f'PERCENTILE_{settings.CONTRIBUTION_PERCENTILE}'].to_dict()         # Get the biodiversity degradation score at specified percentile (pd.DataFrame)
                 unallow_nat_scale = bio_HCAS_contribution_lookup[self.DESC2AGLU['Unallocated - natural land']]                                          # Get the biodiversity degradation score for unallocated natural land (float)
                 bio_HCAS_contribution_lookup = {int(k): v * (1 / unallow_nat_scale) for k, v in bio_HCAS_contribution_lookup.items()}                   # Normalise the biodiversity degradation score to the unallocated natural land score
             case 'USER_DEFINED':
                 bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')['USER_DEFINED'].to_dict()
             case _:
-                print(f"WARNING!! Invalid habitat condition source: {settings.HABITAT_CONDITION}, must be one of [10, 25, 50, 75, 90], or 'USER_DEFINED'")
+                print(f"WARNING!! Invalid habitat condition source: {settings.CONTRIBUTION_PERCENTILE}, must be one of [10, 25, 50, 75, 90], or 'USER_DEFINED'")
         
         self.BIO_HABITAT_CONTRIBUTION_LOOK_UP = {j: round(x, settings.ROUND_DECMIALS) for j, x in bio_HCAS_contribution_lookup.items()}                 # Round to the specified decimal places to avoid numerical issues in the GUROBI solver
         
         
-        # Get the biodiversity contribution score 
-        if settings.BIO_QUALITY_LAYER == 'Suitability':
-            bio_contribution_raw = biodiv_raw[f'BIODIV_PRIORITY_SSP{settings.SSP}'].values
-        elif 'NES' in settings.BIO_QUALITY_LAYER:
-            bio_contribution_raw = xr.open_dataarray(f"{settings.INPUT_DIR}/bio_NES_Zonation.nc").sel(layer=settings.BIO_QUALITY_LAYER).compute().values
-            bio_contribution_raw = bio_contribution_raw[self.MASK]
-        else:
-            raise ValueError(f"Invalid biodiversity quality layer: {settings.BIO_QUALITY_LAYER}, must be 'Suitability' or contain '*NES_likely|may' layers")
-
-        self.BIO_CONNECTIVITY_RAW = bio_contribution_raw * connectivity_score                                          
-        self.BIO_CONNECTIVITY_LDS = np.where(                                                                     
+        # Get the biodiversity quantity score for each land use in each cell
+        self.BIO_QUALITY_RAW = bio_quality_raw * connectivity_score                                           
+        self.BIO_QUALITY_LDS = np.where(
             self.SAVBURN_ELIGIBLE, 
-            self.BIO_CONNECTIVITY_RAW * settings.BIO_CONTRIBUTION_LDS, 
-            self.BIO_CONNECTIVITY_RAW
+            self.BIO_QUALITY_RAW  - (self.BIO_QUALITY_RAW * (1 - settings.BIO_CONTRIBUTION_LDS)), 
+            self.BIO_QUALITY_RAW
         )
         
   
         # ------------------ Habitat condition impacts for habitat conservation (GBF2) in 'priority degraded areas' regions ---------------
         if settings.BIODIVERSITY_TARGET_GBF_2 != 'off':
-            
-            if settings.BIO_QUALITY_LAYER == 'Suitability':
-                performance_sheet = f'ssp{settings.SSP}'
-            elif 'NES' in settings.BIO_QUALITY_LAYER:
-                performance_sheet = settings.BIO_QUALITY_LAYER
-            else:
-                raise ValueError(f"Invalid biodiversity quality layer: {settings.BIO_QUALITY_LAYER}, must be 'Suitability' or contain '*NES_likely|may' layers")
 
             # Get the mask of 'priority degraded areas' for habitat conservation
-            conservation_performance_curve = pd.read_excel(os.path.join(settings.INPUT_DIR, 'BIODIVERSITY_GBF2_conservation_performance.xlsx'), sheet_name=performance_sheet
-                ).set_index('AREA_COVERAGE_PERCENT')['PRIORITY_RANK'].to_dict()
+            conservation_performance_curve = pd.read_excel(
+                os.path.join(settings.INPUT_DIR, 'BIODIVERSITY_GBF2_conservation_performance.xlsx'), 
+                sheet_name=performance_sheet
+            ).set_index('AREA_COVERAGE_PERCENT')['PRIORITY_RANK'].to_dict()
             
-            priority_degraded_areas_mask = bio_contribution_raw >= conservation_performance_curve[settings.GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT]
-            
-            self.BIO_PRIORITY_DEGRADED_AREAS_R = np.where(
+            self.BIO_GBF2_MASK = bio_quality_raw >= conservation_performance_curve[settings.GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT]
+            self.BIO_GBF2_MASK_LDS = np.where(
                 self.SAVBURN_ELIGIBLE,
-                priority_degraded_areas_mask * self.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
-                priority_degraded_areas_mask * self.REAL_AREA
+                self.BIO_GBF2_MASK  - (self.BIO_GBF2_MASK * (1 - settings.BIO_CONTRIBUTION_LDS)),
+                self.BIO_GBF2_MASK
             )
             
-            self.BIO_PRIORITY_DEGRADED_CONTRIBUTION_WEIGHTED_AREAS_BASE_YR_R = np.einsum(
-                'j,mrj,r->r',
+            self.BIO_GBF2_BASE_YR = np.einsum(
+                'j,mrj,r,r->r',
                 np.array(list(self.BIO_HABITAT_CONTRIBUTION_LOOK_UP.values())),
-                self.AG_L_MRJ,
-                self.BIO_PRIORITY_DEGRADED_AREAS_R
-            )
-
+                self.AG_L_MRJ,      # lumap in proportion representation if resfactored
+                self.BIO_GBF2_MASK,
+                self.REAL_AREA
+            ) - (self.SAVBURN_ELIGIBLE * self.BIO_GBF2_MASK * (1 - settings.BIO_CONTRIBUTION_LDS) * self.REAL_AREA)
+              
         
         ###############################################################
         # Vegetation data (GBF3).
@@ -1252,7 +1251,7 @@ class Data:
             # Apply Savanna Burning penalties
             self.NVIS_LAYERS_LDS = np.where(
                 self.SAVBURN_ELIGIBLE,
-                NVIS_layers * settings.BIO_CONTRIBUTION_LDS,
+                NVIS_layers  - (NVIS_layers * (1 - settings.BIO_CONTRIBUTION_LDS)),
                 NVIS_layers
             )
             
@@ -1637,9 +1636,9 @@ class Data:
         float
             The priority degrade areas conservation target for the given year.
         """
- 
-        bio_habitat_score_baseline_sum = self.BIO_PRIORITY_DEGRADED_AREAS_R.sum()
-        bio_habitat_score_base_yr_sum = self.BIO_PRIORITY_DEGRADED_CONTRIBUTION_WEIGHTED_AREAS_BASE_YR_R.sum()
+        
+        bio_habitat_score_baseline_sum = (self.BIO_GBF2_MASK * self.REAL_AREA).sum()
+        bio_habitat_score_base_yr_sum = self.BIO_GBF2_BASE_YR.sum()
         bio_habitat_score_base_yr_proportion = bio_habitat_score_base_yr_sum / bio_habitat_score_baseline_sum
 
         bio_habitat_target_proportion = [
@@ -1649,7 +1648,10 @@ class Data:
 
         targets_key_years = {
             self.YR_CAL_BASE: bio_habitat_score_base_yr_sum, 
-            **dict(zip(settings.GBF2_TARGETS_DICT[settings.BIODIVERSITY_TARGET_GBF_2].keys(), bio_habitat_score_baseline_sum * np.array(bio_habitat_target_proportion)))
+            **dict(zip(
+                settings.GBF2_TARGETS_DICT[settings.BIODIVERSITY_TARGET_GBF_2].keys(), 
+                bio_habitat_score_baseline_sum * np.array(bio_habitat_target_proportion)
+            ))
         }
 
         f = interp1d(

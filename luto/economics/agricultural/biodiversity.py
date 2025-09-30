@@ -30,7 +30,7 @@ from luto import tools
 from luto.data import Data
 
 
-def get_bio_overall_priority_score_matrices_mrj(data:Data):
+def get_bio_quality_score_mrj(data:Data):
     """
     Return b_mrj biodiversity score matrices by land management, cell, and land-use type.
 
@@ -44,8 +44,8 @@ def get_bio_overall_priority_score_matrices_mrj(data:Data):
 
     for j in range(data.N_AG_LUS):
         b_mrj[:, :, j] = (
-            data.BIO_CONNECTIVITY_LDS -                                                     # Biodiversity score after Late Dry Season (LDS) burning
-            (data.BIO_CONNECTIVITY_RAW * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[j]))    # Biodiversity degradation for land-use j
+            data.BIO_QUALITY_LDS -                                                     # Biodiversity score after Late Dry Season (LDS) burning
+            (data.BIO_QUALITY_RAW * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[j]))    # Biodiversity degradation for land-use j
         ) * data.REAL_AREA    
     
     return b_mrj
@@ -112,7 +112,7 @@ def get_savanna_burning_effect_b_mrj(data:Data):
 
     eds_sav_burning_biodiv_benefits = np.where(
         data.SAVBURN_ELIGIBLE, 
-        data.BIO_CONNECTIVITY_RAW * (1 - settings.BIO_CONTRIBUTION_LDS) * data.REAL_AREA, 
+        data.BIO_GBF2_MASK * (1 - settings.BIO_CONTRIBUTION_LDS) * data.REAL_AREA, 
         0
     ).astype(np.float32)
     
@@ -139,10 +139,14 @@ def get_agtech_ei_effect_b_mrj(data:Data):
 
 def get_biochar_effect_b_mrj(data:Data, ag_b_mrj: np.ndarray, yr_idx):
     """
-    Gets biodiversity impacts of using Biochar
+    Gets biodiversity impacts of using Biochar. If the ag_b_mrj comes from bio_quality,
+    then the biodiversity impact is calculated for the whole Australia. If the ag_b_mrj
+    comes from bio_GBF2, then the biodiversity impact is calculated only for the 'priority degraded areas'.
 
     Parameters
     - data: The input data object containing information about NLMS and NCELLS.
+    - ag_b_mrj: A numpy array representing the biodiversity scores by land management, cell, and land-use type.
+    - yr_idx: The index of the target year for which the biodiversity impacts are to be
 
     Returns
     - new_b_mrj: A numpy array representing the biodiversity impacts of using Biochar.
@@ -163,20 +167,24 @@ def get_biochar_effect_b_mrj(data:Data, ag_b_mrj: np.ndarray, yr_idx):
         if biodiv_impact != 1:
             j = lu_codes[lu_idx]
             b_mrj_effect[:, :, lu_idx] = ag_b_mrj[:, :, j] * (biodiv_impact - 1)
-
+            
     return b_mrj_effect
 
 
 
 def get_beef_hir_effect_b_mrj(data: Data, ag_b_mrj: np.ndarray) -> np.ndarray:
     """
-    Gets biodiversity impacts of using HIR on beef.
+    Gets biodiversity impacts of using HIR on beef. If the ag_b_mrj comes from bio_quality,
+    then the biodiversity impact is calculated for the whole Australia. If the ag_b_mrj
+    comes from bio_GBF2, then the biodiversity impact is calculated only for the 'priority degraded areas'.
 
-    Parameters:
+    Parameters
     - data: The input data object containing information about NLMS and NCELLS.
-
-    Returns:
-    - b_mrj_effect: A numpy array representing the biodiversity impacts of using Biochar.
+    - ag_b_mrj: A numpy array representing the biodiversity scores by land management, cell, and land-use type.
+    - yr_idx: The index of the target year for which the biodiversity impacts are to be calculated.
+    
+    Returns
+    - b_mrj_effect: A numpy array representing the biodiversity impacts of using HIR on beef.
     """
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
@@ -187,20 +195,27 @@ def get_beef_hir_effect_b_mrj(data: Data, ag_b_mrj: np.ndarray) -> np.ndarray:
     unallocated_b_mr = ag_b_mrj[:, :, unallocated_j]
 
     for idx, lu_code in enumerate(lu_codes):
-        b_mrj_effect[:, :, idx] = unallocated_b_mr * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[lu_code])
+        b_mrj_effect[:, :, idx] = (
+            unallocated_b_mr * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[lu_code])     # The proportional gap of biodiversity between beef-natural to full-natural
+            - (1 - settings.HIR_CEILING_PERCENTAGE)                                     # HIR achienves HIR_CEILING_PERCENTAGE% of full-natural biodiversity
+        )
 
     return b_mrj_effect
 
 
 def get_sheep_hir_effect_b_mrj(data: Data, ag_b_mrj: np.ndarray) -> np.ndarray:
     """
-    Gets biodiversity impacts of using HIR on beef.
+    Gets biodiversity impacts of using HIR on sheep. If the ag_b_mrj comes from bio_quality,
+    then the biodiversity impact is calculated for the whole Australia. If the ag_b_mrj
+    comes from bio_GBF2, then the biodiversity impact is calculated only for the 'priority degraded areas'.
 
-    Parameters:
+    Parameters
     - data: The input data object containing information about NLMS and NCELLS.
-
-    Returns:
-    - b_mrj_effect: A numpy array representing the biodiversity impacts of using Biochar.
+    - ag_b_mrj: A numpy array representing the biodiversity scores by land management, cell, and land-use type.
+    - yr_idx: The index of the target year for which the biodiversity impacts are to be calculated.
+    
+    Returns
+    - b_mrj_effect: A numpy array representing the biodiversity impacts of using HIR on sheep.
     """
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
@@ -211,12 +226,15 @@ def get_sheep_hir_effect_b_mrj(data: Data, ag_b_mrj: np.ndarray) -> np.ndarray:
     unallocated_b_mr = ag_b_mrj[:, :, unallocated_j]
 
     for idx, lu_code in enumerate(lu_codes):
-        b_mrj_effect[:, :, idx] = unallocated_b_mr * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[lu_code])
-
+        b_mrj_effect[:, :, idx] = (
+            unallocated_b_mr * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[lu_code])     # The proportional gap of biodiversity between beef-natural to full-natural
+            - (1 - settings.HIR_CEILING_PERCENTAGE)                                     # HIR achienves HIR_CEILING_PERCENTAGE% of full-natural biodiversity
+        )
+        
     return b_mrj_effect
 
 
-def get_agricultural_management_biodiversity_matrices(data:Data, ag_b_mrj: np.ndarray, yr_idx: int):
+def get_ag_mgt_biodiversity_matrices(data:Data, ag_b_mrj: np.ndarray, yr_idx: int):
     """
     Calculate the biodiversity matrices for different agricultural management practices.
 
@@ -348,7 +366,10 @@ def get_ag_management_biodiversity_contribution(
         am_contr_dict['HIR - Beef'] = {
             j_idx: (
                 np.ones(data.NCELLS).astype(np.float32) 
-                * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[tools.get_natural_beef_code(data)])    # The proportional gap of biodiversity between beef-natural to full-natural
+                * (
+                    (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[tools.get_natural_beef_code(data)])  # The proportional gap of biodiversity between beef-natural to full-natural
+                    - (1 - settings.HIR_CEILING_PERCENTAGE)                                         # The gap that HIR's biodiversity contribution to full-natural biodiversity 
+                )   
             )
             for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef'])
         }
@@ -356,7 +377,10 @@ def get_ag_management_biodiversity_contribution(
         am_contr_dict['HIR - Sheep'] = {
             j_idx: (
                 np.ones(data.NCELLS).astype(np.float32)
-                * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[tools.get_natural_sheep_code(data)])   # The proportional gap of biodiversity between sheep-natural to full-natural
+                * (
+                    (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[tools.get_natural_beef_code(data)])  # The proportional gap of biodiversity between beef-natural to full-natural
+                    - (1 - settings.HIR_CEILING_PERCENTAGE)                                         # The gap that HIR's biodiversity contribution to full-natural biodiversity 
+                )  
             )
             for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep'])
         }

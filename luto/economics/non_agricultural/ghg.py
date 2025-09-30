@@ -334,7 +334,7 @@ def get_ghg_destocked_land(
     
     for from_lu in data.LU_LVSTK_NATURAL:
         penalty_ghg_r[lumap_BASE_YR == from_lu] = (
-            data.CO2E_STOCK_UNALL_NATURAL[lumap_BASE_YR == from_lu]
+            data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA[lumap_BASE_YR == from_lu]
             * (data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[from_lu] - 1)
             * data.REAL_AREA[lumap_BASE_YR == from_lu]
             / settings.CARBON_EFFECTS_WINDOW    # Annualise carbon sequestration capacity to align the full grwoth span of a tree

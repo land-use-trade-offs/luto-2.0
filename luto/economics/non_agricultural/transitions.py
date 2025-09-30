@@ -420,7 +420,14 @@ def get_destocked_from_ag(
     data: Data, yr_idx, lumap, lmmap, separate=False
 ) -> np.ndarray | dict:
     """
-    Get transition costs from agricultural land uses to destocked land for each cell.
+    Get transition costs from agricultural land uses to destocked land for each cell, including
+     - Fixed cost of removing livestock
+     - Establishment cost, proportional to the increase of biodiversity/habitat contribution jumped
+     - Water costs of removing irrigation (if previously irrigated)
+    
+    The establishment cost is just calculated as `proportional of biodiversity benefit` * `Environmental Planting 
+    establishment cost per ha`, not meaning any actual planting is done.
+    
 
     Returns
     -------
@@ -433,20 +440,21 @@ def get_destocked_from_ag(
     """
     yr_cal = data.YR_CAL_BASE + yr_idx
     cells = np.isin(lumap, data.LU_LVSTK_NATURAL)
-            
-    # Restoration costs; E.g., if destocking brings 30% of bio/GHG benefits, then it takes 30% of establishment costs as Environmental Plantings
-    HCAS_benefit_mult = {lu:1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[lu] for lu in data.LU_LVSTK_NATURAL}
-    removal_cost_r = np.vectorize(HCAS_benefit_mult.get, otypes=[np.float32])(lumap) * data.EP_EST_COST_HA
-    removal_cost_r = np.nan_to_num(removal_cost_r)
-    removal_cost_r = tools.amortise(removal_cost_r * data.REAL_AREA)
     
-    # Fixed cost of removing livestock 
+    # Fixed cost of removing livestock
     ag2destock_j = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Destocked - natural land').values
     trans_cost_r = np.vectorize(dict(enumerate(ag2destock_j)).get, otypes=['float32'])(lumap)
     trans_cost_r = np.nan_to_num(trans_cost_r)
     trans_cost_r = tools.amortise(trans_cost_r * data.REAL_AREA)
     trans_cost_r[~cells] = 0.0
-    
+            
+    # Establishment cost, proportional to the `increase of biodiversity/habitat contribution` * `Environmental Planting establishment cost per ha`
+    # Note: This is just a notional cost, not meaning any actual planting is done
+    HCAS_benefit_mult = {lu:1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[lu] for lu in data.LU_LVSTK_NATURAL}
+    removal_cost_r = np.vectorize(HCAS_benefit_mult.get, otypes=[np.float32])(lumap) * data.EP_EST_COST_HA
+    removal_cost_r = np.nan_to_num(removal_cost_r)
+    removal_cost_r = tools.amortise(removal_cost_r * data.REAL_AREA)
+ 
     est_costs_r = removal_cost_r + trans_cost_r
         
     # Water costs; Assume destocked land is dryland
