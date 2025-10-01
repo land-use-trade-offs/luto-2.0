@@ -26,14 +26,21 @@ import pandas as pd
 
 
 # ---------------------------------------------------------------------------- #
-# LUTO model version.                                                                 #
+# Temporary settings                                                        #
+# ---------------------------------------------------------------------------- #
+
+DESTOCKED_FIX_PRICE = 2000
+
+
+# ---------------------------------------------------------------------------- #
+# LUTO model version.                                                          #
 # ---------------------------------------------------------------------------- #
 
 VERSION = '2.3'
 
 
 # ---------------------------------------------------------------------------- #
-# Spyder options                                                            #
+# Spyder options                                                               #
 # ---------------------------------------------------------------------------- #
 
 pd.set_option('display.width', 470)
@@ -52,7 +59,7 @@ RAW_DATA = '../raw_data'
 
 
 # ---------------------------------------------------------------------------- #
-# Scenario parameters.                                                                  #
+# Scenario parameters.                                                         #
 # ---------------------------------------------------------------------------- #
 
 # Climate change assumptions. Options include '126', '245', '370', '585'
@@ -187,23 +194,35 @@ THREADS = min(32, os.cpu_count())
 # No-Go areas; Regional adoption constraints
 # ---------------------------------------------------------------------------- #
 
-EXCLUDE_NO_GO_LU = False
+EXCLUDE_NO_GO_LU = False        # True or False
+'''
+The exclude no-go land-uses option.
+- True: exclude land-uses from no-go areas. User must provide the `NO_GO_VECTORS` dictionary, with land-use names as keys and shapefile paths as values.
+- False: do not exclude land-uses from no-go areas.
+'''
 NO_GO_VECTORS = {
     'Winter cereals':           os.path.join(os.path.abspath(INPUT_DIR), 'no_go_areas', 'no_go_Winter_cereals.shp'),
     'Environmental Plantings':  os.path.join(os.path.abspath(INPUT_DIR), 'no_go_areas', 'no_go_Enviornmental_Plantings.shp')
 }
 '''
 Land-use and vector file pairs to exclude land-use from being utilised in that area. 
- - The key is the land-use name. 
- - The value is the path to the ESRI shapefile.
+- The key is the land-use name. 
+- The value is the path to the ESRI shapefile.
 '''
 
-REGIONAL_ADOPTION_CONSTRAINTS = 'off'            # 'off', 
-                                                 # 'on', user needs to set the percentage targets in 'input/regional_adoption_zones.xlsx'
-                                                 # 'NON_AG_UNIFORM', each of the non-ag land uses can not exceed a certain percentage (REGIONAL_ADOPTION_NON_AG_UNIFORM) in every region
+REGIONAL_ADOPTION_CONSTRAINTS = 'off'            
+'''
+Adoption mode for non-ag land uses.
+- 'off': no regional adoption constraints
+- 'on', user needs to set the percentage targets in 'input/regional_adoption_zones.xlsx'
+- 'NON_AG_UNIFORM', each of the non-ag land uses can not exceed a certain percentage (REGIONAL_ADOPTION_NON_AG_UNIFORM) in every region
+'''
 
-REGIONAL_ADOPTION_NON_AG_UNIFORM = 15            # None or numbers between 0-100 (both inclusive); Only work under 'REGIONAL_ADOPTION_CONSTRAINTS = NON_AG_UNIFORM'
-                                                 #   E.g., 5 means each non-ag land can not exceed 5% adoption in every region
+REGIONAL_ADOPTION_NON_AG_UNIFORM = 15            
+'''
+None or numbers between 0-100 (both inclusive); 
+ Only work under 'REGIONAL_ADOPTION_CONSTRAINTS = NON_AG_UNIFORM'. E.g., 5 means each non-ag land can not exceed 5% adoption in every region.
+'''
                                         
 REGIONAL_ADOPTION_ZONE = 'NRM_CODE'              # 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
 '''

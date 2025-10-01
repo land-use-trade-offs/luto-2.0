@@ -61,8 +61,8 @@ def get_to_ag_exclude_matrices(data: Data, lumap: np.ndarray):
     x_mrj = data.EXCLUDE.copy().astype(np.int8)
 
     # Transition exclusion; Whether a landuse can be converted to another one (np.nan indicates NOT-ALLOW)
-    t_ij = data.T_MAT.loc[:,data.AGRICULTURAL_LANDUSES].copy()                                          # Lexicographical transition matix (2D, all-lus to ag-lus).
-    ag_cells, non_ag_cells = tools.get_ag_and_non_ag_cells(lumap)                                       # Get ag and non-ag index from base year lumap
+    t_ij = data.T_MAT.loc[:,data.AGRICULTURAL_LANDUSES].copy()                              # Lexicographical transition matix (2D, all-lus to ag-lus).
+    ag_cells, non_ag_cells = tools.get_ag_and_non_ag_cells(lumap)                           # Get ag and non-ag index from base year lumap
     lumap2desc = np.vectorize(data.ALLLU2DESC.get, otypes=[str])
     
     t_rj = np.ones((data.NCELLS, len(data.AGRICULTURAL_LANDUSES))).astype(np.float32)       # Empty ones_rj array to be filled with transition flag (1 allow, 0 not allow)
