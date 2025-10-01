@@ -27,7 +27,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = '../Custom_runs/20250924_RES5_HIGH_HIGH' # Do not include the trailing slash (/) in the end of the path
+TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20251001_RES5_DIFF_DESTOCK_TRAN_COST/" # Do not include the trailing slash (/) in the end of the path
 
 
 # Set the grid search parameters
@@ -59,8 +59,8 @@ grid_search = {
     'SSP': ['245'],                                                         #'126', '245', '370', '585'
     
     # --------------- Economics ---------------
-    'BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR': [10, 20, 30, 50, 100, 200],  # AUD/ha/year       
-    'SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR':[10, 20, 30, 50, 100, 200],  # AUD/ha/year  
+    'BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR': [100],  # AUD/ha/year       
+    'SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR':[100],  # AUD/ha/year  
 
     # --------------- Target deviation weight ---------------
     'SOLVER_WEIGHT_DEMAND': [1], 

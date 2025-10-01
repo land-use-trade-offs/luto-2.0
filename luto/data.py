@@ -722,8 +722,7 @@ class Data:
         # Raw transition cost matrix. In AUD/ha and ordered lexicographically.
         self.AG_TMATRIX = np.load(os.path.join(settings.INPUT_DIR, "ag_tmatrix.npy"))
         self.AG_TO_DESTOCKED_NATURAL_COSTS_HA = np.load(os.path.join(settings.INPUT_DIR, "ag_to_destock_tmatrix.npy"))
-        self.AG_TO_DESTOCKED_NATURAL_COSTS_HA = self.AG_TO_DESTOCKED_NATURAL_COSTS_HA + settings.DESTOCKED_FIX_PRICE - 1500
-        
+
         
   
         # Boolean x_mrj matrix with allowed land uses j for each cell r under lm.

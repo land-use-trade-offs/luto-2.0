@@ -505,7 +505,7 @@ def save_report_data(raw_data_dir:str):
     out_dict = {'AUSTRALIA': demand_type_wide.to_dict(orient='records')}
         
     filename = 'Production_overview_demand_type'
-    with open(fr'{SAVE_DIR}\{filename}.js', 'w') as f:
+    with open(fr'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
         json.dump(out_dict, f, separators=(',', ':'), indent=2)
         f.write(';\n')

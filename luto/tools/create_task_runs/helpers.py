@@ -378,6 +378,9 @@ def process_task_root_dirs(task_root_dir, n_workers=10):
 
         # Depending on output structure, the report can be found in different places
         json_dir_path = os.path.join(task_root_dir, run_dir, 'Run_Archive.zip')
+        if not os.path.exists(json_dir_path):
+            print(f'Warning: No output found for {run_dir}, skipping...')
+            continue
         tasks.append(delayed(get_report_df)(json_dir_path, run_paras))
         
         
