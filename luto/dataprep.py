@@ -19,21 +19,13 @@
 
 
 
-"""
-Script to load and prepare input data based on build.ipynb by F. de Haan
-and Brett Bryan, Deakin University
-
-"""
-
-
-# Load libraries
 import h5py
 import numpy as np
+import xarray as xr
 import pandas as pd
 import shutil, os, time, h5py
 
 from luto import settings
-
 
 from joblib import Parallel, delayed
 from itertools import product
@@ -59,13 +51,14 @@ def create_new_dataset():
     fdh_inpath = 'N:/LUF-Modelling/fdh-archive/data/neoluto-data/new-data-and-domain/'
     profit_map_inpath = 'N:/Data-Master/Profit_map/'
     water_domestic_use = 'N:/Data-Master/Water/Water_account/'
-    no_go_areas = 'N:/Data-Master/Regional_adoption_and_Social_license/'
+    no_go_areas = 'N:/Data-Master/Regional_adoption_and_Social_license/'    # just a toy example dataset
     nlum_inpath = 'N:/Data-Master/National_Landuse_Map/'
     BECCS_inpath = 'N:/Data-Master/BECCS/From_CSIRO/20211124_as_submitted/'
     GHG_off_land_inpath = 'N:/LUF-Modelling/Food_demand_AU/au.food.demand/Inputs/Off_land_GHG_emissions'
     bio_HACS_inpath = 'N:/Data-Master/Habitat_condition_assessment_system/Data/Processed/'
     bio_GBF2_inpath = 'N:/Data-Master/Biodiversity/DCCEEW/SNES_ECNES/Processed/'
     bio_GBF3_NVIS_inpath = 'N:/Data-Master/NVIS/Processed'
+    bio_GBF3_IBRA_inpath = 'N:/Data-Master/Australian_administrative_boundaries/ibra7_2019_aus/processed'
     bio_GBF4_inpath = bio_GBF2_inpath
     bio_GBF8_inpath = 'N:/Data-Master/Biodiversity/Environmental-suitability/Annual-species-suitability_20-year_snapshots_5km_to_NetCDF/'
     bio_NES_Zonation_inpath = bio_GBF4_inpath
@@ -80,10 +73,9 @@ def create_new_dataset():
     for file in os.scandir(outpath):
         if file.name != '.gitignore':
             os.remove(file.path)
-    for file in os.scandir(raw_data): os.remove(file.path)
+
 
     # Copy raw data files from their source into raw_data folder for further processing
-
     shutil.copyfile(fdh_inpath + 'tmatrix-cat2lus.csv', raw_data + 'tmatrix_cat2lus.csv')
     shutil.copyfile(fdh_inpath + 'transitions_costs_20250925.xlsx', raw_data + 'transitions_costs_20250925.xlsx')
 
@@ -160,8 +152,8 @@ def create_new_dataset():
     # Copy biodiversity GBF-3 data
     shutil.copyfile(bio_GBF3_NVIS_inpath + '/NVIS7_0_AUST_PRE_MVS.nc', outpath + 'bio_GBF3_NVIS_MVS.nc')
     shutil.copyfile(bio_GBF3_NVIS_inpath + '/NVIS7_0_AUST_PRE_MVG.nc', outpath + 'bio_GBF3_NVIS_MVG.nc')
-    
-    shutil.copyfile(bio_GBF3_NVIS_inpath + '/BIODIVERSITY_GBF3_SCORES_AND_TARGETS.xlsx', outpath + 'BIODIVERSITY_GBF3_SCORES_AND_TARGETS.xlsx')
+    shutil.copyfile(bio_GBF3_NVIS_inpath + '/BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS.xlsx', outpath + 'BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS.xlsx')
+    shutil.copyfile(bio_GBF3_IBRA_inpath + '/BIODIVERSITY_GBF3_IBRA_SCORES_AND_TARGETS.xlsx', outpath + 'BIODIVERSITY_GBF3_IBRA_SCORES_AND_TARGETS.xlsx')
 
     # Copy biodiversity GBF-4 files
     shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_SNES.nc', outpath + 'bio_GBF4_SNES.nc')
@@ -381,7 +373,46 @@ def create_new_dataset():
 
     # Save to file
     zones['CELL_HA'].to_hdf(outpath + 'real_area.h5', key='real_area', mode='w', format='table', index=False, complevel=9)
-
+    
+    
+    # IBRA region and subregion categorical maps (store ID->Name lookup as JSON string for NetCDF compatibility)
+    IBRA_region_arr = np.zeros((zones['IBRA_REG_NAME_7'].nunique(), zones.shape[0]), dtype=np.bool_) # shape=(regions, cells)
+    IBRA_subRegion_arr = np.zeros((zones['IBRA_SUB_NAME_7'].nunique(), zones.shape[0]), dtype=np.bool_) # shape=(subregions, cells)
+    
+    IBRA_region_id2name = dict(enumerate(zones['IBRA_REG_NAME_7'].cat.categories))
+    IBRA_subRegion_id2name = dict(enumerate(zones['IBRA_SUB_NAME_7'].cat.categories))
+    
+    for i,_ in IBRA_region_id2name.items():
+        IBRA_region_arr[i, :] = (zones['IBRA_REG_NAME_7'].cat.codes.values == i)
+        
+    for i,_ in IBRA_subRegion_id2name.items():
+        IBRA_subRegion_arr[i, :] = (zones['IBRA_SUB_NAME_7'].cat.codes.values == i)
+    
+    
+    REGION_IBRA_regions = xr.DataArray(
+        name='data',
+        data = IBRA_region_arr,
+        dims = ['region','cell'],
+        coords = {
+            'region':  list(IBRA_region_id2name.values()),
+            'cell': np.arange(zones.shape[0])},
+    )
+    REGION_IBRA_subregions = xr.DataArray(
+        name='data',
+        data = IBRA_subRegion_arr,
+        dims = ['subregion','cell'],
+        coords = {
+            'subregion':  list(IBRA_subRegion_id2name.values()),
+            'cell': np.arange(zones.shape[0])},
+    )
+    REGION_IBRA_regions.to_netcdf(
+        outpath + 'bio_GBF3_IBRA_Regions.nc', 
+        encoding={'data': {'dtype': 'bool', 'zlib': True, 'complevel': 9}}
+    )
+    REGION_IBRA_subregions.to_netcdf(
+        outpath + 'bio_GBF3_IBRA_SubRegions.nc', 
+        encoding={'data': {'dtype': 'bool', 'zlib': True, 'complevel': 9}}
+    )
 
 
     ############### Create ag_tmatrix -- agricultural transition cost matrix

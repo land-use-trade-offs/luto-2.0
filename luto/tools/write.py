@@ -1867,11 +1867,11 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
 
 
 def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
-    ''' Biodiversity GBF3 only being written to disk when `BIODIVERSITY_TARGET_GBF_3` is not 'off' '''
+    ''' Biodiversity GBF3 only being written to disk when `BIODIVERSITY_TARGET_GBF_3_NVIS` is not 'off' '''
         
     # Do nothing if biodiversity limits are off and no need to report
-    if settings.BIODIVERSITY_TARGET_GBF_3 == 'off':
-        return "Skipped: Biodiversity GBF3 scores not written as `BIODIVERSITY_TARGET_GBF_3` is set to 'off'"
+    if settings.BIODIVERSITY_TARGET_GBF_3_NVIS == 'off':
+        return "Skipped: Biodiversity GBF3 scores not written as `BIODIVERSITY_TARGET_GBF_3_NVIS` is set to 'off'"
     
         
     # Unpack the agricultural management land-use
@@ -1898,7 +1898,7 @@ def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
     vegetation_score_vr = xr.DataArray(
         ag_biodiversity.get_GBF3_major_vegetation_matrices_vr(data), 
         dims=['group','cell'], 
-        coords={'group':list(data.BIO_GBF3_ID2DESC.values()),  'cell':range(data.NCELLS)}
+        coords={'group':list(data.BIO_GBF3_NVIS_ID2DESC.values()),  'cell':range(data.NCELLS)}
     ).chunk({'cell': min(1024, data.NCELLS), 'group': 1})
 
     # Get the impacts of each ag/non-ag/am to vegetation matrices
@@ -1925,7 +1925,7 @@ def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
     
     # Get the base year biodiversity scores
     veg_base_score_score = pd.DataFrame({
-            'group': data.BIO_GBF3_ID2DESC.values(), 
+            'group': data.BIO_GBF3_NVIS_ID2DESC.values(), 
             'BASE_OUTSIDE_SCORE': data.BIO_GBF3_BASELINE_SCORE_OUTSIDE_LUTO, 
             'BASE_TOTAL_SCORE': data.BIO_GBF3_BASELINE_SCORE_ALL_AUSTRALIA,
             'TARGET_INSIDE_SCORE': data.get_GBF3_limit_score_inside_LUTO_by_yr(yr_cal)}

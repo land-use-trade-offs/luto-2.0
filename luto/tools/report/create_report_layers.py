@@ -439,7 +439,7 @@ def save_report_layer(data:Data):
         get_map_obj_float(data, bio_GBF2_nonag, f'{SAVE_DIR}/map_layers/map_bio_GBF2_NonAg.js')
         
     # GBF3
-    if settings.BIODIVERSITY_TARGET_GBF_3 != 'off':
+    if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off':
         bio_GBF3_ag = files_bio.query('base_name == "xr_biodiversity_GBF3_vegetation_ag"')
         get_map_obj_float(data, bio_GBF3_ag, f'{SAVE_DIR}/map_layers/map_bio_GBF3_Ag.js')
 

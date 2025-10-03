@@ -285,23 +285,23 @@ def get_GBF2_mask_area_r(data: Data) -> np.ndarray:
     return output
 
 def get_GBF3_contribution_area_vr(data: Data):
-    if settings.BIODIVERSITY_TARGET_GBF_3 == "off":
+    if settings.BIODIVERSITY_TARGET_GBF_3_NVIS == "off":
         return np.empty(0)
     print('Getting agricultural major vegetation groups matrices...', flush = True)
     output = ag_biodiversity.get_GBF3_major_vegetation_matrices_vr(data)
     return output
 
 def get_GBF3_major_vegetation_names(data: Data) -> dict[int,str]:
-    if settings.BIODIVERSITY_TARGET_GBF_3 == "off":
+    if settings.BIODIVERSITY_TARGET_GBF_3_NVIS == "off":
         return np.empty(0)
     print('Getting agricultural major vegetation groups names...', flush = True)
-    return data.BIO_GBF3_ID2DESC
+    return data.BIO_GBF3_NVIS_ID2DESC
 
 def get_GBF3_major_indices(data: Data) -> dict[str, int]:
-    if settings.BIODIVERSITY_TARGET_GBF_3 == "off":
+    if settings.BIODIVERSITY_TARGET_GBF_3_NVIS == "off":
         return np.empty(0)
     print('Getting agricultural major vegetation groups indices...', flush = True)
-    return data.MAJOR_VEG_INDECES
+    return data.GBF3_NVIS_IDX
 
 def get_GBF4_SNES_contribution_area_sr(data: Data) -> np.ndarray:
     if settings.BIODIVERSITY_TARGET_GBF_4_SNES != "on":
@@ -685,7 +685,7 @@ def get_limits(data: Data, yr_cal: int, resale_factors) -> dict[str, Any]:
         limits["GBF2"] = data.get_GBF2_target_for_yr_cal(yr_cal)
         limits["GBF2_rescale"] = limits["GBF2"] / resale_factors['GBF2']
 
-    if settings.BIODIVERSITY_TARGET_GBF_3 != 'off':
+    if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off':
         limits["GBF3"] = data.get_GBF3_limit_score_inside_LUTO_by_yr(yr_cal)
         limits["GBF3_rescale"] = limits["GBF3"] / resale_factors['GBF3']
         
@@ -847,7 +847,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
             else 1.0),
         "GBF3":(
             rescale_solver_input_data([GBF3_contribution_area_vr])
-            if settings.BIODIVERSITY_TARGET_GBF_3 != "off"
+            if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != "off"
             else 1.0
         ),
         "GBF4_SNES":(

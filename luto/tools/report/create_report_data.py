@@ -2638,7 +2638,7 @@ def save_report_data(raw_data_dir:str):
             
             
             
-    if settings.BIODIVERSITY_TARGET_GBF_3 != 'off':
+    if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off':
         filter_str = '''
             category == "biodiversity" 
             and base_name.str.contains("biodiversity_GBF3")

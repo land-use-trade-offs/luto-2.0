@@ -1208,47 +1208,49 @@ class Data:
               
         
         ###############################################################
-        # Vegetation data (GBF3).
+        # Biogeographic Regionalisation (GBF3).
         ###############################################################
-        if settings.BIODIVERSITY_TARGET_GBF_3 != 'off':
+        if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off':
         
             print("\tLoading vegetation data...", flush=True)
             
             # Read in the pre-1750 vegetation statistics, and get NVIS class names and areas
-            GBF3_targets_df = pd.read_excel(
-                settings.INPUT_DIR + '/BIODIVERSITY_GBF3_SCORES_AND_TARGETS.xlsx',
-                sheet_name = f'NVIS_{settings.GBF3_TARGET_CLASS}'
+            GBF3_NVIS_targets_df = pd.read_excel(
+                settings.INPUT_DIR + '/BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS.xlsx',
+                sheet_name = f'NVIS_{settings.GBF3_NVIS_TARGET_CLASS}'
             ).sort_values(by='group', ascending=True)
             
             
-            if settings.BIODIVERSITY_TARGET_GBF_3 == 'USER_DEFINED':
-                self.GBF3_GROUPS_SEL = [row['group'] for _,row in GBF3_targets_df.iterrows()
+            if settings.BIODIVERSITY_TARGET_GBF_3_NVIS == 'USER_DEFINED':
+                self.GBF3_NVIS_SEL = [row['group'] for _,row in GBF3_NVIS_targets_df.iterrows()
                     if all([
                         row['USER_DEFINED_TARGET_PERCENT_2030']>0,
                         row['USER_DEFINED_TARGET_PERCENT_2050']>0,
                         row['USER_DEFINED_TARGET_PERCENT_2100']>0]
                     )]
-                self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS = GBF3_targets_df.query('group.isin(@self.GBF3_GROUPS_SEL)')
+                self.GBF3_NVIS_BASELINE_AND_TARGETS = GBF3_NVIS_targets_df.query('group.isin(@self.GBF3_NVIS_SEL)')
             else:
-                self.GBF3_GROUPS_SEL = GBF3_targets_df['group'].tolist()
-                self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS = GBF3_targets_df.query('group.isin(@self.GBF3_GROUPS_SEL)')
-                self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS[[
+                self.GBF3_NVIS_SEL = GBF3_NVIS_targets_df['group'].tolist()
+                self.GBF3_NVIS_BASELINE_AND_TARGETS = GBF3_NVIS_targets_df.query('group.isin(@self.GBF3_NVIS_SEL)')
+                self.GBF3_NVIS_BASELINE_AND_TARGETS[[
                     'USER_DEFINED_TARGET_PERCENT_2030',
                     'USER_DEFINED_TARGET_PERCENT_2050', 
-                    'USER_DEFINED_TARGET_PERCENT_2100']] = settings.GBF3_TARGETS_DICT[settings.BIODIVERSITY_TARGET_GBF_3]
+                    'USER_DEFINED_TARGET_PERCENT_2100']] = settings.GBF3_TARGETS_DICT[settings.BIODIVERSITY_TARGET_GBF_3_NVIS]
                 
 
-            self.BIO_GBF3_BASELINE_SCORE_ALL_AUSTRALIA = self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS['AREA_WEIGHTED_SCORE_ALL_AUSTRALIA_HA'].to_numpy()
-            self.BIO_GBF3_BASELINE_SCORE_OUTSIDE_LUTO = self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS['AREA_WEIGHTED_SCORE_OUTSIDE_LUTO_NATURAL_HA'].to_numpy()
-            self.BIO_GBF3_ID2DESC = dict(enumerate(self.GBF3_GROUPS_SEL))
-            self.BIO_GBF3_N_CLASSES = len(self.GBF3_GROUPS_SEL) 
-            
-            
+            self.BIO_GBF3_NVIS_BASELINE_AUSTRALIA = self.GBF3_NVIS_BASELINE_AND_TARGETS['AREA_WEIGHTED_SCORE_ALL_AUSTRALIA_HA'].to_numpy()
+            self.BIO_GBF3_NVIS_BASELINE_OUTSIDE_LUTO = self.GBF3_NVIS_BASELINE_AND_TARGETS['AREA_WEIGHTED_SCORE_OUTSIDE_LUTO_NATURAL_HA'].to_numpy()
+
             
             # Read in vegetation layer data
-            NVIS_layers = xr.open_dataarray(settings.INPUT_DIR + f"/bio_GBF3_NVIS_{settings.GBF3_TARGET_CLASS}.nc").sel(group=self.GBF3_GROUPS_SEL)
+            NVIS_layers = xr.open_dataarray(settings.INPUT_DIR + f"/bio_GBF3_NVIS_{settings.GBF3_NVIS_TARGET_CLASS}.nc").sel(group=self.GBF3_NVIS_SEL)
+            self.BIO_GBF3_NVIS_ID2DESC = dict(enumerate(NVIS_layers.group.values))
             NVIS_layers = np.array([self.get_exact_resfactored_average_arr_without_lu_mask(arr) for arr in NVIS_layers], dtype=np.float32) / 100.0  # divide by 100 to get the percentage of the area in each cell that is covered by the vegetation type
-
+            
+            # Make sure the target has the same order as the layers
+            self.GBF3_NVIS_BASELINE_AND_TARGETS['order'] = self.GBF3_NVIS_BASELINE_AND_TARGETS['group'].apply(lambda x: list(NVIS_layers.group.values).index(x))
+            self.GBF3_NVIS_BASELINE_AND_TARGETS = self.GBF3_NVIS_BASELINE_AND_TARGETS.sort_values(by='order').drop(columns='order')
+    
             # Apply Savanna Burning penalties
             self.NVIS_LAYERS_LDS = np.where(
                 self.SAVBURN_ELIGIBLE,
@@ -1258,12 +1260,62 @@ class Data:
             
             # Container storing which cells apply to each major vegetation group
             epsilon = 1e-5
-            self.MAJOR_VEG_INDECES = {
+            self.GBF3_NVIS_IDX = {
                 v: np.where(NVIS_layers[v] > epsilon)[0]
                 for v in range(NVIS_layers.shape[0])
             }
             
             
+        if settings.BIODIVERSITY_TARGET_GBF_3_IBRA != 'off':
+            print("\tLoading bioregional data...", flush=True)
+            
+            # Read in the pre-1750 vegetation statistics, and get IBRA class names and areas
+            GBF3_IBRA_targets_df = pd.read_excel(
+                settings.INPUT_DIR + '/BIODIVERSITY_GBF3_IBRA_SCORES_AND_TARGETS.xlsx',
+                sheet_name = f'{settings.GBF3_IBRA_TARGET_CLASS}'
+            ).sort_values(by='Region', ascending=True)
+            
+            
+            if settings.BIODIVERSITY_TARGET_GBF_3_IBRA == 'USER_DEFINED':
+                self.GBF3_IBRA_SEL = [row['Region'] for _,row in GBF3_IBRA_targets_df.iterrows()
+                    if all([
+                        row['USER_DEFINED_TARGET_PERCENT_2030']>0,
+                        row['USER_DEFINED_TARGET_PERCENT_2050']>0,
+                        row['USER_DEFINED_TARGET_PERCENT_2100']>0]
+                    )]
+                self.GBF3_IBRA_BASELINE_AND_TARGETS = GBF3_IBRA_targets_df.query('Region.isin(@self.GBF3_IBRA_SEL)')
+            else:
+                self.GBF3_IBRA_SEL = GBF3_IBRA_targets_df['Region'].tolist()
+                self.GBF3_IBRA_BASELINE_AND_TARGETS = GBF3_IBRA_targets_df.query('Region.isin(@self.GBF3_IBRA_SEL)')
+                self.GBF3_IBRA_BASELINE_AND_TARGETS[[
+                    'USER_DEFINED_TARGET_PERCENT_2030',
+                    'USER_DEFINED_TARGET_PERCENT_2050', 
+                    'USER_DEFINED_TARGET_PERCENT_2100']] = settings.GBF3_TARGETS_DICT[settings.BIODIVERSITY_TARGET_GBF_3_IBRA]
+                
+            self.BIO_GBF3_IBRA_BASELINE_AUSTRALIA = self.GBF3_IBRA_BASELINE_AND_TARGETS['AREA_WEIGHTED_SCORE_ALL_AUSTRALIA_HA'].to_numpy()
+            self.BIO_GBF3_IBRA_BASELINE_OUTSIDE_LUTO = self.GBF3_IBRA_BASELINE_AND_TARGETS['AREA_WEIGHTED_SCORE_OUTSIDE_LUTO_NATURAL_HA'].to_numpy()
+        
+            # Read in IBRA layer data
+            IBRA_layers = xr.open_dataarray(settings.INPUT_DIR + f"/bio_GBF3_{settings.GBF3_IBRA_TARGET_CLASS}.nc")
+            self.BIO_GBF3_IBRA_ID2DESC = dict(enumerate(self.GBF3_IBRA_SEL))
+            IBRA_layers = np.array([self.get_exact_resfactored_average_arr_without_lu_mask(arr) for arr in IBRA_layers.sel(region=self.GBF3_IBRA_SEL)], dtype=np.float32) 
+            
+            # Make sure the target has the same order as the layers
+            self.GBF3_IBRA_BASELINE_AND_TARGETS['order'] = self.GBF3_IBRA_BASELINE_AND_TARGETS['Region'].apply(lambda x: list(IBRA_layers.region.values).index(x))
+            self.GBF3_IBRA_BASELINE_AND_TARGETS = self.GBF3_IBRA_BASELINE_AND_TARGETS.sort_values(by='order').drop(columns='order')
+            
+            # Apply Savanna Burning penalties
+            self.IBRA_LAYERS_LDS = np.where(
+                self.SAVBURN_ELIGIBLE,
+                IBRA_layers  - (IBRA_layers * (1 - settings.BIO_CONTRIBUTION_LDS)),
+                IBRA_layers
+            )
+            
+            self.GBF3_IBRA_IDX = {
+                v: np.where(IBRA_layers[v] > 0)[0]
+                for v in range(IBRA_layers.shape[0])
+            }
+
  
         
         ##########################################################################
@@ -1671,7 +1723,7 @@ class Data:
         '''
         
         GBF3_target_percents = []
-        for _,row in self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS.iterrows():
+        for _,row in self.GBF3_NVIS_BASELINE_AND_TARGETS.iterrows():
             f = interp1d(
                 [2010, 2030, 2050, 2100],
                 [min(row['BASE_YR_PERCENT'],row['USER_DEFINED_TARGET_PERCENT_2030']), 
@@ -1684,8 +1736,8 @@ class Data:
             )
             GBF3_target_percents.append(f(yr).item())
         
-        limit_score_all_AUS = self.BIO_GBF3_BASELINE_SCORE_ALL_AUSTRALIA * (np.array(GBF3_target_percents) / 100)  # Convert the percentage to proportion
-        limit_score_inside_LUTO = limit_score_all_AUS - self.BIO_GBF3_BASELINE_SCORE_OUTSIDE_LUTO
+        limit_score_all_AUS = self.BIO_GBF3_NVIS_BASELINE_AUSTRALIA * (np.array(GBF3_target_percents) / 100)  # Convert the percentage to proportion
+        limit_score_inside_LUTO = limit_score_all_AUS - self.BIO_GBF3_NVIS_BASELINE_OUTSIDE_LUTO
             
         return np.where(limit_score_inside_LUTO < 0, 0, limit_score_inside_LUTO)
 

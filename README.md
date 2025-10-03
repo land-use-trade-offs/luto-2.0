@@ -219,7 +219,7 @@ settings.SIM_YEARS = [2010, 2020, 2030, 2040, 2050]
 settings.WATER_LIMITS = 'on'                            # 'on' or 'off'. 
 settings.GHG_EMISSIONS_LIMITS = 'high'                  # 'off', 'low', 'medium', or 'high'
 settings.BIODIVERSITY_TARGET_GBF_2 = 'high'             # 'off', 'low', 'medium', or 'high'
-settings.BIODIVERSITY_TARGET_GBF_3  = 'off'             # 'off', 'medium', 'high', or 'USER_DEFINED'   
+settings.BIODIVERSITY_TARGET_GBF_3_NVIS  = 'off'             # 'off', 'medium', 'high', or 'USER_DEFINED'   
 settings.BIODIVERSITY_TARGET_GBF_4_SNES =  'off'        # 'on' or 'off'.
 settings.BIODIVERSITY_TARGET_GBF_4_ECNES = 'off'        # 'on' or 'off'.
 settings.BIODIVERSITY_TARGET_GBF_8 = 'off'              # 'on' or 'off'.
@@ -269,7 +269,7 @@ LUTO2 behavior can be customized through the `luto.settings` module. Key paramet
 - `GHG_EMISSIONS_LIMITS`: Greenhouse gas emission targets ('off', 'low', 'medium', 'high')
 - `WATER_LIMITS`: Whether to enforce water yield constraints ('on' or 'off')
 - `BIODIVERSITY_TARGET_GBF_2`: Global Biodiversity Framework Target 2 ('off', 'low', 'medium', 'high')
-- `BIODIVERSITY_TARGET_GBF_3`: Conservation targets for vegetation types ('off', 'medium', 'high')
+- `BIODIVERSITY_TARGET_GBF_3_NVIS`: Conservation targets for vegetation types ('off', 'medium', 'high')
 
 ### Land Use Options
 - `NON_AG_LAND_USES`: Enable/disable non-agricultural land uses (Environmental Plantings, Carbon Plantings, etc.)
