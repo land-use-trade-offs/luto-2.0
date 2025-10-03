@@ -39,72 +39,72 @@ LUTO2 comes with a full diagram to illustrate its data preparation, workflow, an
 The LUTO2 codebase is organized into the following structure:
 
 ```
-luto/                                # Main package directory
-├── data.py                          # Core data management and loading
-├── simulation.py                    # Main simulation engine
-├── settings.py                      # Configuration parameters
-├── dataprep.py                      # Data preprocessing utilities
-├── helpers.py                       # Utility functions
-├── economics/                       # Economic models and calculations
-│   ├── agricultural/                # Agricultural economics modules
-│   │   ├── biodiversity.py          # Biodiversity calculations
-│   │   ├── cost.py                  # Cost calculations
-│   │   ├── ghg.py                   # GHG emissions calculations
-│   │   ├── quantity.py              # Production quantity calculations
-│   │   ├── revenue.py               # Revenue calculations
-│   │   ├── transitions.py           # Land use transition costs
-│   │   └── water.py                 # Water yield calculations
-│   ├── non_agricultural/            # Non-agricultural economics modules
-│   │   ├── biodiversity.py          # Non-ag biodiversity impacts
-│   │   ├── cost.py                  # Non-ag establishment costs
-│   │   ├── ghg.py                   # Non-ag GHG calculations
-│   │   ├── quantity.py              # Non-ag production quantities
-│   │   ├── revenue.py               # Non-ag revenue streams
-│   │   ├── transitions.py           # Non-ag transition costs
-│   │   └── water.py                 # Non-ag water impacts
-│   ├── off_land_commodity/          # Off-land commodity economics
-│   └── land_use_culling.py          # Land use optimization culling
-├── solvers/                         # Optimization solvers and algorithms
-│   ├── input_data.py                # GUROBI solver input preparation
-│   └── solver.py                    # GUROBI solver interface
-├── tests/                           # Unit and integration tests
-└── tools/                           # Utility tools and scripts
-    ├── create_task_runs/            # Task execution and batch processing
-    │   ├── bash_scripts/            # Shell scripts and conda environment
+luto/                                    # Main package directory
+├── data.py                              # Core data management and loading
+├── simulation.py                        # Main simulation engine
+├── settings.py                          # Configuration parameters
+├── dataprep.py                          # Data preprocessing utilities
+├── helpers.py                           # Utility functions
+├── economics/                           # Economic models and calculations
+│   ├── agricultural/                    # Agricultural economics modules
+│   │   ├── biodiversity.py              # Biodiversity calculations
+│   │   ├── cost.py                      # Cost calculations
+│   │   ├── ghg.py                       # GHG emissions calculations
+│   │   ├── quantity.py                  # Production quantity calculations
+│   │   ├── revenue.py                   # Revenue calculations
+│   │   ├── transitions.py               # Land use transition costs
+│   │   └── water.py                     # Water yield calculations
+│   ├── non_agricultural/                # Non-agricultural economics modules
+│   │   ├── biodiversity.py              # Non-ag biodiversity impacts
+│   │   ├── cost.py                      # Non-ag establishment costs
+│   │   ├── ghg.py                       # Non-ag GHG calculations
+│   │   ├── quantity.py                  # Non-ag production quantities
+│   │   ├── revenue.py                   # Non-ag revenue streams
+│   │   ├── transitions.py               # Non-ag transition costs
+│   │   └── water.py                     # Non-ag water impacts
+│   ├── off_land_commodity/              # Off-land commodity economics
+│   └── land_use_culling.py              # Land use optimization culling
+├── solvers/                             # Optimization solvers and algorithms
+│   ├── input_data.py                    # GUROBI solver input preparation
+│   └── solver.py                        # GUROBI solver interface
+├── tests/                               # Unit and integration tests
+└── tools/                               # Utility tools and scripts
+    ├── create_task_runs/                # Task execution and batch processing
+    │   ├── bash_scripts/                # Shell scripts and conda environment
     │   ├── create_grid_search_tasks.py  # Grid search task generation
-    │   ├── helpers.py               # Task run utilities
-    │   └── parameters.py            # Task run parameters
-    ├── Manual_jupyter_books/        # Documentation notebooks
-    │   ├── helpers/                 # Notebook helper functions
-    │   └── asset/                   # Notebook assets and data descriptions
-    ├── report/                      # Reporting and visualization system
-    │   ├── VUE_modules/             # Vue.js 3 interactive reporting dashboard
-    │   │   ├── components/          # Reusable Vue components
-    │   │   ├── data/                # Chart data files
-    │   │   │   ├── chart_option/    # Chart configuration options
-    │   │   │   ├── geo/             # Geographic boundary data
-    │   │   │   └── map_layers/      # Map layer data
-    │   │   ├── dataTransform/       # Data transformation scripts
-    │   │   ├── lib/                 # JavaScript libraries (Vue, Leaflet, Highcharts)
-    │   │   ├── routes/              # Vue router configuration
-    │   │   ├── services/            # Data and map services
-    │   │   ├── views/               # Vue view components (11 modules)
-    │   │   ├── index.html           # Main HTML entry point
-    │   │   └── index.js             # Vue application entry
-    │   ├── Assets/                  # Color schemes and styling assets
-    │   ├── data_tools/              # Data processing for reports
-    │   ├── map_tools/               # Spatial visualization utilities
-    │   ├── create_report_data.py    # Generate chart data files
-    │   └── create_report_layers.py  # Generate map layer files
-    ├── plotmap.py                   # Mapping utilities
-    ├── spatializers.py              # Spatial data processing and upsampling
-    └── write.py                     # Output writing functions
-
-input/                               # Input data directory (requires separate download)
-output/                              # Simulation outputs with interactive HTML reports
-docs/                                # Documentation files
-requirements.txt                     # Python package dependencies
-pyproject.toml                       # Project configuration
+    │   ├── helpers.py                   # Task run utilities
+    │   └── parameters.py                # Task run parameters
+    ├── Manual_jupyter_books/            # Documentation notebooks
+    │   ├── helpers/                     # Notebook helper functions
+    │   └── asset/                       # Notebook assets and data descriptions
+    ├── report/                          # Reporting and visualization system
+    │   ├── VUE_modules/                 # Vue.js 3 interactive reporting dashboard
+    │   │   ├── components/              # Reusable Vue components
+    │   │   ├── data/                    # Chart data files
+    │   │   │   ├── chart_option/        # Chart configuration options
+    │   │   │   ├── geo/                 # Geographic boundary data
+    │   │   │   └── map_layers/          # Map layer data
+    │   │   ├── dataTransform/           # Data transformation scripts
+    │   │   ├── lib/                     # JavaScript libraries (Vue, Leaflet, Highcharts)
+    │   │   ├── routes/                  # Vue router configuration
+    │   │   ├── services/                # Data and map services
+    │   │   ├── views/                   # Vue view components (11 modules)
+    │   │   ├── index.html               # Main HTML entry point
+    │   │   └── index.js                 # Vue application entry
+    │   ├── Assets/                      # Color schemes and styling assets
+    │   ├── data_tools/                  # Data processing for reports
+    │   ├── map_tools/                   # Spatial visualization utilities
+    │   ├── create_report_data.py        # Generate chart data files
+    │   └── create_report_layers.py      # Generate map layer files
+    ├── plotmap.py                       # Mapping utilities
+    ├── spatializers.py                  # Spatial data processing and upsampling
+    └── write.py                         # Output writing functions
+    
+input/                                   # Input data directory (requires separate download)
+output/                                  # Simulation outputs with interactive HTML reports
+docs/                                    # Documentation files
+requirements.txt                         # Python package dependencies
+pyproject.toml                           # Project configuration
 ```
 
 ## Troubleshooting
@@ -157,21 +157,10 @@ cd luto-2.0
 
 ### 2. Set Up Environment
 
-#### Option A: Conda Environment (Recommended)
 ```bash
 # Create and activate the LUTO environment
 conda env create -f luto/tools/create_task_runs/bash_scripts/conda_env.yml
 conda activate luto
-```
-
-#### Option B: pip install
-```bash
-# Create virtual environment
-python -m venv luto_env
-source luto_env/bin/activate  # On Windows: luto_env\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
 ```
 
 ### 3. Configure GUROBI Solver
@@ -185,14 +174,6 @@ LUTO2 requires GUROBI for optimization. Follow these steps:
 The LUTO2 input database is approximately 40 GB and contains sensitive data. 
 Please contact **b.bryan@deakin.edu.au** to request access to the input dataset.
 
-### 5. Run Tests (Optional)
-```bash
-# Run all tests using pytest
-python -m pytest
-
-# Run specific test modules
-python -m pytest luto/tests/
-```
 
 ## Running LUTO2
 
@@ -216,13 +197,14 @@ import luto.settings as settings
 settings.RESFACTOR = 10                                 # 10 makes the spatial resolution to ~10km. 
 settings.SIM_YEARS = [2010, 2020, 2030, 2040, 2050]
 
-settings.WATER_LIMITS = 'on'                            # 'on' or 'off'. 
+settings.WATER_LIMITS = 'on'                            # 'on' or 'off'.
 settings.GHG_EMISSIONS_LIMITS = 'high'                  # 'off', 'low', 'medium', or 'high'
 settings.BIODIVERSITY_TARGET_GBF_2 = 'high'             # 'off', 'low', 'medium', or 'high'
-settings.BIODIVERSITY_TARGET_GBF_3_NVIS  = 'off'             # 'off', 'medium', 'high', or 'USER_DEFINED'   
-settings.BIODIVERSITY_TARGET_GBF_4_SNES =  'off'        # 'on' or 'off'.
-settings.BIODIVERSITY_TARGET_GBF_4_ECNES = 'off'        # 'on' or 'off'.
-settings.BIODIVERSITY_TARGET_GBF_8 = 'off'              # 'on' or 'off'.
+settings.BIODIVERSITY_TARGET_GBF_3_NVIS = 'off'         # 'off', 'medium', 'high', or 'USER_DEFINED'
+settings.BIODIVERSITY_TARGET_GBF_3_IBRA = 'off'         # 'off', 'medium', 'high', or 'USER_DEFINED'
+settings.BIODIVERSITY_TARGET_GBF_4_SNES = 'off'         # 'on' or 'off'
+settings.BIODIVERSITY_TARGET_GBF_4_ECNES = 'off'        # 'on' or 'off'
+settings.BIODIVERSITY_TARGET_GBF_8 = 'off'              # 'on' or 'off'
 
 # Load data with custom parameters
 data = sim.load_data()
@@ -269,7 +251,11 @@ LUTO2 behavior can be customized through the `luto.settings` module. Key paramet
 - `GHG_EMISSIONS_LIMITS`: Greenhouse gas emission targets ('off', 'low', 'medium', 'high')
 - `WATER_LIMITS`: Whether to enforce water yield constraints ('on' or 'off')
 - `BIODIVERSITY_TARGET_GBF_2`: Global Biodiversity Framework Target 2 ('off', 'low', 'medium', 'high')
-- `BIODIVERSITY_TARGET_GBF_3_NVIS`: Conservation targets for vegetation types ('off', 'medium', 'high')
+- `BIODIVERSITY_TARGET_GBF_3_NVIS`: Conservation targets for NVIS vegetation types ('off', 'medium', 'high', 'USER_DEFINED')
+- `BIODIVERSITY_TARGET_GBF_3_IBRA`: Conservation targets for IBRA bioregions ('off', 'medium', 'high', 'USER_DEFINED')
+- `BIODIVERSITY_TARGET_GBF_4_SNES`: Species of National Environmental Significance ('on' or 'off')
+- `BIODIVERSITY_TARGET_GBF_4_ECNES`: Ecological Communities of National Environmental Significance ('on' or 'off')
+- `BIODIVERSITY_TARGET_GBF_8`: Species and group targets ('on' or 'off')
 
 ### Land Use Options
 - `NON_AG_LAND_USES`: Enable/disable non-agricultural land uses (Environmental Plantings, Carbon Plantings, etc.)
