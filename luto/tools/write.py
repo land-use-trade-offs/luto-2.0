@@ -1194,7 +1194,7 @@ def write_ghg_separate(data: Data, yr_cal, path):
     # Save table to disk
     pd.concat([ghg_df_AUS, ghg_df_region]).to_csv(os.path.join(path, f'GHG_emissions_separate_agricultural_landuse_{yr_cal}.csv'), index=False)
 
-    save2nc(ghg_e, os.path.join(path, 'xr_GHG_ag.nc'))
+    save2nc(ghg_e, os.path.join(path, f'xr_GHG_ag_{yr_cal}.nc'))
 
 
     # -----------------------------------------------------------#
