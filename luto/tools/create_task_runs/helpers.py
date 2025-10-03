@@ -244,6 +244,8 @@ def create_task_runs(
 
 def get_json_data_from_zip(zip_path, json_filename):
     with zipfile.ZipFile(os.path.join(zip_path), 'r') as zip_ref:
+        if f'DATA_REPORT/data/{json_filename}' not in zip_ref.namelist():
+            return {}
         with zip_ref.open(f'DATA_REPORT/data/{json_filename}') as f:
             json_part = f.read().decode('utf-8').split('=')[1][:-2] # split at '=' and remove the trailing ';\n'
             json_data = json.loads(json_part)
@@ -255,6 +257,9 @@ def return_df_ag(json_data):
     '''
     Ag data is 3-level nested, with region, water supply, and records.
     '''
+    if len(json_data) == 0:
+        return pd.DataFrame()
+    
     records_with_metadata = []
     for region, region_data in json_data.items():
         for water_supply, records in region_data.items():
@@ -275,6 +280,9 @@ def return_df_ag_mgt(json_data):
     '''
     Ag management data is 4-level nested, with region, ag-management, water supply, and records.
     '''
+    if len(json_data) == 0:
+        return pd.DataFrame()
+    
     records_with_metadata = []
     for region, region_data in json_data.items():
         for ag_mgt, ag_mgt_data in region_data.items():
@@ -296,6 +304,9 @@ def return_df_plain(json_data):
     '''
     Plain data is 2-level nested, with region and records.
     '''
+    if len(json_data) == 0:
+        return pd.DataFrame()
+    
     records_with_metadata = []
     for region, records in json_data.items():
         for record in records:
