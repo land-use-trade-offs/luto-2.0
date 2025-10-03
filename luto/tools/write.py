@@ -1896,7 +1896,7 @@ def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
 
     # Get vegetation matrices for the year
     vegetation_score_vr = xr.DataArray(
-        ag_biodiversity.get_GBF3_major_vegetation_matrices_vr(data), 
+        ag_biodiversity.get_GBF3_NVIS_matrices_vr(data), 
         dims=['group','cell'], 
         coords={'group':list(data.BIO_GBF3_NVIS_ID2DESC.values()),  'cell':range(data.NCELLS)}
     ).chunk({'cell': min(1024, data.NCELLS), 'group': 1})

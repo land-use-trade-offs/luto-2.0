@@ -30,6 +30,7 @@ from luto import tools
 from luto.data import Data
 
 
+################################ Functions below calculate biodiversity matrices for the bio-objective of the solover ################################
 def get_bio_quality_score_mrj(data:Data):
     """
     Return b_mrj biodiversity score matrices by land management, cell, and land-use type.
@@ -112,7 +113,7 @@ def get_savanna_burning_effect_b_mrj(data:Data):
 
     eds_sav_burning_biodiv_benefits = np.where(
         data.SAVBURN_ELIGIBLE, 
-        data.BIO_GBF2_MASK * (1 - settings.BIO_CONTRIBUTION_LDS) * data.REAL_AREA, 
+        data.BIO_QUALITY_RAW * (1 - settings.BIO_CONTRIBUTION_LDS) * data.REAL_AREA, 
         0
     ).astype(np.float32)
     
@@ -267,7 +268,11 @@ def get_ag_mgt_biodiversity_matrices(data:Data, ag_b_mrj: np.ndarray, yr_idx: in
     }
 
 
-def get_GBF3_major_vegetation_matrices_vr(data:Data) -> np.ndarray:
+
+
+################################ Functions below calculate biodiversity matrices for the bio-constraints of the solover ################################
+
+def get_GBF3_NVIS_matrices_vr(data:Data) -> np.ndarray:
     return data.NVIS_LAYERS_LDS * data.REAL_AREA
 
 

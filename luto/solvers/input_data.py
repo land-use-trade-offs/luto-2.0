@@ -288,7 +288,7 @@ def get_GBF3_contribution_area_vr(data: Data):
     if settings.BIODIVERSITY_TARGET_GBF_3_NVIS == "off":
         return np.empty(0)
     print('Getting agricultural major vegetation groups matrices...', flush = True)
-    output = ag_biodiversity.get_GBF3_major_vegetation_matrices_vr(data)
+    output = ag_biodiversity.get_GBF3_NVIS_matrices_vr(data)
     return output
 
 def get_GBF3_major_vegetation_names(data: Data) -> dict[int,str]:
