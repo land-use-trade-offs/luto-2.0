@@ -64,12 +64,20 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 - **`luto/settings.py`**: Configuration parameters for all model aspects
 - **`luto/solvers/`**: Optimization solver interface and input data preparation
   - `solver.py`: GUROBI solver wrapper (LutoSolver class)
+    - Biodiversity constraint methods: `_add_GBF2_constraints()`, `_add_GBF3_NVIS_constraints()`, `_add_GBF4_SNES_constraints()`, `_add_GBF4_ECNES_constraints()`, `_add_GBF8_constraints()`
   - `input_data.py`: Prepares optimization model input data
+    - Biodiversity data attributes use `*_pre_1750_area_*` naming (e.g., `GBF3_NVIS_pre_1750_area_vr`, `GBF4_SNES_pre_1750_area_sr`)
+    - `rescale_solver_input_data()`: **In-place** rescaling of arrays to magnitude 0-1e3 for numerical stability
 
 ### Economic Modules
 - **`luto/economics/agricultural/`**: Agricultural land use economics
   - Revenue, cost, quantity, water, biodiversity, GHG calculations
   - Transition costs between agricultural land uses
+  - **Biodiversity module** (`biodiversity.py`): GBF (Global Biodiversity Framework) calculations
+    - `get_GBF2_MASK_area()`: Returns GBF2 priority degraded areas (mask × real area)
+    - `get_GBF3_NVIS_matrices_vr()`: NVIS vegetation layer matrices for GBF3
+    - `get_GBF4_SNES_matrix_sr()`, `get_GBF4_ECNES_matrix_sr()`: Species/Ecological Community NES matrices
+    - Variable naming convention: `*_pre_1750_area_*` for baseline biodiversity area matrices
 - **`luto/economics/non_agricultural/`**: Non-agricultural land use economics
   - Environmental plantings, carbon plantings, etc.
 - **`luto/economics/off_land_commodity/`**: Off-land commodity economics
@@ -98,7 +106,12 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 ### Environmental Constraints
 - `GHG_EMISSIONS_LIMITS`: Greenhouse gas targets ('off', 'low', 'medium', 'high')
 - `WATER_LIMITS`: Water yield constraints ('on' or 'off')
-- `BIODIVERSITY_TARGET_GBF_*`: Various Global Biodiversity Framework targets
+- `BIODIVERSITY_TARGET_GBF_*`: Global Biodiversity Framework targets
+  - `BIODIVERSITY_TARGET_GBF_2`: Priority degraded areas restoration ('off' or percentage target)
+  - `BIODIVERSITY_TARGET_GBF_3_NVIS`: NVIS vegetation group targets ('off' or percentage target)
+  - `BIODIVERSITY_TARGET_GBF_4_SNES`: Species NES (National Environmental Significance) ('on' or 'off')
+  - `BIODIVERSITY_TARGET_GBF_4_ECNES`: Ecological Community NES ('on' or 'off')
+  - `BIODIVERSITY_TARGET_GBF_8`: Species conservation targets ('on' or 'off')
 
 ### Solver Configuration
 - `SOLVE_METHOD`: GUROBI algorithm (default: 2 for barrier method)
@@ -109,10 +122,13 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 
 1. **Data Loading**: `luto.data.Data` class loads spatial datasets from `/input/`
 2. **Preprocessing**: `dataprep.py` processes raw data into model-ready formats
-3. **Economic Calculations**: Economics modules calculate costs, revenues, transitions
+3. **Economic Calculations**: Economics modules calculate costs, revenues, transitions, biodiversity impacts
 4. **Solver Input**: `solvers/input_data.py` prepares optimization model data
-5. **Optimization**: `solvers/solver.py` runs GUROBI optimization
+   - Biodiversity matrices: GBF2 mask areas, GBF3 NVIS layers, GBF4 SNES/ECNES matrices, GBF8 species data
+   - Data rescaling: Arrays rescaled in-place to 0-1e3 magnitude for numerical stability
+5. **Optimization**: `solvers/solver.py` runs GUROBI optimization with biodiversity constraints
 6. **Output Generation**: `tools/write.py` writes results to `/output/`
+   - Biodiversity outputs: GBF2/3/4/8 scores, species impacts, vegetation group restoration
 
 ## Output Structure
 
@@ -134,6 +150,36 @@ Results are saved in `/output/<timestamp>/`:
 - Uses pytest with hypothesis for property-based testing
 - Tests focus on robustness of core functionality
 - Run tests before making significant changes to ensure model integrity
+
+## Biodiversity Module Naming Conventions
+
+The biodiversity module follows consistent naming conventions for GBF (Global Biodiversity Framework) variables:
+
+### Variable Naming Pattern
+- **Pre-1750 baseline areas**: Use `*_pre_1750_area_*` suffix
+  - Examples: `GBF3_NVIS_pre_1750_area_vr`, `GBF4_SNES_pre_1750_area_sr`, `GBF8_pre_1750_area_sr`
+  - These represent baseline biodiversity area matrices before land use changes
+
+### Function Naming Pattern
+- **GBF constraint methods**: Use `_add_GBF{N}_{TYPE}_constraints()` format
+  - Examples: `_add_GBF2_constraints()`, `_add_GBF3_NVIS_constraints()`, `_add_GBF4_SNES_constraints()`
+  - Maintain consistency between method names and GBF target types
+
+### Data Structure Indices
+- `v, r`: Vegetation group (v) × cell (r) - used for GBF3 NVIS data
+- `s, r`: Species/community (s) × cell (r) - used for GBF4 and GBF8 data
+- `r`: Cell only - used for GBF2 mask data
+
+### Key GBF Modules
+1. **GBF2**: Priority degraded areas restoration
+   - Function: `get_GBF2_MASK_area(data)` returns mask × real area
+2. **GBF3**: NVIS major vegetation group targets
+   - Function: `get_GBF3_NVIS_matrices_vr(data)` returns vegetation layers
+3. **GBF4**: Species and Ecological Community NES
+   - SNES: `get_GBF4_SNES_matrix_sr(data)`
+   - ECNES: `get_GBF4_ECNES_matrix_sr(data)`
+4. **GBF8**: Species conservation
+   - Function: `get_GBF8_species_matrices_sr(data, target_year)`
 
 ## Vue.js Reporting System Architecture
 
