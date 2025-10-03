@@ -39,13 +39,13 @@ print(report_data['Type'].unique())
 
 
 ####################### GHG #######################
-report_data_ghg = report_data.query('Type == "GHG_tCO2e"').copy().reset_index()
+report_data_ghg = report_data.query('Type == "GHG_tCO2e" and BIODIVERSITY_TARGET_GBF_2 == "high"').copy().reset_index()
 report_data_ghg['name'].unique()
 
 fig = (
     p9.ggplot() +
     p9.geom_col(
-        data=report_data_ghg.query('name != "Net emissions"'),
+        data=report_data_ghg.query('name not in ["Net emissions", "GHG emission limit"]', engine='python'),
         mapping = p9.aes(
             x='year', 
             y='value / 1e6', 
@@ -64,7 +64,8 @@ fig = (
         color='black',
         size=1,
     ) +
-    p9.facet_wrap(
+    p9.facet_grid(
+        'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT',
         'CARBON_EFFECTS_WINDOW',
         labeller='label_both',
     ) +
