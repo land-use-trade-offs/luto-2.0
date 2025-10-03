@@ -77,7 +77,7 @@ def create_new_dataset():
 
     # Copy raw data files from their source into raw_data folder for further processing
     shutil.copyfile(fdh_inpath + 'tmatrix-cat2lus.csv', raw_data + 'tmatrix_cat2lus.csv')
-    shutil.copyfile(fdh_inpath + 'transitions_costs_20250925.xlsx', raw_data + 'transitions_costs_20250925.xlsx')
+    shutil.copyfile(fdh_inpath + 'transitions_costs_20251002.xlsx', raw_data + 'transitions_costs_20251002.xlsx')
 
     shutil.copyfile(profit_map_inpath + 'NLUM_SPREAD_LU_ID_Mapped_Concordance.h5', raw_data + 'NLUM_SPREAD_LU_ID_Mapped_Concordance.h5')
 
@@ -191,7 +191,7 @@ def create_new_dataset():
 
     # Read in from-to costs in category-to-category format
     # tmcat = pd.read_csv(raw_data + 'tmatrix_categories.csv', index_col = 0)
-    tmcat = pd.read_excel( raw_data + 'transitions_costs_20250925.xlsx'
+    tmcat = pd.read_excel( raw_data + 'transitions_costs_20251002.xlsx'
                           , sheet_name = 'Current'
                           , usecols = 'B:M'
                           , skiprows = 5
@@ -199,13 +199,13 @@ def create_new_dataset():
                           , index_col = 0)
 
     # Read transition costs from agricultural land to environmental plantings
-    ag_to_new_land_uses = pd.read_excel( raw_data + 'transitions_costs_20250925.xlsx'
+    ag_to_new_land_uses = pd.read_excel( raw_data + 'transitions_costs_20251002.xlsx'
                                        , sheet_name = 'Ag_to_new_land-uses'
                                        , usecols = 'B,C'
                                        , index_col = 0 )
     
     # Read transition costs of ag to destocked natural land
-    ag_to_natural_land = pd.read_excel( raw_data + 'transitions_costs_20250925.xlsx'
+    ag_to_natural_land = pd.read_excel( raw_data + 'transitions_costs_20251002.xlsx'
                                         , sheet_name = 'Ag_to_destock_natural'
                                         , index_col = 0 
                                         ).sort_values(by = 'LU_DESC', ascending = True)
@@ -213,7 +213,7 @@ def create_new_dataset():
     
     # Read land clearing costs for non-agricultural land to unallocated modified land
     tmat_clear_data = pd.read_excel(
-        raw_data + 'transitions_costs_20250925.xlsx',
+        raw_data + 'transitions_costs_20251002.xlsx',
         sheet_name='Current',
         usecols='F',
         skiprows=19,
@@ -375,7 +375,7 @@ def create_new_dataset():
     zones['CELL_HA'].to_hdf(outpath + 'real_area.h5', key='real_area', mode='w', format='table', index=False, complevel=9)
     
     
-    # IBRA region and subregion categorical maps (store ID->Name lookup as JSON string for NetCDF compatibility)
+    ############### IBRA region and subregion categorical maps 
     IBRA_region_arr = np.zeros((zones['IBRA_REG_NAME_7'].nunique(), zones.shape[0]), dtype=np.bool_) # shape=(regions, cells)
     IBRA_subRegion_arr = np.zeros((zones['IBRA_SUB_NAME_7'].nunique(), zones.shape[0]), dtype=np.bool_) # shape=(subregions, cells)
     
