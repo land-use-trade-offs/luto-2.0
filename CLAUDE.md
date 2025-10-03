@@ -215,7 +215,7 @@ All reporting views follow the progressive selection pattern:
 - **Dynamic ChartData Structure**: Biodiversity data is conditionally loaded based on scenario settings
   - **Conditional Loading Logic**: Only load GBF scripts when corresponding targets are not 'off':
     - `BIODIVERSITY_TARGET_GBF_2 !== 'off'` → loads GBF2 data
-    - `BIODIVERSITY_TARGET_GBF_3 !== 'off'` → loads GBF3 data
+    - `BIODIVERSITY_TARGET_GBF_3_NVIS !== 'off'` → loads GBF3 data
     - `BIODIVERSITY_TARGET_GBF_4_SNES !== 'off'` → loads GBF4 (SNES) data
     - `BIODIVERSITY_TARGET_GBF_4_ECNES !== 'off'` → loads GBF4 (ECNES) data
     - `BIODIVERSITY_TARGET_GBF_8 !== 'off'` → loads GBF8 (SPECIES & GROUP) data

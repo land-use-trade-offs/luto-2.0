@@ -101,7 +101,7 @@ grid_search = {
     'GBF2_CONSTRAINT_TYPE': ['hard'],                                       # 'hard' or 'soft'
 
     # --------------- Biodiversity settings - GBF 3 ---------------
-    'BIODIVERSITY_TARGET_GBF_3': ['off'],                                   # 'off', 'medium', 'high', 'USER_DEFINED'
+    'BIODIVERSITY_TARGET_GBF_3_NVIS': ['off'],                                   # 'off', 'medium', 'high', 'USER_DEFINED'
     
     # --------------- Biodiversity settings - GBF 4 ---------------
     'BIODIVERSITY_TARGET_GBF_4_SNES': ['off'],                              # 'on' or 'off'.

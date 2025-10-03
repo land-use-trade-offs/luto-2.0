@@ -875,7 +875,7 @@ class LutoSolver:
 
 
     def _add_GBF3_major_vegetation_group_limit_constraints(self) -> None:
-        if settings.BIODIVERSITY_TARGET_GBF_3 == "off":
+        if settings.BIODIVERSITY_TARGET_GBF_3_NVIS == "off":
             print("      |__ TURNING OFF constraints for biodiversity GBF 3 (major vegetation groups)")
             return
 
@@ -1622,7 +1622,7 @@ class LutoSolver:
         )
         prod_data["BIO (GBF3) value (ha)"]=(
             0                                                                               
-            if settings.BIODIVERSITY_TARGET_GBF_3 == "off"         
+            if settings.BIODIVERSITY_TARGET_GBF_3_NVIS == "off"         
             else {
                 k: v.getValue() * self._input_data.scale_factors['GBF3'] 
                 for k,v in self.bio_GBF3_exprs.items()
@@ -1698,7 +1698,7 @@ class LutoSolver:
                 ),
                 "Deviation BIO (GBF3) value (ha)":(
                     0                                                                               
-                    if settings.BIODIVERSITY_TARGET_GBF_3 == "off"         
+                    if settings.BIODIVERSITY_TARGET_GBF_3_NVIS == "off"         
                     else [
                         v - self._input_data.limits['GBF3'][k]
                         for k,v in prod_data["BIO (GBF3) value (ha)"].items()

@@ -162,7 +162,7 @@ window.HomeView = {
       if (runScenario.value['BIODIVERSITY_TARGET_GBF_2'] !== 'off') {
         await loadScript(chartOverview_bio_GBF2['path'], chartOverview_bio_GBF2['name'], VIEW_NAME);
       }
-      if (runScenario.value['BIODIVERSITY_TARGET_GBF_3'] !== 'off') {
+      if (runScenario.value['BIODIVERSITY_TARGET_GBF_3_NVIS'] !== 'off') {
         await loadScript(chartOverview_bio_GBF3['path'], chartOverview_bio_GBF3['name'], VIEW_NAME);
       }
       if (runScenario.value['BIODIVERSITY_TARGET_GBF_4_SNES'] !== 'off') {
@@ -258,7 +258,7 @@ window.HomeView = {
       if (runScenario.value['BIODIVERSITY_TARGET_GBF_2'] !== 'off') {
         ChartData.value['Biodiversity']['GBF2'] = window[chartOverview_bio_GBF2['name']];
       }
-      if (runScenario.value['BIODIVERSITY_TARGET_GBF_3'] !== 'off') {
+      if (runScenario.value['BIODIVERSITY_TARGET_GBF_3_NVIS'] !== 'off') {
         ChartData.value['Biodiversity']['GBF3'] = window[chartOverview_bio_GBF3['name']];
       }
       if (runScenario.value['BIODIVERSITY_TARGET_GBF_4_SNES'] !== 'off') {
