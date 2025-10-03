@@ -1741,10 +1741,12 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
         ).chunk({'cell': min(1024, data.NCELLS)}
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
 
-
+    # Get the priority degraded areas 
+    GBF2_MASK_area_ha = ag_biodiversity.get_GBF2_MASK_area(data)
+    
     # Get the priority degraded areas score
     priority_degraded_area_score_r = xr.DataArray(
-        data.BIO_GBF2_MASK_LDS,
+        GBF2_MASK_area_ha,
         dims=['cell'],
         coords={'cell':range(data.NCELLS)}
     )
@@ -1776,7 +1778,7 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
 
 
     # Get the total area of the priority degraded areas
-    total_priority_degraded_area = data.BIO_GBF2_MASK_LDS.sum()
+    total_priority_degraded_area = GBF2_MASK_area_ha.sum()
 
     # Calculate xarray biodiversity GBF2 scores
     xr_gbf2_ag = priority_degraded_area_score_r * ag_impact_j * ag_dvar_mrj

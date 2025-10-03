@@ -272,6 +272,9 @@ def get_ag_mgt_biodiversity_matrices(data:Data, ag_b_mrj: np.ndarray, yr_idx: in
 
 ################################ Functions below calculate biodiversity matrices for the bio-constraints of the solover ################################
 
+def get_GBF2_MASK_area(data:Data) -> np.ndarray:
+    return data.BIO_GBF2_MASK * data.REAL_AREA
+
 def get_GBF3_NVIS_matrices_vr(data:Data) -> np.ndarray:
     return data.NVIS_LAYERS_LDS * data.REAL_AREA
 
