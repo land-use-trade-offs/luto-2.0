@@ -432,14 +432,14 @@ def save_report_layer(data:Data):
         
     # GBF3-NVIS
     if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off':
-        bio_GBF3_ag = files_bio.query('base_name == "xr_biodiversity_GBF3_NVIS_ag"')
-        get_map_obj_float(data, bio_GBF3_ag, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_Ag.js')
+        bio_GBF3_NVIS_ag = files_bio.query('base_name == "xr_biodiversity_GBF3_NVIS_ag"')
+        get_map_obj_float(data, bio_GBF3_NVIS_ag, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_Ag.js')
 
-        bio_GBF3_am = files_bio.query('base_name == "xr_biodiversity_GBF3_NVIS_ag_management"')
-        get_map_obj_float(data, bio_GBF3_am, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_Am.js')
+        bio_GBF3_NVIS_am = files_bio.query('base_name == "xr_biodiversity_GBF3_NVIS_ag_management"')
+        get_map_obj_float(data, bio_GBF3_NVIS_am, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_Am.js')
 
-        bio_GBF3_nonag = files_bio.query('base_name == "xr_biodiversity_GBF3_NVIS_non_ag"')
-        get_map_obj_float(data, bio_GBF3_nonag, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_NonAg.js')
+        bio_GBF3_NVIS_nonag = files_bio.query('base_name == "xr_biodiversity_GBF3_NVIS_non_ag"')
+        get_map_obj_float(data, bio_GBF3_NVIS_nonag, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_NonAg.js')
         
     # GBF3-IBRA
     if settings.BIODIVERSITY_TARGET_GBF_3_IBRA != 'off':

@@ -2697,7 +2697,7 @@ def save_report_data(raw_data_dir:str):
             df = df.drop(['region'], axis=1)
             out_dict[region] = df.to_dict(orient='records')
 
-        filename = f'BIO_GBF3_overview_sum'
+        filename = f'BIO_GBF3_NVIS_overview_sum'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
@@ -2726,7 +2726,7 @@ def save_report_data(raw_data_dir:str):
             df = df.drop(['region'], axis=1)
             out_dict[region] = df.to_dict(orient='records')
 
-        filename = f'BIO_GBF3_overview_Ag'
+        filename = f'BIO_GBF3_NVIS_overview_Ag'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
@@ -2751,7 +2751,7 @@ def save_report_data(raw_data_dir:str):
             df = df.drop(['region'], axis=1)
             out_dict[region] = df.to_dict(orient='records')
 
-        filename = f'BIO_GBF3_overview_Am'
+        filename = f'BIO_GBF3_NVIS_overview_Am'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
@@ -2780,7 +2780,7 @@ def save_report_data(raw_data_dir:str):
             df = df.drop(['region'], axis=1)
             out_dict[region] = df.to_dict(orient='records')
 
-        filename = f'BIO_GBF3_overview_NonAg'
+        filename = f'BIO_GBF3_NVIS_overview_NonAg'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
@@ -2811,7 +2811,7 @@ def save_report_data(raw_data_dir:str):
                 out_dict[region][species][water] = {}
             out_dict[region][species][water] = df.to_dict(orient='records')
             
-        filename = f'BIO_GBF3_Ag'
+        filename = f'BIO_GBF3_NVIS_Ag'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
@@ -2840,7 +2840,7 @@ def save_report_data(raw_data_dir:str):
                 out_dict[region][species][water] = {}
             out_dict[region][species][water] = df.to_dict(orient='records')
 
-        filename = f'BIO_GBF3_Am'
+        filename = f'BIO_GBF3_NVIS_Am'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
@@ -2866,7 +2866,7 @@ def save_report_data(raw_data_dir:str):
                 out_dict[region] = {}
             out_dict[region][species] = df.to_dict(orient='records')
 
-        filename = f'BIO_GBF3_NonAg'
+        filename = f'BIO_GBF3_NVIS_NonAg'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
