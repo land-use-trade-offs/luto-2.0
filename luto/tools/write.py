@@ -142,15 +142,29 @@ def create_report(data: Data):
 
         
 def save2nc(in_xr:xr.DataArray, save_path:str):
+    
+    # Ensure dask chunking: keep 'cell' chunks as full length, others as 1
+    chunks_size = dict(zip(in_xr.dims, in_xr.shape))
+    chunks_size = {k: (v if k == 'cell' else 1) for k, v in chunks_size.items()}
+    in_xr = in_xr.chunk(chunks_size)
+ 
     encoding = {'data':{
         'dtype': 'float32',
         'zlib': True,
         'complevel': 4,
-        'chunksizes': [v[0] for k, v in in_xr.chunksizes.items()]
+        'chunksizes': list(chunks_size.values())
     }}
     in_xr.name = 'data'
     in_xr = in_xr.drop_vars(set(in_xr.coords) - set(in_xr.dims))
-    in_xr.astype('float32').to_netcdf(save_path, encoding=encoding, compute=True)
+    
+    # Precalculate valid layers as attribute
+    valid_df = (in_xr.sum(['cell']) == 0).to_dataframe('isEmpty').query('isEmpty != True')
+    loop_sel = valid_df.index.to_frame().to_dict('records')
+    
+    in_xr.attrs['valid_layers'] = str(loop_sel)
+    in_xr.astype('float32')\
+        .to_netcdf(save_path, encoding=encoding, compute=False)\
+        .compute(scheduler='threads', num_workers=settings.WRITE_THREADS)
 
 
 

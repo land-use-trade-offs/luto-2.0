@@ -159,10 +159,6 @@ def map2base64_float(rxr_path:str, arr_lyr:xr.DataArray, attrs:tuple) -> dict|No
             rxr_arr = rxr_ds['__xarray_dataarray_variable__']
             rxr_crs = rxr_ds['spatial_ref'].attrs['crs_wkt']
 
-        # Skip if the layer is empty
-        if arr_lyr.sum() == 0:
-            return 
-
         # Normalize the layer
         min_val = np.nanmin(arr_lyr.values)
         max_val = np.nanmax(arr_lyr.values)
@@ -205,23 +201,19 @@ def get_map_obj_float(data:Data, files_df:pd.DataFrame, save_path:str, workers:i
     # Get an template rio-xarray, it will be used to convert 1D array to its 2D map format
     template_xr = f'{data.path}/out_{sorted(settings.SIM_YEARS)[0]}/xr_map_lumap_{sorted(settings.SIM_YEARS)[0]}.nc'
     
-    # Get dim info
-    with xr.open_dataarray(files_df.iloc[0]['path']) as arr_eg:
-        loop_dims = set(arr_eg.dims) - set(['cell', 'y', 'x'])
-        
-        dim_vals = pd.MultiIndex.from_product(
-            [arr_eg[dim].values for dim in loop_dims],
-            names=loop_dims
-        ).to_list()
-
-        loop_sel = [dict(zip(loop_dims, val)) for val in dim_vals]
-        
     # Loop through each year
     task = []
     for _,row in files_df.iterrows():
-        xr_arr = xr.load_dataarray(row['path'])
+        xr_arr = xr.open_dataarray(row['path'])
+        chunks = {k:1 for k in xr_arr.dims}
+        chunks.update({'cell':-1})
+        
+        xr_arr = xr_arr.chunk(chunks)  # the cell dimension is full size, all other dimensions are 1
         _year = row['Year']
         
+        # Skip empty layers, the valid layers are precalculated and stored as attribute
+        loop_sel = eval(xr_arr.attrs['valid_layers'])
+
         for sel in loop_sel:
             arr_sel = xr_arr.sel(**sel) 
             
@@ -239,7 +231,7 @@ def get_map_obj_float(data:Data, files_df:pd.DataFrame, save_path:str, workers:i
                     'Sheep lexp': 'Sheep live export',
                     'Beef lexp': 'Beef live export'
                 }.get(commodity, commodity)
-                
+   
             task.append(
                 delayed(map2base64_float)(template_xr, arr_sel, tuple(list(sel_rename.values()) + [_year]))
             )    

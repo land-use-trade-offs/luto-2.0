@@ -69,35 +69,67 @@ window.ChartService = {
           },
         },
       },
-      "GBF3": {
+      "GBF3_NVIS": {
         "Ag": {
-          "path": "data/BIO_GBF3_Ag.js",
-          "name": "BIO_GBF3_Ag",
+          "path": "data/BIO_GBF3_NVIS_Ag.js",
+          "name": "BIO_GBF3_NVIS_Ag",
         },
         "Ag Mgt": {
-          "path": "data/BIO_GBF3_Am.js",
-          "name": "BIO_GBF3_Am",
+          "path": "data/BIO_GBF3_NVIS_Am.js",
+          "name": "BIO_GBF3_NVIS_Am",
         },
         "Non-Ag": {
-          "path": "data/BIO_GBF3_NonAg.js",
-          "name": "BIO_GBF3_NonAg",
+          "path": "data/BIO_GBF3_NVIS_NonAg.js",
+          "name": "BIO_GBF3_NVIS_NonAg",
         },
         "overview": {
           "Ag": {
-            "path": "data/BIO_GBF3_overview_Ag.js",
-            "name": "BIO_GBF3_overview_Ag",
+            "path": "data/BIO_GBF3_NVIS_overview_Ag.js",
+            "name": "BIO_GBF3_NVIS_overview_Ag",
           },
           "Ag Mgt": {
-            "path": "data/BIO_GBF3_overview_Am.js",
-            "name": "BIO_GBF3_overview_Am",
+            "path": "data/BIO_GBF3_NVIS_overview_Am.js",
+            "name": "BIO_GBF3_NVIS_overview_Am",
           },
           "Non-Ag": {
-            "path": "data/BIO_GBF3_overview_NonAg.js",
-            "name": "BIO_GBF3_overview_NonAg",
+            "path": "data/BIO_GBF3_NVIS_overview_NonAg.js",
+            "name": "BIO_GBF3_NVIS_overview_NonAg",
           },
           "sum": {
-            "path": "data/BIO_GBF3_overview_sum.js",
-            "name": "BIO_GBF3_overview_sum",
+            "path": "data/BIO_GBF3_NVIS_overview_sum.js",
+            "name": "BIO_GBF3_NVIS_overview_sum",
+          },
+        },
+      },
+      "GBF3_IBRA": {
+        "Ag": {
+          "path": "data/BIO_GBF3_IBRA_Ag.js",
+          "name": "BIO_GBF3_IBRA_Ag",
+        },
+        "Ag Mgt": {
+          "path": "data/BIO_GBF3_IBRA_Am.js",
+          "name": "BIO_GBF3_IBRA_Am",
+        },
+        "Non-Ag": {
+          "path": "data/BIO_GBF3_IBRA_NonAg.js",
+          "name": "BIO_GBF3_IBRA_NonAg",
+        },
+        "overview": {
+          "Ag": {
+            "path": "data/BIO_GBF3_IBRA_overview_Ag.js",
+            "name": "BIO_GBF3_IBRA_overview_Ag",
+          },
+          "Ag Mgt": {
+            "path": "data/BIO_GBF3_IBRA_overview_Am.js",
+            "name": "BIO_GBF3_IBRA_overview_Am",
+          },
+          "Non-Ag": {
+            "path": "data/BIO_GBF3_IBRA_overview_NonAg.js",
+            "name": "BIO_GBF3_IBRA_overview_NonAg",
+          },
+          "sum": {
+            "path": "data/BIO_GBF3_IBRA_overview_sum.js",
+            "name": "BIO_GBF3_IBRA_overview_sum",
           },
         },
       },
