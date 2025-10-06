@@ -33,13 +33,13 @@ p9.options.dpi = 100
 
 
 # Get the data
-task_root_dir = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20251002_RES5_DIFF_CARBON_WINDOW_BIO/"
+task_root_dir = "N:/LUF-Modelling/LUTO2_XH/LUTO2/output/20251004_Cost_curve_task"
 report_data = process_task_root_dirs(task_root_dir).query('region == "AUSTRALIA"').copy()
 print(report_data['Type'].unique())
 
 
 ####################### GHG #######################
-report_data_ghg = report_data.query('Type == "GHG_tCO2e"').copy().reset_index()
+report_data_ghg = report_data.query('Type == "GHG_tCO2e" and BIODIVERSITY_TARGET_GBF_2 == "high"').copy().reset_index()
 report_data_ghg['name'].unique()
 
 fig = (
@@ -64,9 +64,9 @@ fig = (
         color='black',
         size=1,
     ) +
-    p9.facet_wrap(
-        'CARBON_EFFECTS_WINDOW',
-        labeller='label_both',
+    p9.facet_grid(
+        'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT',
+        'CARBON_PRICE_COSTANT',
     ) +
     p9.theme(
         figure_size=(16, 10),
@@ -83,126 +83,4 @@ fig = (
     )
 )
 
-
-####################### Ecnomomics #######################
-report_data_economics = report_data.query('Type == "Economic_AUD"').copy().reset_index()
-
-fig = (
-    p9.ggplot() +
-    p9.geom_col(
-        data=report_data_economics.query('name != "Profit"'),
-        mapping = p9.aes(
-            x='year', 
-            y='value / 1e9', 
-            fill='name'
-        ), 
-        position='stack', 
-        width=0.7
-    ) +
-    p9.geom_line(
-        data=report_data_economics.query('name == "Profit"'),
-        mapping = p9.aes(
-            x='year', 
-            y='value / 1e9', 
-            group='run_idx',
-        ), 
-        color='black',
-        size=1,
-    ) +
-    p9.facet_wrap(
-        'CARBON_EFFECTS_WINDOW',
-        labeller='label_both',
-    ) +
-    p9.theme(
-        figure_size=(16, 10),
-        subplots_adjust={'wspace': 0.25, 'hspace': 0.25},
-        axis_text_x=p9.element_text(rotation=45, hjust=1),
-        legend_position='right',
-        legend_title=p9.element_text(size=10),
-        legend_text=p9.element_text(size=8),
-        strip_text=p9.element_text(size=8),
-    ) +
-    p9.labs(
-        x='Year',
-        y='Econmic val (billion AUD)',
-    )
-)
-
-
-
-####################### Area #######################
-
-
-report_area_am = report_data.query('Type == "Area_ag_man_ha"'\
-    ).copy(
-    ).groupby(['run_idx','CARBON_EFFECTS_WINDOW','year','ag_mgt']
-    ).sum(numeric_only=True
-    ).reset_index()
-    
-    
-fig = (
-    p9.ggplot(report_area_am) +
-    p9.geom_col(
-        p9.aes(
-            x='year', 
-            y='value / 1e6', 
-            fill='ag_mgt'
-        ), 
-        position='stack', 
-        width=0.7
-    ) +
-    p9.facet_wrap(
-        'CARBON_EFFECTS_WINDOW',
-        labeller='label_both',
-    ) +
-    p9.theme(
-        figure_size=(16, 10),
-        subplots_adjust={'wspace': 0.25, 'hspace': 0.25},
-        axis_text_x=p9.element_text(rotation=45, hjust=1),
-        legend_position='right',
-        legend_title=p9.element_text(size=10),
-        legend_text=p9.element_text(size=8),
-        strip_text=p9.element_text(size=8),
-    ) +
-    p9.labs(
-        title='Area of Agricultural Management (million ha)',
-        x='Year',
-        y='Area (million ha)',
-    )
-)
-
-
-
-report_area_non_ag = report_data.query('Type == "Area_non_ag_lu_ha"').copy( ).reset_index()
-
-fig = (
-    p9.ggplot(report_area_non_ag) +
-    p9.geom_col(
-        p9.aes(
-            x='year', 
-            y='value / 1e6', 
-            fill='name'
-        ), 
-        position='stack', 
-        width=0.7
-    ) +
-    p9.facet_wrap(
-        'CARBON_EFFECTS_WINDOW',
-        labeller='label_both',
-    ) +
-    p9.theme(
-        figure_size=(16, 10),
-        subplots_adjust={'wspace': 0.25, 'hspace': 0.25},
-        axis_text_x=p9.element_text(rotation=45, hjust=1),
-        legend_position='right',
-        legend_title=p9.element_text(size=10),
-        legend_text=p9.element_text(size=8),
-        strip_text=p9.element_text(size=8),
-    ) +
-    p9.labs(
-        title='Area of Non-Ag (million ha)',
-        x='Year',
-        y='Area (million ha)',
-    )
-)
 

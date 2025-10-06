@@ -384,7 +384,7 @@ def process_task_root_dirs(task_root_dir, n_workers=10):
     
     tasks = []
     for run_dir in run_dirs:
-        run_idx = int(run_dir.split('_')[-1])
+        run_idx = re.compile(r'Run_(\d{1,4})_').search(run_dir).group(1)
         run_paras = grid_search_params.query(f'run_idx == {int(run_idx)}').to_dict(orient='records')[0]
 
         # Depending on output structure, the report can be found in different places
