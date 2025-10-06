@@ -2641,7 +2641,7 @@ def save_report_data(raw_data_dir:str):
     if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off':
         filter_str = '''
             category == "biodiversity" 
-            and base_name.str.contains("biodiversity_GBF3")
+            and base_name.str.contains("biodiversity_GBF3_NVIS")
         '''.strip().replace('\n','')
         
         bio_paths = files.query(filter_str).reset_index(drop=True)
@@ -2656,7 +2656,7 @@ def save_report_data(raw_data_dir:str):
         bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"')
         
         
-        # ---------------- (GBF3) Ranking  ----------------
+        # ---------------- (GBF3-NVIS) Ranking  ----------------
         bio_rank_total = bio_df_non_all\
             .groupby(['Year', 'region'])\
             .sum(numeric_only=True)\
@@ -2668,15 +2668,15 @@ def save_report_data(raw_data_dir:str):
             
         for region, df in bio_rank_total.groupby('region'):
             df = df.drop(columns='region')
-            if 'GBF3' not in bio_rank_dict[region]:
-                bio_rank_dict[region]['GBF3'] = {}
+            if 'GBF3-NVIS' not in bio_rank_dict[region]:
+                bio_rank_dict[region]['GBF3-NVIS'] = {}
                 
-            bio_rank_dict[region]['GBF3']['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
-            bio_rank_dict[region]['GBF3']['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
-            bio_rank_dict[region]['GBF3']['value'] = df.set_index('Year')['Area Weighted Score (ha)'].apply(lambda x: format_with_suffix(x)).to_dict()
+            bio_rank_dict[region]['GBF3-NVIS']['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
+            bio_rank_dict[region]['GBF3-NVIS']['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
+            bio_rank_dict[region]['GBF3-NVIS']['value'] = df.set_index('Year')['Area Weighted Score (ha)'].apply(lambda x: format_with_suffix(x)).to_dict()
 
 
-        # ---------------- (GBF3) Overview  ----------------
+        # ---------------- (GBF3-NVIS) Overview  ----------------
         
         # sum
         bio_df_target = bio_df_non_all.groupby(['Year', 'species'])[['Target_by_Percent']].agg('first').reset_index()
@@ -2787,7 +2787,7 @@ def save_report_data(raw_data_dir:str):
             f.write(';\n')
             
             
-        # ---------------- (GBF3) - Ag  ----------------
+        # ---------------- (GBF3-NVIS) - Ag  ----------------
         bio_df_ag = bio_df.query('Type == "Agricultural Landuse"').copy()
 
         df_wide = bio_df_ag\
@@ -2818,7 +2818,7 @@ def save_report_data(raw_data_dir:str):
             f.write(';\n')
             
             
-        # ---------------- (GBF3) - Am  ----------------
+        # ---------------- (GBF3-NVIS) - Am  ----------------
         bio_df_am = bio_df.query('Type == "Agricultural Management"').copy()
         
         df_wide = bio_df_am\
@@ -2846,7 +2846,7 @@ def save_report_data(raw_data_dir:str):
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
             
-        # ---------------- (GBF3) - Non-Ag  ----------------
+        # ---------------- (GBF3-NVIS) - Non-Ag  ----------------
         bio_df_nonag = bio_df.query('Type == "Non-Agricultural Land-use"').copy()
         
         df_wide = bio_df_nonag\
@@ -2873,6 +2873,241 @@ def save_report_data(raw_data_dir:str):
             f.write(';\n')
             
             
+    if settings.BIODIVERSITY_TARGET_GBF_3_IBRA != 'off':
+        filter_str = '''
+            category == "biodiversity"
+            and base_name.str.contains("biodiversity_GBF3_IBRA")
+        '''.strip().replace('\n','')
+
+        bio_paths = files.query(filter_str).reset_index(drop=True)
+        bio_df = pd.concat([pd.read_csv(path, low_memory=False) for path in bio_paths['path']])
+        bio_df = bio_df.replace(RENAME_AM_NON_AG)\
+            .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)', 'IBRA Bioregion': 'species'})\
+            .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
+            .round(6)
+        bio_df_non_all = bio_df.query('Water_supply != "ALL" and `Agri-Management` != "ALL"')
+        bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural Landuse"')
+        bio_df_am_non_all = bio_df_non_all.query('Type == "Agricultural Management"')
+        bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"')
+
+
+        # ---------------- (GBF3-IBRA) Ranking  ----------------
+        bio_rank_total = bio_df_non_all\
+            .groupby(['Year', 'region'])\
+            .sum(numeric_only=True)\
+            .reset_index()\
+            .sort_values(['Year', 'Area Weighted Score (ha)'], ascending=[True, False])\
+            .assign(Rank=lambda x: x.groupby(['Year']).cumcount())\
+            .assign(Type='Total')\
+            .assign(color=lambda x: x['Rank'].map(get_rank_color))
+
+        for region, df in bio_rank_total.groupby('region'):
+            df = df.drop(columns='region')
+            if 'GBF3_IBRA' not in bio_rank_dict[region]:
+                bio_rank_dict[region]['GBF3_IBRA'] = {}
+
+            bio_rank_dict[region]['GBF3_IBRA']['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
+            bio_rank_dict[region]['GBF3_IBRA']['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
+            bio_rank_dict[region]['GBF3_IBRA']['value'] = df.set_index('Year')['Area Weighted Score (ha)'].apply(lambda x: format_with_suffix(x)).to_dict()
+
+
+        # ---------------- (GBF3-IBRA) Overview  ----------------
+
+        # sum
+        bio_df_target = bio_df_non_all.groupby(['Year', 'species'])[['Target_by_Percent']].agg('first').reset_index()
+
+        df_region = bio_df_non_all\
+            .groupby(['Year', 'region', 'Type'])\
+            .sum(numeric_only=True)\
+            .reset_index()\
+            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
+        df_wide = df_region.groupby(['Type', 'region'])[['Year','Area Weighted Score (ha)']]\
+            .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
+            .reset_index()
+        df_wide.columns = ['name', 'region', 'data']
+        df_wide['type'] = 'column'
+
+        out_dict = {}
+        for region, df in df_wide.groupby('region'):
+            df = df.drop(['region'], axis=1)
+            out_dict[region] = df.to_dict(orient='records')
+
+        filename = f'BIO_GBF3_IBRA_overview_sum'
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
+
+
+
+        # ag
+        df_region = bio_df_ag_non_all\
+            .groupby(['Year', 'region', 'Landuse'])\
+            .sum(numeric_only=True)\
+            .reset_index()\
+            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
+        df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Area Weighted Score (ha)']]\
+            .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
+            .reset_index()
+        df_wide.columns = ['name', 'region', 'data']
+        df_wide['type'] = 'column'
+
+        df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+        df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+        df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+
+        out_dict = {}
+        for region, df in df_wide.groupby('region'):
+            df = df.drop(['region'], axis=1)
+            out_dict[region] = df.to_dict(orient='records')
+
+        filename = f'BIO_GBF3_IBRA_overview_Ag'
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
+
+
+        # am
+        df_region = bio_df_am_non_all\
+            .groupby(['Year', 'region', 'Agri-Management'])\
+            .sum(numeric_only=True)\
+            .reset_index()\
+            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
+        df_wide = df_region.groupby(['Agri-Management', 'region'])[['Year','Area Weighted Score (ha)']]\
+            .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
+            .reset_index()
+        df_wide.columns = ['name', 'region', 'data']
+        df_wide['type'] = 'column'
+
+
+        out_dict = {}
+        for region, df in df_wide.groupby('region'):
+            df = df.drop(['region'], axis=1)
+            out_dict[region] = df.to_dict(orient='records')
+
+        filename = f'BIO_GBF3_IBRA_overview_Am'
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
+
+
+        # non-ag
+        df_region = bio_df_nonag\
+            .groupby(['Year', 'region', 'Landuse'])\
+            .sum(numeric_only=True)\
+            .reset_index()\
+            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
+        df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Area Weighted Score (ha)']]\
+            .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
+            .reset_index()
+        df_wide.columns = ['name', 'region', 'data']
+        df_wide['type'] = 'column'
+
+        df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+        df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+        df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+
+
+        out_dict = {}
+        for region, df in df_wide.groupby('region'):
+            df = df.drop(['region'], axis=1)
+            out_dict[region] = df.to_dict(orient='records')
+
+        filename = f'BIO_GBF3_IBRA_overview_NonAg'
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
+
+
+        # ---------------- (GBF3-IBRA) - Ag  ----------------
+        bio_df_ag = bio_df.query('Type == "Agricultural Landuse"').copy()
+
+        df_wide = bio_df_ag\
+            .groupby(['region', 'species', 'Water_supply', 'Landuse'])[['Year', 'Value (%)']]\
+            .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+            .reset_index()
+        df_wide.columns = ['region', 'species', 'water', 'name', 'data']
+        df_wide['type'] = 'column'
+        df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+        df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+        df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+
+        out_dict = {}
+        for (region, species, water), df in df_wide.groupby(['region', 'species', 'water']):
+            df = df.drop(['region', 'species', 'water'], axis=1)
+            if region not in out_dict:
+                out_dict[region] = {}
+            if species not in out_dict[region]:
+                out_dict[region][species] = {}
+            if water not in out_dict[region][species]:
+                out_dict[region][species][water] = {}
+            out_dict[region][species][water] = df.to_dict(orient='records')
+
+        filename = f'BIO_GBF3_IBRA_Ag'
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
+
+
+        # ---------------- (GBF3-IBRA) - Am  ----------------
+        bio_df_am = bio_df.query('Type == "Agricultural Management"').copy()
+
+        df_wide = bio_df_am\
+            .groupby(['region', 'species', 'Water_supply', 'Agri-Management', 'Landuse'])[['Year', 'Value (%)']]\
+            .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+            .reset_index()
+        df_wide.columns = ['region', 'species', 'water', 'Ag Mgt', 'Land-use', 'data']
+        df_wide['type'] = 'column'
+        df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['Land-use']], axis=1)
+
+        out_dict = {}
+        for (region, species, water), df in df_wide.groupby(['region', 'species', 'water']):
+            df = df.drop(['region', 'species', 'water'], axis=1)
+            if region not in out_dict:
+                out_dict[region] = {}
+            if species not in out_dict[region]:
+                out_dict[region][species] = {}
+            if water not in out_dict[region][species]:
+                out_dict[region][species][water] = {}
+            out_dict[region][species][water] = df.to_dict(orient='records')
+
+        filename = f'BIO_GBF3_IBRA_Am'
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
+
+        # ---------------- (GBF3-IBRA) - Non-Ag  ----------------
+        bio_df_nonag = bio_df.query('Type == "Non-Agricultural Land-use"').copy()
+
+        df_wide = bio_df_nonag\
+            .groupby(['region', 'species', 'Landuse'])[['Year', 'Value (%)']]\
+            .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+            .reset_index()
+        df_wide.columns = ['region', 'species', 'name', 'data']
+        df_wide['type'] = 'column'
+        df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+        df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+        df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+
+        out_dict = {}
+        for (region, species), df in df_wide.groupby(['region', 'species']):
+            df = df.drop(['region', 'species'], axis=1)
+            if region not in out_dict:
+                out_dict[region] = {}
+            out_dict[region][species] = df.to_dict(orient='records')
+
+        filename = f'BIO_GBF3_IBRA_NonAg'
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
+
+
 
     if settings.BIODIVERSITY_TARGET_GBF_4_SNES == 'on':
         

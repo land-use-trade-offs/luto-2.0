@@ -180,7 +180,8 @@ def write_output_single_year(data: Data, yr_cal, path_yr):
         delayed(write_ghg_offland_commodity)(data, yr_cal, path_yr),
         delayed(write_biodiversity_overall_quality_scores)(data, yr_cal, path_yr),
         delayed(write_biodiversity_GBF2_scores)(data, yr_cal, path_yr),
-        delayed(write_biodiversity_GBF3_scores)(data, yr_cal, path_yr),
+        delayed(write_biodiversity_GBF3_NVIS_scores)(data, yr_cal, path_yr),
+        delayed(write_biodiversity_GBF3_IBRA_scores)(data, yr_cal, path_yr),
         delayed(write_biodiversity_GBF4_SNES_scores)(data, yr_cal, path_yr),
         delayed(write_biodiversity_GBF4_ECNES_scores)(data, yr_cal, path_yr),
         delayed(write_biodiversity_GBF8_scores_groups)(data, yr_cal, path_yr),
@@ -1868,8 +1869,8 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
 
 
 
-def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
-    ''' Biodiversity GBF3 only being written to disk when `BIODIVERSITY_TARGET_GBF_3_NVIS` is not 'off' '''
+def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
+    ''' Biodiversity GBF3 (NVIS) only being written to disk when `BIODIVERSITY_TARGET_GBF_3_NVIS` is not 'off' '''
         
     # Do nothing if biodiversity limits are off and no need to report
     if settings.BIODIVERSITY_TARGET_GBF_3_NVIS == 'off':
@@ -1928,9 +1929,9 @@ def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
     # Get the base year biodiversity scores
     veg_base_score_score = pd.DataFrame({
             'group': data.BIO_GBF3_NVIS_ID2DESC.values(), 
-            'BASE_OUTSIDE_SCORE': data.BIO_GBF3_BASELINE_SCORE_OUTSIDE_LUTO, 
-            'BASE_TOTAL_SCORE': data.BIO_GBF3_BASELINE_SCORE_ALL_AUSTRALIA,
-            'TARGET_INSIDE_SCORE': data.get_GBF3_limit_score_inside_LUTO_by_yr(yr_cal)}
+            'BASE_OUTSIDE_SCORE': data.BIO_GBF3_NVIS_BASELINE_OUTSIDE_LUTO, 
+            'BASE_TOTAL_SCORE': data.BIO_GBF3_NVIS_BASELINE_AUSTRALIA,
+            'TARGET_INSIDE_SCORE': data.get_GBF3_NVIS_limit_score_inside_LUTO_by_yr(yr_cal)}
         ).eval('Target_by_Percent = (TARGET_INSIDE_SCORE + BASE_OUTSIDE_SCORE) / BASE_TOTAL_SCORE * 100')
 
     # Calculate xarray biodiversity GBF3 scores
@@ -2013,15 +2014,170 @@ def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
         ).reset_index(drop=True
         ).replace({'dry':'Dryland', 'irr':'Irrigated'}
         ).query('abs(`Area Weighted Score (ha)`) > 0'
-        ).to_csv(os.path.join(path, f'biodiversity_GBF3_scores_{yr_cal}.csv'), index=False)
+        ).to_csv(os.path.join(path, f'biodiversity_GBF3_NVIS_scores_{yr_cal}.csv'), index=False)
         
     # Save xarray data to netCDF
-    save2nc(xr_gbf3_ag, os.path.join(path, f'xr_biodiversity_GBF3_vegetation_ag_{yr_cal}.nc'))
-    save2nc(xr_gbf3_non_ag, os.path.join(path, f'xr_biodiversity_GBF3_vegetation_non_ag_{yr_cal}.nc'))
-    save2nc(xr_gbf3_am, os.path.join(path, f'xr_biodiversity_GBF3_vegetation_ag_management_{yr_cal}.nc'))
+    save2nc(xr_gbf3_ag, os.path.join(path, f'xr_biodiversity_GBF3_NVIS_ag_{yr_cal}.nc'))
+    save2nc(xr_gbf3_non_ag, os.path.join(path, f'xr_biodiversity_GBF3_NVIS_non_ag_{yr_cal}.nc'))
+    save2nc(xr_gbf3_am, os.path.join(path, f'xr_biodiversity_GBF3_NVIS_ag_management_{yr_cal}.nc'))
     
     return f"Biodiversity GBF3 scores written for year {yr_cal}"
 
+
+
+def write_biodiversity_GBF3_IBRA_scores(data: Data, yr_cal: int, path) -> None:
+    ''' Biodiversity GBF3 (IBRA) only being written to disk when `BIODIVERSITY_TARGET_GBF_3_IBRA` is not 'off' '''
+
+    # Do nothing if biodiversity limits are off and no need to report
+    if settings.BIODIVERSITY_TARGET_GBF_3_IBRA == 'off':
+        return "Skipped: Biodiversity GBF3 IBRA scores not written as `BIODIVERSITY_TARGET_GBF_3_IBRA` is set to 'off'"
+
+
+    # Unpack the agricultural management land-use
+    am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]
+
+    # Get decision variables for the year
+    ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]
+        ).chunk({'cell': min(1024, data.NCELLS)}
+        ).assign_coords(region=('cell', data.REGION_NRM_NAME))
+    non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]
+        ).chunk({'cell': min(1024, data.NCELLS)}
+        ).assign_coords(region=('cell', data.REGION_NRM_NAME))
+    am_dvar_amrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
+        ).chunk({'cell': min(1024, data.NCELLS)}
+        ).assign_coords(region=('cell', data.REGION_NRM_NAME))
+
+    # Expand dimension
+    ag_dvar_mrj = xr.concat([ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_dvar_mrj], dim='lm')
+    am_dvar_amrj = xr.concat([am_dvar_amrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), am_dvar_amrj], dim='am')
+    am_dvar_amrj = xr.concat([am_dvar_amrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), am_dvar_amrj], dim='lm')
+
+
+    # Get IBRA bioregion matrices for the year
+    bioregion_score_vr = xr.DataArray(
+        ag_biodiversity.get_GBF3_IBRA_matrices_vr(data),
+        dims=['group','cell'],
+        coords={'group':list(data.BIO_GBF3_IBRA_ID2DESC.values()),  'cell':range(data.NCELLS)}
+    ).chunk({'cell': min(1024, data.NCELLS), 'group': 1})
+
+    # Get the impacts of each ag/non-ag/am to bioregion matrices
+    ag_impact_j = xr.DataArray(
+        ag_biodiversity.get_ag_biodiversity_contribution(data),
+        dims=['lu'],
+        coords={'lu':data.AGRICULTURAL_LANDUSES}
+    )
+    non_ag_impact_k = xr.DataArray(
+        list(non_ag_biodiversity.get_non_ag_lu_biodiv_contribution(data).values()),
+        dims=['lu'],
+        coords={'lu':data.NON_AGRICULTURAL_LANDUSES}
+    )
+    am_impact_amr = xr.DataArray(
+        np.stack([arr for _, v in ag_biodiversity.get_ag_management_biodiversity_contribution(data, yr_cal).items() for arr in v.values()]),
+        dims=['idx', 'cell'],
+        coords={
+            'idx': pd.MultiIndex.from_tuples(am_lu_unpack, names=['am', 'lu']),
+            'cell': range(data.NCELLS)}
+    ).unstack()
+
+    # Expand dimension
+    am_impact_amr = xr.concat([am_impact_amr.sum(dim='am', keepdims=True).assign_coords(am=['ALL']), am_impact_amr], dim='am')
+
+    # Get the base year biodiversity scores
+    bioregion_base_score = pd.DataFrame({
+            'group': data.BIO_GBF3_IBRA_ID2DESC.values(),
+            'BASE_OUTSIDE_SCORE': data.BIO_GBF3_IBRA_BASELINE_OUTSIDE_LUTO,
+            'BASE_TOTAL_SCORE': data.BIO_GBF3_IBRA_BASELINE_AUSTRALIA,
+            'TARGET_INSIDE_SCORE': data.get_GBF3_IBRA_limit_score_inside_LUTO_by_yr(yr_cal)}
+        ).eval('Target_by_Percent = (TARGET_INSIDE_SCORE + BASE_OUTSIDE_SCORE) / BASE_TOTAL_SCORE * 100')
+
+    # Calculate xarray biodiversity GBF3 IBRA scores
+    xr_gbf3_ibra_ag = bioregion_score_vr * ag_impact_j * ag_dvar_mrj
+    xr_gbf3_ibra_am = bioregion_score_vr * am_impact_amr * am_dvar_amrj
+    xr_gbf3_ibra_non_ag = bioregion_score_vr * non_ag_impact_k * non_ag_dvar_rk
+
+    # Regional level aggregation
+    GBF3_IBRA_score_ag_region = xr_gbf3_ibra_ag.groupby('region'
+        ).sum('cell'
+        ).to_dataframe('Area Weighted Score (ha)'
+        ).reset_index(
+        ).merge(bioregion_base_score
+        ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
+        ).assign(Type='Agricultural Landuse', Year=yr_cal)
+
+    GBF3_IBRA_score_am_region = xr_gbf3_ibra_am.groupby('region'
+        ).sum('cell', skipna=False
+        ).to_dataframe('Area Weighted Score (ha)'
+        ).reset_index(allow_duplicates=True
+        ).merge(bioregion_base_score,
+        ).astype({'Area Weighted Score (ha)': 'float', 'BASE_TOTAL_SCORE': 'float'}
+        ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
+        ).assign(Type='Agricultural Management', Year=yr_cal)
+
+    GBF3_IBRA_score_non_ag_region = xr_gbf3_ibra_non_ag.groupby('region'
+        ).sum(['cell']
+        ).to_dataframe('Area Weighted Score (ha)'
+        ).reset_index(
+        ).merge(bioregion_base_score,
+        ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
+        ).assign(Type='Non-Agricultural Land-use', Year=yr_cal)
+
+    # Australia level aggregation
+    GBF3_IBRA_score_ag_AUS = xr_gbf3_ibra_ag.sum('cell'
+        ).to_dataframe('Area Weighted Score (ha)'
+        ).reset_index(
+        ).merge(bioregion_base_score
+        ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
+        ).assign(Type='Agricultural Landuse', Year=yr_cal, region='AUSTRALIA')
+
+    GBF3_IBRA_score_am_AUS = xr_gbf3_ibra_am.sum('cell', skipna=False
+        ).to_dataframe('Area Weighted Score (ha)'
+        ).reset_index(allow_duplicates=True
+        ).merge(bioregion_base_score,
+        ).astype({'Area Weighted Score (ha)': 'float', 'BASE_TOTAL_SCORE': 'float'}
+        ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
+        ).assign(Type='Agricultural Management', Year=yr_cal, region='AUSTRALIA')
+
+    GBF3_IBRA_score_non_ag_AUS = xr_gbf3_ibra_non_ag.sum(['cell']
+        ).to_dataframe('Area Weighted Score (ha)'
+        ).reset_index(
+        ).merge(bioregion_base_score,
+        ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
+        ).assign(Type='Non-Agricultural Land-use', Year=yr_cal, region='AUSTRALIA')
+
+    # Combine regional and Australia level data
+    GBF3_IBRA_score_ag = pd.concat([GBF3_IBRA_score_ag_region, GBF3_IBRA_score_ag_AUS], axis=0)
+    GBF3_IBRA_score_am = pd.concat([GBF3_IBRA_score_am_region, GBF3_IBRA_score_am_AUS], axis=0)
+    GBF3_IBRA_score_non_ag = pd.concat([GBF3_IBRA_score_non_ag_region, GBF3_IBRA_score_non_ag_AUS], axis=0)
+
+    # Concatenate the dataframes, rename the columns, and reset the index, then save to a csv file
+    bioregion_base_score = bioregion_base_score.assign(
+            Type='Outside LUTO study area',
+            Year=yr_cal,
+            lu='Outside LUTO study area',
+        ).eval('Relative_Contribution_Percentage = BASE_OUTSIDE_SCORE / BASE_TOTAL_SCORE * 100')
+
+    pd.concat([
+        GBF3_IBRA_score_ag,
+        GBF3_IBRA_score_am,
+        GBF3_IBRA_score_non_ag,
+        bioregion_base_score],axis=0
+        ).rename(columns={
+            'lu':'Landuse',
+            'lm':'Water_supply',
+            'am':'Agri-Management',
+            'group':'IBRA Bioregion',
+            'Relative_Contribution_Percentage':'Contribution Relative to Pre-1750 Level (%)'}
+        ).reset_index(drop=True
+        ).replace({'dry':'Dryland', 'irr':'Irrigated'}
+        ).query('abs(`Area Weighted Score (ha)`) > 0'
+        ).to_csv(os.path.join(path, f'biodiversity_GBF3_IBRA_scores_{yr_cal}.csv'), index=False)
+
+    # Save xarray data to netCDF
+    save2nc(xr_gbf3_ibra_ag, os.path.join(path, f'xr_biodiversity_GBF3_IBRA_ag_{yr_cal}.nc'))
+    save2nc(xr_gbf3_ibra_non_ag, os.path.join(path, f'xr_biodiversity_GBF3_IBRA_non_ag_{yr_cal}.nc'))
+    save2nc(xr_gbf3_ibra_am, os.path.join(path, f'xr_biodiversity_GBF3_IBRA_ag_management_{yr_cal}.nc'))
+
+    return f"Biodiversity GBF3 IBRA scores written for year {yr_cal}"
 
 
 

@@ -109,7 +109,7 @@ AMORTISATION_PERIOD = 30 # years
 RESFACTOR = 13      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-SIM_YEARS =  [2010, 2050] # list(range(2020,2051,5))
+SIM_YEARS =  list(range(2020,2051,5))
 
 
 # Define the objective function
@@ -666,29 +666,44 @@ will be 0.6 * 0.8 = 0.48.
 
 # ---------------------- GBF3 parameters ----------------------
 
-BIODIVERSITY_TARGET_GBF_3_NVIS  = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
-BIODIVERSITY_TARGET_GBF_3_IBRA = 'off'            # 'off', 'medium', 'high', or 'USER_DEFINED'
+BIODIVERSITY_TARGET_GBF_3_NVIS = 'medium'           # 'off', 'medium', 'high', or 'USER_DEFINED'
 '''
-Target 3 of the Kunming-Montreal Global Biodiversity Framework:
-protect and manage 30% of the world's land, water, and coastal areas by 2030.
+Target 3 of the Kunming-Montreal Global Biodiversity Framework (NVIS):
+protect and manage vegetation groups using the National Vegetation Information System.
 
-- if 'off' is selected, turn off the GBF-3 target for biodiversity.
-- if 'medium' is selected, the conservation target is set to 30% for each NVIS group at 2050.
-- if 'high' is selected, the conservation target is set to 50% for each NVIS group at 2050.
-- if 'USER_DEFINED' is selected, the conservation target is reading from `input.BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS.xlsx`.
+- if 'off' is selected, turn off the GBF-3 NVIS target for biodiversity.
+- if 'medium' is selected, the conservation target is set to 30% for each vegetation group at 2050.
+- if 'high' is selected, the conservation target is set to 50% for each vegetation group at 2050.
+- if 'USER_DEFINED' is selected, the conservation target is reading from input Excel file.
 '''
 
+BIODIVERSITY_TARGET_GBF_3_IBRA = 'medium'           # 'off', 'medium', 'high', or 'USER_DEFINED'
+'''
+Target 3 of the Kunming-Montreal Global Biodiversity Framework (IBRA):
+protect and manage bioregions using the Interim Biogeographic Regionalisation for Australia.
 
-GBF3_NVIS_TARGET_CLASS  = 'MVS'                  # 'MVG', 'MVS', 'MVG_IBRA', 'MVS_IBRA'
-GBF3_IBRA_TARGET_CLASS  = 'IBRA_Regions'         # 'IBRA_Regions', 'IBRA_SubRegions'
+- if 'off' is selected, turn off the GBF-3 IBRA target for biodiversity.
+- if 'medium' is selected, the conservation target is set to 30% for each bioregion at 2050.
+- if 'high' is selected, the conservation target is set to 50% for each bioregion at 2050.
+- if 'USER_DEFINED' is selected, the conservation target is reading from input Excel file.
+'''
+
+GBF3_NVIS_TARGET_CLASS  = 'MVG'                  # 'MVG', 'MVS'
 '''
 The National Vegetation Information System (NVIS) provides the 100m resolution information on
 the distribution of vegetation (~30 primary group layers, or ~90 subgroup layers) across Australia.
 
-We resampled the 100m NVIS layers to 1km resolution by calculating the percentage of each vegetation type in 
-each 1km cell. Therefore, the original 100m sigle layer is converted to a n-bands (n=number of vegetation types)
-raster layer, with each band representing the percentage of that vegetation type in each 1km cell.
+We resampled the layers to 1km resolution by calculating the percentage of each type in
+each 1km cell. The original layer is converted to n-bands (n=number of types)
+raster layer, with each band representing the percentage of that type in each 1km cell.
 '''
+
+GBF3_IBRA_TARGET_CLASS  = 'IBRA_Regions'         # 'IBRA_Regions', 'IBRA_SubRegions'
+'''
+IBRA (Interim Biogeographic Regionalisation for Australia) provides bioregional classifications
+with regions or subregions. There are 89 regions and 419 subregions across Australia.
+'''
+
 
 GBF3_TARGETS_DICT = {
     'off':     None,

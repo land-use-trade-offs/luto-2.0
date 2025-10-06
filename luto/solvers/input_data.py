@@ -83,15 +83,16 @@ class SolverInputData:
     biodiv_contr_non_ag_k: dict[int, float]                             # Biodiversity contribution scale from non-agricultural land uses.
     biodiv_contr_ag_man: dict[str, dict[int, np.ndarray]]               # Biodiversity contribution scale from agricultural management options.
     
-    GBF2_mask_area_r: np.ndarray                       # Raw areas (GBF2) from priority degrade areas - indexed by cell (r).
-    GBF3_NVIS_pre_1750_area_vr: np.ndarray                                    # Raw areas (GBF3) from Major vegetation group - indexed by veg. group (v) and cell (r)
-    GBF3_names: dict[int, str]                                          # Major vegetation groups names - indexed by major vegetation group (v).
-    GBF3_ind: dict[str, int]                                            # Major vegetation groups indices - indexed by major vegetation group (v).
-    GBF4_SNES_pre_1750_area_sr: np.ndarray                                            # Raw areas (GBF4) Species NES contribution data - indexed by species/ecological community (x) and cell (r).
+    GBF2_mask_area_r: np.ndarray                                        # Raw areas (GBF2) from priority degrade areas - indexed by cell (r).
+    GBF3_NVIS_pre_1750_area_vr: np.ndarray                              # Raw areas (GBF3) from NVIS vegetation - indexed by group (v) and cell (r)
+    GBF3_NVIS_names: dict[int, str]                                     # GBF3 NVIS vegetation group names - indexed by group (v).
+    GBF3_IBRA_pre_1750_area_vr: np.ndarray                              # Raw areas (GBF3) from IBRA bioregions - indexed by region (v) and cell (r)
+    GBF3_IBRA_names: dict[int, str]                                     # GBF3 IBRA bioregion names - indexed by region (v).
+    GBF4_SNES_pre_1750_area_sr: np.ndarray                              # Raw areas (GBF4) Species NES contribution data - indexed by species/ecological community (x) and cell (r).
     GBF4_SNES_names: dict[int, str]                                     # Species NES names - indexed by species/ecological community (x).
-    GBF4_ECNES_pre_1750_area_sr: np.ndarray                                           # Raw areas (GBF4) Ecological community NES contribution data - indexed by species/ecological community (x) and cell (r).
+    GBF4_ECNES_pre_1750_area_sr: np.ndarray                             # Raw areas (GBF4) Ecological community NES contribution data - indexed by species/ecological community (x) and cell (r).
     GBF4_ECNES_names: dict[int, str]                                    # Ecological community NES names - indexed by species/ecological community (x).
-    GBF8_pre_1750_area_sr: np.ndarray                                # Raw areas (GBF8) Species data - indexed by species (s) and cell (r).
+    GBF8_pre_1750_area_sr: np.ndarray                                   # Raw areas (GBF8) Species data - indexed by species (s) and cell (r).
     GBF8_species_names: dict[int, str]                                  # Species names - indexed by species (s).
     GBF8_species_indices: dict[int, float]                              # Species indices - indexed by species (s).
 
@@ -279,28 +280,35 @@ def get_ag_man_biodiv_impacts(data: Data, target_year: int) -> dict[str, dict[st
 def get_GBF2_mask_area_r(data: Data) -> np.ndarray:
     if settings.BIODIVERSITY_TARGET_GBF_2 == "off":
         return np.empty(0)
-    print('Getting GBF2 full naturel score layer...', flush = True)
+    print('Getting GBF2 mask area layer...', flush = True)
     output = ag_biodiversity.get_GBF2_MASK_area(data)
     return output
 
 def get_GBF3_NVIS_pre_1750_area_vr(data: Data):
     if settings.BIODIVERSITY_TARGET_GBF_3_NVIS == "off":
         return np.empty(0)
-    print('Getting agricultural major vegetation groups matrices...', flush = True)
+    print('Getting GBF3 NVIS vegetation matrices...', flush = True)
     output = ag_biodiversity.get_GBF3_NVIS_matrices_vr(data)
     return output
 
-def get_GBF3_major_vegetation_names(data: Data) -> dict[int,str]:
+def get_GBF3_NVIS_names(data: Data) -> dict[int,str]:
     if settings.BIODIVERSITY_TARGET_GBF_3_NVIS == "off":
-        return np.empty(0)
-    print('Getting agricultural major vegetation groups names...', flush = True)
+        return {}
+    print('Getting GBF3 NVIS vegetation group names...', flush = True)
     return data.BIO_GBF3_NVIS_ID2DESC
 
-def get_GBF3_major_indices(data: Data) -> dict[str, int]:
-    if settings.BIODIVERSITY_TARGET_GBF_3_NVIS == "off":
+def get_GBF3_IBRA_pre_1750_area_vr(data: Data):
+    if settings.BIODIVERSITY_TARGET_GBF_3_IBRA == "off":
         return np.empty(0)
-    print('Getting agricultural major vegetation groups indices...', flush = True)
-    return data.GBF3_NVIS_IDX
+    print('Getting GBF3 IBRA bioregion matrices...', flush = True)
+    output = ag_biodiversity.get_GBF3_IBRA_matrices_vr(data)
+    return output
+
+def get_GBF3_IBRA_names(data: Data) -> dict[int,str]:
+    if settings.BIODIVERSITY_TARGET_GBF_3_IBRA == "off":
+        return {}
+    print('Getting GBF3 IBRA bioregion names...', flush = True)
+    return data.BIO_GBF3_IBRA_ID2DESC
 
 def get_GBF4_SNES_pre_1750_area_sr(data: Data) -> np.ndarray:
     if settings.BIODIVERSITY_TARGET_GBF_4_SNES != "on":
@@ -685,9 +693,13 @@ def get_limits(data: Data, yr_cal: int, resale_factors) -> dict[str, Any]:
         limits["GBF2_rescale"] = limits["GBF2"] / resale_factors['GBF2']
 
     if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off':
-        limits["GBF3"] = data.get_GBF3_limit_score_inside_LUTO_by_yr(yr_cal)
-        limits["GBF3_rescale"] = limits["GBF3"] / resale_factors['GBF3']
-        
+        limits["GBF3_NVIS"] = data.get_GBF3_NVIS_limit_score_inside_LUTO_by_yr(yr_cal)
+        limits["GBF3_NVIS_rescale"] = limits["GBF3_NVIS"] / resale_factors['GBF3_NVIS']
+
+    if settings.BIODIVERSITY_TARGET_GBF_3_IBRA != 'off':
+        limits["GBF3_IBRA"] = data.get_GBF3_IBRA_limit_score_inside_LUTO_by_yr(yr_cal)
+        limits["GBF3_IBRA_rescale"] = limits["GBF3_IBRA"] / resale_factors['GBF3_IBRA']
+
     if settings.BIODIVERSITY_TARGET_GBF_4_SNES == "on":
         limits["GBF4_SNES"] = data.get_GBF4_SNES_target_inside_LUTO_by_year(yr_cal)
         limits["GBF4_SNES_rescale"] = limits["GBF4_SNES"] / resale_factors['GBF4_SNES']
@@ -812,8 +824,9 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
 
     GBF2_mask_area_r = get_GBF2_mask_area_r(data)
     GBF3_NVIS_pre_1750_area_vr=get_GBF3_NVIS_pre_1750_area_vr(data)
-    GBF3_names=get_GBF3_major_vegetation_names(data)
-    GBF3_ind=get_GBF3_major_indices(data)
+    GBF3_NVIS_names=get_GBF3_NVIS_names(data)
+    GBF3_IBRA_pre_1750_area_vr=get_GBF3_IBRA_pre_1750_area_vr(data)
+    GBF3_IBRA_names=get_GBF3_IBRA_names(data)
     GBF4_SNES_pre_1750_area_sr=get_GBF4_SNES_pre_1750_area_sr(data)
     GBF4_SNES_names=get_GBF4_SNES_names(data)
     GBF4_ECNES_pre_1750_area_sr=get_GBF4_ECNES_pre_1750_area_sr(data)
@@ -844,9 +857,14 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
             rescale_solver_input_data([GBF2_mask_area_r])
             if settings.BIODIVERSITY_TARGET_GBF_2 != "off"
             else 1.0),
-        "GBF3":(
+        "GBF3_NVIS":(
             rescale_solver_input_data([GBF3_NVIS_pre_1750_area_vr])
             if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != "off"
+            else 1.0
+        ),
+        "GBF3_IBRA":(
+            rescale_solver_input_data([GBF3_IBRA_pre_1750_area_vr])
+            if settings.BIODIVERSITY_TARGET_GBF_3_IBRA != "off"
             else 1.0
         ),
         "GBF4_SNES":(
@@ -929,8 +947,9 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         
         GBF2_mask_area_r,
         GBF3_NVIS_pre_1750_area_vr,
-        GBF3_names,
-        GBF3_ind,
+        GBF3_NVIS_names,
+        GBF3_IBRA_pre_1750_area_vr,
+        GBF3_IBRA_names,
         GBF4_SNES_pre_1750_area_sr,
         GBF4_SNES_names,
         GBF4_ECNES_pre_1750_area_sr,

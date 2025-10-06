@@ -106,8 +106,10 @@ class LutoSolver:
         self.ghg_consts_soft = []
         self.bio_GBF2_expr = None
         self.bio_GBF2_constrs = {}
-        self.bio_GBF3_exprs = {}
-        self.bio_GBF3_constrs = {}
+        self.bio_GBF3_NVIS_exprs = {}
+        self.bio_GBF3_NVIS_constrs = {}
+        self.bio_GBF3_IBRA_exprs = {}
+        self.bio_GBF3_IBRA_constrs = {}
         self.bio_GBF4_SNES_exprs = {}
         self.bio_GBF4_SNES_constrs = {}
         self.bio_GBF4_ECNES_exprs = {}
@@ -129,14 +131,14 @@ class LutoSolver:
 
 
     def _setup_vars(self):
-        print("...Setting up decision variables...")
+        print("├── Setting up decision variables...")
         self._setup_ag_vars()
         self._setup_non_ag_vars()
         self._setup_ag_management_variables()
         self._setup_deviation_penalties()
 
     def _setup_constraints(self):
-        print("...Adding the constraints...")
+        print("├── Adding the constraints...")
         self._add_cell_usage_constraints()
         self._add_agricultural_management_constraints()
         self._add_agricultural_management_adoption_limit_constraints()
@@ -150,7 +152,7 @@ class LutoSolver:
         """
         Formulate the objective based on settings.OBJECTIVE
         """
-        print(f"...Setting up the objective function to {settings.OBJECTIVE}...")
+        print(f"└── Setting up the objective function to {settings.OBJECTIVE}...")
 
         # Get objectives 
         self.obj_economy = self._setup_economy_objective()    
@@ -185,7 +187,7 @@ class LutoSolver:
            
 
     def _setup_ag_vars(self):
-        print("    |__ setting up decision variables for agricultural land uses...")
+        print("│   ├── setting up decision variables for agricultural land uses...")
         self.X_ag_dry_vars_jr = np.zeros(
             (self._input_data.n_ag_lus, self._input_data.ncells), dtype=object
         )
@@ -206,7 +208,7 @@ class LutoSolver:
                 )
 
     def _setup_non_ag_vars(self):
-        print("    |__ setting up decision variables for non-agricultural land uses...")
+        print("│   ├── setting up decision variables for non-agricultural land uses...")
         self.X_non_ag_vars_kr = np.zeros(
             (self._input_data.n_non_ag_lus, self._input_data.ncells), dtype=object
         )
@@ -228,7 +230,7 @@ class LutoSolver:
                 )
 
     def _setup_ag_management_variables(self):
-        print("    |__ setting up decision variables for agricultural management options...")
+        print("│   ├── setting up decision variables for agricultural management options...")
         self.X_ag_man_dry_vars_jr = {
             am: np.zeros((len(am_j_list), self._input_data.ncells), dtype=object)
             for am, am_j_list in self._input_data.am2j.items()
@@ -288,7 +290,7 @@ class LutoSolver:
         3) [W] Penalty vector for water usage, each one corespondes a region, that minimises the deviations from the target.
         4) [B] A single penalty scalar for biodiversity, minimises its deviation from the target.
         """
-        print("    |__ Setting up decision variables for soft constraints...")
+        print("│   └── Setting up decision variables for soft constraints...")
         
         self.V = self.gurobi_model.addMVar(self._input_data.ncms, lb=0, name="V") # force lb=0 to make sure demand penalties are positive; i.e., demand must be met or exceeded
 
@@ -301,7 +303,7 @@ class LutoSolver:
 
         
     def _setup_economy_objective(self):
-        print("    |__ setting up objective for economy...")
+        print("    ├── setting up objective for economy...")
         
         # Get economic contributions
         ag_obj_mrj, non_ag_obj_rk, ag_man_objs = self._input_data.economic_contr_mrj
@@ -348,7 +350,7 @@ class LutoSolver:
     
     
     def _setup_biodiversity_objective(self):
-        print("    |__ setting up objective for biodiversity...")
+        print("    ├── setting up objective for biodiversity...")
         
         ag_exprs = []
         for j in range(self._input_data.n_ag_lus):
@@ -400,7 +402,7 @@ class LutoSolver:
         
         
     def _setup_penalty_objectives(self):
-        print("    |__ setting up objective for soft constraints...")
+        print("    └── setting up objective for soft constraints...")
 
         penalty_ghg = 0
         penalty_water = 0
@@ -448,7 +450,7 @@ class LutoSolver:
         Constraint that all of every cell is used for some land use.
         If `cells` is provided, only adds constraints for the given cells
         """
-        print("    |__ Adding constraints for cell usage...")
+        print("│   ├── Adding constraints for cell usage...")
 
         if cells is None:
             cells = np.array(range(self._input_data.ncells))
@@ -477,7 +479,7 @@ class LutoSolver:
         Constraint handling alternative agricultural management options:
         Ag. man. variables cannot exceed the value of the agricultural variable.
         """
-        print("    |__ Adding constraints for agricultural management options...")
+        print("│   ├── Adding constraints for agricultural management options...")
 
         for am, am_j_list in self._input_data.am2j.items():
             for j_idx, j in enumerate(am_j_list):
@@ -511,7 +513,7 @@ class LutoSolver:
         """
         Add adoption limits constraints for agricultural management options.
         """
-        print("    |__ Adding constraints for agricultural management adoption limits...")
+        print("│   ├── Adding constraints for agricultural management adoption limits...")
 
         for am, am_j_list in self._input_data.am2j.items():
             for j_idx, j in enumerate(am_j_list):
@@ -536,7 +538,7 @@ class LutoSolver:
         """
         Constraints to penalise under and over production compared to demand.
         """
-        print("    |__ Adding constraints for demand penalties...")
+        print("│   ├── Adding constraints for demand penalties...")
         
         self.ag_q_c = [gp.LinExpr(0) for _ in range(self._input_data.ncms)]
         for j in range(self._input_data.n_ag_lus):
@@ -669,12 +671,12 @@ class LutoSolver:
 
 
     def _add_water_usage_limit_constraints(self) -> None:
-        
-        if settings.WATER_LIMITS != "on": 
-            print("    |__ TURNING OFF water usage constraints ...")
+
+        if settings.WATER_LIMITS != "on":
+            print("│   └── TURNING OFF water usage constraints ...")
             return
-        
-        print("    |__ Adding constraints for water usage limits...")
+
+        print("│   └── Adding constraints for water usage limits...")
         
         # Ensure water use remains below limit for each region
         for reg_idx, water_limit_rescale in self._input_data.limits["water_rescale"].items():
@@ -683,7 +685,7 @@ class LutoSolver:
             ind = self._input_data.water_region_indices[reg_idx]
             reg_name = self._input_data.water_region_names[reg_idx]
 
-            print(f"      |__ target (inside LUTO study area) is {w_limit_raw:15,.0f} ML for {reg_name}")
+            print(f"│   │   ├── target (inside LUTO study area) is {w_limit_raw:15,.0f} ML for {reg_name}")
 
             self.water_nyiled_exprs[reg_idx] = self._get_water_net_yield_expr_for_region(ind)           # Water net yield inside LUTO study area
 
@@ -764,21 +766,21 @@ class LutoSolver:
         Add either hard or soft GHG constraints depending on settings.GHG_CONSTRAINT_TYPE
         """
         if settings.GHG_EMISSIONS_LIMITS == "off":
-            print("    |__ TURNING OFF GHG emissions constraints ...")
+            print("│   ├── TURNING OFF GHG emissions constraints ...")
             return
-                
+
         ghg_limit_raw = self._input_data.limits["ghg"]
         ghg_limit_rescale = self._input_data.limits["ghg_rescale"]
         self.ghg_expr = self._get_total_ghg_expr()
 
         if settings.GHG_CONSTRAINT_TYPE == "hard":
-            print(f"    |__ Adding <hard> constraints for GHG emissions: {ghg_limit_raw:,.0f} tCO2e")
+            print(f"│   ├── Adding <hard> constraints for GHG emissions: {ghg_limit_raw:,.0f} tCO2e")
             self.ghg_consts_ub = self.gurobi_model.addConstr(
                 self.ghg_expr <= ghg_limit_rescale,
                 name="ghg_emissions_limit_ub",
             )
         elif settings.GHG_CONSTRAINT_TYPE == "soft":
-            print(f"    |__ Adding <soft> constraints for GHG emissions: {ghg_limit_raw:,.0f} tCO2e")
+            print(f"│   ├── Adding <soft> constraints for GHG emissions: {ghg_limit_raw:,.0f} tCO2e")
             self.ghg_consts_soft.append(
                 self.gurobi_model.addConstr(
                     self.ghg_expr - ghg_limit_rescale <= self.E,
@@ -798,9 +800,10 @@ class LutoSolver:
             
             
     def _add_biodiversity_constraints(self) -> None:
-        print("    |__ Adding constraints for biodiversity...")
+        print("│   ├── Adding constraints for biodiversity...")
         self._add_GBF2_constraints()
         self._add_GBF3_NVIS_constraints()
+        self._add_GBF3_IBRA_constraints()
         self._add_GBF4_SNES_constraints()
         self._add_GBF4_ECNES_constraints()
         self._add_GBF8_constraints()
@@ -809,7 +812,7 @@ class LutoSolver:
     def _add_GBF2_constraints(self) -> None:
         
         if settings.BIODIVERSITY_TARGET_GBF_2 == "off":
-            print("      |__ TURNING OFF constraints for biodiversity GBF 2...")
+            print("│   │   ├── TURNING OFF constraints for biodiversity GBF 2...")
             return
         
         bio_ag_exprs = []
@@ -866,7 +869,7 @@ class LutoSolver:
         ) 
 
 
-        print(f'      |__ Adding constraints for biodiversity GBF 2: {self._input_data.limits["GBF2"]:15,.0f}')
+        print(f'│   │   ├── Adding constraints for biodiversity GBF 2: {self._input_data.limits["GBF2"]:15,.0f}')
         
         self.bio_GBF2_constrs = self.gurobi_model.addConstr(
             self.bio_GBF2_expr >= self._input_data.limits["GBF2_rescale"], 
@@ -876,34 +879,34 @@ class LutoSolver:
 
     def _add_GBF3_NVIS_constraints(self) -> None:
         if settings.BIODIVERSITY_TARGET_GBF_3_NVIS == "off":
-            print("      |__ TURNING OFF constraints for biodiversity GBF 3 (major vegetation groups)")
+            print("│   │   ├── TURNING OFF constraints for biodiversity GBF 3 NVIS")
             return
 
-        v_limits = self._input_data.limits["GBF3_rescale"]
-        v_names = self._input_data.GBF3_names
-        v_ind = self._input_data.GBF3_ind
+        v_limits = self._input_data.limits["GBF3_NVIS_rescale"]
+        v_names = self._input_data.GBF3_NVIS_names
 
-        print(f"      Adding constraints for biodiversity GBF 3...")
+        print("│   │   ├── Adding constraints for biodiversity GBF 3 NVIS...")
 
         for v, v_area_lb_rescale in enumerate(v_limits):
-            
-            v_area_lb_raw = v_area_lb_rescale * self._input_data.scale_factors['GBF3']
-            
+
+            v_area_lb_raw = v_area_lb_rescale * self._input_data.scale_factors['GBF3_NVIS']
+
             if v_area_lb_raw == 0:
-                print(f"        |__ target is {v_area_lb_raw:15,.0f} for {v_names[v]} (skipped modelling)  ")
+                print(f"│   │   │   ├── target is {v_area_lb_raw:15,.0f} for {v_names[v]} (skipped modelling)  ")
                 continue
-            
-            ind = v_ind[v]
-            MVG_raw_area_r = self._input_data.GBF3_NVIS_pre_1750_area_vr[v, ind]
+
+            print(f"│   │   │   ├── target is {v_area_lb_raw:15,.0f} for {v_names[v]}")
+            ind = np.where(self._input_data.GBF3_NVIS_pre_1750_area_vr[v, :] > 0)[0]
+            GBF3_NVIS_raw_area_r = self._input_data.GBF3_NVIS_pre_1750_area_vr[v, ind]
 
             ag_contr = gp.quicksum(
                 gp.quicksum(
-                    MVG_raw_area_r
+                    GBF3_NVIS_raw_area_r
                     * self._input_data.biodiv_contr_ag_j[j]
                     * self.X_ag_dry_vars_jr[j, ind]
                 )  # Dryland agriculture contribution
                 + gp.quicksum(
-                    MVG_raw_area_r
+                    GBF3_NVIS_raw_area_r
                     * self._input_data.biodiv_contr_ag_j[j]
                     * self.X_ag_irr_vars_jr[j, ind]
                 )  # Irrigated agriculture contribution
@@ -912,12 +915,12 @@ class LutoSolver:
 
             ag_man_contr = gp.quicksum(
                 gp.quicksum(
-                    MVG_raw_area_r
+                    GBF3_NVIS_raw_area_r
                     * self._input_data.biodiv_contr_ag_man[am][j_idx][ind]
                     * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
                 )  # Dryland alt. ag. management contributions
                 + gp.quicksum(
-                    MVG_raw_area_r
+                    GBF3_NVIS_raw_area_r
                     * self._input_data.biodiv_contr_ag_man[am][j_idx][ind]
                     * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
                 )  # Irrigated alt. ag. management contributions
@@ -927,7 +930,7 @@ class LutoSolver:
 
             non_ag_contr = gp.quicksum(
                 gp.quicksum(
-                    MVG_raw_area_r
+                    GBF3_NVIS_raw_area_r
                     * self._input_data.biodiv_contr_non_ag_k[k]
                     * self.X_non_ag_vars_kr[k, ind]
                 )  # Non-agricultural contribution
@@ -935,24 +938,92 @@ class LutoSolver:
             )
 
 
-            self.bio_GBF3_exprs[v] = ag_contr + ag_man_contr + non_ag_contr
+            self.bio_GBF3_NVIS_exprs[v] = ag_contr + ag_man_contr + non_ag_contr
 
-            print(f"        |__ target is {v_area_lb_raw:15,.0f} for {v_names[v]} ")
-            self.bio_GBF3_constrs[v] = self.gurobi_model.addConstr(
-                self.bio_GBF3_exprs[v] >= v_area_lb_rescale,
-                name=f"bio_GBF3_limit_{v_names[v]}".replace(" ", "_")
+            self.bio_GBF3_NVIS_constrs[v] = self.gurobi_model.addConstr(
+                self.bio_GBF3_NVIS_exprs[v] >= v_area_lb_rescale,
+                name=f"bio_GBF3_NVIS_limit_{v_names[v]}".replace(" ", "_")
+            )
+
+
+    def _add_GBF3_IBRA_constraints(self) -> None:
+        if settings.BIODIVERSITY_TARGET_GBF_3_IBRA == "off":
+            print("│   │   ├── TURNING OFF constraints for biodiversity GBF 3 IBRA")
+            return
+
+        v_limits = self._input_data.limits["GBF3_IBRA_rescale"]
+        v_names = self._input_data.GBF3_IBRA_names
+
+        print("│   │   ├── Adding constraints for biodiversity GBF 3 IBRA...")
+
+        for v, v_area_lb_rescale in enumerate(v_limits):
+
+            v_area_lb_raw = v_area_lb_rescale * self._input_data.scale_factors['GBF3_IBRA']
+
+            if v_area_lb_raw == 0:
+                print(f"│   │   │   ├── target is {v_area_lb_raw:15,.0f} for {v_names[v]} (skipped modelling)  ")
+                continue
+
+            print(f"│   │   │   ├── target is {v_area_lb_raw:15,.0f} for {v_names[v]}")
+            ind = np.where(self._input_data.GBF3_IBRA_pre_1750_area_vr[v, :] > 0)[0]
+            GBF3_IBRA_raw_area_r = self._input_data.GBF3_IBRA_pre_1750_area_vr[v, ind]
+
+            ag_contr = gp.quicksum(
+                gp.quicksum(
+                    GBF3_IBRA_raw_area_r
+                    * self._input_data.biodiv_contr_ag_j[j]
+                    * self.X_ag_dry_vars_jr[j, ind]
+                )  # Dryland agriculture contribution
+                + gp.quicksum(
+                    GBF3_IBRA_raw_area_r
+                    * self._input_data.biodiv_contr_ag_j[j]
+                    * self.X_ag_irr_vars_jr[j, ind]
+                )  # Irrigated agriculture contribution
+                for j in range(self._input_data.n_ag_lus)
+            )
+
+            ag_man_contr = gp.quicksum(
+                gp.quicksum(
+                    GBF3_IBRA_raw_area_r
+                    * self._input_data.biodiv_contr_ag_man[am][j_idx][ind]
+                    * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
+                )  # Dryland alt. ag. management contributions
+                + gp.quicksum(
+                    GBF3_IBRA_raw_area_r
+                    * self._input_data.biodiv_contr_ag_man[am][j_idx][ind]
+                    * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
+                )  # Irrigated alt. ag. management contributions
+                for am, am_j_list in self._input_data.am2j.items()
+                for j_idx in range(len(am_j_list))
+            )
+
+            non_ag_contr = gp.quicksum(
+                gp.quicksum(
+                    GBF3_IBRA_raw_area_r
+                    * self._input_data.biodiv_contr_non_ag_k[k]
+                    * self.X_non_ag_vars_kr[k, ind]
+                )  # Non-agricultural contribution
+                for k in range(self._input_data.n_non_ag_lus)
+            )
+
+
+            self.bio_GBF3_IBRA_exprs[v] = ag_contr + ag_man_contr + non_ag_contr
+
+            self.bio_GBF3_IBRA_constrs[v] = self.gurobi_model.addConstr(
+                self.bio_GBF3_IBRA_exprs[v] >= v_area_lb_rescale,
+                name=f"bio_GBF3_IBRA_limit_{v_names[v]}".replace(" ", "_")
             )
 
 
     def _add_GBF4_SNES_constraints(self) -> None:
         if settings.BIODIVERSITY_TARGET_GBF_4_SNES != "on":
-            print('      |__ TURNING OFF constraints for biodiversity GBF 4 SNES...')
+            print('│   │   ├── TURNING OFF constraints for biodiversity GBF 4 SNES...')
             return
         
         x_limits = self._input_data.limits["GBF4_SNES_rescale"]
         x_names = self._input_data.GBF4_SNES_names
 
-        print(f"      |__ Adding constraints for biodiversity GBF 4 SNES...")
+        print(f"│   │   ├── Adding constraints for biodiversity GBF 4 SNES...")
         
         for x, x_area_lb_rescale in enumerate(x_limits):
             x_area_lb_raw = x_area_lb_rescale * self._input_data.scale_factors['GBF4_SNES']
@@ -960,7 +1031,7 @@ class LutoSolver:
 
             if ind.size == 0:
                 print(
-                    f"        |__ WARNING: SNES species NOT added because of empty layer for {x_names[x]}")
+                    f"│   │   │   ├── WARNING: SNES species NOT added because of empty layer for {x_names[x]}")
                 continue
             
             ag_contr = gp.quicksum(
@@ -1003,7 +1074,7 @@ class LutoSolver:
 
             self.bio_GBF4_SNES_exprs[x] = ag_contr + ag_man_contr + non_ag_contr
 
-            print(f"        |__ target is {x_area_lb_raw:15,.0f} for {x_names[x]}")
+            print(f"│   │   │   ├── target is {x_area_lb_raw:15,.0f} for {x_names[x]}")
             self.bio_GBF4_SNES_constrs[x] = self.gurobi_model.addConstr(
                 self.bio_GBF4_SNES_exprs[x] >= x_area_lb_rescale,
                 name=f"bio_GBF4_SNES_limit_{x_names[x]}".replace(" ", "_"),
@@ -1011,13 +1082,13 @@ class LutoSolver:
 
     def _add_GBF4_ECNES_constraints(self) -> None:
         if settings.BIODIVERSITY_TARGET_GBF_4_ECNES != "on":
-            print('      |__ TURNING OFF constraints for biodiversity GBF 4 ECNES...')
+            print('│   │   ├── TURNING OFF constraints for biodiversity GBF 4 ECNES...')
             return
         
         x_limits = self._input_data.limits["GBF4_ECNES_rescale"]
         x_names = self._input_data.GBF4_ECNES_names
 
-        print(f"      |__ Adding constraints for biodiversity GBF 4 ECNES...")
+        print(f"│   │   ├── Adding constraints for biodiversity GBF 4 ECNES...")
         
         for x, x_area_lb_rescale in enumerate(x_limits):
             x_area_lb_raw = x_area_lb_rescale * self._input_data.scale_factors['GBF4_ECNES']
@@ -1025,7 +1096,7 @@ class LutoSolver:
 
             if ind.size == 0:
                 print(
-                    f"        |__ WARNING: ECNES species was NOT added because of empty layer for {x_names[x]}")
+                    f"│   │   │   ├── WARNING: ECNES species was NOT added because of empty layer for {x_names[x]}")
                 continue
             
             ag_contr = gp.quicksum(
@@ -1069,7 +1140,7 @@ class LutoSolver:
             self.bio_GBF4_ECNES_exprs[x] = ag_contr + ag_man_contr + non_ag_contr
 
 
-            print(f"        |__ target is {x_area_lb_raw:15,.0f} for {x_names[x]} ")
+            print(f"│   │   │   ├── target is {x_area_lb_raw:15,.0f} for {x_names[x]} ")
             self.bio_GBF4_ECNES_constrs[x] = self.gurobi_model.addConstr(
                 self.bio_GBF4_ECNES_exprs[x] >= x_area_lb_rescale,
                 name=f"bio_GBF4_ECNES_limit_{x_names[x]}".replace(" ", "_")
@@ -1079,14 +1150,14 @@ class LutoSolver:
     def _add_GBF8_constraints(self) -> None:
                 
         if settings.BIODIVERSITY_TARGET_GBF_8 != "on":
-            print('      |__ TURNING OFF constraints for biodiversity GBF 8...')
+            print('│   │   ├── TURNING OFF constraints for biodiversity GBF 8...')
             return
         
         s_limits = self._input_data.limits["GBF8_rescale"]
         s_names = self._input_data.GBF8_species_names
         s_ind = self._input_data.GBF8_species_indices
 
-        print(f"      |__ Adding constraints for biodiversity GBF 8...")
+        print(f"│   │   ├── Adding constraints for biodiversity GBF 8...")
         
         for s, s_area_lb_rescale in enumerate(s_limits):
             
@@ -1135,7 +1206,7 @@ class LutoSolver:
             # Divide by constant to reduce strain on the constraint matrix range
             self.bio_GBF8_exprs[s] = ag_contr + ag_man_contr + non_ag_contr
     
-            print(f"        |__ target is {s_area_lb_raw:15,.0f} for {s_names[s]}")
+            print(f"│   │   │   ├── target is {s_area_lb_raw:15,.0f} for {s_names[s]}")
             self.bio_GBF8_constrs[s] = self.gurobi_model.addConstr(
                 self.bio_GBF8_exprs[s] >= s_area_lb_rescale,
                 name=f"bio_GBF8_limit_{s_names[s]}".replace(" ", "_"),
@@ -1145,23 +1216,23 @@ class LutoSolver:
     def _add_regional_adoption_constraints(self) -> None:
 
         if settings.REGIONAL_ADOPTION_CONSTRAINTS == "off":
-            print("      |__ TURNING OFF constraints for regional adoption...")
+            print("│   │   ├── TURNING OFF constraints for regional adoption...")
             return
-                
+
         # Add adoption constraints for agricultural land uses
         reg_adopt_limits = self._input_data.limits["ag_regional_adoption"]
         for reg_id, j, lu_name, reg_ind, reg_area_limit in reg_adopt_limits:
-            print(f"       |__ Adding constraints for {lu_name} in {settings.REGIONAL_ADOPTION_ZONE} region {reg_id} <= {reg_area_limit:,.0f} HA...")
+            print(f"│   │   │   ├── Adding constraints for {lu_name} in {settings.REGIONAL_ADOPTION_ZONE} region {reg_id} <= {reg_area_limit:,.0f} HA...")
             reg_expr = (
                   gp.quicksum(self._input_data.real_area[reg_ind] * self.X_ag_dry_vars_jr[j, reg_ind])
                 + gp.quicksum(self._input_data.real_area[reg_ind] * self.X_ag_irr_vars_jr[j, reg_ind])
             )
             self.regional_adoption_constrs.append(self.gurobi_model.addConstr(reg_expr <= reg_area_limit, name=f"reg_adopt_limit_ag_{lu_name}_{reg_id}"))
-        
+
         # Add adoption constraints for non-agricultural land uses
         reg_adopt_limits = self._input_data.limits["non_ag_regional_adoption"]
         for reg_id, k, lu_name, reg_ind, reg_area_limit in reg_adopt_limits:
-            print(f"       |__ Adding constraints for {lu_name} in {settings.REGIONAL_ADOPTION_ZONE} region {reg_id} <= {reg_area_limit:,.0f} HA...")
+            print(f"│   │   │   ├── Adding constraints for {lu_name} in {settings.REGIONAL_ADOPTION_ZONE} region {reg_id} <= {reg_area_limit:,.0f} HA...")
             reg_expr = gp.quicksum(self._input_data.real_area[reg_ind] * self.X_non_ag_vars_kr[k, reg_ind])
             self.regional_adoption_constrs.append(self.gurobi_model.addConstr(reg_expr <= reg_area_limit, name=f"reg_adopt_limit_non_ag_{lu_name}_{reg_id}"))
 
@@ -1187,7 +1258,7 @@ class LutoSolver:
         self._input_data = input_data
         self._input_data.limits['demand'] = d_c
 
-        print("Updating variables...", flush=True)
+        print("\nUpdating variables...", flush=True)
         updated_cells = self._update_variables(
             old_ag_x_mrj,
             old_ag_man_lb_mrj,
@@ -1198,10 +1269,10 @@ class LutoSolver:
             old_lmmap,
             current_lmmap,
         )
-        print("Updating constraints...", flush=True)
+        print("├── Updating constraints...", flush=True)
         self._update_constraints(updated_cells)
 
-        print("Updating objective function...", flush=True)
+        print("└── Updating objective function...", flush=True)
         self._setup_objective()
 
     def _update_variables(
@@ -1353,10 +1424,10 @@ class LutoSolver:
 
     def _update_constraints(self, updated_cells: np.array):
         if len(updated_cells) == 0:
-            print("No constraints need updating.")
+            print("    No constraints need updating.")
             return
 
-        print("  ...removing existing constraints...\n")
+        print("    ...removing existing constraints...\n")
         for r in updated_cells:
             self.gurobi_model.remove(self.cell_usage_constraint_r.pop(r, []))
             self.gurobi_model.remove(self.ag_management_constraints_r.pop(r, []))
@@ -1367,8 +1438,12 @@ class LutoSolver:
             self.gurobi_model.remove(self.bio_GBF2_constrs)
         if self.water_limit_constraints:
             self.gurobi_model.remove(self.water_limit_constraints)
-        if self.bio_GBF3_constrs:
-            for constr in self.bio_GBF3_constrs.values():
+        if self.bio_GBF3_NVIS_constrs:
+            for constr in self.bio_GBF3_NVIS_constrs.values():
+                self.gurobi_model.remove(constr)
+
+        if self.bio_GBF3_IBRA_constrs:
+            for constr in self.bio_GBF3_IBRA_constrs.values():
                 self.gurobi_model.remove(constr)
         if self.bio_GBF4_SNES_constrs:
             for constr in self.bio_GBF4_SNES_constrs.values():
@@ -1384,8 +1459,10 @@ class LutoSolver:
         self.adoption_limit_constraints = []
         self.demand_penalty_constraints = []
         self.water_limit_constraints = []
-        self.bio_GBF3_exprs = {}
-        self.bio_GBF3_constrs = {}
+        self.bio_GBF3_NVIS_exprs = {}
+        self.bio_GBF3_NVIS_constrs = {}
+        self.bio_GBF3_IBRA_exprs = {}
+        self.bio_GBF3_IBRA_constrs = {}
         self.bio_GBF8_exprs = {}
         self.bio_GBF8_constrs = {}
         self.bio_GBF4_SNES_exprs = {}
@@ -1620,12 +1697,20 @@ class LutoSolver:
             if settings.BIODIVERSITY_TARGET_GBF_2 == "off"         
             else self.bio_GBF2_expr.getValue() * self._input_data.scale_factors['GBF2']       
         )
-        prod_data["BIO (GBF3) value (ha)"]=(
-            0                                                                               
-            if settings.BIODIVERSITY_TARGET_GBF_3_NVIS == "off"         
+        prod_data["BIO (GBF3) NVIS value (ha)"]=(
+            0
+            if settings.BIODIVERSITY_TARGET_GBF_3_NVIS == "off"
             else {
-                k: v.getValue() * self._input_data.scale_factors['GBF3'] 
-                for k,v in self.bio_GBF3_exprs.items()
+                k: v.getValue() * self._input_data.scale_factors['GBF3_NVIS']
+                for k,v in self.bio_GBF3_NVIS_exprs.items()
+            }
+        )
+        prod_data["BIO (GBF3) IBRA value (ha)"]=(
+            0
+            if settings.BIODIVERSITY_TARGET_GBF_3_IBRA == "off"
+            else {
+                k: v.getValue() * self._input_data.scale_factors['GBF3_IBRA']
+                for k,v in self.bio_GBF3_IBRA_exprs.items()
             }
         )
         prod_data["BIO (GBF4) SNES value (ha)"] = (
@@ -1696,12 +1781,20 @@ class LutoSolver:
                         prod_data["BIO (GBF2) value (ha)"] - self._input_data.limits['GBF2']
                     ]         
                 ),
-                "Deviation BIO (GBF3) value (ha)":(
+                "Deviation BIO (GBF3) NVIS value (ha)":(
                     0                                                                               
                     if settings.BIODIVERSITY_TARGET_GBF_3_NVIS == "off"         
                     else [
-                        v - self._input_data.limits['GBF3'][k]
-                        for k,v in prod_data["BIO (GBF3) value (ha)"].items()
+                        v - self._input_data.limits['GBF3_NVIS'][k]
+                        for k,v in prod_data["BIO (GBF3) NVIS value (ha)"].items()
+                    ]
+                ),
+                "Deviation BIO (GBF3) IBRA value (ha)":(
+                    0                                                                               
+                    if settings.BIODIVERSITY_TARGET_GBF_3_IBRA == "off"         
+                    else [
+                        v - self._input_data.limits['GBF3_IBRA'][k]
+                        for k,v in prod_data["BIO (GBF3) IBRA value (ha)"].items()
                     ]
                 ),
                 "Deviation BIO (GBF4) SNES value (ha)":(
