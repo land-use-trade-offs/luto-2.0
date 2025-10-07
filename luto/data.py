@@ -1030,6 +1030,16 @@ class Data:
         # The mismatch is caused by resfactoring spatial layers. Land uses of small size (i.e., other non-cereal crops) 
         # are distorted more under higher resfactoring.
         self.D_CY *= (yr_cal_base_prod_data / self.D_CY[0])[None, :]
+        
+        
+        # Demand elasticity data
+        demand_elasticity = pd.read_csv(f'{settings.INPUT_DIR}/demand_elasticity.csv').drop(columns=['Unnamed: 0'])
+        demand_elasticity['demand_elasticity'] = demand_elasticity.eval('`Demand Elasticity(ED)` - `Supply Elasticity (Es)`')
+        self.DEMAND_ELASTICITY = demand_elasticity.set_index('Commodity')['demand_elasticity'].to_dict()
+        
+        demand_xr = xr.DataArray(self.DEMAND_C) 
+        self.DEMAND_DELTA = (demand_xr - demand_xr.sel(YEAR=2010)) / demand_xr.sel(YEAR=2010)
+        
 
 
         ###############################################################
@@ -1627,6 +1637,12 @@ class Data:
         )
       
         return lumap_resfactored[*nearst_ind]
+    
+    def get_elasticity_price_for_yr(self, yr:int) -> float:
+        demand_xr = xr.DataArray(self.DEMAND_C) 
+        demand_delta = (demand_xr - demand_xr.sel(YEAR=2010)) / demand_xr.sel(YEAR=2010)
+        
+        
     
     
     def get_watershed_yield_components(self, valid_watershed_id:list[int] = None):

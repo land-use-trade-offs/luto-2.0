@@ -50,6 +50,8 @@ def create_new_dataset():
     luto_4D_inpath = 'N:/Data-Master/LUTO_2.0_input_data/Input_data/4D_Spatial_SSP_Timeseries/'
     fdh_inpath = 'N:/LUF-Modelling/fdh-archive/data/neoluto-data/new-data-and-domain/'
     profit_map_inpath = 'N:/Data-Master/Profit_map/'
+    demand_scenarios_inpath = 'N:/LUF-Modelling/Food_demand_AU/au.food.demand/Outputs'
+    demand_elasticity_inpath = 'N:/Data-Master/Demand_elasticity'
     water_domestic_use = 'N:/Data-Master/Water/Water_account/'
     no_go_areas = 'N:/Data-Master/Regional_adoption_and_Social_license/'    # just a toy example dataset
     nlum_inpath = 'N:/Data-Master/National_Landuse_Map/'
@@ -91,8 +93,12 @@ def create_new_dataset():
     shutil.copyfile(luto_2D_inpath + 'cell_biophysical_df.h5', raw_data + 'cell_biophysical_df.h5')
     shutil.copyfile(luto_2D_inpath + 'SA2_climate_damage_mult.h5', raw_data + 'SA2_climate_damage_mult.h5')
 
-    shutil.copyfile('N:/LUF-Modelling/Food_demand_AU/au.food.demand/Outputs/All_LUTO_demand_scenarios_with_convergences.csv',  raw_data + 'All_LUTO_demand_scenarios_with_convergences.csv')
-
+    
+    # Demand and elasticity data
+    shutil.copyfile(f'{demand_scenarios_inpath}/All_LUTO_demand_scenarios_with_convergences.csv',  raw_data + 'All_LUTO_demand_scenarios_with_convergences.csv')
+    shutil.copyfile(f'{demand_elasticity_inpath}/Elasticities_Table.csv', outpath + 'demand_elasticity.csv')
+    
+    
     # Read raw BECCS data from CSIRO and save as HDF5
     BECCS_raw = pd.read_pickle(BECCS_inpath + 'df_info_best_grid_20211116.pkl')
 
