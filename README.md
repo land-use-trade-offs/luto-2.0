@@ -51,7 +51,7 @@ luto/                                    # Main package directory
 │   │   ├── cost.py                      # Cost calculations
 │   │   ├── ghg.py                       # GHG emissions calculations
 │   │   ├── quantity.py                  # Production quantity calculations
-│   │   ├── revenue.py                   # Revenue calculations
+│   │   ├── revenue.py                   # Revenue calculations (includes dynamic pricing)
 │   │   ├── transitions.py               # Land use transition costs
 │   │   └── water.py                     # Water yield calculations
 │   ├── non_agricultural/                # Non-agricultural economics modules
@@ -206,6 +206,8 @@ settings.BIODIVERSITY_TARGET_GBF_4_SNES = 'off'         # 'on' or 'off'
 settings.BIODIVERSITY_TARGET_GBF_4_ECNES = 'off'        # 'on' or 'off'
 settings.BIODIVERSITY_TARGET_GBF_8 = 'off'              # 'on' or 'off'
 
+settings.DYNAMIC_PRICE = False                          # Enable demand elasticity-based dynamic pricing
+
 # Load data with custom parameters
 data = sim.load_data()
 
@@ -263,9 +265,11 @@ LUTO2 behavior can be customized through the `luto.settings` module. Key paramet
 - `EXCLUDE_NO_GO_LU`: Whether to exclude certain land uses from specific areas
 
 ### Economic Parameters
+- `DYNAMIC_PRICE`: Enable demand elasticity-based dynamic pricing (default: False)
 - `CARBON_PRICES_FIELD`: Carbon pricing scenario ('Default', 'CONSTANT', etc.)
-- `AMORTISE_UPFRONT_COSTS`: Whether to amortize establishment costs
+- `AMORTISE_UPFRONT_COSTS`: Whether to amortize establishment costs (default: False)
 - `DISCOUNT_RATE`: Discount rate for economic calculations (default: 7%)
+- `AMORTISATION_PERIOD`: Period for cost amortization in years (default: 30)
 
 ### Solver Configuration
 - `SOLVE_METHOD`: GUROBI algorithm selection (default: 2 for barrier method)

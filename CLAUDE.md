@@ -73,6 +73,10 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 - **`luto/economics/agricultural/`**: Agricultural land use economics
   - Revenue, cost, quantity, water, biodiversity, GHG calculations
   - Transition costs between agricultural land uses
+  - **Dynamic pricing** (`revenue.py`): Demand elasticity-based price adjustments
+    - Calculates commodity price multipliers based on supply-demand dynamics
+    - Uses elasticity coefficients and demand deltas from 2010 baseline
+    - Applied to crops and livestock (beef, sheep, dairy) when `DYNAMIC_PRICE` enabled
   - **Biodiversity module** (`biodiversity.py`): GBF (Global Biodiversity Framework) calculations
     - `get_GBF2_MASK_area()`: Returns GBF2 priority degraded areas (mask × real area)
     - `get_GBF3_NVIS_matrices_vr()`: NVIS vegetation layer matrices for GBF3
@@ -103,6 +107,12 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 - `RCP`: Representative Concentration Pathway (e.g., 'rcp4p5')
 - `OBJECTIVE`: Optimization objective ('maxprofit' or 'mincost')
 
+### Economic Settings
+- `DYNAMIC_PRICE`: Enable demand elasticity-based dynamic pricing (default: False)
+- `AMORTISE_UPFRONT_COSTS`: Whether to amortize establishment costs (default: False)
+- `DISCOUNT_RATE`: Discount rate for economic calculations (default: 0.07)
+- `AMORTISATION_PERIOD`: Period for cost amortization in years (default: 30)
+
 ### Environmental Constraints
 - `GHG_EMISSIONS_LIMITS`: Greenhouse gas targets ('off', 'low', 'medium', 'high')
 - `WATER_LIMITS`: Water yield constraints ('on' or 'off')
@@ -121,8 +131,13 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 ## Data Flow
 
 1. **Data Loading**: `luto.data.Data` class loads spatial datasets from `/input/`
+   - Loads demand scenarios and elasticity coefficients for dynamic pricing
+   - Calculates demand deltas (change from 2010 baseline) for price adjustments
 2. **Preprocessing**: `dataprep.py` processes raw data into model-ready formats
+   - Copies demand elasticity data from source to input directory
 3. **Economic Calculations**: Economics modules calculate costs, revenues, transitions, biodiversity impacts
+   - Revenue calculations apply demand elasticity multipliers when `DYNAMIC_PRICE` enabled
+   - Elasticity multipliers computed as: `1 + (demand_delta / demand_elasticity)`
 4. **Solver Input**: `solvers/input_data.py` prepares optimization model data
    - Biodiversity matrices: GBF2 mask areas, GBF3 NVIS layers, GBF4 SNES/ECNES matrices, GBF8 species data
    - Data rescaling: Arrays rescaled in-place to 0-1e3 magnitude for numerical stability
