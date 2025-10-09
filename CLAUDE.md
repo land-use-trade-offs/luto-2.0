@@ -73,6 +73,10 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 - **`luto/economics/agricultural/`**: Agricultural land use economics
   - Revenue, cost, quantity, water, biodiversity, GHG calculations
   - Transition costs between agricultural land uses
+  - **Dynamic pricing** (`revenue.py`): Demand elasticity-based price adjustments
+    - Calculates commodity price multipliers based on supply-demand dynamics
+    - Uses elasticity coefficients and demand deltas from 2010 baseline
+    - Applied to crops and livestock (beef, sheep, dairy) when `DYNAMIC_PRICE` enabled
   - **Biodiversity module** (`biodiversity.py`): GBF (Global Biodiversity Framework) calculations
     - `get_GBF2_MASK_area()`: Returns GBF2 priority degraded areas (mask × real area)
     - `get_GBF3_NVIS_matrices_vr()`: NVIS vegetation layer matrices for GBF3
@@ -84,6 +88,10 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 
 ### Data Processing
 - **`luto/dataprep.py`**: Data preprocessing utilities
+  - **Carbon sequestration data**: Migrated from HDF5/pandas to NetCDF/xarray format
+  - Saves tree planting carbon data at specific ages (50, 60, 70, 80, 90 years)
+  - Uses compressed NetCDF encoding with chunking for efficient storage
+  - Format: `tCO2_ha_{type}.nc` where type is ep_block, ep_belt, ep_rip, cp_block, cp_belt, hir_block, hir_rip
 - **`luto/tools/spatializers.py`**: Spatial data processing and upsampling
 - **`luto/tools/write.py`**: Output writing and file generation
 
@@ -103,9 +111,19 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 - `RCP`: Representative Concentration Pathway (e.g., 'rcp4p5')
 - `OBJECTIVE`: Optimization objective ('maxprofit' or 'mincost')
 
+### Economic Settings
+- `DYNAMIC_PRICE`: Enable demand elasticity-based dynamic pricing (default: False)
+- `AMORTISE_UPFRONT_COSTS`: Whether to amortize establishment costs (default: False)
+- `DISCOUNT_RATE`: Discount rate for economic calculations (default: 0.07)
+- `AMORTISATION_PERIOD`: Period for cost amortization in years (default: 30)
+
 ### Environmental Constraints
 - `GHG_EMISSIONS_LIMITS`: Greenhouse gas targets ('off', 'low', 'medium', 'high')
 - `WATER_LIMITS`: Water yield constraints ('on' or 'off')
+- `CARBON_EFFECTS_WINDOW`: Years for carbon accumulation averaging (50, 60, 70, 80, or 90 years)
+  - Must match available NetCDF data ages in input files
+  - Determines annual sequestration rate by averaging total CO2 over this period
+  - Default: 50 years (follows S-curve logic with rapid early accumulation)
 - `BIODIVERSITY_TARGET_GBF_*`: Global Biodiversity Framework targets
   - `BIODIVERSITY_TARGET_GBF_2`: Priority degraded areas restoration ('off' or percentage target)
   - `BIODIVERSITY_TARGET_GBF_3_NVIS`: NVIS vegetation group targets ('off' or percentage target)
@@ -121,8 +139,18 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 ## Data Flow
 
 1. **Data Loading**: `luto.data.Data` class loads spatial datasets from `/input/`
+   - Loads demand scenarios and elasticity coefficients for dynamic pricing
+   - Calculates demand deltas (change from 2010 baseline) for price adjustments
+   - **Carbon data**: Loads NetCDF files using xarray, selects data at `CARBON_EFFECTS_WINDOW` age
+   - Carbon sequestration components: Trees + Debris (aboveground, risk-discounted) + Soil (belowground)
 2. **Preprocessing**: `dataprep.py` processes raw data into model-ready formats
+   - Copies demand elasticity data from source to input directory
+   - **Carbon data preparation**: Converts 3D timeseries to NetCDF format with age dimension
+   - Selects specific ages (50, 60, 70, 80, 90 years) for carbon accumulation data
+   - Applies chunked compression (zlib level 5) for efficient storage
 3. **Economic Calculations**: Economics modules calculate costs, revenues, transitions, biodiversity impacts
+   - Revenue calculations apply demand elasticity multipliers when `DYNAMIC_PRICE` enabled
+   - Elasticity multipliers computed as: `1 + (demand_delta / demand_elasticity)`
 4. **Solver Input**: `solvers/input_data.py` prepares optimization model data
    - Biodiversity matrices: GBF2 mask areas, GBF3 NVIS layers, GBF4 SNES/ECNES matrices, GBF8 species data
    - Data rescaling: Arrays rescaled in-place to 0-1e3 magnitude for numerical stability
@@ -150,6 +178,57 @@ Results are saved in `/output/<timestamp>/`:
 - Uses pytest with hypothesis for property-based testing
 - Tests focus on robustness of core functionality
 - Run tests before making significant changes to ensure model integrity
+
+## Carbon Sequestration Data Format
+
+The carbon sequestration data has been migrated from HDF5/pandas format to NetCDF/xarray format for improved performance and flexibility.
+
+### Data Structure
+- **Format**: NetCDF (.nc) files with compressed chunking
+- **Dimensions**: `age` × `cell` (age dimension contains specific tree ages, cell dimension covers all spatial cells)
+- **Available ages**: 50, 60, 70, 80, 90 years (selected from full timeseries)
+- **Encoding**: zlib compression (level 5) with chunk size (1, 6956407)
+
+### Carbon Components
+Each NetCDF file contains three data variables representing different carbon pools:
+1. **Trees**: Aboveground biomass in trees (`*_TREES_T_CO2_HA` or `*_TREES_TOT_T_CO2_HA`)
+2. **Debris**: Aboveground debris/litter (`*_DEBRIS_T_CO2_HA` or `*_DEBRIS_TOT_T_CO2_HA`)
+3. **Soil**: Belowground soil carbon (`*_SOIL_T_CO2_HA` or `*_SOIL_TOT_T_CO2_HA`)
+
+### File Naming Convention
+- Environmental Plantings (Block): `tCO2_ha_ep_block.nc`
+- Environmental Plantings (Belt): `tCO2_ha_ep_belt.nc`
+- Environmental Plantings (Riparian): `tCO2_ha_ep_rip.nc`
+- Carbon Plantings (Block): `tCO2_ha_cp_block.nc`
+- Carbon Plantings (Belt): `tCO2_ha_cp_belt.nc`
+- Human-Induced Regeneration (Block): `tCO2_ha_hir_block.nc`
+- Human-Induced Regeneration (Riparian): `tCO2_ha_hir_rip.nc`
+
+### Data Loading Pattern
+```python
+import xarray as xr
+# Load NetCDF and select specific age from CARBON_EFFECTS_WINDOW setting
+ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_block.nc"))
+ds = ds.sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
+
+# Calculate total sequestration with risk discounting
+total_co2 = (
+    (ds.EP_BLOCK_TREES_TOT_T_CO2_HA + ds.EP_BLOCK_DEBRIS_TOT_T_CO2_HA)
+    * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)  # Aboveground with risk discount
+    + ds.EP_BLOCK_SOIL_TOT_T_CO2_HA  # Belowground (no risk discount)
+).values / settings.CARBON_EFFECTS_WINDOW  # Average over window
+```
+
+### Risk Discounting
+- **Aboveground carbon** (Trees + Debris): Discounted by fire risk and reversal risk
+- **Belowground carbon** (Soil): No risk discounting applied
+- Formula: `(AG_carbon × fire_risk% × (1 - RISK_OF_REVERSAL)) + BG_carbon`
+
+### Migration Notes
+- **Old format**: HDF5 files with pandas DataFrames, separate AG/BG columns
+- **New format**: NetCDF files with xarray Datasets, separate component variables
+- **Advantages**: Better compression, faster subsetting, age dimension flexibility, xarray integration
+- **CARBON_EFFECTS_WINDOW**: Must be one of [50, 60, 70, 80, 90] to match available data ages
 
 ## Biodiversity Module Naming Conventions
 

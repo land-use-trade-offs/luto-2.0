@@ -276,7 +276,27 @@ def get_GBF2_MASK_area(data:Data) -> np.ndarray:
     return data.BIO_GBF2_MASK * data.REAL_AREA
 
 def get_GBF3_NVIS_matrices_vr(data:Data) -> np.ndarray:
-    return data.NVIS_LAYERS_LDS * data.REAL_AREA
+    """
+    Gets the NVIS vegetation group matrices for GBF3 constraint.
+
+    Returns
+    -------
+    np.ndarray
+        indexed (v, r) where v is NVIS vegetation group and r is cell
+    """
+    return data.GBF3_NVIS_LAYERS_LDS * data.REAL_AREA
+
+
+def get_GBF3_IBRA_matrices_vr(data:Data) -> np.ndarray:
+    """
+    Gets the IBRA bioregion matrices for GBF3 constraint.
+
+    Returns
+    -------
+    np.ndarray
+        indexed (v, r) where v is IBRA bioregion and r is cell
+    """
+    return data.GBF3_IBRA_LAYERS_LDS * data.REAL_AREA
 
 
 def get_GBF4_SNES_matrix_sr(data:Data) -> np.ndarray:

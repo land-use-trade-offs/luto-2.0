@@ -21,7 +21,6 @@ import os
 import shutil
 import zipfile
 import luto.simulation as sim
-import luto.settings as settings
 
 
 

@@ -34,7 +34,7 @@ p9.options.dpi = 100
 
 
 # Get the data
-task_root_dir = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20251002_RES5_DIFF_CARBON_WINDOW_BIO/"
+task_root_dir = "N:/LUF-Modelling/LUTO2_XH/LUTO2/output/20251004_Cost_curve_task"
 report_data = process_task_root_dirs(task_root_dir).query('region == "AUSTRALIA"').copy()
 print(report_data['Type'].unique())
 

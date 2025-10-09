@@ -25,14 +25,11 @@ functions as a singleton class. It is intended to be the _only_ part of the
 model that has 'global' varying state.
 """
 
-import os
 import time
-import dill
-import gzip
-import pickle
 import threading
 
 from gurobipy import GRB
+import joblib
 from luto import settings
 from luto.data import Data
 from luto.solvers.input_data import get_input_data
@@ -116,7 +113,7 @@ def run(
                 years.insert(0, data.YR_CAL_BASE)
             # Solve and write outputs
             solve_timeseries(data, years)
-            save_data_to_disk(data, f"{save_dir}/Data_RES{settings.RESFACTOR}.gz")
+            save_data_to_disk(data, f"{save_dir}/Data_RES{settings.RESFACTOR}.lz4")
             write_outputs(data)
         except Exception as e:
             print(f"An error occurred during the simulation: {e}")
@@ -198,23 +195,17 @@ def solve_timeseries(data: Data, years_to_run: list[int]) -> None:
 
 
 
-def save_data_to_disk(data: Data, path: str, compress_level=6) -> None:
-    """Save the Data object to disk with gzip compression.
-    Arguments:
-        data: `Data` object.
-        path: Path to save the Data object.
-        compress_level: Compression level for gzip compression.
-    """
+def save_data_to_disk(data: Data, path: str, compress_level=3) -> None:
+    """Save using joblib - faster and more memory efficient."""
     print(f'Saving data to {path}...')
-
-    # Save with gzip compression
-    with gzip.open(path, 'wb', compresslevel=compress_level) as f:
-        dill.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
+    
+    # joblib is optimized for large numpy/scipy data
+    joblib.dump(data, path, compress=('lz4', compress_level))
     
     
 def load_data_from_disk(path: str) -> Data:
     """Load the Data object from disk.
-    
+
     Arguments:
         path: Path to the Data object.
 
@@ -236,12 +227,11 @@ def load_data_from_disk(path: str) -> Data:
     @LogToFile(log_path, 'w')
     def _load_data():
         print(f"Loading data from {path}...\n")
-        
-        # Load the data object with gzip compression
-        with gzip.open(path, 'rb') as f:
-            data = dill.load(f)
-            data.timestamp = read_timestamp()
-            data.path = save_dir
+
+        # Load joblib-compressed file
+        data = joblib.load(path)
+        data.timestamp = read_timestamp()
+        data.path = save_dir
 
         # Check if the resolution factor from the data object matches the settings.RESFACTOR
         if int(data.RESMULT ** 0.5) != settings.RESFACTOR:

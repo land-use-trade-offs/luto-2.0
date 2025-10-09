@@ -629,7 +629,7 @@ class Data:
         # Load soil carbon data, convert C to CO2e (x 44/12), and average over years
         self.SOIL_CARBON_AVG_T_CO2_HA = (
             pd.read_hdf(os.path.join(settings.INPUT_DIR, "soil_carbon_t_ha.h5"), where=self.MASK).to_numpy(dtype=np.float32) 
-            * (44 / 12) 
+            * (44 / 12)  # Convert C to CO2e
             / settings.CARBON_EFFECTS_WINDOW
         )
 
@@ -748,41 +748,44 @@ class Data:
         fire_risk = fr_df[fr_dict[settings.FIRE_RISK]]
 
         # Load environmental plantings (block) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
-        ep_df = pd.read_hdf(os.path.join(settings.INPUT_DIR, "ep_block_t_co2_ha.h5"), where=self.MASK)
+        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_block.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
         self.EP_BLOCK_AVG_T_CO2_HA = (
-            ep_df.EP_BLOCK_AG_T_CO2_HA * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
-            + ep_df.EP_BLOCK_BG_T_CO2_HA
-        ).to_numpy(dtype=np.float32) / settings.CARBON_EFFECTS_WINDOW
-
+            (ds.EP_BLOCK_TREES_TOT_T_CO2_HA + ds.EP_BLOCK_DEBRIS_TOT_T_CO2_HA)
+            * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
+            + ds.EP_BLOCK_SOIL_TOT_T_CO2_HA
+        ).values / settings.CARBON_EFFECTS_WINDOW
 
         # Load environmental plantings (belt) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
-        ep_df = pd.read_hdf(os.path.join(settings.INPUT_DIR, "ep_belt_t_co2_ha.h5"), where=self.MASK)
+        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_belt.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
         self.EP_BELT_AVG_T_CO2_HA = (
-            (ep_df.EP_BELT_AG_T_CO2_HA * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL))
-            + ep_df.EP_BELT_BG_T_CO2_HA
-        ).to_numpy(dtype=np.float32) / settings.CARBON_EFFECTS_WINDOW
+            (ds.EP_BELT_TREES_T_CO2_HA + ds.EP_BELT_DEBRIS_T_CO2_HA)
+            * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
+            + ds.EP_BELT_SOIL_T_CO2_HA
+        ).values / settings.CARBON_EFFECTS_WINDOW
 
         # Load environmental plantings (riparian) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
-        ep_df = pd.read_hdf(os.path.join(settings.INPUT_DIR, "ep_rip_t_co2_ha.h5"), where=self.MASK)
+        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_rip.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
         self.EP_RIP_AVG_T_CO2_HA = (
-            (ep_df.EP_RIP_AG_T_CO2_HA * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL))
-            + ep_df.EP_RIP_BG_T_CO2_HA
-        ).to_numpy(dtype=np.float32) / settings.CARBON_EFFECTS_WINDOW
+            (ds.EP_RIP_TREES_T_CO2_HA + ds.EP_RIP_DEBRIS_T_CO2_HA)
+            * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
+            + ds.EP_RIP_SOIL_T_CO2_HA
+        ).values / settings.CARBON_EFFECTS_WINDOW
 
         # Load carbon plantings (block) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
-        cp_df = pd.read_hdf(os.path.join(settings.INPUT_DIR, "cp_block_t_co2_ha.h5"), where=self.MASK)
+        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_cp_block.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
         self.CP_BLOCK_AVG_T_CO2_HA = (
-            (cp_df.CP_BLOCK_AG_T_CO2_HA * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL))
-            + cp_df.CP_BLOCK_BG_T_CO2_HA
-        ).to_numpy(dtype=np.float32) / settings.CARBON_EFFECTS_WINDOW
-
+            (ds.CP_BLOCK_TREES_T_CO2_HA + ds.CP_BLOCK_DEBRIS_T_CO2_HA)
+            * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
+            + ds.CP_BLOCK_SOIL_T_CO2_HA
+        ).values / settings.CARBON_EFFECTS_WINDOW
 
         # Load farm forestry [i.e. carbon plantings (belt)] GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
-        cp_df = pd.read_hdf(os.path.join(settings.INPUT_DIR, "cp_belt_t_co2_ha.h5"), where=self.MASK)
+        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_cp_belt.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
         self.CP_BELT_AVG_T_CO2_HA = (
-            (cp_df.CP_BELT_AG_T_CO2_HA * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL))
-            + cp_df.CP_BELT_BG_T_CO2_HA
-        ).to_numpy(dtype=np.float32) / settings.CARBON_EFFECTS_WINDOW
+            (ds.CP_BELT_TREES_T_CO2_HA + ds.CP_BELT_DEBRIS_T_CO2_HA)
+            * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
+            + ds.CP_BELT_SOIL_T_CO2_HA
+        ).values / settings.CARBON_EFFECTS_WINDOW
 
         # Agricultural land use to plantings raw transition costs:
         self.AG2EP_TRANSITION_COSTS_HA = np.load(
@@ -1030,6 +1033,16 @@ class Data:
         # The mismatch is caused by resfactoring spatial layers. Land uses of small size (i.e., other non-cereal crops) 
         # are distorted more under higher resfactoring.
         self.D_CY *= (yr_cal_base_prod_data / self.D_CY[0])[None, :]
+        
+        
+        # Demand elasticity data
+        demand_elasticity = pd.read_csv(f'{settings.INPUT_DIR}/demand_elasticity.csv').drop(columns=['Unnamed: 0'])
+        demand_elasticity['demand_elasticity'] = demand_elasticity.eval('`Supply Elasticity (Es)` - `Demand Elasticity(ED)`')
+        self.DEMAND_ELASTICITY = demand_elasticity.set_index('Commodity')['demand_elasticity'].to_dict()
+        
+        demand_xr = xr.DataArray(self.DEMAND_C) 
+        self.DEMAND_DELTA = (demand_xr - demand_xr.sel(YEAR=2010)) / demand_xr.sel(YEAR=2010)
+        
 
 
         ###############################################################
@@ -1208,113 +1221,132 @@ class Data:
               
         
         ###############################################################
-        # Biogeographic Regionalisation (GBF3).
+        # GBF3 biodiversity data. (NVIS and IBRA)
         ###############################################################
         if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off':
-        
-            print("\tLoading vegetation data...", flush=True)
-            
-            # Read in the pre-1750 vegetation statistics, and get NVIS class names and areas
-            GBF3_NVIS_targets_df = pd.read_excel(
-                settings.INPUT_DIR + '/BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS.xlsx',
-                sheet_name = f'NVIS_{settings.GBF3_NVIS_TARGET_CLASS}'
+            print("\tLoading GBF3 vegetation data (NVIS)...", flush=True)
+
+            # Read in the pre-1750 statistics and targets
+            nvis_targets_df = pd.read_excel(
+                settings.INPUT_DIR + "/BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS.xlsx",
+                sheet_name=f'NVIS_{settings.GBF3_NVIS_TARGET_CLASS}'
             ).sort_values(by='group', ascending=True)
-            
-            
+
+            # Select groups based on target type
             if settings.BIODIVERSITY_TARGET_GBF_3_NVIS == 'USER_DEFINED':
-                self.GBF3_NVIS_SEL = [row['group'] for _,row in GBF3_NVIS_targets_df.iterrows()
+                nvis_selected_groups = [
+                    row['group'] for _, row in nvis_targets_df.iterrows()
                     if all([
-                        row['USER_DEFINED_TARGET_PERCENT_2030']>0,
-                        row['USER_DEFINED_TARGET_PERCENT_2050']>0,
-                        row['USER_DEFINED_TARGET_PERCENT_2100']>0]
-                    )]
-                self.GBF3_NVIS_BASELINE_AND_TARGETS = GBF3_NVIS_targets_df.query('group.isin(@self.GBF3_NVIS_SEL)')
+                        row['USER_DEFINED_TARGET_PERCENT_2030'] > 0,
+                        row['USER_DEFINED_TARGET_PERCENT_2050'] > 0,
+                        row['USER_DEFINED_TARGET_PERCENT_2100'] > 0
+                    ])
+                ]
+                nvis_baseline_and_targets = nvis_targets_df.query("group.isin(@nvis_selected_groups)")
             else:
-                self.GBF3_NVIS_SEL = GBF3_NVIS_targets_df['group'].tolist()
-                self.GBF3_NVIS_BASELINE_AND_TARGETS = GBF3_NVIS_targets_df.query('group.isin(@self.GBF3_NVIS_SEL)')
-                self.GBF3_NVIS_BASELINE_AND_TARGETS[[
+                nvis_selected_groups = nvis_targets_df['group'].tolist()
+                nvis_baseline_and_targets = nvis_targets_df.query("group.isin(@nvis_selected_groups)")
+                nvis_baseline_and_targets[[
                     'USER_DEFINED_TARGET_PERCENT_2030',
-                    'USER_DEFINED_TARGET_PERCENT_2050', 
-                    'USER_DEFINED_TARGET_PERCENT_2100']] = settings.GBF3_TARGETS_DICT[settings.BIODIVERSITY_TARGET_GBF_3_NVIS]
-                
+                    'USER_DEFINED_TARGET_PERCENT_2050',
+                    'USER_DEFINED_TARGET_PERCENT_2100'
+                ]] = settings.GBF3_TARGETS_DICT[settings.BIODIVERSITY_TARGET_GBF_3_NVIS]
 
-            self.BIO_GBF3_NVIS_BASELINE_AUSTRALIA = self.GBF3_NVIS_BASELINE_AND_TARGETS['AREA_WEIGHTED_SCORE_ALL_AUSTRALIA_HA'].to_numpy()
-            self.BIO_GBF3_NVIS_BASELINE_OUTSIDE_LUTO = self.GBF3_NVIS_BASELINE_AND_TARGETS['AREA_WEIGHTED_SCORE_OUTSIDE_LUTO_NATURAL_HA'].to_numpy()
+            # Store NVIS attributes
+            self.GBF3_NVIS_SEL = nvis_selected_groups
+            self.GBF3_NVIS_BASELINE_AND_TARGETS = nvis_baseline_and_targets
+            self.BIO_GBF3_NVIS_BASELINE_AUSTRALIA = nvis_baseline_and_targets['AREA_WEIGHTED_SCORE_ALL_AUSTRALIA_HA'].to_numpy()
+            self.BIO_GBF3_NVIS_BASELINE_OUTSIDE_LUTO = nvis_baseline_and_targets['AREA_WEIGHTED_SCORE_OUTSIDE_LUTO_NATURAL_HA'].to_numpy()
 
-            
-            # Read in vegetation layer data
-            NVIS_layers = xr.open_dataarray(settings.INPUT_DIR + f"/bio_GBF3_NVIS_{settings.GBF3_NVIS_TARGET_CLASS}.nc").sel(group=self.GBF3_NVIS_SEL)
-            self.BIO_GBF3_NVIS_ID2DESC = dict(enumerate(NVIS_layers.group.values))
-            NVIS_layers = np.array([self.get_exact_resfactored_average_arr_without_lu_mask(arr) for arr in NVIS_layers], dtype=np.float32) / 100.0  # divide by 100 to get the percentage of the area in each cell that is covered by the vegetation type
-            
-            # Make sure the target has the same order as the layers
-            self.GBF3_NVIS_BASELINE_AND_TARGETS['order'] = self.GBF3_NVIS_BASELINE_AND_TARGETS['group'].apply(lambda x: list(NVIS_layers.group.values).index(x))
+            # Read in NVIS layer data
+            nvis_layers = xr.open_dataarray(settings.INPUT_DIR + f"/bio_GBF3_NVIS_{settings.GBF3_NVIS_TARGET_CLASS}.nc")
+            nvis_layers_sel = nvis_layers.sel(group=nvis_selected_groups)
+
+            # Create ID to description mapping
+            self.BIO_GBF3_NVIS_ID2DESC = dict(enumerate(nvis_layers_sel.group.values))
+
+            # Process layers with resfactoring
+            nvis_layers_arr = np.array(
+                [self.get_exact_resfactored_average_arr_without_lu_mask(arr) for arr in nvis_layers_sel],
+                dtype=np.float32
+            )
+            nvis_layers_arr = nvis_layers_arr / 100.0  # Convert to percentage
+
+            # Ensure target order matches layer order
+            self.GBF3_NVIS_BASELINE_AND_TARGETS['order'] = self.GBF3_NVIS_BASELINE_AND_TARGETS['group'].apply(
+                lambda x: list(nvis_layers_sel.group.values).index(x)
+            )
             self.GBF3_NVIS_BASELINE_AND_TARGETS = self.GBF3_NVIS_BASELINE_AND_TARGETS.sort_values(by='order').drop(columns='order')
-    
+
             # Apply Savanna Burning penalties
-            self.NVIS_LAYERS_LDS = np.where(
+            self.GBF3_NVIS_LAYERS_LDS = np.where(
                 self.SAVBURN_ELIGIBLE,
-                NVIS_layers  - (NVIS_layers * (1 - settings.BIO_CONTRIBUTION_LDS)),
-                NVIS_layers
+                nvis_layers_arr - (nvis_layers_arr * (1 - settings.BIO_CONTRIBUTION_LDS)),
+                nvis_layers_arr
             )
-            
-            # Container storing which cells apply to each major vegetation group
-            epsilon = 1e-5
-            self.GBF3_NVIS_IDX = {
-                v: np.where(NVIS_layers[v] > epsilon)[0]
-                for v in range(NVIS_layers.shape[0])
-            }
-            
-            
+
+
         if settings.BIODIVERSITY_TARGET_GBF_3_IBRA != 'off':
-            print("\tLoading bioregional data...", flush=True)
-            
-            # Read in the pre-1750 vegetation statistics, and get IBRA class names and areas
-            GBF3_IBRA_targets_df = pd.read_excel(
-                settings.INPUT_DIR + '/BIODIVERSITY_GBF3_IBRA_SCORES_AND_TARGETS.xlsx',
-                sheet_name = f'{settings.GBF3_IBRA_TARGET_CLASS}'
+            print("\tLoading GBF3 bioregional data (IBRA)...", flush=True)
+
+            # Read in the pre-1750 statistics and targets
+            ibra_targets_df = pd.read_excel(
+                settings.INPUT_DIR + "/BIODIVERSITY_GBF3_IBRA_SCORES_AND_TARGETS.xlsx",
+                sheet_name=f'{settings.GBF3_IBRA_TARGET_CLASS}'
             ).sort_values(by='Region', ascending=True)
-            
-            
+
+            # Select groups based on target type
             if settings.BIODIVERSITY_TARGET_GBF_3_IBRA == 'USER_DEFINED':
-                self.GBF3_IBRA_SEL = [row['Region'] for _,row in GBF3_IBRA_targets_df.iterrows()
+                ibra_selected_groups = [
+                    row['Region'] for _, row in ibra_targets_df.iterrows()
                     if all([
-                        row['USER_DEFINED_TARGET_PERCENT_2030']>0,
-                        row['USER_DEFINED_TARGET_PERCENT_2050']>0,
-                        row['USER_DEFINED_TARGET_PERCENT_2100']>0]
-                    )]
-                self.GBF3_IBRA_BASELINE_AND_TARGETS = GBF3_IBRA_targets_df.query('Region.isin(@self.GBF3_IBRA_SEL)')
+                        row['USER_DEFINED_TARGET_PERCENT_2030'] > 0,
+                        row['USER_DEFINED_TARGET_PERCENT_2050'] > 0,
+                        row['USER_DEFINED_TARGET_PERCENT_2100'] > 0
+                    ])
+                ]
+                ibra_baseline_and_targets = ibra_targets_df.query("Region.isin(@ibra_selected_groups)")
             else:
-                self.GBF3_IBRA_SEL = GBF3_IBRA_targets_df['Region'].tolist()
-                self.GBF3_IBRA_BASELINE_AND_TARGETS = GBF3_IBRA_targets_df.query('Region.isin(@self.GBF3_IBRA_SEL)')
-                self.GBF3_IBRA_BASELINE_AND_TARGETS[[
+                ibra_selected_groups = ibra_targets_df['Region'].tolist()
+                ibra_baseline_and_targets = ibra_targets_df.query("Region.isin(@ibra_selected_groups)")
+                ibra_baseline_and_targets[[
                     'USER_DEFINED_TARGET_PERCENT_2030',
-                    'USER_DEFINED_TARGET_PERCENT_2050', 
-                    'USER_DEFINED_TARGET_PERCENT_2100']] = settings.GBF3_TARGETS_DICT[settings.BIODIVERSITY_TARGET_GBF_3_IBRA]
-                
-            self.BIO_GBF3_IBRA_BASELINE_AUSTRALIA = self.GBF3_IBRA_BASELINE_AND_TARGETS['AREA_WEIGHTED_SCORE_ALL_AUSTRALIA_HA'].to_numpy()
-            self.BIO_GBF3_IBRA_BASELINE_OUTSIDE_LUTO = self.GBF3_IBRA_BASELINE_AND_TARGETS['AREA_WEIGHTED_SCORE_OUTSIDE_LUTO_NATURAL_HA'].to_numpy()
-        
+                    'USER_DEFINED_TARGET_PERCENT_2050',
+                    'USER_DEFINED_TARGET_PERCENT_2100'
+                ]] = settings.GBF3_TARGETS_DICT[settings.BIODIVERSITY_TARGET_GBF_3_IBRA]
+
+            # Store IBRA attributes
+            self.GBF3_IBRA_SEL = ibra_selected_groups
+            self.GBF3_IBRA_BASELINE_AND_TARGETS = ibra_baseline_and_targets
+            self.BIO_GBF3_IBRA_BASELINE_AUSTRALIA = ibra_baseline_and_targets['AREA_WEIGHTED_SCORE_ALL_AUSTRALIA_HA'].to_numpy()
+            self.BIO_GBF3_IBRA_BASELINE_OUTSIDE_LUTO = ibra_baseline_and_targets['AREA_WEIGHTED_SCORE_OUTSIDE_LUTO_NATURAL_HA'].to_numpy()
+
             # Read in IBRA layer data
-            IBRA_layers = xr.open_dataarray(settings.INPUT_DIR + f"/bio_GBF3_{settings.GBF3_IBRA_TARGET_CLASS}.nc")
-            self.BIO_GBF3_IBRA_ID2DESC = dict(enumerate(self.GBF3_IBRA_SEL))
-            IBRA_layers = np.array([self.get_exact_resfactored_average_arr_without_lu_mask(arr) for arr in IBRA_layers.sel(region=self.GBF3_IBRA_SEL)], dtype=np.float32) 
-            
-            # Make sure the target has the same order as the layers
-            self.GBF3_IBRA_BASELINE_AND_TARGETS['order'] = self.GBF3_IBRA_BASELINE_AND_TARGETS['Region'].apply(lambda x: list(IBRA_layers.region.values).index(x))
-            self.GBF3_IBRA_BASELINE_AND_TARGETS = self.GBF3_IBRA_BASELINE_AND_TARGETS.sort_values(by='order').drop(columns='order')
-            
-            # Apply Savanna Burning penalties
-            self.IBRA_LAYERS_LDS = np.where(
-                self.SAVBURN_ELIGIBLE,
-                IBRA_layers  - (IBRA_layers * (1 - settings.BIO_CONTRIBUTION_LDS)),
-                IBRA_layers
+            ibra_layers = xr.open_dataarray(settings.INPUT_DIR + f"/bio_GBF3_{settings.GBF3_IBRA_TARGET_CLASS}.nc")
+            ibra_layers_sel = ibra_layers.sel(region=ibra_selected_groups)
+
+            # Create ID to description mapping
+            self.BIO_GBF3_IBRA_ID2DESC = dict(enumerate(ibra_layers_sel.region.values))
+
+            # Process layers with resfactoring (IBRA already in correct units, no /100 needed)
+            ibra_layers_arr = np.array(
+                [self.get_exact_resfactored_average_arr_without_lu_mask(arr) for arr in ibra_layers_sel],
+                dtype=np.float32
             )
-            
-            self.GBF3_IBRA_IDX = {
-                v: np.where(IBRA_layers[v] > 0)[0]
-                for v in range(IBRA_layers.shape[0])
-            }
+
+            # Ensure target order matches layer order
+            self.GBF3_IBRA_BASELINE_AND_TARGETS['order'] = self.GBF3_IBRA_BASELINE_AND_TARGETS['Region'].apply(
+                lambda x: list(ibra_layers_sel.region.values).index(x)
+            )
+            self.GBF3_IBRA_BASELINE_AND_TARGETS = self.GBF3_IBRA_BASELINE_AND_TARGETS.sort_values(by='order').drop(columns='order')
+
+            # Apply Savanna Burning penalties
+            self.GBF3_IBRA_LAYERS_LDS = np.where(
+                self.SAVBURN_ELIGIBLE,
+                ibra_layers_arr - (ibra_layers_arr * (1 - settings.BIO_CONTRIBUTION_LDS)),
+                ibra_layers_arr
+            )
+
 
  
         
@@ -1517,16 +1549,17 @@ class Data:
         Safely adds agricultural management decision variables' values to the Data object.
         """
         self.ag_man_dvars[yr] = ag_man_dvars
-        
-    
+                
+
+
     def get_exact_resfactored_lumap_mrj(self):
         """
         Rather than picking the center cell when resfactoring the lumap, this function
         calculate the exact value of each land-use cell based from lumap to create dvars.
-        
+
         E.g., given a resfactor of 5, then each resfactored dvar cell will cover a 5x5 area.
-        If there are 9 Apple cells in the 5x5 area, then the dvar cell for it will be 9/25. 
-        
+        If there are 9 Apple cells in the 5x5 area, then the dvar cell for it will be 9/25.
+
         """
         if settings.RESFACTOR == 1:
             return tools.lumap2ag_l_mrj(self.LUMAP_NO_RESFACTOR, self.LMMAP_NO_RESFACTOR)[:, self.MASK, :]
@@ -1607,6 +1640,12 @@ class Data:
         )
       
         return lumap_resfactored[*nearst_ind]
+    
+    def get_elasticity_price_for_yr(self, yr:int) -> float:
+        demand_xr = xr.DataArray(self.DEMAND_C) 
+        demand_delta = (demand_xr - demand_xr.sel(YEAR=2010)) / demand_xr.sel(YEAR=2010)
+        
+        
     
     
     def get_watershed_yield_components(self, valid_watershed_id:list[int] = None):
@@ -1717,28 +1756,63 @@ class Data:
         return f(yr_cal).item()  # Convert the interpolated value to a scalar
     
     
-    def get_GBF3_limit_score_inside_LUTO_by_yr(self, yr:int) -> np.ndarray:
+    def get_GBF3_NVIS_limit_score_inside_LUTO_by_yr(self, yr: int) -> np.ndarray:
         '''
-        Interpolate the user-defined targets to get target at the given year
+        Interpolate GBF3 NVIS vegetation targets for the given year.
+
+        Args:
+            yr: Target year
+
+        Returns:
+            Array of NVIS vegetation target scores inside LUTO area
         '''
-        
-        GBF3_target_percents = []
-        for _,row in self.GBF3_NVIS_BASELINE_AND_TARGETS.iterrows():
+        GBF3_NVIS_target_percents = []
+        for _, row in self.GBF3_NVIS_BASELINE_AND_TARGETS.iterrows():
             f = interp1d(
                 [2010, 2030, 2050, 2100],
-                [min(row['BASE_YR_PERCENT'],row['USER_DEFINED_TARGET_PERCENT_2030']), 
-                 row['USER_DEFINED_TARGET_PERCENT_2030'], 
-                 row['USER_DEFINED_TARGET_PERCENT_2050'], 
+                [min(row['BASE_YR_PERCENT'], row['USER_DEFINED_TARGET_PERCENT_2030']),
+                 row['USER_DEFINED_TARGET_PERCENT_2030'],
+                 row['USER_DEFINED_TARGET_PERCENT_2050'],
                  row['USER_DEFINED_TARGET_PERCENT_2100']
                 ],
                 kind="linear",
                 fill_value="extrapolate",
             )
-            GBF3_target_percents.append(f(yr).item())
-        
-        limit_score_all_AUS = self.BIO_GBF3_NVIS_BASELINE_AUSTRALIA * (np.array(GBF3_target_percents) / 100)  # Convert the percentage to proportion
+            GBF3_NVIS_target_percents.append(f(yr).item())
+
+        limit_score_all_AUS = self.BIO_GBF3_NVIS_BASELINE_AUSTRALIA * (np.array(GBF3_NVIS_target_percents) / 100)  # Convert percentage to proportion
         limit_score_inside_LUTO = limit_score_all_AUS - self.BIO_GBF3_NVIS_BASELINE_OUTSIDE_LUTO
-            
+
+        return np.where(limit_score_inside_LUTO < 0, 0, limit_score_inside_LUTO)
+
+
+    def get_GBF3_IBRA_limit_score_inside_LUTO_by_yr(self, yr: int) -> np.ndarray:
+        '''
+        Interpolate GBF3 IBRA bioregion targets for the given year.
+
+        Args:
+            yr: Target year
+
+        Returns:
+            Array of IBRA bioregion target scores inside LUTO area
+        '''
+        GBF3_IBRA_target_percents = []
+        for _, row in self.GBF3_IBRA_BASELINE_AND_TARGETS.iterrows():
+            f = interp1d(
+                [2010, 2030, 2050, 2100],
+                [min(row['BASE_YR_PERCENT'], row['USER_DEFINED_TARGET_PERCENT_2030']),
+                 row['USER_DEFINED_TARGET_PERCENT_2030'],
+                 row['USER_DEFINED_TARGET_PERCENT_2050'],
+                 row['USER_DEFINED_TARGET_PERCENT_2100']
+                ],
+                kind="linear",
+                fill_value="extrapolate",
+            )
+            GBF3_IBRA_target_percents.append(f(yr).item())
+
+        limit_score_all_AUS = self.BIO_GBF3_IBRA_BASELINE_AUSTRALIA * (np.array(GBF3_IBRA_target_percents) / 100)  # Convert percentage to proportion
+        limit_score_inside_LUTO = limit_score_all_AUS - self.BIO_GBF3_IBRA_BASELINE_OUTSIDE_LUTO
+
         return np.where(limit_score_inside_LUTO < 0, 0, limit_score_inside_LUTO)
 
     
