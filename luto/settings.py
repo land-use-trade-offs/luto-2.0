@@ -72,7 +72,17 @@ FEED_EFFICIENCY = 'BAU'             # 'BAU' or 'High'
 CO2_FERT = 'off'   # or 'off'
 
 # Number of years over which to spread (average) soil carbon accumulation (from Mosnier et al. 2022 and Johnson et al. 2021)
-CARBON_EFFECTS_WINDOW = 91
+CARBON_EFFECTS_WINDOW = 50 # 50, 60, 70, 80, or 90 
+'''
+Available options are  50, 60, 70, 80, 90 years. This is the number of years over which to spread (average) 
+soil carbon accumulation. 
+
+The logic is that carbon accumulation after tree planting over time follows an S-shaped curve,
+with rapid accumulation in the first few decades, then slowing down as it approaches a new equilibrium.
+
+For example, by setting the CARBON_EFFECTS_WINDOW to 50 years, LUTO will take the total co2 sequestration
+for the first 50 years after planting and then use the average as the annual sequestration rate in the model.
+'''
 
 
 # Fire impacts on carbon sequestration
@@ -100,7 +110,7 @@ DISCOUNT_RATE = 0.07     # 0.05 = 5% pa.
 AMORTISATION_PERIOD = 30 # years
 
 # Set whether to use demand elasticity when calculating commodity prices
-DYNAMIC_PRICE = False
+DYNAMIC_PRICE = True
 
 
 
@@ -112,7 +122,7 @@ DYNAMIC_PRICE = False
 RESFACTOR = 13      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-SIM_YEARS =  list(range(2020,2051,5))
+SIM_YEARS =  list(range(2020,2051,10))
 
 
 # Define the objective function
@@ -357,12 +367,12 @@ AG_MANAGEMENTS_TO_LAND_USES = {
 
 
 AG_MANAGEMENTS = {
-    'Asparagopsis taxiformis': True,
-    'Precision Agriculture': True,
+    'Asparagopsis taxiformis': False,
+    'Precision Agriculture': False,
     'Ecological Grazing': False,
     'Savanna Burning': True,
-    'AgTech EI': True,
-    'Biochar': True,
+    'AgTech EI': False,
+    'Biochar': False,
     'HIR - Beef': True,
     'HIR - Sheep': True,
 }
@@ -669,7 +679,7 @@ will be 0.6 * 0.8 = 0.48.
 
 # ---------------------- GBF3 parameters ----------------------
 
-BIODIVERSITY_TARGET_GBF_3_NVIS = 'medium'           # 'off', 'medium', 'high', or 'USER_DEFINED'
+BIODIVERSITY_TARGET_GBF_3_NVIS = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
 '''
 Target 3 of the Kunming-Montreal Global Biodiversity Framework (NVIS):
 protect and manage vegetation groups using the National Vegetation Information System.
@@ -680,7 +690,7 @@ protect and manage vegetation groups using the National Vegetation Information S
 - if 'USER_DEFINED' is selected, the conservation target is reading from input Excel file.
 '''
 
-BIODIVERSITY_TARGET_GBF_3_IBRA = 'medium'           # 'off', 'medium', 'high', or 'USER_DEFINED'
+BIODIVERSITY_TARGET_GBF_3_IBRA = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
 '''
 Target 3 of the Kunming-Montreal Global Biodiversity Framework (IBRA):
 protect and manage bioregions using the Interim Biogeographic Regionalisation for Australia.

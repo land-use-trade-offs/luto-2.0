@@ -52,7 +52,8 @@ def get_rev_crop( data:Data         # Data object.
         rev_multiplier = 1
         if lu in data.CROP_PRICE_MULTIPLIERS.columns:
             rev_multiplier = data.CROP_PRICE_MULTIPLIERS.loc[data.YR_CAL_BASE + yr_idx, lu]
-            
+        
+        elasticity_multiplier = 1
         if settings.DYNAMIC_PRICE:
             elasticity_multiplier = 1 + (data.DEMAND_DELTA.sel(YEAR=yr_cal, COMMODITY=lu.lower()) / data.DEMAND_ELASTICITY[lu.lower()]).values
             
@@ -85,6 +86,14 @@ def get_rev_lvstk( data:Data   # Data object.
     # Get the yield potential, i.e. the total number of heads per hectare.
     yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
     
+    elasticity_multiplier = {
+        'beef lexp': 1,
+        'beef meat': 1,
+        'sheep lexp': 1,
+        'sheep meat': 1,
+        'sheep wool': 1,
+        'dairy': 1,
+    }
     # Get the dynamic price elasticity multiplier if required
     if settings.DYNAMIC_PRICE:
         elasticity_multiplier = {
