@@ -252,6 +252,10 @@ LUTO2 behavior can be customized through the `luto.settings` module. Key paramet
 ### Environmental Constraints
 - `GHG_EMISSIONS_LIMITS`: Greenhouse gas emission targets ('off', 'low', 'medium', 'high')
 - `WATER_LIMITS`: Whether to enforce water yield constraints ('on' or 'off')
+- `CARBON_EFFECTS_WINDOW`: Years for carbon accumulation averaging (50, 60, 70, 80, or 90 years)
+  - Determines the time period over which carbon sequestration is averaged
+  - Must match available ages in NetCDF input data
+  - Default: 50 years (based on S-curve carbon accumulation pattern)
 - `BIODIVERSITY_TARGET_GBF_2`: Global Biodiversity Framework Target 2 ('off', 'low', 'medium', 'high')
 - `BIODIVERSITY_TARGET_GBF_3_NVIS`: Conservation targets for NVIS vegetation types ('off', 'medium', 'high', 'USER_DEFINED')
 - `BIODIVERSITY_TARGET_GBF_3_IBRA`: Conservation targets for IBRA bioregions ('off', 'medium', 'high', 'USER_DEFINED')
@@ -282,6 +286,38 @@ LUTO2 behavior can be customized through the `luto.settings` module. Key paramet
 - `RESFACTOR`: Spatial resolution factor (1 = full resolution, >1 = coarser)
 
 Refer to `luto/settings.py` for a complete list of configurable parameters and detailed descriptions.
+
+## Data Formats
+
+### Carbon Sequestration Data (NetCDF)
+
+LUTO2 uses NetCDF format with xarray for carbon sequestration data, replacing the previous HDF5/pandas format. This provides better performance, compression, and flexibility.
+
+**Key Features:**
+- **Format**: NetCDF (.nc) files with dimensions: `age` × `cell`
+- **Available ages**: 50, 60, 70, 80, 90 years (selected from full carbon accumulation timeseries)
+- **Components**: Trees (aboveground biomass), Debris (litter), Soil (belowground)
+- **Compression**: zlib level 5 with chunking for efficient storage and loading
+- **File naming**: `tCO2_ha_{type}.nc` (e.g., `tCO2_ha_ep_block.nc` for Environmental Plantings Block)
+
+**Planting Types:**
+- Environmental Plantings: Block, Belt, Riparian (ep_block, ep_belt, ep_rip)
+- Carbon Plantings: Block, Belt (cp_block, cp_belt)
+- Human-Induced Regeneration: Block, Riparian (hir_block, hir_rip)
+
+**Carbon Calculation:**
+The model loads NetCDF data at the age specified by `CARBON_EFFECTS_WINDOW` setting:
+- Aboveground carbon (Trees + Debris) is discounted by fire risk and reversal risk
+- Belowground carbon (Soil) is not risk-discounted
+- Total sequestration is averaged over the carbon effects window to get annual rate
+
+**Example:**
+```python
+settings.CARBON_EFFECTS_WINDOW = 50  # Use 50-year carbon accumulation data
+# Model will load NetCDF data at age=50 and average to get annual sequestration rate
+```
+
+For more technical details, see the "Carbon Sequestration Data Format" section in `CLAUDE.md`.
 
 ## Copyright
 Copyright 2024-now **Bryan, B.A., Williams, N., Archibald, C.L., de Haan, F., Wang, J., van Schoten, N., Hadjikakou, M., Sanson, J., Zyngier, R., Marcos-Martinez, R., Navarro, J., Gao, L., Aghighi, H., Armstrong, T., Bohl, H., Jaffe, P., Khan, M.S., Moallemi, E.A., Nazari, A., Pan, X., Steyl, D., and Thiruvady, D.R.**  
