@@ -27,7 +27,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20251002_RES5_DIFF_CARBON_WINDOW_BIO/" # Do not include the trailing slash (/) in the end of the path
+TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20251009_RES5_DIFF_CARBON_WINDOW_AND_DYNAMIC_PRICES" # Do not include the trailing slash (/) in the end of the path
 
 
 # Set the grid search parameters
@@ -46,7 +46,7 @@ grid_search = {
     ###############################################################
     'OBJECTIVE': ['maxprofit'],                                             # 'maxprofit' or 'mincost'
     'RESFACTOR': [5],
-    'SIM_YEARS': [list(range(2020,2051,5))],                                    # Years to run the model 
+    'SIM_YEARS': [list(range(2020,2051,5))],                                # Years to run the model 
     'WRITE_THREADS': [2],
     
  
@@ -57,9 +57,10 @@ grid_search = {
     
     # --------------- Scenarios ---------------
     'SSP': ['245'],                                                         #'126', '245', '370', '585'
-    'CARBON_EFFECTS_WINDOW': list(range(50, 101, 10)),                                  
+    'CARBON_EFFECTS_WINDOW': list(range(50, 91, 10)),                                  
     
     # --------------- Economics ---------------
+    'DYNAMIC_PRICE' : [True, False],                                        # True or False
     'BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR': [100],  # AUD/ha/year       
     'SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR':[100],  # AUD/ha/year  
 
@@ -94,14 +95,14 @@ grid_search = {
     # --------------- Biodiversity overall ---------------
     'CONTRIBUTION_PERCENTILE': ['USER_DEFINED'],                            # One of [10, 25, 50, 75, 90], or 'USER_DEFINED'              
     'CONNECTIVITY_SOURCE': ['NCI'],
-    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [10, 20, 30, 40],        # Percentage of degraded areas to cut in GBF2 priority areas
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [40],                    # Percentage of degraded areas to cut in GBF2 priority areas
     
     # --------------- Biodiversity settings - GBF 2 ---------------
-    'BIODIVERSITY_TARGET_GBF_2': ['off','high'],                            # 'off', 'low', 'medium', 'high'
+    'BIODIVERSITY_TARGET_GBF_2': ['high'],                                  # 'off', 'low', 'medium', 'high'
     'GBF2_CONSTRAINT_TYPE': ['hard'],                                       # 'hard' or 'soft'
 
     # --------------- Biodiversity settings - GBF 3 ---------------
-    'BIODIVERSITY_TARGET_GBF_3_NVIS': ['off'],                                   # 'off', 'medium', 'high', 'USER_DEFINED'
+    'BIODIVERSITY_TARGET_GBF_3_NVIS': ['off'],                              # 'off', 'medium', 'high', 'USER_DEFINED'
     
     # --------------- Biodiversity settings - GBF 4 ---------------
     'BIODIVERSITY_TARGET_GBF_4_SNES': ['off'],                              # 'on' or 'off'.

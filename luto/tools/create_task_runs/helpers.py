@@ -20,13 +20,15 @@
 import os, re, json
 import shutil, itertools, subprocess, zipfile
 import pandas as pd
+import matplotlib.pyplot as plt
 
 from tqdm.auto import tqdm
 from typing import Literal
 from joblib import delayed, Parallel
+from matplotlib import patches
 
 from luto import settings
-from luto.tools.create_task_runs.parameters import EXCLUDE_DIRS, SERVER_PARAMS
+from luto.tools.create_task_runs.parameters import EXCLUDE_DIRS, HATCH_PATTERNS, SERVER_PARAMS, PLOT_COL_WIDTH
 
 
 def get_settings_df(task_root_dir:str) -> pd.DataFrame:
@@ -384,7 +386,7 @@ def process_task_root_dirs(task_root_dir, n_workers=10):
     
     tasks = []
     for run_dir in run_dirs:
-        run_idx = re.compile(r'Run_(\d{1,4})_').search(run_dir).group(1)
+        run_idx = re.compile(r'Run_(\d{1,4})').search(run_dir).group(1)
         run_paras = grid_search_params.query(f'run_idx == {int(run_idx)}').to_dict(orient='records')[0]
 
         # Depending on output structure, the report can be found in different places
@@ -404,3 +406,59 @@ def process_task_root_dirs(task_root_dir, n_workers=10):
     return out_df
 
         
+
+# Export to matplotlib to add hatches
+def get_hatch_patches(in_fig: plt.figure, in_df: pd.DataFrame, warp_col: str, shift_col: str):
+
+    # Group the data for rectangle plotting 
+    rectangle_map = pd.DataFrame()
+    for (_warp_col, _shift_col, _year), _df in in_df.groupby([warp_col, shift_col, 'year'], observed=True):
+        rectangle = pd.DataFrame({
+            'warp_col': [_warp_col],
+            'shift_col': [_shift_col],
+            'year': [_year],
+            'rect_x_start': [_year + _df['jitter_val'].iloc[0] - (PLOT_COL_WIDTH * 0.8) / 2],
+            'rect_x_end': [_year + _df['jitter_val'].iloc[0] + (PLOT_COL_WIDTH * 0.8) / 2],
+            'rect_y_start': [_df['value'][_df['value'] < 0].sum()],
+            'rect_y_end': [_df['value'][_df['value'] >= 0].sum()],
+            'hatch': [_df['hatch_val'].iloc[0]],
+        })
+        rectangle_map = pd.concat([rectangle, rectangle_map], ignore_index=True)
+        
+        
+    # Add hatch patterns 
+    for ax, (_, df) in zip(in_fig.axes, rectangle_map.groupby('warp_col')):
+        for _, row in df.iterrows():
+            rect = patches.Rectangle(
+                (row['rect_x_start'], row['rect_y_start']),
+                row['rect_x_end'] - row['rect_x_start'],
+                row['rect_y_end'] - row['rect_y_start'],
+                hatch=row['hatch'],
+                fill=False,
+                edgecolor='gray',
+                linewidth=0.01,
+                alpha=0.5,
+                zorder=10
+            )
+            ax.add_patch(rect)
+
+
+    # Add legend for the hatches
+    legend_patches = [
+        patches.Patch(facecolor='none', edgecolor='grey', hatch=i, label=lbl)
+        for (i, lbl) in zip(HATCH_PATTERNS, in_df[shift_col].sort_values().unique())
+    ]
+
+    # Place hatch legend at relative position
+    in_fig.legend(
+        handles=legend_patches, 
+        title=shift_col, 
+        loc='center', 
+        bbox_to_anchor=(0.9, 0.78), 
+        fontsize=8, 
+        frameon=True, 
+        facecolor='white', 
+        edgecolor='white'
+    )
+    
+    return in_fig
