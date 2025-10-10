@@ -35,15 +35,15 @@ from luto.settings import (
 
 
 def get_biodiv_environmental_plantings(data: Data) -> np.ndarray:
-    return data.BIO_CONNECTIVITY_RAW * data.REAL_AREA * BIO_CONTRIBUTION_ENV_PLANTING
+    return data.BIO_QUALITY_RAW * data.REAL_AREA * BIO_CONTRIBUTION_ENV_PLANTING
 
 
 def get_biodiv_riparian_plantings(data: Data) -> np.ndarray:
-    return data.BIO_CONNECTIVITY_RAW * data.REAL_AREA * BIO_CONTRIBUTION_RIPARIAN_PLANTING
+    return data.BIO_QUALITY_RAW * data.REAL_AREA * BIO_CONTRIBUTION_RIPARIAN_PLANTING
 
 
 def get_biodiv_agroforestry_base(data: Data) -> np.ndarray:
-    return data.BIO_CONNECTIVITY_RAW * data.REAL_AREA * BIO_CONTRIBUTION_AGROFORESTRY
+    return data.BIO_QUALITY_RAW * data.REAL_AREA * BIO_CONTRIBUTION_AGROFORESTRY
 
 
 def get_biodiv_sheep_agroforestry(
@@ -103,11 +103,11 @@ def get_biodiv_beef_agroforestry(
 
 
 def get_biodiv_carbon_plantings_block(data: Data) -> np.ndarray:
-    return data.BIO_CONNECTIVITY_RAW * data.REAL_AREA * BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK
+    return data.BIO_QUALITY_RAW * data.REAL_AREA * BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK
 
 
 def get_biodiv_carbon_plantings_belt_base(data: Data) -> np.ndarray:
-    return data.BIO_CONNECTIVITY_RAW * data.REAL_AREA * BIO_CONTRIBUTION_CARBON_PLANTING_BELT
+    return data.BIO_QUALITY_RAW * data.REAL_AREA * BIO_CONTRIBUTION_CARBON_PLANTING_BELT
 
 
 def get_biodiv_sheep_carbon_plantings_belt(
@@ -176,7 +176,7 @@ def get_biodiv_beccs(data: Data):
     ------
     Numpy array indexed by r
     """
-    return data.BIO_CONNECTIVITY_RAW * data.REAL_AREA * BIO_CONTRIBUTION_BECCS
+    return data.BIO_QUALITY_RAW * data.REAL_AREA * BIO_CONTRIBUTION_BECCS
 
 
 def get_biodiv_destocked_land(data: Data, lumap: np.ndarray):
@@ -196,7 +196,7 @@ def get_biodiv_destocked_land(data: Data, lumap: np.ndarray):
 
     for from_lu in data.LU_LVSTK_NATURAL:
         destock_b_contr[lumap == from_lu] = (
-            data.BIO_CONNECTIVITY_RAW[lumap == from_lu] 
+            data.BIO_QUALITY_RAW[lumap == from_lu] 
             * (data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[to_lu] - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[from_lu])
             * data.REAL_AREA[lumap == from_lu]
         )

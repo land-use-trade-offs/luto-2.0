@@ -19,21 +19,13 @@
 
 
 
-"""
-Script to load and prepare input data based on build.ipynb by F. de Haan
-and Brett Bryan, Deakin University
-
-"""
-
-
-# Load libraries
 import h5py
 import numpy as np
+import xarray as xr
 import pandas as pd
 import shutil, os, time, h5py
 
 from luto import settings
-
 
 from joblib import Parallel, delayed
 from itertools import product
@@ -54,19 +46,24 @@ def create_new_dataset():
     # Set data input paths
     luto_1D_inpath = 'N:/Data-Master/LUTO_2.0_input_data/Input_data/1D_Parameter_Timeseries/'
     luto_2D_inpath = 'N:/Data-Master/LUTO_2.0_input_data/Input_data/2D_Spatial_Snapshot/'
-    # luto_3D_inpath = 'N:/Data-Master/LUTO_2.0_input_data/Input_data/3D_Spatial_Timeseries/'
+    luto_3D_inpath = 'N:/Data-Master/LUTO_2.0_input_data/Input_data/3D_Spatial_Timeseries/'
     luto_4D_inpath = 'N:/Data-Master/LUTO_2.0_input_data/Input_data/4D_Spatial_SSP_Timeseries/'
     fdh_inpath = 'N:/LUF-Modelling/fdh-archive/data/neoluto-data/new-data-and-domain/'
     profit_map_inpath = 'N:/Data-Master/Profit_map/'
+    demand_scenarios_inpath = 'N:/LUF-Modelling/Food_demand_AU/au.food.demand/Outputs'
+    demand_elasticity_inpath = 'N:/Data-Master/Demand_elasticity'
     water_domestic_use = 'N:/Data-Master/Water/Water_account/'
+    no_go_areas = 'N:/Data-Master/Regional_adoption_and_Social_license/'    # just a toy example dataset
     nlum_inpath = 'N:/Data-Master/National_Landuse_Map/'
     BECCS_inpath = 'N:/Data-Master/BECCS/From_CSIRO/20211124_as_submitted/'
     GHG_off_land_inpath = 'N:/LUF-Modelling/Food_demand_AU/au.food.demand/Inputs/Off_land_GHG_emissions'
     bio_HACS_inpath = 'N:/Data-Master/Habitat_condition_assessment_system/Data/Processed/'
-    bio_GBF2_inpath = 'N:/Data-Master/Biodiversity/Environmental-suitability/Annual-species-suitability_20-year_snapshots_5km_to_NetCDF/'
+    bio_GBF2_inpath = 'N:/Data-Master/Biodiversity/DCCEEW/SNES_ECNES/Processed/'
     bio_GBF3_NVIS_inpath = 'N:/Data-Master/NVIS/Processed'
-    bio_GBF4_inpath = 'N:/Data-Master/Biodiversity/DCCEEW/SNES_ECNES/Processed/'
-    bio_GBF8_inpath = bio_GBF2_inpath
+    bio_GBF3_IBRA_inpath = 'N:/Data-Master/Australian_administrative_boundaries/ibra7_2019_aus/processed'
+    bio_GBF4_inpath = bio_GBF2_inpath
+    bio_GBF8_inpath = 'N:/Data-Master/Biodiversity/Environmental-suitability/Annual-species-suitability_20-year_snapshots_5km_to_NetCDF/'
+    bio_NES_Zonation_inpath = bio_GBF4_inpath
     
 
 
@@ -78,12 +75,11 @@ def create_new_dataset():
     for file in os.scandir(outpath):
         if file.name != '.gitignore':
             os.remove(file.path)
-    for file in os.scandir(raw_data): os.remove(file.path)
+
 
     # Copy raw data files from their source into raw_data folder for further processing
-
     shutil.copyfile(fdh_inpath + 'tmatrix-cat2lus.csv', raw_data + 'tmatrix_cat2lus.csv')
-    shutil.copyfile(fdh_inpath + 'transitions_costs_20250606.xlsx', raw_data + 'transitions_costs_20250606.xlsx')
+    shutil.copyfile(fdh_inpath + 'transitions_costs_20251002.xlsx', raw_data + 'transitions_costs_20251002.xlsx')
 
     shutil.copyfile(profit_map_inpath + 'NLUM_SPREAD_LU_ID_Mapped_Concordance.h5', raw_data + 'NLUM_SPREAD_LU_ID_Mapped_Concordance.h5')
 
@@ -97,8 +93,12 @@ def create_new_dataset():
     shutil.copyfile(luto_2D_inpath + 'cell_biophysical_df.h5', raw_data + 'cell_biophysical_df.h5')
     shutil.copyfile(luto_2D_inpath + 'SA2_climate_damage_mult.h5', raw_data + 'SA2_climate_damage_mult.h5')
 
-    shutil.copyfile('N:/LUF-Modelling/Food_demand_AU/au.food.demand/Outputs/All_LUTO_demand_scenarios_with_convergences.csv',  raw_data + 'All_LUTO_demand_scenarios_with_convergences.csv')
-
+    
+    # Demand and elasticity data
+    shutil.copyfile(f'{demand_scenarios_inpath}/All_LUTO_demand_scenarios_with_convergences.csv',  raw_data + 'All_LUTO_demand_scenarios_with_convergences.csv')
+    shutil.copyfile(f'{demand_elasticity_inpath}/Elasticities_Table.csv', outpath + 'demand_elasticity.csv')
+    
+    
     # Read raw BECCS data from CSIRO and save as HDF5
     BECCS_raw = pd.read_pickle(BECCS_inpath + 'df_info_best_grid_20211116.pkl')
 
@@ -108,12 +108,31 @@ def create_new_dataset():
     shutil.copyfile(nlum_inpath + 'NLUM_2010-11_mask.tif', outpath + 'NLUM_2010-11_mask.tif')
     shutil.copyfile(nlum_inpath + 'ag_landuses.csv', outpath + 'ag_landuses.csv')
 
-    shutil.copyfile(luto_1D_inpath + 'GHG_targets_20240421.xlsx', outpath + 'GHG_targets.xlsx')
+    shutil.copyfile(luto_1D_inpath + 'GHG_targets_20250411.xlsx', outpath + 'GHG_targets.xlsx')
     shutil.copyfile(luto_1D_inpath + 'carbon_prices_20240612.xlsx', outpath + 'carbon_prices.xlsx')
     shutil.copyfile(luto_1D_inpath + 'ag_price_multipliers_20240612.xlsx', outpath + 'ag_price_multipliers.xlsx')
     shutil.copyfile(luto_1D_inpath + 'cost_multipliers_20240612.xlsx', outpath + 'cost_multipliers.xlsx')
 
     pd.read_hdf(luto_2D_inpath + 'cell_savanna_burning.h5').to_hdf(outpath + 'cell_savanna_burning.h5', key='cell_savanna_burning', mode='w', format='table', index=False, complevel=9)
+        
+        
+    # Save tree planting carbon sequestration data; only save the sequestration at tree age of [50, 60, 70, 80, 90] years
+    sel_ages = [50, 60, 70, 80, 90]
+    ds = xr.open_dataset(luto_3D_inpath + 'tCO2_ha_ep_block.nc').sel(age=sel_ages).assign_coords(age=sel_ages, cell=range(6956407))
+    ds.to_netcdf(outpath + 'tCO2_ha_ep_block.nc', encoding={var: {'zlib': True, 'complevel': 5, 'chunksizes':(1, 6956407)} for var in ds.data_vars})
+    ds = xr.open_dataset(luto_3D_inpath + 'tCO2_ha_ep_rip.nc').sel(age=sel_ages).assign_coords(age=sel_ages, cell=range(6956407))
+    ds.to_netcdf(outpath + 'tCO2_ha_ep_rip.nc', encoding={var: {'zlib': True, 'complevel': 5, 'chunksizes':(1, 6956407)} for var in ds.data_vars})
+    ds = xr.open_dataset(luto_3D_inpath + 'tCO2_ha_ep_belt.nc').sel(age=sel_ages).assign_coords(age=sel_ages, cell=range(6956407))
+    ds.to_netcdf(outpath + 'tCO2_ha_ep_belt.nc', encoding={var: {'zlib': True, 'complevel': 5, 'chunksizes':(1, 6956407)} for var in ds.data_vars})
+    ds = xr.open_dataset(luto_3D_inpath + 'tCO2_ha_cp_block.nc').sel(age=sel_ages).assign_coords(age=sel_ages, cell=range(6956407))
+    ds.to_netcdf(outpath + 'tCO2_ha_cp_block.nc', encoding={var: {'zlib': True, 'complevel': 5, 'chunksizes':(1, 6956407)} for var in ds.data_vars})
+    ds = xr.open_dataset(luto_3D_inpath + 'tCO2_ha_cp_belt.nc').sel(age=sel_ages).assign_coords(age=sel_ages, cell=range(6956407))
+    ds.to_netcdf(outpath + 'tCO2_ha_cp_belt.nc', encoding={var: {'zlib': True, 'complevel': 5, 'chunksizes':(1, 6956407)} for var in ds.data_vars})
+    ds = xr.open_dataset(luto_3D_inpath + 'tCO2_ha_hir_block.nc').sel(age=sel_ages).assign_coords(age=sel_ages, cell=range(6956407))
+    ds.to_netcdf(outpath + 'tCO2_ha_hir_block.nc', encoding={var: {'zlib': True, 'complevel': 5, 'chunksizes':(1, 6956407)} for var in ds.data_vars})
+    ds = xr.open_dataset(luto_3D_inpath + 'tCO2_ha_hir_rip.nc').sel(age=sel_ages).assign_coords(age=sel_ages, cell=range(6956407))
+    ds.to_netcdf(outpath + 'tCO2_ha_hir_rip.nc', encoding={var: {'zlib': True, 'complevel': 5, 'chunksizes':(1, 6956407)} for var in ds.data_vars})
+
 
     # Save Water yield data to HDF5 in table format, so we can apply queries at reading time
     with h5py.File(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp126_2010-2100_DR_ML_HA_mean.h5', 'r') as f:
@@ -136,6 +155,9 @@ def create_new_dataset():
     # Save water use from domestic and industrial sectors for each watershed
     shutil.copyfile(water_domestic_use + 'Water_Use_Agriculture_ML.csv', outpath + 'Water_Use_Agriculture_ML.csv')
     shutil.copyfile(water_domestic_use + 'Water_Use_Domestic.csv', outpath + 'Water_Use_Domestic.csv')
+    
+    # Save no-go areas for land-use change; no-go areas are just toy template datasets
+    shutil.copytree(f'{no_go_areas}/no_go_areas', f'{outpath}/no_go_areas', dirs_exist_ok=True)
   
 
     # Copy agricultural management datafiles
@@ -154,8 +176,8 @@ def create_new_dataset():
     # Copy biodiversity GBF-3 data
     shutil.copyfile(bio_GBF3_NVIS_inpath + '/NVIS7_0_AUST_PRE_MVS.nc', outpath + 'bio_GBF3_NVIS_MVS.nc')
     shutil.copyfile(bio_GBF3_NVIS_inpath + '/NVIS7_0_AUST_PRE_MVG.nc', outpath + 'bio_GBF3_NVIS_MVG.nc')
-    
-    shutil.copyfile(bio_GBF3_NVIS_inpath + '/BIODIVERSITY_GBF3_SCORES_AND_TARGETS.xlsx', outpath + 'BIODIVERSITY_GBF3_SCORES_AND_TARGETS.xlsx')
+    shutil.copyfile(bio_GBF3_NVIS_inpath + '/BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS.xlsx', outpath + 'BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS.xlsx')
+    shutil.copyfile(bio_GBF3_IBRA_inpath + '/BIODIVERSITY_GBF3_IBRA_SCORES_AND_TARGETS.xlsx', outpath + 'BIODIVERSITY_GBF3_IBRA_SCORES_AND_TARGETS.xlsx')
 
     # Copy biodiversity GBF-4 files
     shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_SNES.nc', outpath + 'bio_GBF4_SNES.nc')
@@ -179,6 +201,9 @@ def create_new_dataset():
     shutil.copyfile(bio_GBF8_inpath + 'BIODIVERSITY_GBF8_SCORES_group.csv', outpath + 'BIODIVERSITY_GBF8_SCORES_group.csv')
     shutil.copyfile(bio_GBF8_inpath + 'BIODIVERSITY_GBF8_TARGET_group.csv', outpath + 'BIODIVERSITY_GBF8_TARGET_group.csv')
     
+    # Copy biodiversity NES Zonation files
+    shutil.copyfile(bio_NES_Zonation_inpath + 'bio_NES_Zonation.nc', outpath + 'bio_NES_Zonation.nc')
+    
 
     ############### Read data
 
@@ -190,7 +215,7 @@ def create_new_dataset():
 
     # Read in from-to costs in category-to-category format
     # tmcat = pd.read_csv(raw_data + 'tmatrix_categories.csv', index_col = 0)
-    tmcat = pd.read_excel( raw_data + 'transitions_costs_20250606.xlsx'
+    tmcat = pd.read_excel( raw_data + 'transitions_costs_20251002.xlsx'
                           , sheet_name = 'Current'
                           , usecols = 'B:M'
                           , skiprows = 5
@@ -198,13 +223,13 @@ def create_new_dataset():
                           , index_col = 0)
 
     # Read transition costs from agricultural land to environmental plantings
-    ag_to_new_land_uses = pd.read_excel( raw_data + 'transitions_costs_20250606.xlsx'
+    ag_to_new_land_uses = pd.read_excel( raw_data + 'transitions_costs_20251002.xlsx'
                                        , sheet_name = 'Ag_to_new_land-uses'
                                        , usecols = 'B,C'
                                        , index_col = 0 )
     
     # Read transition costs of ag to destocked natural land
-    ag_to_natural_land = pd.read_excel( raw_data + 'transitions_costs_20250606.xlsx'
+    ag_to_natural_land = pd.read_excel( raw_data + 'transitions_costs_20251002.xlsx'
                                         , sheet_name = 'Ag_to_destock_natural'
                                         , index_col = 0 
                                         ).sort_values(by = 'LU_DESC', ascending = True)
@@ -212,7 +237,7 @@ def create_new_dataset():
     
     # Read land clearing costs for non-agricultural land to unallocated modified land
     tmat_clear_data = pd.read_excel(
-        raw_data + 'transitions_costs_20250606.xlsx',
+        raw_data + 'transitions_costs_20251002.xlsx',
         sheet_name='Current',
         usecols='F',
         skiprows=19,
@@ -280,7 +305,7 @@ def create_new_dataset():
     # Read in ag-landuse, which is a lexicographically ordered list
     ag_landuses = pd.read_csv(outpath + 'ag_landuses.csv', header = None)[0].to_list()
 
-    # Create a non-agricultural landuses file
+    # Create a Non-Agricultural Land-uses file
     non_ag_landuses = list(settings.NON_AG_LAND_USES.keys())
 
 
@@ -372,7 +397,46 @@ def create_new_dataset():
 
     # Save to file
     zones['CELL_HA'].to_hdf(outpath + 'real_area.h5', key='real_area', mode='w', format='table', index=False, complevel=9)
-
+    
+    
+    ############### IBRA region and subregion categorical maps 
+    IBRA_region_arr = np.zeros((zones['IBRA_REG_NAME_7'].nunique(), zones.shape[0]), dtype=np.bool_) # shape=(regions, cells)
+    IBRA_subRegion_arr = np.zeros((zones['IBRA_SUB_NAME_7'].nunique(), zones.shape[0]), dtype=np.bool_) # shape=(subregions, cells)
+    
+    IBRA_region_id2name = dict(enumerate(zones['IBRA_REG_NAME_7'].cat.categories))
+    IBRA_subRegion_id2name = dict(enumerate(zones['IBRA_SUB_NAME_7'].cat.categories))
+    
+    for i,_ in IBRA_region_id2name.items():
+        IBRA_region_arr[i, :] = (zones['IBRA_REG_NAME_7'].cat.codes.values == i)
+        
+    for i,_ in IBRA_subRegion_id2name.items():
+        IBRA_subRegion_arr[i, :] = (zones['IBRA_SUB_NAME_7'].cat.codes.values == i)
+    
+    
+    REGION_IBRA_regions = xr.DataArray(
+        name='data',
+        data = IBRA_region_arr,
+        dims = ['region','cell'],
+        coords = {
+            'region':  list(IBRA_region_id2name.values()),
+            'cell': np.arange(zones.shape[0])},
+    )
+    REGION_IBRA_subregions = xr.DataArray(
+        name='data',
+        data = IBRA_subRegion_arr,
+        dims = ['subregion','cell'],
+        coords = {
+            'subregion':  list(IBRA_subRegion_id2name.values()),
+            'cell': np.arange(zones.shape[0])},
+    )
+    REGION_IBRA_regions.to_netcdf(
+        outpath + 'bio_GBF3_IBRA_Regions.nc', 
+        encoding={'data': {'dtype': 'bool', 'zlib': True, 'complevel': 9}}
+    )
+    REGION_IBRA_subregions.to_netcdf(
+        outpath + 'bio_GBF3_IBRA_SubRegions.nc', 
+        encoding={'data': {'dtype': 'bool', 'zlib': True, 'complevel': 9}}
+    )
 
 
     ############### Create ag_tmatrix -- agricultural transition cost matrix
@@ -789,8 +853,6 @@ def create_new_dataset():
 
 
 
-
-
     ############### Forest and reforestation data
 
     # # Carbon stock in mature forest on natural land and save to file
@@ -804,44 +866,7 @@ def create_new_dataset():
     s['NATURAL_LAND_TREES_DEBRIS_SOIL_TCO2_HA'] = bioph['NATURAL_LAND_TREES_DEBRIS_SOIL_TCO2_HA']
     s.to_hdf(outpath + 'natural_land_t_co2_ha.h5', key='natural_land_t_co2_ha', mode='w', format='table', index=False, complevel=9)
 
-    # Average annual carbon sequestration by Environmental Plantings (block plantings) and save to file
-    s = pd.DataFrame(columns=['EP_BLOCK_AG_AVG_T_CO2_HA_YR', 'EP_BLOCK_BG_AVG_T_CO2_HA_YR'])
-    s['EP_BLOCK_AG_AVG_T_CO2_HA_YR'] = bioph.eval('EP_BLOCK_TREES_AVG_T_CO2_HA_YR + EP_BLOCK_DEBRIS_AVG_T_CO2_HA_YR')
-    s['EP_BLOCK_BG_AVG_T_CO2_HA_YR'] = bioph['EP_BLOCK_SOIL_AVG_T_CO2_HA_YR']
-    s.to_hdf(outpath + 'ep_block_avg_t_co2_ha_yr.h5', key='ep_block_avg_t_co2_ha_yr', mode='w', format='table', index=False, complevel=9)
-
-    # Average annual carbon sequestration by Environmental Plantings (belt plantings) and save to file
-    s = pd.DataFrame(columns=['EP_BELT_AG_AVG_T_CO2_HA_YR', 'EP_BELT_BG_AVG_T_CO2_HA_YR'])
-    s['EP_BELT_AG_AVG_T_CO2_HA_YR'] = bioph.eval('EP_BELT_TREES_AVG_T_CO2_HA_YR + EP_BELT_DEBRIS_AVG_T_CO2_HA_YR')
-    s['EP_BELT_BG_AVG_T_CO2_HA_YR'] = bioph['EP_BELT_SOIL_AVG_T_CO2_HA_YR']
-    s.to_hdf(outpath + 'ep_belt_avg_t_co2_ha_yr.h5', key='ep_belt_avg_t_co2_ha_yr', mode='w', format='table', index=False, complevel=9)
-
-    # Average annual carbon sequestration by Environmental Plantings (riparian plantings) and save to file
-    s = pd.DataFrame(columns=['EP_RIP_AG_AVG_T_CO2_HA_YR', 'EP_RIP_BG_AVG_T_CO2_HA_YR'])
-    s['EP_RIP_AG_AVG_T_CO2_HA_YR'] = bioph.eval('EP_RIP_TREES_AVG_T_CO2_HA_YR + EP_RIP_DEBRIS_AVG_T_CO2_HA_YR')
-    s['EP_RIP_BG_AVG_T_CO2_HA_YR'] = bioph['EP_RIP_SOIL_AVG_T_CO2_HA_YR']
-    s.to_hdf(outpath + 'ep_rip_avg_t_co2_ha_yr.h5', key='ep_rip_avg_t_co2_ha_yr', mode='w', format='table', index=False, complevel=9)
-
-
-    # Average annual carbon sequestration by Hardwood Plantings (block plantings) and save to file
-    s = pd.DataFrame(columns=['CP_BLOCK_AG_AVG_T_CO2_HA_YR', 'CP_BLOCK_BG_AVG_T_CO2_HA_YR'])
-    s['CP_BLOCK_AG_AVG_T_CO2_HA_YR'] = bioph.eval('CP_BLOCK_TREES_AVG_T_CO2_HA_YR + CP_BLOCK_DEBRIS_AVG_T_CO2_HA_YR')
-    s['CP_BLOCK_BG_AVG_T_CO2_HA_YR'] = bioph['CP_BLOCK_SOIL_AVG_T_CO2_HA_YR']
-    s.to_hdf(outpath + 'cp_block_avg_t_co2_ha_yr.h5', key='cp_block_avg_t_co2_ha_yr', mode='w', format='table', index=False, complevel=9)
-
-    # Average annual carbon sequestration by Hardwood Plantings (belt plantings) and save to file
-    s = pd.DataFrame(columns=['CP_BELT_AG_AVG_T_CO2_HA_YR', 'CP_BELT_BG_AVG_T_CO2_HA_YR'])
-    s['CP_BELT_AG_AVG_T_CO2_HA_YR'] = bioph.eval('CP_BELT_TREES_AVG_T_CO2_HA_YR + CP_BELT_DEBRIS_AVG_T_CO2_HA_YR')
-    s['CP_BELT_BG_AVG_T_CO2_HA_YR'] = bioph['CP_BELT_SOIL_AVG_T_CO2_HA_YR']
-    s.to_hdf(outpath + 'cp_belt_avg_t_co2_ha_yr.h5', key='cp_belt_avg_t_co2_ha_yr', mode='w', format='table', index=False, complevel=9)
     
-    # Average annual carbon sequestration by Human Induced Regrowth (block plantings) and save to file
-    s = pd.DataFrame(columns=['HIR_BLOCK_AG_AVG_T_CO2_HA_YR', 'HIR_BLOCK_BG_AVG_T_CO2_HA_YR'])
-    s['HIR_BLOCK_AG_AVG_T_CO2_HA_YR'] = bioph.eval('HIR_BLOCK_TREES_AVG_T_CO2_HA_YR + HIR_BLOCK_DEBRIS_AVG_T_CO2_HA_YR')
-    s['HIR_BLOCK_BG_AVG_T_CO2_HA_YR'] = bioph['HIR_BLOCK_SOIL_AVG_T_CO2_HA_YR']
-    s.to_hdf(outpath + 'hir_block_avg_t_co2_ha_yr.h5', key='hir_block_avg_t_co2_ha_yr', mode='w', format='table', index=False, complevel=9)
-    
-
     # # MASK for Human Induced Regrowth; stop using HIR mask at 2025-06-16 after meeting with Carbon Market Institute (CMI)
     # hir_mask = zones['HIR_MASK'].copy().values
     # np.save(outpath + 'hir_mask.npy', hir_mask)  # shape: (6956407,)

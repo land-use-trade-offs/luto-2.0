@@ -16,8 +16,6 @@ dependencies:
   - hypothesis==6.102.4
   - lxml==5.2.2
   - folium==0.16.0
-  - contextily==1.6.0
-  - imageio==2.34.1
   - geopandas==0.14.4
   - ipython==8.24.0
   - rioxarray==0.15.5
@@ -27,7 +25,6 @@ dependencies:
   - ipykernel==6.29.4
   - sparse==0.15.4
   - nbformat==5.10.4
-  - dill==0.3.8
   - netcdf4=1.7.2
   - pip
   - pip:

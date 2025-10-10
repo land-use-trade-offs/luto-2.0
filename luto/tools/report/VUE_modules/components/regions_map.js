@@ -14,7 +14,7 @@ window.RegionsMap = {
 
     const map = ref(null);
     const boundingBox = ref(null);
-    const loadScript = window.loadScript;                       // DataConstructor has been registered in index.html [DataConstructor.js] [helpers.js]
+    const loadScript = window.loadScript;
     const selectedBaseMap = ref('OpenStreetMap');
     const tileLayers = ref({});
     const baseMapOptions = ref(['OpenStreetMap', 'Satellite', 'None']);

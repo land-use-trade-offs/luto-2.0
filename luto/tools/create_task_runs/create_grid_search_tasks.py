@@ -27,7 +27,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = '../Custom_runs/20250902_RES3_NON_AG_2_5_10_15_20_25_30' # Do not include the trailing slash (/) in the end of the path
+TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20251009_RES5_DIFF_CARBON_WINDOW_AND_DYNAMIC_PRICES" # Do not include the trailing slash (/) in the end of the path
 
 
 # Set the grid search parameters
@@ -35,9 +35,9 @@ grid_search = {
     ###############################################################
     # Task run settings for submitting the job to the cluster
     ###############################################################
-    'MEM': ['96GB'],
-    'NCPUS':[24],
-    'TIME': ['12:00:00'],
+    'MEM': ['60GB'],
+    'NCPUS':[15],
+    'TIME': ['5:00:00'],
     'QUEUE': ['normalsr'],                                                  # normalsr for CPU, hugemembw for memory intensive jobs
     
  
@@ -45,8 +45,8 @@ grid_search = {
     # Working settings for the model run
     ###############################################################
     'OBJECTIVE': ['maxprofit'],                                             # 'maxprofit' or 'mincost'
-    'RESFACTOR': [3],
-    'SIM_YEARS': [range(2020, 2051, 5)],                                    # Years to run the model 
+    'RESFACTOR': [5],
+    'SIM_YEARS': [list(range(2020,2051,5))],                                # Years to run the model 
     'WRITE_THREADS': [2],
     
  
@@ -57,7 +57,12 @@ grid_search = {
     
     # --------------- Scenarios ---------------
     'SSP': ['245'],                                                         #'126', '245', '370', '585'
+    'CARBON_EFFECTS_WINDOW': list(range(50, 91, 10)),                                  
     
+    # --------------- Economics ---------------
+    'DYNAMIC_PRICE' : [True, False],                                        # True or False
+    'BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR': [100],  # AUD/ha/year       
+    'SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR':[100],  # AUD/ha/year  
 
     # --------------- Target deviation weight ---------------
     'SOLVER_WEIGHT_DEMAND': [1], 
@@ -68,13 +73,13 @@ grid_search = {
 
     # --------------- Social license ---------------
     'EXCLUDE_NO_GO_LU': [False],                                            # True or False
-    'REGIONAL_ADOPTION_CONSTRAINTS': ['off', 'NON_AG_UNIFORM'],             # 'off', 'on', 'NON_AG_UNIFORM'    
-    'REGIONAL_ADOPTION_NON_AG_UNIFORM': [2, 5, 10, 15, 20, 25, 30],         # Only work under 'NON_AG_UNIFORM'; None or numbers between 0-100 (both inclusive);  E.g., 5 means each non-ag land can not exceed 5% adoption in every region
-    'REGIONAL_ADOPTION_ZONE': ['NRM_CODE', 'NRM_CODE'],                     # One of 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
+    'REGIONAL_ADOPTION_CONSTRAINTS': ['off'],                               # 'off', 'on', 'NON_AG_UNIFORM'    
+    'REGIONAL_ADOPTION_NON_AG_UNIFORM': [15],                               # Only work under 'NON_AG_UNIFORM'; None or numbers between 0-100 (both inclusive);  E.g., 5 means each non-ag land can not exceed 5% adoption in every region
+    'REGIONAL_ADOPTION_ZONE': ['NRM_CODE'],                                 # One of 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
 
 
     # --------------- GHG settings ---------------
-    'GHG_EMISSIONS_LIMITS': ['low', 'high'],                                # 'off', 'low', 'medium', 'high'
+    'GHG_EMISSIONS_LIMITS': ['high'],                                       # 'off', 'low', 'medium', 'high'
     'CARBON_PRICES_FIELD': ['CONSTANT'],
     'GHG_CONSTRAINT_TYPE': ['hard'],                                        # 'hard' or 'soft'
     'USE_GHG_SCOPE_1': [True],                                              # True or False
@@ -88,16 +93,16 @@ grid_search = {
     'INCLUDE_WATER_LICENSE_COSTS': [1],
     
     # --------------- Biodiversity overall ---------------
-    'HABITAT_CONDITION': ['USER_DEFINED'],                                  # One of [10, 25, 50, 75, 90], or 'USER_DEFINED'              
+    'CONTRIBUTION_PERCENTILE': ['USER_DEFINED'],                            # One of [10, 25, 50, 75, 90], or 'USER_DEFINED'              
     'CONNECTIVITY_SOURCE': ['NCI'],
-    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [20, 40],                # Percentage of degraded areas to cut in GBF2 priority areas
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [40],                    # Percentage of degraded areas to cut in GBF2 priority areas
     
     # --------------- Biodiversity settings - GBF 2 ---------------
     'BIODIVERSITY_TARGET_GBF_2': ['high'],                                  # 'off', 'low', 'medium', 'high'
     'GBF2_CONSTRAINT_TYPE': ['hard'],                                       # 'hard' or 'soft'
 
     # --------------- Biodiversity settings - GBF 3 ---------------
-    'BIODIVERSITY_TARGET_GBF_3': ['off'],                                   # 'off', 'medium', 'high', 'USER_DEFINED'
+    'BIODIVERSITY_TARGET_GBF_3_NVIS': ['off'],                              # 'off', 'medium', 'high', 'USER_DEFINED'
     
     # --------------- Biodiversity settings - GBF 4 ---------------
     'BIODIVERSITY_TARGET_GBF_4_SNES': ['off'],                              # 'on' or 'off'.

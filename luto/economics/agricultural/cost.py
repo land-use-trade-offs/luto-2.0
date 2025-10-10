@@ -178,7 +178,7 @@ def get_cost_lvstk(data:Data, lu, lm, yr_idx):
 
     costs = np.stack([costs_a, costs_flc, costs_foc, costs_fdc, costs_w, costs_q]).T
 
-    # Return costs as numpy array.
+    # Return costs 
     return pd.DataFrame(
         costs,
         columns=pd.MultiIndex.from_product(
@@ -480,22 +480,22 @@ def get_beef_hir_effect_c_mrj(data: Data, yr_idx: int):
     Returns
     - c_mrj_effects: The updated cost data <unit: $/cell>.
     """
-    yr_cal = data.YR_CAL_BASE + yr_idx
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef']
     c_mrj_effects = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
-    # Cost reduction due to reduced livestock density
+    # Cost reduction due to reduced livestock density; all costs (Area, Fixed, Quantity ...) are reduced proportionally
     for m, lm in enumerate(data.LANDMANS):
         for j_idx, lu in enumerate(land_uses):
-            # Quantity costs are reduced by `HIR_PRODUCTIVITY_CONTRIBUTION` under HIR
-            lvstype, vegtype = lvs_veg_types(lu)
-            lvstype_capital = lvstype.capitalize()
-            yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
+            # ag_cost_r = get_cost_lvstk(data, lu, lm, yr_idx)[(lu, lm, 'Quantity cost')].values
+            ag_cost_r = get_cost_lvstk(data, lu, lm, yr_idx).values.sum(axis=1)  # This is all costs, not just quantity cost
+            c_mrj_effects[m, :, j_idx] += (settings.HIR_PRODUCTIVITY_CONTRIBUTION - 1) * ag_cost_r
 
-            q_costs = data.AGEC_LVSTK['QC', lvstype] * yield_pot * data.QC_COST_MULTS.loc[yr_cal, lvstype_capital] * data.REAL_AREA
-            c_mrj_effects[m, :, j_idx] += (settings.HIR_PRODUCTIVITY_CONTRIBUTION - 1) * q_costs
+    # Maintenance cost per hectare
+    mainten_cost_rj = (settings.BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR * data.REAL_AREA)[:,None] * (1 - settings.HIR_PRODUCTIVITY_CONTRIBUTION)
+    cost_mrj = c_mrj_effects + mainten_cost_rj
 
-    return c_mrj_effects + (settings.BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR * data.REAL_AREA)[:,None]
+    
+    return cost_mrj
 
 
 def get_sheep_hir_effect_c_mrj(data: Data, yr_idx: int):
@@ -510,21 +510,21 @@ def get_sheep_hir_effect_c_mrj(data: Data, yr_idx: int):
     Returns
     - c_mrj_effects: The updated cost data <unit: $/cell>.
     """
-    yr_cal = data.YR_CAL_BASE + yr_idx
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep']
     c_mrj_effects = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
-
+    
+    # Cost reduction due to reduced livestock density; all costs (Area, Fixed, Quantity ...) are reduced proportionally
     for m, lm in enumerate(data.LANDMANS):
         for j_idx, lu in enumerate(land_uses):
-            # Quantity costs are reduced by 50% under HIR
-            lvstype, vegtype = lvs_veg_types(lu)
-            lvstype_capital = lvstype.capitalize()
-            yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
+            # ag_cost_r = get_cost_lvstk(data, lu, lm, yr_idx)[(lu, lm, 'Quantity cost')].values
+            ag_cost_r = get_cost_lvstk(data, lu, lm, yr_idx).values.sum(axis=1)  # This is all costs, not just quantity cost
+            c_mrj_effects[m, :, j_idx] += (settings.HIR_PRODUCTIVITY_CONTRIBUTION - 1) * ag_cost_r
 
-            q_costs = data.AGEC_LVSTK['QC', lvstype] * yield_pot * data.QC_COST_MULTS.loc[yr_cal, lvstype_capital] * data.REAL_AREA
-            c_mrj_effects[m, :, j_idx] += (settings.HIR_PRODUCTIVITY_CONTRIBUTION - 1) * q_costs
-
-    return c_mrj_effects + (settings.SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR * data.REAL_AREA)[:,None]
+    # Maintenance cost per hectare
+    mainten_cost_rj = (settings.SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR * data.REAL_AREA)[:,None] * (1 - settings.HIR_PRODUCTIVITY_CONTRIBUTION)
+    cost_mrj = c_mrj_effects + mainten_cost_rj
+    
+    return cost_mrj
 
 
 def get_agricultural_management_cost_matrices(data: Data, c_mrj, yr_idx):

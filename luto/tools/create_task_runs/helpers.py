@@ -20,13 +20,15 @@
 import os, re, json
 import shutil, itertools, subprocess, zipfile
 import pandas as pd
+import matplotlib.pyplot as plt
 
 from tqdm.auto import tqdm
 from typing import Literal
 from joblib import delayed, Parallel
+from matplotlib import patches
 
 from luto import settings
-from luto.tools.create_task_runs.parameters import EXCLUDE_DIRS, SERVER_PARAMS
+from luto.tools.create_task_runs.parameters import EXCLUDE_DIRS, HATCH_PATTERNS, SERVER_PARAMS, PLOT_COL_WIDTH
 
 
 def get_settings_df(task_root_dir:str) -> pd.DataFrame:
@@ -242,96 +244,113 @@ def create_task_runs(
 
 
 
-def return_zipped_df(json_dir_path, filename):
-    with zipfile.ZipFile(os.path.join(json_dir_path), 'r') as zip_ref:
-        with zip_ref.open(f'data/{filename}') as f:
-            return pd.concat([
-                pd.json_normalize(record, 'data', ['name'])\
-                    .rename(columns={0: 'year', 1: 'val'})\
-                    .assign(region=region)
-                for region,record in json.load(f).items()
-            ])
-
-def return_plain_df(json_dir_path, filename):
-    with open(os.path.join(json_dir_path, filename), 'r') as f:
-        return pd.concat([
-            pd.json_normalize(record, 'data', ['name'])\
-                .rename(columns={0: 'year', 1: 'val'})\
-                .assign(region=region)
-            for region,record in json.load(f).items()
-        ])
+def get_json_data_from_zip(zip_path, json_filename):
+    with zipfile.ZipFile(os.path.join(zip_path), 'r') as zip_ref:
+        if f'DATA_REPORT/data/{json_filename}' not in zip_ref.namelist():
+            return {}
+        with zip_ref.open(f'DATA_REPORT/data/{json_filename}') as f:
+            json_part = f.read().decode('utf-8').split('=')[1][:-2] # split at '=' and remove the trailing ';\n'
+            json_data = json.loads(json_part)
+    return json_data
 
 
 
-def load_json_data(json_dir_path, filename):
-    if json_dir_path.endswith('.zip'):
-        return return_zipped_df(json_dir_path, filename)
-    else:
-        return return_plain_df(json_dir_path, filename)
+def return_df_ag(json_data):
+    '''
+    Ag data is 3-level nested, with region, water supply, and records.
+    '''
+    if len(json_data) == 0:
+        return pd.DataFrame()
+    
+    records_with_metadata = []
+    for region, region_data in json_data.items():
+        for water_supply, records in region_data.items():
+            for record in records:
+                # Expand data points with metadata in one go
+                for year, value in record['data']:
+                    records_with_metadata.append({
+                        'region': region,
+                        'water_supply': water_supply, 
+                        'name': record['name'],
+                        'year': int(year),
+                        'value': value
+                    })
+    return pd.DataFrame(records_with_metadata).query('water_supply != "ALL"')
+
+
+def return_df_ag_mgt(json_data):
+    '''
+    Ag management data is 4-level nested, with region, ag-management, water supply, and records.
+    '''
+    if len(json_data) == 0:
+        return pd.DataFrame()
+    
+    records_with_metadata = []
+    for region, region_data in json_data.items():
+        for ag_mgt, ag_mgt_data in region_data.items():
+            for water_supply, records in ag_mgt_data.items():
+                for record in records:
+                    # Expand data points with metadata in one go
+                    for year, value in record['data']:
+                        records_with_metadata.append({
+                            'region': region,
+                            'ag_mgt': ag_mgt,
+                            'water_supply': water_supply, 
+                            'name': record['name'],
+                            'year': int(year),
+                            'value': value
+                        })
+    return pd.DataFrame(records_with_metadata).query('ag_mgt != "ALL" and water_supply != "ALL"')
+
+def return_df_plain(json_data):
+    '''
+    Plain data is 2-level nested, with region and records.
+    '''
+    if len(json_data) == 0:
+        return pd.DataFrame()
+    
+    records_with_metadata = []
+    for region, records in json_data.items():
+        for record in records:
+            # Expand data points with metadata in one go
+            for year, value in record['data']:
+                records_with_metadata.append({
+                    'region': region,
+                    'name': record['name'],
+                    'year': int(year),
+                    'value': value
+                })
+    return pd.DataFrame(records_with_metadata)
 
 
 
 def process_area_category(json_dir_path):
-    return load_json_data(json_dir_path, 'Area_overview_2_Category.json')
+    json_data = get_json_data_from_zip(json_dir_path, 'Area_overview_1_Land-use.js')
+    return return_df_plain(json_data)
 
 def process_area_non_ag_lu(json_dir_path):
-    return load_json_data(json_dir_path, 'Area_NonAg_1_Land-use.json')
+    json_data = get_json_data_from_zip(json_dir_path, 'Area_NonAg.js')
+    return return_df_plain(json_data)
 
 def process_area_ag_man(json_dir_path):
-    return load_json_data(json_dir_path, 'Area_Am_1_Type.json')
+    json_data = get_json_data_from_zip(json_dir_path, 'Area_Am.js')
+    return return_df_ag_mgt(json_data)
 
 def process_economic_data(json_dir_path):
-    return load_json_data(json_dir_path, 'Economics_overview.json')
-
-
-def process_transition_cost_data(json_dir_path):
-    if json_dir_path.endswith('.zip'):
-        with zipfile.ZipFile(os.path.join(json_dir_path), 'r') as zip_ref:
-            with zip_ref.open(f'data/economics_8_transition_ag2ag_cost_4_transition_matrix.json') as f:
-                transition_data = json.load(f)
-    else:
-        with open(os.path.join(json_dir_path, 'economics_8_transition_ag2ag_cost_4_transition_matrix.json'), 'r') as f:
-            transition_data = json.load(f)
-            
-    categories = dict(enumerate(transition_data["categories"]))
-
-    # Extract matrix to DataFrame
-    data_df = pd.DataFrame()
-    for data in transition_data["series"]:
-        df_yr = pd.DataFrame(data["data"], columns=['from', 'to', 'val'])
-        df_yr['val'] = df_yr['val'].astype(float)   # Ensure 'val' is float
-        df_yr[['from', 'to']] = df_yr[['from', 'to']].map(lambda x: categories.get(x, x))
-        df_yr['year'] = data['Year']
-        df_yr = df_yr.fillna(0.0)                   # Fill NaN values with 0 and infer types
-        data_df = pd.concat([data_df, df_yr], ignore_index=True)
-            
-    # Combine 'from' and 'to' columns into a single 'name' column
-    data_df['name'] = data_df.apply(lambda x: [x['from'], x['to']], axis=1)  
-    return data_df
-
-
-def process_production_quantity_data(json_dir_path):
-    return load_json_data(json_dir_path, 'Production_sum_1_Commodity.json')
+    json_data = get_json_data_from_zip(json_dir_path, 'Economics_overview_sum.js')
+    return return_df_plain(json_data)
 
 def process_production_deviation_data(json_dir_path):
-    df = load_json_data(json_dir_path, 'Production_achive_percent.json')
-    df['val'] = df['val'] - 100 # Achiment percent to deviation percent
-    return df
+    json_data = get_json_data_from_zip(json_dir_path, 'Production_overview_AUS_achive_percent.js')
+    return return_df_plain(json_data)
 
 def process_GHG_data(json_dir_path):
-    return load_json_data(json_dir_path, 'GHG_overview.json')
-
-def process_GHG_deviation_data(json_dir_path):
-    df = load_json_data(json_dir_path, 'GHG_overview.json').query('region == "AUSTRALIA"')
-    df_target = df.query('name == "GHG emission limit"')
-    df_actual = df.query('name == "Net emissions"')
-    df_deviation = df_target.merge(df_actual, on=['year','region'], suffixes=('_target', '_actual'))
-    df_deviation['name'] = 'GHG deviation'
-    df_deviation['val'] = df_deviation['val_actual'] - df_deviation['val_target']
-    return df_deviation
+    json_data = get_json_data_from_zip(json_dir_path, 'GHG_overview_sum.js')
+    return return_df_plain(json_data)
 
 def process_bio_obj_data(json_dir_path):
-    return load_json_data(json_dir_path, 'BIO_GBF2_overview_1_Type.json')
+    json_data = get_json_data_from_zip(json_dir_path, 'BIO_GBF2_overview_sum.js')
+    return return_df_plain(json_data)
 
 
 
@@ -341,22 +360,18 @@ def get_report_df(json_dir_path, run_paras):
     df_area_non_ag_lu = process_area_non_ag_lu(json_dir_path)
     df_area_ag_man = process_area_ag_man(json_dir_path)
     df_economy = process_economic_data(json_dir_path)
-    # df_transition_cost = process_transition_cost_data(json_dir_path)
     df_ghg = process_GHG_data(json_dir_path)
-    df_ghg_deviation = process_GHG_deviation_data(json_dir_path)
     df_demand_deviation = process_production_deviation_data(json_dir_path)
-    df_bio_objective = process_bio_obj_data(json_dir_path)
+    df_bio_pct = process_bio_obj_data(json_dir_path)
 
     report_df = pd.concat([
-        df_area_all_lu[['year', 'name', 'region', 'val']].assign(Type='Area_broad_category_ha'),
-        df_area_non_ag_lu[['year', 'name', 'region', 'val']].assign(Type='Area_non_ag_lu_ha'),
-        df_area_ag_man[['year', 'name', 'region', 'val']].assign(Type='Area_ag_man_ha'),
-        df_economy[['year', 'name', 'region', 'val']].assign(Type='Economic_AUD'),
-        # df_transition_cost[['year', 'name', 'region', 'val']].assign(Type='Transition_cost_AUD'),
-        df_demand_deviation[['year', 'name', 'region', 'val']].assign(Type='Production_deviation_pct'),
-        df_ghg[['year', 'name', 'region', 'val']].assign(Type='GHG_emissions_tCO2e'),
-        df_ghg_deviation[['year', 'name', 'region', 'val']].assign(Type='GHG_Deviation_pct'),
-        df_bio_objective[['year', 'name', 'region', 'val']].assign(Type='Biodiversity_obj_score'),
+        df_area_all_lu.assign(Type='Area_broad_category_ha'),
+        df_area_non_ag_lu.assign(Type='Area_non_ag_lu_ha'),
+        df_area_ag_man.assign(Type='Area_ag_man_ha'),
+        df_economy.assign(Type='Economic_AUD'),
+        df_demand_deviation.assign(Type='Production_deviation_percent'),
+        df_ghg.assign(Type='GHG_tCO2e'),
+        df_bio_pct.assign(Type='Bio_relative_to_PRE1750_percent'),
     ]).assign(**run_paras).reset_index(drop=True)
 
     return report_df
@@ -371,27 +386,14 @@ def process_task_root_dirs(task_root_dir, n_workers=10):
     
     tasks = []
     for run_dir in run_dirs:
-        run_idx = int(run_dir.split('_')[-1])
+        run_idx = re.compile(r'Run_(\d{1,4})').search(run_dir).group(1)
         run_paras = grid_search_params.query(f'run_idx == {int(run_idx)}').to_dict(orient='records')[0]
 
         # Depending on output structure, the report can be found in different places
-        output_dir = os.path.join(task_root_dir, run_dir, 'output')
-        json_dir_path = os.path.join(task_root_dir, run_dir, 'DATA_REPORT.zip')
-
-        if os.path.exists(output_dir):
-            out_dirs = [d for d in os.listdir(output_dir) if os.path.isdir(os.path.join(output_dir, d))]
-            if not out_dirs:
-                print(f'{run_dir}: No output directories found in Run_{run_idx}!')
-                continue
-            else:
-                last_dir = sorted([d for d in os.listdir(output_dir) if os.path.isdir(os.path.join(output_dir, d))])[-1]
-                json_dir_path = os.path.join(output_dir, last_dir, 'DATA_REPORT', 'data')
-
+        json_dir_path = os.path.join(task_root_dir, run_dir, 'Run_Archive.zip')
         if not os.path.exists(json_dir_path):
-            print(f'{run_dir}: DATA_REPORT not found in Run_{run_idx}!')
+            print(f'Warning: No output found for {run_dir}, skipping...')
             continue
-        
-        # Json to df
         tasks.append(delayed(get_report_df)(json_dir_path, run_paras))
         
         
@@ -404,3 +406,59 @@ def process_task_root_dirs(task_root_dir, n_workers=10):
     return out_df
 
         
+
+# Export to matplotlib to add hatches
+def get_hatch_patches(in_fig: plt.figure, in_df: pd.DataFrame, warp_col: str, shift_col: str):
+
+    # Group the data for rectangle plotting 
+    rectangle_map = pd.DataFrame()
+    for (_warp_col, _shift_col, _year), _df in in_df.groupby([warp_col, shift_col, 'year'], observed=True):
+        rectangle = pd.DataFrame({
+            'warp_col': [_warp_col],
+            'shift_col': [_shift_col],
+            'year': [_year],
+            'rect_x_start': [_year + _df['jitter_val'].iloc[0] - (PLOT_COL_WIDTH * 0.8) / 2],
+            'rect_x_end': [_year + _df['jitter_val'].iloc[0] + (PLOT_COL_WIDTH * 0.8) / 2],
+            'rect_y_start': [_df['value'][_df['value'] < 0].sum()],
+            'rect_y_end': [_df['value'][_df['value'] >= 0].sum()],
+            'hatch': [_df['hatch_val'].iloc[0]],
+        })
+        rectangle_map = pd.concat([rectangle, rectangle_map], ignore_index=True)
+        
+        
+    # Add hatch patterns 
+    for ax, (_, df) in zip(in_fig.axes, rectangle_map.groupby('warp_col')):
+        for _, row in df.iterrows():
+            rect = patches.Rectangle(
+                (row['rect_x_start'], row['rect_y_start']),
+                row['rect_x_end'] - row['rect_x_start'],
+                row['rect_y_end'] - row['rect_y_start'],
+                hatch=row['hatch'],
+                fill=False,
+                edgecolor='gray',
+                linewidth=0.01,
+                alpha=0.5,
+                zorder=10
+            )
+            ax.add_patch(rect)
+
+
+    # Add legend for the hatches
+    legend_patches = [
+        patches.Patch(facecolor='none', edgecolor='grey', hatch=i, label=lbl)
+        for (i, lbl) in zip(HATCH_PATTERNS, in_df[shift_col].sort_values().unique())
+    ]
+
+    # Place hatch legend at relative position
+    in_fig.legend(
+        handles=legend_patches, 
+        title=shift_col, 
+        loc='center', 
+        bbox_to_anchor=(0.9, 0.78), 
+        fontsize=8, 
+        frameon=True, 
+        facecolor='white', 
+        edgecolor='white'
+    )
+    
+    return in_fig

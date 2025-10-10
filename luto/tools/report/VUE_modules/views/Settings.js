@@ -1,7 +1,7 @@
 window.SettingsView = {
   setup(props, { emit }) {
     const { ref, onMounted, watch, computed } = Vue;
-    const loadScript = window.loadScript;                       // DataConstructor has been registered in index.html [DataConstructor.js] [helpers.js]
+    const loadScript = window.loadScript;
 
     // Tab management
     const activeTab = ref('settings');
@@ -28,7 +28,7 @@ window.SettingsView = {
       },
       'Risk & Environmental': {
         icon: '⚠️',
-        keywords: ['RISK_OF_REVERSAL', 'FIRE_RISK', 'CO2_FERT', 'SOC_AMORTISATION']
+        keywords: ['RISK_OF_REVERSAL', 'FIRE_RISK', 'CO2_FERT', 'CARBON_EFFECTS_WINDOW']
       },
       'Biodiversity & Conservation': {
         icon: '🌿',

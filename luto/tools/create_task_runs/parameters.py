@@ -29,3 +29,6 @@ EXCLUDE_DIRS = [
 ]
 
 SERVER_PARAMS = ['MEM', 'NCPUS', 'TIME', 'QUEUE', 'JOB_NAME']
+
+PLOT_COL_WIDTH = 0.7
+HATCH_PATTERNS = ['////', '\\\\\\\\', '||||', '----', '++++', 'xxxx', 'oooo', 'OOOO', '....', '****']

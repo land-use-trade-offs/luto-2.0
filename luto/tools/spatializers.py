@@ -20,7 +20,6 @@
 
 import numpy as np
 import luto.settings as settings
-from scipy.ndimage import distance_transform_edt
 
 
 def create_2d_map(data, map_:np.ndarray=None) -> np.ndarray:
@@ -51,7 +50,7 @@ def get_fullres2D_map(data, map_:np.ndarray)-> np.ndarray:
         `data`(Data): The data object containing the NLUM_MASK and LUMAP_NO_RESFACTOR arrays.
         `map_`(np.ndarray): The 1D np.ndarray to be filled into the `NLUM_MASK` array.
 
-    Returns
+    Returns:
         np.ndarray : The restored 2D full resolution land-use map.
     """
     LUMAP_FullRes_2D = np.full(data.NLUM_MASK.shape, data.NODATA).astype(np.float32) 
