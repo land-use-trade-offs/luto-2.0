@@ -367,12 +367,12 @@ AG_MANAGEMENTS_TO_LAND_USES = {
 
 
 AG_MANAGEMENTS = {
-    'Asparagopsis taxiformis': False,
-    'Precision Agriculture': False,
+    'Asparagopsis taxiformis': True,
+    'Precision Agriculture': True,
     'Ecological Grazing': False,
     'Savanna Burning': True,
-    'AgTech EI': False,
-    'Biochar': False,
+    'AgTech EI': True,
+    'Biochar': True,
     'HIR - Beef': True,
     'HIR - Sheep': True,
 }

@@ -273,7 +273,7 @@ def get_ghg_unall_natural_to_lvstk_natural(data:Data, lumap) -> np.ndarray:
     for to_lu in data.LU_LVSTK_NATURAL:
 
         ghg_unall_natural_to_lvstk_natural_r = (
-            data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA[lumap == un_allow_code] 
+            data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR[lumap == un_allow_code] 
             * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[to_lu])
             * data.REAL_AREA[lumap == un_allow_code]
         ) 
@@ -302,7 +302,7 @@ def get_ghg_lvstk_natural_to_modified(data:Data, lumap) -> np.ndarray:
         for to_lu in data.LU_MODIFIED_LAND:
             # Get GHG penalties from current land use to future land use
             ghg_lvstk_natural_to_modified_r = (
-                data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA[lumap == from_lu] 
+                data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR[lumap == from_lu] 
                 * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[to_lu])
                 * data.REAL_AREA[lumap == from_lu]
             ) 
@@ -331,7 +331,7 @@ def get_ghg_unall_natural_to_modified(data:Data, lumap) -> np.ndarray:
     for to_lu in data.LU_MODIFIED_LAND:
         # Get GHG penalties from current land use to future land use
         ghg_unall_natural_to_modified_r = (
-            data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA[lumap == un_allow_code] 
+            data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR[lumap == un_allow_code] 
             * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[to_lu])
             * data.REAL_AREA[lumap == un_allow_code]
         ) 
@@ -530,10 +530,9 @@ def get_ecological_grazing_effect_g_mrj(data:Data, yr_idx):
             soil_multiplier = lu_data.loc[yr_cal, 'IMPACTS_soil_carbon'] - 1
             if soil_multiplier != 0:
                 soil_reduction_amnt = (
-                    data.SOIL_CARBON_AVG_T_CO2_HA
+                    data.SOIL_CARBON_AVG_T_CO2_HA_PER_YR
                     * soil_multiplier
-                    * data.REAL_AREA  # adjust for resfactor
-                    / settings.CARBON_EFFECTS_WINDOW # annualise the soil carbon sequestration
+                    * data.REAL_AREA 
                 )
                 new_g_mrj[m, :, lu_idx] -= soil_reduction_amnt
 
@@ -692,10 +691,9 @@ def get_biochar_effect_g_mrj(data:Data, yr_idx):
             soil_multiplier = lu_data.loc[yr_cal, 'IMPACTS_soil_carbon'] - 1
             if soil_multiplier != 0:
                 soil_reduction_amnt = (
-                    data.SOIL_CARBON_AVG_T_CO2_HA
+                    data.SOIL_CARBON_AVG_T_CO2_HA_PER_YR
                     * soil_multiplier
-                    * data.REAL_AREA  # adjust for resfactor
-                    / settings.CARBON_EFFECTS_WINDOW # annualise the soil carbon sequestration 
+                    * data.REAL_AREA
                 )
                 new_g_mrj[m, :, lu_idx] -= soil_reduction_amnt
 
@@ -710,14 +708,14 @@ def get_beef_hir_effect_g_mrj(data: Data, yr_idx):
     for j_idx, lu in enumerate(land_uses):
         g_mrj_effect[:, :, j_idx] -= (
             (
-                data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA
+                data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR
                 * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[data.DESC2AGLU[lu]])
             )
             - (
-                data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA
+                data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR
                 * (1 - settings.HIR_CEILING_PERCENTAGE)
             )
-        ) * data.REAL_AREA / settings.CARBON_EFFECTS_WINDOW 
+        ) * data.REAL_AREA 
 
     # GHG abatement from livestock density reduction
     for lm_idx, lm in enumerate(data.LANDMANS):         
@@ -735,14 +733,14 @@ def get_sheep_hir_effect_g_mrj(data: Data, yr_idx):
     for j_idx, lu in enumerate(land_uses):
         g_mrj_effect[:, :, j_idx] -= (
             (
-                data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA
+                data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR
                 * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[data.DESC2AGLU[lu]])
             )
             - (
-                data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA
+                data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR
                 * (1 - settings.HIR_CEILING_PERCENTAGE)
             )
-        ) * data.REAL_AREA / settings.CARBON_EFFECTS_WINDOW 
+        ) * data.REAL_AREA 
         
     # GHG abatement from livestock density reduction
     for lm_idx, lm in enumerate(data.LANDMANS):

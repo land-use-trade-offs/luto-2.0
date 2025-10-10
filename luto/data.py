@@ -627,7 +627,7 @@ class Data:
         )
 
         # Load soil carbon data, convert C to CO2e (x 44/12), and average over years
-        self.SOIL_CARBON_AVG_T_CO2_HA = (
+        self.SOIL_CARBON_AVG_T_CO2_HA_PER_YR = (
             pd.read_hdf(os.path.join(settings.INPUT_DIR, "soil_carbon_t_ha.h5"), where=self.MASK).to_numpy(dtype=np.float32) 
             * (44 / 12)  # Convert C to CO2e
             / settings.CARBON_EFFECTS_WINDOW
@@ -749,7 +749,7 @@ class Data:
 
         # Load environmental plantings (block) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
         ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_block.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
-        self.EP_BLOCK_AVG_T_CO2_HA = (
+        self.EP_BLOCK_AVG_T_CO2_HA_PER_YR = (
             (ds.EP_BLOCK_TREES_TOT_T_CO2_HA + ds.EP_BLOCK_DEBRIS_TOT_T_CO2_HA)
             * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
             + ds.EP_BLOCK_SOIL_TOT_T_CO2_HA
@@ -757,7 +757,7 @@ class Data:
 
         # Load environmental plantings (belt) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
         ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_belt.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
-        self.EP_BELT_AVG_T_CO2_HA = (
+        self.EP_BELT_AVG_T_CO2_HA_PER_YR = (
             (ds.EP_BELT_TREES_T_CO2_HA + ds.EP_BELT_DEBRIS_T_CO2_HA)
             * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
             + ds.EP_BELT_SOIL_T_CO2_HA
@@ -765,7 +765,7 @@ class Data:
 
         # Load environmental plantings (riparian) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
         ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_rip.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
-        self.EP_RIP_AVG_T_CO2_HA = (
+        self.EP_RIP_AVG_T_CO2_HA_PER_YR = (
             (ds.EP_RIP_TREES_T_CO2_HA + ds.EP_RIP_DEBRIS_T_CO2_HA)
             * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
             + ds.EP_RIP_SOIL_T_CO2_HA
@@ -773,7 +773,7 @@ class Data:
 
         # Load carbon plantings (block) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
         ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_cp_block.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
-        self.CP_BLOCK_AVG_T_CO2_HA = (
+        self.CP_BLOCK_AVG_T_CO2_HA_PER_YR = (
             (ds.CP_BLOCK_TREES_T_CO2_HA + ds.CP_BLOCK_DEBRIS_T_CO2_HA)
             * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
             + ds.CP_BLOCK_SOIL_T_CO2_HA
@@ -781,7 +781,7 @@ class Data:
 
         # Load farm forestry [i.e. carbon plantings (belt)] GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
         ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_cp_belt.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
-        self.CP_BELT_AVG_T_CO2_HA = (
+        self.CP_BELT_AVG_T_CO2_HA_PER_YR = (
             (ds.CP_BELT_TREES_T_CO2_HA + ds.CP_BELT_DEBRIS_T_CO2_HA)
             * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
             + ds.CP_BELT_SOIL_T_CO2_HA
@@ -974,9 +974,9 @@ class Data:
         nat_land_CO2 = pd.read_hdf(os.path.join(settings.INPUT_DIR, "natural_land_t_co2_ha.h5"), where=self.MASK)
         
         # Get the carbon stock of unallowcated natural land
-        self.CO2E_STOCK_UNALL_NATURAL_TCO2_HA = np.array(
+        self.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR = np.array(
             nat_land_CO2['NATURAL_LAND_TREES_DEBRIS_SOIL_TCO2_HA'] - (nat_land_CO2['NATURAL_LAND_AGB_DEBRIS_TCO2_HA'] * (100 - fire_risk).to_numpy() / 100),  # everyting minus the fire DAMAGE
-        )
+        ) / settings.CARBON_EFFECTS_WINDOW
         
         
         ###############################################################
