@@ -19,11 +19,9 @@
 
 
 
-import pandas as pd
 import numpy as np
 import plotnine as p9
-import matplotlib.patches as patches
-import matplotlib.pyplot as plt
+
 
 from luto.tools.create_task_runs.helpers import get_hatch_patches, process_task_root_dirs
 from luto.tools.create_task_runs.parameters import HATCH_PATTERNS, PLOT_COL_WIDTH
@@ -32,7 +30,7 @@ from itertools import cycle
 
 
 # Get the data
-task_root_dir = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20251009_RES5_DIFF_CARBON_WINDOW_AND_DYNAMIC_PRICES/"
+task_root_dir = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20251010_RES5_DIFF_CARBON_WINDOW_AND_DYNAMIC_PRICES/"
 report_data = process_task_root_dirs(task_root_dir).query('region == "AUSTRALIA"').copy()
 print(report_data['Type'].unique())
 
@@ -100,7 +98,7 @@ p = (
     ) +
     p9.labs(
         x='Year',
-        y='GHG (million tCO2e)',
+        y='Area (million ha)',
         fill=''
     )
 )
@@ -112,7 +110,7 @@ get_hatch_patches(p.draw(), report_data_area, warp_col, shift_col)
 ####################### Area ag-mgt #######################
 report_data_area_agmgt = report_data\
     .query('Type == "Area_ag_man_ha"')\
-    .groupby(['run_idx',warp_col, shift_col,'ag_mgt','year'], observed=True)\
+    .groupby(['run_idx', warp_col, shift_col, 'ag_mgt', 'hatch_val', 'jitter_val', 'year'], observed=True)\
     .sum(numeric_only=True)\
     .reset_index()\
     .eval('value = value / 1e6')
@@ -288,3 +286,47 @@ p = (
 # Export to matplotlib to add hatches
 get_hatch_patches(p.draw(), report_data_economics_col, warp_col, shift_col)
 
+
+
+####################### Demand - Percent deviation from target #######################
+demand_deviation = report_data\
+    .query('Type == "Production_deviation_percent"')\
+    .copy()\
+    .reset_index(drop=True)
+    
+p = (
+    p9.ggplot() +
+    p9.geom_col(
+        data=demand_deviation,
+        mapping = p9.aes(
+            x='year + jitter_val',
+            y='value',
+            fill='name'
+        ),
+        position='dodge',
+    ) +
+    p9.facet_wrap(
+        f'~{warp_col}',  
+        labeller='label_both',
+        ncol=3
+    ) +
+    p9.theme_bw() +
+    p9.theme(
+        figure_size=(16, 10),
+        subplots_adjust={'wspace': 0.25, 'hspace': 0.25},
+        axis_text_x=p9.element_text(rotation=45, hjust=1),
+        legend_position='right',
+        legend_title=p9.element_text(size=10),
+        legend_text=p9.element_text(size=8),
+        strip_text=p9.element_text(size=8),
+    ) +
+    p9.labs(
+        x='Year',
+        y='Percent deviation from target (%)',
+        color=''
+    )
+)
+
+
+
+    

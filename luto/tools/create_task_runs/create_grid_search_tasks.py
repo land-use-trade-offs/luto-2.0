@@ -27,7 +27,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20251009_RES5_DIFF_CARBON_WINDOW_AND_DYNAMIC_PRICES" # Do not include the trailing slash (/) in the end of the path
+TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20251010_RES5_DIFF_CARBON_WINDOW_AND_DYNAMIC_PRICES" # Do not include the trailing slash (/) in the end of the path
 
 
 # Set the grid search parameters
