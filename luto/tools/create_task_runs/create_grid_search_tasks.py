@@ -27,7 +27,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20251010_RES5_DIFF_CARBON_WINDOW_AND_DYNAMIC_PRICES" # Do not include the trailing slash (/) in the end of the path
+TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20251013_RES5_SACHIN_RUNS" # Do not include the trailing slash (/) in the end of the path
 
 
 # Set the grid search parameters
@@ -56,8 +56,19 @@ grid_search = {
     
     
     # --------------- Scenarios ---------------
-    'SSP': ['245'],                                                         #'126', '245', '370', '585'
-    'CARBON_EFFECTS_WINDOW': list(range(50, 91, 10)),                                  
+    'SSP': ['126', '245', '370'],                                          # '126', '245', '370', '585'
+    'CARBON_EFFECTS_WINDOW': [60],
+    'NON_AG_LAND_USES' : [{
+        'Environmental Plantings': True,
+        'Riparian Plantings': True,
+        'Sheep Agroforestry': True,
+        'Beef Agroforestry': True,
+        'Carbon Plantings (Block)': False,
+        'Sheep Carbon Plantings (Belt)': False,
+        'Beef Carbon Plantings (Belt)': False,
+        'BECCS': False,
+        'Destocked - natural land': True,
+    }],                                
     
     # --------------- Economics ---------------
     'DYNAMIC_PRICE' : [True, False],                                        # True or False
@@ -79,7 +90,7 @@ grid_search = {
 
 
     # --------------- GHG settings ---------------
-    'GHG_EMISSIONS_LIMITS': ['high'],                                       # 'off', 'low', 'medium', 'high'
+    'GHG_EMISSIONS_LIMITS': ['low', 'high'],                                 # 'off', 'low', 'medium', 'high'
     'CARBON_PRICES_FIELD': ['CONSTANT'],
     'GHG_CONSTRAINT_TYPE': ['hard'],                                        # 'hard' or 'soft'
     'USE_GHG_SCOPE_1': [True],                                              # True or False
@@ -95,10 +106,10 @@ grid_search = {
     # --------------- Biodiversity overall ---------------
     'CONTRIBUTION_PERCENTILE': ['USER_DEFINED'],                            # One of [10, 25, 50, 75, 90], or 'USER_DEFINED'              
     'CONNECTIVITY_SOURCE': ['NCI'],
-    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [40],                    # Percentage of degraded areas to cut in GBF2 priority areas
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [20, 40],                # Percentage of degraded areas to cut in GBF2 priority areas
     
     # --------------- Biodiversity settings - GBF 2 ---------------
-    'BIODIVERSITY_TARGET_GBF_2': ['high'],                                  # 'off', 'low', 'medium', 'high'
+    'BIODIVERSITY_TARGET_GBF_2': ['off', 'high'],                           # 'off', 'low', 'medium', 'high'
     'GBF2_CONSTRAINT_TYPE': ['hard'],                                       # 'hard' or 'soft'
 
     # --------------- Biodiversity settings - GBF 3 ---------------
@@ -118,16 +129,11 @@ grid_search = {
     'SOLVE_WEIGHT_BETA':  [0.5],         
     
     
-    #-------------------- Diet BAU --------------------
-    'DIET_DOM': ['BAU',],                                                   # 'BAU' or 'FLX'
-    'DIET_GLOB': ['BAU',],                                                  # 'BAU' or 'FLX'
-    'WASTE': [1],                                                           # 1 or 0.5
+    #-------------------- Dietary --------------------
+    'DIET_DOM': ['BAU', 'FLX', 'VEG', 'VGN'],                               # 'BAU', 'FLX', 'VEG', 'VGN'
+    'DIET_GLOB': ['BAU'],                                                   # 'BAU' or 'FLX'
+    'WASTE': [1, 0.5],                                                      # 1 or 0.5
     'FEED_EFFICIENCY': ['BAU'],                                             # 'BAU' or 'High'
-    #---------------------Diet FLX --------------------
-    # 'DIET_DOM': ['FLX',],                                                 # 'BAU' or 'FLX'
-    # 'DIET_GLOB': ['FLX',],                                                # 'BAU' or 'FLX'
-    # 'WASTE': [0.5],                                                       # 1 or 0.5
-    # 'FEED_EFFICIENCY': ['High'],                                          # 'BAU' or 'High'
 }
 
 
@@ -164,5 +170,5 @@ if __name__ == '__main__':
     # create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='single', n_workers=min(len(grid_search_param_df), 100))
 
     # 2) Submit task to multiple linux computation nodes
-    create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='cluster', max_concurrent_tasks = 200)
+    create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='cluster', max_concurrent_tasks = 300)
 

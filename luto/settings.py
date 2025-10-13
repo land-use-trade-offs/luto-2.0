@@ -60,7 +60,7 @@ SSP = '245'
 RCP = 'rcp' + SSP[1] + 'p' + SSP[2] # Representative Concentration Pathway string identifier e.g., 'rcp4p5'.
 
 # Set demand parameters which define requirements for Australian production of agricultural commodities
-SCENARIO = 'SSP' + SSP[0] # SSP1, SSP2, SSP3, SSP4, SSP5
+SCENARIO = 'SSP' + SSP[0]           # SSP1, SSP2, SSP3, SSP4, SSP5
 DIET_DOM = 'BAU'                    # 'BAU', 'FLX', 'VEG', 'VGN' - domestic diets in Australia
 DIET_GLOB = 'BAU'                   # 'BAU', 'FLX', 'VEG', 'VGN' - global diets
 CONVERGENCE = 2050                  # 2050 or 2100 - date at which dietary transformation is completed (velocity of transformation)
