@@ -1043,6 +1043,8 @@ class Data:
         demand_xr = xr.DataArray(self.DEMAND_C) 
         self.DEMAND_DELTA = (demand_xr - demand_xr.sel(YEAR=2010)) / demand_xr.sel(YEAR=2010)
         
+        
+        
 
 
         ###############################################################
@@ -1641,11 +1643,24 @@ class Data:
       
         return lumap_resfactored[*nearst_ind]
     
-    def get_elasticity_price_for_yr(self, yr:int) -> float:
-        demand_xr = xr.DataArray(self.DEMAND_C) 
-        demand_delta = (demand_xr - demand_xr.sel(YEAR=2010)) / demand_xr.sel(YEAR=2010)
+
+    def get_elasticity_multiplier(self, yr_cal):
+        '''
+        Get the elasticity multiplier for a given year and land use.
+        yr_cal: year (int).
         
+        Returns:
+            dict: A dictionary with land use as keys and elasticity multipliers as values.
+        '''
+        elasticity_multiplier = {
+            c: 1 + (self.DEMAND_DELTA.sel(YEAR=yr_cal, COMMODITY=c) / self.DEMAND_ELASTICITY[c]).values
+            for c in self.DEMAND_DELTA.COMMODITY.values
+        }
         
+        if settings.DYNAMIC_PRICE:
+            return elasticity_multiplier
+        else:
+            return {k: 1 for k in elasticity_multiplier.keys()}
     
     
     def get_watershed_yield_components(self, valid_watershed_id:list[int] = None):

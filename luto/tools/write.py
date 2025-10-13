@@ -1888,7 +1888,7 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
         
     # Do nothing if biodiversity limits are off and no need to report
     if settings.BIODIVERSITY_TARGET_GBF_3_NVIS == 'off':
-        return "Skipped: Biodiversity GBF3 scores not written as `BIODIVERSITY_TARGET_GBF_3_NVIS` is set to 'off'"
+        return "Skipped: Biodiversity GBF3 NVIS scores not written as `BIODIVERSITY_TARGET_GBF_3_NVIS` is set to 'off'"
     
         
     # Unpack the agricultural management land-use

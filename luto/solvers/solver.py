@@ -414,7 +414,7 @@ class LutoSolver:
         penalty_demand = (
             gp.quicksum(
                 self.V[c] * self._input_data.scale_factors['Demand'] * price
-                for c, price in enumerate(self._input_data.economic_BASE_YR_prices)
+                for c, price in enumerate(self._input_data.economic_prices)
             ) 
             * settings.SOLVER_WEIGHT_DEMAND
             / 1e6  # Convert to million AUD

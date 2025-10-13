@@ -103,7 +103,7 @@ class SolverInputData:
     scale_factors: dict[float]                                          # Scale factors for each input layer.
 
     economic_contr_mrj: float                                           # base year economic contribution matrix.
-    economic_BASE_YR_prices: np.ndarray                                 # base year commodity prices.
+    economic_prices: np.ndarray                                 # base year commodity prices.
     economic_target_yr_carbon_price: float                              # target year carbon price.
     
     offland_ghg: np.ndarray                                             # GHG emissions from off-land commodities.
@@ -554,12 +554,12 @@ def get_economic_mrj(
     return [ag_obj_mrj, non_ag_obj_rk, ag_man_objs]
 
 
-def get_commodity_prices_BASE_YR(data: Data) -> np.ndarray:
+def get_commodity_prices_target_yr(data: Data, yr_cal) -> np.ndarray:
     """
     Get the commodity prices for the target year.
     """
     print('Getting commodity prices...', flush = True)
-    return ag_revenue.get_commodity_prices(data)
+    return ag_revenue.get_commodity_prices(data, yr_cal)
 
 
 def get_target_yr_carbon_price(data: Data, target_year: int) -> float:
@@ -894,7 +894,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     }
 
     economic_contr_mrj=(ag_obj_mrj, non_ag_obj_rk,  ag_man_objs)
-    economic_BASE_YR_prices=get_commodity_prices_BASE_YR(data)
+    economic_prices=get_commodity_prices_target_yr(data, target_year)
     economic_target_yr_carbon_price=get_target_yr_carbon_price(data, target_year)
     
     offland_ghg=(
@@ -965,7 +965,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         scale_factors,
         
         economic_contr_mrj,
-        economic_BASE_YR_prices,
+        economic_prices,
         economic_target_yr_carbon_price,
         
         offland_ghg,

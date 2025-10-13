@@ -52,20 +52,17 @@ def get_rev_crop( data:Data         # Data object.
         rev_multiplier = 1
         if lu in data.CROP_PRICE_MULTIPLIERS.columns:
             rev_multiplier = data.CROP_PRICE_MULTIPLIERS.loc[data.YR_CAL_BASE + yr_idx, lu]
-        
-        elasticity_multiplier = 1
-        if settings.DYNAMIC_PRICE:
-            elasticity_multiplier = 1 + (data.DEMAND_DELTA.sel(YEAR=yr_cal, COMMODITY=lu.lower()) / data.DEMAND_ELASTICITY[lu.lower()]).values
-            
+
         # Revenue in $ per cell (includes REAL_AREA via get_quantity)
         rev_t = ( data.AGEC_CROPS['P1', lm, lu] 
-                * get_quantity( data, lu.upper(), lm, yr_idx )  # lu.upper() only for crops as needs to be in product format in get_quantity().
+                * get_quantity( data, lu.upper(), lm, yr_idx )          # lu.upper() only for crops as needs to be in product format in get_quantity().
                 * rev_multiplier
-                * elasticity_multiplier
+                * data.get_elasticity_multiplier(yr_cal)[lu.lower()]    # Dynamic price elasticity multiplier
                 ).values
     
     # Return revenue as MultiIndexed DataFrame.
     return pd.DataFrame(rev_t, columns=pd.MultiIndex.from_tuples([(lu, lm, 'Crop')]))
+
 
 def get_rev_lvstk( data:Data   # Data object.
                  , lu           # Land use.
@@ -85,45 +82,25 @@ def get_rev_lvstk( data:Data   # Data object.
 
     # Get the yield potential, i.e. the total number of heads per hectare.
     yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
-    
-    elasticity_multiplier = {
-        'beef lexp': 1,
-        'beef meat': 1,
-        'sheep lexp': 1,
-        'sheep meat': 1,
-        'sheep wool': 1,
-        'dairy': 1,
-    }
-    # Get the dynamic price elasticity multiplier if required
-    if settings.DYNAMIC_PRICE:
-        elasticity_multiplier = {
-            'beef lexp': 1 + (data.DEMAND_DELTA.sel(YEAR=yr_cal, COMMODITY='beef lexp') / data.DEMAND_ELASTICITY['beef lexp']).values,
-            'beef meat': 1 + (data.DEMAND_DELTA.sel(YEAR=yr_cal, COMMODITY='beef meat') / data.DEMAND_ELASTICITY['beef meat']).values,
-            'sheep lexp': 1 + (data.DEMAND_DELTA.sel(YEAR=yr_cal, COMMODITY='sheep lexp') / data.DEMAND_ELASTICITY['sheep lexp']).values,
-            'sheep meat': 1 + (data.DEMAND_DELTA.sel(YEAR=yr_cal, COMMODITY='sheep meat') / data.DEMAND_ELASTICITY['sheep meat']).values,
-            'sheep wool': 1 + (data.DEMAND_DELTA.sel(YEAR=yr_cal, COMMODITY='sheep wool') / data.DEMAND_ELASTICITY['sheep wool']).values,
-            'dairy': 1 + (data.DEMAND_DELTA.sel(YEAR=yr_cal, COMMODITY='dairy') / data.DEMAND_ELASTICITY['dairy']).values,
-        }
-            
 
     # Revenue in $ per cell (includes RESMULT via get_quantity)
     if lvstype == 'BEEF':
 
         # Get the revenue from meat and live exports. Set to zero if not produced.
-        rev_meat = yield_pot * (                               # Stocking density (head/ha)
-                            ( data.AGEC_LVSTK['F1', lvstype]   # Fraction of herd producing (0 - 1)
-                            * data.AGEC_LVSTK['Q1', lvstype]   # Quantity produced per head (meat tonnes/head)
-                            * data.AGEC_LVSTK['P1', lvstype] ) # Price per unit quantity ($/tonne of meat)
-                            * data.LVSTK_PRICE_MULTIPLIERS.loc[yr_cal, "BEEF P1"] # Multiplier for commodity price
-                            * elasticity_multiplier['beef meat']  # Dynamic price elasticity multiplier
+        rev_meat = yield_pot * (                                                            # Stocking density (head/ha)
+                            ( data.AGEC_LVSTK['F1', lvstype]                                # Fraction of herd producing (0 - 1)
+                            * data.AGEC_LVSTK['Q1', lvstype]                                # Quantity produced per head (meat tonnes/head)
+                            * data.AGEC_LVSTK['P1', lvstype] )                              # Price per unit quantity ($/tonne of meat)
+                            * data.LVSTK_PRICE_MULTIPLIERS.loc[yr_cal, "BEEF P1"]           # Multiplier for commodity price
+                            * data.get_elasticity_multiplier(yr_cal)['beef meat']           # Dynamic price elasticity multiplier
                             )
 
         rev_lexp = yield_pot * (  
-                            ( data.AGEC_LVSTK['F3', lvstype]   # Fraction of herd producing (0 - 1)
-                            * data.AGEC_LVSTK['Q3', lvstype]   # Quantity produced per head (animal weight tonnes/head)
-                            * data.AGEC_LVSTK['P3', lvstype] ) # Price per unit quantity ($/tonne of animal)
-                            * data.LVSTK_PRICE_MULTIPLIERS.loc[yr_cal, "BEEF P3"] # Multiplier for commodity price
-                            * elasticity_multiplier['beef lexp']  # Dynamic price elasticity multiplier
+                            ( data.AGEC_LVSTK['F3', lvstype]                                # Fraction of herd producing (0 - 1)
+                            * data.AGEC_LVSTK['Q3', lvstype]                                # Quantity produced per head (animal weight tonnes/head)
+                            * data.AGEC_LVSTK['P3', lvstype] )                              # Price per unit quantity ($/tonne of animal)
+                            * data.LVSTK_PRICE_MULTIPLIERS.loc[yr_cal, "BEEF P3"]           # Multiplier for commodity price
+                            * data.get_elasticity_multiplier(yr_cal)['beef lexp']           # Dynamic price elasticity multiplier
                             )  
 
         # Set Wool and Milk to zero as they are not produced by beef cattle
@@ -132,27 +109,27 @@ def get_rev_lvstk( data:Data   # Data object.
     elif lvstype == 'SHEEP':    
 
         # Get the revenue from meat, wool and live exports. Set to zero if not produced.
-        rev_meat = yield_pot * (  # Meat                           # Stocking density (head/ha)
-                                ( data.AGEC_LVSTK['F1', lvstype]   # Fraction of herd producing (0 - 1)
-                                * data.AGEC_LVSTK['Q1', lvstype]   # Quantity produced per head (meat tonnes/head)
-                                * data.AGEC_LVSTK['P1', lvstype] ) # Price per unit quantity ($/tonne of meat)
-                                * data.LVSTK_PRICE_MULTIPLIERS.loc[yr_cal, "SHEEP P1"] # Multiplier for commodity price
-                                * elasticity_multiplier['sheep meat']  # Dynamic price elasticity multiplier
+        rev_meat = yield_pot * (  # Meat                                                    # Stocking density (head/ha)
+                                ( data.AGEC_LVSTK['F1', lvstype]                            # Fraction of herd producing (0 - 1)
+                                * data.AGEC_LVSTK['Q1', lvstype]                            # Quantity produced per head (meat tonnes/head)
+                                * data.AGEC_LVSTK['P1', lvstype] )                          # Price per unit quantity ($/tonne of meat)
+                                * data.LVSTK_PRICE_MULTIPLIERS.loc[yr_cal, "SHEEP P1"]      # Multiplier for commodity price
+                                * data.get_elasticity_multiplier(yr_cal)['sheep meat']      # Dynamic price elasticity multiplier
                                 )
-        rev_wool = yield_pot * (  # Wool                           # Stocking density (head/ha) 
-                                ( data.AGEC_LVSTK['F2', lvstype]   # Fraction of herd producing (0 - 1) 
-                                * data.AGEC_LVSTK['Q2', lvstype]   # Quantity produced per head (wool tonnes/head)
-                                * data.AGEC_LVSTK['P2', lvstype] ) # Price per unit quantity ($/tonne wool)
-                                * data.LVSTK_PRICE_MULTIPLIERS.loc[yr_cal, "SHEEP P2"] # Multiplier for commodity price
-                                * elasticity_multiplier['sheep wool']  # Dynamic price elasticity multiplier
+        rev_wool = yield_pot * (  # Wool                                                    # Stocking density (head/ha) 
+                                ( data.AGEC_LVSTK['F2', lvstype]                            # Fraction of herd producing (0 - 1) 
+                                * data.AGEC_LVSTK['Q2', lvstype]                            # Quantity produced per head (wool tonnes/head)
+                                * data.AGEC_LVSTK['P2', lvstype] )                          # Price per unit quantity ($/tonne wool)
+                                * data.LVSTK_PRICE_MULTIPLIERS.loc[yr_cal, "SHEEP P2"]      # Multiplier for commodity price
+                                * data.get_elasticity_multiplier(yr_cal)['sheep wool']      # Dynamic price elasticity multiplier
                                 )   
 
-        rev_lexp = yield_pot * (  # Live exports                   # Stocking density (head/ha)
-                                ( data.AGEC_LVSTK['F3', lvstype]   # Fraction of herd producing (0 - 1) 
-                                * data.AGEC_LVSTK['Q3', lvstype]   # Quantity produced per head (animal weight tonnes/head)
-                                * data.AGEC_LVSTK['P3', lvstype] ) # Price per unit quantity ($/tonne of whole animal)
-                                * data.LVSTK_PRICE_MULTIPLIERS.loc[yr_cal, "SHEEP P3"] # Multiplier for commodity price
-                                * elasticity_multiplier['sheep lexp']  # Dynamic price elasticity multiplier
+        rev_lexp = yield_pot * (  # Live exports                                            # Stocking density (head/ha)
+                                ( data.AGEC_LVSTK['F3', lvstype]                            # Fraction of herd producing (0 - 1) 
+                                * data.AGEC_LVSTK['Q3', lvstype]                            # Quantity produced per head (animal weight tonnes/head)
+                                * data.AGEC_LVSTK['P3', lvstype] )                          # Price per unit quantity ($/tonne of whole animal)
+                                * data.LVSTK_PRICE_MULTIPLIERS.loc[yr_cal, "SHEEP P3"]      # Multiplier for commodity price
+                                * data.get_elasticity_multiplier(yr_cal)['sheep lexp']      # Dynamic price elasticity multiplier
                                 )
 
         # Set Milk to zero as it is not produced by sheep
@@ -162,12 +139,12 @@ def get_rev_lvstk( data:Data   # Data object.
     elif lvstype == 'DAIRY':
 
         # Get the revenue from milk. Set to zero if not produced.
-        rev_milk = yield_pot * (  # Milk                           # Stocking density (head/ha)
-                                ( data.AGEC_LVSTK['F1', lvstype]   # Fraction of herd producing (0 - 1) 
-                                * data.AGEC_LVSTK['Q1', lvstype]   # Quantity produced per head (milk litres/head)
-                                * data.AGEC_LVSTK['P1', lvstype] ) # Price per unit quantity ($/litre milk)
-                                * data.LVSTK_PRICE_MULTIPLIERS.loc[yr_cal, "DAIRY P1"] # Multiplier for commodity price
-                                * elasticity_multiplier['dairy']  # Dynamic price elasticity multiplier
+        rev_milk = yield_pot * (  # Milk                                                    # Stocking density (head/ha)
+                                ( data.AGEC_LVSTK['F1', lvstype]                            # Fraction of herd producing (0 - 1) 
+                                * data.AGEC_LVSTK['Q1', lvstype]                            # Quantity produced per head (milk litres/head)
+                                * data.AGEC_LVSTK['P1', lvstype] )                          # Price per unit quantity ($/litre milk)
+                                * data.LVSTK_PRICE_MULTIPLIERS.loc[yr_cal, "DAIRY P1"]      # Multiplier for commodity price
+                                * data.get_elasticity_multiplier(yr_cal)['dairy']           # Dynamic price elasticity multiplier
                                 )
 
         # Set Meat, Wool and Live exports to zero
@@ -247,7 +224,7 @@ def get_rev_matrices(data:Data, yr_idx, aggregate:bool = True):
     return np.einsum('jmr->mrj', arr_jmr)
 
 
-def get_commodity_prices(data: Data) -> np.ndarray:
+def get_commodity_prices(data: Data, yr_cal:int) -> np.ndarray:
     '''
     Get the prices of commodities in the base year. These prices will be used as multiplier
     to weight deviatios of commodity production from the target.
@@ -273,6 +250,12 @@ def get_commodity_prices(data: Data) -> np.ndarray:
     # Get the median price of each crop; here need to use 'irr' because dry-Rice does exist in the data
     for name, col in data.AGEC_CROPS['P1','irr'].items():
         commodity_prices[name.lower()] = np.nanpercentile(col, 50)
+        
+    # Apply elasticity multipliers to the prices
+    commodity_prices = {
+        k: v * data.get_elasticity_multiplier(yr_cal)[k] 
+        for k, v in commodity_prices.items()
+    }
 
     return np.array([commodity_prices[k] for k in data.COMMODITIES])
 
