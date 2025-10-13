@@ -24,68 +24,87 @@ window.SettingsView = {
       },
       'Economic Parameters': {
         icon: '💰',
-        keywords: ['DISCOUNT_RATE', 'RESFACTOR', 'CARBON_PRICE', 'COST', 'AMORTISE', 'AMORTISATION', 'FENCING_COST', 'IRRIG_COST', 'MAINTENANCE', 'ECOSYSTEM_SERVICES']
+        keywords: ['DISCOUNT_RATE', 'RESFACTOR', 'CARBON_PRICE', 'COST', 'AMORTISE', 'AMORTISATION', 'FENCING_COST', 'IRRIG_COST', 'MAINTENANCE', 'ECOSYSTEM_SERVICES', 'DYNAMIC_PRICE']
       },
       'Risk & Environmental': {
         icon: '⚠️',
         keywords: ['RISK_OF_REVERSAL', 'FIRE_RISK', 'CO2_FERT', 'CARBON_EFFECTS_WINDOW']
       },
-      'Biodiversity & Conservation': {
+      'Biodiversity Quality & Connectivity': {
         icon: '🌿',
-        keywords: ['BIO_CONTRIBUTION', 'GBF', 'BIODIVERSITY', 'HABITAT', 'CONNECTIVITY', 'EP_', 'RP_', 'DEGRADED_AREAS']
+        keywords: ['BIO_QUALITY_LAYER', 'BIO_CONTRIBUTION', 'CONNECTIVITY_SOURCE', 'CONNECTIVITY_LB', 'CONTRIBUTION_PERCENTILE', 'HABITAT', 'SUITABILITY']
+      },
+      'Biodiversity GBF Targets': {
+        icon: '🎯',
+        keywords: ['BIODIVERSITY_TARGET_GBF', 'GBF2', 'GBF3', 'GBF4', 'GBF8', 'GBF_CONSTRAINT', 'NVIS', 'IBRA', 'SNES', 'ECNES', 'DEGRADED_AREAS', 'PRIORITY_DEGRADED']
       },
       'Climate & GHG': {
         icon: '🌡️',
-        keywords: ['GHG', 'CO2', 'CARBON', 'CLIMATE', 'EMISSIONS', 'SCOPE_1', 'CROP_GHG', 'LVSTK_GHG']
+        keywords: ['GHG_EMISSIONS_LIMITS', 'GHG_TARGETS', 'GHG_CONSTRAINT_TYPE', 'CO2', 'CARBON', 'CLIMATE', 'EMISSIONS', 'USE_GHG_SCOPE', 'CROP_GHG_SCOPE', 'LVSTK_GHG_SCOPE']
       },
       'Water Management': {
         icon: '💧',
-        keywords: ['WATER', 'IRRIGATION', 'DRAINAGE', 'LIVESTOCK_DRINKING', 'LICENSE']
+        keywords: ['WATER_LIMITS', 'WATER_CONSTRAINT_TYPE', 'WATER_STRESS', 'WATER_REGION_DEF', 'WATER_CLIMATE_CHANGE', 'IRRIGATION', 'DRAINAGE', 'LIVESTOCK_DRINKING', 'LICENSE']
       },
-      'Land Use & Planning': {
+      'Non-Agricultural Land Uses': {
         icon: '🌾',
-        keywords: ['LAND', 'AGRICULTURAL', 'NON_AG', 'PLANTING', 'AGROFORESTRY', 'NO_GO', 'REGIONAL_ADOPTION', 'CULL_MODE', 'MAX_LAND_USES']
+        keywords: ['NON_AG_LAND_USES', 'ENVIRONMENTAL_PLANTINGS', 'RIPARIAN_PLANTINGS', 'CARBON_PLANTINGS', 'BECCS', 'DESTOCKED', 'REVERSIBLE']
+      },
+      'Environmental Plantings': {
+        icon: '🌳',
+        keywords: ['EP_ANNUAL', 'EP_MAINTENANCE', 'EP_ECOSYSTEM']
       },
       'Carbon Plantings': {
-        icon: '🌳',
-        keywords: ['CP_BLOCK', 'CP_BELT', 'CARBON_PLANTING']
+        icon: '🌲',
+        keywords: ['CP_BLOCK', 'CP_BELT', 'CP_ANNUAL', 'CP_ROW_WIDTH', 'CP_ROW_SPACING', 'CP_PROPORTION', 'CP_FENCING']
       },
       'Riparian & Agroforestry': {
-        icon: '🌲',
-        keywords: ['RIPARIAN', 'AF_', 'AGROFORESTRY', 'ROW_WIDTH', 'ROW_SPACING', 'PROPORTION', 'BUFFER_WIDTH', 'TORTUOSITY']
+        icon: '🏞️',
+        keywords: ['RP_ANNUAL', 'RIPARIAN_PLANTING', 'AF_ANNUAL', 'AGROFORESTRY_ROW', 'AF_PROPORTION', 'AF_FENCING', 'BUFFER_WIDTH', 'TORTUOSITY']
       },
       'Agricultural Management': {
         icon: '🚜',
-        keywords: ['AG_MANAGEMENTS', 'HIR_', 'BEEF_HIR', 'SHEEP_HIR', 'SAVBURN', 'PRODUCTIVITY', 'EFFECT_YEARS', 'USE_THRESHOLD']
+        keywords: ['AG_MANAGEMENTS_TO_LAND_USES', 'AG_MANAGEMENTS', 'ASPARAGOPSIS', 'PRECISION_AGRICULTURE', 'ECOLOGICAL_GRAZING', 'SAVANNA_BURNING', 'AGTECH_EI', 'BIOCHAR', 'HIR', 'SAVBURN', 'AGRICULTURAL_MANAGEMENT_USE_THRESHOLD']
       },
       'Solver & Optimization': {
         icon: '🔧',
-        keywords: ['SOLVER', 'WEIGHT', 'TOLERANCE', 'PRESOLVE', 'CROSSOVER', 'BARRIER', 'SCALE_FLAG', 'NUMERIC_FOCUS', 'BARHOMOGENOUS', 'CONSTRAINT_TYPE', 'PENALTY', 'ALPHA', 'BETA']
+        keywords: ['SOLVE_METHOD', 'SOLVE_WEIGHT', 'SOLVER_WEIGHT', 'TOLERANCE', 'PRESOLVE', 'CROSSOVER', 'BARRIER', 'SCALE_FLAG', 'NUMERIC_FOCUS', 'BARHOMOGENOUS', 'CONSTRAINT_TYPE', 'ALPHA', 'BETA', 'RESCALE_FACTOR']
       },
       'Output & Processing': {
         icon: '📊',
-        keywords: ['WRITE', 'OUTPUT', 'PARALLEL', 'GEOTIFFS', 'RESCALE_FACTOR', 'VERBOSE', 'KEEP_OUTPUTS', 'ROUND_DECMIALS']
+        keywords: ['WRITE', 'OUTPUT', 'PARALLEL_WRITE', 'WRITE_THREADS', 'GEOTIFFS', 'VERBOSE', 'KEEP_OUTPUTS', 'ROUND_DECMIALS']
       },
       'System Resources': {
         icon: '💻',
-        keywords: ['THREADS', 'MEM', 'NCPUS', 'TIME', 'QUEUE', 'JOB_NAME', 'SOLVE_METHOD', 'AGGREGATE']
+        keywords: ['THREADS', 'MEM', 'NCPUS', 'TIME', 'QUEUE', 'JOB_NAME', 'AGGREGATE']
       },
-      'Land Use Configuration': {
+      'Regional Constraints': {
         icon: '🗺️',
-        keywords: ['EXCLUDE_NO_GO', 'VECTORS', 'REVERSIBLE', 'BASE_CODE', 'PERCENTAGE']
+        keywords: ['EXCLUDE_NO_GO', 'NO_GO_VECTORS', 'REGIONAL_ADOPTION_CONSTRAINTS', 'REGIONAL_ADOPTION_NON_AG_UNIFORM', 'REGIONAL_ADOPTION_ZONE']
+      },
+      'Off-Land Commodities': {
+        icon: '🥚',
+        keywords: ['OFF_LAND_COMMODITIES', 'EGGS_AVG_WEIGHT', 'PORK', 'CHICKEN', 'AQUACULTURE']
+      },
+      'Other Settings': {
+        icon: '⚙️',
+        keywords: ['CULL_MODE', 'MAX_LAND_USES_PER_CELL', 'LAND_USAGE_CULL_PERCENTAGE', 'NON_AGRICULTURAL_LU_BASE_CODE']
       }
     };
 
     const filterButtons = ref([
       { key: 'all', label: 'All' },
-      { key: 'BIO_', label: 'Biodiversity' },
-      { key: 'GBF', label: 'GBF' },
+      { key: 'BIO', label: 'Biodiversity' },
+      { key: 'GBF', label: 'GBF Targets' },
       { key: 'GHG', label: 'GHG' },
       { key: 'WATER', label: 'Water' },
-      { key: 'SOLVER', label: 'Solver' },
-      { key: 'AG_', label: 'Agriculture' },
-      { key: 'CP_', label: 'Carbon' },
-      { key: 'COST', label: 'Costs' }
+      { key: 'CARBON', label: 'Carbon' },
+      { key: 'AG_MANAGEMENTS', label: 'Ag Management' },
+      { key: 'NON_AG', label: 'Non-Ag Land Use' },
+      { key: 'SOLVE', label: 'Solver' },
+      { key: 'COST', label: 'Costs' },
+      { key: 'DIET', label: 'Diet' },
+      { key: 'REGIONAL', label: 'Regional' }
     ]);
 
     // Helper functions
