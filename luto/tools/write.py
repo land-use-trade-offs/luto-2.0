@@ -231,7 +231,7 @@ def write_dvar_and_mosaic_map(data: Data, yr_cal, path):
     
     ag_mask = ag_map.sum(['lm','lu']) > 0.001
     am_mask = am_map.sum(['am','lm', 'lu']) > 0.001
-    non_ag_mask = non_ag_map > 0.001
+    non_ag_mask = non_ag_map.sum('lu') > 0.001
 
     # Expand dimension
     ag_map = xr.concat([ag_map.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_map], dim='lm')
