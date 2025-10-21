@@ -55,20 +55,20 @@ window.WaterView = {
         return {};
       }
       let mapDataWithALL = JSON.parse(JSON.stringify(window[mapRegister[selectCategory.value]["name"]]));
-      let mapDataWithMosaic = JSON.parse(JSON.stringify(window[mosaicMap['name']]));
+      let mapMosaic = JSON.parse(JSON.stringify(window[mosaicMap['name']]));
       if (selectCategory.value === "Ag") {
         mapDataWithALL[selectWater.value] = {
-          "ALL": mapDataWithMosaic['Agricultural Land-use'],
+          "ALL": mapMosaic['Agricultural Land-use'],
           ...mapDataWithALL[selectWater.value]
         }
       } else if (selectCategory.value === "Ag Mgt") {
         mapDataWithALL[selectAgMgt.value][selectWater.value] = {
-          "ALL": mapDataWithMosaic['Agricultural Management'],
+          "ALL": mapMosaic['Agricultural Management'],
           ...mapDataWithALL[selectAgMgt.value][selectWater.value]
         }
       } else if (selectCategory.value === "Non-Ag") {
         mapDataWithALL = {
-          "ALL": mapDataWithMosaic['Non-Agricultural Land-use'],
+          "ALL": mapMosaic['Non-Agricultural Land-use'],
           ...mapDataWithALL
         }
       }
