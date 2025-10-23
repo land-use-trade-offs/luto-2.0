@@ -18,230 +18,129 @@
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
 
-import json
 import os
-import base64
+import json
 import numpy as np
 import pandas as pd
 import xarray as xr
 
-from io import BytesIO
-from PIL import Image
 from joblib import delayed, Parallel
 
 from luto import settings
-from luto.data import Data
-from luto.tools.report.data_tools import get_all_files
-from luto.tools.report.data_tools.parameters import RENAME_AM_NON_AG
+from luto.tools.report.data_tools import (
+    array_to_base64, 
+    get_all_files, 
+    get_map_legend,
+    hex_color_to_numeric, 
+    rename_reorder_hierarchy, 
+    tuple_dict_to_nested
+)
 
 
 
-def tuple_dict_to_nested(flat_dict):
-    nested_dict = {}
-    for key_tuple, value in flat_dict.items():
-        current_level = nested_dict
-        for key in key_tuple[:-1]:
-            if key not in current_level:
-                current_level[key] = {}
-            current_level = current_level[key]
-        current_level[key_tuple[-1]] = value
-    return nested_dict
-        
-        
-def hex_color_to_numeric(hex: str) -> tuple:
-    hex = hex.lstrip('#')
-    if len(hex) == 6:
-        hex = hex + 'FF'  # Add full opacity if alpha is not provided
-    return tuple(int(hex[i:i+2], 16) for i in (0, 2, 4, 6))
-
-
-
-def get_color_legend(data:Data) -> dict:
-
-    color_csvs = {
-        'lumap': 'luto/tools/report/VUE_modules/assets/lumap_colors_grouped.csv',
-        'lm': 'luto/tools/report/VUE_modules/assets/lm_colors.csv',
-        'ag': 'luto/tools/report/VUE_modules/assets/lumap_colors.csv',
-        'non_ag': 'luto/tools/report/VUE_modules/assets/non_ag_colors.csv',
-        'am': 'luto/tools/report/VUE_modules/assets/ammap_colors.csv',
-    }
-    
-    rm_lus = [i for i in settings.NON_AG_LAND_USES if not settings.NON_AG_LAND_USES[i]]
-    rm_ams = [i for i in settings.AG_MANAGEMENTS if not settings.AG_MANAGEMENTS[i]]
-    rm_items = rm_lus + rm_ams
-    
-    return {
-        'Land-use': {
-            'color_csv': color_csvs['lumap'], 
-            'legend': {
-                RENAME_AM_NON_AG.get(k,k):v for k,v in pd.read_csv(color_csvs['lumap']).set_index('lu_desc')['lu_color_HEX'].to_dict().items() 
-                if k not in rm_items
-            }
-        },
-        'Water-supply': {
-            'color_csv': color_csvs['lm'],
-            'legend': pd.read_csv(color_csvs['lm']).set_index('lu_desc')['lu_color_HEX'].to_dict()
-        },
-        'Agricultural Land-use': {
-            'color_csv': color_csvs['ag'],
-            'legend': pd.read_csv(color_csvs['ag']).set_index('lu_desc')['lu_color_HEX'].to_dict()
-        },
-        'Non-Agricultural Land-use': {
-            'color_csv': color_csvs['non_ag'],
-            'legend': {
-                RENAME_AM_NON_AG.get(k,k):v for k,v in pd.read_csv(color_csvs['non_ag']).set_index('lu_desc')['lu_color_HEX'].to_dict().items() 
-                if k not in rm_items
-            }
-        },
-        'Agricultural Management': {
-            'color_csv': color_csvs['am'],
-            'legend': {
-                RENAME_AM_NON_AG.get(k,k):v for k,v in pd.read_csv(color_csvs['am']).set_index('lu_desc')['lu_color_HEX'].to_dict().items() 
-                if k not in rm_items
-            }
-        }
-    }
-
-
-   
-def array_to_base64(arr_4band: np.ndarray, bbox: list, min_max:list) -> dict:
-
-    # Create PIL Image from RGBA array
-    image = Image.fromarray(arr_4band, 'RGBA')
-    
-    # Convert to base64 string
-    buffered = BytesIO()
-    image.save(buffered, format="PNG")
-    img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
-    
-    return {
-        'img_str': 'data:image/png;base64,' + img_str,
-        'bounds': [
-            [bbox[1], bbox[0]],
-            [bbox[3], bbox[2]]
-        ],
-        'min_max': min_max
-    }
-
-
-
-def map2base64_interger(f:str, color_csv:str, attrs:tuple = ()) -> dict:
-    
-        with xr.open_dataset(f) as ds:
-            img = ds['__xarray_dataarray_variable__'].compute()
-            img_geo = ds['spatial_ref'].attrs['crs_wkt']
-
-        # Convert the 1D array to a RGBA array
-        color_csv = pd.read_csv(color_csv)
-        color_csv['color_numeric'] = color_csv['lu_color_HEX'].apply(hex_color_to_numeric)
-        color_dict = color_csv.set_index('lu_code')['color_numeric'].to_dict()
-        color_dict[-1] = (0,0,0,0)    # Nodata pixels are transparent
- 
-        # Get the bounding box, then reproject to Mercator
-        img = img.rio.write_crs(img_geo)
-        bbox = img.rio.bounds()
-        img = img.rio.reproject('EPSG:3857') # To Mercator with Nearest Neighbour
-        img = np.nan_to_num(img, nan=-1).astype('int16')
-
-        # Convert to RGBA array
-        arr_4band = np.zeros((img.shape[0], img.shape[1], 4), dtype='uint8')
-        for k, v in color_dict.items():
-            arr_4band[img == k] = v
-
-        return attrs, array_to_base64(arr_4band, bbox, [])
-    
-    
-    
-def map2base64_float(rxr_path:str, arr_lyr:xr.DataArray, attrs:tuple) -> dict|None:
-
-        # Get an template rio-xarray, it will be used to convert 1D array to its 2D map format
-        with xr.open_dataset(rxr_path) as rxr_ds:
-            rxr_arr = rxr_ds['__xarray_dataarray_variable__']
-            rxr_crs = rxr_ds['spatial_ref'].attrs['crs_wkt']
-
-        # Normalize the layer
-        min_val = np.nanmin(arr_lyr.values)
-        max_val = np.nanmax(arr_lyr.values)
-        arr_lyr.values = (arr_lyr - min_val) / (max_val - min_val)
-
-        # Convert the 1D array to a 2D array
-        np.place(rxr_arr.data, rxr_arr.data>=0, arr_lyr.data)  # Set negative values to NaN
-        rxr_arr = xr.where(rxr_arr<0, np.nan, rxr_arr)
-        rxr_arr = rxr_arr.rio.write_crs(rxr_crs)
-
-        # Get bounding box, then reproject to Mercator
-        bbox = rxr_arr.rio.bounds()
-        rxr_arr = rxr_arr.rio.reproject('EPSG:3857') # To Mercator with Nearest Neighbour
-
-        # Convert layer to integer; after this 0 is nodata, -100 is outside LUTO area
-        rxr_arr.values *= 100
-        rxr_arr = np.where(np.isnan(rxr_arr), 0, rxr_arr).astype('int32')
-
-        # Convert the 1D array to a RGBA array
-        color_dict = pd.read_csv('luto/tools/report/VUE_modules/assets/float_img_colors.csv')
-        if max_val == 0:
-            color_dict.loc[range(100), 'lu_color_HEX'] = color_dict.loc[range(100), 'lu_color_HEX'].values[::-1]
-            min_val, max_val = max_val, min_val
-        color_dict['color_numeric'] = color_dict['lu_color_HEX'].apply(hex_color_to_numeric)
-        color_dict = color_dict.set_index('lu_code')['color_numeric'].to_dict()
-
-        color_dict[0] = (0,0,0,0)    # Nodata pixels are transparent
-
-        arr_4band = np.zeros((rxr_arr.shape[0], rxr_arr.shape[1], 4), dtype='uint8')
-        for k, v in color_dict.items():
-            arr_4band[rxr_arr == k] = v
-
-        # Generate base64 and overlay info
-        return attrs, array_to_base64(arr_4band, bbox, [float(max_val), float(min_val)])
-    
-    
-
-def get_map_obj_float(data:Data, files_df:pd.DataFrame, save_path:str, workers:int=max(settings.WRITE_THREADS, 16)) -> dict:
+def map2base64(ds_template:str, arr_lyr:xr.DataArray, min_max:tuple[float,float], isInt:bool, legend_dict:dict, hierarchy_tp:tuple) -> tuple:
 
     # Get an template rio-xarray, it will be used to convert 1D array to its 2D map format
-    template_xr = f'{data.path}/out_{sorted(settings.SIM_YEARS)[0]}/xr_map_lumap_{sorted(settings.SIM_YEARS)[0]}.nc'
+    with xr.open_dataset(ds_template) as rxr_ds:
+        rxr_arr = rxr_ds['layer'].astype('float32')         # Use float32 to allow NaN values
+        rxr_crs = rxr_ds['spatial_ref'].attrs['crs_wkt']
+
+    img_attrs = {}
+    if isInt:
+        img_attrs = {
+            'intOrFloat': 'int',
+            'legend': legend_dict['legend']
+        }
+    else:
+        # Normalize the layer to 0-100 as integer
+        min_val, max_val = min_max
+        arr_lyr.values = (arr_lyr - min_val) / (max_val - min_val) * 100
+        arr_lyr = arr_lyr.astype(np.float32)
+        img_attrs = {
+            'intOrFloat': 'float',
+            'legend': legend_dict['legend'],
+            'min_max': min_max
+        }
+        
+
+    # Convert the 1D array to a 2D array
+    np.place(rxr_arr.data, rxr_arr.data>=0, arr_lyr.values)     # Negative values in the template are outside LUTO area
+    rxr_arr = xr.where(rxr_arr<0, np.nan, rxr_arr)              # Set negative values to NaN, which will be transparent in the final map
+    # Get the bounds
+    rxr_arr = rxr_arr.rio.write_crs(rxr_crs)
+    bbox = rxr_arr.rio.bounds()
+    bbox = [[bbox[1], bbox[0]],[bbox[3], bbox[2]]]
+    # Reproject to Web Mercator EPSG:3857; because Leaflet uses EPSG:3857 to display maps
+    rxr_arr = rxr_arr.rio.reproject('EPSG:3857')                # To Mercator with Nearest Neighbour
+    rxr_arr = np.nan_to_num(rxr_arr, nan=-1).astype('int16')    # Use -1 to flag nodata pixels
+    # Convert the 1D array to a RGBA array
+    color_csv = pd.read_csv(legend_dict['color_csv'])
+    color_csv['color_numeric'] = color_csv['lu_color_HEX'].apply(hex_color_to_numeric)
+    color_dict = color_csv.set_index('lu_code')['color_numeric'].to_dict()
+    color_dict[-1] = (0,0,0,0)                                  # Nodata pixels are transparent
+    arr_4band = np.zeros((rxr_arr.shape[0], rxr_arr.shape[1], 4), dtype='uint8')
+    for k, v in color_dict.items():
+        arr_4band[rxr_arr == k] = v
+
+    return hierarchy_tp, {**array_to_base64(arr_4band), 'bounds':bbox, **img_attrs}
     
+    
+
+def get_map_float(
+    files_df:pd.DataFrame, 
+    legend_int:dict, 
+    legend_int_level:dict|str, 
+    legend_float:dict, 
+    save_path:str, 
+    workers:int=min(settings.WRITE_THREADS, 16)
+    ) -> None:
+
     # Loop through each year
-    task = []
+    tasks = []
     for _,row in files_df.iterrows():
         xr_arr = xr.open_dataarray(row['path'])
         chunks = {k:1 for k in xr_arr.dims}
         chunks.update({'cell':-1})
-        
         xr_arr = xr_arr.chunk(chunks)  # the cell dimension is full size, all other dimensions are 1
-        _year = row['Year']
+        min_max = eval(xr_arr.attrs['valid_layers'])
         
-        # Skip empty layers, the valid layers are precalculated and stored as attribute
-        loop_sel = eval(xr_arr.attrs['valid_layers'])
-
-        for sel in loop_sel:
-            arr_sel = xr_arr.sel(**sel) 
+        _year = row['Year']
+        ds_template = f'{os.path.dirname(row['path'])}/xr_map_template_{_year}.nc'
+        
+        # Loop and skip empty layers, the valid layers are precalculated and stored as attribute
+        for sel in eval(xr_arr.attrs['valid_layers']):
             
-            # Rename keys; also serve as reordering the keys
-            sel_rename = {}
-            if 'am' in sel:
-                sel_rename['am'] = RENAME_AM_NON_AG.get(sel['am'], sel['am'])
-            if 'lm' in sel:
-                sel_rename['lm'] =  {'irr': 'Irrigated', 'dry': 'Dryland'}.get(sel['lm'], sel['lm'])
-            if 'lu' in sel:
-                sel_rename['lu'] = RENAME_AM_NON_AG.get(sel['lu'], sel['lu'])
-            if 'Commodity' in sel:
-                commodity = sel['Commodity'].capitalize()
-                sel_rename['Commodity'] = {
-                    'Sheep lexp': 'Sheep live export',
-                    'Beef lexp': 'Beef live export'
-                }.get(commodity, commodity)
-   
-            task.append(
-                delayed(map2base64_float)(template_xr, arr_sel, tuple(list(sel_rename.values()) + [_year]))
+            if isinstance(legend_int_level, dict):
+                if legend_int_level.items() <= sel.items():
+                    legend = legend_int
+                    arrIsInt = True
+                else:
+                    legend = legend_float
+                    arrIsInt = False
+                    
+            elif isinstance(legend_int_level, str):
+                if legend_int_level in sel.keys():
+                    legend = legend_int
+                    arrIsInt = True
+                else:
+                    legend = legend_float
+                    arrIsInt = False
+            else:
+                raise ValueError('legend_int_level must be either a dict or a str')
+            
+            arr_sel = xr_arr.sel(**sel) 
+            sel_rename = rename_reorder_hierarchy(sel)
+            hierarchy_tp = tuple(list(sel_rename.values()) + [_year])
+
+            tasks.append(
+                delayed(map2base64)(ds_template, arr_sel, min_max, arrIsInt, legend, hierarchy_tp)
             )    
             
     # Gather results and save to JSON
     output = {}
-    for res in Parallel(n_jobs=workers, return_as='generator')(task):
-        if res is None:continue
-        attr, val = res
-        output[attr] = val
+    for res in Parallel(n_jobs=workers, return_as='generator')(tasks):
+        hierarchy_tp, val_dict = res
+        output[hierarchy_tp] = val_dict
         
     # To nested dict
     output = tuple_dict_to_nested(output)
@@ -256,117 +155,34 @@ def get_map_obj_float(data:Data, files_df:pd.DataFrame, save_path:str, workers:i
         f.write(';\n')
         
 
-def get_map_obj_interger(files_df:pd.DataFrame, save_path:str, colors_legend, workers:int=max(settings.WRITE_THREADS, 16)) -> dict:
+
+def save_report_layer(raw_data_dir:str):
     
-    map_mosaic_lumap = files_df.query('base_name == "xr_map_lumap"'
-        ).assign(
-            _type='Land-use', 
-            color_csv=colors_legend['Land-use']['color_csv'], 
-            legend_info=str(colors_legend['Land-use']['legend'])
-        )
-    map_mosaic_lmmap = files_df.query('base_name == "xr_map_lmmap"'
-        ).assign(
-            _type='Water-supply',
-            color_csv=colors_legend['Water-supply']['color_csv'],
-            legend_info=str(colors_legend['Water-supply']['legend'])
-        )
-    map_mosaic_ag = files_df.query('base_name == "xr_map_ag_argmax"'
-        ).assign(
-            _type='Agricultural Land-use',
-            color_csv=colors_legend['Agricultural Land-use']['color_csv'],
-            legend_info=str(colors_legend['Agricultural Land-use']['legend'])
-        )
-    map_mosaic_non_ag = files_df.query('base_name == "xr_map_non_ag_argmax"'
-        ).assign(
-            _type='Non-Agricultural Land-use',
-            color_csv=colors_legend['Non-Agricultural Land-use']['color_csv'],
-            legend_info=str(colors_legend['Non-Agricultural Land-use']['legend'])
-        )
-    map_mosaic_am = files_df.query('base_name == "xr_map_am_argmax"'
-        ).assign(
-            _type='Agricultural Management',
-            color_csv=colors_legend['Agricultural Management']['color_csv'],
-            legend_info=str(colors_legend['Agricultural Management']['legend'])
-        )
-    map_mosaic = pd.concat([
-        map_mosaic_lumap,
-        map_mosaic_lmmap,
-        map_mosaic_ag,
-        map_mosaic_non_ag,
-        map_mosaic_am
-    ], ignore_index=True)
-
-    
-    task = []
-    for _, row in map_mosaic.iterrows():
-        task.append(
-            delayed(map2base64_interger)(
-                row['path'], 
-                row['color_csv'], 
-                (row['_type'], row['Year'], row['legend_info'])
-            )
-        )
-
-    output = {}
-    for res in Parallel(n_jobs=workers, return_as='generator')(task):
-        if res is None:continue
-        (_type, _year, legend), val = res
-        if _type not in output:
-            output[_type] = {}
-        if _year not in output[_type]:
-            output[_type][_year] = {}
-        output[_type][_year] = {
-            **val,
-            'legend': eval(legend)
-        }
-        
-    # Save to JSON
-    if not os.path.exists(os.path.dirname(save_path)):
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        
-    with open(save_path, 'w') as f:
-        filename = os.path.basename(save_path).replace('.js', '')
-        f.write(f'window["{filename}"] = ')
-        json.dump(output, f, separators=(',', ':'), indent=2)
-        f.write(';\n')
-
-
-
-
-def save_report_layer(data:Data):
-    """
-    Saves the report data in the specified directory.
-
-    Parameters
-    ----------
-    data (Data): The Data object containing the metadata and settings.
-    
-    Returns
-    -------
-    None
-    """
-    
-    SAVE_DIR = f'{data.path}/DATA_REPORT/data'
-    years = sorted(settings.SIM_YEARS)
+    SAVE_DIR = f'{raw_data_dir}/DATA_REPORT/data'
 
     # Create the directory if it does not exist
     if not os.path.exists(f'{SAVE_DIR}/map_layers'):
         os.makedirs(f'{SAVE_DIR}/map_layers', exist_ok=True)
 
     # Get all LUTO output files and store them in a dataframe
-    files = get_all_files(data.path).query('category == "xarray_layer"')
+    files = get_all_files(raw_data_dir).query('category == "xarray_layer"')
     files['Year'] = files['Year'].astype(int)
-    files = files.query('Year.isin(@years)')
+    files = files.query(f'Year.isin({sorted(settings.SIM_YEARS)})')
     
-    
+    # Get legend info
+    colors_legend = get_map_legend()
+    colors_legend_ag = colors_legend['ag']
+    colors_legend_am = colors_legend['am']
+    colors_legend_non_ag = colors_legend['non_ag']
+    colors_legend_lumap = colors_legend['lumap']
+    colors_legend_float = colors_legend['float']
+
     
     ####################################################
-    #                   1) Mosaic maps                 #
+    #                   1) LUMAP Layer                 #
     ####################################################
-    
-    save_path = f'{SAVE_DIR}/map_layers/map_dvar_mosaic.js'
-    colors_legend= get_color_legend(data)
-    get_map_obj_interger(files, save_path, colors_legend)
+    lumap_ly = files.query('base_name == "xr_map_lumap"')
+    get_map_float(lumap_ly, colors_legend_lumap, 'lm', None, f'{SAVE_DIR}/map_layers/map_dvar_lumap.js')
 
 
  
@@ -374,14 +190,14 @@ def save_report_layer(data:Data):
     #                   2) Dvar Layer                  #
     ####################################################
     
-    dvar_ag = files.query('base_name == "xr_map_ag"')
-    get_map_obj_float(data, dvar_ag, f'{SAVE_DIR}/map_layers/map_dvar_Ag.js')
+    dvar_ag = files.query('base_name == "xr_dvar_ag"')
+    get_map_float(dvar_ag, colors_legend_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_dvar_Ag.js')
     
-    dvar_am = files.query('base_name == "xr_map_am"')
-    get_map_obj_float(data, dvar_am, f'{SAVE_DIR}/map_layers/map_dvar_Am.js')
+    dvar_am = files.query('base_name == "xr_dvar_am"')
+    get_map_float(dvar_am, colors_legend_am, {'am':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_dvar_Am.js')
     
-    dvar_nonag = files.query('base_name == "xr_map_non_ag"')
-    get_map_obj_float(data, dvar_nonag, f'{SAVE_DIR}/map_layers/map_dvar_NonAg.js')
+    dvar_nonag = files.query('base_name == "xr_dvar_non_ag"')
+    get_map_float(dvar_nonag, colors_legend_non_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_dvar_NonAg.js')
     
     
     
@@ -392,13 +208,13 @@ def save_report_layer(data:Data):
     files_area = files.query('base_name.str.contains("area")')
 
     area_ag = files_area.query('base_name == "xr_area_agricultural_landuse"')
-    get_map_obj_float(data, area_ag, f'{SAVE_DIR}/map_layers/map_area_Ag.js')
+    get_map_float(area_ag, colors_legend_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_area_Ag.js')
 
     area_am = files_area.query('base_name == "xr_area_agricultural_management"')
-    get_map_obj_float(data, area_am, f'{SAVE_DIR}/map_layers/map_area_Am.js')
+    get_map_float(area_am, colors_legend_am, {'am':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_area_Am.js')
 
     area_nonag = files_area.query('base_name == "xr_area_non_agricultural_landuse"')
-    get_map_obj_float(data, area_nonag, f'{SAVE_DIR}/map_layers/map_area_NonAg.js')
+    get_map_float(area_nonag, colors_legend_non_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_area_NonAg.js')
 
 
 
@@ -410,89 +226,89 @@ def save_report_layer(data:Data):
     
     # Overall priority
     bio_overall_ag = files_bio.query('base_name == "xr_biodiversity_overall_priority_ag"')
-    get_map_obj_float(data, bio_overall_ag, f'{SAVE_DIR}/map_layers/map_bio_overall_Ag.js')
+    get_map_float(bio_overall_ag, colors_legend_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_bio_overall_Ag.js')
 
     bio_overall_am = files_bio.query('base_name == "xr_biodiversity_overall_priority_ag_management"')
-    get_map_obj_float(data, bio_overall_am, f'{SAVE_DIR}/map_layers/map_bio_overall_Am.js')
+    get_map_float(bio_overall_am, colors_legend_am, {'am':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_bio_overall_Am.js')
 
     bio_overall_nonag = files_bio.query('base_name == "xr_biodiversity_overall_priority_non_ag"')
-    get_map_obj_float(data, bio_overall_nonag, f'{SAVE_DIR}/map_layers/map_bio_overall_NonAg.js')
+    get_map_float(bio_overall_nonag, colors_legend_non_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_bio_overall_NonAg.js')
 
 
     # GBF2
     if settings.BIODIVERSITY_TARGET_GBF_2 != 'off':
         bio_GBF2_ag = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_ag"')
-        get_map_obj_float(data, bio_GBF2_ag, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Ag.js')
+        get_map_float(bio_GBF2_ag, colors_legend_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Ag.js')
 
         bio_GBF2_am = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_ag_management"')
-        get_map_obj_float(data, bio_GBF2_am, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Am.js')
+        get_map_float(bio_GBF2_am, colors_legend_am, {'am':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Am.js')
 
         bio_GBF2_nonag = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_non_ag"')
-        get_map_obj_float(data, bio_GBF2_nonag, f'{SAVE_DIR}/map_layers/map_bio_GBF2_NonAg.js')
+        get_map_float(bio_GBF2_nonag, colors_legend_non_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF2_NonAg.js')
         
     # GBF3-NVIS
     if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off':
         bio_GBF3_NVIS_ag = files_bio.query('base_name == "xr_biodiversity_GBF3_NVIS_ag"')
-        get_map_obj_float(data, bio_GBF3_NVIS_ag, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_Ag.js')
+        get_map_float(bio_GBF3_NVIS_ag, colors_legend_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_Ag.js')
 
         bio_GBF3_NVIS_am = files_bio.query('base_name == "xr_biodiversity_GBF3_NVIS_ag_management"')
-        get_map_obj_float(data, bio_GBF3_NVIS_am, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_Am.js')
+        get_map_float(bio_GBF3_NVIS_am, colors_legend_am, {'am':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_Am.js')
 
         bio_GBF3_NVIS_nonag = files_bio.query('base_name == "xr_biodiversity_GBF3_NVIS_non_ag"')
-        get_map_obj_float(data, bio_GBF3_NVIS_nonag, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_NonAg.js')
+        get_map_float(bio_GBF3_NVIS_nonag, colors_legend_non_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_NonAg.js')
         
     # GBF3-IBRA
     if settings.BIODIVERSITY_TARGET_GBF_3_IBRA != 'off':
         bio_GBF3_IBRA_ag = files_bio.query('base_name == "xr_biodiversity_GBF3_IBRA_ag"')
-        get_map_obj_float(data, bio_GBF3_IBRA_ag, f'{SAVE_DIR}/map_layers/map_bio_GBF3_IBRA_Ag.js')
+        get_map_float(bio_GBF3_IBRA_ag, colors_legend_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF3_IBRA_Ag.js')
 
         bio_GBF3_IBRA_am = files_bio.query('base_name == "xr_biodiversity_GBF3_IBRA_ag_management"')
-        get_map_obj_float(data, bio_GBF3_IBRA_am, f'{SAVE_DIR}/map_layers/map_bio_GBF3_IBRA_Am.js')
+        get_map_float(bio_GBF3_IBRA_am, colors_legend_am, {'am':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF3_IBRA_Am.js')
 
         bio_GBF3_IBRA_nonag = files_bio.query('base_name == "xr_biodiversity_GBF3_IBRA_non_ag"')
-        get_map_obj_float(data, bio_GBF3_IBRA_nonag, f'{SAVE_DIR}/map_layers/map_bio_GBF3_IBRA_NonAg.js')
+        get_map_float(bio_GBF3_IBRA_nonag, colors_legend_non_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF3_IBRA_NonAg.js')
     
     # GBF4-SNES
     if settings.BIODIVERSITY_TARGET_GBF_4_SNES != 'off':
         bio_GBF4_SNES_ag = files_bio.query('base_name == "xr_biodiversity_GBF4_SNES_ag"')
-        get_map_obj_float(data, bio_GBF4_SNES_ag, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_Ag.js')
+        get_map_float(bio_GBF4_SNES_ag, colors_legend_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_Ag.js')
 
         bio_GBF4_SNES_am = files_bio.query('base_name == "xr_biodiversity_GBF4_SNES_ag_management"')
-        get_map_obj_float(data, bio_GBF4_SNES_am, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_Am.js')
+        get_map_float(bio_GBF4_SNES_am, colors_legend_am, {'am':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_Am.js')
 
         bio_GBF4_SNES_nonag = files_bio.query('base_name == "xr_biodiversity_GBF4_SNES_non_ag"')
-        get_map_obj_float(data, bio_GBF4_SNES_nonag, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_NonAg.js')
+        get_map_float(bio_GBF4_SNES_nonag, colors_legend_non_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_NonAg.js')
         
     # GBF4_ECNES
     if settings.BIODIVERSITY_TARGET_GBF_4_ECNES != 'off':
         bio_GBF4_ECNES_ag = files_bio.query('base_name == "xr_biodiversity_GBF4_ECNES_ag"')
-        get_map_obj_float(data, bio_GBF4_ECNES_ag, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_Ag.js')
+        get_map_float(bio_GBF4_ECNES_ag, colors_legend_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_Ag.js')
 
         bio_GBF4_ECNES_am = files_bio.query('base_name == "xr_biodiversity_GBF4_ECNES_ag_management"')
-        get_map_obj_float(data, bio_GBF4_ECNES_am, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_Am.js')
+        get_map_float(bio_GBF4_ECNES_am, colors_legend_am, {'am':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_Am.js')
 
         bio_GBF4_ECNES_nonag = files_bio.query('base_name == "xr_biodiversity_GBF4_ECNES_non_ag"')
-        get_map_obj_float(data, bio_GBF4_ECNES_nonag, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_NonAg.js')
+        get_map_float(bio_GBF4_ECNES_nonag, colors_legend_non_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_NonAg.js')
         
     # GBF8
     if settings.BIODIVERSITY_TARGET_GBF_8 != 'off':
         bio_GBF8_ag = files_bio.query('base_name == "xr_biodiversity_GBF8_species_ag"')
-        get_map_obj_float(data, bio_GBF8_ag, f'{SAVE_DIR}/map_layers/map_bio_GBF8_Ag.js')
+        get_map_float(bio_GBF8_ag, colors_legend_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF8_Ag.js')
 
         bio_GBF8_am = files_bio.query('base_name == "xr_biodiversity_GBF8_species_ag_management"')
-        get_map_obj_float(data, bio_GBF8_am, f'{SAVE_DIR}/map_layers/map_bio_GBF8_Am.js')
+        get_map_float(bio_GBF8_am, colors_legend_am, {'am':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF8_Am.js')
 
         bio_GBF8_nonag = files_bio.query('base_name == "xr_biodiversity_GBF8_species_non_ag"')
-        get_map_obj_float(data, bio_GBF8_nonag, f'{SAVE_DIR}/map_layers/map_bio_GBF8_NonAg.js')
-        
+        get_map_float(bio_GBF8_nonag, colors_legend_non_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF8_NonAg.js')
+
         bio_GBF8_ag_group = files_bio.query('base_name == "xr_biodiversity_GBF8_groups_ag"')
-        get_map_obj_float(data, bio_GBF8_ag_group, f'{SAVE_DIR}/map_layers/map_bio_GBF8_groups_Ag.js')
-        
+        get_map_float(bio_GBF8_ag_group, colors_legend_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF8_groups_Ag.js')
+
         bio_GBF8_am_group = files_bio.query('base_name == "xr_biodiversity_GBF8_groups_ag_management"')
-        get_map_obj_float(data, bio_GBF8_am_group, f'{SAVE_DIR}/map_layers/map_bio_GBF8_groups_Am.js')
-        
+        get_map_float(bio_GBF8_am_group, colors_legend_am, {'am':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF8_groups_Am.js')
+
         bio_GBF8_nonag_group = files_bio.query('base_name == "xr_biodiversity_GBF8_groups_non_ag"')
-        get_map_obj_float(data, bio_GBF8_nonag_group, f'{SAVE_DIR}/map_layers/map_bio_GBF8_groups_NonAg.js')
+        get_map_float(bio_GBF8_nonag_group, colors_legend_non_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF8_groups_NonAg.js')
 
     
 
@@ -504,16 +320,16 @@ def save_report_layer(data:Data):
     files_cost = files.query('base_name.str.contains("cost")')
 
     cost_ag = files_cost.query('base_name == "xr_cost_ag"')
-    get_map_obj_float(data, cost_ag, f'{SAVE_DIR}/map_layers/map_cost_Ag.js')
+    get_map_float(cost_ag, colors_legend_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_cost_Ag.js')
 
     cost_am = files_cost.query('base_name == "xr_cost_agricultural_management"')
-    get_map_obj_float(data, cost_am, f'{SAVE_DIR}/map_layers/map_cost_Am.js')
+    get_map_float(cost_am, colors_legend_am, {'am':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_cost_Am.js')
 
     cost_nonag = files_cost.query('base_name == "xr_cost_non_ag"')
-    get_map_obj_float(data, cost_nonag, f'{SAVE_DIR}/map_layers/map_cost_NonAg.js')
+    get_map_float(cost_nonag, colors_legend_non_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_cost_NonAg.js')
 
     # cost_transition = files_cost.query('base_name == "xr_cost_transition_ag2ag"')
-    # get_map_obj_float(data, cost_transition, f'{SAVE_DIR}/map_layers/map_cost_transition.js')
+    # get_map_float(cost_transition, f'{SAVE_DIR}/map_layers/map_cost_transition.js')
 
 
 
@@ -524,13 +340,13 @@ def save_report_layer(data:Data):
     files_ghg = files.query('base_name.str.contains("GHG")')
 
     ghg_ag = files_ghg.query('base_name == "xr_GHG_ag"')
-    get_map_obj_float(data, ghg_ag, f'{SAVE_DIR}/map_layers/map_GHG_Ag.js')
+    get_map_float(ghg_ag, colors_legend_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_GHG_Ag.js')
 
     ghg_am = files_ghg.query('base_name == "xr_GHG_ag_management"')
-    get_map_obj_float(data, ghg_am, f'{SAVE_DIR}/map_layers/map_GHG_Am.js')
+    get_map_float(ghg_am, colors_legend_am, {'am':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_GHG_Am.js')
 
     ghg_nonag = files_ghg.query('base_name == "xr_GHG_non_ag"')
-    get_map_obj_float(data, ghg_nonag, f'{SAVE_DIR}/map_layers/map_GHG_NonAg.js')
+    get_map_float(ghg_nonag, colors_legend_non_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_GHG_NonAg.js')
 
 
 
@@ -541,13 +357,13 @@ def save_report_layer(data:Data):
     files_quantities = files.query('base_name.str.contains("quantities")')
 
     quantities_ag = files_quantities.query('base_name == "xr_quantities_agricultural"')
-    get_map_obj_float(data, quantities_ag, f'{SAVE_DIR}/map_layers/map_quantities_Ag.js')
+    get_map_float(quantities_ag, colors_legend_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_quantities_Ag.js')
 
     quantities_am = files_quantities.query('base_name == "xr_quantities_agricultural_management"')
-    get_map_obj_float(data, quantities_am, f'{SAVE_DIR}/map_layers/map_quantities_Am.js')
+    get_map_float(quantities_am, colors_legend_am, {'am':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_quantities_Am.js')
 
     quantities_nonag = files_quantities.query('base_name == "xr_quantities_non_agricultural"')
-    get_map_obj_float(data, quantities_nonag, f'{SAVE_DIR}/map_layers/map_quantities_NonAg.js')
+    get_map_float(quantities_nonag, colors_legend_non_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_quantities_NonAg.js')
 
 
 
@@ -558,13 +374,13 @@ def save_report_layer(data:Data):
     files_revenue = files.query('base_name.str.contains("revenue")')
 
     revenue_ag = files_revenue.query('base_name == "xr_revenue_ag"')
-    get_map_obj_float(data, revenue_ag, f'{SAVE_DIR}/map_layers/map_revenue_Ag.js')
+    get_map_float(revenue_ag, colors_legend_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_revenue_Ag.js')
 
     revenue_am = files_revenue.query('base_name == "xr_revenue_agricultural_management"')
-    get_map_obj_float(data, revenue_am, f'{SAVE_DIR}/map_layers/map_revenue_Am.js')
+    get_map_float(revenue_am, colors_legend_am, {'am':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_revenue_Am.js')
 
     revenue_nonag = files_revenue.query('base_name == "xr_revenue_non_ag"')
-    get_map_obj_float(data, revenue_nonag, f'{SAVE_DIR}/map_layers/map_revenue_NonAg.js')
+    get_map_float(revenue_nonag, colors_legend_non_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_revenue_NonAg.js')
 
 
 
@@ -575,10 +391,10 @@ def save_report_layer(data:Data):
     # files_transition = files.query('base_name.str.contains("transition")')
 
     # transition_cost = files_transition.query('base_name == "xr_transition_cost_ag2non_ag"')
-    # get_map_obj_float(data, transition_cost, f'{SAVE_DIR}/map_layers/map_transition_cost.js')
+    # get_map_float(transition_cost, f'{SAVE_DIR}/map_layers/map_transition_cost.js')
 
     # transition_ghg = files_transition.query('base_name == "xr_transition_GHG"')
-    # get_map_obj_float(data, transition_ghg, f'{SAVE_DIR}/map_layers/map_transition_GHG.js')
+    # get_map_float(transition_ghg, f'{SAVE_DIR}/map_layers/map_transition_GHG.js')
 
 
 
@@ -589,10 +405,10 @@ def save_report_layer(data:Data):
     files_water = files.query('base_name.str.contains("water_yield")')
 
     water_ag = files_water.query('base_name == "xr_water_yield_ag"')
-    get_map_obj_float(data, water_ag, f'{SAVE_DIR}/map_layers/map_water_yield_Ag.js')
+    get_map_float(water_ag, colors_legend_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_water_yield_Ag.js')
 
     water_am = files_water.query('base_name == "xr_water_yield_ag_management"')
-    get_map_obj_float(data, water_am, f'{SAVE_DIR}/map_layers/map_water_yield_Am.js')
+    get_map_float(water_am, colors_legend_am, {'am':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_water_yield_Am.js')
 
     water_nonag = files_water.query('base_name == "xr_water_yield_non_ag"')
-    get_map_obj_float(data, water_nonag, f'{SAVE_DIR}/map_layers/map_water_yield_NonAg.js')
+    get_map_float(water_nonag, colors_legend_non_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_water_yield_NonAg.js')
