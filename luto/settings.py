@@ -442,10 +442,9 @@ EGGS_AVG_WEIGHT = 60  # Average weight of an egg in grams
 
 # Take data from 'GHG_targets.xlsx', 
 GHG_TARGETS_DICT = {
-    'off':      None,
-    'low':      '1.8C (67%) excl. avoided emis SCOPE1',
-    'medium':   '1.5C (50%) excl. avoided emis SCOPE1',
-    'high':     '1.5C (67%) excl. avoided emis SCOPE1',
+    'off':     None,
+    'low':    '1.8C 67%',
+    'high':   '1.5C 50%',
 }
 
 # Greenhouse gas emissions limits and parameters *******************************
@@ -458,6 +457,8 @@ GHG_EMISSIONS_LIMITS = 'high'        # 'off', 'low', 'medium', or 'high'
     - '1.5C (67%) excl. avoided emis', '1.5C (50%) excl. avoided emis', or '1.8C (67%) excl. avoided emis'
 - Assuming agriculture is responsible to sequester carbon emissions only in the scope 1 emissions (i.e., direct emissions from land-use and livestock types)
     - '1.5C (67%) excl. avoided emis SCOPE1', '1.5C (50%) excl. avoided emis SCOPE1', or '1.8C (67%) excl. avoided emis SCOPE1'
+- When turning off the 'Carbon Planttings', including block/belt, use the following options:
+    - '1.5C 50%', '1.8C 67%'
 '''
   	  	  
 
