@@ -160,27 +160,23 @@ def save2nc(in_xr:xr.DataArray, save_path:str, calc_valid_layers:bool=True):
     if calc_valid_layers:
         # Identify valid layers (i.e., layers with non-zero values)
         valid_df = in_xr.sum(['cell'], skipna=True).to_dataframe('ly_sum').query('abs(ly_sum) > 1e-3')
-        
-        if len(valid_df.index.names) > 1: # only do this when there are multiple levels
-            # Remove the 'ALL' option if there is only one valid layer.
-            #   E.g., for lm of ['ALL', 'dry'], we just need to keep the 'dry' option
-            for level_name in valid_df.index.names:
-                other_levels = [l for l in valid_df.index.names if l != level_name]
-                grouped = valid_df.groupby(level=other_levels)
-                
-                rows_to_drop = []
-                for _, group_df in grouped:
-                    if group_df.index.get_level_values(level_name).nunique() == 2:
-                        mask_all = group_df.index.get_level_values(level_name) == 'ALL'
-                        rows_to_drop.extend(group_df[mask_all].index.tolist())
-                
-                valid_df = valid_df.drop(rows_to_drop, errors='ignore')
-    
         loop_sel = valid_df.index.to_frame().to_dict('records')
         in_xr.attrs['valid_layers'] = str(loop_sel)
         
-        # Add min and max attributes
-        in_xr.attrs['min_max'] = (float(in_xr.min().values), float(in_xr.max().values))
+        # Add min and max attributes, 
+        #  excluding 'ALL' layers because they are index (used to create mosaic maps) 
+        #  rather than actual data
+        data_lys = in_xr
+        
+        if 'am' in data_lys.dims and 'ALL' in data_lys['am'].values:
+            data_lys = data_lys.drop_sel(am='ALL')
+        if 'lu' in data_lys.dims and 'ALL' in data_lys['lu'].values:
+            data_lys = data_lys.drop_sel(lu='ALL')
+        
+        min_val = float(data_lys.min().values)
+        if abs(min_val) < 1e-3: min_val = 0.0
+        max_val = float(data_lys.max().values)
+        in_xr.attrs['min_max'] = (min_val, max_val)
     
     in_xr.astype('float32').to_netcdf(save_path, encoding=encoding)
 
@@ -240,30 +236,30 @@ def write_dvar_and_mosaic_map(data: Data, yr_cal, path):
 
     # Mosaic maps
     lm_map = data.lmmaps[yr_cal].astype(bool) # has to be boolean for the '~' operator to work
+    lu_map = data.lumaps[yr_cal]
     
-    ag_map_argmax_ALL = ag_map.sum('lm').argmax(dim='lu', skipna=False).expand_dims(lm=['ALL']).astype(np.float32)
+    ag_map_argmax_ALL = ag_map.sum('lm').argmax(dim='lu').expand_dims(lm=['ALL']).astype(np.float32)
     ag_map_argmax_dry = ag_map_argmax_ALL.where(~lm_map).drop_vars('lm').assign_coords(lm=['dry']).astype(np.float32)
     ag_map_argmax_irr = ag_map_argmax_ALL.where(lm_map).drop_vars('lm').assign_coords(lm=['irr']).astype(np.float32)
     ag_map_argmax = xr.concat([ag_map_argmax_ALL, ag_map_argmax_dry, ag_map_argmax_irr], dim='lm').astype(np.float32)
     ag_map_argmax = ag_map_argmax.expand_dims(lu=['ALL'])
     ag_map_argmax = xr.where(ag_mask.values[None, None, :], ag_map_argmax, np.nan)
     
-    
-    am_argmax_ALL = am_map.sum(['lm','lu']).argmax(dim='am', skipna=False).expand_dims(lm=['ALL']).astype(np.float32)
+    am_argmax_ALL = am_map.sum(['lm','lu']).argmax(dim='am').expand_dims(lm=['ALL']).astype(np.float32)
     am_argmax_dry = am_argmax_ALL.where(~lm_map).drop_vars('lm').assign_coords(lm=['dry']).astype(np.float32)
     am_argmax_irr = am_argmax_ALL.where(lm_map).drop_vars('lm').assign_coords(lm=['irr']).astype(np.float32)
     am_argmax_lm = xr.concat([am_argmax_ALL, am_argmax_dry, am_argmax_irr], dim='lm')
     am_argmax_lu = xr.concat([
-        am_argmax_lm.where(am_argmax_lm == lu_code).expand_dims(lu=[lu_desc])
-        for lu_code, lu_desc in data.ALLLU2DESC.items()
+        am_argmax_lm.where(lu_map == lu_code).expand_dims(lu=[lu_desc])
+        for lu_code, lu_desc in data.AGLU2DESC.items()
         if lu_code != -1 # Exclude NoData (cells outside LUTO study area)
     ], dim='lu')
-    am_argmax = xr.concat([am_argmax_lm.expand_dims(lu=['ALL']), am_argmax_lu], dim='lu')
+    am_argmax = xr.concat([am_argmax_lu.sum('lu', skipna=True).expand_dims(lu=['ALL']), am_argmax_lu], dim='lu')
     am_argmax = am_argmax.expand_dims(am=['ALL'])
     am_argmax = xr.where(am_mask.values[None,None,None,:], am_argmax, np.nan)
     
-    
-    non_ag_map_argmax = non_ag_map.argmax(dim='lu', skipna=False) + settings.NON_AGRICULTURAL_LU_BASE_CODE
+
+    non_ag_map_argmax = non_ag_map.argmax(dim='lu') + settings.NON_AGRICULTURAL_LU_BASE_CODE
     non_ag_map_argmax = xr.where(non_ag_mask, non_ag_map_argmax, np.nan)
     non_ag_map_argmax = non_ag_map_argmax.expand_dims(lu=['ALL']).astype(np.float32)
     
@@ -429,18 +425,15 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
         region=('cell', data.REGION_NRM_NAME),
     )
 
-    # Expand dimension
-    ag_X_mrj_xr = xr.concat([ag_X_mrj_xr.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_X_mrj_xr], dim='lm')
-    ag_man_X_mrj_xr = xr.concat([ag_man_X_mrj_xr.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_man_X_mrj_xr], dim='lm')
-    ag_man_X_mrj_xr = xr.concat([ag_man_X_mrj_xr.sum(dim='lu', keepdims=True).assign_coords(lu=['ALL']), ag_man_X_mrj_xr], dim='lu')
-    
-    ag_q_mrp_xr = xr.concat([ag_q_mrp_xr.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_q_mrp_xr], dim='lm')
-    ag_man_q_mrp_xr = xr.concat([ag_man_q_mrp_xr.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_man_q_mrp_xr], dim='lm')
-
-    # Calculate the commodity production 
+    # Calculate the commodity production (BEFORE dimension expansion to avoid double counting)
     ag_q_mrc = (((ag_X_mrj_xr * lu2pr_xr).sum(dim=['lu']) * ag_q_mrp_xr) * pr2cm_xr).sum(dim='product')
     non_ag_p_rc = (non_ag_X_rk_xr * non_ag_crk_xr).sum(dim=['lu'])
     am_p_amrc = (((ag_man_X_mrj_xr * lu2pr_xr).sum(['lu']) * ag_man_q_mrp_xr) * pr2cm_xr).sum('product')
+
+    # Expand dimension (has to be after calculation to avoid double counting)
+    ag_q_mrc = xr.concat([ag_q_mrc.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_q_mrc], dim='lm')
+    am_p_amrc = xr.concat([am_p_amrc.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), am_p_amrc], dim='lm')
+    am_p_amrc = xr.concat([am_p_amrc.sum(dim='Commodity', keepdims=True).assign_coords(Commodity=['ALL']), am_p_amrc], dim='Commodity')
 
     # Regional level aggregation
     ag_q_mrc_df_region = ag_q_mrc.groupby('region'
@@ -493,11 +486,27 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
     # Append the mosaic layers and save to netcdf
     ag_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc'))['data'].sel(lu=['ALL']).rename({'lu':'Commodity'})
     non_ag_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc'))['data'].sel(lu=['ALL']).rename({'lu':'Commodity'})
-    am_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc'))['data'].sel(am=['ALL']).rename({'lu':'Commodity'})
+    am_mosaic = xr.open_dataarray(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc'), chunks='auto').sel(am=['ALL'], lu='ALL', drop=True)
+    am_mosaic.attrs = {}
     
+    # Get the commodity mosaic map
+    commodity_lumap = am_p_amrc.sel(lm='ALL').sum('am', skipna=True).argmax('Commodity')
+    
+    commodity_ammap = xr.concat([
+        am_mosaic.where(commodity_lumap == c_code).expand_dims(Commodity=[c_desc])
+        for c_code, c_desc in enumerate(data.COMMODITIES)
+    ], dim='Commodity')
+    
+    commodity_ammap = xr.concat([
+        am_mosaic.expand_dims(Commodity=['ALL']),
+        commodity_ammap
+    ], dim='Commodity')
+
+    
+
     ag_q_mrc_cat = xr.concat([ag_mosaic, ag_q_mrc], dim='Commodity')
     non_ag_p_rc_cat = xr.concat([non_ag_mosaic, non_ag_p_rc], dim='Commodity')
-    am_p_amrc_cat = xr.concat([am_mosaic, am_p_amrc], dim='Commodity')
+    am_p_amrc_cat = xr.concat([commodity_ammap, am_p_amrc], dim='am')
     
     save2nc(ag_q_mrc_cat, os.path.join(path, f'xr_quantities_agricultural_{yr_cal}.nc'))
     save2nc(non_ag_p_rc_cat, os.path.join(path, f'xr_quantities_non_agricultural_{yr_cal}.nc'))
@@ -997,17 +1006,19 @@ def write_dvar_area(data: Data, yr_cal, path):
         ).assign_coords({'region': ('cell', data.REGION_NRM_NAME)}
         ).chunk({'cell': min(1024, data.NCELLS)})
 
-    # Expand dimension
-    ag_dvar_mrj = xr.concat([ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_dvar_mrj], dim='lm')
-    am_dvar_mrj = xr.concat([am_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), am_dvar_mrj], dim='lm')
-    am_dvar_mrj = xr.concat([am_dvar_mrj.sum(dim='lu', keepdims=True).assign_coords(lu=['ALL']), am_dvar_mrj], dim='lu')
-
+    
     # Calculate the real area in hectares
     real_area_r = xr.DataArray(data.REAL_AREA, dims=['cell'], coords={'cell': range(data.NCELLS)})
 
     area_ag = (ag_dvar_mrj * real_area_r)
     area_non_ag = (non_ag_rj * real_area_r)
     area_am = (am_dvar_mrj * real_area_r)
+    
+    # Expand dimension (has to be after multiplication to avoid double counting)
+    area_ag = xr.concat([area_ag.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), area_ag], dim='lm')
+    area_am = xr.concat([area_am.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), area_am], dim='lm')
+    area_am = xr.concat([area_am.sum(dim='lu', keepdims=True).assign_coords(lu=['ALL']), area_am], dim='lu')
+
 
     # Region level aggregation
     df_ag_area_region = area_ag.groupby('region'
@@ -1472,16 +1483,10 @@ def write_water(data: Data, yr_cal, path):
         coords={'region_water': list(data.WATER_YIELD_TARGETS.keys())}
     )
     domestic_water_use = xr.DataArray(
-        list(data.WATER_USE_DOMESTIC.values()), 
+        list(data.WATER_USE_DOMESTIC.values()),
         dims=['region_water'],
         coords={'region_water': list(data.WATER_USE_DOMESTIC.keys())}
     )
-
-    # Expand dimension
-    ag_dvar_mrj = xr.concat([ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_dvar_mrj], dim='lm')
-    am_dvar_mrj = xr.concat([am_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), am_dvar_mrj], dim='lm')
-    am_dvar_mrj = xr.concat([am_dvar_mrj.sum(dim='lu', keepdims=True).assign_coords(lu=['ALL']), am_dvar_mrj], dim='lu')
-
 
     # ------------------------------- Get water yield without CCI -----------------------------------
 
@@ -1520,7 +1525,7 @@ def write_water(data: Data, yr_cal, path):
     xr_non_ag_wny = non_ag_dvar_rj * non_ag_w_rk
     xr_am_wny = ag_man_w_mrj * am_dvar_mrj
 
-    # Expand dimension (has to be after multiplication to avoid double counting)
+    # Expand dimension (has to be after calculation to avoid double counting)
     xr_ag_wny = xr.concat([xr_ag_wny.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), xr_ag_wny], dim='lm')
     xr_am_wny = xr.concat([xr_am_wny.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), xr_am_wny], dim='lm')
     xr_am_wny = xr.concat([xr_am_wny.sum(dim='lu', keepdims=True).assign_coords(lu=['ALL']), xr_am_wny], dim='lu')
