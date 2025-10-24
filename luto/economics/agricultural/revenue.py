@@ -244,7 +244,7 @@ def get_commodity_prices(data: Data, yr_cal:int) -> np.ndarray:
     # Get the median price of each commodity
     for names, commodity in commodity_lookup.items():
         prices = np.nanpercentile(data.AGEC_LVSTK[names[0], names[1]], 50)
-        prices = prices * 1000 if commodity == 'dairy' else prices # convert to per tonne for dairy
+        prices = prices * 1000 if commodity == 'dairy' else prices # convert to kiloLitre (~ tonne) for dairy
         commodity_prices[commodity] = prices
 
     # Get the median price of each crop; here need to use 'irr' because dry-Rice does exist in the data
