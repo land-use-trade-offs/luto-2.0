@@ -130,13 +130,13 @@ def create_report(data: Data):
     @tools.LogToFile(log_path, mode='a')
     def _create_report():
         print('Creating report...')
-        print(' --| Copying report template...')
+        print('├── Copying report template...')
         shutil.copytree('luto/tools/report/VUE_modules', f"{data.path}/DATA_REPORT", dirs_exist_ok=True)
-        print(' --| Creating chart data...')
+        print('├── Creating chart data...')
         save_report_data(data.path)
-        print(' --| Creating map data...')
+        print('├── Creating map data...')
         save_report_layer(data.path)
-        print(' --| Report created successfully!')
+        print('└── Report created successfully!')
 
     return _create_report()
    

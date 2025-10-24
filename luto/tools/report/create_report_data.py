@@ -109,7 +109,7 @@ def save_report_data(raw_data_dir:str):
         delayed(process_area_data)(files, SAVE_DIR, lu_group, colors_lu_category),
         delayed(process_production_data)(files, SAVE_DIR, years),
         delayed(process_economics_data)(files, SAVE_DIR),
-        delayed(process_ghg_data)(files, SAVE_DIR, lu_group),
+        delayed(process_ghg_data)(files, SAVE_DIR, lu_group, years),
         delayed(process_water_data)(files, SAVE_DIR),
         delayed(process_biodiversity_data)(files, SAVE_DIR),
         delayed(process_supporting_info_data)(SAVE_DIR, years, raw_data_dir),
@@ -117,8 +117,12 @@ def save_report_data(raw_data_dir:str):
 
     # Execute jobs in parallel
     num_jobs = len(jobs)
-    for out in Parallel(n_jobs=num_jobs, return_as='generator')(jobs):
-        print(f"  {out}")
+    results = list(Parallel(n_jobs=num_jobs, return_as='generator')(jobs))
+    for i, out in enumerate(results):
+        if i < len(results) - 1:
+            print(f"│   ├── {out}")
+        else:
+            print(f"│   └── {out}")
 
 
 
@@ -1250,7 +1254,7 @@ def process_production_data(files, SAVE_DIR, years):
     return "Production data processing completed"
 
 
-def process_ghg_data(files, SAVE_DIR, lu_group):
+def process_ghg_data(files, SAVE_DIR, lu_group, years):
     """Process and save GHG emissions data (Section 4)."""
     '''GHG is written to disk no matter if GHG_EMISSIONS_LIMITS is 'off' or 'on' '''
 
