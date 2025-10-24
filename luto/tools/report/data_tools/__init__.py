@@ -195,6 +195,7 @@ def rename_reorder_hierarchy(sel: dict) -> dict:
     if 'Commodity' in sel:
         commodity = sel['Commodity'].capitalize()
         sel_rename['Commodity'] = {
+            'All': 'ALL',
             'Sheep lexp': 'Sheep live export',
             'Beef lexp': 'Beef live export'
         }.get(commodity, commodity)
@@ -203,7 +204,7 @@ def rename_reorder_hierarchy(sel: dict) -> dict:
     for key in leftover_keys:
         sel_rename[key] = sel[key]
         
-    # last level: 'lu'
+    # 4 last level: 'lu'
     if 'lu' in sel:
         sel_rename['lu'] = RENAME_AM_NON_AG.get(sel['lu'], sel['lu'])
         
