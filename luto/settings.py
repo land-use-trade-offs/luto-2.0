@@ -68,6 +68,8 @@ IMPORT_TREND = 'Static'             # 'Static' (assumes 2010 shares of imports f
 WASTE = 1                           # 1 for full waste, 0.5 for half waste
 FEED_EFFICIENCY = 'BAU'             # 'BAU' or 'High'
 
+APPLY_DEMAND_MULTIPLIERS = True     # True or False. Whether to apply demand multipliers from AusTIME model.
+
 # Add CO2 fertilisation effects on agricultural production from GAEZ v4
 CO2_FERT = 'off'   # or 'off'
 

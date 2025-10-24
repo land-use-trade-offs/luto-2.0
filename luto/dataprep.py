@@ -97,7 +97,7 @@ def create_new_dataset():
     # Demand and elasticity data
     shutil.copyfile(f'{demand_scenarios_inpath}/All_LUTO_demand_scenarios_with_convergences.csv',  raw_data + 'All_LUTO_demand_scenarios_with_convergences.csv')
     shutil.copyfile(f'{demand_elasticity_inpath}/Elasticities_Table.csv', outpath + 'demand_elasticity.csv')
-    
+    shutil.copyfile(f'{luto_1D_inpath}/20251023_CNS25 Pathways AusTIMES data.xlsx', outpath + 'AusTIMES_demand_multiplier.xlsx')
     
     # Read raw BECCS data from CSIRO and save as HDF5
     BECCS_raw = pd.read_pickle(BECCS_inpath + 'df_info_best_grid_20211116.pkl')
