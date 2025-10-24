@@ -2263,7 +2263,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         f.write(';\n')
         
     # ---------------- Overall quality - Am ----------------
-    bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL" and abs(`Area Weighted Score (ha)`) > 1').copy()
+    bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL"').copy()
 
     df_wide = bio_df_am.groupby(['region', 'Water_supply', "Agri-Management", 'Landuse'])[['Year','Value (%)']]\
         .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
