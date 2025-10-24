@@ -446,7 +446,7 @@ def get_cells_using_ag_landuse(lumap: np.ndarray, j: int) -> np.ndarray:
     return np.where(lumap == j)[0]
 
 
-def ag_mrj_to_xr(data, arr):
+def ag_mrj_to_xr(data, arr: np.ndarray, threshold: float = 0.01) -> xr.DataArray:
     """Convert agricultural dvar array to xarray DataArray with automatic masking.
 
     Masks out cells where the sum across all land uses is less than 0.01.
@@ -459,13 +459,13 @@ def ag_mrj_to_xr(data, arr):
                 'lu': data.AGRICULTURAL_LANDUSES}
     ).astype(np.float32)
 
-    # Mask out cells with very small values (sum across lu < 0.01)
-    ag_mask = (abs(xr_arr.sum('lu')) > 0.01).values
-    xr_arr = xr_arr.where(ag_mask[..., None], 0)
+    # Mask out cells with very small values
+    ag_mask = (abs(xr_arr.sum(['lu','lm'])) > threshold).values
+    xr_arr = xr_arr.where(ag_mask[None,:,None], 0)
 
     return xr_arr
 
-def non_ag_rk_to_xr(data, arr):
+def non_ag_rk_to_xr(data, arr: np.ndarray, threshold: float = 0.01) -> xr.DataArray:
     """Convert non-agricultural dvar array to xarray DataArray with automatic masking.
 
     Masks out cells where the sum across all land uses is less than 0.01.
@@ -477,19 +477,19 @@ def non_ag_rk_to_xr(data, arr):
                 'lu': data.NON_AGRICULTURAL_LANDUSES}
     ).astype(np.float32)
 
-    # Mask out cells with very small values (sum across lu < 0.01)
-    non_ag_mask = (abs(xr_arr.sum('lu')) > 0.01).values
+    # Mask out cells with very small values
+    non_ag_mask = (abs(xr_arr.sum('lu')) > threshold).values
     xr_arr = xr_arr.where(non_ag_mask[..., None], 0)
 
     return xr_arr
 
-def am_mrj_to_xr(data, am_mrj_dict):
+def am_mrj_to_xr(data, am_mrj_dict: dict, threshold: float = 0.01) -> xr.DataArray:
     """Convert agricultural management dvar dict to xarray DataArray with automatic masking.
 
     Masks out cells where the sum across all agricultural management types is less than 0.01.
     """
     emp_arr_xr = xr.DataArray(
-        np.full((data.N_AG_MANS, data.NLMS, data.NCELLS, data.N_AG_LUS), np.nan, dtype=np.float32),
+        np.zeros((data.N_AG_MANS, data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32),
         dims=['am', 'lm', 'cell', 'lu'],
         coords={'am': data.AG_MAN_DESC,
                 'lm': data.LANDMANS,
@@ -506,9 +506,9 @@ def am_mrj_to_xr(data, am_mrj_dict):
             lu_idx = [data.DESC2AGLU[i] for i in settings.AG_MANAGEMENTS_TO_LAND_USES[am]]
             emp_arr_xr.loc[am, :, :, lu] = am_mrj_dict[am][:,:, lu_idx]
 
-    # Mask out cells with very small values (sum across lu < 0.01)
-    am_mask = (abs(emp_arr_xr.sum('lu')) > 0).values
-    emp_arr_xr = emp_arr_xr.where(am_mask[..., None], 0)
+    # Mask out cells with very small values
+    am_mask = (abs(emp_arr_xr.sum(['am','lm','lu'])) > threshold).values
+    emp_arr_xr = emp_arr_xr.where(am_mask[None,None,:,None], 0)
 
     return emp_arr_xr
 
