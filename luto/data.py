@@ -1031,6 +1031,8 @@ class Data:
         ] = AusTIME_multipliers
         
         demand_multipliers = demand_multipliers.T
+        demand_multipliers.columns.name = 'YEAR'
+        demand_multipliers.index.name = 'COMMODITY'
             
 
 
@@ -1070,9 +1072,7 @@ class Data:
         # are distorted more under higher resfactoring.
         self.D_CY *= (yr_cal_base_prod_data / self.D_CY[0])[None, :]
         
-        
-        
-        
+
         # Demand elasticity data
         demand_elasticity = pd.read_csv(f'{settings.INPUT_DIR}/demand_elasticity.csv').drop(columns=['Unnamed: 0'])
         demand_elasticity['demand_elasticity'] = demand_elasticity.eval('`Supply Elasticity (Es)` - `Demand Elasticity(ED)`')
