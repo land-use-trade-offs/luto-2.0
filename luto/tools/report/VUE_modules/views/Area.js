@@ -83,13 +83,13 @@ window.AreaView = {
         seriesData = seriesData.filter(serie => (selectLanduse.value === "ALL" || serie.name === selectLanduse.value));
       }
       else if (selectCategory.value === "Ag Mgt") {
-        console.log(chartData);
-        seriesData = chartData[selectAgMgt.value]?.[selectWater.value];
-        seriesData = seriesData.filter(serie => (selectLanduse.value === "ALL" || serie.name === selectLanduse.value));
-        console.log(seriesData);
+        seriesData = chartData[selectWater.value][selectLanduse.value];
+        seriesData = seriesData.filter(serie => (selectAgMgt.value === "ALL" || serie.name === selectAgMgt.value));
       } else if (selectCategory.value === "Non-Ag") {
         seriesData = chartData
+        seriesData = seriesData.filter(serie => (selectLanduse.value === "ALL" || serie.name === selectLanduse.value));
       }
+
 
       return {
         ...window["Chart_default_options"],
