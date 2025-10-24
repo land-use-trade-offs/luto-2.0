@@ -68,6 +68,8 @@ IMPORT_TREND = 'Static'             # 'Static' (assumes 2010 shares of imports f
 WASTE = 1                           # 1 for full waste, 0.5 for half waste
 FEED_EFFICIENCY = 'BAU'             # 'BAU' or 'High'
 
+APPLY_DEMAND_MULTIPLIERS = True     # True or False. Whether to apply demand multipliers from AusTIME model.
+
 # Add CO2 fertilisation effects on agricultural production from GAEZ v4
 CO2_FERT = 'off'   # 'on' or 'off'
 
@@ -162,7 +164,7 @@ the model sensitive to variations in input data.
 # Geographical raster writing parameters
 # ---------------------------------------------------------------------------- #
 PARALLEL_WRITE = True                       # If to use parallel processing to write GeoTiffs: True or False
-WRITE_THREADS = min(10, os.cpu_count())     # The Threads to use for map making, only work with PARALLEL_WRITE = True
+WRITE_THREADS = min(4, os.cpu_count())     # The Threads to use for map making, only work with PARALLEL_WRITE = True
 
 # ---------------------------------------------------------------------------- #
 # Gurobi parameters
@@ -442,10 +444,9 @@ EGGS_AVG_WEIGHT = 60  # Average weight of an egg in grams
 
 # Take data from 'GHG_targets.xlsx', 
 GHG_TARGETS_DICT = {
-    'off':      None,
-    'low':      '1.8C (67%) excl. avoided emis SCOPE1',
-    'medium':   '1.5C (50%) excl. avoided emis SCOPE1',
-    'high':     '1.5C (67%) excl. avoided emis SCOPE1',
+    'off':     None,
+    'low':    '1.8C 67%',
+    'high':   '1.5C 50%',
 }
 
 # Greenhouse gas emissions limits and parameters *******************************
@@ -458,6 +459,8 @@ GHG_EMISSIONS_LIMITS = 'high'        # 'off', 'low', 'medium', or 'high'
     - '1.5C (67%) excl. avoided emis', '1.5C (50%) excl. avoided emis', or '1.8C (67%) excl. avoided emis'
 - Assuming agriculture is responsible to sequester carbon emissions only in the scope 1 emissions (i.e., direct emissions from land-use and livestock types)
     - '1.5C (67%) excl. avoided emis SCOPE1', '1.5C (50%) excl. avoided emis SCOPE1', or '1.8C (67%) excl. avoided emis SCOPE1'
+- When turning off the 'Carbon Planttings', including block/belt, use the following options:
+    - '1.5C 50%', '1.8C 67%'
 '''
   	  	  
 

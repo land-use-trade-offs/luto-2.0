@@ -93,12 +93,48 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
   - Uses compressed NetCDF encoding with chunking for efficient storage
   - Format: `tCO2_ha_{type}.nc` where type is ep_block, ep_belt, ep_rip, cp_block, cp_belt, hir_block, hir_rip
 - **`luto/tools/spatializers.py`**: Spatial data processing and upsampling
-- **`luto/tools/write.py`**: Output writing and file generation
+- **`luto/tools/write.py`**: Output writing and xarray NetCDF generation
+  - Outputs model results as xarray datasets in NetCDF format
+  - Uses hierarchical dimension structure for progressive selection in reporting UI
+  - Dimension hierarchies:
+    - **Ag**: `lm` (land management: dryland/irrigated) → `lu` (land use)
+    - **Am**: `am` (agricultural management) → `lm` → `lu`
+    - **NonAg**: `lu` only (simplified structure)
+  - Expands dimensions with "ALL" aggregations before saving:
+    - **Ag**: Adds `lu="ALL"` dimension (aggregated across land uses)
+    - **Am**: Adds `lu="ALL"` and `lm="ALL"` dimensions (aggregated across land uses and land management)
+    - **NonAg**: No expansion (already simplified)
+  - **Special GHG expansion**: Adds `source="ALL"` dimension (aggregated across emission sources)
+    - **GHG structure**: `lm` → `source` → `lu` for Ag; `am` → `lm` → `source` → `lu` for Am
+  - **Mosaic layer generation**: Creates categorical land use/management maps (BEFORE multiplication with data matrices)
+    - **Ag mosaic**: `argmax(sum(ag_dvar, dim=lm))` + separate dryland/irrigated argmax layers
+    - **Am mosaic**: `argmax(sum(am_dvar, dim=[lu, lm]))` + separate layers per land use and water type
+    - **NonAg mosaic**: `argmax(nonag_dvar) + NON_AGRICULTURAL_LU_BASE_CODE` (100, 101, ...)
+  - Appends mosaic layers to xarray outputs with `ALL` dimension labels
+  - Uses `save2nc()` function with optimized chunking and valid layer filtering
+- **`luto/tools/report/create_report_layers.py`**: Converts NetCDF outputs to web-ready map layers
+  - Reads xarray NetCDF files and processes valid layers (filtered by `valid_layer` attribute)
+  - Reprojects layers from native CRS to EPSG:3857 (Web Mercator for Leaflet compatibility)
+  - Converts 1-band float arrays to 4-band RGBA uint8 format using color legends
+  - Applies `rename_reorder_hierarchy()` to enforce dimension order: `am` → `lm` → other → `lu`
+  - Converts RGBA arrays to base64-encoded PNG strings using `array_to_base64()`
+  - Outputs hierarchical JSON files matching Vue.js progressive selection pattern
+- **`luto/tools/report/data_tools/__init__.py`**: Shared utilities for report generation
+  - `array_to_base64()`: Converts 4-band RGBA numpy arrays to base64-encoded PNG strings
+  - `tuple_dict_to_nested()`: Converts flat tuple-keyed dictionaries to nested hierarchical dictionaries
+  - `hex_color_to_numeric()`: Converts hex color codes to RGBA tuples (R, G, B, A)
+  - `rename_reorder_hierarchy()`: Enforces consistent dimension ordering (`am` → `lm` → other → `lu`)
+  - `get_map_legend()`: Returns color legend mappings from CSV files in VUE_modules/assets
 
 ### Utilities
 - **`luto/tools/create_task_runs/`**: Batch processing and grid search utilities
 - **`luto/tools/report/`**: Report generation and visualization
-  - `data_tools/`: Data processing for reports
+  - `data_tools/`: Data processing utilities for report generation
+    - `__init__.py`: Shared helper functions (array_to_base64, tuple_dict_to_nested, etc.)
+    - `parameters.py`: Configuration parameters and name mappings
+  - `create_report_data.py`: Generates chart data JSON files for Vue.js dashboard
+  - `create_report_layers.py`: Converts NetCDF to map layer JSON files
+    - **Function signature**: `save_report_layer(data_path: str)` - takes output path, not Data object
   - `map_tools/`: Spatial visualization utilities
 - **`luto/helpers.py`**: General utility functions
 
@@ -156,15 +192,311 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
    - Data rescaling: Arrays rescaled in-place to 0-1e3 magnitude for numerical stability
 5. **Optimization**: `solvers/solver.py` runs GUROBI optimization with biodiversity constraints
 6. **Output Generation**: `tools/write.py` writes results to `/output/`
+   - **Two-stage writing process**: Decision variables and mosaic maps written first (stage 1), then all other outputs (stage 2)
+   - Stage 1 uses `write_dvar_and_mosaic_map()` which combines dvar and mosaic generation in a single function
+   - Mosaic maps are concatenated directly to dvar arrays before saving (optimizes file I/O)
    - Biodiversity outputs: GBF2/3/4/8 scores, species impacts, vegetation group restoration
 
 ## Output Structure
 
 Results are saved in `/output/<timestamp>/`:
 - `DATA_REPORT/REPORT_HTML/index.html`: Interactive HTML dashboard
-- Spatial outputs: GeoTIFF files for mapping
+- Spatial outputs: NetCDF files (xarray format) for mapping
 - Data tables: CSV files with numerical results
 - Logs: Execution logs and performance metrics
+
+### NetCDF Output Format and Structure
+
+The model outputs spatial results as xarray datasets saved in NetCDF format, designed to support the hierarchical progressive selection pattern in the Vue.js reporting interface.
+
+#### Dimension Hierarchies
+
+Output files follow category-specific dimension structures that determine the progressive button hierarchy in the web interface:
+
+1. **Agricultural Land Use (Ag)**:
+   - **Base hierarchy**: `lm` (land management) → `lu` (land use) → `year` → `cell`
+   - **lm values**: `"ALL"`, `"dry"` (dryland), `"irr"` (irrigated)
+   - **lu values**: `"ALL"`, `"Apples"`, `"Beef"`, `"Citrus"`, etc. (28 agricultural commodities)
+   - **After expansion**: Contains `lu="ALL"` aggregation across all land uses
+
+2. **Agricultural Management (Am)**:
+   - **Base hierarchy**: `am` (agricultural management) → `lm` → `lu` → `year` → `cell`
+   - **am values**: `"ALL"`, `"Asparagopsis taxiformis"`, `"AgTech EI"`, `"Biochar"`, etc.
+   - **After expansion**: Contains `am="ALL"` and `lm="ALL"` aggregations
+
+3. **Non-Agricultural Land Use (NonAg)**:
+   - **Base hierarchy**: `lu` → `year` → `cell`
+   - **lu values**: `"ALL"`, `"Environmental Plantings"`, `"Carbon Plantings"`, etc.
+   - **No expansion needed** (already simplified)
+
+4. **Special Case - GHG Emissions**:
+   - **Ag hierarchy**: `lm` → `source` → `lu` → `year` → `cell`
+   - **Am hierarchy**: `am` → `lm` → `source` → `lu` → `year` → `cell`
+   - **source values**: `"ALL"`, `"Chemical"`, `"Crop Management"`, `"Manure"`, etc.
+   - **Additional expansion**: `source="ALL"` aggregates across emission sources
+
+5. **Special Case - Economics (Cost/Revenue)**:
+   - **Cost structure**: Includes additional source dimension for cost types
+   - **source values**: `"ALL"`, `"Labour cost"`, `"Area cost"`, etc.
+   - **Separate files**: Cost and revenue saved as independent NetCDF files
+
+#### Mosaic Layer Generation
+
+Mosaic layers are integer-coded categorical maps showing the dominant land use or management practice at each cell. These layers are generated **BEFORE** multiplication with data matrices (since multiplying integer indices is meaningless).
+
+**Agricultural (Ag) Mosaic**:
+```python
+# 1. Generate overall mosaic (argmax across both lm and lu)
+ag_mosaic_all = ag_map.sum('lm').argmax(dim='lu', skipna=False).expand_dims(lm=['ALL'])
+
+# 2. Create dryland and irrigated mosaics using boolean land management map
+lm_map = data.lmmaps[yr_cal].astype(bool)  # True = irrigated, False = dryland
+ag_mosaic_dry = ag_mosaic_all.where(~lm_map).drop_vars('lm').assign_coords(lm=['dry'])
+ag_mosaic_irr = ag_mosaic_all.where(lm_map).drop_vars('lm').assign_coords(lm=['irr'])
+
+# 3. Concatenate all mosaic layers and expand dimensions
+ag_mosaic = xr.concat([ag_mosaic_all, ag_mosaic_dry, ag_mosaic_irr], dim='lm')
+ag_mosaic = ag_mosaic.expand_dims(lu=['ALL'])  # Add lu dimension with 'ALL' label
+
+# 4. Apply mask to filter cells with negligible agriculture
+ag_mask = ag_map.sum(['lm', 'lu']) > 0.001
+ag_mosaic = xr.where(ag_mask, ag_mosaic, np.nan)
+```
+
+**Agricultural Management (Am) Mosaic**:
+```python
+# 1. Generate overall mosaic (argmax across am, summing over lm and lu)
+am_mosaic_all = am_map.sum(['lm', 'lu']).argmax(dim='am', skipna=False).expand_dims(lm=['ALL'])
+
+# 2. Create dryland/irrigated mosaics
+am_mosaic_dry = am_mosaic_all.where(~lm_map).drop_vars('lm').assign_coords(lm=['dry'])
+am_mosaic_irr = am_mosaic_all.where(lm_map).drop_vars('lm').assign_coords(lm=['irr'])
+
+# 3. Concatenate lm-level mosaics
+am_mosaic_lm = xr.concat([am_mosaic_all, am_mosaic_dry, am_mosaic_irr], dim='lm')
+
+# 4. Create per-land-use mosaics (filter by land use code)
+am_mosaic_lu = xr.concat([
+    am_mosaic_lm.where(am_mosaic_lm == lu_code).expand_dims(lu=[lu_desc])
+    for lu_code, lu_desc in data.ALLLU2DESC.items()
+    if lu_code != -1  # Exclude NoData (cells outside LUTO study area)
+], dim='lu')
+
+# 5. Combine lm-level and lu-specific mosaics, then expand am dimension
+am_mosaic = xr.concat([am_mosaic_lm.expand_dims(lu=['ALL']), am_mosaic_lu], dim='lu')
+am_mosaic = am_mosaic.expand_dims(am=['ALL'])
+
+# 6. Apply mask to filter cells with negligible agricultural management
+am_mask = am_map.sum(['am', 'lm', 'lu']) > 0.001
+am_mosaic = xr.where(am_mask, am_mosaic, np.nan)
+```
+
+**Non-Agricultural (NonAg) Mosaic**:
+```python
+# 1. Find dominant non-agricultural land use (argmax returns 0-N indices)
+nonag_mosaic = non_ag_map.argmax(dim='lu', skipna=False)  # Shape: (cell,)
+
+# 2. Add base code offset to distinguish from agricultural codes
+nonag_mosaic = nonag_mosaic + settings.NON_AGRICULTURAL_LU_BASE_CODE  # Values: 100, 101, 102, ...
+
+# 3. Apply mask to filter cells with negligible non-agricultural land use
+non_ag_mask = non_ag_map > 0.001
+nonag_mosaic = xr.where(non_ag_mask, nonag_mosaic, np.nan)
+
+# 4. Expand dimension and assign as 'ALL' label
+nonag_mosaic = nonag_mosaic.expand_dims(lu=['ALL']).astype(np.float32)
+```
+
+#### Appending Mosaics to xarray Outputs
+
+After mosaic generation, they are concatenated to the main data arrays **in the same function** (`write_dvar_and_mosaic_map`):
+
+```python
+# Ag: Prepend mosaic with lu='ALL' coordinate (mosaic first, then dvar data)
+ag_map_cat = xr.concat([ag_mosaic, ag_map], dim='lu')
+# Final shape: (lm=['ALL', 'dry', 'irr'], lu=['ALL', 'Apples', ..., 'Beef', ...], cell)
+
+# Am: Prepend mosaic with am='ALL' coordinate
+am_map_cat = xr.concat([am_mosaic, am_map], dim='am')
+# Final shape: (am=['ALL', 'Asparagopsis', ..., 'Biochar', ...], lm=['ALL', 'dry', 'irr'], lu=['ALL', 'Apples', ..., 'Beef', ...], cell)
+
+# NonAg: Prepend mosaic with lu='ALL' coordinate
+non_ag_map_cat = xr.concat([nonag_mosaic, non_ag_map], dim='lu')
+# Final shape: (lu=['ALL', 'Environmental Plantings', ..., 'Carbon Plantings', ...], cell)
+```
+
+The `ALL` dimensions serve dual purposes:
+1. **Aggregated data**: For data matrices, `ALL` contains summed/averaged values across the dimension
+2. **Mosaic maps**: For decision variables, `ALL` contains the categorical dominant land use/management map (integer codes)
+
+**Key Implementation Detail**: Mosaics are **prepended** (placed first) rather than appended, making `'ALL'` the first coordinate in each dimension. This improves readability when inspecting NetCDF files.
+
+#### save2nc() Function - Optimized NetCDF Export
+
+The `save2nc()` function implements four critical optimizations:
+
+**1. Cell-Dimension Chunking**:
+```python
+# Chunking strategy: Keep 'cell' dimension full size, chunk other dimensions to 1
+# This enables fast reads of complete spatial layers (cell is the map dimension)
+encoding = {
+    var_name: {
+        'chunksizes': (1, 1, ..., full_cell_size),  # Other dims=1, cell=full
+        'zlib': True,
+        'complevel': 5
+    }
+}
+```
+
+**2. Valid Layer Filtering**:
+```python
+# Calculate which dimension combinations have meaningful data
+# Skip layers where abs(sum(data)) < 1e-3 (negligible values)
+valid_df = in_xr.sum(['cell'], skipna=True).to_dataframe('ly_sum').query('abs(ly_sum) > 1e-3')
+
+# For multi-index DataFrames, iterate through each dimension level
+# Remove 'ALL' entries when only one other valid option exists
+# Example: If lm=['ALL', 'irr'] (no dryland), drop 'ALL' since 'irr' alone is informative
+for level_name in valid_df.index.names:
+    other_levels = [l for l in valid_df.index.names if l != level_name]
+    grouped = valid_df.groupby(level=other_levels)
+
+    rows_to_drop = []
+    for _, group_df in grouped:
+        if group_df.index.get_level_values(level_name).nunique() == 2:
+            mask_all = group_df.index.get_level_values(level_name) == 'ALL'
+            rows_to_drop.extend(group_df[mask_all].index.tolist())
+
+    valid_df = valid_df.drop(rows_to_drop, errors='ignore')
+
+# Store as NetCDF attribute for fast filtering during map generation
+loop_sel = valid_df.index.to_frame().to_dict('records')
+xr_dataset.attrs['valid_layers'] = str(loop_sel)
+```
+
+**3. Min/Max Attributes**:
+```python
+# Add global min and max values as attributes for legend scaling
+in_xr.attrs['min_max'] = (float(in_xr.min().values), float(in_xr.max().values))
+```
+
+**4. Simplified NetCDF Writing**:
+```python
+# Direct write without dask compute (faster for pre-chunked data)
+in_xr.astype('float32').to_netcdf(save_path, encoding=encoding)
+```
+
+#### create_report_layers.py - NetCDF to JSON Map Workflow
+
+The `create_report_layers.py` script transforms NetCDF outputs into web-ready hierarchical JSON map files:
+
+**Step 1: Load NetCDF and Filter Valid Layers**
+```python
+# Open NetCDF file
+ds = xr.open_dataset('ag_dvar_output.nc')
+
+# Parse valid_layers attribute (saved by save2nc)
+valid_layers = json.loads(ds.attrs.get('valid_layers', '[]'))
+
+# Loop only through valid dimension combinations
+for (lu, lm, year) in valid_layers:
+    layer_data = ds.sel(lu=lu, lm=lm, year=year).values  # 1D cell array
+```
+
+**Step 2: Wrap 1D to 2D Geospatial Format**
+```python
+# Reshape 1D cell array back to 2D raster using spatial index
+raster_2d = np.full((n_rows, n_cols), np.nan)
+raster_2d[row_indices, col_indices] = layer_data  # Map cells to spatial positions
+```
+
+**Step 3: Reproject to EPSG:3857 (Web Mercator)**
+```python
+# Reproject from native CRS (e.g., GDA94) to Web Mercator for Leaflet compatibility
+from rasterio.warp import reproject, Resampling
+
+reprojected_array, transform = reproject(
+    source=raster_2d,
+    src_crs=native_crs,
+    dst_crs='EPSG:3857',
+    resampling=Resampling.nearest
+)
+```
+
+**Step 4: Convert to 4-Band RGBA uint8**
+```python
+# Convert float values to RGBA color using legend mapping
+from luto.tools.report.data_tools import get_map_legend, hex_color_to_numeric
+
+colors = get_map_legend()  # Returns color legend dictionary for all map types
+color_hex = colors['float']['legend']  # Get float value color mapping
+
+# Map float values to RGBA (Red, Green, Blue, Alpha)
+rgba_array = apply_colormap(reprojected_array, color_hex)  # Shape: (height, width, 4), dtype: uint8
+```
+
+**Step 5: Convert RGBA Array to Base64 PNG**
+```python
+# Use helper function to convert 4-band RGBA array to base64-encoded PNG
+from luto.tools.report.data_tools import array_to_base64
+
+result = array_to_base64(rgba_array)  # Returns {'img_str': 'data:image/png;base64,...'}
+img_str = result['img_str']
+```
+
+**Step 6: Apply rename_reorder_hierarchy()**
+```python
+# CRITICAL: Enforce consistent dimension ordering for Vue.js progressive selection
+# Order: am → lm → other → lu (lu must be LAST)
+from luto.tools.report.data_tools import rename_reorder_hierarchy
+
+# Input: dimension selection dict like {'lm': 'dry', 'lu': 'Apples'}
+# Output: Renamed and reordered dict with proper hierarchy
+hierarchy_sel = rename_reorder_hierarchy(sel)
+# Example: {'lm': 'Dryland', 'lu': 'Apples'} (renamed and ordered)
+```
+
+**Step 7: Build Hierarchical JSON Structure**
+```python
+# Use helper function to convert flat tuple-keyed dict to nested structure
+from luto.tools.report.data_tools import tuple_dict_to_nested
+
+# Build flat dictionary with tuple keys
+flat_dict = {}
+for lm in ['ALL', 'dry', 'irr']:
+    for lu in ['ALL', 'Apples', 'Beef', ...]:
+        for year in [2020, 2030, 2050]:
+            # Apply rename_reorder_hierarchy to get consistent ordering
+            sel = rename_reorder_hierarchy({'lm': lm, 'lu': lu})
+
+            # Create tuple key maintaining hierarchy order
+            key = tuple(sel.values()) + (year,)
+            flat_dict[key] = {
+                'img_str': img_str,
+                'bounds': [[lat_min, lon_min], [lat_max, lon_max]],
+                'min_max': [data_min, data_max]
+            }
+
+# Convert flat dict to nested dict
+map_json = tuple_dict_to_nested(flat_dict)
+
+# Save as JSON file
+with open('map_ag_dvar.json', 'w') as f:
+    json.dump(map_json, f)
+```
+
+**Key Attributes in JSON Output**:
+- **img_str**: Base64-encoded PNG string (format: `'data:image/png;base64,...'`)
+- **bounds**: Geographic bounds in EPSG:3857 `[[south, west], [north, east]]`
+- **min_max**: Data value range `[minimum, maximum]` for legend scaling
+
+**Why 'lu' Must Be Last Dimension**:
+The Vue.js reporting interface aggregates chart data at the land use (`lu`) level. By ensuring `lu` is the terminal dimension in the hierarchy, users can:
+1. Select upstream dimensions (category, water, agmgt)
+2. See all available land uses for that selection
+3. Filter both map layers AND chart data by the same `lu` value
+
+This maintains consistency between spatial maps and statistical charts, ensuring synchronized filtering throughout the interactive dashboard.
 
 ## Memory and Performance
 
@@ -381,7 +713,7 @@ All reporting views follow the progressive selection pattern:
   - `map_dvar_Ag`: `Landuse → Year → {img_str, bounds, min_max}` (direct landuse access)
   - `map_dvar_Am`: `AgMgt → Year → {img_str, bounds, min_max}` (direct agmgt access)  
   - `map_dvar_NonAg`: `Landuse → Year → {img_str, bounds, min_max}` (direct landuse access)
-  - `map_dvar_mosaic`: Contains overview categories:
+  - `map_dvar_lumap`: Contains overview categories:
     - `"Land-use"`: `Year → {img_str, bounds, min_max}`
     - `"Water-supply"`: `Year → {img_str, bounds, min_max}` 
     - `"Agricultural Land-use"`: `Year → {img_str, bounds, min_max}`
