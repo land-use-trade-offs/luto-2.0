@@ -348,7 +348,7 @@ def process_GHG_data(json_dir_path):
     json_data = get_json_data_from_zip(json_dir_path, 'GHG_overview_sum.js')
     return return_df_plain(json_data)
 
-def process_bio_obj_data(json_dir_path):
+def process_bio_data(json_dir_path):
     json_data = get_json_data_from_zip(json_dir_path, 'BIO_GBF2_overview_sum.js')
     return return_df_plain(json_data)
 
@@ -362,7 +362,7 @@ def get_report_df(json_dir_path, run_paras):
     df_economy = process_economic_data(json_dir_path)
     df_ghg = process_GHG_data(json_dir_path)
     df_demand_deviation = process_production_deviation_data(json_dir_path)
-    df_bio_pct = process_bio_obj_data(json_dir_path)
+    df_bio_pct = process_bio_data(json_dir_path)
 
     report_df = pd.concat([
         df_area_all_lu.assign(Type='Area_broad_category_ha'),

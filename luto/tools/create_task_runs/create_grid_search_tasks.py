@@ -19,6 +19,7 @@
 
 
 import numpy as np
+import pandas as pd
 from luto.tools.create_task_runs.helpers import (
     get_settings_df,
     get_grid_search_param_df,
@@ -27,7 +28,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20251013_RES5_SACHIN_RUNS" # Do not include the trailing slash (/) in the end of the path
+TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20251017_RES5_SACHIN_RUNS/" 
 
 
 # Set the grid search parameters
@@ -56,8 +57,9 @@ grid_search = {
     
     
     # --------------- Scenarios ---------------
-    'SSP': ['126', '245', '370'],                                          # '126', '245', '370', '585'
+    'SSP': ['126', '245', '370', '585'],                                    # '126', '245', '370', '585'
     'CARBON_EFFECTS_WINDOW': [60],
+    'CO2_FERT': ['off', 'on'],                                             # 'on' or 'off'
     'NON_AG_LAND_USES' : [{
         'Environmental Plantings': True,
         'Riparian Plantings': True,
@@ -90,7 +92,7 @@ grid_search = {
 
 
     # --------------- GHG settings ---------------
-    'GHG_EMISSIONS_LIMITS': ['low', 'high'],                                 # 'off', 'low', 'medium', 'high'
+    'GHG_EMISSIONS_LIMITS': ['medium', 'high'],                                 # 'off', 'low', 'medium', 'high'
     'CARBON_PRICES_FIELD': ['CONSTANT'],
     'GHG_CONSTRAINT_TYPE': ['hard'],                                        # 'hard' or 'soft'
     'USE_GHG_SCOPE_1': [True],                                              # True or False
@@ -106,10 +108,10 @@ grid_search = {
     # --------------- Biodiversity overall ---------------
     'CONTRIBUTION_PERCENTILE': ['USER_DEFINED'],                            # One of [10, 25, 50, 75, 90], or 'USER_DEFINED'              
     'CONNECTIVITY_SOURCE': ['NCI'],
-    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [20, 40],                # Percentage of degraded areas to cut in GBF2 priority areas
     
     # --------------- Biodiversity settings - GBF 2 ---------------
     'BIODIVERSITY_TARGET_GBF_2': ['off', 'high'],                           # 'off', 'low', 'medium', 'high'
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [20, 40],                # Percentage of degraded areas to cut in GBF2 priority areas
     'GBF2_CONSTRAINT_TYPE': ['hard'],                                       # 'hard' or 'soft'
 
     # --------------- Biodiversity settings - GBF 3 ---------------
@@ -133,7 +135,8 @@ grid_search = {
     'DIET_DOM': ['BAU', 'FLX', 'VEG', 'VGN'],                               # 'BAU', 'FLX', 'VEG', 'VGN'
     'DIET_GLOB': ['BAU'],                                                   # 'BAU' or 'FLX'
     'WASTE': [1, 0.5],                                                      # 1 or 0.5
-    'FEED_EFFICIENCY': ['BAU'],                                             # 'BAU' or 'High'
+    'FEED_EFFICIENCY': ['BAU', 'High'],                                     # 'BAU' or 'High'
+    'IMPORT_TREND':['Static', 'Trend'],                                     # 'Static' or 'Trend'
 }
 
 
@@ -143,6 +146,9 @@ duplicate_runs = {
 }
 
 
+
+# valid_df = pd.read_csv("/g/data/jk53/jinzhu/LUTO/Custom_runs/20251017_RES5_SACHIN_RUNS/grid_search_parameters_unique_manual_check.csv")
+# valid_runs =  valid_df['run_idx'].tolist()
 
 
 if __name__ == '__main__':
@@ -162,8 +168,9 @@ if __name__ == '__main__':
     grid_search_param_df = grid_search_param_df[~grid_search_param_df['run_idx'].isin(rm_idx)]
     grid_search_param_df.to_csv(f'{TASK_ROOT_DIR}/grid_search_parameters.csv', index=False)
     print(f'Removed {len(set(rm_idx))} unnecessary runs!')
-    
+
     # Get full settings df
+    grid_search_param_df = grid_search_param_df.query('run_idx in @valid_runs').reset_index(drop=True)
     grid_search_settings_df = get_grid_search_settings_df(TASK_ROOT_DIR, default_settings_df, grid_search_param_df)
 
     # 1) Submit task to a single linux machine, and run simulations parallely

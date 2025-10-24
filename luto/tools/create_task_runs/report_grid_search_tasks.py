@@ -30,7 +30,7 @@ from itertools import cycle
 
 
 # Get the data
-task_root_dir = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20251010_RES5_DIFF_CARBON_WINDOW_AND_DYNAMIC_PRICES/"
+task_root_dir = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20251013_RES5_SACHIN_RUNS/"
 report_data = process_task_root_dirs(task_root_dir).query('region == "AUSTRALIA"').copy()
 print(report_data['Type'].unique())
 

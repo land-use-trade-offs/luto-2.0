@@ -69,7 +69,7 @@ WASTE = 1                           # 1 for full waste, 0.5 for half waste
 FEED_EFFICIENCY = 'BAU'             # 'BAU' or 'High'
 
 # Add CO2 fertilisation effects on agricultural production from GAEZ v4
-CO2_FERT = 'off'   # or 'off'
+CO2_FERT = 'off'   # 'on' or 'off'
 
 # Number of years over which to spread (average) soil carbon accumulation (from Mosnier et al. 2022 and Johnson et al. 2021)
 CARBON_EFFECTS_WINDOW = 50 # 50, 60, 70, 80, or 90 
