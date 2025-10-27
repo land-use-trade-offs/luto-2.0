@@ -30,7 +30,7 @@ sim.run(data=data)
 
 
 # Set up report directory and archive path
-output_dir = pathlib.Path(data.path)
+output_dir = pathlib.Path(data.path).absolute()
 simulation_root = output_dir.parent.parent
 
 run_idx = simulation_root.name

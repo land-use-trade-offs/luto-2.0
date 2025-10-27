@@ -28,7 +28,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20251027_LUF_RES5_YERA5_RUNS/" 
+TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20251028_TEST_RUNS/" 
 
 
 # Set the grid search parameters
@@ -46,8 +46,8 @@ grid_search = {
     # Working settings for the model run
     ###############################################################
     'OBJECTIVE': ['maxprofit'],                                             # 'maxprofit' or 'mincost'
-    'RESFACTOR': [5],
-    'SIM_YEARS': [list(range(2020,2051,5))],                                # Years to run the model 
+    'RESFACTOR': [13],
+    'SIM_YEARS': [list(range(2020,2051,10))],                                # Years to run the model 
     'WRITE_THREADS': [2],
     
  
@@ -167,11 +167,11 @@ if __name__ == '__main__':
     grid_search_param_df.to_csv(f'{TASK_ROOT_DIR}/grid_search_parameters.csv', index=False)
     print(f'Removed {len(set(rm_idx))} unnecessary runs!')
 
-    # Read in valid runs from manual check file
-    valid_runs = pd.read_csv(f'{TASK_ROOT_DIR}/grid_search_parameters_unique_check.csv')['run_idx'].tolist()
+    # # Read in valid runs from manual check file
+    # valid_runs = pd.read_csv(f'{TASK_ROOT_DIR}/grid_search_parameters_unique_check.csv')['run_idx'].tolist()
+    # grid_search_param_df = grid_search_param_df.query('run_idx in @valid_runs').reset_index(drop=True)
     
     # Get full settings df
-    grid_search_param_df = grid_search_param_df.query('run_idx in @valid_runs').reset_index(drop=True)
     grid_search_settings_df = get_grid_search_settings_df(TASK_ROOT_DIR, default_settings_df, grid_search_param_df)
 
     # 1) Submit task to a single linux machine, and run simulations parallely
