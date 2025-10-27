@@ -321,7 +321,7 @@ def process_area_data(files, SAVE_DIR, lu_group, colors_lu_category):
 
 
 def process_economics_data(files, SAVE_DIR):
-    """Process and save economics data (Section 3)."""
+    
     # -------------------- Get the revenue and cost data --------------------
     revenue_ag_df = files.query('base_name == "revenue_ag"').reset_index(drop=True)
     revenue_ag_df = pd.concat([pd.read_csv(path) for path in revenue_ag_df['path']], ignore_index=True)
@@ -1121,7 +1121,7 @@ def process_production_data(files, SAVE_DIR, years):
         out_dict = {'AUSTRALIA': demand_group.to_dict(orient='records')}
 
         filename = f'Production_overview_{_type}'
-        with open(fr'{SAVE_DIR}\{filename}.js', 'w') as f:
+        with open(fr'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')

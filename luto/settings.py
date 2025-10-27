@@ -615,8 +615,9 @@ Essentially, the biodiversity quality layer determines how important (0-100) a c
       related to the Environment Protection and Biodiversity Conservation Act 1999 (EPBC Act). 
     - If choosing one of the 'ECNES_likely|may' layers, you assume that the overal biodiversity is determined by ecological
       communities related to the Environment Protection and Biodiversity Conservation Act 1999 (EPBC Act).
-
-The MNES is a merge (simple concatenating) of the SNES and ECNES species communities. 
+    - If choosing one of the 'MNES_likely|may' layers, you assume that the overal biodiversity is determined by both SNES 
+      and ECNES species communities, where each community is treated as a species, and the Zonation algorith sees each
+      community and species equally important.
 
 To understand the 'Suitability' layer, refer to 
     https://academic.oup.com/gigascience/article/doi/10.1093/gigascience/giae002/7619364
