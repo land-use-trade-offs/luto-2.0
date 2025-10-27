@@ -18,318 +18,165 @@
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
 
-
 import numpy as np
-import plotnine as p9
-
-
-from luto.tools.create_task_runs.helpers import get_hatch_patches, process_task_root_dirs
-from luto.tools.create_task_runs.parameters import HATCH_PATTERNS, PLOT_COL_WIDTH
-from itertools import cycle
-
-
-
-# Get the data
-task_root_dir = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20251024_RES5_YERA5_RUNS/"
-report_data = process_task_root_dirs(task_root_dir).query('region == "AUSTRALIA"').copy()
-print(report_data['Type'].unique())
-
-# if regional adoption constraints is off, set non-ag uniform to off as well
-report_data['REGIONAL_ADOPTION_NON_AG_UNIFORM'] = report_data.apply(
-    lambda x: 'off' if x['REGIONAL_ADOPTION_CONSTRAINTS'] =='off' else x['REGIONAL_ADOPTION_NON_AG_UNIFORM'],
-    axis=1
+import pandas as pd
+from luto.tools.create_task_runs.helpers import (
+    get_settings_df,
+    get_grid_search_param_df,
+    get_grid_search_settings_df, 
+    create_task_runs,
 )
 
-report_data['REGIONAL_ADOPTION_NON_AG_UNIFORM'] = report_data['REGIONAL_ADOPTION_NON_AG_UNIFORM'].astype('category')
+# Define the root dir for the task runs
+TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20251027_SACHI_RES5_YERA5_RUNS_MAIN/" 
 
 
-# Plot settings
-p9.options.figure_size = (12, 6)
-p9.options.dpi = 100
-
-
-# Define grouping hierarchy
-warp_row = 'GHG_EMISSIONS_LIMITS'
-warp_col = 'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT'
-shift_col = 'REGIONAL_ADOPTION_NON_AG_UNIFORM'
-
-# Define jitter and hatch mappings
-# Jitter is to offset bars so they are visible when overlapping
-# Hatch is to add pattern to bars so they are visible when overlapping
-n_shifts = report_data[shift_col].nunique()
-shift_distances = (np.arange(n_shifts) - ((n_shifts) / 2)) * PLOT_COL_WIDTH
-
-jitter_map = dict(zip(report_data[shift_col].sort_values().unique(), shift_distances))
-hatch_map = dict(zip(report_data[shift_col].sort_values().unique(), cycle(HATCH_PATTERNS)))
-
-report_data['jitter_val'] = report_data[shift_col].cat.as_ordered().map(jitter_map)
-report_data['hatch_val'] = report_data[shift_col].map(hatch_map)
-
-# Convert to categorical for plotting order
-report_data[shift_col] = report_data[shift_col].astype('category')
-
-
-####################### Area non-ag #######################
-report_data_area = report_data\
-    .query('Type == "Area_non_ag_lu_ha"')\
-    .eval('value = value / 1e6')\
-    .copy()\
-    .reset_index(drop=True)
-
-p = (
-    p9.ggplot() +
-    p9.geom_col(
-        data=report_data_area,
-        mapping = p9.aes(
-            x='year + jitter_val.astype(float)',
-            y='value',
-            fill='name',
-        ),
-        position='stack',
-        width=( PLOT_COL_WIDTH * 0.85),
-        alpha=0.8
-    ) +
-    p9.facet_wrap(
-        f'~ {warp_col} +{warp_row}',
-        labeller='label_both',
-    ) +
-    p9.theme_bw() +
-    p9.theme(
-        figure_size=(16, 10),
-        subplots_adjust={'wspace': 0.25, 'hspace': 0.25},
-        axis_text_x=p9.element_text(rotation=45, hjust=1),
-        legend_position='right',
-        legend_title=p9.element_text(size=10),
-        legend_text=p9.element_text(size=8),
-        strip_text=p9.element_text(size=8),
-    ) +
-    p9.labs(
-        x='Year',
-        y='Area (million ha)',
-        fill=''
-    )
-)
-
-# Add patches to the base column plot
-get_hatch_patches(p.draw(), report_data_area, warp_col, shift_col)
-
-
-####################### Area ag-mgt #######################
-report_data_area_agmgt = report_data\
-    .query('Type == "Area_ag_man_ha"')\
-    .groupby(['run_idx', warp_row, warp_col, shift_col, 'name', 'hatch_val', 'jitter_val', 'year'], observed=True)\
-    .sum(numeric_only=True)\
-    .reset_index()\
-    .eval('value = value / 1e6')
+# Set the grid search parameters
+grid_search = {
+    ###############################################################
+    # Task run settings for submitting the job to the cluster
+    ###############################################################
+    'MEM': ['60GB'],
+    'NCPUS':[15],
+    'TIME': ['5:00:00'],
+    'QUEUE': ['normalsr'],                                                  # normalsr for CPU, hugemembw for memory intensive jobs
     
-
-p = (
-    p9.ggplot() +
-    p9.geom_col(
-        data=report_data_area_agmgt,
-        mapping = p9.aes(
-            x='year + jitter_val.astype(float)',
-            y='value',
-            fill='name'
-        ),
-        position='stack',
-        width=( PLOT_COL_WIDTH * 0.85),
-        alpha=0.8
-    ) +
-    p9.facet_wrap(
-        f'~ {warp_col} + {warp_row}',
-        labeller='label_both',
-    ) +
-    p9.theme_bw() +
-    p9.theme(
-        figure_size=(16, 10),
-        subplots_adjust={'wspace': 0.25, 'hspace': 0.25},
-        axis_text_x=p9.element_text(rotation=45, hjust=1),
-        legend_position='right',
-        legend_title=p9.element_text(size=10),
-        legend_text=p9.element_text(size=8),
-        strip_text=p9.element_text(size=8),
-    ) +
-    p9.labs(
-        x='Year',
-        y='Area (million ha)',
-        fill=''
-    )
-)
-
-# Add patches to the base column plot
-get_hatch_patches(p.draw(), report_data_area_agmgt, warp_col, shift_col)
-
-
-
-
-
-####################### GHG #######################
-report_data_ghg = report_data\
-    .query('Type == "GHG_tCO2e"')\
-    .eval('value = value / 1e6')\
-    .copy()\
-    .reset_index(drop=True)
-
-report_data_ghg_col = report_data_ghg.query('name not in ["Net emissions", "GHG emission limit"]').copy()
-report_data_ghg_net = report_data_ghg.query('name == "Net emissions"').copy()
-report_data_ghg_limit = report_data_ghg.query('name == "GHG emission limit"').copy()
-
-
-p = (
-    p9.ggplot() +
-    p9.geom_col(
-        data=report_data_ghg_col,
-        mapping = p9.aes(
-            x='year + jitter_val.astype(float)',
-            y='value',
-            fill='name'
-        ),
-        position='stack',
-        width=( PLOT_COL_WIDTH * 0.85),
-        alpha=0.8
-    ) +
-    p9.geom_line(
-        data=report_data_ghg_net,
-        mapping = p9.aes(
-            x='year',
-            y='value',
-            color=shift_col,
-        ),
-    ) +
-    p9.geom_line(
-        data=report_data_ghg_limit,
-        mapping = p9.aes(
-            x='year',
-            y='value',
-            group=shift_col,
-        ),
-    ) +
-    p9.facet_wrap(
-        f'~ {warp_col} + {warp_row}',
-        labeller='label_both',
-    ) +
-    p9.theme_bw() +
-    p9.theme(
-        figure_size=(16, 10),
-        subplots_adjust={'wspace': 0.25, 'hspace': 0.25},
-        axis_text_x=p9.element_text(rotation=45, hjust=1),
-        legend_position='right',
-        legend_title=p9.element_text(size=10),
-        legend_text=p9.element_text(size=8),
-        strip_text=p9.element_text(size=8),
-    ) +
-    p9.labs(
-        x='Year',
-        y='GHG (million tCO2e)',
-        fill=''
-    )
-)
-
-# Add patches to the base column plot
-get_hatch_patches(p.draw(), report_data_ghg_col, warp_col, shift_col)
-
-
-
-
-
-####################### Economics #######################
-report_data_economics = report_data\
-    .query('Type == "Economic_AUD"')\
-    .eval('value = value / 1e9')\
-    .copy()\
-    .reset_index(drop=True)
-
-report_data_economics_col = report_data_economics.query('name != "Profit"').copy()
-report_data_economics_net = report_data_economics.query('name == "Profit"').copy()
-
-p = (
-    p9.ggplot() +
-    p9.geom_col(
-        data=report_data_economics_col,
-        mapping = p9.aes(
-            x='year + jitter_val.astype(float)',
-            y='value',
-            fill='name'
-        ),
-        position='stack',
-        width=( PLOT_COL_WIDTH * 0.85),
-        alpha=0.8
-    ) +
-    p9.geom_line(
-        data=report_data_economics_net,
-        mapping = p9.aes(
-            x='year',
-            y='value',
-            color=shift_col,
-        ),
-    ) +
-    p9.facet_wrap(
-        f'~ {warp_col} + {warp_row}',
-        labeller='label_both',
-    ) +
-    p9.theme_bw() +
-    p9.theme(
-        figure_size=(16, 10),
-        subplots_adjust={'wspace': 0.25, 'hspace': 0.25},
-        axis_text_x=p9.element_text(rotation=45, hjust=1),
-        legend_position='right',
-        legend_title=p9.element_text(size=10),
-        legend_text=p9.element_text(size=8),
-        strip_text=p9.element_text(size=8),
-    ) +
-    p9.labs(
-        x='Year',
-        y='AUD (billion tCO2e)',
-        fill=''
-    )
-)
-
-
-
-# Export to matplotlib to add hatches
-get_hatch_patches(p.draw(), report_data_economics_col, warp_col, shift_col)
-
-
-
-####################### Demand - Percent deviation from target #######################
-demand_deviation = report_data\
-    .query('Type == "Production_deviation_percent"')\
-    .copy()\
-    .reset_index(drop=True)
+ 
+    ###############################################################
+    # Working settings for the model run
+    ###############################################################
+    'OBJECTIVE': ['maxprofit'],                                             # 'maxprofit' or 'mincost'
+    'RESFACTOR': [5],
+    'SIM_YEARS': [list(range(2020,2051,5))],                                # Years to run the model 
+    'WRITE_THREADS': [2],
     
-p = (
-    p9.ggplot() +
-    p9.geom_col(
-        data=demand_deviation,
-        mapping = p9.aes(
-            x='year + jitter_val.astype(float)',
-            y='value',
-            fill='name'
-        ),
-        position='dodge',
-    ) +
-    p9.facet_wrap(
-        f'~ {warp_col} + {warp_row}',
-        labeller='label_both',
-    ) +
-    p9.theme_bw() +
-    p9.theme(
-        figure_size=(16, 10),
-        subplots_adjust={'wspace': 0.25, 'hspace': 0.25},
-        axis_text_x=p9.element_text(rotation=45, hjust=1),
-        legend_position='right',
-        legend_title=p9.element_text(size=10),
-        legend_text=p9.element_text(size=8),
-        strip_text=p9.element_text(size=8),
-    ) +
-    p9.labs(
-        x='Year',
-        y='Percent deviation from target (%)',
-        color=''
-    )
-)
+ 
+    ###############################################################
+    # Model run settings
+    ###############################################################
+    
+    
+    # --------------- Scenarios ---------------
+    'SSP': ['245'],                                                         # '126', '245', '370', '585'
+    'CARBON_EFFECTS_WINDOW': [60],
+    'CO2_FERT': ['off'],                                                    # 'on' or 'off'
+    'AG_YIELD_MULT': [1.0],                                                 # Agricultural yield multiplier for productivity intensification. E.g., 1.1 means 10% increase in yields.
+    'APPLY_DEMAND_MULTIPLIERS': [True],                                     # True or False. Whether to apply demand multipliers from AusTIME model.
+    'NON_AG_LAND_USES' : [{
+        'Environmental Plantings': True,
+        'Riparian Plantings': True,
+        'Sheep Agroforestry': True,
+        'Beef Agroforestry': True,
+        'Carbon Plantings (Block)': False,
+        'Sheep Carbon Plantings (Belt)': False,
+        'Beef Carbon Plantings (Belt)': False,
+        'BECCS': False,
+        'Destocked - natural land': True,
+    }],                                
+    
+    # --------------- Economics ---------------
+    'DYNAMIC_PRICE' : [False],                                              # True or False
+    'BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR': [100],                     # AUD/ha/year       
+    'SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR':[100],                     # AUD/ha/year  
+
+    # --------------- Target deviation weight ---------------
+    'SOLVER_WEIGHT_DEMAND': [1], 
+    'SOLVER_WEIGHT_GHG': [1],
+    'SOLVER_WEIGHT_WATER': [1],
 
 
+    # --------------- Social license ---------------
+    'EXCLUDE_NO_GO_LU': [False],                                            # True or False
+    'REGIONAL_ADOPTION_CONSTRAINTS': ['off'],                               # 'off', 'on', 'NON_AG_UNIFORM'    
+    'REGIONAL_ADOPTION_NON_AG_UNIFORM': [5],                                # Only work under 'NON_AG_UNIFORM'; None or numbers between 0-100 (both inclusive);  E.g., 5 means each non-ag land can not exceed 5% adoption in every region
+    'REGIONAL_ADOPTION_ZONE': ['NRM_CODE'],                                 # One of 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
+
+
+    # --------------- GHG settings ---------------
+    'GHG_EMISSIONS_LIMITS': ['low'],                                        # 'off', 'low', 'high'
+    'CARBON_PRICES_FIELD': ['CONSTANT'],
+    'GHG_CONSTRAINT_TYPE': ['hard'],                                        # 'hard' or 'soft'
+    'USE_GHG_SCOPE_1': [True],                                              # True or False
 
     
+    # --------------- Water constraints ---------------
+    'WATER_REGION_DEF':['Drainage Division'],                               # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
+    'WATER_LIMITS': ['on'],                                                 # 'on' or 'off'
+    'WATER_CONSTRAINT_TYPE': ['hard'],                                      # 'hard' or 'soft'
+    'WATER_PENALTY': [1e-5],
+    'INCLUDE_WATER_LICENSE_COSTS': [1],
+    
+    # --------------- Biodiversity overall ---------------
+    'CONTRIBUTION_PERCENTILE': ['USER_DEFINED'],                            # One of [10, 25, 50, 75, 90], or 'USER_DEFINED'              
+    'CONNECTIVITY_SOURCE': ['NCI'],
+    
+    # --------------- Biodiversity settings - GBF 2 ---------------
+    'BIODIVERSITY_TARGET_GBF_2': ['high'],                                  # 'off', 'low', 'medium', 'high'
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [20],                    # Percentage of degraded areas to cut in GBF2 priority areas
+    'GBF2_CONSTRAINT_TYPE': ['hard'],                                       # 'hard' or 'soft'
+
+    # --------------- Biodiversity settings - GBF 3 ---------------
+    'BIODIVERSITY_TARGET_GBF_3_NVIS': ['off'],                              # 'off', 'medium', 'high', 'USER_DEFINED'
+    
+    # --------------- Biodiversity settings - GBF 4 ---------------
+    'BIODIVERSITY_TARGET_GBF_4_SNES': ['off'],                              # 'on' or 'off'.
+    'BIODIVERSITY_TARGET_GBF_4_ECNES': ['off'],                             # 'on' or 'off'.
+
+    # --------------- Biodiversity settings - GBF 8 ---------------
+    'BIODIVERSITY_TARGET_GBF_8': ['off'],                                   # 'on' or 'off'
+
+    ###############################################################
+    # Scenario settings for the model run
+    ###############################################################
+    'SOLVE_WEIGHT_ALPHA': [1],                                              # between 0 and 1, if 1 will turn off biodiversity objective, if 0 will turn off profit objective
+    'SOLVE_WEIGHT_BETA':  [0.5],         
+    
+    
+    #-------------------- Dietary --------------------
+    'DIET_DOM': ['BAU'],                                                    # 'BAU', 'FLX', 'VEG', 'VGN'
+    'DIET_GLOB': ['BAU'],                                                   # 'BAU' or 'FLX'
+    'WASTE': [1],                                                           # 1 or 0.5
+    'FEED_EFFICIENCY': ['BAU'],                                             # 'BAU' or 'High'
+    'IMPORT_TREND':['Static'],                                              # 'Static' or 'Trend'
+}
+
+
+duplicate_runs = {
+    'REGIONAL_ADOPTION_CONSTRAINTS': ('off', 'REGIONAL_ADOPTION_NON_AG_UNIFORM'),
+    'BIODIVERSITY_TARGET_GBF_2': ('off', 'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT'),
+}
+
+
+
+# valid_df = pd.read_csv("/g/data/jk53/jinzhu/LUTO/Custom_runs/20251024_RES5_YERA5_RUNS/grid_search_parameters_unique_mannual.csv")
+# valid_runs =  valid_df['run_idx'].tolist()
+
+
+if __name__ == '__main__':
+    
+    # Create the grid settings parameters
+    default_settings_df = get_settings_df(TASK_ROOT_DIR)
+    grid_search_param_df = get_grid_search_param_df(grid_search)
+    grid_search_settings_df = get_grid_search_settings_df(TASK_ROOT_DIR, default_settings_df, grid_search_param_df)
+    
+    # Remove unnecessary runs
+    rm_idx = []
+    for idx, row in grid_search_param_df.iterrows():
+        for k, v in duplicate_runs.items():
+            if (row[k] == v[0]) and (str(row[v[1]]) != str(grid_search[v[1]][0])):
+                rm_idx.append(row['run_idx'])
+                
+    grid_search_param_df = grid_search_param_df[~grid_search_param_df['run_idx'].isin(rm_idx)]
+    grid_search_param_df.to_csv(f'{TASK_ROOT_DIR}/grid_search_parameters.csv', index=False)
+    print(f'Removed {len(set(rm_idx))} unnecessary runs!')
+
+    # Get full settings df
+    grid_search_param_df = grid_search_param_df.query('run_idx in @valid_runs').reset_index(drop=True)
+    grid_search_settings_df = get_grid_search_settings_df(TASK_ROOT_DIR, default_settings_df, grid_search_param_df)
+
+    # 1) Submit task to a single linux machine, and run simulations parallely
+    # create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='single', n_workers=min(len(grid_search_param_df), 100))
+
+    # 2) Submit task to multiple linux computation nodes
+    create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='cluster', max_concurrent_tasks = 300)
+

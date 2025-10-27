@@ -28,7 +28,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20251024_RES5_YERA5_RUNS/" 
+TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20251027_SACHI_RES5_YERA5_RUNS_SENSITIVITY/" 
 
 
 # Set the grid search parameters
@@ -57,9 +57,11 @@ grid_search = {
     
     
     # --------------- Scenarios ---------------
-    'SSP': ['245'],                                                         # '126', '245', '370', '585'
+    'SSP': ['126', '370', '585'],                                           # '126', '245', '370', '585'
     'CARBON_EFFECTS_WINDOW': [60],
-    'CO2_FERT': ['off'],                                                    # 'on' or 'off'
+    'CO2_FERT': ['on'],                                                     # 'on' or 'off'
+    'AG_YIELD_MULT': [1.15],                                                # Agricultural yield multiplier for productivity intensification. E.g., 1.1 means 10% increase in yields.
+    'APPLY_DEMAND_MULTIPLIERS': [True],                                     # True or False. Whether to apply demand multipliers from AusTIME model.
     'NON_AG_LAND_USES' : [{
         'Environmental Plantings': True,
         'Riparian Plantings': True,
@@ -73,26 +75,25 @@ grid_search = {
     }],                                
     
     # --------------- Economics ---------------
-    'DYNAMIC_PRICE' : [True],                                               # True or False
-    'BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR': [100],  # AUD/ha/year       
-    'SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR':[100],  # AUD/ha/year  
+    'DYNAMIC_PRICE' : [True],                                              # True or False
+    'BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR': [100],                     # AUD/ha/year       
+    'SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR':[100],                     # AUD/ha/year  
 
     # --------------- Target deviation weight ---------------
     'SOLVER_WEIGHT_DEMAND': [1], 
     'SOLVER_WEIGHT_GHG': [1],
     'SOLVER_WEIGHT_WATER': [1],
-    'SOLVER_WEIGHT_GBF2': [1],
 
 
     # --------------- Social license ---------------
     'EXCLUDE_NO_GO_LU': [False],                                            # True or False
-    'REGIONAL_ADOPTION_CONSTRAINTS': ['off', 'on'],                         # 'off', 'on', 'NON_AG_UNIFORM'    
-    'REGIONAL_ADOPTION_NON_AG_UNIFORM': [5, 10, 15],                        # Only work under 'NON_AG_UNIFORM'; None or numbers between 0-100 (both inclusive);  E.g., 5 means each non-ag land can not exceed 5% adoption in every region
+    'REGIONAL_ADOPTION_CONSTRAINTS': ['off'],                               # 'off', 'on', 'NON_AG_UNIFORM'    
+    'REGIONAL_ADOPTION_NON_AG_UNIFORM': [5],                                # Only work under 'NON_AG_UNIFORM'; None or numbers between 0-100 (both inclusive);  E.g., 5 means each non-ag land can not exceed 5% adoption in every region
     'REGIONAL_ADOPTION_ZONE': ['NRM_CODE'],                                 # One of 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
 
 
     # --------------- GHG settings ---------------
-    'GHG_EMISSIONS_LIMITS': ['low', 'high'],                                # 'off', 'low', 'high'
+    'GHG_EMISSIONS_LIMITS': ['high'],                                        # 'off', 'low', 'high'
     'CARBON_PRICES_FIELD': ['CONSTANT'],
     'GHG_CONSTRAINT_TYPE': ['hard'],                                        # 'hard' or 'soft'
     'USE_GHG_SCOPE_1': [True],                                              # True or False
@@ -111,7 +112,7 @@ grid_search = {
     
     # --------------- Biodiversity settings - GBF 2 ---------------
     'BIODIVERSITY_TARGET_GBF_2': ['high'],                                  # 'off', 'low', 'medium', 'high'
-    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [10, 20, 30, 40],        # Percentage of degraded areas to cut in GBF2 priority areas
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [40],                    # Percentage of degraded areas to cut in GBF2 priority areas
     'GBF2_CONSTRAINT_TYPE': ['hard'],                                       # 'hard' or 'soft'
 
     # --------------- Biodiversity settings - GBF 3 ---------------
@@ -132,9 +133,9 @@ grid_search = {
     
     
     #-------------------- Dietary --------------------
-    'DIET_DOM': ['BAU'],                                                    # 'BAU', 'FLX', 'VEG', 'VGN'
+    'DIET_DOM': ['FLX', 'VEG', 'VGN'],                                      # 'BAU', 'FLX', 'VEG', 'VGN'
     'DIET_GLOB': ['BAU'],                                                   # 'BAU' or 'FLX'
-    'WASTE': [1],                                                           # 1 or 0.5
+    'WASTE': [0.5],                                                           # 1 or 0.5
     'FEED_EFFICIENCY': ['BAU'],                                             # 'BAU' or 'High'
     'IMPORT_TREND':['Static'],                                              # 'Static' or 'Trend'
 }
@@ -147,8 +148,8 @@ duplicate_runs = {
 
 
 
-valid_df = pd.read_csv("/g/data/jk53/jinzhu/LUTO/Custom_runs/20251024_RES5_YERA5_RUNS/grid_search_parameters_unique_mannual.csv")
-valid_runs =  valid_df['run_idx'].tolist()
+# valid_df = pd.read_csv("/g/data/jk53/jinzhu/LUTO/Custom_runs/20251024_RES5_YERA5_RUNS/grid_search_parameters_unique_mannual.csv")
+# valid_runs =  valid_df['run_idx'].tolist()
 
 
 if __name__ == '__main__':

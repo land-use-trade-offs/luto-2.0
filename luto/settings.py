@@ -68,7 +68,9 @@ IMPORT_TREND = 'Static'             # 'Static' (assumes 2010 shares of imports f
 WASTE = 1                           # 1 for full waste, 0.5 for half waste
 FEED_EFFICIENCY = 'BAU'             # 'BAU' or 'High'
 
+# Set the demand and supply multipliers
 APPLY_DEMAND_MULTIPLIERS = True     # True or False. Whether to apply demand multipliers from AusTIME model.
+AG_YIELD_MULT = 1.15                # Agricultural yield multiplier for productivity intensification. E.g., 1.1 means 10% increase in yields.
 
 # Add CO2 fertilisation effects on agricultural production from GAEZ v4
 CO2_FERT = 'off'   # 'on' or 'off'
