@@ -159,7 +159,7 @@ def save2nc(in_xr:xr.DataArray, save_path:str, calc_valid_layers:bool=True):
     
     if calc_valid_layers:
         # Identify valid layers (i.e., layers with non-zero values)
-        valid_df = in_xr.sum(['cell'], skipna=True).to_dataframe('ly_sum').query('abs(ly_sum) > 1e-3')
+        valid_df = in_xr.sum(['cell'], skipna=True).to_dataframe('ly_sum').query('abs(ly_sum) > 1') # layers with abs(sum) <= 1 are ignored in report modules
         loop_sel = valid_df.index.to_frame().to_dict('records')
         in_xr.attrs['valid_layers'] = str(loop_sel)
         
