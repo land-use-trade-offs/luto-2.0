@@ -30,9 +30,17 @@ from itertools import cycle
 
 
 # Get the data
-task_root_dir = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20251013_RES5_SACHIN_RUNS/"
+task_root_dir = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20251024_RES5_YERA5_RUNS/"
 report_data = process_task_root_dirs(task_root_dir).query('region == "AUSTRALIA"').copy()
 print(report_data['Type'].unique())
+
+# if regional adoption constraints is off, set non-ag uniform to off as well
+report_data['REGIONAL_ADOPTION_NON_AG_UNIFORM'] = report_data.apply(
+    lambda x: 'off' if x['REGIONAL_ADOPTION_CONSTRAINTS'] =='off' else x['REGIONAL_ADOPTION_NON_AG_UNIFORM'],
+    axis=1
+)
+
+report_data['REGIONAL_ADOPTION_NON_AG_UNIFORM'] = report_data['REGIONAL_ADOPTION_NON_AG_UNIFORM'].astype('category')
 
 
 # Plot settings
@@ -41,8 +49,9 @@ p9.options.dpi = 100
 
 
 # Define grouping hierarchy
-warp_col = 'DYNAMIC_PRICE'
-shift_col = 'CARBON_EFFECTS_WINDOW'
+warp_row = 'GHG_EMISSIONS_LIMITS'
+warp_col = 'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT'
+shift_col = 'REGIONAL_ADOPTION_NON_AG_UNIFORM'
 
 # Define jitter and hatch mappings
 # Jitter is to offset bars so they are visible when overlapping
@@ -53,12 +62,11 @@ shift_distances = (np.arange(n_shifts) - ((n_shifts) / 2)) * PLOT_COL_WIDTH
 jitter_map = dict(zip(report_data[shift_col].sort_values().unique(), shift_distances))
 hatch_map = dict(zip(report_data[shift_col].sort_values().unique(), cycle(HATCH_PATTERNS)))
 
-report_data['jitter_val'] = report_data[shift_col].map(jitter_map)
+report_data['jitter_val'] = report_data[shift_col].cat.as_ordered().map(jitter_map)
 report_data['hatch_val'] = report_data[shift_col].map(hatch_map)
 
 # Convert to categorical for plotting order
 report_data[shift_col] = report_data[shift_col].astype('category')
-report_data[warp_col] = report_data[warp_col].astype('category')
 
 
 ####################### Area non-ag #######################
@@ -73,18 +81,17 @@ p = (
     p9.geom_col(
         data=report_data_area,
         mapping = p9.aes(
-            x='year + jitter_val',
+            x='year + jitter_val.astype(float)',
             y='value',
-            fill='name'
+            fill='name',
         ),
         position='stack',
         width=( PLOT_COL_WIDTH * 0.85),
         alpha=0.8
     ) +
     p9.facet_wrap(
-        f'~{warp_col}',  
+        f'~ {warp_col} +{warp_row}',
         labeller='label_both',
-        ncol=3
     ) +
     p9.theme_bw() +
     p9.theme(
@@ -110,7 +117,7 @@ get_hatch_patches(p.draw(), report_data_area, warp_col, shift_col)
 ####################### Area ag-mgt #######################
 report_data_area_agmgt = report_data\
     .query('Type == "Area_ag_man_ha"')\
-    .groupby(['run_idx', warp_col, shift_col, 'ag_mgt', 'hatch_val', 'jitter_val', 'year'], observed=True)\
+    .groupby(['run_idx', warp_row, warp_col, shift_col, 'name', 'hatch_val', 'jitter_val', 'year'], observed=True)\
     .sum(numeric_only=True)\
     .reset_index()\
     .eval('value = value / 1e6')
@@ -121,18 +128,17 @@ p = (
     p9.geom_col(
         data=report_data_area_agmgt,
         mapping = p9.aes(
-            x='year + jitter_val',
+            x='year + jitter_val.astype(float)',
             y='value',
-            fill='ag_mgt'
+            fill='name'
         ),
         position='stack',
         width=( PLOT_COL_WIDTH * 0.85),
         alpha=0.8
     ) +
     p9.facet_wrap(
-        f'~{warp_col}',  
+        f'~ {warp_col} + {warp_row}',
         labeller='label_both',
-        ncol=3
     ) +
     p9.theme_bw() +
     p9.theme(
@@ -175,7 +181,7 @@ p = (
     p9.geom_col(
         data=report_data_ghg_col,
         mapping = p9.aes(
-            x='year + jitter_val',
+            x='year + jitter_val.astype(float)',
             y='value',
             fill='name'
         ),
@@ -200,9 +206,8 @@ p = (
         ),
     ) +
     p9.facet_wrap(
-        f'~{warp_col}',  
+        f'~ {warp_col} + {warp_row}',
         labeller='label_both',
-        ncol=3
     ) +
     p9.theme_bw() +
     p9.theme(
@@ -243,7 +248,7 @@ p = (
     p9.geom_col(
         data=report_data_economics_col,
         mapping = p9.aes(
-            x='year + jitter_val',
+            x='year + jitter_val.astype(float)',
             y='value',
             fill='name'
         ),
@@ -260,9 +265,8 @@ p = (
         ),
     ) +
     p9.facet_wrap(
-        f'~{warp_col}',  
+        f'~ {warp_col} + {warp_row}',
         labeller='label_both',
-        ncol=3
     ) +
     p9.theme_bw() +
     p9.theme(
@@ -299,16 +303,15 @@ p = (
     p9.geom_col(
         data=demand_deviation,
         mapping = p9.aes(
-            x='year + jitter_val',
+            x='year + jitter_val.astype(float)',
             y='value',
             fill='name'
         ),
         position='dodge',
     ) +
     p9.facet_wrap(
-        f'~{warp_col}',  
+        f'~ {warp_col} + {warp_row}',
         labeller='label_both',
-        ncol=3
     ) +
     p9.theme_bw() +
     p9.theme(
