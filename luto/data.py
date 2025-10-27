@@ -119,14 +119,14 @@ class Data:
         self.obj_vals = {}
 
         print('')
-        print(f'Beginning data initialisation at RES{settings.RESFACTOR}...')
+        print(f'Data Initialization at RES{settings.RESFACTOR}')
 
         self.YR_CAL_BASE = 2010  # The base year, i.e. where year index yr_idx == 0.
 
         ###############################################################
         # Masking and spatial coarse graining.
         ###############################################################
-        print("\tSetting up masking and spatial course graining data...", flush=True)
+        print("├── Setting up masking and spatial course graining data", flush=True)
 
         # Set resfactor multiplier
         self.RESMULT = settings.RESFACTOR ** 2
@@ -177,7 +177,7 @@ class Data:
         ###############################################################
         # Load agricultural crop and livestock economic and yield data.
         ###############################################################
-        print("\tLoading agricultural crop and livestock data...", flush=True)
+        print("├── Loading agricultural crop and livestock data", flush=True)
         self.AGEC_CROPS = pd.read_hdf(os.path.join(settings.INPUT_DIR, "agec_crops.h5"), where=self.MASK)
         self.AGEC_LVSTK = pd.read_hdf(os.path.join(settings.INPUT_DIR, "agec_lvstk.h5"), where=self.MASK)
         
@@ -190,7 +190,7 @@ class Data:
         ###############################################################
         # Set up lists of land-uses, commodities etc.
         ###############################################################
-        print("\tSetting up lists of land uses, commodities, etc...", flush=True)
+        print("├── Setting up lists of land uses, commodities, etc.", flush=True)
 
         # Read in lexicographically ordered list of land-uses.
         self.AGRICULTURAL_LANDUSES = pd.read_csv((os.path.join(settings.INPUT_DIR, 'ag_landuses.csv')), header = None)[0].to_list()
@@ -378,7 +378,7 @@ class Data:
         ###############################################################
         # Spatial layers.
         ###############################################################
-        print("\tSetting up spatial layers data...", flush=True)
+        print("├── Setting up spatial layers data", flush=True)
 
         # Actual hectares per cell, including projection corrections.
         self.REAL_AREA_NO_RESFACTOR = pd.read_hdf(os.path.join(settings.INPUT_DIR, "real_area.h5")).to_numpy()
@@ -423,7 +423,7 @@ class Data:
         ###############################################################
         # Climate change impact data.
         ###############################################################
-        print("\tLoading climate change data...", flush=True)
+        print("├── Loading climate change data", flush=True)
 
         self.CLIMATE_CHANGE_IMPACT = pd.read_hdf(
             os.path.join(settings.INPUT_DIR, "climate_change_impacts_" + settings.RCP + "_CO2_FERT_" + settings.CO2_FERT.upper() + ".h5"), where=self.MASK
@@ -444,7 +444,7 @@ class Data:
         ###############################################################
         # No-Go areas; Regional adoption constraints.
         ###############################################################
-        print("\tLoading no-go areas and regional adoption zones...", flush=True)
+        print("├── Loading no-go areas and regional adoption zones", flush=True)
    
         ##################### No-go areas
         self.NO_GO_LANDUSE_AG = []
@@ -522,7 +522,7 @@ class Data:
             ) if len(self.REGIONAL_ADOPTION_TARGETS) > 0 else np.array([])
 
             if len(lost_zones) > 0:
-                print(f" 	    WARNING: {len(lost_zones)} regional adoption zones have no cells due to (RES{settings.RESFACTOR}). Please check if this is expected.")
+                print(f"│   ⚠ WARNING: {len(lost_zones)} regional adoption zones have no cells due to (RES{settings.RESFACTOR}). Please check if this is expected.", flush=True)
                 self.REGIONAL_ADOPTION_TARGETS = self.REGIONAL_ADOPTION_TARGETS.query(f"{settings.REGIONAL_ADOPTION_ZONE} not in {list(lost_zones)}").reset_index(drop=True)
                 
             
@@ -532,7 +532,7 @@ class Data:
         ###############################################################
         # Livestock related data.
         ###############################################################
-        print("\tLoading livestock related data...", flush=True)
+        print("├── Loading livestock related data", flush=True)
 
         self.FEED_REQ = np.nan_to_num(
             pd.read_hdf(os.path.join(settings.INPUT_DIR, "feed_req.h5"), where=self.MASK).to_numpy()
@@ -552,7 +552,7 @@ class Data:
         ###############################################################
         # Agricultural Management options data.
         ###############################################################
-        print("\tLoading agricultural management options' data...", flush=True)
+        print("├── Loading agricultural management options' data", flush=True)
 
         # Asparagopsis taxiformis data
         asparagopsis_file = os.path.join(settings.INPUT_DIR, "20250415_Bundle_MR.xlsx")
@@ -675,7 +675,7 @@ class Data:
         ###############################################################
         # Productivity data.
         ###############################################################
-        print("\tLoading productivity data...", flush=True)
+        print("├── Loading productivity data", flush=True)
 
         # Yield increases.
         fpath = os.path.join(settings.INPUT_DIR, "yieldincreases_bau2022.csv")
@@ -688,7 +688,7 @@ class Data:
         # Auxiliary Spatial Layers
         # (spatial layers not required for production calculation)
         ###############################################################
-        print("\tLoading auxiliary spatial layers data...", flush=True)
+        print("├── Loading auxiliary spatial layers data", flush=True)
 
         # Load stream length data in metres of stream per cell
         self.STREAM_LENGTH = pd.read_hdf(
@@ -709,7 +709,7 @@ class Data:
         ###############################################################
         # Additional agricultural GHG data.
         ###############################################################
-        print("\tLoading additional agricultural GHG data...", flush=True)
+        print("├── Loading additional agricultural GHG data", flush=True)
 
 
         # Load greenhouse gas emissions from agriculture
@@ -733,7 +733,7 @@ class Data:
         ###############################################################
         # Non-agricultural data.
         ###############################################################
-        print("\tLoading non-agricultural data...", flush=True)
+        print("├── Loading non-agricultural data", flush=True)
 
         # Load plantings economic data
         self.EP_EST_COST_HA = pd.read_hdf(os.path.join(settings.INPUT_DIR, "ep_est_cost_ha.h5"), where=self.MASK).to_numpy(dtype=np.float32)
@@ -869,7 +869,7 @@ class Data:
         ###############################################################
         # Water data.
         ###############################################################
-        print("\tLoading water data...", flush=True)
+        print("├── Loading water data", flush=True)
         
         # Initialize water constraints to avoid recalculating them every time.
         self.WATER_YIELD_LIMITS = None
@@ -958,7 +958,7 @@ class Data:
         ###############################################################
         # Carbon sequestration by natural lands.
         ###############################################################
-        print("\tLoading carbon sequestration by natural lands data...", flush=True)
+        print("├── Loading carbon sequestration by natural lands data", flush=True)
 
         '''
         ['NATURAL_LAND_AGB_TCO2_HA']
@@ -985,7 +985,7 @@ class Data:
         self.AG_MAN_L_MRJ_DICT = get_base_am_vars(self.NCELLS, self.NLMS, self.N_AG_LUS)
         self.add_ag_man_dvars(self.YR_CAL_BASE, self.AG_MAN_L_MRJ_DICT)
         
-        print(f"\tCalculating base year productivity...", flush=True)
+        print("├── Calculating base year productivity", flush=True)
         yr_cal_base_prod_data = self.get_production()        
         self.add_production_data(self.YR_CAL_BASE, "Production", yr_cal_base_prod_data)
         
@@ -1002,7 +1002,7 @@ class Data:
         ###############################################################
         # Demand data.
         ###############################################################
-        print("\tLoading demand data...", flush=True)
+        print("├── Loading demand data", flush=True)
         
         # Load demand multiplier data
         AusTIME_multipliers = pd.read_excel(
@@ -1059,9 +1059,9 @@ class Data:
         self.DEMAND_C = self.DEMAND_DATA.loc[self.DEMAND_DATA.query("COMMODITY not in @settings.OFF_LAND_COMMODITIES").index, 'PRODUCTION'].copy()
 
         if settings.APPLY_DEMAND_MULTIPLIERS:
-            print('The years before applying demand multipliers:', self.DEMAND_C.columns.min(), self.DEMAND_C.columns.max(), flush=True)
+            print(f"│   ├── Years before applying demand multipliers: {self.DEMAND_C.columns.min()} - {self.DEMAND_C.columns.max()}", flush=True)
             self.DEMAND_C = (self.DEMAND_C *  demand_multipliers).dropna(axis=1)
-            print("The years after applying demand multipliers:", self.DEMAND_C.columns.min(), self.DEMAND_C.columns.max(), flush=True)
+            print(f"│   └── Years after applying demand multipliers: {self.DEMAND_C.columns.min()} - {self.DEMAND_C.columns.max()}", flush=True)
         
         # Convert to numpy array of shape (91, 26)
         self.D_CY = self.DEMAND_C.to_numpy(dtype = np.float32).T
@@ -1087,7 +1087,7 @@ class Data:
         ###############################################################
         # Carbon emissions from off-land commodities.
         ###############################################################
-        print("\tLoading off-land commodities' carbon emissions data...", flush=True)
+        print("├── Loading off-land commodities' carbon emissions data", flush=True)
 
         # Read the greenhouse gas intensity data
         off_land_ghg_intensity = pd.read_csv(f'{settings.INPUT_DIR}/agGHG_lvstk_off_land.csv')
@@ -1136,7 +1136,7 @@ class Data:
         ###############################################################
         # GHG targets data.
         ###############################################################
-        print("\tLoading GHG targets data...", flush=True)
+        print("├── Loading GHG targets data", flush=True)
         if settings.GHG_EMISSIONS_LIMITS != 'off':
             self.GHG_TARGETS = pd.read_excel(
                 os.path.join(settings.INPUT_DIR, "GHG_targets.xlsx"), sheet_name="Data", index_col="YEAR"
@@ -1148,7 +1148,7 @@ class Data:
         ###############################################################
         # Savanna burning data.
         ###############################################################
-        print("\tLoading savanna burning data...", flush=True)
+        print("├── Loading savanna burning data", flush=True)
 
         # Read in the dataframe
         savburn_df = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'cell_savanna_burning.h5'), where=self.MASK)
@@ -1171,7 +1171,7 @@ class Data:
         # Biodiversity priority conservation data. (GBF Target 2)
         ###############################################################
         
-        print("\tLoading biodiversity data...", flush=True)
+        print("├── Loading biodiversity data", flush=True)
         """
         Kunming-Montreal Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
         Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
@@ -1220,7 +1220,7 @@ class Data:
             case 'USER_DEFINED':
                 bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')['USER_DEFINED'].to_dict()
             case _:
-                print(f"WARNING!! Invalid habitat condition source: {settings.CONTRIBUTION_PERCENTILE}, must be one of [10, 25, 50, 75, 90], or 'USER_DEFINED'")
+                print(f"│   ⚠ WARNING: Invalid habitat condition source: {settings.CONTRIBUTION_PERCENTILE}, must be one of [10, 25, 50, 75, 90], or 'USER_DEFINED'", flush=True)
         
         self.BIO_HABITAT_CONTRIBUTION_LOOK_UP = {j: round(x, settings.ROUND_DECMIALS) for j, x in bio_HCAS_contribution_lookup.items()}                 # Round to the specified decimal places to avoid numerical issues in the GUROBI solver
         
@@ -1263,7 +1263,7 @@ class Data:
         # GBF3 biodiversity data. (NVIS and IBRA)
         ###############################################################
         if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off':
-            print("\tLoading GBF3 vegetation data (NVIS)...", flush=True)
+            print("│   ├── Loading GBF3 vegetation data (NVIS)", flush=True)
 
             # Read in the pre-1750 statistics and targets
             nvis_targets_df = pd.read_excel(
@@ -1326,7 +1326,7 @@ class Data:
 
 
         if settings.BIODIVERSITY_TARGET_GBF_3_IBRA != 'off':
-            print("\tLoading GBF3 bioregional data (IBRA)...", flush=True)
+            print("│   ├── Loading GBF3 bioregional data (IBRA)", flush=True)
 
             # Read in the pre-1750 statistics and targets
             ibra_targets_df = pd.read_excel(
@@ -1394,7 +1394,7 @@ class Data:
         ##########################################################################
         if settings.BIODIVERSITY_TARGET_GBF_4_SNES != 'off':
 
-            print("\tLoading environmental significance data (SNES)...", flush=True)
+            print("│   ├── Loading environmental significance data (SNES)", flush=True)
             
             # Read in the species data from DCCEEW National Environmental Significance (noted as GBF-4)
             BIO_GBF4_SNES_score = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF4_TARGET_SNES.csv').sort_values(by='SCIENTIFIC_NAME', ascending=True)
@@ -1414,8 +1414,9 @@ class Data:
 
             likely_maybe_union = set(self.BIO_GBF4_SNES_LIKELY_SEL).intersection(self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL)
             if likely_maybe_union:
-                print(f"\tWARNING: {len(likely_maybe_union)} duplicate SNE species targets found, using 'LIKELY' targets only:")
-                [print(f"    {idx+1}) {name}") for idx, name in enumerate(likely_maybe_union)]
+                print(f"│   │   ⚠ WARNING: {len(likely_maybe_union)} duplicate SNE species targets found, using 'LIKELY' targets only:", flush=True)
+                for idx, name in enumerate(likely_maybe_union):
+                    print(f"│   │       ├── {idx+1}) {name}", flush=True)
                 self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL = list(set(self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL) - likely_maybe_union)
                 
             self.BIO_GBF4_SNES_SEL_ALL = self.BIO_GBF4_SNES_LIKELY_SEL + self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL
@@ -1431,7 +1432,7 @@ class Data:
         
         
         if settings.BIODIVERSITY_TARGET_GBF_4_SNES != 'off':
-            print("\tLoading environmental significance data (ECNES)...", flush=True)
+            print("│   ├── Loading environmental significance data (ECNES)", flush=True)
         
         
             BIO_GBF4_ECNES_score = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF4_TARGET_ECNES.csv').sort_values(by='COMMUNITY', ascending=True)
@@ -1451,8 +1452,9 @@ class Data:
   
             likely_maybe_union = set(self.BIO_GBF4_ECNES_LIKELY_SEL).intersection(self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL)
             if likely_maybe_union:
-                print(f"\tWARNING: {len(likely_maybe_union)} duplicate ECNES species targets found, using 'LIKELY' targets only:")
-                [print(f"    {idx+1}) {name}") for idx, name in enumerate(likely_maybe_union)]
+                print(f"│   │   ⚠ WARNING: {len(likely_maybe_union)} duplicate ECNES species targets found, using 'LIKELY' targets only:", flush=True)
+                for idx, name in enumerate(likely_maybe_union):
+                    print(f"│   │       ├── {idx+1}) {name}", flush=True)
                 self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL = list(set(self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL) - likely_maybe_union)
                  
             self.BIO_GBF4_ECNES_SEL_ALL = self.BIO_GBF4_ECNES_LIKELY_SEL + self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL
@@ -1474,7 +1476,7 @@ class Data:
         
         if settings.BIODIVERSITY_TARGET_GBF_8 != 'off':
             
-            print("\tLoading Species suitability data...", flush=True)
+            print("│   ├── Loading Species suitability data", flush=True)
             
             # Read in the species data from Carla Archibald (noted as GBF-8)
             BIO_GBF8_SPECIES_raw = xr.open_dataset(f'{settings.INPUT_DIR}/bio_GBF8_ssp{settings.SSP}_EnviroSuit.nc', chunks={'year':1,'species':1})['data']        
@@ -1502,7 +1504,7 @@ class Data:
         ###############################################################
         # BECCS data.
         ###############################################################
-        print("\tLoading BECCS data...", flush=True)
+        print("└── Loading BECCS data", flush=True)
 
         # Load dataframe
         beccs_df = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'cell_BECCS_df.h5'), where=self.MASK)
@@ -1755,7 +1757,7 @@ class Data:
         self.WATERSHED_DISAPPEARING = [self.WATER_REGION_NAMES[i] for i in set(self.WATER_REGION_NAMES.keys()) - set(valid_watershed_id)]
         
         if self.WATERSHED_DISAPPEARING:
-            print(f"    WARNING! {len(self.WATERSHED_DISAPPEARING)} river regions are disappearing due to using high resolution factors.")
+            print(f"│   ⚠ WARNING: {len(self.WATERSHED_DISAPPEARING)} river regions are disappearing due to using high resolution factors.", flush=True)
             [print(f"       - {list(i)}") for i in np.array_split(self.WATERSHED_DISAPPEARING, len(self.WATERSHED_DISAPPEARING)//3)]
             self.WATER_REGION_NAMES = {k: v for k, v in self.WATER_REGION_NAMES.items() if k in valid_watershed_id}
             self.WATER_REGION_HIST_LEVEL = {k: v for k, v in self.WATER_REGION_HIST_LEVEL.items() if k in valid_watershed_id}
