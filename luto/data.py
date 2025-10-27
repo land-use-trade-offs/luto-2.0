@@ -516,15 +516,14 @@ class Data:
             ]
             
             # Check missing zones due to high resfactor
-            if len(self.REGIONAL_ADOPTION_TARGETS) > 0:
-                lost_zones = np.setdiff1d(
-                    self.REGIONAL_ADOPTION_TARGETS[settings.REGIONAL_ADOPTION_ZONE].unique(),
-                    np.unique(self.REGIONAL_ADOPTION_ZONES)
-                )
-                
-                if len(lost_zones) > 0:
-                    print(f" 	    WARNING: {len(lost_zones)} regional adoption zones have no cells due to (RES{settings.RESFACTOR}). Please check if this is expected.")
-                    self.REGIONAL_ADOPTION_TARGETS = self.REGIONAL_ADOPTION_TARGETS.query(f"{settings.REGIONAL_ADOPTION_ZONE} not in {list(lost_zones)}").reset_index(drop=True)
+            lost_zones = np.setdiff1d(
+                self.REGIONAL_ADOPTION_TARGETS[settings.REGIONAL_ADOPTION_ZONE].unique(),
+                np.unique(self.REGIONAL_ADOPTION_ZONES)
+            ) if len(self.REGIONAL_ADOPTION_TARGETS) > 0 else np.array([])
+
+            if len(lost_zones) > 0:
+                print(f" 	    WARNING: {len(lost_zones)} regional adoption zones have no cells due to (RES{settings.RESFACTOR}). Please check if this is expected.")
+                self.REGIONAL_ADOPTION_TARGETS = self.REGIONAL_ADOPTION_TARGETS.query(f"{settings.REGIONAL_ADOPTION_ZONE} not in {list(lost_zones)}").reset_index(drop=True)
                 
             
 
