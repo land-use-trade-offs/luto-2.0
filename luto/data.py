@@ -118,6 +118,7 @@ class Data:
         self.prod_data = {}
         self.obj_vals = {}
 
+        print('')
         print(f'Data Initialization at RES{settings.RESFACTOR}')
 
         self.YR_CAL_BASE = 2010  # The base year, i.e. where year index yr_idx == 0.
