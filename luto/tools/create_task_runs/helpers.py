@@ -390,7 +390,7 @@ def process_task_root_dirs(task_root_dir, n_workers=10):
         run_paras = grid_search_params.query(f'run_idx == {int(run_idx)}').to_dict(orient='records')[0]
 
         # Depending on output structure, the report can be found in different places
-        json_dir_path = os.path.join(task_root_dir, run_dir, 'Run_Archive.zip')
+        json_dir_path = os.path.join(task_root_dir, 'Report_Data', f'Run_{run_idx}.zip')
         if not os.path.exists(json_dir_path):
             print(f'Warning: No output found for {run_dir}, skipping...')
             continue

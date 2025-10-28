@@ -49,10 +49,11 @@ with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as run_zip,\
         files = [f for f in files if f != 'Run_Archive.zip']  # Exclude existing zip files
         for file in files:
             abs_path = pathlib.Path(root) / file 
-            zip_path = abs_path.relative_to(simulation_root)
             if 'DATA_REPORT' in abs_path.as_posix():
+                zip_path = abs_path.relative_to(output_dir)
                 report_zip.write(abs_path, arcname=zip_path)
             else:
+                zip_path = abs_path.relative_to(simulation_root)
                 run_zip.write(abs_path, arcname=zip_path)
 
 
