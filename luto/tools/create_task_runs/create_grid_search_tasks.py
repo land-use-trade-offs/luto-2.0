@@ -28,7 +28,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20251028_TEST_RUNS/"
+TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20251027_SACHI_RES5_YERA5_RUNS/"
 
 
 # Set the grid search parameters
@@ -148,17 +148,14 @@ duplicate_runs = {
 
 
 
-# valid_df = pd.read_csv("/g/data/jk53/jinzhu/LUTO/Custom_runs/20251024_RES5_YERA5_RUNS/grid_search_parameters_unique_mannual.csv")
-# valid_runs =  valid_df['run_idx'].tolist()
-
 
 if __name__ == '__main__':
     
     # Create the grid settings parameters
     default_settings_df = get_settings_df(TASK_ROOT_DIR)
     grid_search_param_df = get_grid_search_param_df(grid_search)
-    grid_search_settings_df = get_grid_search_settings_df(TASK_ROOT_DIR, default_settings_df, grid_search_param_df)
-    
+
+
     # Remove unnecessary runs
     rm_idx = []
     for idx, row in grid_search_param_df.iterrows():
@@ -169,6 +166,10 @@ if __name__ == '__main__':
     grid_search_param_df = grid_search_param_df[~grid_search_param_df['run_idx'].isin(rm_idx)]
     grid_search_param_df.to_csv(f'{TASK_ROOT_DIR}/grid_search_parameters.csv', index=False)
     print(f'Removed {len(set(rm_idx))} unnecessary runs!')
+    
+    # Get valid runs
+    valid_runs = pd.read_csv(f"{TASK_ROOT_DIR}/grid_search_parameters_unique_check.csv")['run_idx'].tolist()
+
 
     # Get full settings df
     grid_search_param_df = grid_search_param_df.query('run_idx in @valid_runs').reset_index(drop=True)
