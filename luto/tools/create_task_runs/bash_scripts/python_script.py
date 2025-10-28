@@ -50,7 +50,6 @@ with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as run_zip,\
         for file in files:
             abs_path = pathlib.Path(root) / file 
             zip_path = abs_path.relative_to(simulation_root)
-            print(f'Archiving {abs_path} to {zip_path}')
             if 'DATA_REPORT' in abs_path.as_posix():
                 report_zip.write(abs_path, arcname=zip_path)
             else:
