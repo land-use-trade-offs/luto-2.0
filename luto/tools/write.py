@@ -274,9 +274,9 @@ def write_dvar_and_mosaic_map(data: Data, yr_cal, path):
     save2nc(am_map_cat, os.path.join(path, f'xr_dvar_am_{yr_cal}.nc'))
 
     # Write landuse mosaic map
-    lumap_xr_ALL= xr.DataArray(data.lumaps[yr_cal], dims=['cell'], coords={'cell': range(data.NCELLS)})
-    lumap_xr_dry = xr.DataArray(np.where(~lm_map, lumap_xr_ALL, np.nan), dims=['cell'], coords={'cell': range(data.NCELLS)})
-    lumap_xr_irr = xr.DataArray(np.where(lm_map, lumap_xr_ALL, np.nan), dims=['cell'], coords={'cell': range(data.NCELLS)})
+    lumap_xr_ALL= xr.DataArray(data.lumaps[yr_cal].astype(np.float32), dims=['cell'], coords={'cell': range(data.NCELLS)})
+    lumap_xr_dry = xr.DataArray(np.where(~lm_map, lumap_xr_ALL, np.nan).astype(np.float32), dims=['cell'], coords={'cell': range(data.NCELLS)})
+    lumap_xr_irr = xr.DataArray(np.where(lm_map, lumap_xr_ALL, np.nan).astype(np.float32), dims=['cell'], coords={'cell': range(data.NCELLS)})
     
     lumap_xr = xr.concat([
         lumap_xr_ALL.expand_dims(lm=['ALL']),
@@ -369,9 +369,9 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
     ag_man_X_mrj_xr = tools.am_mrj_to_xr(data, ag_man_X_mrj).chunk({'cell': min(4096, data.NCELLS)})
 
 
-    # Convert LU2PR and PR2CM to xr.DataArray 
+    # Convert LU2PR and PR2CM to xr.DataArray
     lu2pr_xr = xr.DataArray(
-        data.LU2PR.astype(bool),
+        data.LU2PR.astype(np.float32),
         dims=['product', 'lu'],
         coords={
             'product': data.PRODUCTS,
@@ -380,7 +380,7 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
     )
 
     pr2cm_xr = xr.DataArray(
-        data.PR2CM.astype(bool),
+        data.PR2CM.astype(np.float32),
         dims=['Commodity', 'product'],
         coords={
             'Commodity': data.COMMODITIES,
@@ -390,7 +390,7 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
 
     # Get commodity matrices
     ag_q_mrp_xr = xr.DataArray(
-        ag_quantity.get_quantity_matrices(data, yr_idx),
+        ag_quantity.get_quantity_matrices(data, yr_idx).astype(np.float32),
         dims=['lm','cell','product'],
         coords={
             'lm': data.LANDMANS,
@@ -402,7 +402,7 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
     )
 
     non_ag_crk_xr = xr.DataArray(
-        non_ag_quantity.get_quantity_matrix(data, ag_q_mrp_xr, lumap),
+        non_ag_quantity.get_quantity_matrix(data, ag_q_mrp_xr, lumap).astype(np.float32),
         dims=['Commodity', 'cell', 'lu'],
         coords={
             'Commodity': data.COMMODITIES,
@@ -414,7 +414,7 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
     )
 
     ag_man_q_mrp_xr = xr.DataArray(
-        np.stack(list(ag_quantity.get_agricultural_management_quantity_matrices(data, ag_q_mrp_xr, yr_idx).values())),
+        np.stack(list(ag_quantity.get_agricultural_management_quantity_matrices(data, ag_q_mrp_xr, yr_idx).values())).astype(np.float32),
         dims=['am', 'lm', 'cell', 'product'],
         coords={
             'am': data.AG_MAN_DESC,
@@ -532,7 +532,7 @@ def write_revenue_cost_ag(data: Data, yr_cal, path):
     # Convert the ag_rev_rjms and ag_cost_rjms to xarray DataArray, 
     # and assign region names to the cell dimension
     ag_rev_rjms = xr.DataArray(
-            ag_rev_rjms,
+            ag_rev_rjms.astype(np.float32),
             dims=['cell', 'lu', 'lm', 'source'],
             coords={
                 'cell': range(data.NCELLS),
@@ -544,7 +544,7 @@ def write_revenue_cost_ag(data: Data, yr_cal, path):
             region = ('cell', data.REGION_NRM_NAME),
         )
     ag_cost_rjms = xr.DataArray(
-            ag_cost_rjms,
+            ag_cost_rjms.astype(np.float32),
             dims=['cell', 'lu', 'lm', 'source'],
             coords={
                 'cell': range(data.NCELLS),
@@ -799,7 +799,7 @@ def write_transition_cost_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         ag_transitions_cost_mat = ag_transitions.get_transition_matrices_ag2ag_from_base_year(data, yr_idx, yr_cal_sim_pre, separate=True)
         
     ag_transitions_cost_mat = xr.DataArray(
-        np.stack(list(ag_transitions_cost_mat.values())),
+        np.stack(list(ag_transitions_cost_mat.values())).astype(np.float32),
         coords={
             'Type': list(ag_transitions_cost_mat.keys()),
             'To water-supply': data.LANDMANS,
@@ -873,7 +873,7 @@ def write_transition_cost_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None
             non_ag_transitions_flat[(lu, source)] = arr
             
     non_ag_transitions_flat = xr.DataArray(
-        np.stack(list(non_ag_transitions_flat.values())),
+        np.stack(list(non_ag_transitions_flat.values())).astype(np.float32),
         coords={
             'lu_source': pd.MultiIndex.from_tuples(
                 list(non_ag_transitions_flat.keys()),
@@ -1009,7 +1009,7 @@ def write_dvar_area(data: Data, yr_cal, path):
 
     
     # Calculate the real area in hectares
-    real_area_r = xr.DataArray(data.REAL_AREA, dims=['cell'], coords={'cell': range(data.NCELLS)})
+    real_area_r = xr.DataArray(data.REAL_AREA.astype(np.float32), dims=['cell'], coords={'cell': range(data.NCELLS)})
 
     area_ag = (ag_dvar_mrj * real_area_r)
     area_non_ag = (non_ag_rj * real_area_r)
@@ -1095,7 +1095,7 @@ def write_area_transition_start_end(data: Data, path, yr_cal_end):
     # Get the end year
     yr_cal_start = data.YR_CAL_BASE
 
-    real_area_r = xr.DataArray(data.REAL_AREA, dims=['cell'], coords={'cell': range(data.NCELLS)})
+    real_area_r = xr.DataArray(data.REAL_AREA.astype(np.float32), dims=['cell'], coords={'cell': range(data.NCELLS)})
 
     # Get the decision variables for the start year
     ag_dvar_base_mrj = tools.ag_mrj_to_xr(data, tools.lumap2ag_l_mrj(data.lumaps[yr_cal_start], data.lmmaps[yr_cal_start])
@@ -1400,7 +1400,7 @@ def write_ghg_separate(data: Data, yr_cal, path):
         yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1]
         ghg_t_dict = ag_ghg.get_ghg_transition_emissions(data, data.lumaps[yr_cal_sim_pre], separate=True)
         ghg_t_smrj = xr.DataArray(
-            np.stack(list(ghg_t_dict.values()), axis=0),
+            np.stack(list(ghg_t_dict.values()), axis=0).astype(np.float32),
             dims=['Type', 'lm', 'cell', 'lu'],
             coords={
                 'Type': list(ghg_t_dict.keys()),
@@ -1479,12 +1479,12 @@ def write_water(data: Data, yr_cal, path):
         
     # Get water target and domestic use
     w_limit_inside_luto = xr.DataArray(
-        list(data.WATER_YIELD_TARGETS.values()),
+        np.array(list(data.WATER_YIELD_TARGETS.values()), dtype=np.float32),
         dims=['region_water'],
         coords={'region_water': list(data.WATER_YIELD_TARGETS.keys())}
     )
     domestic_water_use = xr.DataArray(
-        list(data.WATER_USE_DOMESTIC.values()),
+        np.array(list(data.WATER_USE_DOMESTIC.values()), dtype=np.float32),
         dims=['region_water'],
         coords={'region_water': list(data.WATER_USE_DOMESTIC.keys())}
     )
@@ -1564,7 +1564,7 @@ def write_water(data: Data, yr_cal, path):
 
     # ------------------------------- Get water yield outside LUTO study region -----------------------------------
     wny_outside_luto_study_area = xr.DataArray(
-        list(data.WATER_OUTSIDE_LUTO_BY_CCI.loc[data.YR_CAL_BASE].to_dict().values()),
+        np.array(list(data.WATER_OUTSIDE_LUTO_BY_CCI.loc[data.YR_CAL_BASE].to_dict().values()), dtype=np.float32),
         dims=['region_water'],
         coords={'region_water': list(data.WATER_REGION_INDEX_R.keys())},
     )
@@ -1611,8 +1611,8 @@ def write_water(data: Data, yr_cal, path):
         .groupby('Region')[['Water Net Yield (ML)']]\
         .sum()
     wny_inside_luto_sum = xr.DataArray(
-        wny_inside_luto_sum['Water Net Yield (ML)'].values, 
-        dims=['region_water'], 
+        wny_inside_luto_sum['Water Net Yield (ML)'].values.astype(np.float32),
+        dims=['region_water'],
         coords={'region_water': [region2code[i] for i in wny_inside_luto_sum.index.values]}
     )
     wny_watershed_sum = wny_inside_luto_sum + wny_outside_luto_study_area - domestic_water_use  # CCI delta already include in the wny_inside_luto_sum
@@ -1843,24 +1843,24 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
     
     # Get the priority degraded areas score
     priority_degraded_area_score_r = xr.DataArray(
-        GBF2_MASK_area_ha,
+        GBF2_MASK_area_ha.astype(np.float32),
         dims=['cell'],
         coords={'cell':range(data.NCELLS)}
     )
 
     # Get the impacts of each ag/non-ag/am to vegetation matrices
     ag_impact_j = xr.DataArray(
-        ag_biodiversity.get_ag_biodiversity_contribution(data),
+        ag_biodiversity.get_ag_biodiversity_contribution(data).astype(np.float32),
         dims=['lu'],
         coords={'lu':data.AGRICULTURAL_LANDUSES}
     )
     non_ag_impact_k = xr.DataArray(
-        list(non_ag_biodiversity.get_non_ag_lu_biodiv_contribution(data).values()),
+        np.array(list(non_ag_biodiversity.get_non_ag_lu_biodiv_contribution(data).values()), dtype=np.float32),
         dims=['lu'],
         coords={'lu':data.NON_AGRICULTURAL_LANDUSES}
     )
     am_impact_ajr = xr.DataArray(
-        np.stack([arr for _, v in ag_biodiversity.get_ag_management_biodiversity_contribution(data, yr_cal).items() for arr in v.values()]),
+        np.stack([arr for _, v in ag_biodiversity.get_ag_management_biodiversity_contribution(data, yr_cal).items() for arr in v.values()]).astype(np.float32),
         dims=['idx', 'cell'],
         coords={
             'idx': pd.MultiIndex.from_tuples(am_lu_unpack, names=['am', 'lu']),
@@ -1996,24 +1996,24 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
     
     # Get vegetation matrices for the year
     vegetation_score_vr = xr.DataArray(
-        ag_biodiversity.get_GBF3_NVIS_matrices_vr(data),
+        ag_biodiversity.get_GBF3_NVIS_matrices_vr(data).astype(np.float32),
         dims=['group','cell'],
         coords={'group':list(data.BIO_GBF3_NVIS_ID2DESC.values()),  'cell':range(data.NCELLS)}
     ).chunk({'cell': min(1024, data.NCELLS), 'group': 1})
 
     # Get the impacts of each ag/non-ag/am to vegetation matrices
     ag_impact_j = xr.DataArray(
-        ag_biodiversity.get_ag_biodiversity_contribution(data),
+        ag_biodiversity.get_ag_biodiversity_contribution(data).astype(np.float32),
         dims=['lu'],
         coords={'lu':data.AGRICULTURAL_LANDUSES}
     )
     non_ag_impact_k = xr.DataArray(
-        list(non_ag_biodiversity.get_non_ag_lu_biodiv_contribution(data).values()),
+        np.array(list(non_ag_biodiversity.get_non_ag_lu_biodiv_contribution(data).values()), dtype=np.float32),
         dims=['lu'],
         coords={'lu':data.NON_AGRICULTURAL_LANDUSES}
     )
     am_impact_amr = xr.DataArray(
-        np.stack([arr for _, v in ag_biodiversity.get_ag_management_biodiversity_contribution(data, yr_cal).items() for arr in v.values()]),
+        np.stack([arr for _, v in ag_biodiversity.get_ag_management_biodiversity_contribution(data, yr_cal).items() for arr in v.values()]).astype(np.float32),
         dims=['idx', 'cell'],
         coords={
             'idx': pd.MultiIndex.from_tuples(am_lu_unpack, names=['am', 'lu']),
@@ -2156,24 +2156,24 @@ def write_biodiversity_GBF3_IBRA_scores(data: Data, yr_cal: int, path) -> None:
 
     # Get IBRA bioregion matrices for the year
     bioregion_score_vr = xr.DataArray(
-        ag_biodiversity.get_GBF3_IBRA_matrices_vr(data),
+        ag_biodiversity.get_GBF3_IBRA_matrices_vr(data).astype(np.float32),
         dims=['group','cell'],
         coords={'group':list(data.BIO_GBF3_IBRA_ID2DESC.values()),  'cell':range(data.NCELLS)}
     ).chunk({'cell': min(1024, data.NCELLS), 'group': 1})
 
     # Get the impacts of each ag/non-ag/am to bioregion matrices
     ag_impact_j = xr.DataArray(
-        ag_biodiversity.get_ag_biodiversity_contribution(data),
+        ag_biodiversity.get_ag_biodiversity_contribution(data).astype(np.float32),
         dims=['lu'],
         coords={'lu':data.AGRICULTURAL_LANDUSES}
     )
     non_ag_impact_k = xr.DataArray(
-        list(non_ag_biodiversity.get_non_ag_lu_biodiv_contribution(data).values()),
+        np.array(list(non_ag_biodiversity.get_non_ag_lu_biodiv_contribution(data).values()), dtype=np.float32),
         dims=['lu'],
         coords={'lu':data.NON_AGRICULTURAL_LANDUSES}
     )
     am_impact_amr = xr.DataArray(
-        np.stack([arr for _, v in ag_biodiversity.get_ag_management_biodiversity_contribution(data, yr_cal).items() for arr in v.values()]),
+        np.stack([arr for _, v in ag_biodiversity.get_ag_management_biodiversity_contribution(data, yr_cal).items() for arr in v.values()]).astype(np.float32),
         dims=['idx', 'cell'],
         coords={
             'idx': pd.MultiIndex.from_tuples(am_lu_unpack, names=['am', 'lu']),
@@ -2314,24 +2314,24 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
     
     # Get the biodiversity scores for the year
     bio_snes_sr = xr.DataArray(
-        ag_biodiversity.get_GBF4_SNES_matrix_sr(data),
+        ag_biodiversity.get_GBF4_SNES_matrix_sr(data).astype(np.float32),
         dims=['species','cell'],
         coords={'species':data.BIO_GBF4_SNES_SEL_ALL, 'cell':np.arange(data.NCELLS)}
     )
 
     # Apply habitat contribution from ag/am/non-ag land-use to biodiversity scores
     ag_impact_j = xr.DataArray(
-        ag_biodiversity.get_ag_biodiversity_contribution(data),
+        ag_biodiversity.get_ag_biodiversity_contribution(data).astype(np.float32),
         dims=['lu'],
         coords={'lu':data.AGRICULTURAL_LANDUSES}
     )
     non_ag_impact_k = xr.DataArray(
-        list(non_ag_biodiversity.get_non_ag_lu_biodiv_contribution(data).values()),
+        np.array(list(non_ag_biodiversity.get_non_ag_lu_biodiv_contribution(data).values()), dtype=np.float32),
         dims=['lu'],
         coords={'lu':data.NON_AGRICULTURAL_LANDUSES}
     )
     am_impact_amr = xr.DataArray(
-        np.stack([arr for _, v in ag_biodiversity.get_ag_management_biodiversity_contribution(data, yr_cal).items() for arr in v.values()]),
+        np.stack([arr for _, v in ag_biodiversity.get_ag_management_biodiversity_contribution(data, yr_cal).items() for arr in v.values()]).astype(np.float32),
         dims=['idx', 'cell'],
         coords={
             'idx': pd.MultiIndex.from_tuples(am_lu_unpack, names=['am', 'lu']),
@@ -2475,24 +2475,24 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
     
     # Get the biodiversity scores for the year
     bio_ecnes_sr = xr.DataArray(
-        ag_biodiversity.get_GBF4_ECNES_matrix_sr(data),
+        ag_biodiversity.get_GBF4_ECNES_matrix_sr(data).astype(np.float32),
         dims=['species','cell'],
         coords={'species':data.BIO_GBF4_ECNES_SEL_ALL, 'cell':np.arange(data.NCELLS)}
     ).chunk({'cell': min(1024, data.NCELLS), 'species': 1})
 
     # Apply habitat contribution from ag/am/non-ag land-use to biodiversity scores
     ag_impact_j = xr.DataArray(
-        ag_biodiversity.get_ag_biodiversity_contribution(data),
+        ag_biodiversity.get_ag_biodiversity_contribution(data).astype(np.float32),
         dims=['lu'],
         coords={'lu':data.AGRICULTURAL_LANDUSES}
     )
     non_ag_impact_k = xr.DataArray(
-        list(non_ag_biodiversity.get_non_ag_lu_biodiv_contribution(data).values()),
+        np.array(list(non_ag_biodiversity.get_non_ag_lu_biodiv_contribution(data).values()), dtype=np.float32),
         dims=['lu'],
         coords={'lu': data.NON_AGRICULTURAL_LANDUSES}
     )
     am_impact_amr = xr.DataArray(
-        np.stack([arr for _, v in ag_biodiversity.get_ag_management_biodiversity_contribution(data, yr_cal).items() for arr in v.values()]),
+        np.stack([arr for _, v in ag_biodiversity.get_ag_management_biodiversity_contribution(data, yr_cal).items() for arr in v.values()]).astype(np.float32),
         dims=['idx', 'cell'],
         coords={
             'idx': pd.MultiIndex.from_tuples(am_lu_unpack, names=['am', 'lu']),
@@ -2634,7 +2634,7 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
 
     # Get biodiversity scores for selected species
     bio_scores_sr = xr.DataArray(
-        data.get_GBF8_bio_layers_by_yr(yr_cal, level='group') * data.REAL_AREA[None,:],
+        (data.get_GBF8_bio_layers_by_yr(yr_cal, level='group') * data.REAL_AREA[None,:]).astype(np.float32),
         dims=['group','cell'],
         coords={
             'group': data.BIO_GBF8_GROUPS_NAMES,
@@ -2643,17 +2643,17 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
 
     # Get the habitat contribution for ag/non-ag/am land-use to biodiversity scores
     ag_impact_j = xr.DataArray(
-        ag_biodiversity.get_ag_biodiversity_contribution(data),
+        ag_biodiversity.get_ag_biodiversity_contribution(data).astype(np.float32),
         dims=['lu'],
         coords={'lu':data.AGRICULTURAL_LANDUSES}
     )
     non_ag_impact_k = xr.DataArray(
-        list(non_ag_biodiversity.get_non_ag_lu_biodiv_contribution(data).values()),
+        np.array(list(non_ag_biodiversity.get_non_ag_lu_biodiv_contribution(data).values()), dtype=np.float32),
         dims=['lu'],
         coords={'lu': data.NON_AGRICULTURAL_LANDUSES}
     )
     am_impact_amr = xr.DataArray(
-        np.stack([arr for _, v in ag_biodiversity.get_ag_management_biodiversity_contribution(data, yr_cal).items() for arr in v.values()]),
+        np.stack([arr for _, v in ag_biodiversity.get_ag_management_biodiversity_contribution(data, yr_cal).items() for arr in v.values()]).astype(np.float32),
         dims=['idx', 'cell'],
         coords={
             'idx': pd.MultiIndex.from_tuples(am_lu_unpack, names=['am', 'lu']),
@@ -2798,7 +2798,7 @@ def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
 
     # Get biodiversity scores for selected species
     bio_scores_sr = xr.DataArray(
-        data.get_GBF8_bio_layers_by_yr(yr_cal, level='species') * data.REAL_AREA[None, :],
+        (data.get_GBF8_bio_layers_by_yr(yr_cal, level='species') * data.REAL_AREA[None, :]).astype(np.float32),
         dims=['species', 'cell'],
         coords={
             'species': data.BIO_GBF8_SEL_SPECIES,
@@ -2807,17 +2807,17 @@ def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
 
     # Get the habitat contribution for ag/non-ag/am land-use to biodiversity scores
     ag_impact_j = xr.DataArray(
-        ag_biodiversity.get_ag_biodiversity_contribution(data),
+        ag_biodiversity.get_ag_biodiversity_contribution(data).astype(np.float32),
         dims=['lu'],
         coords={'lu':data.AGRICULTURAL_LANDUSES}
     )
     non_ag_impact_k = xr.DataArray(
-        list(non_ag_biodiversity.get_non_ag_lu_biodiv_contribution(data).values()),
+        np.array(list(non_ag_biodiversity.get_non_ag_lu_biodiv_contribution(data).values()), dtype=np.float32),
         dims=['lu'],
         coords={'lu': data.NON_AGRICULTURAL_LANDUSES}
     )
     am_impact_amr = xr.DataArray(
-        np.stack([arr for _, v in ag_biodiversity.get_ag_management_biodiversity_contribution(data, yr_cal).items() for arr in v.values()]),
+        np.stack([arr for _, v in ag_biodiversity.get_ag_management_biodiversity_contribution(data, yr_cal).items() for arr in v.values()]).astype(np.float32),
         dims=['idx', 'cell'],
         coords={
             'idx': pd.MultiIndex.from_tuples(am_lu_unpack, names=['am', 'lu']),
