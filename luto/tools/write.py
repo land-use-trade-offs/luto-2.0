@@ -102,7 +102,7 @@ def write_data(data: Data):
     num_jobs = (min(len(jobs), settings.WRITE_THREADS) if settings.PARALLEL_WRITE else 1)
 
     # Execute jobs in parallel and print outputs as they complete
-    for out in Parallel(n_jobs=num_jobs, return_as='generator')(jobs):
+    for out in Parallel(n_jobs=num_jobs, return_as='generator_unordered')(jobs):
         print(out)
 
 

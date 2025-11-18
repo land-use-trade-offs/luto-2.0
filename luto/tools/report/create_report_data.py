@@ -117,7 +117,7 @@ def save_report_data(raw_data_dir:str):
 
     # Execute jobs in parallel
     num_jobs = len(jobs)
-    results = list(Parallel(n_jobs=num_jobs, return_as='generator')(jobs))
+    results = list(Parallel(n_jobs=num_jobs, return_as='generator_unordered')(jobs))
     for i, out in enumerate(results):
         if i < len(results) - 1:
             print(f"│   ├── {out}")

@@ -145,7 +145,7 @@ def get_map2json(
             
     # Gather results and save to JSON
     output = {}
-    for res in Parallel(n_jobs=workers, return_as='generator')(tasks):
+    for res in Parallel(n_jobs=workers, return_as='generator_unordered')(tasks):
         hierarchy_tp, val_dict = res
         output[hierarchy_tp] = val_dict
         

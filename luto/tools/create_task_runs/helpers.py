@@ -239,7 +239,7 @@ def create_task_runs(
     
     # Run the tasks in parallel
     tasks = [delayed(task_wraper)(col) for col in custom_settings.columns]
-    for result in tqdm(Parallel(n_jobs=n_workers, return_as='generator')(tasks), total=len(tasks)):
+    for result in tqdm(Parallel(n_jobs=n_workers, return_as='generator_unordered')(tasks), total=len(tasks)):
         pass
 
 
@@ -399,7 +399,7 @@ def process_task_root_dirs(task_root_dir, n_workers=10):
         
     # Concatenate the results, only keep the columns with more than 1 unique value
     out_df = pd.concat(
-        tqdm(Parallel(n_jobs=n_workers, return_as='generator')(tasks), total=len(tasks)), 
+        tqdm(Parallel(n_jobs=n_workers, return_as='generator_unordered')(tasks), total=len(tasks)), 
         ignore_index=True
     )
     
