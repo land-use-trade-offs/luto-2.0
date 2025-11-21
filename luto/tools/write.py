@@ -771,7 +771,6 @@ def write_revenue_cost_non_ag(data: Data, yr_cal, path):
 def write_transition_cost_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     """Calculate transition cost."""
 
-    
     simulated_year_list = sorted(list(data.lumaps.keys()))
     yr_idx = yr_cal - data.YR_CAL_BASE
 
@@ -808,26 +807,87 @@ def write_transition_cost_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         }
     )
 
+    # Compute in chunks and aggregate to DataFrame; This is to reduce memory usage
     cost_xr = ag_dvar_mrj_base * ag_dvar_mrj_target * ag_transitions_cost_mat
-    cost_df_region = cost_xr.groupby('region'
-        ).sum(dim='cell'
-        ).to_dataframe('Cost ($)'
-        ).reset_index(
-        ).assign(Year=yr_cal
-        ).query('abs(`Cost ($)`) > 0')
-    cost_df_AUS = cost_xr.sum(dim='cell'
-        ).to_dataframe('Cost ($)'
-        ).reset_index(
-        ).assign(Year=yr_cal, region='AUSTRALIA'
-        ).query('abs(`Cost ($)`) > 0')
-    cost_df = pd.concat([cost_df_AUS, cost_df_region]).reset_index(drop=True)
-                
+    
+    chunk_size = min(1024, data.NCELLS)
+    cost_dfs = []
+    for i in range(0, data.NCELLS, chunk_size):
+        
+         
+        # Get the cell slice for this chunk
+        end_idx = min(i + chunk_size, data.NCELLS)
+        cell_slice = slice(i, end_idx)
 
-    # Save the cost DataFrames
+        # Select and compute this chunk
+        chunk_xr = cost_xr.isel(cell=cell_slice)
+
+        # Process the chunk
+        cost_df_region = chunk_xr.groupby('region'
+            ).sum(dim='cell'
+            ).to_dataframe('Cost ($)'
+            ).reset_index(
+            ).assign(Year=yr_cal
+            ).query('abs(`Cost ($)`) > 0')
+        cost_df_AUS = chunk_xr.sum(dim='cell'
+            ).to_dataframe('Cost ($)'
+            ).reset_index(
+            ).assign(Year=yr_cal, region='AUSTRALIA'
+            ).query('abs(`Cost ($)`) > 0')
+
+        cost_dfs.append(pd.concat([cost_df_AUS, cost_df_region], ignore_index=True))
+        
+
+    # Combine all chunks and re-aggregate (in case same region appears in multiple chunks)
+    cost_df = pd.concat(cost_dfs, ignore_index=True)\
+        .groupby(['region', 'Type', 'From water-supply', 'From land-use', 'To water-supply', 'To land-use', 'Year'],  dropna=False
+        )['Cost ($)'].sum(
+        ).reset_index(
+        ).query('abs(`Cost ($)`) > 0')
+
+    # Extract valid transitions BEFORE replacing dry/irr (must match xarray coords)
+    valid_transitions = pd.MultiIndex.from_frame(
+        cost_df[['Type', 'From water-supply', 'From land-use', 'To water-supply', 'To land-use']]
+        .drop_duplicates()
+        .reset_index(drop=True)
+    )
+
+    # Stack the xarray to prepare for filtering
+    cost_xr_stacked = cost_xr.stack({
+        'transition': ['Type', 'From water-supply', 'From land-use','To water-supply', 'To land-use']
+    })
+
+    # Now replace for CSV output
     cost_df = cost_df.replace({'dry':'Dryland', 'irr':'Irrigated'})
     cost_df.to_csv(os.path.join(path, f'cost_transition_ag2ag_{yr_cal}.csv'), index=False)
+
+    # Create valid_layers_info with human-readable names for reporting
+    valid_layers_info = cost_df[[
+        'Type', 'From water-supply', 'From land-use', 'To water-supply', 'To land-use']
+    ].drop_duplicates().to_dict('records')
+
+    cost_xr_filtered = cost_xr_stacked.sel(transition=valid_transitions)
+
+    # Materialize the filtered array by looping through chunks
+    cost_xr_filtered_array = xr.DataArray(
+        np.empty((len(valid_transitions), data.NCELLS), dtype=np.float32),
+        coords={
+            'transition': valid_transitions,
+            'cell': range(data.NCELLS)
+        }
+    )
     
-    save2nc(cost_xr, os.path.join(path, f'xr_cost_transition_ag2ag_{yr_cal}.nc'))
+    for i in range(0, data.NCELLS, chunk_size):
+        end_idx = min(i + chunk_size, data.NCELLS)
+        cell_slice = slice(i, end_idx)
+        cost_xr_filtered_array[:, cell_slice] = cost_xr_filtered.isel(cell=cell_slice).compute()
+        
+
+
+    # Save the compact filtered array
+    cost_xr_filtered_array.attrs['valid_layers'] = str(valid_layers_info)
+    cost_xr_filtered_array.attrs['min_max'] = (float(cost_df['Cost ($)'].min()), float(cost_df['Cost ($)'].max()))
+    save2nc(cost_xr_filtered_array, os.path.join(path, f'xr_cost_transition_ag2ag_{yr_cal}.nc'), calc_valid_layers=False)
 
     return f"Agricultural to agricultural transition cost written for year {yr_cal}"
 
