@@ -103,7 +103,7 @@ luto/                                    # Main package directory
 input/                                   # Input data directory (requires separate download)
 output/                                  # Simulation outputs with interactive HTML reports
 docs/                                    # Documentation files
-requirements.txt                         # Python package dependencies
+requirements.toml                        # Python package dependencies (conda environment spec)
 pyproject.toml                           # Project configuration
 ```
 
@@ -158,8 +158,8 @@ cd luto-2.0
 ### 2. Set Up Environment
 
 ```bash
-# Create and activate the LUTO environment
-conda env create -f luto/tools/create_task_runs/bash_scripts/conda_env.yml
+# Create and activate the LUTO environment from requirements.toml
+conda env create -f requirements.toml
 conda activate luto
 ```
 
@@ -282,7 +282,7 @@ LUTO2 behavior can be customized through the `luto.settings` module. Key paramet
 - `VERBOSE`: Control solver output verbosity
 
 ### Output Control
-- `PARALLEL_WRITE`: Use parallel processing for output generation
+- `WRITE_PARALLEL`: Use parallel processing for output generation
 - `RESFACTOR`: Spatial resolution factor (1 = full resolution, >1 = coarser)
 
 Refer to `luto/settings.py` for a complete list of configurable parameters and detailed descriptions.

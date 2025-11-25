@@ -6,12 +6,11 @@ This document covers environment setup, common commands, and configuration param
 
 ### Environment Creation
 ```bash
-# Create and activate conda environment
-conda env create -f luto/tools/create_task_runs/bash_scripts/conda_env.yml
+# Create and activate conda environment from requirements.toml
+conda env create -f requirements.toml
 conda activate luto
 
-# Install additional pip dependencies (gurobipy, numpy_financial, tables)
-pip install gurobipy==11.0.2 numpy_financial==1.0.0 tables==3.9.2
+# Note: All dependencies including gurobipy, numpy_financial, and tables are included in requirements.toml
 ```
 
 ### GUROBI License
