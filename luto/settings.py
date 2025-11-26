@@ -165,8 +165,13 @@ the model sensitive to variations in input data.
 # ---------------------------------------------------------------------------- #
 # Geographical raster writing parameters
 # ---------------------------------------------------------------------------- #
-PARALLEL_WRITE = True                       # If to use parallel processing to write GeoTiffs: True or False
-WRITE_THREADS = min(4, os.cpu_count())     # The Threads to use for map making, only work with PARALLEL_WRITE = True
+WRITE_PARALLEL = True                       # If to use parallel processing to write GeoTiffs: True or False
+WRITE_THREADS = min(4, os.cpu_count())      # The Threads to use for map making, only work with WRITE_PARALLEL = True
+WRITE_CHUNK_SIZE = 1024                     # The processing size of each chunk during writeing process. 
+                                            #   E.g., layer of ~200 k cells (under chunk size of 1024) will create ~200 chunks.
+                                            #   This makes memory usage to be ~1/200 of the original size.
+
+
 
 # ---------------------------------------------------------------------------- #
 # Gurobi parameters

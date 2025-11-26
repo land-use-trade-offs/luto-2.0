@@ -23,14 +23,11 @@
 Pure helper functions and other tools.
 """
 
-import gc
 import sys
 import os.path
-import threading
 import time
 import traceback
 import functools
-import tracemalloc
 
 import pandas as pd
 import numpy as np
@@ -680,101 +677,3 @@ def log_memory_usage(output_dir=settings.OUTPUT_DIR, mode='a', interval=1, stop_
             file.flush()
             time.sleep(interval)
 
-
-# Enhanced memory monitoring helper functions            
-memory_log = []
-monitoring = False
-monitor_thread = None
-baseline_memory = 0  # Store the baseline memory at start
-
-def monitor_memory(interval=0.01):
-    """
-    Memory monitoring focused on Working Set delta from baseline.
-    Runs in a thread, logs memory usage every `interval` seconds.
-    """
-    process = psutil.Process(os.getpid())
-    
-    while monitoring:
-        try:
-            memory_info = process.memory_info()
-            
-            # Check if working set is available and use consistently
-            has_wset = hasattr(memory_info, 'wset')
-            
-            if has_wset:
-                current_wset_mb = memory_info.wset / 1024 ** 2
-            else:
-                current_wset_mb = memory_info.rss / 1024 ** 2
-            
-            # Calculate delta from baseline
-            delta_mb = current_wset_mb - baseline_memory
-            
-            # Store delta memory info
-            memory_log.append({
-                'time': time.time(),
-                'wset_mb': current_wset_mb,
-                'delta_mb': delta_mb
-            })
-            
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
-            break
-            
-        time.sleep(interval)
-
-def start_memory_monitor():
-    """
-    Start Working Set memory monitoring with baseline measurement.
-    Clears previous logs and starts monitoring from current memory usage.
-    """
-    global monitoring, monitor_thread, baseline_memory
-    
-    # Clear previous log
-    memory_log.clear()
-    
-    # Force garbage collection to get clean baseline
-    gc.collect()
-    
-    # Get baseline memory usage
-    process = psutil.Process(os.getpid())
-    memory_info = process.memory_info()
-    
-    has_wset = hasattr(memory_info, 'wset')
-    if has_wset:
-        baseline_memory = memory_info.wset / 1024 ** 2
-    else:
-        baseline_memory = memory_info.rss / 1024 ** 2
-        
-    # Start monitoring
-    monitoring = True
-    monitor_thread = threading.Thread(target=monitor_memory, daemon=True)
-    monitor_thread.start()
-    
-    print("Delta memory monitoring started")
-
-def stop_memory_monitor():
-    """
-    Stop memory monitoring and return delta analysis.
-    Returns a plot showing only the incremental memory usage.
-    """
-    global monitoring
-    
-    monitoring = False
-    if monitor_thread:
-        monitor_thread.join()
-    
-    if not memory_log:
-        print("No memory data collected")
-        return None
-    
-    # Convert to DataFrame
-    df = pd.DataFrame(memory_log)
-    df['Time'] = df['time'] - df['time'].min()
-
-    # Delta memory plot (main focus)
-    plt.plot(df['Time'], df['delta_mb'])
-    plt.xlabel('Time (s)')
-    plt.ylabel('Delta Memory (MB)')
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
-    
-    return plt
