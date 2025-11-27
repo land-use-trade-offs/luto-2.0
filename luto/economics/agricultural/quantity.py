@@ -17,20 +17,73 @@
 # You should have received a copy of the GNU General Public License along with
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
-
-
 """
-Pure functions for calculating the production quantities of agricutlural commodities.
+Pure functions for calculating the production quantities of agricultural commodities.
 """
-
-
 import numpy as np
 import luto.settings as settings
 
 from typing import Dict
 from scipy.interpolate import interp1d
 
+### Quantification of electricity yields from renewable energy land management strategies ###
+from luto.data import load_capacity_factor_raster, load_dlf_raster
 
+MGMT_TO_PRODUCT = {
+    "Utility Solar PV": "UTILITY SOLAR PV - ELECTRICITY",
+    "Onshore Wind": "ONSHORE WIND - ELECTRICITY"
+}
+
+MGMT_CONFIG = {
+    "Utility Solar PV": {"gd": 150},  # in MW/km^2 as per data
+    "Onshore Wind": {"gd": 7.2}
+}
+
+def compute_solar_yield_per_ha(cf_raster, dlf_raster, mw_per_ha):
+    """
+    Compute Utility Solar PV electricity yield per cell [MWh/ha/year].
+    """
+    hours = 8760
+    return mw_per_ha * cf_raster * hours * (1 - dlf_raster)
+
+def compute_wind_yield_per_ha(cf_raster, dlf_raster, mw_per_ha):
+    """
+    Compute Onshore Wind electricity yield per cell [MWh/ha/year].
+    """
+    hours = 8760
+    return mw_per_ha * cf_raster * hours * (1 - dlf_raster)
+
+def get_quantity_renewable(data, pr: str, lm: int, yr_idx: int):
+    """
+    Return electricity yield [MWh] for renewable product `pr` under management index `lm` for year index `yr_idx`.
+    """
+    if pr not in ["UTILITY SOLAR PV - ELECTRICITY", "ONSHORE WIND - ELECTRICITY"]:
+        raise KeyError(f"Unknown renewable product '{pr}'")
+
+    tech_name = data.LANDMANS[lm]
+    if "solar" in tech_name.lower():
+        lm_name = "Utility Solar PV"
+    elif "wind" in tech_name.lower():
+        lm_name = "Onshore Wind"
+    else:
+        raise KeyError(f"Unknown management type '{tech_name}' for renewable")
+
+    cf = load_capacity_factor_raster(lm, data)
+    dlf = load_dlf_raster(lm, data)
+
+    mw_per_ha = MGMT_CONFIG[lm_name]["gd"] / 100  # Convert MW/km^2 to MW/ha
+
+    if lm_name == "Utility Solar PV":
+        yield_per_ha = compute_solar_yield_per_ha(cf, dlf, mw_per_ha)
+    elif lm_name == "Onshore Wind":
+        yield_per_ha = compute_wind_yield_per_ha(cf, dlf, mw_per_ha)
+    else:
+        raise KeyError(f"Unknown land management name '{lm_name}' for renewable yield")
+
+    quantity = yield_per_ha * data.REAL_AREA
+    return quantity.astype(np.float32)
+
+#Main function to pull yield raster for a given management type
 def lvs_veg_types(lu) -> tuple[str, str]:
     """Return livestock and vegetation types of the livestock land-use `lu`.
 
@@ -66,7 +119,7 @@ def lvs_veg_types(lu) -> tuple[str, str]:
     return lvstype, vegtype
 
 
-
+# Climate change impact function
 def get_ccimpact(data, lu, lm, yr_idx):
     """
     Return climate change impact multiplier at (zero-based) year index.
@@ -255,7 +308,6 @@ def get_quantity_crop(data, pr, lm, yr_idx):
 
     return quantity
 
-
 def get_quantity(data, pr, lm, yr_idx):
     """Return yield <unit: t/cell> of `pr`+`lm` in `yr_idx` as 1D Numpy array.
 
@@ -279,10 +331,10 @@ def get_quantity(data, pr, lm, yr_idx):
     # If it is a crop, it is known how to get the quantities.
     if pr in data.PR_CROPS:
         q = get_quantity_crop(data, pr.capitalize(), lm, yr_idx)
-
     elif pr in data.PR_LVSTK:
         q = get_quantity_lvstk(data, pr, lm, yr_idx)
-
+    elif pr in ["UTILITY SOLAR PV - ELECTRICITY", "ONSHORE WIND - ELECTRICITY"]:
+        q = get_quantity_renewable(data, pr, lm, yr_idx)
     else:
         raise KeyError(f"Land use '{pr}' not found in data.")
 
@@ -561,6 +613,54 @@ def get_sheep_hir_effect_q_mrp(data, q_mrp):
 
     return q_mrp_effect
 
+def get_utility_solar_pv_effect_q_mrj(data, q_mrj, yr_idx):
+    """
+    Applies the effects of Utility Solar PV to the quantity data
+    for all relevant agricultural land uses.
+    """
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Utility Solar PV']
+    lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
+    yr_cal = data.YR_CAL_BASE + yr_idx
+
+    # Set up the effects matrix
+    new_q_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    if not settings.AG_MANAGEMENTS['Utility Solar PV']:
+        return new_q_mrj
+
+    # Update values in the new matrix using the correct multiplier for each LU
+    for lu_idx, lu in enumerate(land_uses):
+        productivity_multiplier = data.UTILITY_SOLAR_PV_DATA[lu].loc[yr_cal, 'Productivity']
+        if productivity_multiplier != 1:
+            j = lu_codes[lu_idx]
+            new_q_mrj[:, :, lu_idx] = q_mrj[:, :, j] * (productivity_multiplier - 1)
+
+    return new_q_mrj
+
+
+def get_onshore_wind_effect_q_mrj(data, q_mrj, yr_idx):
+    """
+    Applies the effects of Onshore Wind to the quantity data
+    for all relevant agricultural land uses.
+    """
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Onshore Wind']
+    lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
+    yr_cal = data.YR_CAL_BASE + yr_idx
+
+    # Set up the effects matrix
+    new_q_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    if not settings.AG_MANAGEMENTS['Onshore Wind']:
+        return new_q_mrj
+
+    # Update values in the new matrix using the correct multiplier for each LU
+    for lu_idx, lu in enumerate(land_uses):
+        productivity_multiplier = data.ONSHORE_WIND_DATA[lu].loc[yr_cal, 'Productivity']
+        if productivity_multiplier != 1:
+            j = lu_codes[lu_idx]
+            new_q_mrj[:, :, lu_idx] = q_mrj[:, :, j] * (productivity_multiplier - 1)
+
+    return new_q_mrj
 
 def get_agricultural_management_quantity_matrices(data, q_mrp, yr_idx) -> Dict[str, np.ndarray]:
     """
@@ -584,6 +684,8 @@ def get_agricultural_management_quantity_matrices(data, q_mrp, yr_idx) -> Dict[s
     ag_mam_q_mrp['AgTech EI'] = get_agtech_ei_effect_q_mrp(data, q_mrp, yr_idx)                             
     ag_mam_q_mrp['Biochar'] = get_biochar_effect_q_mrp(data, q_mrp, yr_idx)                                 
     ag_mam_q_mrp['HIR - Beef'] = get_beef_hir_effect_q_mrp(data, q_mrp)                                     
-    ag_mam_q_mrp['HIR - Sheep'] = get_sheep_hir_effect_q_mrp(data, q_mrp)                                   
+    ag_mam_q_mrp['HIR - Sheep'] = get_sheep_hir_effect_q_mrp(data, q_mrp)     
+    ag_mam_q_mrp['Utility Solar PV'] = get_utility_solar_pv_effect_q_mrj(data, q_mrp, yr_idx)
+    ag_mam_q_mrp['Onshore Wind'] = get_onshore_wind_effect_q_mrj(data, q_mrp, yr_idx)                     
 
     return {am:ag_mam_q_mrp[am] for am in settings.AG_MANAGEMENTS if settings.AG_MANAGEMENTS[am]}

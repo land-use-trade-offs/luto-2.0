@@ -23,8 +23,6 @@
 Pure functions to calculate costs of commodities and alt. land uses.
 """
 
-
-
 import itertools
 import numpy as np
 import pandas as pd
@@ -189,7 +187,6 @@ def get_cost_lvstk(data:Data, lu, lm, yr_idx):
             ]
         )
     )
-
 
 def get_cost(data:Data, lu, lm, yr_idx):
     """Return production cost <unit: $/cell> of `lu`+`lm` in `yr_idx` as np array.
@@ -526,6 +523,83 @@ def get_sheep_hir_effect_c_mrj(data: Data, yr_idx: int):
     
     return cost_mrj
 
+def get_utility_solar_pv_effect_c_mrj(data: Data, c_mrj, yr_idx):
+    """
+    Applies Utility Solar PV cost effects separately for establishment and O&M to the cost data.
+    """
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Utility Solar PV']
+    lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
+    yr_cal = data.YR_CAL_BASE + yr_idx
+
+    # Initialize new effects matrix
+    new_c_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
+
+    if not settings.AG_MANAGEMENTS['Utility Solar PV']:
+        return new_c_mrj
+
+    for j_idx, lu in enumerate(land_uses):
+        # Retrieve multipliers (use 1.0 if missing)
+        est_mult = data.UTILITY_SOLAR_PV_DATA[lu].loc[yr_cal, 'Establishment_Cost_Multiplier']
+        est_mult = est_mult if not np.isnan(est_mult) else 1.0
+
+        om_mult = data.UTILITY_SOLAR_PV_DATA[lu].loc[yr_cal, 'OM_Cost_Multiplier']
+        om_mult = om_mult if not np.isnan(om_mult) else 1.0
+
+        # Decompose original cost into establishment and O&M if possible
+        # For illustration, assume access to base components:
+        # c_mrj_est = establishment cost component
+        # c_mrj_om = O&M cost component
+        c_mrj_est = data.BASE_EST_COST[lu_codes[j_idx]]  # Shape: (NLMS, NCELLS)
+        c_mrj_om = data.BASE_OM_COST[lu_codes[j_idx]]    # Shape: (NLMS, NCELLS)
+
+        # Apply multipliers individually
+        adj_est = c_mrj_est * est_mult
+        adj_om = c_mrj_om * om_mult
+
+        # Sum to get total adjusted cost
+        new_c_mrj[:, :, j_idx] = adj_est + adj_om
+
+    return new_c_mrj
+
+
+def get_onshore_wind_effect_c_mrj(data: Data, c_mrj, yr_idx):
+    """
+    Applies Onshore Wind cost effects separately for establishment and O&M to the cost data.
+    """
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Onshore Wind']
+    lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
+    yr_cal = data.YR_CAL_BASE + yr_idx
+
+    # Initialize new effects matrix
+    new_c_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
+
+    if not settings.AG_MANAGEMENTS['Onshore Wind']:
+        return new_c_mrj
+
+    for j_idx, lu in enumerate(land_uses):
+        # Retrieve multipliers (use 1.0 if missing)
+        est_mult = data.ONSHORE_WIND_DATA[lu].loc[yr_cal, 'Establishment_Cost_Multiplier']
+        est_mult = est_mult if not np.isnan(est_mult) else 1.0
+
+        om_mult = data.ONSHORE_WIND_DATA[lu].loc[yr_cal, 'OM_Cost_Multiplier']
+        om_mult = om_mult if not np.isnan(om_mult) else 1.0
+
+        # Decompose original cost into establishment and O&M if possible
+        # For illustration, assume access to base components:
+        # c_mrj_est = establishment cost component
+        # c_mrj_om = O&M cost component
+        c_mrj_est = data.BASE_EST_COST[lu_codes[j_idx]]  # Shape: (NLMS, NCELLS)
+        c_mrj_om = data.BASE_OM_COST[lu_codes[j_idx]]    # Shape: (NLMS, NCELLS)
+
+        # Apply multipliers individually
+        adj_est = c_mrj_est * est_mult
+        adj_om = c_mrj_om * om_mult
+
+        # Sum to get total adjusted cost
+        new_c_mrj[:, :, j_idx] = adj_est + adj_om
+
+    return new_c_mrj
+
 
 def get_agricultural_management_cost_matrices(data: Data, c_mrj, yr_idx):
     """
@@ -549,6 +623,9 @@ def get_agricultural_management_cost_matrices(data: Data, c_mrj, yr_idx):
     ag_mam_c_mrj['AgTech EI'] = get_agtech_ei_effect_c_mrj(data, yr_idx)                            
     ag_mam_c_mrj['Biochar'] = get_biochar_effect_c_mrj(data, yr_idx)                                
     ag_mam_c_mrj['HIR - Beef'] = get_beef_hir_effect_c_mrj(data, yr_idx)                            
-    ag_mam_c_mrj['HIR - Sheep'] = get_sheep_hir_effect_c_mrj(data, yr_idx)                          
+    ag_mam_c_mrj['HIR - Sheep'] = get_sheep_hir_effect_c_mrj(data, yr_idx)   
+    ag_mam_c_mrj['Utility Solar PV'] = get_utility_solar_pv_effect_c_mrj(data, c_mrj, yr_idx)
+    ag_mam_c_mrj['Onshore Wind'] = get_onshore_wind_effect_c_mrj(data, c_mrj, yr_idx)
+                        
 
     return ag_mam_c_mrj

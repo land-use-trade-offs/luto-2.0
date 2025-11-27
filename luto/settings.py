@@ -363,7 +363,15 @@ AG_MANAGEMENTS_TO_LAND_USES = {
 
     'HIR - Beef':               ['Beef - natural land'],
     'HIR - Sheep':              ['Sheep - natural land'],
-}
+    'Utility Solar PV':         ['Unallocated - modified land','Beef - modified land', 'Sheep - modified land', 'Dairy - modified land'
+                                # Cropping:
+                                'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',], 
+    'Onshore Wind':             ['Unallocated - modified land','Beef - modified land', 'Sheep - modified land', 'Dairy - modified land',
+                                # Cropping:
+                                'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
+                                # Intensive Cropping:
+                                'Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables']
+                                }                                
 
 
 AG_MANAGEMENTS = {
@@ -375,6 +383,8 @@ AG_MANAGEMENTS = {
     'Biochar': True,
     'HIR - Beef': True,
     'HIR - Sheep': True,
+    'Utility Solar PV': True,
+    'Onshore Wind': True,
 }
 """
 The dictionary below contains a master list of all agricultural management options and
@@ -392,6 +402,8 @@ AG_MANAGEMENTS_REVERSIBLE = {
     'Biochar': True,
     'HIR - Beef': True,
     'HIR - Sheep': True,
+    'Utility Solar PV': False,
+    'Onshore Wind': False,
 }
 """
 The values of the below dictionary determine whether the model is allowed to abandon agricultural
@@ -426,7 +438,51 @@ SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
 
 
 
+# -------------- Renewable energy parameters ------------------------
+# Renewable Energy Generation Density (MW/km²) keyed by normalized technology strings
+GENERATION_DENSITY = {
+    'Utility Solar PV': 150,    # MW/km²
+    'Onshore Wind': 7.2,  # MW/km²
+}
 
+def get_generation_density(lm_name: str) -> float:
+    """
+    Return the generation density (MW/km²) for the given land management name.
+    
+    Parameters
+    ----------
+    lm_name : str
+        Normalized management type e.g., 'Utility Solar PV' or 'Onshore Wind'
+    
+    Returns
+    -------
+    float
+        Generation density in MW/km²
+    
+    Raises
+    ------
+    ValueError
+        If management type is unknown.
+    """
+    try:
+        return GENERATION_DENSITY[lm_name]
+    except KeyError:
+        raise ValueError(f"Unknown land management name: {lm_name}")
+
+# --------------Renewable energy target parameters ---------------------------- #  
+# User selects the renewable energy target aggregation level: 'state' or 'NRM'
+RE_TARGET_LEVEL = "state"  # options: "state", "NRM"
+
+# If 'NRM', optionally specify which NRMs to include; None means all
+SELECTED_NRM = None  # e.g., ["Mallee", "Corangamite"]
+
+def get_target_level():
+    return RE_TARGET_LEVEL
+
+def get_selected_nrm():
+    if RE_TARGET_LEVEL.lower() == "nrm":
+        return SELECTED_NRM
+    return None
 
 # ---------------------------------------------------------------------------- #
 # Off-land commodity parameters

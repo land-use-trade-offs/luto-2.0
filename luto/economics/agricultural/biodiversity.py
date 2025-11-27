@@ -235,7 +235,60 @@ def get_sheep_hir_effect_b_mrj(data: Data, ag_b_mrj: np.ndarray) -> np.ndarray:
     return b_mrj_effect
 
 
+<<<<<<< Updated upstream
 def get_ag_mgt_biodiversity_matrices(data:Data, ag_b_mrj: np.ndarray, yr_idx: int):
+=======
+def get_utility_solar_pv_effect_b_mrj(data:Data, ag_b_mrj: np.ndarray, yr_idx: int):
+    """
+    Gets biodiversity impacts of using Utility Solar PV
+
+    Parameters
+    - data: The input data object containing information about NLMS and NCELLS.
+
+    Returns
+    - new_b_mrj: A numpy array representing the biodiversity impacts of using Utility Solar PV.
+    """
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Utility Solar PV']
+    lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
+    yr_cal = data.YR_CAL_BASE + yr_idx
+    # Set up the effects matrix
+    b_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)   
+    if not settings.AG_MANAGEMENTS['Utility Solar PV']:
+        return b_mrj_effect
+    for lu_idx, lu in enumerate(land_uses):
+        biodiv_impact = data.UTILITY_SOLAR_PV_DATA[lu].loc[yr_cal, 'Biodiversity_compatability']
+        if biodiv_impact != 1:
+            j = lu_codes[lu_idx]
+            b_mrj_effect[:, :, lu_idx] = ag_b_mrj[:, :, j] * (biodiv_impact - 1)
+    return b_mrj_effect
+
+def get_onshore_wind_effect_b_mrj(data:Data, ag_b_mrj: np.ndarray, yr_idx: int):
+    """
+    Gets biodiversity impacts of using Onshore Wind
+
+    Parameters
+    - data: The input data object containing information about NLMS and NCELLS.
+
+    Returns
+    - new_b_mrj: A numpy array representing the biodiversity impacts of using Onshore Wind.
+    """
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Onshore Wind']
+    lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
+    yr_cal = data.YR_CAL_BASE + yr_idx
+    # Set up the effects matrix
+    b_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)   
+    if not settings.AG_MANAGEMENTS['Onshore Wind']:
+        return b_mrj_effect
+    for lu_idx, lu in enumerate(land_uses):
+        biodiv_impact = data.ONSHORE_WIND_DATA[lu].loc[yr_cal, 'Biodiversity_compatability']
+        if biodiv_impact != 1:
+            j = lu_codes[lu_idx]
+            b_mrj_effect[:, :, lu_idx] = ag_b_mrj[:, :, j] * (biodiv_impact - 1)
+    return b_mrj_effect
+
+
+def get_agricultural_management_biodiversity_matrices(data:Data, ag_b_mrj: np.ndarray, yr_idx: int):
+>>>>>>> Stashed changes
     """
     Calculate the biodiversity matrices for different agricultural management practices.
 
@@ -255,6 +308,9 @@ def get_ag_mgt_biodiversity_matrices(data:Data, ag_b_mrj: np.ndarray, yr_idx: in
     biochar_data = get_biochar_effect_b_mrj(data, ag_b_mrj, yr_idx)                 
     beef_hir_data = get_beef_hir_effect_b_mrj(data, ag_b_mrj)                       
     sheep_hir_data = get_sheep_hir_effect_b_mrj(data, ag_b_mrj)                     
+    sheep_hir_data = get_sheep_hir_effect_b_mrj(data, ag_b_mrj)
+    solar_pv_data = get_utility_solar_pv_effect_b_mrj(data, ag_b_mrj, yr_idx)
+    wind_data = get_onshore_wind_effect_b_mrj(data, ag_b_mrj, yr_idx)                  
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,
@@ -265,6 +321,8 @@ def get_ag_mgt_biodiversity_matrices(data:Data, ag_b_mrj: np.ndarray, yr_idx: in
         'Biochar': biochar_data,
         'HIR - Beef': beef_hir_data,
         'HIR - Sheep': sheep_hir_data,
+        'Utility Solar PV': solar_pv_data,
+        'Onshore Wind': wind_data,
     }
 
 

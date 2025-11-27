@@ -17,8 +17,6 @@
 # You should have received a copy of the GNU General Public License along with
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
-
-
 import os
 import xarray as xr
 import numpy as np
@@ -289,8 +287,15 @@ class Data:
             'SHEEP - NATURAL LAND MEAT',
             'SHEEP - NATURAL LAND WOOL'
         ]
-        self.PRODUCTS = self.PR_CROPS + self.PR_LVSTK
-        self.PRODUCTS.sort() # Ensure lexicographic order.
+        self.PR_RENEWABLES = [
+            'UTILITY SOLAR PV - ELECTRICITY',
+            'ONSHORE WIND - ELECTRICITY'
+        ]
+        # Sort each product category alphabetically, then concatenate
+        self.PR_CROPS.sort()
+        self.PR_LVSTK.sort()
+        self.PR_RENEWABLES.sort()
+        self.PRODUCTS = self.PR_CROPS + self.PR_LVSTK + self.PR_RENEWABLES
 
         # Get number of products
         self.NPRS = len(self.PRODUCTS)
@@ -671,7 +676,262 @@ class Data:
             # Horticulture land uses
             self.BIOCHAR_DATA[lu] = horticulture_data
 
+        ###############################################################
+        # Renewable energy data.
+        ###############################################################
+        # Path dictionary for renewable target CSV by technology
+        RE_TARGET_PATH = r"T:\GitHub\luto-2.0\input\RE Module\renewable_targets.csv"
 
+        def load_renewable_targets():
+            """
+            Loads renewable targets CSV as is. Returns full DataFrame.
+            """
+            if not os.path.exists(RE_TARGET_PATH):
+                raise FileNotFoundError(f"Renewable targets file not found: {RE_TARGET_PATH}")
+            
+            df = pd.read_csv(RE_TARGET_PATH)
+            return df
+
+        def filter_targets(df, use_nrm_level=False, state=None, region=None, product=None, selected_nrms=None):
+            """
+            Filters renewable targets DataFrame based on:
+            - use_nrm_level: if True, filter by region (NRM); else filter by state level (region empty or 'statewide')
+            - state: filter by STATE column
+            - region: filter by REGION column
+            - product: filter by PRODUCT column
+            - selected_nrms: list of regions to include if filtering for NRM level
+            """
+            if state:
+                df = df[df['STATE'] == state]
+            if product:
+                df = df[df['PRODUCT'] == product]
+
+            if use_nrm_level:
+                # Keep rows where REGION is not empty (assumed NRM-level)
+                df = df[df['REGION'].notna() & (df['REGION'] != "")]
+                if selected_nrms is not None:
+                    df = df[df['REGION'].isin(selected_nrms)]
+            else:
+                # Keep rows where REGION is empty or null (state-level targets)
+                df = df[df['REGION'].isna() | (df['REGION'] == "")]
+
+            return df
+
+        def get_yearly_targets(df):
+            """
+            Converts the wide dataframe with year columns to a tidy format or dict for target values.
+            Returns a DataFrame melted or dictionary keyed by year.
+            """
+            year_cols = [col for col in df.columns if col.isdigit()]
+            # Melt the dataframe (optional; depends on consumption structure)
+            df_melted = df.melt(id_vars=['STATE', 'REGION', 'PRODUCT', 'UNIT'], value_vars=year_cols,
+                                var_name='Year', value_name='Generation_Target')
+            return df_melted
+
+      
+        ############# RE cost rasters #################
+        # Paths to establishment cost rasters
+        ESTABLISHMENT_COST_PATHS = {
+            "solar": r"T:\GitHub\luto-2.0\input\RE Module\establishment_cost_solar.tif",
+            "wind": r"T:\GitHub\luto-2.0\input\RE Module\establishment_cost_wind.tif",
+        }
+
+        # Paths to O&M cost rasters (if you have separate rasters)
+        OM_COST_PATHS = {
+            "solar": r"T:\GitHub\luto-2.0\input\RE Module\om_cost_solar.tif",
+            "wind": r"T:\GitHub\luto-2.0\input\RE Module\om_cost_wind.tif",
+        }
+
+        def load_establishment_cost_raster(tech):
+            """Load establishment cost raster for a renewable technology."""
+            path = ESTABLISHMENT_COST_PATHS.get(tech)
+            if not path:
+                raise ValueError(f"Establishment cost raster path not found for technology: {tech}")
+            
+            # Check if file exists
+            if not os.path.exists(path):
+                raise FileNotFoundError(f"Establishment cost raster not found at: {path}")
+            
+            with rasterio.open(path) as src:
+                cost_array = src.read(1).astype(np.float32)  # read first band as float32
+            
+            # Apply resfactoring if needed
+            if settings.RESFACTOR > 1:
+                cost_resfactored = cost_array[
+                    ::int(settings.RESFACTOR/2), 
+                    ::int(settings.RESFACTOR/2)
+                ]
+                cost_masked = cost_resfactored[self.MASK]
+            else:
+                cost_masked = cost_array[self.MASK]
+            
+            return cost_masked
+
+        def load_om_cost_raster(tech):
+            """Load O&M cost raster for a renewable technology."""
+            path = OM_COST_PATHS.get(tech)
+            
+            # If separate O&M rasters don't exist, calculate from establishment costs
+            if not path or not os.path.exists(path):
+                print(f"   O&M cost raster not found for {tech}. Calculating as % of establishment cost...")
+                est_cost = self.load_establishment_cost_raster(tech)
+                # Use typical O&M percentages: 1.5% for solar, 2% for wind
+                om_percentage = 0.015 if tech == "solar" else 0.02
+                return est_cost * om_percentage
+            
+            with rasterio.open(path) as src:
+                cost_array = src.read(1).astype(np.float32)
+            
+            # Apply resfactoring if needed
+            if settings.RESFACTOR > 1:
+                cost_resfactored = cost_array[
+                    ::int(settings.RESFACTOR/2), 
+                    ::int(settings.RESFACTOR/2)
+                ]
+                cost_masked = cost_resfactored[self.MASK]
+            else:
+                cost_masked = cost_array[self.MASK]
+            
+            return cost_masked
+
+        ############# Capacity factor and distance loss factor rasters #################
+        # Paths for capacity factor rasters
+        CF_RASTER_PATHS = {
+            "Utility Solar PV": r"T:\GitHub\luto-2.0\input\RE Module\pv_capacity.tif",
+            "Onshore Wind": r"T:\GitHub\luto-2.0\input\RE Module\AUS_capacity-factor_IEC2.tif"
+        }
+
+        # Paths for distribution loss factor rasters
+        DLF_RASTER_PATHS = {
+            "Utility Solar PV": r"T:\GitHub\luto-2.0\input\RE Module\dlf_aus_solar.tif",
+            "Onshore Wind": r"T:\GitHub\luto-2.0\input\RE Module\dlf_aus_wind.tif"
+        }
+
+        def load_capacity_factor_raster(lm: int, data) -> np.ndarray:
+            """
+            Load capacity factor raster for given land management index `lm`.
+            """
+            tech_name = data.LANDMANS[lm]
+            if "solar" in tech_name.lower():
+                key = "Utility Solar PV"
+            elif "wind" in tech_name.lower():
+                key = "Onshore Wind"
+            else:
+                raise KeyError(f"No capacity factor raster defined for management '{tech_name}'")
+
+            path = CF_RASTER_PATHS.get(key)
+            if path is None:
+                raise FileNotFoundError(f"Capacity factor raster file not found for '{key}'")
+
+            with rasterio.open(path) as src:
+                cf_data = src.read(1)
+            return cf_data.astype(np.float32)
+
+        def load_dlf_raster(lm: int, data) -> np.ndarray:
+            """
+            Load distribution loss factor raster for given land management index `lm`.
+            """
+            tech_name = data.LANDMANS[lm]
+            if "solar" in tech_name.lower():
+                key = "Utility Solar PV"
+            elif "wind" in tech_name.lower():
+                key = "Onshore Wind"
+            else:
+                raise KeyError(f"No distribution loss factor raster defined for management '{tech_name}'")
+
+            path = DLF_RASTER_PATHS.get(key)
+            if path is None:
+                raise FileNotFoundError(f"Distribution loss factor raster file not found for '{key}'")
+
+            with rasterio.open(path) as src:
+                dlf_data = src.read(1)
+            return dlf_data.astype(np.float32)
+
+
+        ################ Load Utility solar PV data ######################
+        solar_pv_file = os.path.join(settings.INPUT_DIR, 'XXXX_Bundle_SPV.xlsx')
+
+        # Validate file exists
+        if not os.path.exists(solar_pv_file):
+            raise FileNotFoundError(f"Solar PV data file not found: {solar_pv_file}")
+
+        self.SOLAR_PV_DATA = {}
+
+        try:
+            # Load with explicit error handling
+            SOLAR_PV_CROPPING_DATA = pd.read_excel(solar_pv_file, sheet_name='Solar PV (cropping)', index_col='Year')
+            SOLAR_PV_HORTICULTURE_DATA = pd.read_excel(solar_pv_file, sheet_name='Solar PV (horticulture)', index_col='Year') 
+            SOLAR_PV_LIVESTOCK_DATA = pd.read_excel(solar_pv_file, sheet_name='Solar PV (livestock)', index_col='Year')
+    
+            # Validate required columns exist
+            required_columns = ['Productivity', 'Revenue', 'Annual Cost Per Ha (A$2010/yr)', 'Biodiversity_compatability']
+            for data_name, data in [('cropping', SOLAR_PV_CROPPING_DATA), ('horticulture', SOLAR_PV_HORTICULTURE_DATA), 
+                            ('livestock', SOLAR_PV_LIVESTOCK_DATA)]:
+                missing_cols = [col for col in required_columns if col not in data.columns]
+                if missing_cols:
+                    print(f"Warning: Missing columns in {data_name} data: {missing_cols}")
+
+            # Assign data to land uses
+            for lu in ['Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds',
+                'Winter cereals', 'Winter legumes', 'Winter oilseeds', 
+                'Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables']:
+                self.SOLAR_PV_DATA[lu] = SOLAR_PV_CROPPING_DATA
+            
+            for lu in ['Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears',
+                'Plantation fruit', 'Stone fruit', 'Tropical stone fruit']:
+                self.SOLAR_PV_DATA[lu] = SOLAR_PV_HORTICULTURE_DATA
+            
+            for lu in ['Dairy - modified land', 'Beef - modified land', 'Sheep - modified land']:
+                self.SOLAR_PV_DATA[lu] = SOLAR_PV_LIVESTOCK_DATA
+
+            print(f"✓ Successfully loaded Solar PV data for {len(self.SOLAR_PV_DATA)} land use types")
+    
+        except Exception as e:
+            raise ValueError(f"Error loading Solar PV data: {e}")
+
+        ################## Load Onshore wind data ######################
+        onshore_wind_file = os.path.join(settings.INPUT_DIR, 'XXXX_Bundle_Wind.xlsx')
+
+        # Validate file exists
+        if not os.path.exists(onshore_wind_file):
+            raise FileNotFoundError(f"Onshore wind data file not found: {onshore_wind_file}")
+
+        self.ONSHORE_WIND_DATA = {}
+
+        try:
+            # Load with explicit error handling
+            ONSHORE_WIND_CROPPING_DATA = pd.read_excel(onshore_wind_file, sheet_name='Onshore Wind (cropping)', index_col='Year')
+            ONSHORE_WIND_HORTICULTURE_DATA = pd.read_excel(onshore_wind_file, sheet_name='Onshore Wind (horticulture)', index_col='Year') 
+            ONSHORE_WIND_LIVESTOCK_DATA = pd.read_excel(onshore_wind_file, sheet_name='Onshore Wind (livestock)', index_col='Year')
+
+            # Validate required columns exist
+            required_columns = ['Productivity', 'Revenue', 'Annual Cost Per Ha (A$2010/yr)', 'Biodiversity_compatability']
+            for data_name, data in [('cropping', ONSHORE_WIND_CROPPING_DATA), 
+                                ('horticulture', ONSHORE_WIND_HORTICULTURE_DATA), 
+                                ('livestock', ONSHORE_WIND_LIVESTOCK_DATA)]:
+                missing_cols = [col for col in required_columns if col not in data.columns]
+                if missing_cols:
+                    print(f"Warning: Missing columns in {data_name} wind data: {missing_cols}")
+
+            # Assign data to land uses
+            for lu in ['Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds',
+                    'Winter cereals', 'Winter legumes', 'Winter oilseeds', 
+                    'Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables']:
+                self.ONSHORE_WIND_DATA[lu] = ONSHORE_WIND_CROPPING_DATA
+            
+            for lu in ['Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears',
+                    'Plantation fruit', 'Stone fruit', 'Tropical stone fruit']:
+                self.ONSHORE_WIND_DATA[lu] = ONSHORE_WIND_HORTICULTURE_DATA
+            
+            for lu in ['Dairy - modified land', 'Beef - modified land', 'Sheep - modified land']:
+                self.ONSHORE_WIND_DATA[lu] = ONSHORE_WIND_LIVESTOCK_DATA
+
+            print(f"✓ Successfully loaded onshore wind data for {len(self.ONSHORE_WIND_DATA)} land use types")
+
+        except Exception as e:
+            raise ValueError(f"Error loading onshore wind data: {e}")
+
+    
 
         ###############################################################
         # Productivity data.

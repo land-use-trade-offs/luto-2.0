@@ -25,6 +25,7 @@ Pure functions to calculate economic profit from land use.
 
 import numpy as np
 import pandas as pd
+from economics.agricultural import quantity
 import luto.settings as settings 
 
 from luto.data import Data
@@ -188,6 +189,34 @@ def get_rev_lvstk( data:Data   # Data object.
     # Return revenue as numpy array.
     return rev_seperate
 
+def get_rev_renewable(data: Data, lu: str, lm: int, yr_idx: int):
+    """
+    Return renewable revenue [AUD/cell] for given product and land management in year index.
+    """
+    lm_name = data.LANDMANS[lm]
+    if "solar" in lm_name.lower():
+        tech_key = "Utility Solar PV"
+    elif "wind" in lm_name.lower():
+        tech_key = "Onshore Wind"
+    else:
+        raise KeyError(f"Unknown land management type '{lm_name}' for renewable revenue.")
+
+    try:
+        price = data.ELECTRICITY_PRICE.loc[data.YR_CAL_BASE + yr_idx, tech_key]
+    except (AttributeError, KeyError):
+        price = 1.0
+        print(f"Warning: Missing electricity price for {tech_key} at year {yr_idx}. Defaulting to 1.0")
+
+    from luto.economics.agricultural.quantity import get_quantity_renewable
+    quantity = get_quantity_renewable(data, lu, lm, yr_idx)
+
+    revenue_val = quantity * price
+
+    revenue_df = pd.DataFrame(
+        revenue_val,
+        columns=pd.MultiIndex.from_tuples([(lu, lm_name, "Electricity Revenue")])
+    )
+    return revenue_df
 
 def get_rev( data:Data    # Data object.
             , lu           # Land use.
@@ -457,6 +486,54 @@ def get_sheep_hir_effect_r_mrj(data: Data, r_mrj):
 
     return r_mrj_effect
 
+def get_utility_solar_pv_effect_r_mrj(data: Data, r_mrj, yr_idx):
+    """
+    Applies the effects of Utility Solar PV to the revenue data
+    for all relevant agricultural land uses.
+    """
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Utility Solar PV']
+    lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
+    yr_cal = data.YR_CAL_BASE + yr_idx
+
+    # Set up the effects matrix
+    new_r_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    if not settings.AG_MANAGEMENTS['Utility Solar PV']:
+        return new_r_mrj
+
+    # Update values in the new matrix using the revenue multiplier for each LU
+    for lu_idx, lu in enumerate(land_uses):
+        revenue_multiplier = data.UTILITY_SOLAR_PV_DATA[lu].loc[yr_cal, 'Revenue']
+        if revenue_multiplier != 1:
+            j = lu_codes[lu_idx]
+            new_r_mrj[:, :, lu_idx] = r_mrj[:, :, j] * (revenue_multiplier - 1)
+
+    return new_r_mrj
+
+
+def get_onshore_wind_effect_r_mrj(data: Data, r_mrj, yr_idx):
+    """
+    Applies the effects of Onshore Wind to the revenue data
+    for all relevant agricultural land uses.
+    """
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Onshore Wind']
+    lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
+    yr_cal = data.YR_CAL_BASE + yr_idx
+
+    # Set up the effects matrix
+    new_r_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    if not settings.AG_MANAGEMENTS['Onshore Wind']:
+        return new_r_mrj
+
+    # Update values in the new matrix using the revenue multiplier for each LU
+    for lu_idx, lu in enumerate(land_uses):
+        revenue_multiplier = data.ONSHORE_WIND_DATA[lu].loc[yr_cal, 'Revenue']
+        if revenue_multiplier != 1:
+            j = lu_codes[lu_idx]
+            new_r_mrj[:, :, lu_idx] = r_mrj[:, :, j] * (revenue_multiplier - 1)
+
+    return new_r_mrj
 
 def get_agricultural_management_revenue_matrices(data:Data, r_mrj, yr_idx) -> dict[str, np.ndarray]:
     """
@@ -481,6 +558,8 @@ def get_agricultural_management_revenue_matrices(data:Data, r_mrj, yr_idx) -> di
     ag_mam_r_mrj['AgTech EI'] = get_agtech_ei_effect_r_mrj(data, r_mrj, yr_idx)                            
     ag_mam_r_mrj['Biochar'] = get_biochar_effect_r_mrj(data, r_mrj, yr_idx)                                
     ag_mam_r_mrj['HIR - Beef'] = get_beef_hir_effect_r_mrj(data, r_mrj)                                    
-    ag_mam_r_mrj['HIR - Sheep'] = get_sheep_hir_effect_r_mrj(data, r_mrj)                                  
+    ag_mam_r_mrj['HIR - Sheep'] = get_sheep_hir_effect_r_mrj(data, r_mrj)
+    ag_mam_r_mrj['Utility Solar PV'] = get_utility_solar_pv_effect_r_mrj(data, r_mrj, yr_idx)
+    ag_mam_r_mrj['Onshore Wind'] = get_onshore_wind_effect_r_mrj(data, r_mrj, yr_idx)                                  
 
     return ag_mam_r_mrj
