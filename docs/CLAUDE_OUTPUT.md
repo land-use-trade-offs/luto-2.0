@@ -139,6 +139,216 @@ The `ALL` dimensions serve dual purposes:
 
 **Key Implementation Detail**: Mosaics are **prepended** (placed first) rather than appended, making `'ALL'` the first coordinate in each dimension. This improves readability when inspecting NetCDF files.
 
+## Valid Layers Implementation Pattern
+
+The "valid layers" pattern is a **critical memory and disk optimization** that reduces redundant dimension combinations. Instead of saving all possible dimension combinations (most of which contain only zeros), we identify and save only layers with meaningful values (|value| > 1).
+
+### Why Valid Layers Matter
+
+**Problem**: Without valid layer filtering, output files contain massive numbers of empty/zero layers:
+- Agricultural revenue with 3 lm × 5 sources × 28 land uses = **420 layers** per year
+- Most combinations have zero values (e.g., "Irrigated + Water cost + Apples" may not exist)
+- Storing all combinations wastes **memory during processing** and **disk space** in NetCDF files
+
+**Solution**: Extract valid layers from aggregated data, filter both data arrays and mosaic layers, then combine only meaningful layers.
+
+### Implementation Pattern by Category
+
+The pattern varies by data category based on dimension structure:
+
+#### 1. Agricultural (Ag) - Example: Revenue/Cost/GHG
+
+```python
+# Step 1: Get valid data layers from AUS-level aggregated dataframe
+# Use sorted MultiIndex for consistent ordering
+valid_rev_layers = pd.MultiIndex.from_frame(
+    ag_rev_jms_AUS[['lm', 'source', 'lu']]
+).sort_values()
+
+# Step 2: Stack and select valid data layers
+ag_rev_valid_layers = xr_ag_rev.stack(
+    layer=['lm', 'source', 'lu']
+).sel(layer=valid_rev_layers)
+
+# Step 3: Get mosaic and filter using where()
+ag_mosaic = cfxr.decode_compress_to_multi_index(
+    xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc')), 'layer'
+)['data'].sel(lu='ALL', lm='ALL')
+
+# Filter mosaic where data exists, then expand dimensions
+ag_mosaic_rev = ag_mosaic.where(
+    xr_ag_rev.sum(dim='lu').transpose('cell', ...)
+).expand_dims(lu=['ALL'])  # Ag needs lu expansion
+
+# Step 4: Stack mosaic and filter by valid layer dimensions
+ag_mosaic_rev_stack = ag_mosaic_rev.stack(layer=['lm', 'source', 'lu'])
+ag_mosaic_rev_stack = ag_mosaic_rev_stack.sel(
+    layer=(
+        ag_mosaic_rev_stack['layer']['lm'].isin(valid_rev_layers.get_level_values('lm')) &
+        ag_mosaic_rev_stack['layer']['source'].isin(valid_rev_layers.get_level_values('source'))
+        # Note: 'lu' is not filtered because mosaic has lu='ALL' only
+    )
+)
+
+# Step 5: Combine valid data layers with filtered mosaic
+valid_layers_stack = xr.concat([ag_rev_valid_layers, ag_mosaic_rev_stack], dim='layer')
+save2nc(valid_layers_stack, os.path.join(path, f'xr_revenue_ag_{yr_cal}.nc'))
+```
+
+**Key points for Ag**:
+- Mosaic expansion: `.expand_dims(lu=['ALL'])` - adds `lu` dimension
+- Mosaic filter: Uses `lm` and `source` (NOT `lu` since mosaic only has `lu='ALL'`)
+- Dimension order: `['lm', 'source', 'lu']`
+
+#### 2. Agricultural Management (Am) - Example: Revenue/Cost
+
+```python
+# Step 1: Get valid data layers (sorted MultiIndex)
+valid_layers_revenue = pd.MultiIndex.from_frame(
+    revenue_am_df_AUS[['am', 'lm', 'lu']]
+).sort_values()
+
+# Step 2: Stack and select valid data layers
+xr_revenue_am_stack = xr_revenue_am.stack(
+    layer=['am', 'lm', 'lu']
+).sel(layer=valid_layers_revenue)
+
+# Step 3: Get mosaic and filter
+am_mosaic_ds = cfxr.decode_compress_to_multi_index(
+    xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc')), 'layer'
+)['data'].sel(am='ALL', lm='ALL', lu='ALL')
+
+am_mosaic_rev = am_mosaic_ds.where(
+    xr_revenue_am.sum('am').transpose('cell', ...)
+).expand_dims('am')  # Am needs am expansion
+
+# Step 4: Stack mosaic and filter by lm and lu (NOT am)
+am_mosaic_rev_stack = am_mosaic_rev.stack(layer=['am', 'lm', 'lu'])
+am_mosaic_rev_stack = am_mosaic_rev_stack.sel(
+    layer=(
+        am_mosaic_rev_stack['layer']['lm'].isin(valid_layers_revenue.get_level_values('lm')) &
+        am_mosaic_rev_stack['layer']['lu'].isin(valid_layers_revenue.get_level_values('lu'))
+        # Note: 'am' is not filtered because mosaic has am='ALL' only
+    )
+)
+
+# Step 5: Combine
+valid_layers_stack = xr.concat([xr_revenue_am_stack, am_mosaic_rev_stack], dim='layer')
+save2nc(valid_layers_stack, os.path.join(path, f'xr_revenue_agricultural_management_{yr_cal}.nc'))
+```
+
+**Key points for Am**:
+- Mosaic expansion: `.expand_dims('am')` - adds `am` dimension
+- Mosaic filter: Uses `lm` and `lu` (NOT `am` since mosaic only has `am='ALL'`)
+- Dimension order: `['am', 'lm', 'lu']`
+
+#### 3. Non-Agricultural (NonAg) - Example: Revenue/Cost
+
+```python
+# Step 1: Get valid data layers (sorted MultiIndex)
+valid_rev_layers = pd.MultiIndex.from_frame(
+    rev_non_ag_df_AUS[['lu']]
+).sort_values()
+
+# Step 2: Stack and select valid data layers
+non_ag_rev_valid_layers = xr_revenue_non_ag.stack(
+    layer=['lu']
+).sel(layer=valid_rev_layers)
+
+# Step 3: Get mosaic and filter
+non_ag_mosaic = cfxr.decode_compress_to_multi_index(
+    xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
+)['data'].sel(lu='ALL')
+
+non_ag_mosaic_rev = non_ag_mosaic.where(
+    xr_revenue_non_ag.transpose('cell', ...)
+).stack(layer=['lu'])  # Non-ag: NO expansion needed, only 'lu' dimension
+
+# Step 4: Filter mosaic by lu dimension
+non_ag_mosaic_rev = non_ag_mosaic_rev.sel(
+    layer=non_ag_mosaic_rev['layer']['lu'].isin(valid_rev_layers.get_level_values('lu'))
+)
+
+# Step 5: Combine
+xr_revenue_non_ag_cat = xr.concat([non_ag_mosaic_rev, non_ag_rev_valid_layers], dim='layer')
+save2nc(xr_revenue_non_ag_cat, os.path.join(path, f'xr_revenue_non_ag_{yr_cal}.nc'))
+```
+
+**Key points for NonAg**:
+- Mosaic expansion: **NONE** - NonAg has only `lu` dimension, no need to expand
+- Mosaic filter: Uses `lu` only (or `Commodity` for quantity outputs)
+- Dimension order: `['lu']` (simpler hierarchy)
+
+#### 4. Quantity/Production Outputs - Special Case
+
+For commodity production outputs, the dimension is renamed from `'lu'` to `'Commodity'`:
+
+```python
+# Agricultural quantity
+valid_ag_layers = pd.MultiIndex.from_frame(
+    ag_q_mrc_df_AUS[['lm', 'Commodity']]  # Note: 'Commodity' not 'lu'
+).sort_values()
+
+ag_mosaic = cfxr.decode_compress_to_multi_index(
+    xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc')), 'layer'
+)['data'].sel(lu='ALL', lm='ALL').rename({'lu': 'Commodity'})
+
+ag_mosaic_valid = ag_mosaic.where(
+    ag_q_mrc.sum('Commodity').transpose('cell', ...)
+).expand_dims('Commodity')  # Expand with 'Commodity' not 'lu'
+
+# Filter by 'lm' only (not 'Commodity' since mosaic has Commodity='ALL')
+ag_mosaic_stack = ag_mosaic_valid.stack(layer=['lm', 'Commodity'])
+ag_mosaic_stack = ag_mosaic_stack.sel(
+    layer=ag_mosaic_stack['layer']['lm'].isin(valid_ag_layers.get_level_values('lm'))
+)
+```
+
+### Summary Table: Dimension Handling by Category
+
+| Category | Mosaic Expansion | Mosaic Filter Dimensions | Data Stack Order |
+|----------|-----------------|-------------------------|------------------|
+| **Ag** (Revenue/Cost/GHG) | `.expand_dims(lu=['ALL'])` | `lm`, `source` | `['lm', 'source', 'lu']` |
+| **Ag** (Quantity) | `.expand_dims('Commodity')` | `lm` only | `['lm', 'Commodity']` |
+| **Am** (Revenue/Cost) | `.expand_dims('am')` | `lm`, `lu` | `['am', 'lm', 'lu']` |
+| **Am** (Quantity) | `.expand_dims('am')` | `lm`, `Commodity` | `['am', 'lm', 'Commodity']` |
+| **NonAg** (Revenue/Cost) | **NO expansion** | `lu` only | `['lu']` |
+| **NonAg** (Quantity) | **NO expansion** | `Commodity` only | `['Commodity']` |
+
+### Critical Implementation Rules
+
+1. **Valid layers MUST be a sorted MultiIndex**, not a DataFrame:
+   ```python
+   # CORRECT
+   valid_layers = pd.MultiIndex.from_frame(df[['lm', 'source', 'lu']]).sort_values()
+
+   # WRONG
+   valid_layers = df[['lm', 'source', 'lu']]  # This is a DataFrame, not MultiIndex
+   ```
+
+2. **NO manual chunking** - rely on automatic dask chunking for memory efficiency
+
+3. **Filter mosaic by dimensions OTHER than the expanded dimension**:
+   - If you expand `lu=['ALL']`, filter by other dims (`lm`, `source`) but NOT `lu`
+   - If you expand `am`, filter by other dims (`lm`, `lu`) but NOT `am`
+   - NonAg has no expansion, so filter by `lu` or `Commodity` directly
+
+4. **The essence of valid layers**: Reduce redundant dimension combinations to save **both memory and disk space**
+
+### Memory Optimization Note
+
+The implementation avoids manual chunking because intermediate arrays are no larger than the source data matrices already in memory. The comment pattern in code explains:
+
+```python
+# ------------------------- Stack array, get valid layers -------------------------
+'''
+We do NOT manually loop through chunks to reduce memory usage.
+Because the intermediate array is no larger than the in-mem 'ag_cost_df_rjms' object.
+'''
+```
+
+This differs from other write functions (like `write_quantity_separate`) where manual chunking IS required because multiplication creates large intermediate arrays.
+
 ## save2nc() Function - Optimized NetCDF Export
 
 The `save2nc()` function implements four critical optimizations:

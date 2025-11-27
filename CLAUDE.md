@@ -17,6 +17,7 @@ The LUTO2 documentation is split into themed files for better memory efficiency.
 - Configuring model parameters (settings.py)
 - Setting up GUROBI license
 - Performance optimization and memory management
+- Memory profiling with `@trace_mem_usage` decorator
 
 ### 📁 [docs/CLAUDE_ARCHITECTURE.md](docs/CLAUDE_ARCHITECTURE.md)
 **Read this when working on:**
@@ -31,6 +32,7 @@ The LUTO2 documentation is split into themed files for better memory efficiency.
 **Read this when working on:**
 - NetCDF output format and structure
 - Mosaic layer generation (write.py)
+- **Valid layers implementation pattern** (memory/disk optimization)
 - save2nc() optimization
 - create_report_layers.py workflow
 - Carbon sequestration data format

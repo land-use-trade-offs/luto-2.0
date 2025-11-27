@@ -26,6 +26,7 @@ import gc
 import os
 import threading
 import time
+import functools
 
 import pandas as pd
 import psutil
@@ -90,8 +91,11 @@ def _show_live_plot(update_interval=0.1):
     try:
         while not stop_live_plot.is_set() and monitoring:
             if memory_log:
+                # Make thread-safe copy to avoid race condition
+                log_copy = memory_log.copy()
+
                 # Convert to DataFrame
-                df = pd.DataFrame(memory_log)
+                df = pd.DataFrame(log_copy)
                 df['Time'] = df['time'] - df['time'].min()
 
                 # Create plot
@@ -129,7 +133,10 @@ def _show_live_plot(update_interval=0.1):
 
     # Show final plot
     if memory_log:
-        df = pd.DataFrame(memory_log)
+        # Make thread-safe copy to avoid race condition
+        log_copy = memory_log.copy()
+
+        df = pd.DataFrame(log_copy)
         df['Time'] = df['time'] - df['time'].min()
 
         fig = go.Figure()
@@ -175,12 +182,27 @@ def start_memory_monitor(update_interval=0.1):
     """
     global monitoring, monitor_thread, live_plot_thread, baseline_memory, stop_live_plot
 
-    # Clear previous log
+    # Stop any existing monitoring first
+    if monitoring or (monitor_thread and monitor_thread.is_alive()):
+        print("Stopping existing monitor...")
+        monitoring = False
+        stop_live_plot.set()
+
+        # Wait for old threads to finish
+        if monitor_thread and monitor_thread.is_alive():
+            monitor_thread.join(timeout=1)
+        if live_plot_thread and live_plot_thread.is_alive():
+            live_plot_thread.join(timeout=2)
+
+    # Clear previous log and reset state
     memory_log.clear()
     stop_live_plot.clear()
+    monitor_thread = None
+    live_plot_thread = None
 
     # Force garbage collection to get clean baseline
     gc.collect()
+    time.sleep(0.1)  # Give GC time to complete
 
     # Get baseline memory usage
     process = psutil.Process(os.getpid())
@@ -197,7 +219,7 @@ def start_memory_monitor(update_interval=0.1):
     monitor_thread = threading.Thread(target=monitor_memory, daemon=True)
     monitor_thread.start()
 
-    print("Memory monitoring started in background")
+    print(f"Memory monitoring started (baseline: {baseline_memory:.2f} MB)")
 
     # Start plot updates in another background thread
     try:
@@ -238,8 +260,11 @@ def stop_memory_monitor(return_data=False):
         print("No memory data collected")
         return None
 
+    # Make thread-safe copy to avoid race condition
+    log_copy = memory_log.copy()
+
     # Convert to DataFrame
-    df = pd.DataFrame(memory_log)
+    df = pd.DataFrame(log_copy)
     df['Time'] = df['time'] - df['time'].min()
 
     # Calculate summary statistics
@@ -261,3 +286,75 @@ def stop_memory_monitor(return_data=False):
         }
 
     return None
+
+
+def trace_mem_usage(func=None, *, update_interval=0.1, return_data=False):
+    """
+    Trace memory usage of a function with automatic lifecycle management.
+
+    Can be used as a decorator or as a regular function wrapper.
+    This is the recommended way to monitor memory usage. It handles starting,
+    monitoring, and cleanup automatically, even if the function raises an error.
+
+    Parameters:
+        func (callable): The function to monitor (when used as function wrapper)
+        update_interval (float): Seconds between plot updates. Default: 0.1
+        return_data (bool): If True, returns both function result and memory stats. Default: False
+
+    Returns:
+        When used as decorator: Returns wrapped function
+        When used as wrapper: Returns function result (or tuple with stats if return_data=True)
+
+
+    Example:
+        @trace_mem_usage
+        def expensive_operation(size):
+            data = [i**2 for i in range(size)]
+            return sum(data)
+
+        result = expensive_operation(1000000)  # Automatically traced
+    """
+    
+
+    def decorator(fn):
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            print(f"Starting memory trace for: {fn.__name__}")
+            print("-" * 60)
+
+            # Start monitoring
+            start_memory_monitor(update_interval=update_interval)
+
+            function_result = None
+            error_occurred = False
+
+            try:
+                # Execute the function
+                function_result = fn(*args, **kwargs)
+
+            except Exception as e:
+                error_occurred = True
+                print(f"\n{'='*60}")
+                print(f"ERROR: Function '{fn.__name__}' raised an exception:")
+                print(f"{type(e).__name__}: {e}")
+                print(f"{'='*60}")
+                raise  # Re-raise the exception after stopping monitor
+
+            finally:
+                # Always stop monitoring, even if function fails
+                memory_stats = stop_memory_monitor(return_data=True)
+
+                if error_occurred:
+                    print("\nMemory monitoring stopped due to error.")
+                else:
+                    print(f"\nFunction '{fn.__name__}' completed successfully.")
+
+            # Return results
+            if return_data and memory_stats:
+                return function_result, memory_stats
+            else:
+                return function_result
+
+        return wrapper
+
+    return decorator(func)

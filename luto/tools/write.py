@@ -413,6 +413,7 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
     )
 
     # Calculate the commodity production (BEFORE dimension expansion to avoid double counting)
+    #   Note the sum in the middle of the multiplication is essential to reduce memory usage
     ag_q_mrc = (((ag_X_mrj_xr * lu2pr_xr).sum(dim=['lu']) * ag_q_mrp_xr) * pr2cm_xr).sum(dim='product')
     non_ag_p_rc = (non_ag_X_rk_xr * non_ag_crk_xr).sum(dim=['lu'])
     am_p_amrc = (((ag_man_X_mrj_xr * lu2pr_xr).sum(['lu']) * ag_man_q_mrp_xr) * pr2cm_xr).sum('product')
@@ -518,14 +519,11 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
         ).reset_index(
         ).query('abs(`Production (t/KL)`) > 1')
         
-    # Get valid layers
-    valid_ag_layers = ag_q_mrc_df_AUS[['lm', 'Commodity']]
-    valid_non_ag_layers = non_ag_p_rc_df_AUS[['Commodity']]
-    valid_am_layers = am_p_amrc_df_AUS[['am', 'lm', 'Commodity']]
 
     # Save the production dataframes to csv
     quantity_df_AUS = pd.concat([ag_q_mrc_df_AUS, non_ag_p_rc_df_AUS, am_p_amrc_df_AUS], ignore_index=True)
     quantity_df_region = pd.concat([ag_q_mrc_df_region, non_ag_p_rc_df_region, am_p_amrc_df_region], ignore_index=True)
+    
     quantity_df = pd.concat([quantity_df_AUS, quantity_df_region]
             ).rename(columns={'lm':'Water_supply'}
             ).replace({'dry':'Dryland', 'irr':'Irrigated'})
@@ -533,75 +531,88 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
     quantity_df.to_csv(os.path.join(path, f'quantity_production_t_separate_{yr_cal}.csv'), index=False)
     
     
-    # ------------------------- Append the mosaic layers and save to netcdf -------------------------
-    ag_mosaic = cfxr.decode_compress_to_multi_index(xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc')), 'layer')['data'].sel(lu=['ALL']).rename({'lu':'Commodity'})
-    non_ag_mosaic = cfxr.decode_compress_to_multi_index(xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer')['data'].sel(lu=['ALL']).rename({'lu':'Commodity'})
-    am_mosaic = cfxr.decode_compress_to_multi_index(xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc')), 'layer')['data'].sel(am=['ALL']).sel(lu=['ALL']).rename({'lu':'Commodity'})
+    # ------------------------- Stack array, get valid layers -------------------------
     
-    # Get the commodity mosaic map
-    commodity_lumap = am_p_amrc.sel(lm='ALL').sum('am', skipna=True).argmax('Commodity')
+    # Get valid data layers
+    valid_ag_layers = pd.MultiIndex.from_frame(ag_q_mrc_df_AUS[['lm', 'Commodity']]).sort_values()
+    valid_non_ag_layers = pd.MultiIndex.from_frame(non_ag_p_rc_df_AUS[['Commodity']]).sort_values()
+    valid_am_layers = pd.MultiIndex.from_frame(am_p_amrc_df_AUS[['am', 'lm', 'Commodity']]).sort_values()
     
-    commodity_ammap = xr.concat([
-        am_mosaic.where(commodity_lumap == c_code).expand_dims(Commodity=[c_desc])
-        for c_code, c_desc in enumerate(data.COMMODITIES)
-    ], dim='Commodity')
+    ag_q_mrc_stack = ag_q_mrc.stack(layer=['lm','Commodity']).sel(layer=valid_ag_layers)
+    non_ag_p_rc_stack = non_ag_p_rc.stack(layer=['Commodity']).sel(layer=valid_non_ag_layers)
+    am_p_amrc_stack = am_p_amrc.stack(layer=['am','lm','Commodity']).sel(layer=valid_am_layers)
     
-    commodity_ammap = xr.concat([
-        am_mosaic.expand_dims(Commodity=['ALL']),
-        commodity_ammap
-    ], dim='Commodity')
-
-    ag_q_mrc_cat = xr.concat([ag_mosaic, ag_q_mrc], dim='Commodity')
-    non_ag_p_rc_cat = xr.concat([non_ag_mosaic, non_ag_p_rc], dim='Commodity')
-    am_p_amrc_cat = xr.concat([commodity_ammap, am_p_amrc], dim='am')
+    # Get valid mosaic layers
+    ag_mosaic = cfxr.decode_compress_to_multi_index(
+        xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc')), 'layer')['data'
+        ].sel(lu='ALL', lm='ALL').rename({'lu':'Commodity'})
+    non_ag_mosaic = cfxr.decode_compress_to_multi_index(
+        xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer')['data'
+        ].sel(lu='ALL').rename({'lu':'Commodity'})
+    am_mosaic = cfxr.decode_compress_to_multi_index(
+        xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc')), 'layer')['data'
+        ].sel(am='ALL', lm='ALL').sel(lu='ALL').rename({'lu':'Commodity'})
+        
+    ag_mosaic_valid = ag_mosaic.where(ag_q_mrc.sum('Commodity').transpose('cell', ...)).expand_dims('Commodity')
+    non_ag_mosaic_valid = non_ag_mosaic.where(non_ag_p_rc.transpose('cell', ...))
+    am_mosaic_valid = am_mosaic.where(am_p_amrc.sum('am').transpose('cell', ...)).expand_dims('am')
     
-    # Update valid layers attribute
-    valid_ag_layers = pd.MultiIndex.from_frame(
-        pd.concat([valid_ag_layers, ag_mosaic.expand_dims('Commodity').coords.to_index().droplevel('cell').to_frame()], ignore_index=True).drop_duplicates()
-    ).sort_values()
-    valid_non_ag_layers = pd.MultiIndex.from_frame(
-        pd.concat([valid_non_ag_layers, non_ag_mosaic.expand_dims('Commodity').coords.to_index().droplevel('cell').to_frame()], ignore_index=True).drop_duplicates()
-    ).sort_values()
-    valid_am_layers = pd.MultiIndex.from_frame(
-        pd.concat([valid_am_layers, commodity_ammap.expand_dims('am').coords.to_index().droplevel('cell').to_frame()], ignore_index=True).drop_duplicates()
-    ).sort_values()
+    ag_mosaic_stack = ag_mosaic_valid.stack(layer=['lm','Commodity'])
+    non_ag_mosaic_stack = non_ag_mosaic_valid.stack(layer=['Commodity'])
+    am_mosaic_stack = am_mosaic_valid.stack(layer=['am','lm','Commodity'])
     
-
-    # ------------------------- Stack and filter valid layers -------------------------
-    ag_q_mrc_cat_stack = ag_q_mrc_cat.stack(layer=['lm','Commodity'])
-    non_ag_p_rc_cat_stack = non_ag_p_rc_cat.stack(layer=['Commodity'])
-    am_p_amrc_cat_stack = am_p_amrc_cat.stack(layer=['am','lm','Commodity'])
+    ag_mosaic_stack = ag_mosaic_stack.sel(
+        layer=ag_mosaic_stack['layer']['lm'].isin(valid_ag_layers.get_level_values('lm'))
+    )
+    non_ag_mosaic_stack = non_ag_mosaic_stack.sel(
+        layer=non_ag_mosaic_stack['layer']['Commodity'].isin(valid_non_ag_layers.get_level_values('Commodity'))
+    )
+    am_mosaic_stack = am_mosaic_stack.sel(
+        layer=(
+            am_mosaic_stack['layer']['Commodity'].isin(valid_am_layers.get_level_values('Commodity')) &
+            am_mosaic_stack['layer']['lm'].isin(valid_am_layers.get_level_values('lm')) 
+        )
+    )
+    
+    # ------------------------- Create combined arrays -------------------------
+    '''
+    We have to manually loop through chunks to save memory.
+    If not, the large intermidate array will be materialized and consume a lot of memory.
+    '''
+    ag_q_mrc_cat_stack = xr.concat([ag_mosaic_stack, ag_q_mrc_stack], dim='layer')
+    non_ag_p_rc_cat_stack = xr.concat([non_ag_mosaic_stack, non_ag_p_rc_stack], dim='layer')
+    am_p_amrc_cat_stack = xr.concat([am_mosaic_stack, am_p_amrc_stack], dim='layer')
     
     # Create empty xr.DataArray based on valid layers
     ag_q_mrc_cat_arr = xr.DataArray(
-        np.zeros((data.NCELLS, len(valid_ag_layers)), dtype=np.float32),
+        np.zeros((data.NCELLS, len(ag_q_mrc_cat_stack['layer'])), dtype=np.float32),
         dims=['cell', 'layer'],
-        coords={'cell': range(data.NCELLS), 'layer': valid_ag_layers}
+        coords={'cell': range(data.NCELLS), 'layer': ag_q_mrc_cat_stack['layer']}
     )
     non_ag_p_rc_cat_arr = xr.DataArray(
-        np.zeros((data.NCELLS, len(valid_non_ag_layers)), dtype=np.float32),
+        np.zeros((data.NCELLS, len(non_ag_p_rc_cat_stack['layer'])), dtype=np.float32),
         dims=['cell', 'layer'],
-        coords={'cell': range(data.NCELLS), 'layer': valid_non_ag_layers}
+        coords={'cell': range(data.NCELLS), 'layer': non_ag_p_rc_cat_stack['layer']}
     )
     am_p_amrc_cat_arr = xr.DataArray(
-        np.zeros((data.NCELLS, len(valid_am_layers)), dtype=np.float32),
+        np.zeros((data.NCELLS, len(am_p_amrc_cat_stack['layer'])), dtype=np.float32),
         dims=['cell', 'layer'],
-        coords={'cell': range(data.NCELLS), 'layer': valid_am_layers}
+        coords={'cell': range(data.NCELLS), 'layer': am_p_amrc_cat_stack['layer']}
     )
     
     
+    chunk_size = min(settings.WRITE_CHUNK_SIZE, data.NCELLS)
     for i in range(0, data.NCELLS, chunk_size):
-        idx_slice = slice(i, i + chunk_size)
-        ag_q_mrc_cat_arr.loc[idx_slice, valid_ag_layers] = ag_q_mrc_cat_stack.sel(cell=idx_slice, layer=valid_ag_layers)
-        non_ag_p_rc_cat_arr.loc[idx_slice, valid_non_ag_layers] = non_ag_p_rc_cat_stack.sel(cell=idx_slice, layer=valid_non_ag_layers)
-        am_p_amrc_cat_arr.loc[idx_slice, valid_am_layers] = am_p_amrc_cat_stack.sel(cell=idx_slice, layer=valid_am_layers)
-
+        ag_q_mrc_cat_arr[i:i + chunk_size, :] = ag_q_mrc_cat_stack.isel(cell=slice(i, i + chunk_size)).compute()
+        non_ag_p_rc_cat_arr[i:i + chunk_size, :] = non_ag_p_rc_cat_stack.isel(cell=slice(i, i + chunk_size)).compute()
+        am_p_amrc_cat_arr[i:i + chunk_size, :] = am_p_amrc_cat_stack.isel(cell=slice(i, i + chunk_size)).compute()
 
     save2nc(ag_q_mrc_cat_arr, os.path.join(path, f'xr_quantities_agricultural_{yr_cal}.nc'), calc_valid_layers=False)
     save2nc(non_ag_p_rc_cat_arr, os.path.join(path, f'xr_quantities_non_agricultural_{yr_cal}.nc'), calc_valid_layers=False)
     save2nc(am_p_amrc_cat_arr, os.path.join(path, f'xr_quantities_agricultural_management_{yr_cal}.nc'), calc_valid_layers=False)
 
     return f"Separate quantity production written for year {yr_cal}"
+
 
 
 def write_revenue_cost_ag(data: Data, yr_cal, path):
@@ -651,27 +662,51 @@ def write_revenue_cost_ag(data: Data, yr_cal, path):
     xr_ag_cost = xr.concat([xr_ag_cost.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), xr_ag_cost], dim='lm')
     xr_ag_cost = xr.concat([xr_ag_cost.sum(dim='source', keepdims=True).assign_coords(source=['ALL']), xr_ag_cost], dim='source')
 
-    # Regional level aggregation
+
+    # ------------------------- Chunk level aggregation -------------------------
+    '''
+    Here we do NOT manually loop through chunks to reduce memory usage during groupby operation.
+        This is because the `ag_dvar_mrj * ag_rev_rjms` do NOT creates a large intermediate array. 
+        So we can directly do groupby operation on the full array.
+        
+        The larget in-mem object is `ag_cost_df_rjms`
+        The intermediate array `ag_dvar_mrj * ag_rev_rjms` is no larger than `ag_dvar_mrj`
+    '''
+    
     ag_rev_jms_region = xr_ag_rev.groupby('region'
         ).sum(dim='cell'
         ).to_dataframe('Value ($)'
         ).reset_index(
-        ).assign(Year=yr_cal)
-    ag_rev_jms_AUS = xr_ag_rev.sum(dim='cell'
-        ).to_dataframe('Value ($)'
+        ).groupby(['region', 'lu', 'lm', 'source']
+        )[['Value ($)']
+        ].sum(
         ).reset_index(
-        ).assign(Year=yr_cal, region='AUSTRALIA')
-        
+        ).assign(Year=yr_cal
+        ).query('abs(`Value ($)`) > 1')
     ag_cost_jms_region = xr_ag_cost.groupby('region'
         ).sum(dim='cell'
         ).to_dataframe('Value ($)'
         ).reset_index(
-        ).assign(Year=yr_cal)
-    ag_cost_jms_AUS = xr_ag_cost.sum(dim='cell'
-        ).to_dataframe('Value ($)'
+        ).groupby(['region', 'lu', 'lm', 'source']
+        )[['Value ($)']
+        ].sum(
         ).reset_index(
-        ).assign(Year=yr_cal, region='AUSTRALIA')
-   
+        ).assign(Year=yr_cal
+        ).query('abs(`Value ($)`) > 1')
+        
+    # Australia level aggregation
+    ag_rev_jms_AUS = ag_rev_jms_region.groupby(['lu', 'lm', 'source', 'Year']
+        ).sum(
+        ).reset_index(
+        ).assign( region='AUSTRALIA'
+        ).query('abs(`Value ($)`) > 1')
+    ag_cost_jms_AUS = ag_cost_jms_region.groupby(['lu', 'lm', 'source', 'Year']
+        ).sum(
+        ).reset_index(
+        ).assign( region='AUSTRALIA'
+        ).query('abs(`Value ($)`) > 1')
+        
+
     # Save to disk
     ag_rev_jms = pd.concat([ag_rev_jms_AUS, ag_rev_jms_region])
     ag_cost_jms = pd.concat([ag_cost_jms_AUS, ag_cost_jms_region])
@@ -683,71 +718,50 @@ def write_revenue_cost_ag(data: Data, yr_cal, path):
         }).replace({'dry': 'Dryland', 'irr': 'Irrigated'
         }).to_csv(os.path.join(path, f'cost_ag_{yr_cal}.csv'), index=False)
     
-    # Get valid layers
-    valid_rev_layers = ag_rev_jms_AUS[['lm', 'source', 'lu']]
-    valid_cost_layers = ag_cost_jms_AUS[['lm', 'source', 'lu']]
-    
-    
-    # ------------------------- Append the mosaic layers and save to netcdf -------------------------
-    ag_mosaic = cfxr.decode_compress_to_multi_index(xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc')), 'layer')['data'].sel(lu=['ALL'])
-    
-    argmax_rev = xr_ag_rev.sum(dim=['lu', 'lm']).argmax('source').astype(np.uint8)
-    argmax_cost = xr_ag_cost.sum(dim=['lu', 'lm']).argmax('source').astype(np.uint8)
-    
-    code2desc_rev = dict(enumerate(xr_ag_rev.coords['source'].values))
-    code2desc_cost = dict(enumerate(xr_ag_cost.coords['source'].values))
-    
-    ag_mosaic_rev = xr.concat([
-            ag_mosaic.where(argmax_rev == s_code).expand_dims(source=[s_desc])
-            for s_code, s_desc in code2desc_rev.items() if s_code != 0 # Exclude 'ALL'
-        ], dim='source')
-    ag_mosaic_cost = xr.concat([
-            ag_mosaic.where(argmax_cost == s_code).expand_dims(source=[s_desc])
-            for s_code, s_desc in code2desc_cost.items() if s_code != 0 # Exclude 'ALL'
-        ], dim='source')
-    
-    ag_mosaic_rev = xr.concat([
-            ag_mosaic.expand_dims(source=['ALL']),
-            ag_mosaic_rev
-        ], dim='source')
-    ag_mosaic_cost = xr.concat([
-            ag_mosaic.expand_dims(source=['ALL']),
-            ag_mosaic_cost
-        ], dim='source')
     
     
     
-    valid_rev_layers = pd.MultiIndex.from_frame(
-        pd.concat([valid_rev_layers, ag_mosaic_rev.expand_dims(['lu']).coords.to_index().droplevel('cell').to_frame()], ignore_index=True).drop_duplicates()
-    ).sort_values()
-    valid_cost_layers = pd.MultiIndex.from_frame(
-        pd.concat([valid_cost_layers, ag_mosaic_cost.expand_dims(['lu']).coords.to_index().droplevel('cell').to_frame()], ignore_index=True).drop_duplicates()
-    ).sort_values()
+    # ------------------------- Stack array, get valid layers -------------------------
+    '''
+    We donot manually loop through chunks to save memory.
+    Because the intermidate array is no larger than the in-mem 'ag_cost_df_rjms' object.
+    '''
     
+    # Get valid data layers
+    valid_rev_layers = pd.MultiIndex.from_frame(ag_rev_jms_AUS[['lm', 'source', 'lu']]).sort_values()
+    valid_cost_layers = pd.MultiIndex.from_frame(ag_cost_jms_AUS[['lm', 'source', 'lu']]).sort_values()
     
-    # ------------------------- Stack and filter valid layers -------------------------
-    xr_ag_rev_cat = xr.concat([ag_mosaic_rev, xr_ag_rev], dim='lu').stack(layer=['lm','source','lu'])
-    xr_ag_cost_cat = xr.concat([ag_mosaic_cost, xr_ag_cost], dim='lu').stack(layer=['lm','source','lu'])
+    ag_rev_valid_layers = xr_ag_rev.stack(layer=['lm', 'source', 'lu' ]).sel(layer=valid_rev_layers)
+    ag_cost_valid_layers = xr_ag_cost.stack(layer=['lm', 'source','lu']).sel(layer=valid_cost_layers)
     
-    xr_ag_rev_arr = xr.DataArray(
-        np.zeros((data.NCELLS, len(valid_rev_layers)), dtype=np.float32),
-        dims=['cell', 'layer'],
-        coords={'cell': range(data.NCELLS), 'layer': valid_rev_layers}
+    # Get valid mosaic layers 
+    ag_mosaic = cfxr.decode_compress_to_multi_index(xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc')), 'layer')['data'].sel(lu=['ALL'], lm=['ALL'])
+    
+    ag_mosaic_rev = ag_mosaic.where(xr_ag_rev.sum(dim='lu').transpose('cell',...)).expand_dims(lu=['ALL'])
+    ag_mosaic_cost = ag_mosaic.where(xr_ag_cost.sum(dim='lu').transpose('cell',...)).expand_dims(lu=['ALL'])
+    
+    ag_mosaic_rev_stack = ag_mosaic_rev.stack(layer=['lm','source','lu'])
+    ag_mosaic_cost_stack = ag_mosaic_cost.stack(layer=['lm','source','lu'])
+    
+    ag_mosaic_rev_stack = ag_mosaic_rev_stack.sel(
+        layer=(
+            ag_mosaic_rev_stack['layer']['lm'].isin(valid_rev_layers.get_level_values('lm')) &
+            ag_mosaic_rev_stack['layer']['source'].isin(valid_rev_layers.get_level_values('source'))
+        )
     )
-    xr_ag_cost_arr = xr.DataArray(
-        np.zeros((data.NCELLS, len(valid_cost_layers)), dtype=np.float32),
-        dims=['cell', 'layer'],
-        coords={'cell': range(data.NCELLS), 'layer': valid_cost_layers}
+    ag_mosaic_cost_stack = ag_mosaic_cost_stack.sel(
+        layer=(
+            ag_mosaic_cost_stack['layer']['lm'].isin(valid_cost_layers.get_level_values('lm')) &
+            ag_mosaic_cost_stack['layer']['source'].isin(valid_cost_layers.get_level_values('source'))
+        )
     )
     
-    for i in range(0, data.NCELLS, chunk_size):
-        idx_slice = slice(i, i + chunk_size)
-        xr_ag_rev_arr.loc[idx_slice, valid_rev_layers] = xr_ag_rev_cat.sel(cell=idx_slice, layer=valid_rev_layers)
-        xr_ag_cost_arr.loc[idx_slice, valid_cost_layers] = xr_ag_cost_cat.sel(cell=idx_slice, layer=valid_cost_layers)
+    # Combine valid layers from dvar and mosaic
+    valid_layers_stack_rev = xr.concat([ag_rev_valid_layers, ag_mosaic_rev_stack], dim='layer')
+    valid_layers_stack_cost = xr.concat([ag_cost_valid_layers, ag_mosaic_cost_stack], dim='layer')
     
-    
-    save2nc(xr_ag_rev_arr, os.path.join(path, f'xr_revenue_ag_{yr_cal}.nc'))
-    save2nc(xr_ag_rev_arr, os.path.join(path, f'xr_cost_ag_{yr_cal}.nc'))
+    save2nc(valid_layers_stack_rev, os.path.join(path, f'xr_revenue_ag_{yr_cal}.nc'))
+    save2nc(valid_layers_stack_cost, os.path.join(path, f'xr_cost_ag_{yr_cal}.nc'))
 
     return f"Agricultural revenue and cost written for year {yr_cal}"
 
@@ -779,7 +793,11 @@ def write_revenue_cost_ag_man(data: Data, yr_cal, path):
     xr_cost_am = xr.concat([xr_cost_am.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), xr_cost_am], dim='lm')
     xr_cost_am = xr.concat([xr_cost_am.sum(dim='lu', keepdims=True).assign_coords(lu=['ALL']), xr_cost_am], dim='lu')
 
-    # Regional level aggregation
+    # ------------------------ Regional level aggregation -------------------------
+    '''
+    The region level aggregation is done in chunks to reduce memory usage during groupby operation.
+        We DO NOT manually chunk here because the intermediate array size is no larger than the in-mem 'ag_rev_mrj' object.
+    '''
     revenue_am_df_region = xr_revenue_am.groupby('region'
         ).sum(dim='cell'
         ).to_dataframe('Value ($)'
@@ -793,50 +811,84 @@ def write_revenue_cost_ag_man(data: Data, yr_cal, path):
         ).assign(Year = yr_cal)
 
     # Australia level aggregation
-    revenue_am_df_AUS = xr_revenue_am.sum(dim='cell'
-        ).to_dataframe('Value ($)'
-        ).reset_index(
-        ).assign(Year = yr_cal, region='AUSTRALIA'
-        )
-    cost_am_df_AUS = xr_cost_am.sum(dim='cell'
-        ).to_dataframe('Value ($)'
-        ).reset_index(
-        ).assign(Year = yr_cal, region='AUSTRALIA')
-        
-    revenue_am_df = pd.concat([revenue_am_df_AUS, revenue_am_df_region]
-        ).rename(
-            columns={
-                'lu': 'Land-use',
-                'lm': 'Water_supply',
-                'am': 'Management Type'
-        }).replace({'dry': 'Dryland', 'irr': 'Irrigated'})
-    cost_am_df = pd.concat([cost_am_df_AUS, cost_am_df_region]
-        ).rename(
-            columns={
-                'lu': 'Land-use',
-                'lm': 'Water_supply',
-                'am': 'Management Type'
-        }).replace({'dry': 'Dryland', 'irr': 'Irrigated'})
-
+    revenue_am_df_AUS = revenue_am_df_region.groupby(['lu', 'lm', 'am', 'Year']
+        ).sum(
+        ).reset_index().assign( region='AUSTRALIA'
+        ).query('abs(`Value ($)`) > 1')
+    cost_am_df_AUS = cost_am_df_region.groupby(['lu', 'lm', 'am', 'Year']
+        ).sum(
+        ).reset_index().assign( region='AUSTRALIA'
+        ).query('abs(`Value ($)`) > 1')
+ 
+    revenue_am_df = pd.concat([revenue_am_df_AUS, revenue_am_df_region])
+    cost_am_df = pd.concat([cost_am_df_AUS, cost_am_df_region])
+    
     # Save to disk
-    revenue_am_df.to_csv(os.path.join(path, f'revenue_agricultural_management_{yr_cal}.csv'), index=False)
-    cost_am_df.to_csv(os.path.join(path, f'cost_agricultural_management_{yr_cal}.csv'), index=False)
+    revenue_am_df.rename(
+        columns={
+            'lu': 'Land-use',
+            'lm': 'Water_supply',
+            'am': 'Management Type'
+        }).replace({'dry': 'Dryland', 'irr': 'Irrigated'}
+        ).to_csv(os.path.join(path, f'revenue_agricultural_management_{yr_cal}.csv'), index=False)
+    cost_am_df.rename(
+        columns={
+            'lu': 'Land-use',
+            'lm': 'Water_supply',
+            'am': 'Management Type'
+        }).replace({'dry': 'Dryland', 'irr': 'Irrigated'}
+        ).to_csv(os.path.join(path, f'cost_agricultural_management_{yr_cal}.csv'), index=False)
 
-    # Append mosaic layer, then save to netcdf
-    am_mosaic = cfxr.decode_compress_to_multi_index(xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc')), 'layer')['data'].sel(am=['ALL'])
-    xr_revenue_am_cat = xr.concat([am_mosaic, xr_revenue_am], dim='am')
-    xr_cost_am_cat = xr.concat([am_mosaic, xr_cost_am], dim='am')
 
-    save2nc(xr_revenue_am_cat, os.path.join(path, f'xr_revenue_agricultural_management_{yr_cal}.nc'))
-    save2nc(xr_cost_am_cat, os.path.join(path, f'xr_cost_agricultural_management_{yr_cal}.nc'))
+    # ------------------------- Stack array, get valid layers -------------------------
+    
+    # Get valid data layers
+    valid_layers_revenue = pd.MultiIndex.from_frame(revenue_am_df_AUS[['am', 'lm', 'lu']]).sort_values()
+    valid_layers_cost = pd.MultiIndex.from_frame(cost_am_df_AUS[['am', 'lm', 'lu']]).sort_values()
+
+    xr_revenue_am_stack = xr_revenue_am.stack(layer=['am','lm','lu']).sel(layer=valid_layers_revenue)
+    xr_cost_am_stack = xr_cost_am.stack(layer=['am','lm','lu']).sel(layer=valid_layers_cost)
+
+    # Get valid mosaic layers
+    am_mosaic_ds = cfxr.decode_compress_to_multi_index(
+            xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc')), 'layer'
+        )['data'].sel(am='ALL').sel(lu='ALL').sel(lm='ALL')
+
+    am_mosaic_rev = am_mosaic_ds.where(xr_revenue_am.sum('am').transpose('cell', ...)).expand_dims('am')
+    am_mosaic_cost = am_mosaic_ds.where(xr_cost_am.sum('am').transpose('cell', ...)).expand_dims('am')
+
+    am_mosaic_rev_stack = am_mosaic_rev.stack(layer=['am','lm','lu'])
+    am_mosaic_cost_stack = am_mosaic_cost.stack(layer=['am','lm','lu'])
+    
+    am_mosaic_rev_stack = am_mosaic_rev_stack.sel(
+        layer=(
+            am_mosaic_rev_stack['layer']['lm'].isin(valid_layers_revenue.get_level_values('lm')) &
+            am_mosaic_rev_stack['layer']['lu'].isin(valid_layers_revenue.get_level_values('lu'))
+        )
+    )
+    am_mosaic_cost_stack = am_mosaic_cost_stack.sel(
+        layer=(
+            am_mosaic_cost_stack['layer']['lm'].isin(valid_layers_cost.get_level_values('lm')) &
+            am_mosaic_cost_stack['layer']['lu'].isin(valid_layers_cost.get_level_values('lu'))
+        )
+    )
+    
+    
+    # Combine valid layers
+    valid_layers_stack_rev = xr.concat([xr_revenue_am_stack, am_mosaic_rev_stack], dim='layer')
+    valid_layers_stack_cost = xr.concat([xr_cost_am_stack, am_mosaic_cost_stack], dim='layer')
+
+    # Stack and save to netcdf
+    save2nc(valid_layers_stack_rev, os.path.join(path, f'xr_revenue_agricultural_management_{yr_cal}.nc'))
+    save2nc(valid_layers_stack_cost, os.path.join(path, f'xr_cost_agricultural_management_{yr_cal}.nc'))
     
     return f"Agricultural Management revenue and cost written for year {yr_cal}"
+
 
 
 def write_revenue_cost_non_ag(data: Data, yr_cal, path):
     """Calculate non_agricultural cost. """
 
-        
     yr_idx = yr_cal - data.YR_CAL_BASE
 
     non_ag_dvar = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]
@@ -861,35 +913,57 @@ def write_revenue_cost_non_ag(data: Data, yr_cal, path):
         ).sum(dim='cell'
         ).to_dataframe('Value ($)'
         ).reset_index(
-        ).assign(Year=yr_cal
-        ).rename(columns={'lu': 'Land-use'})
+        ).assign(Year=yr_cal)
     cost_non_ag_df_region = xr_cost_non_ag.groupby('region'
         ).sum(dim='cell'
         ).to_dataframe('Value ($)'
         ).reset_index(
-        ).assign(Year=yr_cal
-        ).rename(columns={'lu': 'Land-use'})
+        ).assign(Year=yr_cal)
 
     # Australia level aggregation
     rev_non_ag_df_AUS = xr_revenue_non_ag.sum(dim='cell'
         ).to_dataframe('Value ($)'
         ).reset_index(
         ).assign(Year=yr_cal, region='AUSTRALIA'
-        ).rename(columns={'lu': 'Land-use'})
+        ).query('abs(`Value ($)`) > 1')
     cost_non_ag_df_AUS = xr_cost_non_ag.sum(dim='cell'
         ).to_dataframe('Value ($)'
         ).reset_index(
         ).assign(Year=yr_cal, region='AUSTRALIA'
-        ).rename(columns={'lu': 'Land-use'})
+        ).query('abs(`Value ($)`) > 1')
 
     # Save to disk
-    pd.concat([rev_non_ag_df_AUS, rev_non_ag_df_region]).to_csv(os.path.join(path, f'revenue_non_ag_{yr_cal}.csv'), index = False)
-    pd.concat([cost_non_ag_df_AUS, cost_non_ag_df_region]).to_csv(os.path.join(path, f'cost_non_ag_{yr_cal}.csv'), index = False)
+    pd.concat([rev_non_ag_df_AUS, rev_non_ag_df_region]).rename(columns={'lu': 'Land-use'}).to_csv(os.path.join(path, f'revenue_non_ag_{yr_cal}.csv'), index = False)
+    pd.concat([cost_non_ag_df_AUS, cost_non_ag_df_region]).rename(columns={'lu': 'Land-use'}).to_csv(os.path.join(path, f'cost_non_ag_{yr_cal}.csv'), index = False)
 
-    # Append mosaic layer, then save to netcdf
-    non_ag_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc'))['data'].sel(lu=['ALL'])
-    xr_revenue_non_ag_cat = xr.concat([non_ag_mosaic, xr_revenue_non_ag], dim='lu')
-    xr_cost_non_ag_cat = xr.concat([non_ag_mosaic, xr_cost_non_ag], dim='lu')
+
+    # ------------------------- Stack array, get valid layers -------------------------
+
+    # Get valid data layers
+    valid_rev_layers = pd.MultiIndex.from_frame(rev_non_ag_df_AUS[['lu']]).sort_values()
+    valid_cost_layers = pd.MultiIndex.from_frame(cost_non_ag_df_AUS[['lu']]).sort_values()
+
+    non_ag_rev_valid_layers = xr_revenue_non_ag.stack(layer=['lu']).sel(layer=valid_rev_layers)
+    non_ag_cost_valid_layers = xr_cost_non_ag.stack(layer=['lu']).sel(layer=valid_cost_layers)
+
+    # Get valid mosaic layers
+    non_ag_mosaic = cfxr.decode_compress_to_multi_index(
+        xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
+        )['data'].sel(lu='ALL')
+
+    non_ag_mosaic_rev = non_ag_mosaic.where(xr_revenue_non_ag.transpose('cell', ...)).stack(layer=['lu'])
+    non_ag_mosaic_cost = non_ag_mosaic.where(xr_cost_non_ag.transpose('cell', ...)).stack(layer=['lu'])
+    
+    non_ag_mosaic_rev = non_ag_mosaic_rev.sel(
+        layer=non_ag_mosaic_rev['layer']['lu'].isin(valid_rev_layers.get_level_values('lu'))
+    )
+    non_ag_mosaic_cost = non_ag_mosaic_cost.sel(
+        layer=non_ag_mosaic_cost['layer']['lu'].isin(valid_cost_layers.get_level_values('lu'))
+    )
+
+    # Combine valid layers from dvar and mosaic
+    xr_revenue_non_ag_cat = xr.concat([non_ag_mosaic_rev, non_ag_rev_valid_layers], dim='layer')
+    xr_cost_non_ag_cat = xr.concat([non_ag_mosaic_cost, non_ag_cost_valid_layers], dim='layer')
 
     save2nc(xr_revenue_non_ag_cat, os.path.join(path, f'xr_revenue_non_ag_{yr_cal}.nc'))
     save2nc(xr_cost_non_ag_cat, os.path.join(path, f'xr_cost_non_ag_{yr_cal}.nc'))

@@ -107,6 +107,28 @@ requirements.toml                        # Python package dependencies (conda en
 pyproject.toml                           # Project configuration
 ```
 
+## Memory Profiling and Monitoring
+
+LUTO2 includes a built-in memory monitoring tool (`luto.tools.mem_monitor`) for tracking memory usage with live visualization. This is particularly useful for optimizing memory-intensive functions and identifying memory bottlenecks.
+
+### Using the Memory Monitor as a Decorator
+
+The **recommended way** to monitor memory usage is using the `@trace_mem_usage` decorator. It automatically handles starting, monitoring, and cleanup:
+
+```python
+from luto.tools.mem_monitor import trace_mem_usage
+
+@trace_mem_usage
+def my_expensive_function(data):
+    """This function's memory usage will be automatically monitored."""
+    result = process_large_data(data)
+    return result
+
+# Usage - monitoring happens automatically
+result = my_expensive_function(my_data)
+```
+
+
 ## Troubleshooting
 
 ### Common Issues
@@ -115,6 +137,7 @@ pyproject.toml                           # Project configuration
 - Ensure you have at least 32 GB RAM available
 - Close other applications during simulation
 - Consider running smaller scenarios first
+- Use the memory monitor to identify memory-intensive operations
 
 **GUROBI License Issues:**
 - Verify your license file location

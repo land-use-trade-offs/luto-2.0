@@ -87,10 +87,98 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 
 ## Memory and Performance
 
+### System Requirements
 - Minimum 16GB RAM (32GB recommended for large simulations)
 - Model complexity requires substantial computational resources
 - Use `RESFACTOR > 1` for testing and development to reduce memory usage
-- Monitor memory usage with built-in logging utilities
+
+### Memory Monitoring Tool
+
+LUTO2 includes a built-in memory profiling tool (`luto.tools.mem_monitor`) with live Plotly visualization. This is essential for optimizing memory-intensive operations and identifying bottlenecks.
+
+#### Using `@trace_mem_usage` Decorator (Recommended)
+
+The decorator automatically manages the full monitoring lifecycle:
+
+```python
+from luto.tools.mem_monitor import trace_mem_usage
+
+@trace_mem_usage
+def write_quantity_separate(data, sim, year):
+    """Memory usage is automatically tracked with live visualization."""
+    # Your memory-intensive code here
+    pass
+
+# Usage - monitoring happens automatically
+write_quantity_separate(data, sim, 2030)
+```
+
+**Features:**
+- ✅ Automatic start/stop lifecycle management
+- ✅ Live-updating Plotly visualization in Jupyter notebooks
+- ✅ Graceful exception handling (monitoring stops even if function fails)
+- ✅ Tracks delta memory from baseline (Working Set/RSS)
+- ✅ Reports peak, final memory, and execution duration
+
+**Advanced Usage:**
+
+```python
+# Customize plot update interval (default: 0.1s)
+@trace_mem_usage(update_interval=0.5)
+def slower_refresh(data):
+    return process(data)
+
+# Return memory statistics with function result
+@trace_mem_usage(return_data=True)
+def get_memory_stats(data):
+    return process(data)
+
+result, stats = get_memory_stats(data)
+print(f"Peak: {stats['peak_memory_mb']:.2f} MB")
+print(f"Duration: {stats['duration']:.2f}s")
+```
+
+#### Manual Monitoring
+
+For monitoring multiple operations or interactive development:
+
+```python
+from luto.tools.mem_monitor import start_memory_monitor, stop_memory_monitor
+
+start_memory_monitor(update_interval=0.1)  # Starts with live plot
+# Run your code while plot updates automatically
+operation1()
+operation2()
+stop_memory_monitor()  # Shows final summary and statistics
+```
+
+**When to Use:**
+- Monitoring sequential operations
+- Interactive Jupyter notebook development
+- Custom profiling workflows
+
+#### Example Output
+
+```
+Starting memory trace for: write_quantity_separate
+------------------------------------------------------------
+Memory monitoring started (baseline: 1234.56 MB)
+Live plot active in background. Run your code normally.
+[...live plot updates automatically...]
+
+Monitoring stopped.
+Duration: 45.23s | Peak: 2048.12 MB | Final: 1567.89 MB
+
+Function 'write_quantity_separate' completed successfully.
+```
+
+#### Implementation Location
+
+- **Module**: `luto/tools/mem_monitor.py`
+- **Key Functions**:
+  - `trace_mem_usage()`: Decorator for automatic monitoring
+  - `start_memory_monitor()`: Manual start
+  - `stop_memory_monitor()`: Manual stop with statistics
 
 ## Testing Framework
 
