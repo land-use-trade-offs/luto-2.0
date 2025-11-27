@@ -255,29 +255,26 @@ non_ag_rev_valid_layers = xr_revenue_non_ag.stack(
     layer=['lu']
 ).sel(layer=valid_rev_layers)
 
-# Step 3: Get mosaic and filter
+# Step 3: Get mosaic - simply expand and stack (no filtering)
 non_ag_mosaic = cfxr.decode_compress_to_multi_index(
     xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
-)['data'].sel(lu='ALL')
+)['data'].sel(lu='ALL').expand_dims('lu').stack(layer=['lu'])
 
-non_ag_mosaic_rev = non_ag_mosaic.where(
-    xr_revenue_non_ag.transpose('cell', ...)
-).stack(layer=['lu'])  # Non-ag: NO expansion needed, only 'lu' dimension
+# Step 4: Combine and compute
+xr_revenue_non_ag_cat = xr.concat([non_ag_mosaic, non_ag_rev_valid_layers], dim='layer').compute()
 
-# Step 4: Filter mosaic by lu dimension
-non_ag_mosaic_rev = non_ag_mosaic_rev.sel(
-    layer=non_ag_mosaic_rev['layer']['lu'].isin(valid_rev_layers.get_level_values('lu'))
-)
+xr_revenue_non_ag_cat.attrs = {
+    'min': float(xr_revenue_non_ag_cat.min().values),
+    'max': float(xr_revenue_non_ag_cat.max().values)
+}
 
-# Step 5: Combine
-xr_revenue_non_ag_cat = xr.concat([non_ag_mosaic_rev, non_ag_rev_valid_layers], dim='layer')
 save2nc(xr_revenue_non_ag_cat, os.path.join(path, f'xr_revenue_non_ag_{yr_cal}.nc'))
 ```
 
 **Key points for NonAg**:
-- Mosaic expansion: **NONE** - NonAg has only `lu` dimension, no need to expand
-- Mosaic filter: Uses `lu` only (or `Commodity` for quantity outputs)
-- Dimension order: `['lu']` (simpler hierarchy)
+- Mosaic handling: Simply `.expand_dims('lu').stack(layer=['lu'])` - no `.where()` or `.sel()` filtering needed
+- Unlike Ag/Am: NonAg mosaic doesn't require conditional filtering since it has only one dimension
+- Dimension order: `['lu']` (simplest hierarchy)
 
 #### 4. Quantity/Production Outputs - Special Case
 
@@ -312,8 +309,8 @@ ag_mosaic_stack = ag_mosaic_stack.sel(
 | **Ag** (Quantity) | `.expand_dims('Commodity')` | `lm` only | `['lm', 'Commodity']` |
 | **Am** (Revenue/Cost) | `.expand_dims('am')` | `lm`, `lu` | `['am', 'lm', 'lu']` |
 | **Am** (Quantity) | `.expand_dims('am')` | `lm`, `Commodity` | `['am', 'lm', 'Commodity']` |
-| **NonAg** (Revenue/Cost) | **NO expansion** | `lu` only | `['lu']` |
-| **NonAg** (Quantity) | **NO expansion** | `Commodity` only | `['Commodity']` |
+| **NonAg** (Revenue/Cost) | `.expand_dims('lu')` | **No filtering** | `['lu']` |
+| **NonAg** (Quantity) | `.expand_dims('Commodity')` | **No filtering** | `['Commodity']` |
 
 ### Critical Implementation Rules
 
@@ -331,7 +328,7 @@ ag_mosaic_stack = ag_mosaic_stack.sel(
 3. **Filter mosaic by dimensions OTHER than the expanded dimension**:
    - If you expand `lu=['ALL']`, filter by other dims (`lm`, `source`) but NOT `lu`
    - If you expand `am`, filter by other dims (`lm`, `lu`) but NOT `am`
-   - NonAg has no expansion, so filter by `lu` or `Commodity` directly
+   - **NonAg special case**: Expand with the dimension (`lu` or `Commodity`), but **do NOT filter** - simply `.expand_dims().stack()` and combine directly
 
 4. **The essence of valid layers**: Reduce redundant dimension combinations to save **both memory and disk space**
 

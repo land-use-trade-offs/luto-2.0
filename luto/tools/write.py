@@ -47,7 +47,7 @@ import luto.economics.agricultural.ghg as ag_ghg
 import luto.economics.agricultural.water as ag_water
 import luto.economics.agricultural.biodiversity as ag_biodiversity
 
-import luto.economics.non_agricultural.quantity as non_ag_quantity              
+import luto.economics.non_agricultural.quantity as non_ag_quantity
 import luto.economics.non_agricultural.revenue as non_ag_revenue
 import luto.economics.non_agricultural.cost as non_ag_cost
 import luto.economics.non_agricultural.transitions as non_ag_transitions
@@ -143,7 +143,7 @@ def create_report(data: Data):
     return _create_report()
    
    
-def save2nc(in_xr:xr.DataArray, save_path:str, calc_valid_layers:bool=True):
+def save2nc(in_xr:xr.DataArray, save_path:str):
     
     # Ensure dask chunking: keep 'cell' chunks as full length, others as 1
     chunks_size = {dim: (size if dim == 'cell' else 1) for dim, size in in_xr.sizes.items()}
@@ -162,6 +162,25 @@ def save2nc(in_xr:xr.DataArray, save_path:str, calc_valid_layers:bool=True):
     in_xr.to_netcdf(save_path, encoding=encoding)
 
 
+def safe_min_max(xr_data: xr.DataArray) -> tuple:
+    """
+    Safely compute min and max values from an xarray DataArray, handling NaN values.
+    """
+    try:
+        # Use skipna=True to skip NaN values
+        min_val = float(xr_data.min(skipna=True).values)
+        max_val = float(xr_data.max(skipna=True).values)
+
+        # Check if the result is NaN (happens when all values are NaN)
+        if np.isnan(min_val) or np.isnan(max_val):
+            return 0.0, 0.0
+
+        return min_val, max_val
+    except (ValueError, RuntimeError):
+        # Handle the case where the array is empty or all NaN
+        return 0.0, 0.0
+
+
 
 def write_output_single_year(data: Data, yr_cal, path_yr):
     """Wrap write tasks for a single year"""
@@ -172,7 +191,7 @@ def write_output_single_year(data: Data, yr_cal, path_yr):
     tasks = [
         delayed(write_dvar_area)(data, yr_cal, path_yr),
         delayed(write_crosstab)(data, yr_cal, path_yr),
-        delayed(write_quantity)(data, yr_cal, path_yr),
+        delayed(write_quantity_total)(data, yr_cal, path_yr),
         delayed(write_quantity_separate)(data, yr_cal, path_yr),
         delayed(write_revenue_cost_ag)(data, yr_cal, path_yr),
         delayed(write_revenue_cost_ag_man)(data, yr_cal, path_yr),
@@ -180,12 +199,15 @@ def write_output_single_year(data: Data, yr_cal, path_yr):
         delayed(write_transition_cost_ag2ag)(data, yr_cal, path_yr),
         delayed(write_transition_cost_ag2nonag)(data, yr_cal, path_yr),
         delayed(write_transition_cost_nonag2ag)(data, yr_cal, path_yr),
-        delayed(write_transition_cost_apply_ag_man)(data),
+        delayed(write_transition_cost_ag_man)(data),
         delayed(write_water)(data, yr_cal, path_yr),
-        delayed(write_ghg)(data, yr_cal, path_yr),
-        delayed(write_ghg_separate)(data, yr_cal, path_yr),
+        delayed(write_ghg_total)(data, yr_cal, path_yr),
+        delayed(write_ghg_agricultural)(data, yr_cal, path_yr),
+        delayed(write_ghg_non_agricultural)(data, yr_cal, path_yr),
+        delayed(write_ghg_agricultural_management)(data, yr_cal, path_yr),
+        delayed(write_ghg_transition_penalty)(data, yr_cal, path_yr),
         delayed(write_ghg_offland_commodity)(data, yr_cal, path_yr),
-        delayed(write_biodiversity_overall_quality_scores)(data, yr_cal, path_yr),
+        delayed(write_biodiversity_quality_scores)(data, yr_cal, path_yr),
         delayed(write_biodiversity_GBF2_scores)(data, yr_cal, path_yr),
         delayed(write_biodiversity_GBF3_NVIS_scores)(data, yr_cal, path_yr),
         delayed(write_biodiversity_GBF3_IBRA_scores)(data, yr_cal, path_yr),
@@ -285,7 +307,7 @@ def write_dvar_and_mosaic_map(data: Data, yr_cal, path):
 
 
 
-def write_quantity(data: Data, yr_cal, path):
+def write_quantity_total(data: Data, yr_cal, path):
     
     simulated_year_list = sorted(list(data.lumaps.keys()))
     yr_idx = yr_cal - data.YR_CAL_BASE
@@ -446,8 +468,9 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
     for i in range(0, data.NCELLS, chunk_size):
         
         ag_q_mrc_chunk = ag_q_mrc.isel(cell=slice(i, i + chunk_size)).compute()
-        ag_min = min(ag_min, float(ag_q_mrc_chunk.min().values))
-        ag_max = max(ag_max, float(ag_q_mrc_chunk.max().values))
+        chunk_min, chunk_max = safe_min_max(ag_q_mrc_chunk)
+        ag_min = min(ag_min, chunk_min)
+        ag_max = max(ag_max, chunk_max)
         
         ag_q_mrc_df_regions.append(
             ag_q_mrc_chunk
@@ -459,8 +482,9 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
         )
         
         non_ag_p_rc_chunk = non_ag_p_rc.isel(cell=slice(i, i + chunk_size)).compute()
-        non_ag_min = min(non_ag_min, float(non_ag_p_rc_chunk.min().values))
-        non_ag_max = max(non_ag_max, float(non_ag_p_rc_chunk.max().values))
+        chunk_min, chunk_max = safe_min_max(non_ag_p_rc_chunk)
+        non_ag_min = min(non_ag_min, chunk_min)
+        non_ag_max = max(non_ag_max, chunk_max)
         non_ag_p_rc_df_regions.append(
             non_ag_p_rc_chunk
             .groupby('region')
@@ -471,8 +495,9 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
         )
         
         am_p_amrc_chunk = am_p_amrc.isel(cell=slice(i, i + chunk_size)).compute()
-        am_min = min(am_min, float(am_p_amrc_chunk.min().values))
-        am_max = max(am_max, float(am_p_amrc_chunk.max().values))
+        chunk_min, chunk_max = safe_min_max(am_p_amrc_chunk)
+        am_min = min(am_min, chunk_min)
+        am_max = max(am_max, chunk_max)
         am_p_amrc_df_regions.append(
             am_p_amrc_chunk
             .groupby('region')
@@ -552,25 +577,21 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
     am_mosaic = cfxr.decode_compress_to_multi_index(
         xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc')), 'layer')['data'
         ].sel(am='ALL', lm='ALL').sel(lu='ALL').rename({'lu':'Commodity'})
-        
+
     ag_mosaic_valid = ag_mosaic.where(ag_q_mrc.sum('Commodity').transpose('cell', ...)).expand_dims('Commodity')
-    non_ag_mosaic_valid = non_ag_mosaic.where(non_ag_p_rc.transpose('cell', ...))
     am_mosaic_valid = am_mosaic.where(am_p_amrc.sum('am').transpose('cell', ...)).expand_dims('am')
-    
+
     ag_mosaic_stack = ag_mosaic_valid.stack(layer=['lm','Commodity'])
-    non_ag_mosaic_stack = non_ag_mosaic_valid.stack(layer=['Commodity'])
+    non_ag_mosaic_stack = non_ag_mosaic.expand_dims('Commodity').stack(layer=['Commodity'])
     am_mosaic_stack = am_mosaic_valid.stack(layer=['am','lm','Commodity'])
-    
+
     ag_mosaic_stack = ag_mosaic_stack.sel(
         layer=ag_mosaic_stack['layer']['lm'].isin(valid_ag_layers.get_level_values('lm'))
-    )
-    non_ag_mosaic_stack = non_ag_mosaic_stack.sel(
-        layer=non_ag_mosaic_stack['layer']['Commodity'].isin(valid_non_ag_layers.get_level_values('Commodity'))
     )
     am_mosaic_stack = am_mosaic_stack.sel(
         layer=(
             am_mosaic_stack['layer']['Commodity'].isin(valid_am_layers.get_level_values('Commodity')) &
-            am_mosaic_stack['layer']['lm'].isin(valid_am_layers.get_level_values('lm')) 
+            am_mosaic_stack['layer']['lm'].isin(valid_am_layers.get_level_values('lm'))
         )
     )
     
@@ -587,17 +608,20 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
     ag_q_mrc_cat_arr = xr.DataArray(
         np.zeros((data.NCELLS, len(ag_q_mrc_cat_stack['layer'])), dtype=np.float32),
         dims=['cell', 'layer'],
-        coords={'cell': range(data.NCELLS), 'layer': ag_q_mrc_cat_stack['layer']}
+        coords={'cell': range(data.NCELLS), 'layer': ag_q_mrc_cat_stack['layer']},
+        attrs={'min': ag_min, 'max': ag_max}
     )
     non_ag_p_rc_cat_arr = xr.DataArray(
         np.zeros((data.NCELLS, len(non_ag_p_rc_cat_stack['layer'])), dtype=np.float32),
         dims=['cell', 'layer'],
-        coords={'cell': range(data.NCELLS), 'layer': non_ag_p_rc_cat_stack['layer']}
+        coords={'cell': range(data.NCELLS), 'layer': non_ag_p_rc_cat_stack['layer']},
+        attrs={'min': non_ag_min, 'max': non_ag_max}
     )
     am_p_amrc_cat_arr = xr.DataArray(
         np.zeros((data.NCELLS, len(am_p_amrc_cat_stack['layer'])), dtype=np.float32),
         dims=['cell', 'layer'],
-        coords={'cell': range(data.NCELLS), 'layer': am_p_amrc_cat_stack['layer']}
+        coords={'cell': range(data.NCELLS), 'layer': am_p_amrc_cat_stack['layer']},
+        attrs={'min': am_min, 'max': am_max}
     )
     
     
@@ -607,9 +631,9 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
         non_ag_p_rc_cat_arr[i:i + chunk_size, :] = non_ag_p_rc_cat_stack.isel(cell=slice(i, i + chunk_size)).compute()
         am_p_amrc_cat_arr[i:i + chunk_size, :] = am_p_amrc_cat_stack.isel(cell=slice(i, i + chunk_size)).compute()
 
-    save2nc(ag_q_mrc_cat_arr, os.path.join(path, f'xr_quantities_agricultural_{yr_cal}.nc'), calc_valid_layers=False)
-    save2nc(non_ag_p_rc_cat_arr, os.path.join(path, f'xr_quantities_non_agricultural_{yr_cal}.nc'), calc_valid_layers=False)
-    save2nc(am_p_amrc_cat_arr, os.path.join(path, f'xr_quantities_agricultural_management_{yr_cal}.nc'), calc_valid_layers=False)
+    save2nc(ag_q_mrc_cat_arr, os.path.join(path, f'xr_quantities_agricultural_{yr_cal}.nc'))
+    save2nc(non_ag_p_rc_cat_arr, os.path.join(path, f'xr_quantities_non_agricultural_{yr_cal}.nc'))
+    save2nc(am_p_amrc_cat_arr, os.path.join(path, f'xr_quantities_agricultural_management_{yr_cal}.nc'))
 
     return f"Separate quantity production written for year {yr_cal}"
 
@@ -757,8 +781,16 @@ def write_revenue_cost_ag(data: Data, yr_cal, path):
     )
     
     # Combine valid layers from dvar and mosaic
-    valid_layers_stack_rev = xr.concat([ag_rev_valid_layers, ag_mosaic_rev_stack], dim='layer')
-    valid_layers_stack_cost = xr.concat([ag_cost_valid_layers, ag_mosaic_cost_stack], dim='layer')
+    valid_layers_stack_rev = xr.concat([ag_rev_valid_layers, ag_mosaic_rev_stack], dim='layer').compute()
+    valid_layers_stack_cost = xr.concat([ag_cost_valid_layers, ag_mosaic_cost_stack], dim='layer').compute()
+    
+    valid_layers_stack_rev_min, valid_layers_stack_rev_max = safe_min_max(valid_layers_stack_rev)
+
+    
+    valid_layers_stack_rev.attrs = {'min': valid_layers_stack_rev_min, 'max': valid_layers_stack_rev_max}
+    
+    valid_layers_stack_cost_min, valid_layers_stack_cost_max = safe_min_max(valid_layers_stack_cost)
+    valid_layers_stack_cost.attrs = {'min': valid_layers_stack_cost_min, 'max': valid_layers_stack_cost_max}
     
     save2nc(valid_layers_stack_rev, os.path.join(path, f'xr_revenue_ag_{yr_cal}.nc'))
     save2nc(valid_layers_stack_cost, os.path.join(path, f'xr_cost_ag_{yr_cal}.nc'))
@@ -875,8 +907,16 @@ def write_revenue_cost_ag_man(data: Data, yr_cal, path):
     
     
     # Combine valid layers
-    valid_layers_stack_rev = xr.concat([xr_revenue_am_stack, am_mosaic_rev_stack], dim='layer')
-    valid_layers_stack_cost = xr.concat([xr_cost_am_stack, am_mosaic_cost_stack], dim='layer')
+    valid_layers_stack_rev = xr.concat([xr_revenue_am_stack, am_mosaic_rev_stack], dim='layer').compute()
+    valid_layers_stack_cost = xr.concat([xr_cost_am_stack, am_mosaic_cost_stack], dim='layer').compute()
+    
+    valid_layers_stack_rev_min, valid_layers_stack_rev_max = safe_min_max(valid_layers_stack_rev)
+
+    
+    valid_layers_stack_rev.attrs = {'min': valid_layers_stack_rev_min, 'max': valid_layers_stack_rev_max}
+    valid_layers_stack_cost_min, valid_layers_stack_cost_max = safe_min_max(valid_layers_stack_cost)
+
+    valid_layers_stack_cost.attrs = {'min': valid_layers_stack_cost_min, 'max': valid_layers_stack_cost_max}
 
     # Stack and save to netcdf
     save2nc(valid_layers_stack_rev, os.path.join(path, f'xr_revenue_agricultural_management_{yr_cal}.nc'))
@@ -949,21 +989,19 @@ def write_revenue_cost_non_ag(data: Data, yr_cal, path):
     # Get valid mosaic layers
     non_ag_mosaic = cfxr.decode_compress_to_multi_index(
         xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
-        )['data'].sel(lu='ALL')
-
-    non_ag_mosaic_rev = non_ag_mosaic.where(xr_revenue_non_ag.transpose('cell', ...)).stack(layer=['lu'])
-    non_ag_mosaic_cost = non_ag_mosaic.where(xr_cost_non_ag.transpose('cell', ...)).stack(layer=['lu'])
-    
-    non_ag_mosaic_rev = non_ag_mosaic_rev.sel(
-        layer=non_ag_mosaic_rev['layer']['lu'].isin(valid_rev_layers.get_level_values('lu'))
-    )
-    non_ag_mosaic_cost = non_ag_mosaic_cost.sel(
-        layer=non_ag_mosaic_cost['layer']['lu'].isin(valid_cost_layers.get_level_values('lu'))
-    )
+        )['data'].sel(lu='ALL').expand_dims('lu').stack(layer=['lu'])
 
     # Combine valid layers from dvar and mosaic
-    xr_revenue_non_ag_cat = xr.concat([non_ag_mosaic_rev, non_ag_rev_valid_layers], dim='layer')
-    xr_cost_non_ag_cat = xr.concat([non_ag_mosaic_cost, non_ag_cost_valid_layers], dim='layer')
+    xr_revenue_non_ag_cat = xr.concat([non_ag_mosaic, non_ag_rev_valid_layers], dim='layer').compute()
+    xr_cost_non_ag_cat = xr.concat([non_ag_mosaic, non_ag_cost_valid_layers], dim='layer').compute()
+    
+    xr_revenue_non_ag_cat_min, xr_revenue_non_ag_cat_max = safe_min_max(xr_revenue_non_ag_cat)
+
+    
+    xr_revenue_non_ag_cat.attrs = {'min': xr_revenue_non_ag_cat_min, 'max': xr_revenue_non_ag_cat_max}
+    xr_cost_non_ag_cat_min, xr_cost_non_ag_cat_max = safe_min_max(xr_cost_non_ag_cat)
+
+    xr_cost_non_ag_cat.attrs = {'min': xr_cost_non_ag_cat_min, 'max': xr_cost_non_ag_cat_max}
 
     save2nc(xr_revenue_non_ag_cat, os.path.join(path, f'xr_revenue_non_ag_{yr_cal}.nc'))
     save2nc(xr_cost_non_ag_cat, os.path.join(path, f'xr_cost_non_ag_{yr_cal}.nc'))
@@ -977,6 +1015,11 @@ def write_transition_cost_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 
     simulated_year_list = sorted(list(data.lumaps.keys()))
     yr_idx = yr_cal - data.YR_CAL_BASE
+    
+    # Has to reduce chunk size because of this intermediate array it too large
+    #   Approximate reduction: 3x, which will make it using the similar mem as other functions
+    #   The downside is that it will take longer `3 more times to compute
+    chunk_size = min(settings.WRITE_CHUNK_SIZE//3, data.NCELLS)
 
     # Get index of yr_cal in simulated_year_list (e.g., if yr_cal is 2050 then yr_idx_sim = 2 if snapshot)
     yr_idx_sim = simulated_year_list.index(yr_cal)
@@ -988,11 +1031,11 @@ def write_transition_cost_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 
     ag_dvar_mrj_target = ag_dvar_mrj_target.rename({'lm': 'To water-supply', 'lu': 'To land-use'}
         ).assign_coords(region=('cell', data.REGION_NRM_NAME)
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
+        ).chunk({'cell': chunk_size})
 
     ag_dvar_mrj_base = ag_dvar_mrj_base.rename({'lm': 'From water-supply', 'lu': 'From land-use'}
         ).assign_coords(region=('cell', data.REGION_NRM_NAME)
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
+        ).chunk({'cell': chunk_size})
 
     # Get the transition cost matrices for agricultural land-use
     if yr_idx == 0:
@@ -1014,84 +1057,108 @@ def write_transition_cost_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     # Compute in chunks and aggregate to DataFrame; This is to reduce memory usage
     cost_xr = ag_dvar_mrj_base * ag_dvar_mrj_target * ag_transitions_cost_mat
     
-    chunk_size = min(settings.WRITE_CHUNK_SIZE, data.NCELLS)
-    cost_dfs = []
-    for i in range(0, data.NCELLS, chunk_size):
+    # Append ALL dimensions to cost_xr
+    cost_xr = xr.concat([cost_xr.sum(dim='From water-supply', keepdims=True).assign_coords({'From water-supply': ['ALL']}), cost_xr], dim='From water-supply')
+    cost_xr = xr.concat([cost_xr.sum(dim='From land-use', keepdims=True).assign_coords({'From land-use': ['ALL']}), cost_xr], dim='From land-use')
+    cost_xr = xr.concat([cost_xr.sum(dim='To water-supply', keepdims=True).assign_coords({'To water-supply': ['ALL']}), cost_xr], dim='To water-supply')
+    cost_xr = xr.concat([cost_xr.sum(dim='To land-use', keepdims=True).assign_coords({'To land-use': ['ALL']}), cost_xr], dim='To land-use')
+    cost_xr = xr.concat([cost_xr.sum(dim='Type', keepdims=True).assign_coords({'Type': ['ALL']}), cost_xr], dim='Type')
+    
+    # ------------------------- Chunk level aggregation -------------------------
+    '''
+    Here we manually loop through chunks to reduce memory usage during groupby operation.
+        This is because the `cost_xr` is a huge intermediate array that consumes a lot of memory. 
+        By mannually select each chunk, we can limit the size of the intermediate array.
         
-        # Select and compute this chunk
+        Memory usage at RESFACTOR=13:
+        - Without manual chunking (cost_xr): ~5 GB
+        - With manual chunking:  ~70 MB
+    '''
+    cost_dfs = []
+    val_min, val_max = np.inf, -np.inf
+    for i in range(0, data.NCELLS, chunk_size):
+
         end_idx = min(i + chunk_size, data.NCELLS)
         cell_slice = slice(i, end_idx)
-        chunk_xr = cost_xr.isel(cell=cell_slice)
+        chunk_arr = cost_xr.isel(cell=cell_slice).compute()
 
-        # Process the chunk
-        cost_df_region = chunk_xr.groupby('region'
+        cost_df_region = chunk_arr.groupby('region'
             ).sum(dim='cell'
             ).to_dataframe('Cost ($)'
             ).reset_index(
-            ).assign(Year=yr_cal
-            ).query('abs(`Cost ($)`) > 0')
-        cost_df_AUS = chunk_xr.sum(dim='cell'
-            ).to_dataframe('Cost ($)'
+            ).groupby(['region', 'Type', 'From water-supply', 'From land-use', 'To water-supply', 'To land-use']
+            )['Cost ($)'
+            ].sum(
             ).reset_index(
-            ).assign(Year=yr_cal, region='AUSTRALIA'
-            ).query('abs(`Cost ($)`) > 0')
-
-        cost_dfs.append(pd.concat([cost_df_AUS, cost_df_region], ignore_index=True))
+            ).query('abs(`Cost ($)`) > 1'
+            ).assign(Year=yr_cal, chunk_idx=i//chunk_size) 
+            
+        val_min = min(val_min, chunk_arr.min())
+        val_max = max(val_max, chunk_arr.max())
+            
+        cost_dfs.append(cost_df_region)
         
 
-    # Combine all chunks and re-aggregate (in case same region appears in multiple chunks)
-    cost_df = pd.concat(cost_dfs, ignore_index=True)\
-        .groupby(['region', 'Type', 'From water-supply', 'From land-use', 'To water-supply', 'To land-use', 'Year'],  dropna=False
-        )['Cost ($)'].sum(
+    # Combine all chunks df
+    cost_df_region = pd.concat(cost_dfs, ignore_index=True
+        ).groupby(['region', 'From water-supply', 'From land-use', 'To water-supply', 'To land-use', 'Year', 'Type']
+        )['Cost ($)'
+        ].sum(
+        ).reset_index()
+    
+    # Get Australia level aggregation
+    cost_df_AUS = cost_df_region.groupby(['From water-supply', 'From land-use', 'To water-supply', 'To land-use', 'Type', 'Year']
+        )['Cost ($)'
+        ].sum(
         ).reset_index(
-        ).query('abs(`Cost ($)`) > 0')
+        ).assign(region='AUSTRALIA'
+        ).query('abs(`Cost ($)`) > 1000') # Skip transitions under $1,000 at national level
+        
+    # Write to csv
+    pd.concat([cost_df_region, cost_df_AUS]
+        ).replace({'dry':'Dryland', 'irr':'Irrigated'}
+        ).to_csv(os.path.join(path, f'cost_transition_ag2ag_{yr_cal}.csv'), index=False)
+        
 
-    # Extract valid transitions BEFORE replacing dry/irr (must match xarray coords)
-    valid_transitions = pd.MultiIndex.from_frame(
-        cost_df[['Type', 'From water-supply', 'From land-use', 'To water-supply', 'To land-use']]
-        .drop_duplicates()
-        .reset_index(drop=True)
-    )
-
-    # Stack the xarray to prepare for filtering
+    # ------------------------- Stack array, get valid layers -------------------------
+    '''
+    We manually loop through chunks to save stacked array to reduce memory usage.
+        The materilizing of `cost_xr_stacked` requires a lot of memory.
+    '''
+    
+    # Get valid data layers
+    valid_layers_transition = pd.MultiIndex.from_frame(
+        cost_df_AUS[['From water-supply', 'From land-use', 'To water-supply', 'To land-use', 'Type']]
+    ).sort_values()
+    
     cost_xr_stacked = cost_xr.stack({
-        'layer': ['Type', 'From water-supply', 'From land-use','To water-supply', 'To land-use']
-    })
+        'layer': ['From water-supply', 'From land-use', 'To water-supply', 'To land-use', 'Type']
+    }).sel(layer=valid_layers_transition)
 
-    # Now replace for CSV output
-    cost_df = cost_df.replace({'dry':'Dryland', 'irr':'Irrigated'})
-    cost_df.to_csv(os.path.join(path, f'cost_transition_ag2ag_{yr_cal}.csv'), index=False)
-
-    # Create valid_layers_info with human-readable names for reporting
-    valid_layers_info = cost_df[[
-        'Type', 'From water-supply', 'From land-use', 'To water-supply', 'To land-use']
-    ].drop_duplicates().to_dict('records')
-
-    cost_xr_filtered = cost_xr_stacked.sel(layer=valid_transitions)
 
     # Materialize the filtered array by looping through chunks
-    cost_xr_filtered_array = xr.DataArray(
-        np.zeros((len(valid_transitions), data.NCELLS), dtype=np.float32),
+    cost_xr_stacked_array = xr.DataArray(
+        np.zeros((data.NCELLS, len(valid_layers_transition)), dtype=np.float32),
         coords={
-            'layer': valid_transitions,
-            'cell': range(data.NCELLS)
+            'cell': range(data.NCELLS),
+            'layer': valid_layers_transition
+        },
+        attrs={
+            'min': float(val_min),
+            'max': float(val_max)
         }
     )
     
     for i in range(0, data.NCELLS, chunk_size):
         end_idx = min(i + chunk_size, data.NCELLS)
         cell_slice = slice(i, end_idx)
-        cost_xr_filtered_array[:, cell_slice] = cost_xr_filtered.isel(cell=cell_slice).compute()
+        cost_xr_stacked_array[cell_slice, :] = cost_xr_stacked.isel(cell=cell_slice)
         
 
-
     # Save the compact filtered array
-    cost_xr_filtered_array.attrs['valid_layers'] = str(valid_layers_info)
-    cost_xr_filtered_array.attrs['min_max'] = (float(cost_df['Cost ($)'].min()), float(cost_df['Cost ($)'].max()))
-    save2nc(cost_xr_filtered_array, os.path.join(path, f'xr_cost_transition_ag2ag_{yr_cal}.nc'), calc_valid_layers=False)
+    save2nc(cost_xr_stacked_array, os.path.join(path, f'xr_cost_transition_ag2ag_{yr_cal}.nc'))
 
     return f"Agricultural to agricultural transition cost written for year {yr_cal}"
-
 
 
 
@@ -1146,87 +1213,113 @@ def write_transition_cost_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None
 
     # Compute in chunks and aggregate to DataFrame; This is to reduce memory usage
     cost_xr = ag_dvar_base * non_ag_transitions_flat.unstack('lu_source') * non_ag_dvar_target
+    
+    # Append ALL dimensions to cost_xr
+    cost_xr = xr.concat([cost_xr.sum(dim='From water-supply', keepdims=True).assign_coords({'From water-supply': ['ALL']}), cost_xr], dim='From water-supply')
+    cost_xr = xr.concat([cost_xr.sum(dim='From land-use', keepdims=True).assign_coords({'From land-use': ['ALL']}), cost_xr], dim='From land-use')
+    cost_xr = xr.concat([cost_xr.sum(dim='To land-use', keepdims=True).assign_coords({'To land-use': ['ALL']}), cost_xr], dim='To land-use')
+    cost_xr = xr.concat([cost_xr.sum(dim='Cost type', keepdims=True).assign_coords({'Cost type': ['ALL']}), cost_xr], dim='Cost type')
 
+
+    # ------------------------- Chunk level aggregation -------------------------
+    '''
+    Here we manually loop through chunks to reduce memory usage during groupby operation.
+        This is because the `cost_xr` is a huge intermediate array that consumes a lot of memory. 
+        By mannually select each chunk, we can limit the size of the intermediate array.
+        
+        Memory usage at RESFACTOR=13:
+        - Without manual chunking (cost_xr): ~750 MB
+        - With manual chunking:  ~15 MB
+    '''
     chunk_size = min(settings.WRITE_CHUNK_SIZE, data.NCELLS)
     cost_dfs = []
+    val_min, val_max = np.inf, -np.inf
     for i in range(0, data.NCELLS, chunk_size):
 
         # Select and compute this chunk
         end_idx = min(i + chunk_size, data.NCELLS)
         cell_slice = slice(i, end_idx)
-        chunk_xr = cost_xr.isel(cell=cell_slice)
+        chunk_arr = cost_xr.isel(cell=cell_slice).compute()
 
-        # Process the chunk
-        cost_df_region = chunk_xr.groupby('region'
+        cost_df_region = chunk_arr.groupby('region'
             ).sum(dim='cell'
             ).to_dataframe('Cost ($)'
             ).reset_index(
-            ).assign(Year=yr_cal
-            ).query('abs(`Cost ($)`) > 0')
-        cost_df_AUS = chunk_xr.sum(dim='cell'
-            ).to_dataframe('Cost ($)'
+            ).groupby(['region', 'From water-supply', 'From land-use', 'To land-use', 'Cost type'], dropna=False
+            )['Cost ($)'].sum(
             ).reset_index(
-            ).assign(Year=yr_cal, region='AUSTRALIA'
+            ).assign(Year=yr_cal, chunk_idx=i//chunk_size
             ).query('abs(`Cost ($)`) > 0')
+        
+        val_min = min(val_min, chunk_arr.min())
+        val_max = max(val_max, chunk_arr.max())
+        cost_dfs.append(cost_df_region)
 
-        cost_dfs.append(pd.concat([cost_df_AUS, cost_df_region], ignore_index=True))
 
+    # Combine all chunks df
+    cost_df_region = pd.concat(cost_dfs, ignore_index=True)
 
-    # Combine all chunks and re-aggregate (in case same region appears in multiple chunks)
-    cost_df = pd.concat(cost_dfs, ignore_index=True)\
-        .groupby(['region', 'From water-supply', 'From land-use', 'To land-use', 'Cost type', 'Year'], dropna=False
-        )['Cost ($)'].sum(
+    # Get Australia level aggregation
+    cost_df_AUS = cost_df_region.groupby(['From water-supply', 'From land-use', 'To land-use', 'Cost type', 'Year']
+        )['Cost ($)'
+        ].sum(
         ).reset_index(
-        ).query('abs(`Cost ($)`) > 0')
+        ).assign(region='AUSTRALIA'
+        ).query('abs(`Cost ($)`) > 1000') # Skip transitions under $1,000 at national level
+        
+    # Save to csv
+    pd.concat([cost_df_AUS, cost_df_region]
+        ).replace({'dry':'Dryland', 'irr':'Irrigated'}
+        ).to_csv(os.path.join(path, f'cost_transition_ag2non_ag_{yr_cal}.csv'), index=False)
 
-    # Extract valid transitions BEFORE replacing dry/irr (must match xarray coords)
-    valid_transitions = pd.MultiIndex.from_frame(
-        cost_df[['From water-supply', 'From land-use', 'To land-use', 'Cost type']]
-        .drop_duplicates()
-        .reset_index(drop=True)
-    )
+    
 
-    # Stack the xarray to prepare for filtering
+
+    # ------------------------- Stack array, get valid layers -------------------------
+    '''
+    We manually loop through chunks to save stacked array to reduce memory usage.
+        The materilizing of `cost_xr_stacked` requires a lot of memory.
+    '''
+
+    valid_layers_transition = pd.MultiIndex.from_frame(
+        cost_df_AUS[['From water-supply', 'From land-use', 'To land-use', 'Cost type']]
+    ).sort_values()
+    
     cost_xr_stacked = cost_xr.stack({
         'layer': ['From water-supply', 'From land-use', 'To land-use', 'Cost type']
     })
+    
+    cost_xr_filtered = cost_xr_stacked.sel(layer=valid_layers_transition)
 
-    # Now replace for CSV output
-    cost_df = cost_df.replace({'dry':'Dryland', 'irr':'Irrigated'})
-    cost_df.to_csv(os.path.join(path, f'cost_transition_ag2non_ag_{yr_cal}.csv'), index=False)
 
-    # Create valid_layers_info with human-readable names for reporting
-    valid_layers_info = cost_df[[
-        'From water-supply', 'From land-use', 'To land-use', 'Cost type']
-    ].drop_duplicates().to_dict('records')
 
-    cost_xr_filtered = cost_xr_stacked.sel(layer=valid_transitions)
-
-    # Materialize the filtered array by looping through chunks
+    # Save valid layers 
     cost_xr_filtered_array = xr.DataArray(
-        np.zeros((len(valid_transitions), data.NCELLS), dtype=np.float32),
+        np.zeros((data.NCELLS, len(valid_layers_transition)), dtype=np.float32),
         coords={
-            'layer': valid_transitions,
-            'cell': range(data.NCELLS)
+            'cell': range(data.NCELLS),
+            'layer': valid_layers_transition
+        },
+        attrs={
+            'min': float(val_min),
+            'max': float(val_max)
         }
     )
-
+    
     for i in range(0, data.NCELLS, chunk_size):
         end_idx = min(i + chunk_size, data.NCELLS)
         cell_slice = slice(i, end_idx)
-        cost_xr_filtered_array[:, cell_slice] = cost_xr_filtered.isel(cell=cell_slice).compute()
+        cost_xr_filtered_array[cell_slice, :] = cost_xr_filtered.isel(cell=cell_slice)
 
 
     # Save the compact filtered array
-    cost_xr_filtered_array.attrs['valid_layers'] = str(valid_layers_info)
-    cost_xr_filtered_array.attrs['min_max'] = (float(cost_df['Cost ($)'].min()), float(cost_df['Cost ($)'].max()))
-    save2nc(cost_xr_filtered_array, os.path.join(path, f'xr_transition_cost_ag2non_ag_{yr_cal}.nc'), calc_valid_layers=False)
+    save2nc(cost_xr_filtered_array, os.path.join(path, f'xr_transition_cost_ag2non_ag_{yr_cal}.nc'))
 
     return f"Agricultural to non-agricultural transition cost written for year {yr_cal}"
 
 
 
-def write_transition_cost_apply_ag_man(data: Data):
+def write_transition_cost_ag_man(data: Data):
     
     # The agricultural management transition cost are all zeros, so skip the calculation here
     # am_cost = ag_transitions.get_agricultural_management_transition_matrices(data)
@@ -1234,10 +1327,10 @@ def write_transition_cost_apply_ag_man(data: Data):
     return "Agricultural Management transition cost processing completed"
 
 
+
 def write_transition_cost_nonag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     """Calculate transition cost."""
 
-    
     simulated_year_list = sorted(list(data.lumaps.keys()))
     yr_idx = yr_cal - data.YR_CAL_BASE
 
@@ -1347,61 +1440,137 @@ def write_dvar_area(data: Data, yr_cal, path):
         ).sum(dim='cell'
         ).to_dataframe('Area (ha)'
         ).reset_index(
-        ).rename(columns={'lu': 'Land-use', 'lm':'Water_supply'}
         ).assign(Year=yr_cal
-        ).replace({'dry':'Dryland', 'irr':'Irrigated'}
-        ).query('abs(`Area (ha)`) > 1e-6')
+        ).query('abs(`Area (ha)`) > 1')
     df_non_ag_area_region = area_non_ag.groupby('region'
         ).sum(dim='cell'
         ).to_dataframe('Area (ha)'
         ).reset_index(
-        ).rename(columns={'lu': 'Land-use'}
         ).assign(Year=yr_cal
-        ).query('abs(`Area (ha)`) > 1e-6')
+        ).query('abs(`Area (ha)`) > 1')
     df_am_area_region = area_am.groupby('region'
         ).sum(dim='cell'
         ).to_dataframe('Area (ha)'
         ).reset_index(
-        ).rename(columns={'lu': 'Land-use', 'lm':'Water_supply', 'am': 'Type'}
         ).assign(Year=yr_cal
-        ).replace({'dry':'Dryland', 'irr':'Irrigated'}
-        ).query('abs(`Area (ha)`) > 1e-6')
-        
+        ).query('abs(`Area (ha)`) > 1')
+
     # Australia level aggregation
     df_ag_area_AUS = area_ag.sum(dim='cell'
         ).to_dataframe('Area (ha)'
         ).reset_index(
-        ).rename(columns={'lu': 'Land-use', 'lm':'Water_supply'}
         ).assign(Year=yr_cal, region='AUSTRALIA'
-        ).replace({'dry':'Dryland', 'irr':'Irrigated'}
-        ).query('abs(`Area (ha)`) > 1e-6')
+        ).query('abs(`Area (ha)`) > 1')
     df_non_ag_area_AUS = area_non_ag.sum(dim='cell'
         ).to_dataframe('Area (ha)'
         ).reset_index(
-        ).rename(columns={'lu': 'Land-use'}
         ).assign(Year=yr_cal, region='AUSTRALIA'
-        ).query('abs(`Area (ha)`) > 1e-6')
+        ).query('abs(`Area (ha)`) > 1')
     df_am_area_AUS = area_am.sum(dim='cell'
         ).to_dataframe('Area (ha)'
         ).reset_index(
-        ).rename(columns={'lu': 'Land-use', 'lm':'Water_supply', 'am': 'Type'}
         ).assign(Year=yr_cal, region='AUSTRALIA'
+        ).query('abs(`Area (ha)`) > 1')
+
+
+    # Save to CSV with renamed columns
+    pd.concat([df_ag_area_AUS, df_ag_area_region]
+        ).rename(columns={'lu': 'Land-use', 'lm':'Water_supply'}
         ).replace({'dry':'Dryland', 'irr':'Irrigated'}
-        ).query('abs(`Area (ha)`) > 1e-6')
-                                 
+        ).to_csv(os.path.join(path, f'area_agricultural_landuse_{yr_cal}.csv'), index = False)
+    pd.concat([df_non_ag_area_AUS, df_non_ag_area_region]
+        ).rename(columns={'lu': 'Land-use'}
+        ).to_csv(os.path.join(path, f'area_non_agricultural_landuse_{yr_cal}.csv'), index = False)
+    pd.concat([df_am_area_AUS, df_am_area_region]
+        ).rename(columns={'lu': 'Land-use', 'lm':'Water_supply', 'am': 'Type'}
+        ).replace({'dry':'Dryland', 'irr':'Irrigated'}
+        ).to_csv(os.path.join(path, f'area_agricultural_management_{yr_cal}.csv'), index = False)
 
-    pd.concat([df_ag_area_AUS, df_ag_area_region]).to_csv(os.path.join(path, f'area_agricultural_landuse_{yr_cal}.csv'), index = False)
-    pd.concat([df_non_ag_area_AUS, df_non_ag_area_region]).to_csv(os.path.join(path, f'area_non_agricultural_landuse_{yr_cal}.csv'), index = False)
-    pd.concat([df_am_area_AUS, df_am_area_region]).to_csv(os.path.join(path, f'area_agricultural_management_{yr_cal}.csv'), index = False)
 
-    # Append the mosaic layer, then save to netcdf
-    ag_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc'))['data'].sel(lu=['ALL'])
-    area_ag_cat = xr.concat([ag_mosaic, area_ag], dim='lu')
-    non_ag_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc'))['data'].sel(lu=['ALL'])
-    area_non_ag_cat = xr.concat([non_ag_mosaic, area_non_ag], dim='lu')
-    am_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc'))['data'].sel(am=['ALL'])
-    area_am_cat = xr.concat([am_mosaic, area_am], dim='am')
+    # ------------------------- Stack array, get valid layers -------------------------
+    '''
+    We do NOT manually loop through chunks to reduce memory usage.
+    Because the intermediate array `real_area_r` is no larger than the in-mem area arrays.
+    '''
 
+    # ------------------------- Agricultural Area -------------------------
+    # Get valid data layers
+    valid_ag_layers = pd.MultiIndex.from_frame(df_ag_area_AUS[['lm', 'lu']]).sort_values()
+    area_ag_valid_layers = area_ag.stack(layer=['lm', 'lu']).sel(layer=valid_ag_layers)
+
+    # Get mosaic and filter
+    ag_mosaic = cfxr.decode_compress_to_multi_index(
+            xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc')), 'layer'
+        )['data'].sel(lu='ALL', lm='ALL')
+    ag_mosaic_area = ag_mosaic.where(
+            area_ag.sum(dim='lu').transpose('cell', ...)
+        ).expand_dims(lu=['ALL'])
+
+    # Stack mosaic and filter by valid lm (NOT lu since mosaic has lu='ALL' only)
+    ag_mosaic_area_stack = ag_mosaic_area.stack(layer=['lm', 'lu'])
+    ag_mosaic_area_stack = ag_mosaic_area_stack.sel(
+        layer=ag_mosaic_area_stack['layer']['lm'].isin(valid_ag_layers.get_level_values('lm'))
+    )
+
+    # Combine valid layers from data and mosaic
+    area_ag_cat = xr.concat([ag_mosaic_area_stack, area_ag_valid_layers], dim='layer')
+
+
+    # ------------------------- Non-Agricultural Area -------------------------
+    # Get valid data layers (NonAg: lu dimension only)
+    valid_non_ag_layers = pd.MultiIndex.from_frame(df_non_ag_area_AUS[['lu']]).sort_values()
+
+    # Stack and select valid data layers
+    area_non_ag_valid_layers = area_non_ag.stack(layer=['lu']).sel(layer=valid_non_ag_layers)
+
+    # Get valid mosaic layers
+    non_ag_mosaic = cfxr.decode_compress_to_multi_index(
+        xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
+    )['data'].sel(lu='ALL').expand_dims('lu').stack(layer=['lu'])
+
+    # Combine valid layers from dvar and mosaic
+    area_non_ag_cat = xr.concat([non_ag_mosaic, area_non_ag_valid_layers], dim='layer')
+
+
+    # ------------------------- Agricultural Management Area -------------------------
+    # Get valid data layers (Am: am → lm → lu dimension order)
+    valid_am_layers = pd.MultiIndex.from_frame(df_am_area_AUS[['am', 'lm', 'lu']]).sort_values()
+
+    # Stack and select valid data layers
+    area_am_valid_layers = area_am.stack(layer=['am', 'lm', 'lu']).sel(layer=valid_am_layers)
+
+    # Get mosaic and filter
+    am_mosaic = cfxr.decode_compress_to_multi_index(
+        xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc')), 'layer'
+    )['data'].sel(am='ALL', lm='ALL', lu='ALL')
+
+    # Filter mosaic where data exists, then expand am dimension
+    am_mosaic_area = am_mosaic.where(
+        area_am.sum('am').transpose('cell', ...)
+    ).expand_dims('am')
+
+    # Stack mosaic and filter by lm and lu (NOT am since mosaic has am='ALL' only)
+    am_mosaic_area_stack = am_mosaic_area.stack(layer=['am', 'lm', 'lu'])
+    am_mosaic_area_stack = am_mosaic_area_stack.sel(
+        layer=(
+            am_mosaic_area_stack['layer']['lm'].isin(valid_am_layers.get_level_values('lm')) &
+            am_mosaic_area_stack['layer']['lu'].isin(valid_am_layers.get_level_values('lu'))
+        )
+    )
+
+    # Combine valid layers from data and mosaic
+    area_am_cat = xr.concat([area_am_valid_layers, am_mosaic_area_stack], dim='layer')
+
+    # Save to netcdf with valid layers
+    area_ag_cat_min, area_ag_cat_max = safe_min_max(area_ag_cat)
+
+    area_ag_cat.attrs = {'min': area_ag_cat_min, 'max': area_ag_cat_max}
+    area_non_ag_cat_min, area_non_ag_cat_max = safe_min_max(area_non_ag_cat)
+
+    area_non_ag_cat.attrs = {'min': area_non_ag_cat_min, 'max': area_non_ag_cat_max}
+    area_am_cat_min, area_am_cat_max = safe_min_max(area_am_cat)
+
+    area_am_cat.attrs = {'min': area_am_cat_min, 'max': area_am_cat_max}
     save2nc(area_ag_cat, os.path.join(path, f'xr_area_agricultural_landuse_{yr_cal}.nc'))
     save2nc(area_non_ag_cat, os.path.join(path, f'xr_area_non_agricultural_landuse_{yr_cal}.nc'))
     save2nc(area_am_cat, os.path.join(path, f'xr_area_agricultural_management_{yr_cal}.nc'))
@@ -1412,10 +1581,7 @@ def write_dvar_area(data: Data, yr_cal, path):
 
 def write_area_transition_start_end(data: Data, path, yr_cal_end):
 
-    
-    # Get the end year
     yr_cal_start = data.YR_CAL_BASE
-
     real_area_r = xr.DataArray(data.REAL_AREA.astype(np.float32), dims=['cell'], coords={'cell': range(data.NCELLS)})
 
     # Get the decision variables for the start year
@@ -1425,45 +1591,187 @@ def write_area_transition_start_end(data: Data, path, yr_cal_end):
         ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
 
     ag_dvar_target_mrj = tools.ag_mrj_to_xr(
-        data, tools.lumap2ag_l_mrj(data.lumaps[yr_cal_start], data.lmmaps[yr_cal_start])
+        data, tools.lumap2ag_l_mrj(data.lumaps[yr_cal_end], data.lmmaps[yr_cal_end])
         ).rename({'lu':'To Land-use', 'lm':'To Water_supply'}
         ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
-        
+
     non_ag_dvar_target_rk = tools.non_ag_rk_to_xr(
         data, data.non_ag_dvars[yr_cal_end]
         ).rename({'lu':'To Land-use'}
         ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
-        
+
     xr_ag2ag = ag_dvar_base_mrj * ag_dvar_target_mrj * real_area_r
     xr_ag2non_ag = ag_dvar_base_mrj * non_ag_dvar_target_rk * real_area_r
-        
-    transition_ag2ag = xr_ag2ag.groupby('region'
-        ).sum(dim='cell'
-        ).to_dataframe('Area (ha)'
+
+    # Append ALL dimensions to xr_ag2ag
+    xr_ag2ag = xr.concat([xr_ag2ag.sum(dim='From Water_supply', keepdims=True).assign_coords({'From Water_supply': ['ALL']}), xr_ag2ag], dim='From Water_supply')
+    xr_ag2ag = xr.concat([xr_ag2ag.sum(dim='From Land-use', keepdims=True).assign_coords({'From Land-use': ['ALL']}), xr_ag2ag], dim='From Land-use')
+    xr_ag2ag = xr.concat([xr_ag2ag.sum(dim='To Water_supply', keepdims=True).assign_coords({'To Water_supply': ['ALL']}), xr_ag2ag], dim='To Water_supply')
+    xr_ag2ag = xr.concat([xr_ag2ag.sum(dim='To Land-use', keepdims=True).assign_coords({'To Land-use': ['ALL']}), xr_ag2ag], dim='To Land-use')
+
+    # Append ALL dimensions to xr_ag2non_ag
+    xr_ag2non_ag = xr.concat([xr_ag2non_ag.sum(dim='From Water_supply', keepdims=True).assign_coords({'From Water_supply': ['ALL']}), xr_ag2non_ag], dim='From Water_supply')
+    xr_ag2non_ag = xr.concat([xr_ag2non_ag.sum(dim='From Land-use', keepdims=True).assign_coords({'From Land-use': ['ALL']}), xr_ag2non_ag], dim='From Land-use')
+    xr_ag2non_ag = xr.concat([xr_ag2non_ag.sum(dim='To Land-use', keepdims=True).assign_coords({'To Land-use': ['ALL']}), xr_ag2non_ag], dim='To Land-use')
+
+
+    # ------------------------- Chunk level aggregation -------------------------
+    '''
+    Process both ag2ag and ag2non_ag transitions in a single loop to reduce memory usage.
+        This is because the `xr_ag2ag` and `xr_ag2non_ag` are huge intermediate arrays that consume a lot of memory.
+        By manually selecting each chunk, we can limit the size of the intermediate array.
+
+    '''
+    chunk_size = min(settings.WRITE_CHUNK_SIZE, data.NCELLS)
+    transition_ag2ag_dfs = []
+    transition_ag2non_ag_dfs = []
+    val_min_ag2ag, val_max_ag2ag = np.inf, -np.inf
+    val_min_ag2non_ag, val_max_ag2non_ag = np.inf, -np.inf
+
+    for i in range(0, data.NCELLS, chunk_size):
+        end_idx = min(i + chunk_size, data.NCELLS)
+        cell_slice = slice(i, end_idx)
+
+        # Process ag2ag chunk
+        chunk_arr_ag2ag = xr_ag2ag.isel(cell=cell_slice).compute()
+        transition_df_ag2ag = chunk_arr_ag2ag.groupby('region'
+            ).sum(dim='cell'
+            ).to_dataframe('Area (ha)'
+            ).reset_index(
+            ).groupby(['region', 'From Water_supply', 'From Land-use', 'To Water_supply', 'To Land-use']
+            )['Area (ha)'
+            ].sum(
+            ).reset_index(
+            ).query('abs(`Area (ha)`) > 0.01'
+            ).assign(chunk_idx=i//chunk_size)
+        val_min_ag2ag = min(val_min_ag2ag, chunk_arr_ag2ag.min())
+        val_max_ag2ag = max(val_max_ag2ag, chunk_arr_ag2ag.max())
+        transition_ag2ag_dfs.append(transition_df_ag2ag)
+
+        # Process ag2non_ag chunk
+        chunk_arr_ag2non_ag = xr_ag2non_ag.isel(cell=cell_slice).compute()
+        transition_df_ag2non_ag = chunk_arr_ag2non_ag.groupby('region'
+            ).sum(dim='cell'
+            ).to_dataframe('Area (ha)'
+            ).reset_index(
+            ).groupby(['region', 'From Water_supply', 'From Land-use', 'To Land-use']
+            )['Area (ha)'
+            ].sum(
+            ).reset_index(
+            ).query('abs(`Area (ha)`) > 0.01'
+            ).assign(chunk_idx=i//chunk_size)
+        val_min_ag2non_ag = min(val_min_ag2non_ag, chunk_arr_ag2non_ag.min())
+        val_max_ag2non_ag = max(val_max_ag2non_ag, chunk_arr_ag2non_ag.max())
+        transition_ag2non_ag_dfs.append(transition_df_ag2non_ag)
+
+    # Combine all chunks df for ag2ag
+    transition_ag2ag = pd.concat(transition_ag2ag_dfs, ignore_index=True
+        ).groupby(['region', 'From Water_supply', 'From Land-use', 'To Water_supply', 'To Land-use']
+        )['Area (ha)'
+        ].sum(
+        ).reset_index()
+
+    transition_ag2ag_AUS = transition_ag2ag.groupby(['From Water_supply', 'From Land-use', 'To Water_supply', 'To Land-use']
+        )['Area (ha)'
+        ].sum(
         ).reset_index(
-        ).groupby(['region', 'From Land-use', 'To Land-use']
-        ).sum(
+        ).assign(region='AUSTRALIA'
+        ).query('abs(`Area (ha)`) > 1')  # Skip transitions under 1 ha at national level
+
+    # Combine all chunks df for ag2non_ag
+    transition_ag2non_ag = pd.concat(transition_ag2non_ag_dfs, ignore_index=True
+        ).groupby(['region', 'From Water_supply', 'From Land-use', 'To Land-use']
+        )['Area (ha)'
+        ].sum(
+        ).reset_index()
+
+    transition_ag2non_ag_AUS = transition_ag2non_ag.groupby(['From Water_supply', 'From Land-use', 'To Land-use']
+        )['Area (ha)'
+        ].sum(
         ).reset_index(
-        ).filter(['region', 'From Land-use', 'To Land-use', 'Area (ha)'])
-    transition_ag2non_ag = xr_ag2non_ag.groupby('region'
-        ).sum(dim='cell'
-        ).to_dataframe('Area (ha)'
-        ).reset_index(
-        ).groupby(['region', 'From Land-use', 'To Land-use']
-        ).sum(
-        ).reset_index(
-        ).filter(['region', 'From Land-use', 'To Land-use', 'Area (ha)'])
+        ).assign(region='AUSTRALIA'
+        ).query('abs(`Area (ha)`) > 1')  # Skip transitions under 1 ha at national level
 
     # Write the transition matrix to a csv file
-    pd.concat([transition_ag2ag, transition_ag2non_ag]
-        ).to_csv(os.path.join(path, f'transition_matrix_start_end.csv'), index=False)
-    
-    save2nc(xr_ag2ag, os.path.join(path, f'xr_transition_area_ag2ag_start_end.nc'))
-    save2nc(xr_ag2non_ag, os.path.join(path, f'xr_transition_area_ag2non_ag_start_end.nc'))
+    pd.concat([transition_ag2ag, transition_ag2ag_AUS]
+        ).replace({'dry':'Dryland', 'irr':'Irrigated'}
+        ).to_csv(os.path.join(path, f'transition_matrix_ag2ag_start_end.csv'), index=False)
+
+    pd.concat([transition_ag2non_ag, transition_ag2non_ag_AUS]
+        ).replace({'dry':'Dryland', 'irr':'Irrigated'}
+        ).to_csv(os.path.join(path, f'transition_matrix_ag2non_ag_start_end.csv'), index=False)
+
+
+    # ------------------------- Stack array, get valid layers for ag2ag -------------------------
+    '''
+    We manually loop through chunks to save stacked array to reduce memory usage.
+        The materializing of stacked arrays requires a lot of memory.
+    '''
+
+    # Get valid data layers for ag2ag
+    valid_layers_ag2ag = pd.MultiIndex.from_frame(
+        transition_ag2ag_AUS[['From Water_supply', 'From Land-use', 'To Water_supply', 'To Land-use']]
+    ).sort_values()
+
+    xr_ag2ag_stacked = xr_ag2ag.stack({
+        'layer': ['From Water_supply', 'From Land-use', 'To Water_supply', 'To Land-use']
+    }).sel(layer=valid_layers_ag2ag)
+
+    # Materialize the filtered array by looping through chunks
+    xr_ag2ag_filtered_array = xr.DataArray(
+        np.zeros((data.NCELLS, len(valid_layers_ag2ag)), dtype=np.float32),
+        coords={
+            'cell': range(data.NCELLS),
+            'layer': valid_layers_ag2ag
+        },
+        attrs={
+            'min': float(val_min_ag2ag),
+            'max': float(val_max_ag2ag)
+        }
+    )
+
+    for i in range(0, data.NCELLS, chunk_size):
+        end_idx = min(i + chunk_size, data.NCELLS)
+        cell_slice = slice(i, end_idx)
+        xr_ag2ag_filtered_array[cell_slice, :] = xr_ag2ag_stacked.isel(cell=cell_slice)
+
+    # Save the compact filtered array
+    save2nc(xr_ag2ag_filtered_array, os.path.join(path, f'xr_transition_area_ag2ag_start_end.nc'))
+
+
+    # ------------------------- Stack array, get valid layers for ag2non_ag -------------------------
+
+    # Get valid data layers for ag2non_ag
+    valid_layers_ag2non_ag = pd.MultiIndex.from_frame(
+        transition_ag2non_ag_AUS[['From Water_supply', 'From Land-use', 'To Land-use']]
+    ).sort_values()
+
+    xr_ag2non_ag_stacked = xr_ag2non_ag.stack({
+        'layer': ['From Water_supply', 'From Land-use', 'To Land-use']
+    }).sel(layer=valid_layers_ag2non_ag)
+
+    # Materialize the filtered array by looping through chunks
+    xr_ag2non_ag_filtered_array = xr.DataArray(
+        np.zeros((data.NCELLS, len(valid_layers_ag2non_ag)), dtype=np.float32),
+        coords={
+            'cell': range(data.NCELLS),
+            'layer': valid_layers_ag2non_ag
+        },
+        attrs={
+            'min': float(val_min_ag2non_ag),
+            'max': float(val_max_ag2non_ag)
+        }
+    )
+
+    for i in range(0, data.NCELLS, chunk_size):
+        end_idx = min(i + chunk_size, data.NCELLS)
+        cell_slice = slice(i, end_idx)
+        xr_ag2non_ag_filtered_array[cell_slice, :] = xr_ag2non_ag_stacked.isel(cell=cell_slice)
+
+    # Save the compact filtered array
+    save2nc(xr_ag2non_ag_filtered_array, os.path.join(path, f'xr_transition_area_ag2non_ag_start_end.nc'))
 
     return f"Area transition matrix written from year {data.YR_CAL_BASE} to {yr_cal_end}"
-
-
 
 
 
@@ -1512,8 +1820,7 @@ def write_crosstab(data: Data, yr_cal, path):
 
 
 
-
-def write_ghg(data: Data, yr_cal, path):
+def write_ghg_total(data: Data, yr_cal, path):
     """GHG is written to disk no matter if GHG_EMISSIONS_LIMITS is 'off' or 'on'"""
  
     yr_idx = yr_cal - data.YR_CAL_BASE
@@ -1542,19 +1849,16 @@ def write_ghg(data: Data, yr_cal, path):
 
 
 
+def write_ghg_agricultural(data: Data, yr_cal: int, path: str):
+    """Write agricultural land-use GHG emissions to NetCDF and CSV files.
 
-
-def write_ghg_separate(data: Data, yr_cal, path):
-    '''
-    GHG is written to disk no matter if GHG_EMISSIONS_LIMITS is 'off' or 'on'
-    '''
-
-    # Convert calendar year to year index.
+    Args:
+        data: Simulation data object
+        yr_cal: Calendar year (e.g., 2030)
+        path: Output directory path
+    """
+    # Calculate year index
     yr_idx = yr_cal - data.YR_CAL_BASE
-
-    # -------------------------------------------------------#
-    # Get greenhouse gas emissions from agricultural landuse #
-    # -------------------------------------------------------#
 
     # Get the ghg_df
     ag_g_xr = xr.Dataset(ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=False)
@@ -1567,7 +1871,7 @@ def write_ghg_separate(data: Data, yr_cal, path):
     mindex_coords = xr.Coordinates.from_pandas_multiindex(mindex, 'variable')
     ag_g_rsmj = ag_g_xr.to_dataarray().assign_coords(mindex_coords).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}).unstack()
     ag_g_rsmj['GHG_source'] = ag_g_rsmj['GHG_source'].to_series().replace(GHG_NAMES)
-    
+
     # Calculate GHG emissions
     ghg_e = ag_g_rsmj * ag_dvar_mrj
 
@@ -1580,34 +1884,72 @@ def write_ghg_separate(data: Data, yr_cal, path):
         ).sum('cell'
         ).to_dataframe('Value (t CO2e)'
         ).reset_index(
-        ).rename(columns={'lu':'Land-use', 'lm':'Water_supply', 'GHG_source':'Source'}
-        ).assign(Year=yr_cal, Type='Agricultural land-use',
-        ).replace({'dry':'Dryland', 'irr':'Irrigated'}
-        ).query('abs(`Value (t CO2e)`) > 1e-3') 
-    
+        ).assign(Year=yr_cal, Type='Agricultural land-use'
+        ).query('abs(`Value (t CO2e)`) > 1e-3')
+
     # Australia level aggregation
     ghg_df_AUS = ghg_e.sum('cell'
         ).to_dataframe('Value (t CO2e)'
         ).reset_index(
-        ).rename(columns={'lu':'Land-use', 'lm':'Water_supply', 'GHG_source':'Source'}
         ).assign(Year=yr_cal, Type='Agricultural land-use', region='AUSTRALIA'
+        ).query('abs(`Value (t CO2e)`) > 1e-3')
+        
+    # Save table to disk (rename columns and replace values only for CSV output)
+    pd.concat([ghg_df_AUS, ghg_df_region]
         ).replace({'dry':'Dryland', 'irr':'Irrigated'}
-        ).query('abs(`Value (t CO2e)`) > 1e-3') 
-    
-    # Save table to disk
-    pd.concat([ghg_df_AUS, ghg_df_region]).to_csv(os.path.join(path, f'GHG_emissions_separate_agricultural_landuse_{yr_cal}.csv'), index=False)
-
-    # Append the 'ALL' dimension from dvar file
-    ag_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc'))['data'].sel(lu=['ALL'])
-    ghg_e_cat = xr.concat([ag_mosaic, ghg_e], dim='lu')
-
-    save2nc(ghg_e_cat, os.path.join(path, f'xr_GHG_ag_{yr_cal}.nc'))
+        ).rename(columns={'lu':'Land-use', 'lm':'Water_supply', 'GHG_source':'Source'}
+        ).to_csv(os.path.join(path, f'GHG_emissions_separate_agricultural_landuse_{yr_cal}.csv'), index=False)
 
 
-    # -----------------------------------------------------------#
-    # Get greenhouse gas emissions from Non-Agricultural Land-use #
-    # -----------------------------------------------------------#
-    
+    # ------------------------- Stack array, get valid layers -------------------------
+    '''
+    We do NOT manually loop through chunks to reduce memory usage.
+    Because the intermediate array is no larger than the in-mem 'ag_g_xr' object.
+    '''
+
+    # Get valid data layers (before renaming/replacing)
+    valid_ghg_layers = pd.MultiIndex.from_frame(ghg_df_AUS[['lm', 'GHG_source', 'lu']]).sort_values()
+    ag_ghg_valid_layers = ghg_e.stack(layer=['lm', 'GHG_source', 'lu']).sel(layer=valid_ghg_layers)
+
+    # Get valid mosaic layers
+    ag_mosaic = cfxr.decode_compress_to_multi_index(
+        xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc')), 'layer'
+    )['data'].sel(lu=['ALL'], lm=['ALL'])
+
+    ag_mosaic_ghg = ag_mosaic.where(ghg_e.sum(dim='lu').transpose('cell', ...)).expand_dims(lu=['ALL'])
+
+    ag_mosaic_ghg_stack = ag_mosaic_ghg.stack(layer=['lm', 'GHG_source', 'lu'])
+
+    ag_mosaic_ghg_stack = ag_mosaic_ghg_stack.sel(
+        layer=(
+            ag_mosaic_ghg_stack['layer']['lm'].isin(valid_ghg_layers.get_level_values('lm')) &
+            ag_mosaic_ghg_stack['layer']['GHG_source'].isin(valid_ghg_layers.get_level_values('GHG_source'))
+        )
+    )
+
+    # Combine valid layers from dvar and mosaic
+    valid_layers_stack_ghg = xr.concat([ag_ghg_valid_layers, ag_mosaic_ghg_stack], dim='layer').compute()
+
+    valid_layers_stack_ghg_min, valid_layers_stack_ghg_max = safe_min_max(valid_layers_stack_ghg)
+
+
+    valid_layers_stack_ghg.attrs = {'min': valid_layers_stack_ghg_min, 'max': valid_layers_stack_ghg_max}
+
+    save2nc(valid_layers_stack_ghg, os.path.join(path, f'xr_GHG_ag_{yr_cal}.nc'))
+
+
+
+def write_ghg_non_agricultural(data: Data, yr_cal: int, path: str):
+    """Write non-agricultural land-use GHG emissions to NetCDF and CSV files.
+
+    Args:
+        data: Simulation data object
+        yr_cal: Calendar year (e.g., 2030)
+        path: Output directory path
+    """
+    # Calculate year index
+    yr_idx = yr_cal - data.YR_CAL_BASE
+
     # Get the non_ag GHG reduction
     non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]
         ).assign_coords(region=('cell', data.REGION_NRM_NAME)
@@ -1616,8 +1958,8 @@ def write_ghg_separate(data: Data, yr_cal, path):
     non_ag_g_rk = tools.non_ag_rk_to_xr(
         data,
         non_ag_ghg.get_ghg_matrix(
-            data, 
-            ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True), 
+            data,
+            ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True),
             data.lumaps[yr_cal]
         )
     )
@@ -1630,34 +1972,56 @@ def write_ghg_separate(data: Data, yr_cal, path):
         ).sum('cell'
         ).to_dataframe('Value (t CO2e)'
         ).reset_index(
-        ).rename(columns={'lu': 'Land-use'}
         ).assign(Year=yr_cal, Type='Non-Agricultural Land-use'
-        ).replace({'dry': 'Dryland', 'irr': 'Irrigated'}
-        ).query('abs(`Value (t CO2e)`) > 1e-3') 
-        
+        ).query('abs(`Value (t CO2e)`) > 1e-3')
+
     # Australia level aggregation
     ghg_df_AUS = xr_ghg_non_ag.sum('cell'
         ).to_dataframe('Value (t CO2e)'
         ).reset_index(
-        ).rename(columns={'lu': 'Land-use'}
         ).assign(Year=yr_cal, Type='Non-Agricultural Land-use', region='AUSTRALIA'
-        ).replace({'dry': 'Dryland', 'irr': 'Irrigated'}
-        ).query('abs(`Value (t CO2e)`) > 1e-3') 
+        ).query('abs(`Value (t CO2e)`) > 1e-3')
         
-    # Save table to disk
-    pd.concat([ghg_df_AUS, ghg_df_region]).to_csv(os.path.join(path, f'GHG_emissions_separate_no_ag_reduction_{yr_cal}.csv'), index=False)
+    # Save table to disk (rename columns only for CSV output)
+    pd.concat([ghg_df_AUS, ghg_df_region]
+        ).rename(columns={'lu': 'Land-use'}
+        ).to_csv(os.path.join(path, f'GHG_emissions_separate_no_ag_reduction_{yr_cal}.csv'), index=False)
 
-    # Append the 'ALL' dimension from dvar file
-    non_ag_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc'))['data'].sel(lu=['ALL'])
-    xr_ghg_non_ag_cat = xr.concat([non_ag_mosaic, xr_ghg_non_ag], dim='lu')
+
+    # ------------------------- Stack array, get valid layers -------------------------
+
+    # Get valid data layers (before renaming/replacing)
+    valid_non_ag_ghg_layers = pd.MultiIndex.from_frame(ghg_df_AUS[['lu']]).sort_values()
+    non_ag_ghg_valid_layers = xr_ghg_non_ag.stack(layer=['lu']).sel(layer=valid_non_ag_ghg_layers)
+
+    # Get mosaic - simply expand and stack (no filtering for NonAg)
+    non_ag_mosaic = cfxr.decode_compress_to_multi_index(
+        xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
+    )['data'].sel(lu='ALL').expand_dims('lu').stack(layer=['lu'])
+
+    # Combine and compute
+    xr_ghg_non_ag_cat = xr.concat([non_ag_mosaic, non_ag_ghg_valid_layers], dim='layer').compute()
+
+    xr_ghg_non_ag_cat_min, xr_ghg_non_ag_cat_max = safe_min_max(xr_ghg_non_ag_cat)
+
+
+    xr_ghg_non_ag_cat.attrs = {'min': xr_ghg_non_ag_cat_min, 'max': xr_ghg_non_ag_cat_max}
 
     # Save xarray data to netCDF
     save2nc(xr_ghg_non_ag_cat, os.path.join(path, f'xr_GHG_non_ag_{yr_cal}.nc'))
-    
-    
-    # -------------------------------------------------------------------#
-    # Get greenhouse gas emissions from agricultural management          #
-    # -------------------------------------------------------------------#
+
+
+
+def write_ghg_agricultural_management(data: Data, yr_cal: int, path: str):
+    """Write agricultural management GHG emissions to NetCDF and CSV files.
+
+    Args:
+        data: Simulation data object
+        yr_cal: Calendar year (e.g., 2030)
+        path: Output directory path
+    """
+    # Calculate year index
+    yr_idx = yr_cal - data.YR_CAL_BASE
 
     # Get the ag_man_g_mrj
     ag_man_dvar_mrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
@@ -1665,7 +2029,7 @@ def write_ghg_separate(data: Data, yr_cal, path):
         ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
 
     ag_man_g_mrj = tools.am_mrj_to_xr(
-        data, 
+        data,
         ag_ghg.get_agricultural_management_ghg_matrices(data, yr_idx)
     )
 
@@ -1681,89 +2045,126 @@ def write_ghg_separate(data: Data, yr_cal, path):
         ).sum('cell'
         ).to_dataframe('Value (t CO2e)'
         ).reset_index(
-        ).rename(columns={'lm': 'Water_supply', 'lu': 'Land-use', 'am': 'Agricultural Management Type'}
         ).assign(Year=yr_cal, Type='Agricultural Management'
-        ).replace({'dry': 'Dryland', 'irr': 'Irrigated'}
-        ).query('abs(`Value (t CO2e)`) > 1e-3') 
-        
+        ).query('abs(`Value (t CO2e)`) > 1e-3')
+
     # Australia level aggregation
     ghg_df_AUS = xr_ghg_ag_man.sum('cell'
         ).to_dataframe('Value (t CO2e)'
         ).reset_index(
-        ).rename(columns={'lm': 'Water_supply', 'lu': 'Land-use', 'am': 'Agricultural Management Type'}
         ).assign(Year=yr_cal, Type='Agricultural Management', region='AUSTRALIA'
-        ).replace({'dry': 'Dryland', 'irr': 'Irrigated'}
-        ).query('abs(`Value (t CO2e)`) > 1e-3') 
+        ).query('abs(`Value (t CO2e)`) > 1e-3')
         
-    # Save table to disk
-    pd.concat([ghg_df_AUS, ghg_df_region]).to_csv(os.path.join(path, f'GHG_emissions_separate_agricultural_management_{yr_cal}.csv'), index=False)
+    # Save table to disk (rename columns and replace values only for CSV output)
+    pd.concat([ghg_df_AUS, ghg_df_region]
+        ).replace({'dry': 'Dryland', 'irr': 'Irrigated'}
+        ).rename(columns={'lm': 'Water_supply', 'lu': 'Land-use', 'am': 'Agricultural Management Type'}
+        ).to_csv(os.path.join(path, f'GHG_emissions_separate_agricultural_management_{yr_cal}.csv'), index=False)
 
-    # Append the 'ALL' dimension from dvar file
-    am_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc'))['data'].sel(am=['ALL'])
-    xr_ghg_ag_man_cat = xr.concat([am_mosaic, xr_ghg_ag_man], dim='am')
+
+    # ------------------------- Stack array, get valid layers -------------------------
+
+    # Get valid data layers (before renaming/replacing)
+    valid_am_ghg_layers = pd.MultiIndex.from_frame(ghg_df_AUS[['am', 'lm', 'lu']]).sort_values()
+    am_ghg_valid_layers = xr_ghg_ag_man.stack(layer=['am', 'lm', 'lu']).sel(layer=valid_am_ghg_layers)
+
+    # Get valid mosaic layers
+    am_mosaic = cfxr.decode_compress_to_multi_index(
+        xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc')), 'layer'
+    )['data'].sel(am='ALL', lm='ALL', lu='ALL')
+
+    am_mosaic_ghg = am_mosaic.where(
+        xr_ghg_ag_man.sum('am').transpose('cell', ...)
+    ).expand_dims('am')
+
+    # Stack mosaic and filter by lm and lu (NOT am)
+    am_mosaic_ghg_stack = am_mosaic_ghg.stack(layer=['am', 'lm', 'lu'])
+    am_mosaic_ghg_stack = am_mosaic_ghg_stack.sel(
+        layer=(
+            am_mosaic_ghg_stack['layer']['lm'].isin(valid_am_ghg_layers.get_level_values('lm')) &
+            am_mosaic_ghg_stack['layer']['lu'].isin(valid_am_ghg_layers.get_level_values('lu'))
+        )
+    )
+
+    # Combine valid layers from dvar and mosaic
+    valid_layers_stack_am_ghg = xr.concat([am_ghg_valid_layers, am_mosaic_ghg_stack], dim='layer').compute()
+    valid_layers_stack_am_ghg_min, valid_layers_stack_am_ghg_max = safe_min_max(valid_layers_stack_am_ghg)
 
     # Save xarray data to netCDF
-    save2nc(xr_ghg_ag_man_cat, os.path.join(path, f'xr_GHG_ag_management_{yr_cal}.nc'))
+    valid_layers_stack_am_ghg.attrs = {'min': valid_layers_stack_am_ghg_min, 'max': valid_layers_stack_am_ghg_max}
+    save2nc(valid_layers_stack_am_ghg, os.path.join(path, f'xr_GHG_ag_management_{yr_cal}.nc'))
 
 
-    # -------------------------------------------------------------------#
-    # Get greenhouse gas emissions from landuse transformation penalties #
-    # -------------------------------------------------------------------#
 
-    # Retrieve list of simulation years (e.g., [2010, 2050] for snapshot or [2010, 2011, 2012] for timeseries)
+def write_ghg_transition_penalty(data: Data, yr_cal: int, path: str):
+    """Write land-use transformation penalty GHG emissions to NetCDF and CSV files.
+
+    Args:
+        data: Simulation data object
+        yr_cal: Calendar year (e.g., 2030)
+        path: Output directory path
+    """
+    # Retrieve list of simulation years
     simulated_year_list = sorted(list(data.lumaps.keys()))
     yr_idx_sim = simulated_year_list.index(yr_cal)
 
-    # Get index of year previous to yr_cal in simulated_year_list (e.g., if yr_cal is 2050 then yr_cal_sim_pre = 2010 if snapshot)
+    # Get index of year previous to yr_cal in simulated_year_list
     if yr_cal == data.YR_CAL_BASE:
-        pass
-    else:
-        yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1]
-        ghg_t_dict = ag_ghg.get_ghg_transition_emissions(data, data.lumaps[yr_cal_sim_pre], separate=True)
-        ghg_t_smrj = xr.DataArray(
-            np.stack(list(ghg_t_dict.values()), axis=0).astype(np.float32),
-            dims=['Type', 'lm', 'cell', 'lu'],
-            coords={
-                'Type': list(ghg_t_dict.keys()),
-                'lm': data.LANDMANS,
-                'cell': range(data.NCELLS),
-                'lu': data.AGRICULTURAL_LANDUSES
-            }
-        )
-
-        # Calculate GHG emissions for transition penalties
-        xr_ghg_transition = ghg_t_smrj * ag_dvar_mrj
-        
-        # Regional level aggregation
-        ghg_df_region = xr_ghg_transition.groupby('region'
-            ).sum('cell'
-            ).to_dataframe('Value (t CO2e)'
-            ).reset_index(
-            ).rename(columns={'lu': 'Land-use', 'lm': 'Water_supply'}
-            ).assign(Year=yr_cal
-            ).replace({'dry': 'Dryland', 'irr': 'Irrigated'}
-            ).query('abs(`Value (t CO2e)`) > 1e-3')
-
-        # Australia level aggregation
-        ghg_df_AUS = xr_ghg_transition.sum('cell'
-            ).to_dataframe('Value (t CO2e)'
-            ).reset_index(
-            ).rename(columns={'lu': 'Land-use', 'lm': 'Water_supply'}
-            ).assign(Year=yr_cal, region='AUSTRALIA'
-            ).replace({'dry': 'Dryland', 'irr': 'Irrigated'}
-            ).query('abs(`Value (t CO2e)`) > 1e-3')
-
-        # Save table to disk
-        pd.concat([ghg_df_AUS, ghg_df_region]).to_csv(os.path.join(path, f'GHG_emissions_separate_transition_penalty_{yr_cal}.csv'), index=False)
-        
-        # Save xarray data to netCDF
-        save2nc(xr_ghg_transition, os.path.join(path, f'xr_transition_GHG_{yr_cal}.nc'))
+        return  # No transition penalties for base year
     
-    if settings.GHG_EMISSIONS_LIMITS == 'off':
-        return 'WARNING: GHG emissions calculated as `GHG_EMISSIONS_LIMITS` is set to "off"'
-    else:
-        return f"Separate GHG emissions written for year {yr_cal}"
+    ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]
+        ).assign_coords(region=('cell', data.REGION_NRM_NAME)
+        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
 
+    yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1]
+    ghg_t_dict = ag_ghg.get_ghg_transition_emissions(data, data.lumaps[yr_cal_sim_pre], separate=True)
+    ghg_t_smrj = xr.DataArray(
+        np.stack(list(ghg_t_dict.values()), axis=0).astype(np.float32),
+        dims=['Type', 'lm', 'cell', 'lu'],
+        coords={
+            'Type': list(ghg_t_dict.keys()),
+            'lm': data.LANDMANS,
+            'cell': range(data.NCELLS),
+            'lu': data.AGRICULTURAL_LANDUSES
+        }
+    )
+
+    # Calculate GHG emissions for transition penalties
+    xr_ghg_transition = ghg_t_smrj * ag_dvar_mrj
+
+    # Expand dimension (has to be after multiplication to avoid double counting)
+    xr_ghg_transition = xr.concat([xr_ghg_transition.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), xr_ghg_transition], dim='lm')
+    xr_ghg_transition = xr.concat([xr_ghg_transition.sum(dim='Type', keepdims=True).assign_coords(Type=['ALL']), xr_ghg_transition], dim='Type')
+
+    # Regional level aggregation
+    ghg_df_region = xr_ghg_transition.groupby('region'
+        ).sum('cell'
+        ).to_dataframe('Value (t CO2e)'
+        ).reset_index(
+        ).assign(Year=yr_cal
+        ).query('abs(`Value (t CO2e)`) > 1e-3')
+
+    # Australia level aggregation
+    ghg_df_AUS = xr_ghg_transition.sum('cell'
+        ).to_dataframe('Value (t CO2e)'
+        ).reset_index(
+        ).assign(Year=yr_cal, region='AUSTRALIA'
+        ).query('abs(`Value (t CO2e)`) > 1e-3')
+
+    # Save table to disk (rename columns and replace values only for CSV output)
+    pd.concat([ghg_df_AUS, ghg_df_region]
+        ).replace({'dry': 'Dryland', 'irr': 'Irrigated'}
+        ).rename(columns={'lu': 'Land-use', 'lm': 'Water_supply'}
+        ).to_csv(os.path.join(path, f'GHG_emissions_separate_transition_penalty_{yr_cal}.csv'), index=False)
+
+
+
+    # ------------------------- Stack array, get valid layers -------------------------
+    
+    # Get valid data layers (before renaming/replacing)
+    valid_transition_layers = pd.MultiIndex.from_frame(ghg_df_AUS[['Type', 'lm', 'lu']]).sort_values()
+    transition_valid_layers = xr_ghg_transition.stack(layer=['Type', 'lm', 'lu']).sel(layer=valid_transition_layers)
+    save2nc(transition_valid_layers, os.path.join(path, f'xr_transition_GHG_{yr_cal}.nc'))
 
 
 
@@ -1777,7 +2178,6 @@ def write_ghg_offland_commodity(data: Data, yr_cal, path):
         return 'WARNING: Off-land commodity GHG emissions calculate as `GHG_EMISSIONS_LIMITS` is set to "off"'
     else:
         return f"Off-land commodity GHG emissions written for year {yr_cal}"
-
 
 
 
@@ -1992,12 +2392,20 @@ def write_water(data: Data, yr_cal, path):
     wny_NRM.to_csv(os.path.join(path, f'water_yield_separate_NRM_{yr_cal}.csv'), index=False)
 
     # Append the 'ALL' dimension from dvar file
-    ag_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc'))['data'].sel(lu=['ALL'])
-    xr_ag_wny_cat = xr.concat([ag_mosaic, xr_ag_wny], dim='lu')
-    non_ag_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc'))['data'].sel(lu=['ALL'])
-    xr_non_ag_wny_cat = xr.concat([non_ag_mosaic, xr_non_ag_wny], dim='lu')
-    am_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc'))['data'].sel(am=['ALL'])
-    xr_am_wny_cat = xr.concat([am_mosaic, xr_am_wny], dim='am')
+    ag_mosaic = cfxr.decode_compress_to_multi_index(
+        xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc')), 'layer')['data'].sel(lu=['ALL']
+    )
+    xr_ag_wny_cat = xr.concat([ag_mosaic, xr_ag_wny], dim='lu').stack(layer=['lm', 'lu'])
+    
+    non_ag_mosaic = cfxr.decode_compress_to_multi_index(
+        xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer')['data'].sel(lu=['ALL']
+    )
+    xr_non_ag_wny_cat = xr.concat([non_ag_mosaic, xr_non_ag_wny], dim='lu').stack(layer=['lu'])
+    
+    am_mosaic = cfxr.decode_compress_to_multi_index(
+        xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc')), 'layer')['data'].sel(am=['ALL']
+    ).unstack('layer').expand_dims('am')
+    xr_am_wny_cat = xr.concat([am_mosaic, xr_am_wny], dim='am').stack(layer=['am', 'lm', 'lu'])
 
     save2nc(xr_ag_wny_cat, os.path.join(path, f'xr_water_yield_ag_{yr_cal}.nc'))
     save2nc(xr_non_ag_wny_cat, os.path.join(path, f'xr_water_yield_non_ag_{yr_cal}.nc'))
@@ -2015,7 +2423,8 @@ def write_water(data: Data, yr_cal, path):
     return f"Water yield data written for year {yr_cal}"
 
 
-def write_biodiversity_overall_quality_scores(data: Data, yr_cal, path):
+
+def write_biodiversity_quality_scores(data: Data, yr_cal, path):
     ''' Biodiversity overall quality scores are always written to disk. '''
     
     yr_idx_previouse = sorted(data.lumaps.keys()).index(yr_cal) - 1
@@ -2069,7 +2478,8 @@ def write_biodiversity_overall_quality_scores(data: Data, yr_cal, path):
         ).to_dataframe('Area Weighted Score (ha)'
         ).reset_index(
         ).assign(Relative_Contribution_Percentage = lambda x:( (x['Area Weighted Score (ha)'] / base_yr_score) * 100) 
-        ).assign(Type='Agricultural Landuse', Year=yr_cal, region='AUSTRALIA')
+        ).assign(Type='Agricultural Landuse', Year=yr_cal, region='AUSTRALIA'
+        ).query('`Area Weighted Score (ha)` > 1')
 
     priority_non_ag_region = (xr_priority_non_ag
         ).groupby('region'
@@ -2083,7 +2493,8 @@ def write_biodiversity_overall_quality_scores(data: Data, yr_cal, path):
         ).to_dataframe('Area Weighted Score (ha)'
         ).reset_index(
         ).assign(Relative_Contribution_Percentage = lambda x:( x['Area Weighted Score (ha)'] / base_yr_score * 100)
-        ).assign(Type='Non-Agricultural Land-use', Year=yr_cal, region='AUSTRALIA')
+        ).assign(Type='Non-Agricultural Land-use', Year=yr_cal, region='AUSTRALIA'
+        ).query('`Area Weighted Score (ha)` > 1')
 
     priority_am_region = (xr_priority_am
         ).groupby('region'
@@ -2099,11 +2510,12 @@ def write_biodiversity_overall_quality_scores(data: Data, yr_cal, path):
         ).reset_index(
         ).assign(Relative_Contribution_Percentage = lambda x:( x['Area Weighted Score (ha)'] / base_yr_score * 100)
         ).dropna(
-        ).assign(Type='Agricultural Management', Year=yr_cal, region='AUSTRALIA')
+        ).assign(Type='Agricultural Management', Year=yr_cal, region='AUSTRALIA'
+        ).query('`Area Weighted Score (ha)` > 1')
 
 
     # Save the biodiversity scores
-    df = pd.concat([
+    pd.concat([
         priority_ag_region, 
         priority_ag_AUS, 
         priority_non_ag_region, 
@@ -2118,22 +2530,71 @@ def write_biodiversity_overall_quality_scores(data: Data, yr_cal, path):
         ).reset_index(drop=True
         ).replace({'dry':'Dryland', 'irr':'Irrigated'}
         ).to_csv(os.path.join(path, f'biodiversity_overall_priority_scores_{yr_cal}.csv'), index=False)
-
-    # Append the 'ALL' dimension from dvar file
-    ag_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc'))['data'].sel(lu=['ALL'])
-    xr_priority_ag_cat = xr.concat([ag_mosaic, xr_priority_ag], dim='lu')
-    non_ag_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc'))['data'].sel(lu=['ALL'])
-    xr_priority_non_ag_cat = xr.concat([non_ag_mosaic, xr_priority_non_ag], dim='lu')
-    am_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc'))['data'].sel(am=['ALL'])
-    xr_priority_am_cat = xr.concat([am_mosaic, xr_priority_am], dim='am')
-
+        
+        
+        
+    # ------------------------- Stack array, get valid layers -------------------------
+    
+    # Get valid data layers 
+    valid_ag_layers = pd.MultiIndex.from_frame(priority_ag_AUS[['lm', 'lu']]).sort_values()
+    valid_non_ag_layers = pd.MultiIndex.from_frame(priority_non_ag_AUS[['lu']]).sort_values()
+    valid_am_layers = pd.MultiIndex.from_frame(priority_am_AUS[['am', 'lm', 'lu']]).sort_values()
+    
+    ag_valid_layers = xr_priority_ag.stack(layer=['lm', 'lu']).sel(layer=valid_ag_layers)
+    non_ag_valid_layers = xr_priority_non_ag.stack(layer=['lu']).sel(layer=valid_non_ag_layers)
+    am_valid_layers = xr_priority_am.stack(layer=['am', 'lm', 'lu']).sel(layer=valid_am_layers)
+    
+    # Get valid mosaic layers and combine with dvar valid layers
+    ag_mosaic = cfxr.decode_compress_to_multi_index(
+            xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc')), 'layer'
+        )['data'].sel(lu='ALL', lm='ALL')
+    non_ag_mosaic = cfxr.decode_compress_to_multi_index(
+            xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
+        )['data'].sel(lu='ALL').drop_vars('layer').expand_dims('lu')
+    am_mosaic = cfxr.decode_compress_to_multi_index(
+            xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc')), 'layer'
+        )['data'].sel(am='ALL', lm='ALL', lu='ALL')
+    
+        
+    ag_mosaic_stack = ag_mosaic.where(
+        xr_priority_ag.sum('lu').transpose('cell', ...)
+    ).expand_dims('lu').stack(layer=['lm', 'lu'])
+    ag_mosaic_stack = ag_mosaic_stack.sel(
+        layer=(
+            ag_mosaic_stack['layer']['lm'].isin(valid_ag_layers.get_level_values('lm'))
+        )
+    )
+    valid_layers_stack_ag = xr.concat([ag_valid_layers, ag_mosaic_stack], dim='layer').compute()
+    
+    non_ag_mosaic_stack = non_ag_mosaic.stack(layer=['lu'])
+    valid_layers_stack_non_ag = xr.concat([non_ag_mosaic_stack, non_ag_valid_layers], dim='layer').compute()
+    
+    am_mosaic_stack = am_mosaic.where(
+        xr_priority_am.sum(['am']).transpose('cell', ...)
+    ).expand_dims('am').stack(layer=['am', 'lm', 'lu'])
+    am_mosaic_stack = am_mosaic_stack.sel(
+        layer=(
+            am_mosaic_stack['layer']['lm'].isin(valid_am_layers.get_level_values('lm')) &
+            am_mosaic_stack['layer']['lu'].isin(valid_am_layers.get_level_values('lu'))
+        )
+    )
+    valid_layers_stack_am = xr.concat([am_valid_layers, am_mosaic_stack], dim='layer').compute()
+    
+    
     # Save xarray data to netCDF
-    save2nc(xr_priority_ag_cat, os.path.join(path, f'xr_biodiversity_overall_priority_ag_{yr_cal}.nc'))
-    save2nc(xr_priority_non_ag_cat, os.path.join(path, f'xr_biodiversity_overall_priority_non_ag_{yr_cal}.nc'))
-    save2nc(xr_priority_am_cat, os.path.join(path, f'xr_biodiversity_overall_priority_ag_management_{yr_cal}.nc'))
+    ag_min, ag_max = safe_min_max(valid_layers_stack_ag)
+    non_ag_min, non_ag_max = safe_min_max(valid_layers_stack_non_ag)
+    am_min, am_max = safe_min_max(valid_layers_stack_am)
+
+    valid_layers_stack_ag.attrs = {'min': ag_min, 'max': ag_max}
+    valid_layers_stack_non_ag.attrs = {'min': non_ag_min, 'max': non_ag_max}
+    valid_layers_stack_am.attrs = {'min': am_min, 'max': am_max}
+
+    save2nc(valid_layers_stack_ag, os.path.join(path, f'xr_biodiversity_overall_priority_ag_{yr_cal}.nc'))
+    save2nc(valid_layers_stack_non_ag, os.path.join(path, f'xr_biodiversity_overall_priority_non_ag_{yr_cal}.nc'))
+    save2nc(valid_layers_stack_am, os.path.join(path, f'xr_biodiversity_overall_priority_ag_management_{yr_cal}.nc'))
     
     return f"Biodiversity overall priority scores written for year {yr_cal}"
-
 
 
 
@@ -2276,18 +2737,67 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
         )
     df.to_csv(os.path.join(path, f'biodiversity_GBF2_priority_scores_{yr_cal}.csv'), index=False)
 
-    # Append the 'ALL' dimension from dvar file
-    ag_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc'))['data'].sel(lu=['ALL'])
-    xr_gbf2_ag_cat = xr.concat([ag_mosaic, xr_gbf2_ag], dim='lu')
-    non_ag_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc'))['data'].sel(lu=['ALL'])
-    xr_gbf2_non_ag_cat = xr.concat([non_ag_mosaic, xr_gbf2_non_ag], dim='lu')
-    am_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc'))['data'].sel(am=['ALL'])
-    xr_gbf2_am_cat = xr.concat([am_mosaic, xr_gbf2_am], dim='am')
+    # ------------------------- Stack array, get valid layers -------------------------
+
+    # Get valid data layers (filter to only meaningful data > 1)
+    valid_ag_layers = pd.MultiIndex.from_frame(GBF2_score_ag_AUS.query('`Area Weighted Score (ha)` > 1')[['lm', 'lu']]).sort_values()
+    valid_non_ag_layers = pd.MultiIndex.from_frame(GBF2_score_non_ag_AUS.query('`Area Weighted Score (ha)` > 1')[['lu']]).sort_values()
+    valid_am_layers = pd.MultiIndex.from_frame(GBF2_score_am_AUS.query('`Area Weighted Score (ha)` > 1')[['am', 'lm', 'lu']]).sort_values()
+
+    # Stack and select valid data layers
+    ag_valid_layers = xr_gbf2_ag.stack(layer=['lm', 'lu']).sel(layer=valid_ag_layers)
+    non_ag_valid_layers = xr_gbf2_non_ag.stack(layer=['lu']).sel(layer=valid_non_ag_layers)
+    am_valid_layers = xr_gbf2_am.stack(layer=['am', 'lm', 'lu']).sel(layer=valid_am_layers)
+
+    # Get valid mosaic layers and combine with dvar valid layers
+    ag_mosaic = cfxr.decode_compress_to_multi_index(
+            xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc')), 'layer'
+        )['data'].sel(lu='ALL', lm='ALL')
+    non_ag_mosaic = cfxr.decode_compress_to_multi_index(
+            xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
+        )['data'].sel(lu='ALL').drop_vars('layer').expand_dims('lu')
+    am_mosaic = cfxr.decode_compress_to_multi_index(
+            xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc')), 'layer'
+        )['data'].sel(am='ALL', lm='ALL', lu='ALL')
+
+    # Filter mosaic and stack
+    ag_mosaic_stack = ag_mosaic.where(
+        xr_gbf2_ag.sum('lu').transpose('cell', ...)
+    ).expand_dims('lu').stack(layer=['lm', 'lu'])
+    ag_mosaic_stack = ag_mosaic_stack.sel(
+        layer=(
+            ag_mosaic_stack['layer']['lm'].isin(valid_ag_layers.get_level_values('lm'))
+        )
+    )
+    valid_layers_stack_ag = xr.concat([ag_valid_layers, ag_mosaic_stack], dim='layer').compute()
+
+    non_ag_mosaic_stack = non_ag_mosaic.stack(layer=['lu'])
+    valid_layers_stack_non_ag = xr.concat([non_ag_mosaic_stack, non_ag_valid_layers], dim='layer').compute()
+
+    am_mosaic_stack = am_mosaic.where(
+        xr_gbf2_am.sum(['am']).transpose('cell', ...)
+    ).expand_dims('am').stack(layer=['am', 'lm', 'lu'])
+    am_mosaic_stack = am_mosaic_stack.sel(
+        layer=(
+            am_mosaic_stack['layer']['lm'].isin(valid_am_layers.get_level_values('lm')) &
+            am_mosaic_stack['layer']['lu'].isin(valid_am_layers.get_level_values('lu'))
+        )
+    )
+    valid_layers_stack_am = xr.concat([am_valid_layers, am_mosaic_stack], dim='layer').compute()
 
     # Save xarray data to netCDF
-    save2nc(xr_gbf2_ag_cat, os.path.join(path, f'xr_biodiversity_GBF2_priority_ag_{yr_cal}.nc'))
-    save2nc(xr_gbf2_non_ag_cat, os.path.join(path, f'xr_biodiversity_GBF2_priority_non_ag_{yr_cal}.nc'))
-    save2nc(xr_gbf2_am_cat, os.path.join(path, f'xr_biodiversity_GBF2_priority_ag_management_{yr_cal}.nc'))
+    valid_layers_stack_ag_min, valid_layers_stack_ag_max = safe_min_max(valid_layers_stack_ag)
+
+    valid_layers_stack_ag.attrs = {'min': valid_layers_stack_ag_min, 'max': valid_layers_stack_ag_max}
+    valid_layers_stack_non_ag_min, valid_layers_stack_non_ag_max = safe_min_max(valid_layers_stack_non_ag)
+
+    valid_layers_stack_non_ag.attrs = {'min': valid_layers_stack_non_ag_min, 'max': valid_layers_stack_non_ag_max}
+    valid_layers_stack_am_min, valid_layers_stack_am_max = safe_min_max(valid_layers_stack_am)
+
+    valid_layers_stack_am.attrs = {'min': valid_layers_stack_am_min, 'max': valid_layers_stack_am_max}
+    save2nc(valid_layers_stack_ag, os.path.join(path, f'xr_biodiversity_GBF2_priority_ag_{yr_cal}.nc'))
+    save2nc(valid_layers_stack_non_ag, os.path.join(path, f'xr_biodiversity_GBF2_priority_non_ag_{yr_cal}.nc'))
+    save2nc(valid_layers_stack_am, os.path.join(path, f'xr_biodiversity_GBF2_priority_ag_management_{yr_cal}.nc'))
     
     return f"Biodiversity GBF2 priority scores written for year {yr_cal}"
 
@@ -2436,18 +2946,67 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
         ).query('abs(`Area Weighted Score (ha)`) > 0'
         ).to_csv(os.path.join(path, f'biodiversity_GBF3_NVIS_scores_{yr_cal}.csv'), index=False)
 
-    # Append the 'ALL' dimension from dvar file
-    ag_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc'))['data'].sel(lu=['ALL'])
-    xr_gbf3_ag_cat = xr.concat([ag_mosaic, xr_gbf3_ag], dim='lu')
-    non_ag_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc'))['data'].sel(lu=['ALL'])
-    xr_gbf3_non_ag_cat = xr.concat([non_ag_mosaic, xr_gbf3_non_ag], dim='lu')
-    am_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc'))['data'].sel(am=['ALL'])
-    xr_gbf3_am_cat = xr.concat([am_mosaic, xr_gbf3_am], dim='am')
+    # ------------------------- Stack array, get valid layers -------------------------
+
+    # Get valid data layers (filter to only meaningful data > 1)
+    valid_ag_layers = pd.MultiIndex.from_frame(GBF3_score_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['lm', 'lu']]).sort_values()
+    valid_non_ag_layers = pd.MultiIndex.from_frame(GBF3_score_non_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['lu']]).sort_values()
+    valid_am_layers = pd.MultiIndex.from_frame(GBF3_score_am_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['am', 'lm', 'lu']]).sort_values()
+
+    # Stack and select valid data layers
+    ag_valid_layers = xr_gbf3_ag.stack(layer=['lm', 'lu']).sel(layer=valid_ag_layers)
+    non_ag_valid_layers = xr_gbf3_non_ag.stack(layer=['lu']).sel(layer=valid_non_ag_layers)
+    am_valid_layers = xr_gbf3_am.stack(layer=['am', 'lm', 'lu']).sel(layer=valid_am_layers)
+
+    # Get valid mosaic layers and combine with dvar valid layers
+    ag_mosaic = cfxr.decode_compress_to_multi_index(
+            xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc')), 'layer'
+        )['data'].sel(lu='ALL', lm='ALL')
+    non_ag_mosaic = cfxr.decode_compress_to_multi_index(
+            xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
+        )['data'].sel(lu='ALL').drop_vars('layer').expand_dims('lu')
+    am_mosaic = cfxr.decode_compress_to_multi_index(
+            xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc')), 'layer'
+        )['data'].sel(am='ALL', lm='ALL', lu='ALL')
+
+    # Filter mosaic and stack
+    ag_mosaic_stack = ag_mosaic.where(
+        xr_gbf3_ag.sum('lu').transpose('cell', ...)
+    ).expand_dims('lu').stack(layer=['lm', 'lu'])
+    ag_mosaic_stack = ag_mosaic_stack.sel(
+        layer=(
+            ag_mosaic_stack['layer']['lm'].isin(valid_ag_layers.get_level_values('lm'))
+        )
+    )
+    valid_layers_stack_ag = xr.concat([ag_valid_layers, ag_mosaic_stack], dim='layer').compute()
+
+    non_ag_mosaic_stack = non_ag_mosaic.stack(layer=['lu'])
+    valid_layers_stack_non_ag = xr.concat([non_ag_mosaic_stack, non_ag_valid_layers], dim='layer').compute()
+
+    am_mosaic_stack = am_mosaic.where(
+        xr_gbf3_am.sum(['am']).transpose('cell', ...)
+    ).expand_dims('am').stack(layer=['am', 'lm', 'lu'])
+    am_mosaic_stack = am_mosaic_stack.sel(
+        layer=(
+            am_mosaic_stack['layer']['lm'].isin(valid_am_layers.get_level_values('lm')) &
+            am_mosaic_stack['layer']['lu'].isin(valid_am_layers.get_level_values('lu'))
+        )
+    )
+    valid_layers_stack_am = xr.concat([am_valid_layers, am_mosaic_stack], dim='layer').compute()
 
     # Save xarray data to netCDF
-    save2nc(xr_gbf3_ag_cat, os.path.join(path, f'xr_biodiversity_GBF3_NVIS_ag_{yr_cal}.nc'))
-    save2nc(xr_gbf3_non_ag_cat, os.path.join(path, f'xr_biodiversity_GBF3_NVIS_non_ag_{yr_cal}.nc'))
-    save2nc(xr_gbf3_am_cat, os.path.join(path, f'xr_biodiversity_GBF3_NVIS_ag_management_{yr_cal}.nc'))
+    valid_layers_stack_ag_min, valid_layers_stack_ag_max = safe_min_max(valid_layers_stack_ag)
+
+    valid_layers_stack_ag.attrs = {'min': valid_layers_stack_ag_min, 'max': valid_layers_stack_ag_max}
+    valid_layers_stack_non_ag_min, valid_layers_stack_non_ag_max = safe_min_max(valid_layers_stack_non_ag)
+
+    valid_layers_stack_non_ag.attrs = {'min': valid_layers_stack_non_ag_min, 'max': valid_layers_stack_non_ag_max}
+    valid_layers_stack_am_min, valid_layers_stack_am_max = safe_min_max(valid_layers_stack_am)
+
+    valid_layers_stack_am.attrs = {'min': valid_layers_stack_am_min, 'max': valid_layers_stack_am_max}
+    save2nc(valid_layers_stack_ag, os.path.join(path, f'xr_biodiversity_GBF3_NVIS_ag_{yr_cal}.nc'))
+    save2nc(valid_layers_stack_non_ag, os.path.join(path, f'xr_biodiversity_GBF3_NVIS_non_ag_{yr_cal}.nc'))
+    save2nc(valid_layers_stack_am, os.path.join(path, f'xr_biodiversity_GBF3_NVIS_ag_management_{yr_cal}.nc'))
     
     return f"Biodiversity GBF3 scores written for year {yr_cal}"
 
@@ -2596,18 +3155,67 @@ def write_biodiversity_GBF3_IBRA_scores(data: Data, yr_cal: int, path) -> None:
         ).query('abs(`Area Weighted Score (ha)`) > 0'
         ).to_csv(os.path.join(path, f'biodiversity_GBF3_IBRA_scores_{yr_cal}.csv'), index=False)
 
-    # Append the 'ALL' dimension from dvar file
-    ag_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc'))['data'].sel(lu=['ALL'])
-    xr_gbf3_ibra_ag_cat = xr.concat([ag_mosaic, xr_gbf3_ibra_ag], dim='lu')
-    non_ag_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc'))['data'].sel(lu=['ALL'])
-    xr_gbf3_ibra_non_ag_cat = xr.concat([non_ag_mosaic, xr_gbf3_ibra_non_ag], dim='lu')
-    am_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc'))['data'].sel(am=['ALL'])
-    xr_gbf3_ibra_am_cat = xr.concat([am_mosaic, xr_gbf3_ibra_am], dim='am')
+    # ------------------------- Stack array, get valid layers -------------------------
+
+    # Get valid data layers (filter to only meaningful data > 1)
+    valid_ag_layers = pd.MultiIndex.from_frame(GBF3_IBRA_score_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['lm', 'lu']]).sort_values()
+    valid_non_ag_layers = pd.MultiIndex.from_frame(GBF3_IBRA_score_non_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['lu']]).sort_values()
+    valid_am_layers = pd.MultiIndex.from_frame(GBF3_IBRA_score_am_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['am', 'lm', 'lu']]).sort_values()
+
+    # Stack and select valid data layers
+    ag_valid_layers = xr_gbf3_ibra_ag.stack(layer=['lm', 'lu']).sel(layer=valid_ag_layers)
+    non_ag_valid_layers = xr_gbf3_ibra_non_ag.stack(layer=['lu']).sel(layer=valid_non_ag_layers)
+    am_valid_layers = xr_gbf3_ibra_am.stack(layer=['am', 'lm', 'lu']).sel(layer=valid_am_layers)
+
+    # Get valid mosaic layers and combine with dvar valid layers
+    ag_mosaic = cfxr.decode_compress_to_multi_index(
+            xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc')), 'layer'
+        )['data'].sel(lu='ALL', lm='ALL')
+    non_ag_mosaic = cfxr.decode_compress_to_multi_index(
+            xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
+        )['data'].sel(lu='ALL').drop_vars('layer').expand_dims('lu')
+    am_mosaic = cfxr.decode_compress_to_multi_index(
+            xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc')), 'layer'
+        )['data'].sel(am='ALL', lm='ALL', lu='ALL')
+
+    # Filter mosaic and stack
+    ag_mosaic_stack = ag_mosaic.where(
+        xr_gbf3_ibra_ag.sum('lu').transpose('cell', ...)
+    ).expand_dims('lu').stack(layer=['lm', 'lu'])
+    ag_mosaic_stack = ag_mosaic_stack.sel(
+        layer=(
+            ag_mosaic_stack['layer']['lm'].isin(valid_ag_layers.get_level_values('lm'))
+        )
+    )
+    valid_layers_stack_ag = xr.concat([ag_valid_layers, ag_mosaic_stack], dim='layer').compute()
+
+    non_ag_mosaic_stack = non_ag_mosaic.stack(layer=['lu'])
+    valid_layers_stack_non_ag = xr.concat([non_ag_mosaic_stack, non_ag_valid_layers], dim='layer').compute()
+
+    am_mosaic_stack = am_mosaic.where(
+        xr_gbf3_ibra_am.sum(['am']).transpose('cell', ...)
+    ).expand_dims('am').stack(layer=['am', 'lm', 'lu'])
+    am_mosaic_stack = am_mosaic_stack.sel(
+        layer=(
+            am_mosaic_stack['layer']['lm'].isin(valid_am_layers.get_level_values('lm')) &
+            am_mosaic_stack['layer']['lu'].isin(valid_am_layers.get_level_values('lu'))
+        )
+    )
+    valid_layers_stack_am = xr.concat([am_valid_layers, am_mosaic_stack], dim='layer').compute()
 
     # Save xarray data to netCDF
-    save2nc(xr_gbf3_ibra_ag_cat, os.path.join(path, f'xr_biodiversity_GBF3_IBRA_ag_{yr_cal}.nc'))
-    save2nc(xr_gbf3_ibra_non_ag_cat, os.path.join(path, f'xr_biodiversity_GBF3_IBRA_non_ag_{yr_cal}.nc'))
-    save2nc(xr_gbf3_ibra_am_cat, os.path.join(path, f'xr_biodiversity_GBF3_IBRA_ag_management_{yr_cal}.nc'))
+    valid_layers_stack_ag_min, valid_layers_stack_ag_max = safe_min_max(valid_layers_stack_ag)
+
+    valid_layers_stack_ag.attrs = {'min': valid_layers_stack_ag_min, 'max': valid_layers_stack_ag_max}
+    valid_layers_stack_non_ag_min, valid_layers_stack_non_ag_max = safe_min_max(valid_layers_stack_non_ag)
+
+    valid_layers_stack_non_ag.attrs = {'min': valid_layers_stack_non_ag_min, 'max': valid_layers_stack_non_ag_max}
+    valid_layers_stack_am_min, valid_layers_stack_am_max = safe_min_max(valid_layers_stack_am)
+
+    valid_layers_stack_am.attrs = {'min': valid_layers_stack_am_min, 'max': valid_layers_stack_am_max}
+    save2nc(valid_layers_stack_ag, os.path.join(path, f'xr_biodiversity_GBF3_IBRA_ag_{yr_cal}.nc'))
+    save2nc(valid_layers_stack_non_ag, os.path.join(path, f'xr_biodiversity_GBF3_IBRA_non_ag_{yr_cal}.nc'))
+    save2nc(valid_layers_stack_am, os.path.join(path, f'xr_biodiversity_GBF3_IBRA_ag_management_{yr_cal}.nc'))
 
     return f"Biodiversity GBF3 IBRA scores written for year {yr_cal}"
 
@@ -2755,18 +3363,67 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
         ).query('abs(`Area Weighted Score (ha)`) > 0'
         ).to_csv(os.path.join(path, f'biodiversity_GBF4_SNES_scores_{yr_cal}.csv'), index=False)
 
-    # Append the 'ALL' dimension from dvar file
-    ag_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc'))['data'].sel(lu=['ALL'])
-    xr_gbf4_snes_ag_cat = xr.concat([ag_mosaic, xr_gbf4_snes_ag], dim='lu')
-    non_ag_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc'))['data'].sel(lu=['ALL'])
-    xr_gbf4_snes_non_ag_cat = xr.concat([non_ag_mosaic, xr_gbf4_snes_non_ag], dim='lu')
-    am_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc'))['data'].sel(am=['ALL'])
-    xr_gbf4_snes_am_cat = xr.concat([am_mosaic, xr_gbf4_snes_am], dim='am')
+    # ------------------------- Stack array, get valid layers -------------------------
+
+    # Get valid data layers (filter to only meaningful data > 1)
+    valid_ag_layers = pd.MultiIndex.from_frame(GBF4_score_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['lm', 'lu']]).sort_values()
+    valid_non_ag_layers = pd.MultiIndex.from_frame(GBF4_score_non_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['lu']]).sort_values()
+    valid_am_layers = pd.MultiIndex.from_frame(GBF4_score_am_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['am', 'lm', 'lu']]).sort_values()
+
+    # Stack and select valid data layers
+    ag_valid_layers = xr_gbf4_snes_ag.stack(layer=['lm', 'lu']).sel(layer=valid_ag_layers)
+    non_ag_valid_layers = xr_gbf4_snes_non_ag.stack(layer=['lu']).sel(layer=valid_non_ag_layers)
+    am_valid_layers = xr_gbf4_snes_am.stack(layer=['am', 'lm', 'lu']).sel(layer=valid_am_layers)
+
+    # Get valid mosaic layers and combine with dvar valid layers
+    ag_mosaic = cfxr.decode_compress_to_multi_index(
+            xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc')), 'layer'
+        )['data'].sel(lu='ALL', lm='ALL')
+    non_ag_mosaic = cfxr.decode_compress_to_multi_index(
+            xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
+        )['data'].sel(lu='ALL').drop_vars('layer').expand_dims('lu')
+    am_mosaic = cfxr.decode_compress_to_multi_index(
+            xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc')), 'layer'
+        )['data'].sel(am='ALL', lm='ALL', lu='ALL')
+
+    # Filter mosaic and stack
+    ag_mosaic_stack = ag_mosaic.where(
+        xr_gbf4_snes_ag.sum('lu').transpose('cell', ...)
+    ).expand_dims('lu').stack(layer=['lm', 'lu'])
+    ag_mosaic_stack = ag_mosaic_stack.sel(
+        layer=(
+            ag_mosaic_stack['layer']['lm'].isin(valid_ag_layers.get_level_values('lm'))
+        )
+    )
+    valid_layers_stack_ag = xr.concat([ag_valid_layers, ag_mosaic_stack], dim='layer').compute()
+
+    non_ag_mosaic_stack = non_ag_mosaic.stack(layer=['lu'])
+    valid_layers_stack_non_ag = xr.concat([non_ag_mosaic_stack, non_ag_valid_layers], dim='layer').compute()
+
+    am_mosaic_stack = am_mosaic.where(
+        xr_gbf4_snes_am.sum(['am']).transpose('cell', ...)
+    ).expand_dims('am').stack(layer=['am', 'lm', 'lu'])
+    am_mosaic_stack = am_mosaic_stack.sel(
+        layer=(
+            am_mosaic_stack['layer']['lm'].isin(valid_am_layers.get_level_values('lm')) &
+            am_mosaic_stack['layer']['lu'].isin(valid_am_layers.get_level_values('lu'))
+        )
+    )
+    valid_layers_stack_am = xr.concat([am_valid_layers, am_mosaic_stack], dim='layer').compute()
 
     # Save xarray data to netCDF
-    save2nc(xr_gbf4_snes_ag_cat, os.path.join(path, f'xr_biodiversity_GBF4_SNES_ag_{yr_cal}.nc'))
-    save2nc(xr_gbf4_snes_non_ag_cat, os.path.join(path, f'xr_biodiversity_GBF4_SNES_non_ag_{yr_cal}.nc'))
-    save2nc(xr_gbf4_snes_am_cat, os.path.join(path, f'xr_biodiversity_GBF4_SNES_ag_management_{yr_cal}.nc'))
+    valid_layers_stack_ag_min, valid_layers_stack_ag_max = safe_min_max(valid_layers_stack_ag)
+
+    valid_layers_stack_ag.attrs = {'min': valid_layers_stack_ag_min, 'max': valid_layers_stack_ag_max}
+    valid_layers_stack_non_ag_min, valid_layers_stack_non_ag_max = safe_min_max(valid_layers_stack_non_ag)
+
+    valid_layers_stack_non_ag.attrs = {'min': valid_layers_stack_non_ag_min, 'max': valid_layers_stack_non_ag_max}
+    valid_layers_stack_am_min, valid_layers_stack_am_max = safe_min_max(valid_layers_stack_am)
+
+    valid_layers_stack_am.attrs = {'min': valid_layers_stack_am_min, 'max': valid_layers_stack_am_max}
+    save2nc(valid_layers_stack_ag, os.path.join(path, f'xr_biodiversity_GBF4_SNES_ag_{yr_cal}.nc'))
+    save2nc(valid_layers_stack_non_ag, os.path.join(path, f'xr_biodiversity_GBF4_SNES_non_ag_{yr_cal}.nc'))
+    save2nc(valid_layers_stack_am, os.path.join(path, f'xr_biodiversity_GBF4_SNES_ag_management_{yr_cal}.nc'))
     
     return f"Biodiversity GBF4 SNES scores written for year {yr_cal}"
 
@@ -2913,18 +3570,67 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
         ).query('abs(`Area Weighted Score (ha)`) > 0'
         ).to_csv(os.path.join(path, f'biodiversity_GBF4_ECNES_scores_{yr_cal}.csv'), index=False)
 
-    # Append the 'ALL' dimension from dvar file
-    ag_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc'))['data'].sel(lu=['ALL'])
-    xr_gbf4_ecnes_ag_cat = xr.concat([ag_mosaic, xr_gbf4_ecnes_ag], dim='lu')
-    non_ag_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc'))['data'].sel(lu=['ALL'])
-    xr_gbf4_ecnes_non_ag_cat = xr.concat([non_ag_mosaic, xr_gbf4_ecnes_non_ag], dim='lu')
-    am_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc'))['data'].sel(am=['ALL'])
-    xr_gbf4_ecnes_am_cat = xr.concat([am_mosaic, xr_gbf4_ecnes_am], dim='am')
+    # ------------------------- Stack array, get valid layers -------------------------
+
+    # Get valid data layers (filter to only meaningful data > 1)
+    valid_ag_layers = pd.MultiIndex.from_frame(GBF4_score_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['lm', 'lu']]).sort_values()
+    valid_non_ag_layers = pd.MultiIndex.from_frame(GBF4_score_non_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['lu']]).sort_values()
+    valid_am_layers = pd.MultiIndex.from_frame(GBF4_score_am_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['am', 'lm', 'lu']]).sort_values()
+
+    # Stack and select valid data layers
+    ag_valid_layers = xr_gbf4_ecnes_ag.stack(layer=['lm', 'lu']).sel(layer=valid_ag_layers)
+    non_ag_valid_layers = xr_gbf4_ecnes_non_ag.stack(layer=['lu']).sel(layer=valid_non_ag_layers)
+    am_valid_layers = xr_gbf4_ecnes_am.stack(layer=['am', 'lm', 'lu']).sel(layer=valid_am_layers)
+
+    # Get valid mosaic layers and combine with dvar valid layers
+    ag_mosaic = cfxr.decode_compress_to_multi_index(
+            xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc')), 'layer'
+        )['data'].sel(lu='ALL', lm='ALL')
+    non_ag_mosaic = cfxr.decode_compress_to_multi_index(
+            xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
+        )['data'].sel(lu='ALL').drop_vars('layer').expand_dims('lu')
+    am_mosaic = cfxr.decode_compress_to_multi_index(
+            xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc')), 'layer'
+        )['data'].sel(am='ALL', lm='ALL', lu='ALL')
+
+    # Filter mosaic and stack
+    ag_mosaic_stack = ag_mosaic.where(
+        xr_gbf4_ecnes_ag.sum('lu').transpose('cell', ...)
+    ).expand_dims('lu').stack(layer=['lm', 'lu'])
+    ag_mosaic_stack = ag_mosaic_stack.sel(
+        layer=(
+            ag_mosaic_stack['layer']['lm'].isin(valid_ag_layers.get_level_values('lm'))
+        )
+    )
+    valid_layers_stack_ag = xr.concat([ag_valid_layers, ag_mosaic_stack], dim='layer').compute()
+
+    non_ag_mosaic_stack = non_ag_mosaic.stack(layer=['lu'])
+    valid_layers_stack_non_ag = xr.concat([non_ag_mosaic_stack, non_ag_valid_layers], dim='layer').compute()
+
+    am_mosaic_stack = am_mosaic.where(
+        xr_gbf4_ecnes_am.sum(['am']).transpose('cell', ...)
+    ).expand_dims('am').stack(layer=['am', 'lm', 'lu'])
+    am_mosaic_stack = am_mosaic_stack.sel(
+        layer=(
+            am_mosaic_stack['layer']['lm'].isin(valid_am_layers.get_level_values('lm')) &
+            am_mosaic_stack['layer']['lu'].isin(valid_am_layers.get_level_values('lu'))
+        )
+    )
+    valid_layers_stack_am = xr.concat([am_valid_layers, am_mosaic_stack], dim='layer').compute()
 
     # Save xarray data to netCDF
-    save2nc(xr_gbf4_ecnes_ag_cat, os.path.join(path, f'xr_biodiversity_GBF4_ECNES_ag_{yr_cal}.nc'))
-    save2nc(xr_gbf4_ecnes_non_ag_cat, os.path.join(path, f'xr_biodiversity_GBF4_ECNES_non_ag_{yr_cal}.nc'))
-    save2nc(xr_gbf4_ecnes_am_cat, os.path.join(path, f'xr_biodiversity_GBF4_ECNES_ag_management_{yr_cal}.nc'))
+    valid_layers_stack_ag_min, valid_layers_stack_ag_max = safe_min_max(valid_layers_stack_ag)
+
+    valid_layers_stack_ag.attrs = {'min': valid_layers_stack_ag_min, 'max': valid_layers_stack_ag_max}
+    valid_layers_stack_non_ag_min, valid_layers_stack_non_ag_max = safe_min_max(valid_layers_stack_non_ag)
+
+    valid_layers_stack_non_ag.attrs = {'min': valid_layers_stack_non_ag_min, 'max': valid_layers_stack_non_ag_max}
+    valid_layers_stack_am_min, valid_layers_stack_am_max = safe_min_max(valid_layers_stack_am)
+
+    valid_layers_stack_am.attrs = {'min': valid_layers_stack_am_min, 'max': valid_layers_stack_am_max}
+    save2nc(valid_layers_stack_ag, os.path.join(path, f'xr_biodiversity_GBF4_ECNES_ag_{yr_cal}.nc'))
+    save2nc(valid_layers_stack_non_ag, os.path.join(path, f'xr_biodiversity_GBF4_ECNES_non_ag_{yr_cal}.nc'))
+    save2nc(valid_layers_stack_am, os.path.join(path, f'xr_biodiversity_GBF4_ECNES_ag_management_{yr_cal}.nc'))
     
     return f"Biodiversity GBF4 ECNES scores written for year {yr_cal}"
 
@@ -3072,18 +3778,67 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
         ).query('abs(`Area Weighted Score (ha)`) > 0'
         ).to_csv(os.path.join(path, f'biodiversity_GBF8_groups_scores_{yr_cal}.csv'), index=False)
 
-    # Append the 'ALL' dimension from dvar file
-    ag_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc'))['data'].sel(lu=['ALL'])
-    xr_gbf8_groups_ag_cat = xr.concat([ag_mosaic, xr_gbf8_groups_ag], dim='lu')
-    non_ag_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc'))['data'].sel(lu=['ALL'])
-    xr_gbf8_groups_non_ag_cat = xr.concat([non_ag_mosaic, xr_gbf8_groups_non_ag], dim='lu')
-    am_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc'))['data'].sel(am=['ALL'])
-    xr_gbf8_groups_am_cat = xr.concat([am_mosaic, xr_gbf8_groups_am], dim='am')
+    # ------------------------- Stack array, get valid layers -------------------------
+
+    # Get valid data layers (filter to only meaningful data > 1)
+    valid_ag_layers = pd.MultiIndex.from_frame(GBF8_scores_groups_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['lm', 'lu']]).sort_values()
+    valid_non_ag_layers = pd.MultiIndex.from_frame(GBF8_scores_groups_non_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['lu']]).sort_values()
+    valid_am_layers = pd.MultiIndex.from_frame(GBF8_scores_groups_am_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['am', 'lm', 'lu']]).sort_values()
+
+    # Stack and select valid data layers
+    ag_valid_layers = xr_gbf8_groups_ag.stack(layer=['lm', 'lu']).sel(layer=valid_ag_layers)
+    non_ag_valid_layers = xr_gbf8_groups_non_ag.stack(layer=['lu']).sel(layer=valid_non_ag_layers)
+    am_valid_layers = xr_gbf8_groups_am.stack(layer=['am', 'lm', 'lu']).sel(layer=valid_am_layers)
+
+    # Get valid mosaic layers and combine with dvar valid layers
+    ag_mosaic = cfxr.decode_compress_to_multi_index(
+            xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc')), 'layer'
+        )['data'].sel(lu='ALL', lm='ALL')
+    non_ag_mosaic = cfxr.decode_compress_to_multi_index(
+            xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
+        )['data'].sel(lu='ALL').drop_vars('layer').expand_dims('lu')
+    am_mosaic = cfxr.decode_compress_to_multi_index(
+            xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc')), 'layer'
+        )['data'].sel(am='ALL', lm='ALL', lu='ALL')
+
+    # Filter mosaic and stack
+    ag_mosaic_stack = ag_mosaic.where(
+        xr_gbf8_groups_ag.sum('lu').transpose('cell', ...)
+    ).expand_dims('lu').stack(layer=['lm', 'lu'])
+    ag_mosaic_stack = ag_mosaic_stack.sel(
+        layer=(
+            ag_mosaic_stack['layer']['lm'].isin(valid_ag_layers.get_level_values('lm'))
+        )
+    )
+    valid_layers_stack_ag = xr.concat([ag_valid_layers, ag_mosaic_stack], dim='layer').compute()
+
+    non_ag_mosaic_stack = non_ag_mosaic.stack(layer=['lu'])
+    valid_layers_stack_non_ag = xr.concat([non_ag_mosaic_stack, non_ag_valid_layers], dim='layer').compute()
+
+    am_mosaic_stack = am_mosaic.where(
+        xr_gbf8_groups_am.sum(['am']).transpose('cell', ...)
+    ).expand_dims('am').stack(layer=['am', 'lm', 'lu'])
+    am_mosaic_stack = am_mosaic_stack.sel(
+        layer=(
+            am_mosaic_stack['layer']['lm'].isin(valid_am_layers.get_level_values('lm')) &
+            am_mosaic_stack['layer']['lu'].isin(valid_am_layers.get_level_values('lu'))
+        )
+    )
+    valid_layers_stack_am = xr.concat([am_valid_layers, am_mosaic_stack], dim='layer').compute()
 
     # Save xarray data to netCDF
-    save2nc(xr_gbf8_groups_ag_cat, os.path.join(path, f'xr_biodiversity_GBF8_groups_ag_{yr_cal}.nc'))
-    save2nc(xr_gbf8_groups_non_ag_cat, os.path.join(path, f'xr_biodiversity_GBF8_groups_non_ag_{yr_cal}.nc'))
-    save2nc(xr_gbf8_groups_am_cat, os.path.join(path, f'xr_biodiversity_GBF8_groups_ag_management_{yr_cal}.nc'))
+    valid_layers_stack_ag_min, valid_layers_stack_ag_max = safe_min_max(valid_layers_stack_ag)
+
+    valid_layers_stack_ag.attrs = {'min': valid_layers_stack_ag_min, 'max': valid_layers_stack_ag_max}
+    valid_layers_stack_non_ag_min, valid_layers_stack_non_ag_max = safe_min_max(valid_layers_stack_non_ag)
+
+    valid_layers_stack_non_ag.attrs = {'min': valid_layers_stack_non_ag_min, 'max': valid_layers_stack_non_ag_max}
+    valid_layers_stack_am_min, valid_layers_stack_am_max = safe_min_max(valid_layers_stack_am)
+
+    valid_layers_stack_am.attrs = {'min': valid_layers_stack_am_min, 'max': valid_layers_stack_am_max}
+    save2nc(valid_layers_stack_ag, os.path.join(path, f'xr_biodiversity_GBF8_groups_ag_{yr_cal}.nc'))
+    save2nc(valid_layers_stack_non_ag, os.path.join(path, f'xr_biodiversity_GBF8_groups_non_ag_{yr_cal}.nc'))
+    save2nc(valid_layers_stack_am, os.path.join(path, f'xr_biodiversity_GBF8_groups_ag_management_{yr_cal}.nc'))
     
     return f"Biodiversity GBF8 groups scores written for year {yr_cal}"
 
@@ -3241,18 +3996,67 @@ def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
         ).query('abs(`Area Weighted Score (ha)`) > 0'
         ).to_csv(os.path.join(path, f'biodiversity_GBF8_species_scores_{yr_cal}.csv'), index=False)
 
-    # Append the 'ALL' dimension from dvar file
-    ag_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc'))['data'].sel(lu=['ALL'])
-    xr_gbf8_species_ag_cat = xr.concat([ag_mosaic, xr_gbf8_species_ag], dim='lu')
-    non_ag_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc'))['data'].sel(lu=['ALL'])
-    xr_gbf8_species_non_ag_cat = xr.concat([non_ag_mosaic, xr_gbf8_species_non_ag], dim='lu')
-    am_mosaic = xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc'))['data'].sel(am=['ALL'])
-    xr_gbf8_species_am_cat = xr.concat([am_mosaic, xr_gbf8_species_am], dim='am')
+    # ------------------------- Stack array, get valid layers -------------------------
+
+    # Get valid data layers (filter to only meaningful data > 1)
+    valid_ag_layers = pd.MultiIndex.from_frame(GBF8_scores_species_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['lm', 'lu']]).sort_values()
+    valid_non_ag_layers = pd.MultiIndex.from_frame(GBF8_scores_species_non_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['lu']]).sort_values()
+    valid_am_layers = pd.MultiIndex.from_frame(GBF8_scores_species_am_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['am', 'lm', 'lu']]).sort_values()
+
+    # Stack and select valid data layers
+    ag_valid_layers = xr_gbf8_species_ag.stack(layer=['lm', 'lu']).sel(layer=valid_ag_layers)
+    non_ag_valid_layers = xr_gbf8_species_non_ag.stack(layer=['lu']).sel(layer=valid_non_ag_layers)
+    am_valid_layers = xr_gbf8_species_am.stack(layer=['am', 'lm', 'lu']).sel(layer=valid_am_layers)
+
+    # Get valid mosaic layers and combine with dvar valid layers
+    ag_mosaic = cfxr.decode_compress_to_multi_index(
+            xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc')), 'layer'
+        )['data'].sel(lu='ALL', lm='ALL')
+    non_ag_mosaic = cfxr.decode_compress_to_multi_index(
+            xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
+        )['data'].sel(lu='ALL').drop_vars('layer').expand_dims('lu')
+    am_mosaic = cfxr.decode_compress_to_multi_index(
+            xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc')), 'layer'
+        )['data'].sel(am='ALL', lm='ALL', lu='ALL')
+
+    # Filter mosaic and stack
+    ag_mosaic_stack = ag_mosaic.where(
+        xr_gbf8_species_ag.sum('lu').transpose('cell', ...)
+    ).expand_dims('lu').stack(layer=['lm', 'lu'])
+    ag_mosaic_stack = ag_mosaic_stack.sel(
+        layer=(
+            ag_mosaic_stack['layer']['lm'].isin(valid_ag_layers.get_level_values('lm'))
+        )
+    )
+    valid_layers_stack_ag = xr.concat([ag_valid_layers, ag_mosaic_stack], dim='layer').compute()
+
+    non_ag_mosaic_stack = non_ag_mosaic.stack(layer=['lu'])
+    valid_layers_stack_non_ag = xr.concat([non_ag_mosaic_stack, non_ag_valid_layers], dim='layer').compute()
+
+    am_mosaic_stack = am_mosaic.where(
+        xr_gbf8_species_am.sum(['am']).transpose('cell', ...)
+    ).expand_dims('am').stack(layer=['am', 'lm', 'lu'])
+    am_mosaic_stack = am_mosaic_stack.sel(
+        layer=(
+            am_mosaic_stack['layer']['lm'].isin(valid_am_layers.get_level_values('lm')) &
+            am_mosaic_stack['layer']['lu'].isin(valid_am_layers.get_level_values('lu'))
+        )
+    )
+    valid_layers_stack_am = xr.concat([am_valid_layers, am_mosaic_stack], dim='layer').compute()
 
     # Save xarray data to netCDF
-    save2nc(xr_gbf8_species_ag_cat, os.path.join(path, f'xr_biodiversity_GBF8_species_ag_{yr_cal}.nc'))
-    save2nc(xr_gbf8_species_non_ag_cat, os.path.join(path, f'xr_biodiversity_GBF8_species_non_ag_{yr_cal}.nc'))
-    save2nc(xr_gbf8_species_am_cat, os.path.join(path, f'xr_biodiversity_GBF8_species_ag_management_{yr_cal}.nc'))
+    valid_layers_stack_ag_min, valid_layers_stack_ag_max = safe_min_max(valid_layers_stack_ag)
+
+    valid_layers_stack_ag.attrs = {'min': valid_layers_stack_ag_min, 'max': valid_layers_stack_ag_max}
+    valid_layers_stack_non_ag_min, valid_layers_stack_non_ag_max = safe_min_max(valid_layers_stack_non_ag)
+
+    valid_layers_stack_non_ag.attrs = {'min': valid_layers_stack_non_ag_min, 'max': valid_layers_stack_non_ag_max}
+    valid_layers_stack_am_min, valid_layers_stack_am_max = safe_min_max(valid_layers_stack_am)
+
+    valid_layers_stack_am.attrs = {'min': valid_layers_stack_am_min, 'max': valid_layers_stack_am_max}
+    save2nc(valid_layers_stack_ag, os.path.join(path, f'xr_biodiversity_GBF8_species_ag_{yr_cal}.nc'))
+    save2nc(valid_layers_stack_non_ag, os.path.join(path, f'xr_biodiversity_GBF8_species_non_ag_{yr_cal}.nc'))
+    save2nc(valid_layers_stack_am, os.path.join(path, f'xr_biodiversity_GBF8_species_ag_management_{yr_cal}.nc'))
     
     return f"Biodiversity GBF8 species scores written for year {yr_cal}"
 

@@ -47,6 +47,7 @@ def monitor_memory(interval=0.01):
     """
     Memory monitoring focused on Working Set delta from baseline.
     Runs in a background thread, logs memory usage every `interval` seconds.
+    Includes child processes (multiprocessing support).
     """
     process = psutil.Process(os.getpid())
 
@@ -61,6 +62,20 @@ def monitor_memory(interval=0.01):
                 current_wset_mb = memory_info.wset / 1024 ** 2
             else:
                 current_wset_mb = memory_info.rss / 1024 ** 2
+
+            # Include child processes using the SAME metric type
+            children = process.children(recursive=True)
+            if children:
+                for child in children:
+                    try:
+                        child_memory_info = child.memory_info()
+                        if has_wset and hasattr(child_memory_info, 'wset'):
+                            current_wset_mb += child_memory_info.wset / 1024 ** 2
+                        else:
+                            # Use RSS for consistency if wset not available
+                            current_wset_mb += child_memory_info.rss / 1024 ** 2
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        continue
 
             # Calculate delta from baseline
             delta_mb = current_wset_mb - baseline_memory
@@ -165,13 +180,17 @@ def _show_live_plot(update_interval=0.1):
         display(fig)
 
 
-def start_memory_monitor(update_interval=0.1):
+def start_memory_monitor(update_interval=0.1, enable_live_plot=True):
     """
     Start Working Set memory monitoring with baseline measurement.
-    Monitoring runs in background thread with live plot updates.
+    Monitoring runs in background thread with optional live plot updates.
+
+    Includes child processes (multiprocessing support) - tracks memory usage
+    across all spawned child processes recursively.
 
     Parameters:
         update_interval (float): Seconds between plot updates. Default: 0.1
+        enable_live_plot (bool): If True, shows live updating plot. If False, only shows final plot. Default: True
 
     Usage:
         from luto.tools.mem_monitor import start_memory_monitor, stop_memory_monitor
@@ -204,7 +223,7 @@ def start_memory_monitor(update_interval=0.1):
     gc.collect()
     time.sleep(0.1)  # Give GC time to complete
 
-    # Get baseline memory usage
+    # Get baseline memory usage (including child processes)
     process = psutil.Process(os.getpid())
     memory_info = process.memory_info()
 
@@ -214,22 +233,39 @@ def start_memory_monitor(update_interval=0.1):
     else:
         baseline_memory = memory_info.rss / 1024 ** 2
 
+    # Include child processes in baseline using the SAME metric type
+    children = process.children(recursive=True)
+    if children:
+        for child in children:
+            try:
+                child_memory_info = child.memory_info()
+                if has_wset and hasattr(child_memory_info, 'wset'):
+                    baseline_memory += child_memory_info.wset / 1024 ** 2
+                else:
+                    # Use RSS for consistency if wset not available
+                    baseline_memory += child_memory_info.rss / 1024 ** 2
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+
     # Start monitoring in background thread
     monitoring = True
     monitor_thread = threading.Thread(target=monitor_memory, daemon=True)
     monitor_thread.start()
 
-    print(f"Memory monitoring started (baseline: {baseline_memory:.2f} MB)")
+    print(f"Memory monitoring started (baseline: {baseline_memory:.2f} MB, including child processes)")
 
-    # Start plot updates in another background thread
-    try:
-        live_plot_thread = threading.Thread(target=_show_live_plot, args=(update_interval,), daemon=True)
-        live_plot_thread.start()
-        # Give the live plot thread a moment to initialize
-        time.sleep(0.1)
-    except Exception as e:
-        print(f"Warning: Could not start live plot (requires Jupyter): {e}")
-        print("Continuing with silent monitoring...")
+    # Start plot updates in another background thread (if enabled)
+    if enable_live_plot:
+        try:
+            live_plot_thread = threading.Thread(target=_show_live_plot, args=(update_interval,), daemon=True)
+            live_plot_thread.start()
+            # Give the live plot thread a moment to initialize
+            time.sleep(0.1)
+        except Exception as e:
+            print(f"Warning: Could not start live plot (requires Jupyter): {e}")
+            print("Continuing with silent monitoring...")
+    else:
+        print("Live plot disabled. Print statements will be visible. Final plot will be shown when monitoring stops.")
 
 
 def stop_memory_monitor(return_data=False):
@@ -288,7 +324,7 @@ def stop_memory_monitor(return_data=False):
     return None
 
 
-def trace_mem_usage(func=None, *, update_interval=0.1, return_data=False):
+def trace_mem_usage(func=None, *, update_interval=0.1, return_data=False, live_plot=True):
     """
     Trace memory usage of a function with automatic lifecycle management.
 
@@ -296,23 +332,35 @@ def trace_mem_usage(func=None, *, update_interval=0.1, return_data=False):
     This is the recommended way to monitor memory usage. It handles starting,
     monitoring, and cleanup automatically, even if the function raises an error.
 
+    Includes child processes (multiprocessing support) - tracks memory usage
+    across all spawned child processes recursively.
+
     Parameters:
         func (callable): The function to monitor (when used as function wrapper)
         update_interval (float): Seconds between plot updates. Default: 0.1
         return_data (bool): If True, returns both function result and memory stats. Default: False
+        live_plot (bool): If True, enables live plotting (will suppress print statements). Default: True
 
     Returns:
         When used as decorator: Returns wrapped function
         When used as wrapper: Returns function result (or tuple with stats if return_data=True)
 
 
-    Example:
+    Examples:
+        # Default: Live plot enabled (print statements suppressed)
         @trace_mem_usage
         def expensive_operation(size):
             data = [i**2 for i in range(size)]
             return sum(data)
 
-        result = expensive_operation(1000000)  # Automatically traced
+        result = expensive_operation(1000000)
+
+        # Disable live plot to see print statements
+        @trace_mem_usage(live_plot=False)
+        def another_operation():
+            print("Processing data...")  # ✅ This will be visible!
+            print("Done!")                # ✅ This too!
+            return process_data()
     """
     
 
@@ -322,8 +370,8 @@ def trace_mem_usage(func=None, *, update_interval=0.1, return_data=False):
             print(f"Starting memory trace for: {fn.__name__}")
             print("-" * 60)
 
-            # Start monitoring
-            start_memory_monitor(update_interval=update_interval)
+            # Start monitoring (live plot enabled by default)
+            start_memory_monitor(update_interval=update_interval, enable_live_plot=live_plot)
 
             function_result = None
             error_occurred = False
