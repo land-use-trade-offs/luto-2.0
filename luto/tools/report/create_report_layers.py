@@ -132,7 +132,7 @@ def get_map2json(
                 legend = legend_float
                 min_max = xr_arr.attrs['min'], xr_arr.attrs['max']
             
-            arr_sel = xr_arr.sel(**sel).compute()  # Eagerly load data before passing to workers
+            arr_sel = xr_arr.sel(**sel)
             sel_rename = rename_reorder_hierarchy(sel)
             hierarchy_tp = tuple(list(sel_rename.values()) + [row['Year']])
 

@@ -1951,6 +1951,8 @@ def write_ghg_agricultural(data: Data, yr_cal: int, path: str):
     valid_layers_stack_ghg.attrs = {'min': valid_layers_stack_ghg_min, 'max': valid_layers_stack_ghg_max}
 
     save2nc(valid_layers_stack_ghg, os.path.join(path, f'xr_GHG_ag_{yr_cal}.nc'))
+    
+    return f"Agricultural land-use GHG emissions written for year {yr_cal}"
 
 
 
@@ -2024,6 +2026,8 @@ def write_ghg_non_agricultural(data: Data, yr_cal: int, path: str):
 
     # Save xarray data to netCDF
     save2nc(xr_ghg_non_ag_cat, os.path.join(path, f'xr_GHG_non_ag_{yr_cal}.nc'))
+    
+    return f"Non-agricultural land-use GHG emissions written for year {yr_cal}"
 
 
 
@@ -2111,6 +2115,7 @@ def write_ghg_agricultural_management(data: Data, yr_cal: int, path: str):
     valid_layers_stack_am_ghg.attrs = {'min': valid_layers_stack_am_ghg_min, 'max': valid_layers_stack_am_ghg_max}
     save2nc(valid_layers_stack_am_ghg, os.path.join(path, f'xr_GHG_ag_management_{yr_cal}.nc'))
 
+    return f"Agricultural management GHG emissions written for year {yr_cal}"
 
 
 def write_ghg_transition_penalty(data: Data, yr_cal: int, path: str):
