@@ -166,7 +166,12 @@ the model sensitive to variations in input data.
 # Geographical raster writing parameters
 # ---------------------------------------------------------------------------- #
 WRITE_PARALLEL = True                       # If to use parallel processing to write GeoTiffs: True or False
-WRITE_THREADS = min(4, os.cpu_count())      # The Threads to use for map making, only work with WRITE_PARALLEL = True
+WRITE_THREADS = min(8, os.cpu_count())      # The Threads to use for map making, only work with WRITE_PARALLEL = True
+
+WRITE_REPORT_MAX_MEM_GB = 16                # The maximum memory (in GB) to use for writing report layers.
+                                            #   Estimated based on the 0.5 GB MEM usage when RESFACTOR = 13 
+                                            #   (for example, for RESFACTOR = 5, the MEM usage will be 0.5 * (13/5)^2 = 3.4 GB).
+
 WRITE_CHUNK_SIZE = 1024                     # The processing size of each chunk during writeing process. 
                                             #   E.g., layer of ~200 k cells (under chunk size of 1024) will create ~200 chunks.
                                             #   This makes memory usage to be ~1/200 of the original size.

@@ -354,13 +354,6 @@ def trace_mem_usage(func=None, *, update_interval=0.1, return_data=False, live_p
             return sum(data)
 
         result = expensive_operation(1000000)
-
-        # Disable live plot to see print statements
-        @trace_mem_usage(live_plot=False)
-        def another_operation():
-            print("Processing data...")  # ✅ This will be visible!
-            print("Done!")                # ✅ This too!
-            return process_data()
     """
     
 

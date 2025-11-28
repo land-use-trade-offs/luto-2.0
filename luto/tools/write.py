@@ -280,6 +280,19 @@ def write_dvar_and_mosaic_map(data: Data, yr_cal, path):
     valid_layers_non_ag = (non_ag_map_stack.sum('cell') > 0.001).to_dataframe('valid').query('valid == True').index
     valid_layers_am = (am_map_stack.sum('cell') > 0.001).to_dataframe('valid').query('valid == True').index
 
+    # Save to netcdf
+    ag_map_stack.attrs = {
+        'min': float(am_map.min().values),
+        'max': float(am_map.max().values)
+    }
+    non_ag_map_stack.attrs = {
+        'min': float(non_ag_map.min().values),
+        'max': float(non_ag_map.max().values)
+    }
+    am_map_stack.attrs = {
+        'min': float(am_map.min().values),
+        'max': float(am_map.max().values)
+    }
     save2nc(ag_map_stack.sel(layer=valid_layers_ag), os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc'))
     save2nc(non_ag_map_stack.sel(layer=valid_layers_non_ag), os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc'))
     save2nc(am_map_stack.sel(layer=valid_layers_am), os.path.join(path, f'xr_dvar_am_{yr_cal}.nc'))
@@ -784,14 +797,13 @@ def write_revenue_cost_ag(data: Data, yr_cal, path):
     valid_layers_stack_rev = xr.concat([ag_rev_valid_layers, ag_mosaic_rev_stack], dim='layer').compute()
     valid_layers_stack_cost = xr.concat([ag_cost_valid_layers, ag_mosaic_cost_stack], dim='layer').compute()
     
-    valid_layers_stack_rev_min, valid_layers_stack_rev_max = safe_min_max(valid_layers_stack_rev)
-
+    # min/max should calculated using array without appending mosaic layers
+    valid_layers_stack_rev_min, valid_layers_stack_rev_max = safe_min_max(xr_ag_rev)
+    valid_layers_stack_cost_min, valid_layers_stack_cost_max = safe_min_max(xr_ag_cost)
     
     valid_layers_stack_rev.attrs = {'min': valid_layers_stack_rev_min, 'max': valid_layers_stack_rev_max}
-    
-    valid_layers_stack_cost_min, valid_layers_stack_cost_max = safe_min_max(valid_layers_stack_cost)
     valid_layers_stack_cost.attrs = {'min': valid_layers_stack_cost_min, 'max': valid_layers_stack_cost_max}
-    
+
     save2nc(valid_layers_stack_rev, os.path.join(path, f'xr_revenue_ag_{yr_cal}.nc'))
     save2nc(valid_layers_stack_cost, os.path.join(path, f'xr_cost_ag_{yr_cal}.nc'))
 
@@ -909,13 +921,12 @@ def write_revenue_cost_ag_man(data: Data, yr_cal, path):
     # Combine valid layers
     valid_layers_stack_rev = xr.concat([xr_revenue_am_stack, am_mosaic_rev_stack], dim='layer').compute()
     valid_layers_stack_cost = xr.concat([xr_cost_am_stack, am_mosaic_cost_stack], dim='layer').compute()
-    
-    valid_layers_stack_rev_min, valid_layers_stack_rev_max = safe_min_max(valid_layers_stack_rev)
 
-    
+    # min/max should calculated using array without appending mosaic layers
+    valid_layers_stack_rev_min, valid_layers_stack_rev_max = safe_min_max(xr_revenue_am)
+    valid_layers_stack_cost_min, valid_layers_stack_cost_max = safe_min_max(xr_cost_am)
+
     valid_layers_stack_rev.attrs = {'min': valid_layers_stack_rev_min, 'max': valid_layers_stack_rev_max}
-    valid_layers_stack_cost_min, valid_layers_stack_cost_max = safe_min_max(valid_layers_stack_cost)
-
     valid_layers_stack_cost.attrs = {'min': valid_layers_stack_cost_min, 'max': valid_layers_stack_cost_max}
 
     # Stack and save to netcdf
@@ -1257,7 +1268,11 @@ def write_transition_cost_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None
 
 
     # Combine all chunks df
-    cost_df_region = pd.concat(cost_dfs, ignore_index=True)
+    cost_df_region = pd.concat(cost_dfs, ignore_index=True).groupby(
+        ['region', 'From water-supply', 'From land-use', 'To land-use', 'Cost type', 'Year']
+        )['Cost ($)'
+        ].sum(
+        ).reset_index()
 
     # Get Australia level aggregation
     cost_df_AUS = cost_df_region.groupby(['From water-supply', 'From land-use', 'To land-use', 'Cost type', 'Year']
@@ -1930,8 +1945,8 @@ def write_ghg_agricultural(data: Data, yr_cal: int, path: str):
     # Combine valid layers from dvar and mosaic
     valid_layers_stack_ghg = xr.concat([ag_ghg_valid_layers, ag_mosaic_ghg_stack], dim='layer').compute()
 
-    valid_layers_stack_ghg_min, valid_layers_stack_ghg_max = safe_min_max(valid_layers_stack_ghg)
-
+    # min/max should calculated using array without appending mosaic layers
+    valid_layers_stack_ghg_min, valid_layers_stack_ghg_max = safe_min_max(ghg_e)
 
     valid_layers_stack_ghg.attrs = {'min': valid_layers_stack_ghg_min, 'max': valid_layers_stack_ghg_max}
 
@@ -2088,7 +2103,9 @@ def write_ghg_agricultural_management(data: Data, yr_cal: int, path: str):
 
     # Combine valid layers from dvar and mosaic
     valid_layers_stack_am_ghg = xr.concat([am_ghg_valid_layers, am_mosaic_ghg_stack], dim='layer').compute()
-    valid_layers_stack_am_ghg_min, valid_layers_stack_am_ghg_max = safe_min_max(valid_layers_stack_am_ghg)
+
+    # min/max should calculated using array without appending mosaic layers
+    valid_layers_stack_am_ghg_min, valid_layers_stack_am_ghg_max = safe_min_max(xr_ghg_ag_man)
 
     # Save xarray data to netCDF
     valid_layers_stack_am_ghg.attrs = {'min': valid_layers_stack_am_ghg_min, 'max': valid_layers_stack_am_ghg_max}
@@ -2579,12 +2596,12 @@ def write_biodiversity_quality_scores(data: Data, yr_cal, path):
         )
     )
     valid_layers_stack_am = xr.concat([am_valid_layers, am_mosaic_stack], dim='layer').compute()
-    
-    
-    # Save xarray data to netCDF
-    ag_min, ag_max = safe_min_max(valid_layers_stack_ag)
-    non_ag_min, non_ag_max = safe_min_max(valid_layers_stack_non_ag)
-    am_min, am_max = safe_min_max(valid_layers_stack_am)
+
+
+    # min/max should calculated using array without appending mosaic layers
+    ag_min, ag_max = safe_min_max(xr_priority_ag)
+    non_ag_min, non_ag_max = safe_min_max(xr_priority_non_ag)
+    am_min, am_max = safe_min_max(xr_priority_am)
 
     valid_layers_stack_ag.attrs = {'min': ag_min, 'max': ag_max}
     valid_layers_stack_non_ag.attrs = {'min': non_ag_min, 'max': non_ag_max}
@@ -2785,15 +2802,13 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
     )
     valid_layers_stack_am = xr.concat([am_valid_layers, am_mosaic_stack], dim='layer').compute()
 
-    # Save xarray data to netCDF
-    valid_layers_stack_ag_min, valid_layers_stack_ag_max = safe_min_max(valid_layers_stack_ag)
+    # min/max should calculated using array without appending mosaic layers
+    valid_layers_stack_ag_min, valid_layers_stack_ag_max = safe_min_max(xr_gbf2_ag)
+    valid_layers_stack_non_ag_min, valid_layers_stack_non_ag_max = safe_min_max(xr_gbf2_non_ag)
+    valid_layers_stack_am_min, valid_layers_stack_am_max = safe_min_max(xr_gbf2_am)
 
     valid_layers_stack_ag.attrs = {'min': valid_layers_stack_ag_min, 'max': valid_layers_stack_ag_max}
-    valid_layers_stack_non_ag_min, valid_layers_stack_non_ag_max = safe_min_max(valid_layers_stack_non_ag)
-
     valid_layers_stack_non_ag.attrs = {'min': valid_layers_stack_non_ag_min, 'max': valid_layers_stack_non_ag_max}
-    valid_layers_stack_am_min, valid_layers_stack_am_max = safe_min_max(valid_layers_stack_am)
-
     valid_layers_stack_am.attrs = {'min': valid_layers_stack_am_min, 'max': valid_layers_stack_am_max}
     save2nc(valid_layers_stack_ag, os.path.join(path, f'xr_biodiversity_GBF2_priority_ag_{yr_cal}.nc'))
     save2nc(valid_layers_stack_non_ag, os.path.join(path, f'xr_biodiversity_GBF2_priority_non_ag_{yr_cal}.nc'))
@@ -2994,15 +3009,13 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
     )
     valid_layers_stack_am = xr.concat([am_valid_layers, am_mosaic_stack], dim='layer').compute()
 
-    # Save xarray data to netCDF
-    valid_layers_stack_ag_min, valid_layers_stack_ag_max = safe_min_max(valid_layers_stack_ag)
+    # min/max should calculated using array without appending mosaic layers
+    valid_layers_stack_ag_min, valid_layers_stack_ag_max = safe_min_max(xr_gbf3_ag)
+    valid_layers_stack_non_ag_min, valid_layers_stack_non_ag_max = safe_min_max(xr_gbf3_non_ag)
+    valid_layers_stack_am_min, valid_layers_stack_am_max = safe_min_max(xr_gbf3_am)
 
     valid_layers_stack_ag.attrs = {'min': valid_layers_stack_ag_min, 'max': valid_layers_stack_ag_max}
-    valid_layers_stack_non_ag_min, valid_layers_stack_non_ag_max = safe_min_max(valid_layers_stack_non_ag)
-
     valid_layers_stack_non_ag.attrs = {'min': valid_layers_stack_non_ag_min, 'max': valid_layers_stack_non_ag_max}
-    valid_layers_stack_am_min, valid_layers_stack_am_max = safe_min_max(valid_layers_stack_am)
-
     valid_layers_stack_am.attrs = {'min': valid_layers_stack_am_min, 'max': valid_layers_stack_am_max}
     save2nc(valid_layers_stack_ag, os.path.join(path, f'xr_biodiversity_GBF3_NVIS_ag_{yr_cal}.nc'))
     save2nc(valid_layers_stack_non_ag, os.path.join(path, f'xr_biodiversity_GBF3_NVIS_non_ag_{yr_cal}.nc'))
@@ -3203,15 +3216,13 @@ def write_biodiversity_GBF3_IBRA_scores(data: Data, yr_cal: int, path) -> None:
     )
     valid_layers_stack_am = xr.concat([am_valid_layers, am_mosaic_stack], dim='layer').compute()
 
-    # Save xarray data to netCDF
-    valid_layers_stack_ag_min, valid_layers_stack_ag_max = safe_min_max(valid_layers_stack_ag)
+    # min/max should calculated using array without appending mosaic layers
+    valid_layers_stack_ag_min, valid_layers_stack_ag_max = safe_min_max(xr_gbf3_ibra_ag)
+    valid_layers_stack_non_ag_min, valid_layers_stack_non_ag_max = safe_min_max(xr_gbf3_ibra_non_ag)
+    valid_layers_stack_am_min, valid_layers_stack_am_max = safe_min_max(xr_gbf3_ibra_am)
 
     valid_layers_stack_ag.attrs = {'min': valid_layers_stack_ag_min, 'max': valid_layers_stack_ag_max}
-    valid_layers_stack_non_ag_min, valid_layers_stack_non_ag_max = safe_min_max(valid_layers_stack_non_ag)
-
     valid_layers_stack_non_ag.attrs = {'min': valid_layers_stack_non_ag_min, 'max': valid_layers_stack_non_ag_max}
-    valid_layers_stack_am_min, valid_layers_stack_am_max = safe_min_max(valid_layers_stack_am)
-
     valid_layers_stack_am.attrs = {'min': valid_layers_stack_am_min, 'max': valid_layers_stack_am_max}
     save2nc(valid_layers_stack_ag, os.path.join(path, f'xr_biodiversity_GBF3_IBRA_ag_{yr_cal}.nc'))
     save2nc(valid_layers_stack_non_ag, os.path.join(path, f'xr_biodiversity_GBF3_IBRA_non_ag_{yr_cal}.nc'))
@@ -3411,15 +3422,13 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
     )
     valid_layers_stack_am = xr.concat([am_valid_layers, am_mosaic_stack], dim='layer').compute()
 
-    # Save xarray data to netCDF
-    valid_layers_stack_ag_min, valid_layers_stack_ag_max = safe_min_max(valid_layers_stack_ag)
+    # min/max should calculated using array without appending mosaic layers
+    valid_layers_stack_ag_min, valid_layers_stack_ag_max = safe_min_max(xr_gbf4_snes_ag)
+    valid_layers_stack_non_ag_min, valid_layers_stack_non_ag_max = safe_min_max(xr_gbf4_snes_non_ag)
+    valid_layers_stack_am_min, valid_layers_stack_am_max = safe_min_max(xr_gbf4_snes_am)
 
     valid_layers_stack_ag.attrs = {'min': valid_layers_stack_ag_min, 'max': valid_layers_stack_ag_max}
-    valid_layers_stack_non_ag_min, valid_layers_stack_non_ag_max = safe_min_max(valid_layers_stack_non_ag)
-
     valid_layers_stack_non_ag.attrs = {'min': valid_layers_stack_non_ag_min, 'max': valid_layers_stack_non_ag_max}
-    valid_layers_stack_am_min, valid_layers_stack_am_max = safe_min_max(valid_layers_stack_am)
-
     valid_layers_stack_am.attrs = {'min': valid_layers_stack_am_min, 'max': valid_layers_stack_am_max}
     save2nc(valid_layers_stack_ag, os.path.join(path, f'xr_biodiversity_GBF4_SNES_ag_{yr_cal}.nc'))
     save2nc(valid_layers_stack_non_ag, os.path.join(path, f'xr_biodiversity_GBF4_SNES_non_ag_{yr_cal}.nc'))
@@ -3618,15 +3627,13 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
     )
     valid_layers_stack_am = xr.concat([am_valid_layers, am_mosaic_stack], dim='layer').compute()
 
-    # Save xarray data to netCDF
-    valid_layers_stack_ag_min, valid_layers_stack_ag_max = safe_min_max(valid_layers_stack_ag)
+    # min/max should calculated using array without appending mosaic layers
+    valid_layers_stack_ag_min, valid_layers_stack_ag_max = safe_min_max(xr_gbf4_ecnes_ag)
+    valid_layers_stack_non_ag_min, valid_layers_stack_non_ag_max = safe_min_max(xr_gbf4_ecnes_non_ag)
+    valid_layers_stack_am_min, valid_layers_stack_am_max = safe_min_max(xr_gbf4_ecnes_am)
 
     valid_layers_stack_ag.attrs = {'min': valid_layers_stack_ag_min, 'max': valid_layers_stack_ag_max}
-    valid_layers_stack_non_ag_min, valid_layers_stack_non_ag_max = safe_min_max(valid_layers_stack_non_ag)
-
     valid_layers_stack_non_ag.attrs = {'min': valid_layers_stack_non_ag_min, 'max': valid_layers_stack_non_ag_max}
-    valid_layers_stack_am_min, valid_layers_stack_am_max = safe_min_max(valid_layers_stack_am)
-
     valid_layers_stack_am.attrs = {'min': valid_layers_stack_am_min, 'max': valid_layers_stack_am_max}
     save2nc(valid_layers_stack_ag, os.path.join(path, f'xr_biodiversity_GBF4_ECNES_ag_{yr_cal}.nc'))
     save2nc(valid_layers_stack_non_ag, os.path.join(path, f'xr_biodiversity_GBF4_ECNES_non_ag_{yr_cal}.nc'))
@@ -3826,15 +3833,13 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
     )
     valid_layers_stack_am = xr.concat([am_valid_layers, am_mosaic_stack], dim='layer').compute()
 
-    # Save xarray data to netCDF
-    valid_layers_stack_ag_min, valid_layers_stack_ag_max = safe_min_max(valid_layers_stack_ag)
+    # min/max should calculated using array without appending mosaic layers
+    valid_layers_stack_ag_min, valid_layers_stack_ag_max = safe_min_max(xr_gbf8_groups_ag)
+    valid_layers_stack_non_ag_min, valid_layers_stack_non_ag_max = safe_min_max(xr_gbf8_groups_non_ag)
+    valid_layers_stack_am_min, valid_layers_stack_am_max = safe_min_max(xr_gbf8_groups_am)
 
     valid_layers_stack_ag.attrs = {'min': valid_layers_stack_ag_min, 'max': valid_layers_stack_ag_max}
-    valid_layers_stack_non_ag_min, valid_layers_stack_non_ag_max = safe_min_max(valid_layers_stack_non_ag)
-
     valid_layers_stack_non_ag.attrs = {'min': valid_layers_stack_non_ag_min, 'max': valid_layers_stack_non_ag_max}
-    valid_layers_stack_am_min, valid_layers_stack_am_max = safe_min_max(valid_layers_stack_am)
-
     valid_layers_stack_am.attrs = {'min': valid_layers_stack_am_min, 'max': valid_layers_stack_am_max}
     save2nc(valid_layers_stack_ag, os.path.join(path, f'xr_biodiversity_GBF8_groups_ag_{yr_cal}.nc'))
     save2nc(valid_layers_stack_non_ag, os.path.join(path, f'xr_biodiversity_GBF8_groups_non_ag_{yr_cal}.nc'))
@@ -4044,15 +4049,13 @@ def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
     )
     valid_layers_stack_am = xr.concat([am_valid_layers, am_mosaic_stack], dim='layer').compute()
 
-    # Save xarray data to netCDF
-    valid_layers_stack_ag_min, valid_layers_stack_ag_max = safe_min_max(valid_layers_stack_ag)
+    # min/max should calculated using array without appending mosaic layers
+    valid_layers_stack_ag_min, valid_layers_stack_ag_max = safe_min_max(xr_gbf8_species_ag)
+    valid_layers_stack_non_ag_min, valid_layers_stack_non_ag_max = safe_min_max(xr_gbf8_species_non_ag)
+    valid_layers_stack_am_min, valid_layers_stack_am_max = safe_min_max(xr_gbf8_species_am)
 
     valid_layers_stack_ag.attrs = {'min': valid_layers_stack_ag_min, 'max': valid_layers_stack_ag_max}
-    valid_layers_stack_non_ag_min, valid_layers_stack_non_ag_max = safe_min_max(valid_layers_stack_non_ag)
-
     valid_layers_stack_non_ag.attrs = {'min': valid_layers_stack_non_ag_min, 'max': valid_layers_stack_non_ag_max}
-    valid_layers_stack_am_min, valid_layers_stack_am_max = safe_min_max(valid_layers_stack_am)
-
     valid_layers_stack_am.attrs = {'min': valid_layers_stack_am_min, 'max': valid_layers_stack_am_max}
     save2nc(valid_layers_stack_ag, os.path.join(path, f'xr_biodiversity_GBF8_species_ag_{yr_cal}.nc'))
     save2nc(valid_layers_stack_non_ag, os.path.join(path, f'xr_biodiversity_GBF8_species_non_ag_{yr_cal}.nc'))

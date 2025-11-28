@@ -26,7 +26,6 @@ from joblib import Parallel, delayed
 
 from luto.economics.off_land_commodity import get_demand_df
 from luto.tools.report.data_tools import get_all_files
-
 from luto.tools.report.data_tools.parameters import (
     AG_LANDUSE,
     COLORS,
@@ -358,33 +357,25 @@ def process_economics_data(files, SAVE_DIR):
     cost_transition_ag2ag_df = pd.concat([pd.read_csv(path) for path in cost_transition_ag2ag_df['path'] if not pd.read_csv(path).empty], ignore_index=True)
     cost_transition_ag2ag_df = cost_transition_ag2ag_df.replace(RENAME_AM_NON_AG).assign(Source='Transition cost (Ag2Ag)')
     cost_transition_ag2ag_df['Value ($)'] = cost_transition_ag2ag_df['Cost ($)']  * -1          # Convert cost to negative value
-
+    cost_transition_ag2ag_df_non_all = cost_transition_ag2ag_df.query(
+        '`From water-supply` != "ALL" and `From land-use` != "ALL" and `To water-supply` != "ALL" and `To land-use` != "ALL" and Type != "ALL" '
+        ).copy()
 
     cost_transition_ag2non_ag_df = files.query('base_name == "cost_transition_ag2non_ag"').reset_index(drop=True)
     cost_transition_ag2non_ag_df = pd.concat([pd.read_csv(path) for path in cost_transition_ag2non_ag_df['path'] if not pd.read_csv(path).empty], ignore_index=True)
     cost_transition_ag2non_ag_df = cost_transition_ag2non_ag_df.replace(RENAME_AM_NON_AG).assign(Source='Transition cost (Ag2Non-Ag)')
     cost_transition_ag2non_ag_df['Value ($)'] = cost_transition_ag2non_ag_df['Cost ($)'] * -1   # Convert cost to negative value
+    cost_transition_ag2non_ag_df_non_all = cost_transition_ag2non_ag_df.query(
+        '`From water-supply` != "ALL" and `From land-use` != "ALL" and `To land-use` != "ALL" and `Cost type` != "ALL" '
+        ).copy()
 
     cost_transition_non_ag2ag_df = files.query('base_name == "cost_transition_non_ag2_ag"').reset_index(drop=True)
     cost_transition_non_ag2ag_df = pd.concat([pd.read_csv(path) for path in cost_transition_non_ag2ag_df['path'] if not pd.read_csv(path).empty], ignore_index=True)
     cost_transition_non_ag2ag_df = cost_transition_non_ag2ag_df.replace(RENAME_AM_NON_AG).assign(Source='Transition cost (Non-Ag2Ag)').dropna(subset=['Cost ($)'])
     cost_transition_non_ag2ag_df['Value ($)'] = cost_transition_non_ag2ag_df['Cost ($)'] * -1   # Convert cost to negative value
-
-    economics_df = pd.concat(
-            [
-                revenue_ag_df,
-                revenue_am_df,
-                revenue_non_ag_df,
-                cost_ag_df,
-                cost_am_df,
-                cost_non_ag_df,
-                cost_transition_ag2ag_df,
-                cost_transition_ag2non_ag_df,
-                cost_transition_non_ag2ag_df
-            ]
-        ).round({'Value ($)': 2}
-        ).query('abs(`Value ($)`) > 1e-4'
-        ).reset_index(drop=True)
+    cost_transition_non_ag2ag_df_non_all = cost_transition_non_ag2ag_df.query(
+        '`From land-use` != "ALL" and `To land-use` != "ALL" and `To water-supply` != "ALL" '
+        ).copy()
 
     economics_df_non_all = pd.concat(
             [
@@ -394,9 +385,9 @@ def process_economics_data(files, SAVE_DIR):
                 cost_ag_df_non_all,
                 cost_am_df_non_all,
                 cost_non_ag_df,
-                cost_transition_ag2ag_df,
-                cost_transition_ag2non_ag_df,
-                cost_transition_non_ag2ag_df
+                cost_transition_ag2ag_df_non_all,
+                cost_transition_ag2non_ag_df_non_all,
+                cost_transition_non_ag2ag_df_non_all
             ]
         ).round({'Value ($)': 2}
         ).query('abs(`Value ($)`) > 1e-4'
@@ -424,14 +415,15 @@ def process_economics_data(files, SAVE_DIR):
         ).sort_values(['Year', 'Value ($)'], ascending=[True, False]
         ).assign(Rank=lambda x: x.groupby(['Year']).cumcount()
         ).assign(Source='Revenue')
+        
     cost_df = pd.concat(
         [
             cost_ag_df_non_all,
             cost_am_df_non_all,
             cost_non_ag_df,
-            cost_transition_ag2ag_df,
-            cost_transition_ag2non_ag_df,
-            cost_transition_non_ag2ag_df
+            cost_transition_ag2ag_df_non_all,
+            cost_transition_ag2non_ag_df_non_all,
+            cost_transition_non_ag2ag_df_non_all
         ]
         ).groupby(['Year', 'region']
         )[['Value ($)']].sum(numeric_only=True
@@ -440,6 +432,7 @@ def process_economics_data(files, SAVE_DIR):
         ).sort_values(['Year', 'Value ($)'], ascending=[True, False]
         ).assign(Rank=lambda x: x.groupby(['Year']).cumcount()
         ).assign(Source='Cost')
+        
     profit_df = revenue_df.merge(
         cost_df, on=['Year', 'region'], suffixes=('_revenue', '_cost')
         ).assign(**{'Value ($)': lambda x: x['Value ($)_revenue'] - x['Value ($)_cost']}
@@ -1021,8 +1014,8 @@ def process_production_data(files, SAVE_DIR, years):
         .round({'`Production (t/KL)`': 2})
 
     quantity_ag = quantity_df.query('Type == "Agricultural"').copy()
-    quantity_am = quantity_df.query('Type == "Agricultural Management"').copy()
-    quantity_non_ag = quantity_df.query('Type == "Non-Agricultural"').copy()
+    quantity_am = quantity_df.query('Type == "Agricultural_Management"').copy()
+    quantity_non_ag = quantity_df.query('Type == "Non_Agricultural"').copy()
 
     quantity_ag_non_all = quantity_ag.query('Water_supply != "ALL"').copy()
     quantity_am_non_all = quantity_am.query('Water_supply != "ALL"').copy()

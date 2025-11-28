@@ -23,9 +23,9 @@ import json
 import numpy as np
 import pandas as pd
 import xarray as xr
+import cf_xarray as cfxr
 
 from joblib import delayed, Parallel
-
 from luto import settings
 from luto.tools.report.data_tools import (
     array_to_base64, 
@@ -38,10 +38,17 @@ from luto.tools.report.data_tools import (
 
 
 
-def map2base64(ds_template:str, arr_lyr:xr.DataArray, min_max:tuple[float,float], isInt:bool, legend_dict:dict, hierarchy_tp:tuple) -> tuple:
+def map2base64(
+    ds_template:str, 
+    arr_sel:xr.DataArray, 
+    min_max:tuple[float,float]|None, 
+    isInt:bool, 
+    legend:dict, 
+    hierarchy_tp:tuple
+) -> tuple:
 
     # Get an template rio-xarray, it will be used to convert 1D array to its 2D map format
-    with xr.open_dataset(ds_template) as rxr_ds:
+    with xr.load_dataset(ds_template) as rxr_ds:
         rxr_arr = rxr_ds['layer'].astype('float32')         # Use float32 to allow NaN values
         rxr_crs = rxr_ds['spatial_ref'].attrs['crs_wkt']
 
@@ -49,22 +56,21 @@ def map2base64(ds_template:str, arr_lyr:xr.DataArray, min_max:tuple[float,float]
     if isInt:
         img_attrs = {
             'intOrFloat': 'int',
-            'legend': legend_dict['legend']
+            'legend': legend['legend']
         }
     else:
         # Normalize the layer to 0-100 as integer
         min_val, max_val = min_max
-        arr_lyr.values = (arr_lyr - min_val) / (max_val - min_val) * 100
-        arr_lyr = arr_lyr.astype(np.float32)
+        arr_sel.values = (arr_sel - min_val) / (max_val - min_val) * 100
+        arr_sel = arr_sel.astype(np.float32)
         img_attrs = {
             'intOrFloat': 'float',
-            'legend': legend_dict['legend'],
+            'legend': legend['legend'],
             'min_max': min_max
         }
-        
 
     # Convert the 1D array to a 2D array
-    np.place(rxr_arr.data, rxr_arr.data>=0, arr_lyr.values)     # Negative values in the template are outside LUTO area
+    np.place(rxr_arr.data, rxr_arr.data>=0, arr_sel.values)     # Negative values in the template are outside LUTO area
     rxr_arr = xr.where(rxr_arr<0, np.nan, rxr_arr)              # Set negative values to NaN, which will be transparent in the final map
     # Get the bounds
     rxr_arr = rxr_arr.rio.write_crs(rxr_crs)
@@ -74,10 +80,11 @@ def map2base64(ds_template:str, arr_lyr:xr.DataArray, min_max:tuple[float,float]
     rxr_arr = rxr_arr.rio.reproject('EPSG:3857')                # To Mercator with Nearest Neighbour
     rxr_arr = np.nan_to_num(rxr_arr, nan=-1).astype('int16')    # Use -1 to flag nodata pixels
     # Convert the 1D array to a RGBA array
-    color_csv = pd.read_csv(legend_dict['color_csv'])
+    color_csv = pd.read_csv(legend['color_csv'])
     color_csv['color_numeric'] = color_csv['lu_color_HEX'].apply(hex_color_to_numeric)
     color_dict = color_csv.set_index('lu_code')['color_numeric'].to_dict()
     color_dict[-1] = (0,0,0,0)                                  # Nodata pixels are transparent
+    # Render to 4-band RGBA array
     arr_4band = np.zeros((rxr_arr.shape[0], rxr_arr.shape[1], 4), dtype='uint8')
     for k, v in color_dict.items():
         arr_4band[rxr_arr == k] = v
@@ -92,46 +99,43 @@ def get_map2json(
     legend_int_level:dict|str, 
     legend_float:dict, 
     save_path:str, 
-    workers:int=min(settings.WRITE_THREADS, 16)
     ) -> None:
-
+    
+    # Determine number of workers based on max memory setting
+    #    The MEM for RESFACTOR=13 is ~0.5 GB, so scale accordingly
+    workers = (settings.WRITE_REPORT_MAX_MEM_GB) // (0.5 * (13/settings.RESFACTOR)**2)
+    workers = max(1, int(workers)) # At least 1 worker
+    
     # Loop through each year
     tasks = []
     for _,row in files_df.iterrows():
-        xr_arr = xr.open_dataarray(row['path'])
-        chunks = {k:1 for k in xr_arr.dims}
-        chunks.update({'cell':-1})
-        xr_arr = xr_arr.chunk(chunks)           # the cell dimension is full size, all other dimensions are 1
-        min_max = list(xr_arr.attrs['min_max']) # if its commodity layer, we will calculate min_max based on each commodity
         
-        _year = row['Year']
-        ds_template = f'{os.path.dirname(row['path'])}/xr_map_template_{_year}.nc'
+        xr_arr = cfxr.decode_compress_to_multi_index(xr.open_dataset(row['path'], chunks={}), 'layer')['data']
+        ds_template = f'{os.path.dirname(row['path'])}/xr_map_template_{row['Year']}.nc'
+        valid_layers = xr_arr['layer'].to_index().to_frame().to_dict(orient='records')
         
-        # Loop and skip empty layers, the valid layers are precalculated and stored as attribute
-        for sel in eval(xr_arr.attrs['valid_layers']):
+        for sel in valid_layers:
 
+            # Determine if this layer should use integer legend
             if isinstance(legend_int_level, dict):
-                if legend_int_level.items() <= sel.items():
-                    legend = legend_int
-                    arrIsInt = True
-                else:
-                    legend = legend_float
-                    arrIsInt = False
-                    
+                isInt = legend_int_level.items() <= sel.items()
             elif isinstance(legend_int_level, str):
-                if legend_int_level in sel.keys():
-                    legend = legend_int
-                    arrIsInt = True
-                else:
-                    legend = legend_float
-                    arrIsInt = False
+                isInt = legend_int_level in sel.keys()
             else:
                 raise ValueError('legend_int_level must be either a dict or a str')
+
+            # Set legend and metadata based on type
+            if isInt:
+                legend = legend_int
+                min_max = None
+            else:
+                legend = legend_float
+                min_max = xr_arr.attrs['min'], xr_arr.attrs['max']
             
-            arr_sel = xr_arr.sel(**sel) 
+            arr_sel = xr_arr.sel(**sel).compute()  # Eagerly load data before passing to workers
             sel_rename = rename_reorder_hierarchy(sel)
-            hierarchy_tp = tuple(list(sel_rename.values()) + [_year])
-            
+            hierarchy_tp = tuple(list(sel_rename.values()) + [row['Year']])
+
             # Calculate min_max for commodity layers
             if 'Commodity' in sel.keys():
                 min_val = float(arr_sel.min().values)
@@ -140,12 +144,12 @@ def get_map2json(
                 min_max = (min_val, max_val)
 
             tasks.append(
-                delayed(map2base64)(ds_template, arr_sel, min_max, arrIsInt, legend, hierarchy_tp)
+                delayed(map2base64)(ds_template, arr_sel, min_max, isInt, legend, hierarchy_tp)
             )    
             
     # Gather results and save to JSON
     output = {}
-    for res in Parallel(n_jobs=workers, return_as='generator_unordered')(tasks):
+    for res in Parallel(n_jobs=workers, return_as='generator')(tasks):
         hierarchy_tp, val_dict = res
         output[hierarchy_tp] = val_dict
         
