@@ -123,10 +123,10 @@ DYNAMIC_PRICE = True
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 13      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 1      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-SIM_YEARS =  list(range(2020,2051,10))
+SIM_YEARS =  [2020, 2050] #list(range(2020,2051,10))
 
 
 # Define the objective function
@@ -172,7 +172,7 @@ WRITE_REPORT_MAX_MEM_GB = 16                # The maximum memory (in GB) to use 
                                             #   Estimated based on the 0.5 GB MEM usage when RESFACTOR = 13 
                                             #   (for example, for RESFACTOR = 5, the MEM usage will be 0.5 * (13/5)^2 = 3.4 GB).
 
-WRITE_CHUNK_SIZE = 1024                     # The processing size of each chunk during writeing process. 
+WRITE_CHUNK_SIZE = 4096                     # The processing size of each chunk during writeing process. 
                                             #   E.g., layer of ~200 k cells (under chunk size of 1024) will create ~200 chunks.
                                             #   This makes memory usage to be ~1/200 of the original size.
 
@@ -469,7 +469,7 @@ GHG_EMISSIONS_LIMITS = 'high'        # 'off', 'low', 'medium', or 'high'
     - '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)' 
 - Assuming agriculture is responsible to sequester carbon emissions not including electricity emissions and  off-land emissions 
     - '1.5C (67%) excl. avoided emis', '1.5C (50%) excl. avoided emis', or '1.8C (67%) excl. avoided emis'
-- Assuming agriculture is responsible to sequester carbon emissions only in the scope 1 emissions (i.e., direct emissions from land-use and livestock types)
+- Assuming agriculture is responsible to sequester carbon emissions only in the scope 1 emissions (i.e., direct emissions From-land-use and livestock types)
     - '1.5C (67%) excl. avoided emis SCOPE1', '1.5C (50%) excl. avoided emis SCOPE1', or '1.8C (67%) excl. avoided emis SCOPE1'
 - When turning off the 'Carbon Planttings', including block/belt, use the following options:
     - '1.5C 50%', '1.8C 67%'

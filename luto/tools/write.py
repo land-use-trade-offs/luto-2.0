@@ -613,40 +613,44 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
     We have to manually loop through chunks to save memory.
     If not, the large intermidate array will be materialized and consume a lot of memory.
     '''
-    ag_q_mrc_cat_stack = xr.concat([ag_mosaic_stack, ag_q_mrc_stack], dim='layer')
-    non_ag_p_rc_cat_stack = xr.concat([non_ag_mosaic_stack, non_ag_p_rc_stack], dim='layer')
-    am_p_amrc_cat_stack = xr.concat([am_mosaic_stack, am_p_amrc_stack], dim='layer')
+    ag_q_mrc_cat_stack = xr.concat([ag_mosaic_stack, ag_q_mrc_stack], dim='layer').compute()
+    non_ag_p_rc_cat_stack = xr.concat([non_ag_mosaic_stack, non_ag_p_rc_stack], dim='layer').compute()
+    am_p_amrc_cat_stack = xr.concat([am_mosaic_stack, am_p_amrc_stack], dim='layer').compute()
     
-    # Create empty xr.DataArray based on valid layers
-    ag_q_mrc_cat_arr = xr.DataArray(
-        np.zeros((data.NCELLS, len(ag_q_mrc_cat_stack['layer'])), dtype=np.float32),
-        dims=['cell', 'layer'],
-        coords={'cell': range(data.NCELLS), 'layer': ag_q_mrc_cat_stack['layer']},
-        attrs={'min': ag_min, 'max': ag_max}
-    )
-    non_ag_p_rc_cat_arr = xr.DataArray(
-        np.zeros((data.NCELLS, len(non_ag_p_rc_cat_stack['layer'])), dtype=np.float32),
-        dims=['cell', 'layer'],
-        coords={'cell': range(data.NCELLS), 'layer': non_ag_p_rc_cat_stack['layer']},
-        attrs={'min': non_ag_min, 'max': non_ag_max}
-    )
-    am_p_amrc_cat_arr = xr.DataArray(
-        np.zeros((data.NCELLS, len(am_p_amrc_cat_stack['layer'])), dtype=np.float32),
-        dims=['cell', 'layer'],
-        coords={'cell': range(data.NCELLS), 'layer': am_p_amrc_cat_stack['layer']},
-        attrs={'min': am_min, 'max': am_max}
-    )
+    ag_q_mrc_cat_stack.attrs = {'min': ag_min, 'max': ag_max}
+    non_ag_p_rc_cat_stack.attrs = {'min': non_ag_min, 'max': non_ag_max}
+    am_p_amrc_cat_stack.attrs = {'min': am_min, 'max': am_max}
+    
+    # # Create empty xr.DataArray based on valid layers
+    # ag_q_mrc_cat_arr = xr.DataArray(
+    #     np.zeros((data.NCELLS, len(ag_q_mrc_cat_stack['layer'])), dtype=np.float32),
+    #     dims=['cell', 'layer'],
+    #     coords={'cell': range(data.NCELLS), 'layer': ag_q_mrc_cat_stack['layer']},
+    #     attrs={'min': ag_min, 'max': ag_max}
+    # )
+    # non_ag_p_rc_cat_arr = xr.DataArray(
+    #     np.zeros((data.NCELLS, len(non_ag_p_rc_cat_stack['layer'])), dtype=np.float32),
+    #     dims=['cell', 'layer'],
+    #     coords={'cell': range(data.NCELLS), 'layer': non_ag_p_rc_cat_stack['layer']},
+    #     attrs={'min': non_ag_min, 'max': non_ag_max}
+    # )
+    # am_p_amrc_cat_arr = xr.DataArray(
+    #     np.zeros((data.NCELLS, len(am_p_amrc_cat_stack['layer'])), dtype=np.float32),
+    #     dims=['cell', 'layer'],
+    #     coords={'cell': range(data.NCELLS), 'layer': am_p_amrc_cat_stack['layer']},
+    #     attrs={'min': am_min, 'max': am_max}
+    # )
     
     
-    chunk_size = min(settings.WRITE_CHUNK_SIZE, data.NCELLS)
-    for i in range(0, data.NCELLS, chunk_size):
-        ag_q_mrc_cat_arr[i:i + chunk_size, :] = ag_q_mrc_cat_stack.isel(cell=slice(i, i + chunk_size)).compute()
-        non_ag_p_rc_cat_arr[i:i + chunk_size, :] = non_ag_p_rc_cat_stack.isel(cell=slice(i, i + chunk_size)).compute()
-        am_p_amrc_cat_arr[i:i + chunk_size, :] = am_p_amrc_cat_stack.isel(cell=slice(i, i + chunk_size)).compute()
+    # chunk_size = min(settings.WRITE_CHUNK_SIZE, data.NCELLS)
+    # for i in tqdm(range(0, data.NCELLS, chunk_size)):
+    #     ag_q_mrc_cat_arr[i:i + chunk_size, :] = ag_q_mrc_cat_stack.isel(cell=slice(i, i + chunk_size)).compute()
+    #     non_ag_p_rc_cat_arr[i:i + chunk_size, :] = non_ag_p_rc_cat_stack.isel(cell=slice(i, i + chunk_size)).compute()
+    #     am_p_amrc_cat_arr[i:i + chunk_size, :] = am_p_amrc_cat_stack.isel(cell=slice(i, i + chunk_size)).compute()
 
-    save2nc(ag_q_mrc_cat_arr, os.path.join(path, f'xr_quantities_agricultural_{yr_cal}.nc'))
-    save2nc(non_ag_p_rc_cat_arr, os.path.join(path, f'xr_quantities_non_agricultural_{yr_cal}.nc'))
-    save2nc(am_p_amrc_cat_arr, os.path.join(path, f'xr_quantities_agricultural_management_{yr_cal}.nc'))
+    save2nc(ag_q_mrc_cat_stack, os.path.join(path, f'xr_quantities_agricultural_{yr_cal}.nc'))
+    save2nc(non_ag_p_rc_cat_stack, os.path.join(path, f'xr_quantities_non_agricultural_{yr_cal}.nc'))
+    save2nc(am_p_amrc_cat_stack, os.path.join(path, f'xr_quantities_agricultural_management_{yr_cal}.nc'))
 
     return f"Separate quantity production written for year {yr_cal}"
 
@@ -1026,11 +1030,7 @@ def write_transition_cost_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 
     simulated_year_list = sorted(list(data.lumaps.keys()))
     yr_idx = yr_cal - data.YR_CAL_BASE
-    
-    # Has to reduce chunk size because of this intermediate array it too large
-    #   Approximate reduction: 3x, which will make it using the similar mem as other functions
-    #   The downside is that it will take longer `3 more times to compute
-    chunk_size = min(settings.WRITE_CHUNK_SIZE//3, data.NCELLS)
+    chunk_size = min(settings.WRITE_CHUNK_SIZE * 2, data.NCELLS)
 
     # Get index of yr_cal in simulated_year_list (e.g., if yr_cal is 2050 then yr_idx_sim = 2 if snapshot)
     yr_idx_sim = simulated_year_list.index(yr_cal)
@@ -1040,11 +1040,11 @@ def write_transition_cost_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     ag_dvar_mrj_target = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]).assign_coords(region=('cell', data.REGION_NRM_NAME))
     ag_dvar_mrj_base = tools.ag_mrj_to_xr(data, (tools.lumap2ag_l_mrj(data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre])))
 
-    ag_dvar_mrj_target = ag_dvar_mrj_target.rename({'lm': 'To water-supply', 'lu': 'To land-use'}
+    ag_dvar_mrj_target = ag_dvar_mrj_target.rename({'lm': 'To-water-supply', 'lu': 'To-land-use'}
         ).assign_coords(region=('cell', data.REGION_NRM_NAME)
         ).chunk({'cell': chunk_size})
 
-    ag_dvar_mrj_base = ag_dvar_mrj_base.rename({'lm': 'From water-supply', 'lu': 'From land-use'}
+    ag_dvar_mrj_base = ag_dvar_mrj_base.rename({'lm': 'From-water-supply', 'lu': 'From-land-use'}
         ).assign_coords(region=('cell', data.REGION_NRM_NAME)
         ).chunk({'cell': chunk_size})
 
@@ -1059,9 +1059,9 @@ def write_transition_cost_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         np.stack(list(ag_transitions_cost_mat.values())).astype(np.float32),
         coords={
             'Type': list(ag_transitions_cost_mat.keys()),
-            'To water-supply': data.LANDMANS,
+            'To-water-supply': data.LANDMANS,
             'cell': range(data.NCELLS),
-            'To land-use': data.AGRICULTURAL_LANDUSES
+            'To-land-use': data.AGRICULTURAL_LANDUSES
         }
     )
 
@@ -1069,10 +1069,10 @@ def write_transition_cost_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     cost_xr = ag_dvar_mrj_base * ag_dvar_mrj_target * ag_transitions_cost_mat
     
     # Append ALL dimensions to cost_xr
-    cost_xr = xr.concat([cost_xr.sum(dim='From water-supply', keepdims=True).assign_coords({'From water-supply': ['ALL']}), cost_xr], dim='From water-supply')
-    cost_xr = xr.concat([cost_xr.sum(dim='From land-use', keepdims=True).assign_coords({'From land-use': ['ALL']}), cost_xr], dim='From land-use')
-    cost_xr = xr.concat([cost_xr.sum(dim='To water-supply', keepdims=True).assign_coords({'To water-supply': ['ALL']}), cost_xr], dim='To water-supply')
-    cost_xr = xr.concat([cost_xr.sum(dim='To land-use', keepdims=True).assign_coords({'To land-use': ['ALL']}), cost_xr], dim='To land-use')
+    cost_xr = xr.concat([cost_xr.sum(dim='From-water-supply', keepdims=True).assign_coords({'From-water-supply': ['ALL']}), cost_xr], dim='From-water-supply')
+    cost_xr = xr.concat([cost_xr.sum(dim='From-land-use', keepdims=True).assign_coords({'From-land-use': ['ALL']}), cost_xr], dim='From-land-use')
+    cost_xr = xr.concat([cost_xr.sum(dim='To-water-supply', keepdims=True).assign_coords({'To-water-supply': ['ALL']}), cost_xr], dim='To-water-supply')
+    cost_xr = xr.concat([cost_xr.sum(dim='To-land-use', keepdims=True).assign_coords({'To-land-use': ['ALL']}), cost_xr], dim='To-land-use')
     cost_xr = xr.concat([cost_xr.sum(dim='Type', keepdims=True).assign_coords({'Type': ['ALL']}), cost_xr], dim='Type')
     
     # ------------------------- Chunk level aggregation -------------------------
@@ -1097,7 +1097,7 @@ def write_transition_cost_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
             ).sum(dim='cell'
             ).to_dataframe('Cost ($)'
             ).reset_index(
-            ).groupby(['region', 'Type', 'From water-supply', 'From land-use', 'To water-supply', 'To land-use']
+            ).groupby(['region', 'Type', 'From-water-supply', 'From-land-use', 'To-water-supply', 'To-land-use']
             )['Cost ($)'
             ].sum(
             ).reset_index(
@@ -1112,13 +1112,13 @@ def write_transition_cost_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 
     # Combine all chunks df
     cost_df_region = pd.concat(cost_dfs, ignore_index=True
-        ).groupby(['region', 'From water-supply', 'From land-use', 'To water-supply', 'To land-use', 'Year', 'Type']
+        ).groupby(['region', 'From-water-supply', 'From-land-use', 'To-water-supply', 'To-land-use', 'Year', 'Type']
         )['Cost ($)'
         ].sum(
         ).reset_index()
     
     # Get Australia level aggregation
-    cost_df_AUS = cost_df_region.groupby(['From water-supply', 'From land-use', 'To water-supply', 'To land-use', 'Type', 'Year']
+    cost_df_AUS = cost_df_region.groupby(['From-water-supply', 'From-land-use', 'To-water-supply', 'To-land-use', 'Type', 'Year']
         )['Cost ($)'
         ].sum(
         ).reset_index(
@@ -1139,35 +1139,35 @@ def write_transition_cost_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     
     # Get valid data layers
     valid_layers_transition = pd.MultiIndex.from_frame(
-        cost_df_AUS[['From water-supply', 'From land-use', 'To water-supply', 'To land-use', 'Type']]
+        cost_df_AUS[['From-water-supply', 'From-land-use', 'To-water-supply', 'To-land-use', 'Type']]
     ).sort_values()
     
     cost_xr_stacked = cost_xr.stack({
-        'layer': ['From water-supply', 'From land-use', 'To water-supply', 'To land-use', 'Type']
-    }).sel(layer=valid_layers_transition)
+        'layer': ['From-water-supply', 'From-land-use', 'To-water-supply', 'To-land-use', 'Type']
+    }).sel(layer=valid_layers_transition).compute()
 
 
-    # Materialize the filtered array by looping through chunks
-    cost_xr_stacked_array = xr.DataArray(
-        np.zeros((data.NCELLS, len(valid_layers_transition)), dtype=np.float32),
-        coords={
-            'cell': range(data.NCELLS),
-            'layer': valid_layers_transition
-        },
-        attrs={
-            'min': float(val_min),
-            'max': float(val_max)
-        }
-    )
+    # # Materialize the filtered array by looping through chunks
+    # cost_xr_stacked_array = xr.DataArray(
+    #     np.zeros((data.NCELLS, len(valid_layers_transition)), dtype=np.float32),
+    #     coords={
+    #         'cell': range(data.NCELLS),
+    #         'layer': valid_layers_transition
+    #     },
+    #     attrs={
+    #         'min': float(val_min),
+    #         'max': float(val_max)
+    #     }
+    # )
     
-    for i in range(0, data.NCELLS, chunk_size):
-        end_idx = min(i + chunk_size, data.NCELLS)
-        cell_slice = slice(i, end_idx)
-        cost_xr_stacked_array[cell_slice, :] = cost_xr_stacked.isel(cell=cell_slice)
+    # for i in range(0, data.NCELLS, chunk_size):
+    #     end_idx = min(i + chunk_size, data.NCELLS)
+    #     cell_slice = slice(i, end_idx)
+    #     cost_xr_stacked_array[cell_slice, :] = cost_xr_stacked.isel(cell=cell_slice)
         
 
     # Save the compact filtered array
-    save2nc(cost_xr_stacked_array, os.path.join(path, f'xr_cost_transition_ag2ag_{yr_cal}.nc'))
+    save2nc(cost_xr_stacked, os.path.join(path, f'xr_cost_transition_ag2ag_{yr_cal}.nc'))
 
     return f"Agricultural to agricultural transition cost written for year {yr_cal}"
 
@@ -1191,8 +1191,8 @@ def write_transition_cost_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None
     non_ag_dvar_target = tools.non_ag_rk_to_xr(data, tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
 
-    ag_dvar_base = ag_dvar_base.rename({'lm': 'From water-supply', 'lu': 'From land-use'}).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
-    non_ag_dvar_target = non_ag_dvar_target.rename({'lu': 'To land-use'}).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
+    ag_dvar_base = ag_dvar_base.rename({'lm': 'From-water-supply', 'lu': 'From-land-use'}).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
+    non_ag_dvar_target = non_ag_dvar_target.rename({'lu': 'To-land-use'}).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
 
 
     # Get the transition cost matirces for Non-Agricultural Land-use
@@ -1216,7 +1216,7 @@ def write_transition_cost_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None
         coords={
             'lu_source': pd.MultiIndex.from_tuples(
                 list(non_ag_transitions_flat.keys()),
-                names= ('To land-use', 'Cost type')
+                names= ('To-land-use', 'Cost-type')
             ),
             'cell': range(data.NCELLS),
         }
@@ -1226,10 +1226,10 @@ def write_transition_cost_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None
     cost_xr = ag_dvar_base * non_ag_transitions_flat.unstack('lu_source') * non_ag_dvar_target
     
     # Append ALL dimensions to cost_xr
-    cost_xr = xr.concat([cost_xr.sum(dim='From water-supply', keepdims=True).assign_coords({'From water-supply': ['ALL']}), cost_xr], dim='From water-supply')
-    cost_xr = xr.concat([cost_xr.sum(dim='From land-use', keepdims=True).assign_coords({'From land-use': ['ALL']}), cost_xr], dim='From land-use')
-    cost_xr = xr.concat([cost_xr.sum(dim='To land-use', keepdims=True).assign_coords({'To land-use': ['ALL']}), cost_xr], dim='To land-use')
-    cost_xr = xr.concat([cost_xr.sum(dim='Cost type', keepdims=True).assign_coords({'Cost type': ['ALL']}), cost_xr], dim='Cost type')
+    cost_xr = xr.concat([cost_xr.sum(dim='From-water-supply', keepdims=True).assign_coords({'From-water-supply': ['ALL']}), cost_xr], dim='From-water-supply')
+    cost_xr = xr.concat([cost_xr.sum(dim='From-land-use', keepdims=True).assign_coords({'From-land-use': ['ALL']}), cost_xr], dim='From-land-use')
+    cost_xr = xr.concat([cost_xr.sum(dim='To-land-use', keepdims=True).assign_coords({'To-land-use': ['ALL']}), cost_xr], dim='To-land-use')
+    cost_xr = xr.concat([cost_xr.sum(dim='Cost-type', keepdims=True).assign_coords({'Cost-type': ['ALL']}), cost_xr], dim='Cost-type')
 
 
     # ------------------------- Chunk level aggregation -------------------------
@@ -1256,7 +1256,7 @@ def write_transition_cost_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None
             ).sum(dim='cell'
             ).to_dataframe('Cost ($)'
             ).reset_index(
-            ).groupby(['region', 'From water-supply', 'From land-use', 'To land-use', 'Cost type'], dropna=False
+            ).groupby(['region', 'From-water-supply', 'From-land-use', 'To-land-use', 'Cost-type'], dropna=False
             )['Cost ($)'].sum(
             ).reset_index(
             ).assign(Year=yr_cal, chunk_idx=i//chunk_size
@@ -1269,13 +1269,13 @@ def write_transition_cost_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None
 
     # Combine all chunks df
     cost_df_region = pd.concat(cost_dfs, ignore_index=True).groupby(
-        ['region', 'From water-supply', 'From land-use', 'To land-use', 'Cost type', 'Year']
+        ['region', 'From-water-supply', 'From-land-use', 'To-land-use', 'Cost-type', 'Year']
         )['Cost ($)'
         ].sum(
         ).reset_index()
 
     # Get Australia level aggregation
-    cost_df_AUS = cost_df_region.groupby(['From water-supply', 'From land-use', 'To land-use', 'Cost type', 'Year']
+    cost_df_AUS = cost_df_region.groupby(['From-water-supply', 'From-land-use', 'To-land-use', 'Cost-type', 'Year']
         )['Cost ($)'
         ].sum(
         ).reset_index(
@@ -1297,11 +1297,11 @@ def write_transition_cost_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None
     '''
 
     valid_layers_transition = pd.MultiIndex.from_frame(
-        cost_df_AUS[['From water-supply', 'From land-use', 'To land-use', 'Cost type']]
+        cost_df_AUS[['From-water-supply', 'From-land-use', 'To-land-use', 'Cost-type']]
     ).sort_values()
     
     cost_xr_stacked = cost_xr.stack({
-        'layer': ['From water-supply', 'From land-use', 'To land-use', 'Cost type']
+        'layer': ['From-water-supply', 'From-land-use', 'To-land-use', 'Cost-type']
     })
     
     cost_xr_filtered = cost_xr_stacked.sel(layer=valid_layers_transition)
@@ -1378,20 +1378,20 @@ def write_transition_cost_nonag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None
                 for cost_type in non_ag_transitions_cost_mat[from_lu_desc].keys():
                     
                     
-                    from_lu_cells = data.lumaps[yr_cal_sim_pre] == from_lu_idx          # Get the land-use index of the from land-use (r)
-                    to_lu_cells = data.lumaps[yr_cal] == to_lu_idx                      # Get the land-use index of the to land-use (r*)
+                    from_lu_cells = data.lumaps[yr_cal_sim_pre] == from_lu_idx          # Get the land-use index of the From-land-use (r)
+                    to_lu_cells = data.lumaps[yr_cal] == to_lu_idx                      # Get the land-use index of the To-land-use (r*)
                     to_lm_cells = data.lmmaps[yr_cal] == to_lm_idx                      # Get the land-management index of the from land-management (r)
-                    trans_cells =  from_lu_cells & to_lu_cells & to_lm_cells            # Get the land-use index of the from land-use (r*)
+                    trans_cells =  from_lu_cells & to_lu_cells & to_lm_cells            # Get the land-use index of the From-land-use (r*)
                     
                     if trans_cells.sum() == 0:
                         cost_dfs.append(
                             pd.DataFrame(
                                 [{
                                     'region': data.REGION_NRM_NAME.iloc[0],
-                                    'From land-use': from_lu_desc,
-                                    'To land-use': to_lu,
-                                    'To water-supply': to_lm,
-                                    'Cost type': cost_type,
+                                    'From-land-use': from_lu_desc,
+                                    'To-land-use': to_lu,
+                                    'To-water-supply': to_lm,
+                                    'Cost-type': cost_type,
                                     'Cost ($)': 0,
                                     'Year': yr_cal
                                 }]
@@ -1406,10 +1406,10 @@ def write_transition_cost_nonag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None
                             ).sum(dim='cell'
                             ).to_dataframe('Cost ($)'
                             ).reset_index(
-                            ).rename(columns={'lu': 'To land-use', 'lm': 'To water-supply'}
+                            ).rename(columns={'lu': 'To-land-use', 'lm': 'To-water-supply'}
                             ).assign(**{
-                                'From land-use': from_lu_desc,
-                                'Cost type': cost_type,
+                                'From-land-use': from_lu_desc,
+                                'Cost-type': cost_type,
                                 'Year': yr_cal
                             })
                         )
@@ -1602,32 +1602,32 @@ def write_area_transition_start_end(data: Data, path, yr_cal_end):
     # Get the decision variables for the start year
     ag_dvar_base_mrj = tools.ag_mrj_to_xr(data, tools.lumap2ag_l_mrj(data.lumaps[yr_cal_start], data.lmmaps[yr_cal_start])
         ).assign_coords({'region': ('cell', data.REGION_NRM_NAME)}
-        ).rename({'lu':'From Land-use', 'lm':'From Water_supply'}
+        ).rename({'lu':'From-land-use', 'lm':'From-water-supply'}
         ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
 
     ag_dvar_target_mrj = tools.ag_mrj_to_xr(
         data, tools.lumap2ag_l_mrj(data.lumaps[yr_cal_end], data.lmmaps[yr_cal_end])
-        ).rename({'lu':'To Land-use', 'lm':'To Water_supply'}
+        ).rename({'lu':'To-land-use', 'lm':'To-water-supply'}
         ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
 
     non_ag_dvar_target_rk = tools.non_ag_rk_to_xr(
         data, data.non_ag_dvars[yr_cal_end]
-        ).rename({'lu':'To Land-use'}
+        ).rename({'lu':'To-land-use'}
         ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
 
     xr_ag2ag = ag_dvar_base_mrj * ag_dvar_target_mrj * real_area_r
     xr_ag2non_ag = ag_dvar_base_mrj * non_ag_dvar_target_rk * real_area_r
 
     # Append ALL dimensions to xr_ag2ag
-    xr_ag2ag = xr.concat([xr_ag2ag.sum(dim='From Water_supply', keepdims=True).assign_coords({'From Water_supply': ['ALL']}), xr_ag2ag], dim='From Water_supply')
-    xr_ag2ag = xr.concat([xr_ag2ag.sum(dim='From Land-use', keepdims=True).assign_coords({'From Land-use': ['ALL']}), xr_ag2ag], dim='From Land-use')
-    xr_ag2ag = xr.concat([xr_ag2ag.sum(dim='To Water_supply', keepdims=True).assign_coords({'To Water_supply': ['ALL']}), xr_ag2ag], dim='To Water_supply')
-    xr_ag2ag = xr.concat([xr_ag2ag.sum(dim='To Land-use', keepdims=True).assign_coords({'To Land-use': ['ALL']}), xr_ag2ag], dim='To Land-use')
+    xr_ag2ag = xr.concat([xr_ag2ag.sum(dim='From-water-supply', keepdims=True).assign_coords({'From-water-supply': ['ALL']}), xr_ag2ag], dim='From-water-supply')
+    xr_ag2ag = xr.concat([xr_ag2ag.sum(dim='From-land-use', keepdims=True).assign_coords({'From-land-use': ['ALL']}), xr_ag2ag], dim='From-land-use')
+    xr_ag2ag = xr.concat([xr_ag2ag.sum(dim='To-water-supply', keepdims=True).assign_coords({'To-water-supply': ['ALL']}), xr_ag2ag], dim='To-water-supply')
+    xr_ag2ag = xr.concat([xr_ag2ag.sum(dim='To-land-use', keepdims=True).assign_coords({'To-land-use': ['ALL']}), xr_ag2ag], dim='To-land-use')
 
     # Append ALL dimensions to xr_ag2non_ag
-    xr_ag2non_ag = xr.concat([xr_ag2non_ag.sum(dim='From Water_supply', keepdims=True).assign_coords({'From Water_supply': ['ALL']}), xr_ag2non_ag], dim='From Water_supply')
-    xr_ag2non_ag = xr.concat([xr_ag2non_ag.sum(dim='From Land-use', keepdims=True).assign_coords({'From Land-use': ['ALL']}), xr_ag2non_ag], dim='From Land-use')
-    xr_ag2non_ag = xr.concat([xr_ag2non_ag.sum(dim='To Land-use', keepdims=True).assign_coords({'To Land-use': ['ALL']}), xr_ag2non_ag], dim='To Land-use')
+    xr_ag2non_ag = xr.concat([xr_ag2non_ag.sum(dim='From-water-supply', keepdims=True).assign_coords({'From-water-supply': ['ALL']}), xr_ag2non_ag], dim='From-water-supply')
+    xr_ag2non_ag = xr.concat([xr_ag2non_ag.sum(dim='From-land-use', keepdims=True).assign_coords({'From-land-use': ['ALL']}), xr_ag2non_ag], dim='From-land-use')
+    xr_ag2non_ag = xr.concat([xr_ag2non_ag.sum(dim='To-land-use', keepdims=True).assign_coords({'To-land-use': ['ALL']}), xr_ag2non_ag], dim='To-land-use')
 
 
     # ------------------------- Chunk level aggregation -------------------------
@@ -1653,7 +1653,7 @@ def write_area_transition_start_end(data: Data, path, yr_cal_end):
             ).sum(dim='cell'
             ).to_dataframe('Area (ha)'
             ).reset_index(
-            ).groupby(['region', 'From Water_supply', 'From Land-use', 'To Water_supply', 'To Land-use']
+            ).groupby(['region', 'From-water-supply', 'From-land-use', 'To-water-supply', 'To-land-use']
             )['Area (ha)'
             ].sum(
             ).reset_index(
@@ -1669,7 +1669,7 @@ def write_area_transition_start_end(data: Data, path, yr_cal_end):
             ).sum(dim='cell'
             ).to_dataframe('Area (ha)'
             ).reset_index(
-            ).groupby(['region', 'From Water_supply', 'From Land-use', 'To Land-use']
+            ).groupby(['region', 'From-water-supply', 'From-land-use', 'To-land-use']
             )['Area (ha)'
             ].sum(
             ).reset_index(
@@ -1681,12 +1681,12 @@ def write_area_transition_start_end(data: Data, path, yr_cal_end):
 
     # Combine all chunks df for ag2ag
     transition_ag2ag = pd.concat(transition_ag2ag_dfs, ignore_index=True
-        ).groupby(['region', 'From Water_supply', 'From Land-use', 'To Water_supply', 'To Land-use']
+        ).groupby(['region', 'From-water-supply', 'From-land-use', 'To-water-supply', 'To-land-use']
         )['Area (ha)'
         ].sum(
         ).reset_index()
 
-    transition_ag2ag_AUS = transition_ag2ag.groupby(['From Water_supply', 'From Land-use', 'To Water_supply', 'To Land-use']
+    transition_ag2ag_AUS = transition_ag2ag.groupby(['From-water-supply', 'From-land-use', 'To-water-supply', 'To-land-use']
         )['Area (ha)'
         ].sum(
         ).reset_index(
@@ -1695,12 +1695,12 @@ def write_area_transition_start_end(data: Data, path, yr_cal_end):
 
     # Combine all chunks df for ag2non_ag
     transition_ag2non_ag = pd.concat(transition_ag2non_ag_dfs, ignore_index=True
-        ).groupby(['region', 'From Water_supply', 'From Land-use', 'To Land-use']
+        ).groupby(['region', 'From-water-supply', 'From-land-use', 'To-land-use']
         )['Area (ha)'
         ].sum(
         ).reset_index()
 
-    transition_ag2non_ag_AUS = transition_ag2non_ag.groupby(['From Water_supply', 'From Land-use', 'To Land-use']
+    transition_ag2non_ag_AUS = transition_ag2non_ag.groupby(['From-water-supply', 'From-land-use', 'To-land-use']
         )['Area (ha)'
         ].sum(
         ).reset_index(
@@ -1725,11 +1725,11 @@ def write_area_transition_start_end(data: Data, path, yr_cal_end):
 
     # Get valid data layers for ag2ag
     valid_layers_ag2ag = pd.MultiIndex.from_frame(
-        transition_ag2ag_AUS[['From Water_supply', 'From Land-use', 'To Water_supply', 'To Land-use']]
+        transition_ag2ag_AUS[['From-water-supply', 'From-land-use', 'To-water-supply', 'To-land-use']]
     ).sort_values()
 
     xr_ag2ag_stacked = xr_ag2ag.stack({
-        'layer': ['From Water_supply', 'From Land-use', 'To Water_supply', 'To Land-use']
+        'layer': ['From-water-supply', 'From-land-use', 'To-water-supply', 'To-land-use']
     }).sel(layer=valid_layers_ag2ag)
 
     # Materialize the filtered array by looping through chunks
@@ -1758,11 +1758,11 @@ def write_area_transition_start_end(data: Data, path, yr_cal_end):
 
     # Get valid data layers for ag2non_ag
     valid_layers_ag2non_ag = pd.MultiIndex.from_frame(
-        transition_ag2non_ag_AUS[['From Water_supply', 'From Land-use', 'To Land-use']]
+        transition_ag2non_ag_AUS[['From-water-supply', 'From-land-use', 'To-land-use']]
     ).sort_values()
 
     xr_ag2non_ag_stacked = xr_ag2non_ag.stack({
-        'layer': ['From Water_supply', 'From Land-use', 'To Land-use']
+        'layer': ['From-water-supply', 'From-land-use', 'To-land-use']
     }).sel(layer=valid_layers_ag2non_ag)
 
     # Materialize the filtered array by looping through chunks
@@ -1812,15 +1812,15 @@ def write_crosstab(data: Data, yr_cal, path):
             ).reset_index(
             ).rename(
                 columns={
-                    'row_0': 'From land-use', 
+                    'row_0': 'From-land-use', 
                     'NRM_NAME': 'region', 
-                    'col_0':'To land-use', 
+                    'col_0':'To-land-use', 
                     0: 'Area (ha)'
                 }
             ).dropna(
-            ).replace({'From land-use': data.ALLLU2DESC, 'To land-use': data.ALLLU2DESC})
+            ).replace({'From-land-use': data.ALLLU2DESC, 'To-land-use': data.ALLLU2DESC})
             
-        switches = (crosstab.groupby('From land-use')['Area (ha)'].sum() - crosstab.groupby('To land-use')['Area (ha)'].sum()
+        switches = (crosstab.groupby('From-land-use')['Area (ha)'].sum() - crosstab.groupby('To-land-use')['Area (ha)'].sum()
             ).reset_index(
             ).rename(columns={'index':'Landuse'})
         
@@ -2187,6 +2187,8 @@ def write_ghg_transition_penalty(data: Data, yr_cal: int, path: str):
     valid_transition_layers = pd.MultiIndex.from_frame(ghg_df_AUS[['Type', 'lm', 'lu']]).sort_values()
     transition_valid_layers = xr_ghg_transition.stack(layer=['Type', 'lm', 'lu']).sel(layer=valid_transition_layers)
     save2nc(transition_valid_layers, os.path.join(path, f'xr_transition_GHG_{yr_cal}.nc'))
+    
+    return f"Land-use transition penalty GHG emissions written for year {yr_cal}"
 
 
 
@@ -2333,7 +2335,7 @@ def write_water(data: Data, yr_cal, path):
     # Calculate water net yield (delta) under CCI; 
     #   we use BASE_YEAR (2010) dvar_mrj to calculate CCI, 
     #   because the CCI calculated with base year (previouse year) 
-    #   dvar_mrj includes wny from land-use change
+    #   dvar_mrj includes wny From-land-use change
     xr_ag_dvar_BASE = tools.ag_mrj_to_xr(data, data.AG_L_MRJ).assign_coords(region_water=('cell', data.WATER_REGION_ID), region_NRM=('cell', data.REGION_NRM_NAME))
     xr_ag_dvar_BASE = xr.concat([xr_ag_dvar_BASE.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), xr_ag_dvar_BASE], dim='lm')
 
