@@ -55,6 +55,7 @@ def extract_dtype_from_path(path):
             'quantity':['quantity'],
             'revenue':['revenue'],
             'cost':['cost'],
+            'profit':['profit'],
             'biodiversity':['biodiversity'],
             # Maps (GeoTIFFs)
             'ammap':['ammap'],
@@ -136,7 +137,7 @@ def get_all_files(data_root):
     # Report the unknown files
     unknown_files = file_paths.query('category == "Unknown"')
     if not unknown_files.empty:
-        print(f"Unknown files found: {unknown_files['path'].tolist()}")
+        print(f"Unknown files found: \n\t{'\n\t'.join(unknown_files['path'].tolist())}")
         
     # Remove rows with category = 'Unknown'
     file_paths = file_paths.query('category != "Unknown"').reset_index(drop=True)
@@ -180,18 +181,20 @@ def rename_reorder_hierarchy(sel: dict) -> dict:
     The order is:
     1. 'am' (Agricultural Management)
     2. 'lm' (Water Supply)
-    3. Other dimensions such as "Source" for GHG, or 'Type' for economic data.
+    3. Other dimensions:
+        - such as "Source" for GHG, or 'Type' for economic data.
+        - Or profit/revenue/cost data.
     4. 'lu' (Land-use) has to be the lowest level in the hierarchy.
     '''
     sel_rename = {}
-    # 1 level: 'am'
+    # 1: 'am'
     if 'am' in sel:
         sel_rename['am'] = RENAME_AM_NON_AG.get(sel['am'], sel['am'])
-    # 2 level: 'lm'
+    # 2: 'lm'
     if 'lm' in sel:
         sel_rename['lm'] =  {'irr': 'Irrigated', 'dry': 'Dryland'}.get(sel['lm'], sel['lm'])
         
-    # 3 level: other dimensions
+    # 3-1: Commodity dimensions
     if 'Commodity' in sel:
         commodity = sel['Commodity'].capitalize()
         sel_rename['Commodity'] = {
@@ -200,13 +203,21 @@ def rename_reorder_hierarchy(sel: dict) -> dict:
             'Beef lexp': 'Beef live export'
         }.get(commodity, commodity)
 
+    # 3-2: Profit/Revenue/Cost
     leftover_keys = set(sel.keys()) - set(sel_rename.keys()) - {'lu'}
     for key in leftover_keys:
-        sel_rename[key] = sel[key]
+        sel_rename[key] = {
+            'Operation-cost': 'Cost (operation)',
+            'Transition-cost-ag2ag': 'Cost (trans Ag2Ag)',
+            'Transition-cost-ag2nonag': 'Cost (trans Ag2NonAg)',
+            'Transition-cost-nonag2ag': 'Cost (trans NonAg2Ag)',
+            'Transition-cost-agMgt': 'Cost (trans AgMgt)',
+        }.get(sel[key], sel[key])
         
-    # 4 last level: 'lu'
+    # 4 last: 'lu'
     if 'lu' in sel:
         sel_rename['lu'] = RENAME_AM_NON_AG.get(sel['lu'], sel['lu'])
+        
         
     return sel_rename
 

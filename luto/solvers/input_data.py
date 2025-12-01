@@ -103,7 +103,7 @@ class SolverInputData:
     scale_factors: dict[float]                                          # Scale factors for each input layer.
 
     economic_contr_mrj: float                                           # base year economic contribution matrix.
-    economic_prices: np.ndarray                                 # base year commodity prices.
+    economic_prices: np.ndarray                                         # base year commodity prices.
     economic_target_yr_carbon_price: float                              # target year carbon price.
     
     offland_ghg: np.ndarray                                             # GHG emissions from off-land commodities.

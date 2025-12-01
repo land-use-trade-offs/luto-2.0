@@ -41,7 +41,6 @@ from luto.tools.report.data_tools import (
 def map2base64(
     ds_template:str, 
     arr_sel:xr.DataArray, 
-    min_max:tuple[float,float]|None, 
     isInt:bool, 
     legend:dict, 
     hierarchy_tp:tuple
@@ -60,13 +59,14 @@ def map2base64(
         }
     else:
         # Normalize the layer to 0-100 as integer
-        min_val, max_val = min_max
+        min_val, max_val = np.nanpercentile(arr_sel.values, [1, 99])
+        arr_sel = arr_sel.clip(min_val, max_val)
         arr_sel.values = (arr_sel - min_val) / (max_val - min_val) * 100
         arr_sel = arr_sel.astype(np.float32)
         img_attrs = {
             'intOrFloat': 'float',
             'legend': legend['legend'],
-            'min_max': min_max
+            'min_max': (min_val, max_val)
         }
 
     # Convert the 1D array to a 2D array
@@ -104,7 +104,8 @@ def get_map2json(
     # Determine number of workers based on max memory setting
     #    The MEM for RESFACTOR=13 is ~0.5 GB, so scale accordingly
     workers = (settings.WRITE_REPORT_MAX_MEM_GB) // (0.5 * (13/settings.RESFACTOR)**2)
-    workers = max(1, int(workers)) # At least 1 worker
+    workers = max(4, int(workers))      # At least 4 workers
+    workers = min(workers, 32)          # At most 32 workers
     
     # Loop through each year
     tasks = []
@@ -115,6 +116,11 @@ def get_map2json(
         valid_layers = xr_arr['layer'].to_index().to_frame().to_dict(orient='records')
         
         for sel in valid_layers:
+            
+            # Select the array for this layer
+            arr_sel = xr_arr.sel(**sel)
+            sel_rename = rename_reorder_hierarchy(sel)
+            hierarchy_tp = tuple(list(sel_rename.values()) + [row['Year']])
 
             # Determine if this layer should use integer legend
             if isinstance(legend_int_level, dict):
@@ -127,24 +133,11 @@ def get_map2json(
             # Set legend and metadata based on type
             if isInt:
                 legend = legend_int
-                min_max = None
             else:
                 legend = legend_float
-                min_max = xr_arr.attrs['min'], xr_arr.attrs['max']
-            
-            arr_sel = xr_arr.sel(**sel)
-            sel_rename = rename_reorder_hierarchy(sel)
-            hierarchy_tp = tuple(list(sel_rename.values()) + [row['Year']])
-
-            # Calculate min_max for commodity layers
-            if 'Commodity' in sel.keys():
-                min_val = float(arr_sel.min().values)
-                if abs(min_val) < 1e-3: min_val = 0.0
-                max_val = float(arr_sel.max().values)
-                min_max = (min_val, max_val)
 
             tasks.append(
-                delayed(map2base64)(ds_template, arr_sel, min_max, isInt, legend, hierarchy_tp)
+                delayed(map2base64)(ds_template, arr_sel, isInt, legend, hierarchy_tp)
             )    
             
     # Gather results and save to JSON
@@ -356,26 +349,65 @@ def save_report_layer(raw_data_dir:str):
 
 
     ####################################################
-    #                    5) Cost                       #
+    #        5) Profit/Revenue/Cost/Transition         #
     ####################################################
+    
+    # ---------------- Profit ---------------- 
+    profit_ag = files.query('base_name == "xr_profit_ag"')
+    get_map2json(profit_ag, colors_legend_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_profit_Ag.js')
+    print('│   ├── Profit Ag layer saved.')
+    
+    profit_am = files.query('base_name == "xr_profit_agMgt"')
+    get_map2json(profit_am, colors_legend_am, {'am':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_profit_Am.js')
+    print('│   ├── Profit Am layer saved.')
+    
+    profit_nonag = files.query('base_name == "xr_profit_non_ag"')
+    get_map2json(profit_nonag, colors_legend_non_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_profit_NonAg.js')
+    print('│   ├── Profit Non-Ag layer saved.')
+    
+    
+    # ---------------- Revenue ---------------- 
+    revenue_ag = files.query('base_name == "xr_revenue_ag"')
+    get_map2json(revenue_ag, colors_legend_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_revenue_Ag.js')
+    print('│   ├── Revenue Ag layer saved.')
 
-    files_cost = files.query('base_name.str.contains("cost")')
+    revenue_am = files.query('base_name == "xr_revenue_agricultural_management"')
+    get_map2json(revenue_am, colors_legend_am, {'am':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_revenue_Am.js')
+    print('│   ├── Revenue Am layer saved.')
 
-    cost_ag = files_cost.query('base_name == "xr_cost_ag"')
+    revenue_nonag = files.query('base_name == "xr_revenue_non_ag"')
+    get_map2json(revenue_nonag, colors_legend_non_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_revenue_NonAg.js')
+    print('│   ├── Revenue Non-Ag layer saved.')
+    
+
+    # ---------------- Cost ---------------- 
+    cost_ag = files.query('base_name == "xr_cost_ag"')
     get_map2json(cost_ag, colors_legend_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_cost_Ag.js')
     print('│   ├── Cost Ag layer saved.')
 
-    cost_am = files_cost.query('base_name == "xr_cost_agricultural_management"')
+    cost_am = files.query('base_name == "xr_cost_agricultural_management"')
     get_map2json(cost_am, colors_legend_am, {'am':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_cost_Am.js')
     print('│   ├── Cost Am layer saved.')
 
-    cost_nonag = files_cost.query('base_name == "xr_cost_non_ag"')
+    cost_nonag = files.query('base_name == "xr_cost_non_ag"')
     get_map2json(cost_nonag, colors_legend_non_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_cost_NonAg.js')
     print('│   ├── Cost Non-Ag layer saved.')
 
-    # cost_transition = files_cost.query('base_name == "xr_cost_transition_ag2ag"')
-    # get_map2json(cost_transition, f'{SAVE_DIR}/map_layers/map_cost_transition.js')
-
+    
+    # ---------------- Transition Cost ---------------- 
+    cost_trans_ag2ag = files.query('base_name == "xr_cost_transition_ag2ag"')
+    get_map2json(cost_trans_ag2ag, colors_legend_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_cost_trans_ag2ag.js')
+    
+    cost_trans_ag2nonag = files.query('base_name == "xr_transition_cost_ag2non_ag"')
+    get_map2json(cost_trans_ag2nonag, colors_legend_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_cost_trans_ag2nonag.js')
+    
+    # AgMgt has 0 transition cost, so skipping 
+    # cost_ag_man = files.query('base_name == "xr_cost_agricultural_management"')
+    
+    # Non-Ag to Ag transition cost is not allowed, so skipping
+    # cost_trans_nonag2ag = files.query('base_name == "xr_cost_transition_non_ag2ag"')
+    
+    
 
 
     ####################################################
@@ -419,27 +451,7 @@ def save_report_layer(raw_data_dir:str):
 
 
     ####################################################
-    #                   8) Revenue                     #
-    ####################################################
-
-    files_revenue = files.query('base_name.str.contains("revenue")')
-
-    revenue_ag = files_revenue.query('base_name == "xr_revenue_ag"')
-    get_map2json(revenue_ag, colors_legend_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_revenue_Ag.js')
-    print('│   ├── Revenue Ag layer saved.')
-
-    revenue_am = files_revenue.query('base_name == "xr_revenue_agricultural_management"')
-    get_map2json(revenue_am, colors_legend_am, {'am':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_revenue_Am.js')
-    print('│   ├── Revenue Am layer saved.')
-
-    revenue_nonag = files_revenue.query('base_name == "xr_revenue_non_ag"')
-    get_map2json(revenue_nonag, colors_legend_non_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_revenue_NonAg.js')
-    print('│   ├── Revenue Non-Ag layer saved.')
-
-
-
-    ####################################################
-    #                9) Transition Cost                #
+    #                8) Transition Cost                #
     ####################################################
 
     # files_transition = files.query('base_name.str.contains("transition")')
@@ -455,7 +467,7 @@ def save_report_layer(raw_data_dir:str):
 
 
     ####################################################
-    #               10) Water Yield                    #
+    #               9) Water Yield                    #
     ####################################################
 
     files_water = files.query('base_name.str.contains("water_yield")')

@@ -319,6 +319,7 @@ def process_area_data(files, SAVE_DIR, lu_group, colors_lu_category):
     return "Area data processing completed"
 
 
+
 def process_economics_data(files, SAVE_DIR):
     
     # -------------------- Get the revenue and cost data --------------------
@@ -358,7 +359,7 @@ def process_economics_data(files, SAVE_DIR):
     cost_transition_ag2ag_df = cost_transition_ag2ag_df.replace(RENAME_AM_NON_AG).assign(Source='Transition cost (Ag2Ag)')
     cost_transition_ag2ag_df['Value ($)'] = cost_transition_ag2ag_df['Cost ($)']  * -1          # Convert cost to negative value
     cost_transition_ag2ag_df_non_all = cost_transition_ag2ag_df.query(
-        '`From-water-supply` != "ALL" and `From-land-use` != "ALL" and `To-water-supply` != "ALL" and `To-land-use` != "ALL" and Type != "ALL" '
+        '`From-land-use` != "ALL" and `To-land-use` != "ALL" and Type != "ALL" '
         ).copy()
 
     cost_transition_ag2non_ag_df = files.query('base_name == "cost_transition_ag2non_ag"').reset_index(drop=True)
@@ -366,7 +367,7 @@ def process_economics_data(files, SAVE_DIR):
     cost_transition_ag2non_ag_df = cost_transition_ag2non_ag_df.replace(RENAME_AM_NON_AG).assign(Source='Transition cost (Ag2Non-Ag)')
     cost_transition_ag2non_ag_df['Value ($)'] = cost_transition_ag2non_ag_df['Cost ($)'] * -1   # Convert cost to negative value
     cost_transition_ag2non_ag_df_non_all = cost_transition_ag2non_ag_df.query(
-        '`From-water-supply` != "ALL" and `From-land-use` != "ALL" and `To-land-use` != "ALL" and `Cost-type` != "ALL" '
+        '`From-land-use` != "ALL" and `To-land-use` != "ALL" and `Cost-type` != "ALL" '
         ).copy()
 
     cost_transition_non_ag2ag_df = files.query('base_name == "cost_transition_non_ag2_ag"').reset_index(drop=True)
@@ -374,7 +375,7 @@ def process_economics_data(files, SAVE_DIR):
     cost_transition_non_ag2ag_df = cost_transition_non_ag2ag_df.replace(RENAME_AM_NON_AG).assign(Source='Transition cost (Non-Ag2Ag)').dropna(subset=['Cost ($)'])
     cost_transition_non_ag2ag_df['Value ($)'] = cost_transition_non_ag2ag_df['Cost ($)'] * -1   # Convert cost to negative value
     cost_transition_non_ag2ag_df_non_all = cost_transition_non_ag2ag_df.query(
-        '`From-land-use` != "ALL" and `To-land-use` != "ALL" and `To-water-supply` != "ALL" '
+        '`From-land-use` != "ALL" and `To-land-use` != "ALL"'
         ).copy()
 
     economics_df_non_all = pd.concat(
