@@ -307,7 +307,6 @@ def get_agricultural_management_biodiversity_matrices(data:Data, ag_b_mrj: np.nd
     agtech_ei_data = get_agtech_ei_effect_b_mrj(data)                               
     biochar_data = get_biochar_effect_b_mrj(data, ag_b_mrj, yr_idx)                 
     beef_hir_data = get_beef_hir_effect_b_mrj(data, ag_b_mrj)                       
-    sheep_hir_data = get_sheep_hir_effect_b_mrj(data, ag_b_mrj)                     
     sheep_hir_data = get_sheep_hir_effect_b_mrj(data, ag_b_mrj)
     solar_pv_data = get_utility_solar_pv_effect_b_mrj(data, ag_b_mrj, yr_idx)
     wind_data = get_onshore_wind_effect_b_mrj(data, ag_b_mrj, yr_idx)                  
