@@ -18,6 +18,7 @@ The LUTO2 documentation is split into themed files for better memory efficiency.
 - Setting up GUROBI license
 - Performance optimization and memory management
 - Memory profiling with `@trace_mem_usage` decorator
+- **xr.dot() optimization** (CRITICAL: use `xr.dot()` instead of broadcasting for memory efficiency)
 
 ### 📁 [docs/CLAUDE_ARCHITECTURE.md](docs/CLAUDE_ARCHITECTURE.md)
 **Read this when working on:**
@@ -85,6 +86,20 @@ Results saved in `/output/<timestamp>/`:
 - Logs: Execution logs and metrics
 
 ## Important Conventions
+
+### Memory Optimization: xr.dot() Pattern (CRITICAL)
+
+**ALWAYS use `xr.dot()` instead of broadcasting for array operations:**
+
+```python
+# ❌ BAD - Creates large intermediate arrays
+result = (matrix_A * matrix_B).sum(dim=['lu'])
+
+# ✓ GOOD - Memory-efficient dot product
+result = xr.dot(matrix_A, matrix_B, dims=['lu'])
+```
+
+**Why?** Broadcasting creates intermediate arrays that can consume 50-80% more memory. `xr.dot()` is 2-4x faster and produces identical results. See [CLAUDE_SETUP.md](docs/CLAUDE_SETUP.md) for detailed examples and validation patterns.
 
 ### Naming Patterns
 

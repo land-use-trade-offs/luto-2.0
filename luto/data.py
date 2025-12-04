@@ -307,6 +307,15 @@ class Data:
         self.PR2LU_DICT = {pr: key for key, val in self.LU2PR_DICT.items() for pr in val}
 
         self.LU2PR = dict2matrix(self.LU2PR_DICT, self.AGRICULTURAL_LANDUSES, self.PRODUCTS)
+        
+        self.lu2pr_xr = xr.DataArray(
+            self.LU2PR.astype(np.float32),
+            dims=['product', 'lu'],
+            coords={
+                'product': self.PRODUCTS,
+                'lu': self.AGRICULTURAL_LANDUSES
+            },
+        )
 
 
         # List of commodities. Everything lower case to avoid mistakes.
@@ -343,6 +352,15 @@ class Data:
                     ... # Do nothing, this should be a crop.
 
         self.PR2CM = dict2matrix(self.CM2PR_DICT, self.COMMODITIES, self.PRODUCTS).T # Note the transpose.
+        
+        self.pr2cm_xr = xr.DataArray(
+            self.PR2CM.astype(np.float32),
+            dims=['Commodity', 'product'],
+            coords={
+                'Commodity': self.COMMODITIES,
+                'product': self.PRODUCTS
+            },
+        )
         
         
         # Get the land-use indices for each commodity.
@@ -429,6 +447,12 @@ class Data:
             os.path.join(settings.INPUT_DIR, "climate_change_impacts_" + settings.RCP + "_CO2_FERT_" + settings.CO2_FERT.upper() + ".h5"), where=self.MASK
         )
         
+        self.CLIMATE_CHANGE_IMPACT_xr = (
+                xr.DataArray(self.CLIMATE_CHANGE_IMPACT)
+                .unstack('dim_1')
+                .rename({'dim_1_level_0':'lm', 'dim_1_level_1':'lu', 'dim_1_level_2':'year', 'CELL_ID':'cell'})
+                .assign_coords(cell=range(self.NCELLS))     # Cell index from now will be from 0 to NCELLS-1
+            )
         
         ###############################################################
         # Regional coverage layers, mainly for regional reporting.
@@ -680,7 +704,12 @@ class Data:
         # Yield increases.
         fpath = os.path.join(settings.INPUT_DIR, "yieldincreases_bau2022.csv")
         self.BAU_PROD_INCR = pd.read_csv(fpath, header=[0, 1]).astype(np.float32)
-
+        self.BAU_PROD_INCR_xr = (
+            xr.DataArray(self.BAU_PROD_INCR)
+            .unstack('dim_1')
+            .rename({'dim_1_level_0':'lm', 'dim_1_level_1':'product', 'dim_0':'year'})
+            .assign_coords(year=lambda x: x.year + self.YR_CAL_BASE)  # Adjust year to absolute year
+        )
 
 
 
@@ -986,18 +1015,24 @@ class Data:
         self.add_ag_man_dvars(self.YR_CAL_BASE, self.AG_MAN_L_MRJ_DICT)
         
         print("├── Calculating base year productivity", flush=True)
-        yr_cal_base_prod_data = self.get_production()        
+        self.prod_lyr_base_ag_mrc, self.prod_lyr_base_non_ag_rc, self.prod_lyr_base_am_amrc = self.get_production_lyr(self.YR_CAL_BASE)
+        
+        yr_cal_base_prod_data = (
+            self.prod_lyr_base_ag_mrc.sum(['cell','lm'])
+            + self.prod_lyr_base_non_ag_rc.sum(['cell']) 
+            + self.prod_lyr_base_am_amrc.sum(['cell', 'am', 'lm'])  
+        ).compute().values
+        
         self.add_production_data(self.YR_CAL_BASE, "Production", yr_cal_base_prod_data)
+
         
-        
-        
-        # Place holders for base year values; will be filled in the input_data module.
-        self.BASE_YR_economic_value = None
-        self.BASE_YR_production_t = yr_cal_base_prod_data
-        self.BASE_YR_GHG_t = None
-        self.BASE_YR_water_ML = None
-        self.BASE_YR_overall_bio_value = None
-        self.BASE_YR_GBF2_score = None
+        # Place holders for base year values
+        self.BASE_YR_economic_value = None                      # filled by `input_data.get_BASE_YR_economic_value`
+        self.BASE_YR_production_t = yr_cal_base_prod_data       
+        self.BASE_YR_GHG_t = None                               # filled by `input_data.get_BASE_YR_GHG_t`
+        self.BASE_YR_water_ML = None                            # filled by `input_data.get_BASE_YR_water_ML`
+        self.BASE_YR_overall_bio_value = None                   # filled by `input_data.get_BASE_YR_bio_quality_value`
+        self.BASE_YR_GBF2_score = None                          # filled by `input_data.get_BASE_YR_GBF2_score`
 
         ###############################################################
         # Demand data.
@@ -1057,7 +1092,8 @@ class Data:
 
         # Remove off-land commodities
         self.DEMAND_C = self.DEMAND_DATA.loc[self.DEMAND_DATA.query("COMMODITY not in @settings.OFF_LAND_COMMODITIES").index, 'PRODUCTION'].copy()
-
+        
+        
         if settings.APPLY_DEMAND_MULTIPLIERS:
             print(f"│   ├── Years before applying demand multipliers: {self.DEMAND_C.columns.min()} - {self.DEMAND_C.columns.max()}", flush=True)
             self.DEMAND_C = (self.DEMAND_C *  demand_multipliers).dropna(axis=1)
@@ -1069,19 +1105,25 @@ class Data:
         # Adjust demand data to the production data calculated using the base year layers;
         # The mismatch is caused by resfactoring spatial layers. Land uses of small size (i.e., other non-cereal crops) 
         # are distorted more under higher resfactoring.
-        self.D_CY *= (yr_cal_base_prod_data / self.D_CY[0])[None, :]
-        
+        self.D_CY *= (self.BASE_YR_production_t / self.D_CY[0])[None, :]
+        self.D_CY_xr = xr.DataArray(
+            self.D_CY, 
+            dims=['year','Commodity'], 
+            coords={
+                'year':self.YR_CAL_BASE + np.arange(self.D_CY.shape[0]), 
+                'Commodity':self.COMMODITIES
+            }
+        ) 
 
-        # Demand elasticity data
-        demand_elasticity = pd.read_csv(f'{settings.INPUT_DIR}/demand_elasticity.csv').drop(columns=['Unnamed: 0'])
-        demand_elasticity['demand_elasticity'] = demand_elasticity.eval('`Supply Elasticity (Es)` - `Demand Elasticity(ED)`')
-        self.DEMAND_ELASTICITY = demand_elasticity.set_index('Commodity')['demand_elasticity'].to_dict()
+        # Price elasticity data
+        demand_supply_elasticity = pd.read_csv(f'{settings.INPUT_DIR}/demand_elasticity.csv').drop(columns=['Unnamed: 0'])
+        demand_supply_elasticity = demand_supply_elasticity.sort_values('Commodity')    # Sort by commodity to ensure the order is correct
+        demand_supply_elasticity['Demand Elasticity(ED)'] = demand_supply_elasticity['Demand Elasticity(ED)'] * -1 # ED is subtracted from supply becase demand curve are given as negative numbers
         
-        demand_xr = xr.DataArray(self.DEMAND_C) 
-        self.DEMAND_DELTA = (demand_xr - demand_xr.sel(YEAR=2010)) / demand_xr.sel(YEAR=2010)
-        
-        
-        
+        self.elasticity_demand = demand_supply_elasticity['Demand Elasticity(ED)']
+        self.elasticity_supply = demand_supply_elasticity['Supply Elasticity (Es)']
+
+   
 
 
         ###############################################################
@@ -1681,9 +1723,126 @@ class Data:
         )
       
         return lumap_resfactored[*nearst_ind]
-    
 
-    def get_elasticity_multiplier(self, yr_cal):
+
+    def get_production_lyr(self, yr_cal:int):
+        '''
+        Return the production data for a given year as xarray DataArrays.
+        The returned DataArrays are spatial layers where each cell is the production of a commodity.
+        Such as t/cell for apples, beef. Or ML/cell for milk.
+        '''
+        # Get dvars
+        if yr_cal == self.YR_CAL_BASE:
+            ag_X_mrj = self.AG_L_MRJ
+            non_ag_X_rk = self.NON_AG_L_RK
+            ag_man_X_mrj = self.AG_MAN_L_MRJ_DICT
+            
+        else: # In this case, the dvars are already appended from the solver
+            ag_X_mrj = self.ag_dvars[yr_cal]
+            non_ag_X_rk = self.non_ag_dvars[yr_cal]
+            ag_man_X_mrj = self.ag_man_dvars[yr_cal]
+
+        # Calculate year index (i.e., number of years since 2010)
+        yr_idx = yr_cal - self.YR_CAL_BASE
+        lumap = self.lumaps[yr_cal]
+
+        # Convert np.array to xr.DataArray; Chunk the data to reduce memory usage
+        ag_X_mrj_xr = tools.ag_mrj_to_xr(self, ag_X_mrj).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, self.NCELLS)})
+        non_ag_X_rk_xr = tools.non_ag_rk_to_xr(self, non_ag_X_rk).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, self.NCELLS)})
+        ag_man_X_mrj_xr = tools.am_mrj_to_xr(self, ag_man_X_mrj).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, self.NCELLS)})
+
+        # Get commodity matrices
+        ag_q_mrp_xr = xr.DataArray(
+            ag_quantity.get_quantity_matrices(self, yr_idx).astype(np.float32),
+            dims=['lm','cell','product'],
+            coords={
+                'lm': self.LANDMANS,
+                'cell': range(self.NCELLS),
+                'product': self.PRODUCTS
+            },
+        ).assign_coords(
+            region=('cell', self.REGION_NRM_NAME),
+        )
+
+        non_ag_crk_xr = xr.DataArray(
+            non_ag_quantity.get_quantity_matrix(self, ag_q_mrp_xr, lumap).astype(np.float32),
+            dims=['Commodity', 'cell', 'lu'],
+            coords={
+                'Commodity': self.COMMODITIES,
+                'cell': range(self.NCELLS),
+                'lu': self.NON_AGRICULTURAL_LANDUSES
+            },
+        ).assign_coords(
+            region=('cell', self.REGION_NRM_NAME),
+        )
+
+        ag_man_q_mrp_xr = xr.DataArray(
+            np.stack(list(ag_quantity.get_agricultural_management_quantity_matrices(self, ag_q_mrp_xr, yr_idx).values())).astype(np.float32),
+            dims=['am', 'lm', 'cell', 'product'],
+            coords={
+                'am': self.AG_MAN_DESC,
+                'lm': self.LANDMANS,
+                'cell': np.arange(self.NCELLS),
+                'product': self.PRODUCTS
+            }
+        ).assign_coords(
+            region=('cell', self.REGION_NRM_NAME),
+        )
+
+        # Calculate the commodity production (BEFORE dimension expansion to avoid double counting)
+        #   Using xr.dot() instead of broadcasting for better memory efficiency and performance
+        ag_q_mrc = xr.dot((xr.dot(ag_X_mrj_xr, self.lu2pr_xr, dims=['lu']) * ag_q_mrp_xr), self.pr2cm_xr, dims=['product'])
+        non_ag_p_rc = xr.dot(non_ag_X_rk_xr, non_ag_crk_xr, dims=['lu'])
+        am_p_amrc = xr.dot((xr.dot(ag_man_X_mrj_xr, self.lu2pr_xr, dims=['lu']) * ag_man_q_mrp_xr), self.pr2cm_xr, dims=['product'])
+        
+        return ag_q_mrc, non_ag_p_rc, am_p_amrc
+    
+    
+    
+    # def get_production_impact_stats_from_CCI_yield_change_lucc(self, yr_cal:int):
+    #     '''
+    #     Get the production aggregated stats (t/ML for each commodity) from the below factors for a given year:
+    #      - climate change impact
+    #      - yield trend 
+    #      - land-use change 
+    #     '''
+        
+    #     # Get cci layer with shape of mrj (lm * cell * commodity)
+    #     #   (multipliers such as 1.05 meaning a 5% increase compared to `YR_CAL_BASE`)
+    #     cci_mrj = self.CLIMATE_CHANGE_IMPACT_xr.interp(year=yr_cal, kwargs={"fill_value": "extrapolate"}).drop_vars('year')
+    #     cci_mrj = cci_mrj.where(cci_mrj.notnull(), 0)   # Replace NaNs with 0, NaN means a cell is not suitable for the land-use
+        
+    #     # Get yield trend stats with shape of mp (lm * product)
+    #     #   (multipliers such as 1.05 meaning a 5% increase compared to `YR_CAL_BASE`)
+    #     yield_trend_mp = self.BAU_PROD_INCR_xr.sel(year=yr_cal, drop=True)
+        
+    #     # Calculate total impact from CCI and yield trend
+    #     total_impact_CCI_yield_trend_mrc = xr.dot(xr.dot(cci_mrj, self.lu2pr_xr, dim='lu') * yield_trend_mp, self.pr2cm_xr, dim='product')
+        
+    #     total_production_CCI_yield_trend_c = (
+    #         (self.prod_lyr_base_ag_mrc * total_impact_CCI_yield_trend_mrc).sum(['cell','lm']).compute()
+    #         + (self.prod_lyr_base_non_ag_rc * total_impact_CCI_yield_trend_mrc.sum(dim='lm')).sum(['cell']).compute()
+    #         + (self.prod_lyr_base_am_amrc * total_impact_CCI_yield_trend_mrc).sum(['cell','am', 'lm']).compute()
+    #     ).compute().values
+        
+    #     delta_production_CCI_yield_trend_c = (total_production_CCI_yield_trend_c - self.BASE_YR_production_t)
+        
+        
+    #     # Calculate land-use change impact
+    #     sim_years = sorted(set([self.YR_CAL_BASE]) | set(settings.SIM_YEARS))   # `Y_CAL_BASE` is always included
+    #     if yr_cal == self.YR_CAL_BASE:
+    #         prev_year = self.YR_CAL_BASE
+    #     else:
+    #         prev_year = sim_years[sim_years.index(yr_cal) - 1]
+            
+    #     production_prev = np.array(self.prod_data[prev_year]['Production'])
+    #     delta_production_lucc_c = production_prev - total_production_CCI_yield_trend_c
+        
+        
+    #     return delta_production_lucc_c + delta_production_CCI_yield_trend_c
+    
+    
+    def get_elasticity_multiplier(self, yr_cal:int):
         '''
         Get the elasticity multiplier for a given year and land use.
         yr_cal: year (int).
@@ -1691,15 +1850,33 @@ class Data:
         Returns:
             dict: A dictionary with land use as keys and elasticity multipliers as values.
         '''
-        elasticity_multiplier = {
-            c: 1 + (self.DEMAND_DELTA.sel(YEAR=yr_cal, COMMODITY=c) / self.DEMAND_ELASTICITY[c]).values
-            for c in self.DEMAND_DELTA.COMMODITY.values
-        }
+        
+        # Get previous year
+        sim_years = sorted(set([self.YR_CAL_BASE]) | set(settings.SIM_YEARS))   # `Y_CAL_BASE` is always included
+        if yr_cal == self.YR_CAL_BASE:
+            prev_year = self.YR_CAL_BASE
+        else:
+            prev_year = sim_years[sim_years.index(yr_cal) - 1]
+            
+        # Get supply delta (0-based ratio)
+        supply_base_yr = self.BASE_YR_production_t
+        supply_prev_yr = np.array(self.prod_data[prev_year]['Production'])
+        delta_supply = (supply_prev_yr - supply_base_yr) / supply_base_yr 
+        
+        # Get demand delta (0-based ratio)
+        demand_base_year = self.D_CY_xr.sel(year=self.YR_CAL_BASE)
+        demand_target_year = self.D_CY_xr.sel(year=yr_cal)
+        delta_demand = (demand_target_year - demand_base_year) / demand_base_year
+        
+        # Calculate price_multiplier (1-based ratio)
+        price_delta = (delta_demand - delta_supply) / (self.elasticity_demand + self.elasticity_supply)
+        elasticity_multiplier = (price_delta + 1).to_dataframe('multiplier')['multiplier'].to_dict()
         
         if settings.DYNAMIC_PRICE:
             return elasticity_multiplier
         else:
             return {k: 1 for k in elasticity_multiplier.keys()}
+    
     
     
     def get_watershed_yield_components(self, valid_watershed_id:list[int] = None):
@@ -2097,54 +2274,6 @@ class Data:
         """
         self.obj_vals[yr] = obj_val
 
-    def get_production(self) -> np.ndarray:
-        """
-        Return total production of commodities for YR_CAL_BASE...
-        """
-        ag_X_mrj = self.AG_L_MRJ
-        non_ag_X_rk = self.NON_AG_L_RK
-        ag_man_X_mrj = self.AG_MAN_L_MRJ_DICT
-
-        # The year index for the base year (2010) is 0.
-        yr_idx = 0
-
-        ag_q_mrp = ag_quantity.get_quantity_matrices(self, yr_idx)
-
-        # Convert map of land-use in mrj format to mrp format using vectorization
-        ag_X_mrp = np.einsum('mrj,pj->mrp', ag_X_mrj, self.LU2PR.astype(bool))
-
-        # Sum quantities in product (PR/p) representation.
-        ag_q_p = np.einsum('mrp,mrp->p', ag_q_mrp, ag_X_mrp)
-
-        # Transform quantities to commodity (CM/c) representation.
-        ag_q_c = np.einsum('cp,p->c', self.PR2CM.astype(bool), ag_q_p)
-
-        # Get the quantity of each commodity produced by non-agricultural land uses
-        q_crk = non_ag_quantity.get_quantity_matrix(self, ag_q_mrp, self.LUMAP)
-        non_ag_q_c = np.einsum('crk,rk->c', q_crk, non_ag_X_rk)
-
-        # Get quantities produced by agricultural management options
-        ag_man_q_mrp = ag_quantity.get_agricultural_management_quantity_matrices(self, ag_q_mrp, yr_idx)
-        ag_man_q_c = np.zeros(self.NCMS)
-        for am, am_lus in settings.AG_MANAGEMENTS_TO_LAND_USES.items():
-            if not settings.AG_MANAGEMENTS[am]:
-                continue
-            
-            am_j_list = [self.DESC2AGLU[lu] for lu in am_lus]
-            for j in am_j_list:
-                for p in range(self.NPRS):
-                    if self.LU2PR[p, j] ==0:
-                        continue
-                    dvar_mr = ag_man_X_mrj[am][:, :, j]
-                    ag_q_mr = ag_man_q_mrp[am][:, :, p]
-                    q_mr = dvar_mr * ag_q_mr
-                    
-                    for c in range(self.NCMS):
-                        if self.PR2CM[c, p] == 0:
-                            continue
-                        ag_man_q_c[c] += q_mr.sum()
-            
-        return ag_q_c + non_ag_q_c + ag_man_q_c
 
 
     def get_carbon_price_by_yr_idx(self, yr_idx: int) -> float:

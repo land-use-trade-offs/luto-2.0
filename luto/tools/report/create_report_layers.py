@@ -397,9 +397,11 @@ def save_report_layer(raw_data_dir:str):
     # ---------------- Transition Cost ---------------- 
     cost_trans_ag2ag = files.query('base_name == "xr_cost_transition_ag2ag"')
     get_map2json(cost_trans_ag2ag, colors_legend_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_cost_trans_ag2ag.js')
+    print('│   ├── Transition Cost Ag2Ag layer saved.')
     
     cost_trans_ag2nonag = files.query('base_name == "xr_transition_cost_ag2non_ag"')
     get_map2json(cost_trans_ag2nonag, colors_legend_ag, {'lu':'ALL'}, colors_legend_float, f'{SAVE_DIR}/map_layers/map_cost_trans_ag2nonag.js')
+    print('│   ├── Transition Cost Ag2NonAg layer saved.')
     
     # AgMgt has 0 transition cost, so skipping 
     # cost_ag_man = files.query('base_name == "xr_cost_agricultural_management"')

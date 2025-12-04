@@ -114,7 +114,7 @@ DISCOUNT_RATE = 0.07     # 0.05 = 5% pa.
 AMORTISATION_PERIOD = 30 # years
 
 # Set whether to use demand elasticity when calculating commodity prices
-DYNAMIC_PRICE = True
+DYNAMIC_PRICE = False
 
 
 

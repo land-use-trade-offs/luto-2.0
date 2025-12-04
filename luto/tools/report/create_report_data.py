@@ -370,7 +370,7 @@ def process_economics_data(files, SAVE_DIR):
         '`From-land-use` != "ALL" and `To-land-use` != "ALL" and `Cost-type` != "ALL" '
         ).copy()
 
-    cost_transition_non_ag2ag_df = files.query('base_name == "cost_transition_non_ag2_ag"').reset_index(drop=True)
+    cost_transition_non_ag2ag_df = files.query('base_name == "cost_transition_non_ag2ag"').reset_index(drop=True)
     cost_transition_non_ag2ag_df = pd.concat([pd.read_csv(path) for path in cost_transition_non_ag2ag_df['path'] if not pd.read_csv(path).empty], ignore_index=True)
     cost_transition_non_ag2ag_df = cost_transition_non_ag2ag_df.replace(RENAME_AM_NON_AG).assign(Source='Transition cost (Non-Ag2Ag)').dropna(subset=['Cost ($)'])
     cost_transition_non_ag2ag_df['Value ($)'] = cost_transition_non_ag2ag_df['Cost ($)'] * -1   # Convert cost to negative value
@@ -1012,6 +1012,7 @@ def process_production_data(files, SAVE_DIR, years):
         .assign(group = lambda x: x['Commodity'].map(COMMIDOTY_GROUP.get))\
         .replace(RENAME_AM_NON_AG)\
         .query(f'Year.isin({years}) and abs(`Production (t/KL)`) > 1')\
+        .query('Commodity != "All"')\
         .round({'`Production (t/KL)`': 2})
 
     quantity_ag = quantity_df.query('Type == "Agricultural"').copy()
@@ -1020,6 +1021,7 @@ def process_production_data(files, SAVE_DIR, years):
 
     quantity_ag_non_all = quantity_ag.query('Water_supply != "ALL"').copy()
     quantity_am_non_all = quantity_am.query('Water_supply != "ALL"').copy()
+    
 
 
     # -------------------- Demand --------------------
