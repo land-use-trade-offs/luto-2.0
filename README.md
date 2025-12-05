@@ -103,7 +103,7 @@ luto/                                    # Main package directory
 input/                                   # Input data directory (requires separate download)
 output/                                  # Simulation outputs with interactive HTML reports
 docs/                                    # Documentation files
-requirements.toml                        # Python package dependencies (conda environment spec)
+requirements.yml                        # Python package dependencies (conda environment spec)
 pyproject.toml                           # Project configuration
 ```
 
@@ -181,8 +181,8 @@ cd luto-2.0
 ### 2. Set Up Environment
 
 ```bash
-# Create and activate the LUTO environment from requirements.toml
-conda env create -f requirements.toml
+# Create and activate the LUTO environment from requirements.yml
+conda env create -f requirements.yml
 conda activate luto
 ```
 

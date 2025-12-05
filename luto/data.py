@@ -1799,47 +1799,34 @@ class Data:
     
     
     
-    # def get_production_impact_stats_from_CCI_yield_change_lucc(self, yr_cal:int):
-    #     '''
-    #     Get the production aggregated stats (t/ML for each commodity) from the below factors for a given year:
-    #      - climate change impact
-    #      - yield trend 
-    #      - land-use change 
-    #     '''
+    def get_production_impact_stats_from_CCI_and_yield_change(self, yr_cal:int):
+        '''
+        Get the production aggregated stats (t/ML for each commodity) based on `YR_CAL_BASE` 
+        under the below factors for a given year:
+         - climate change impact
+         - yield trend 
+        '''
         
-    #     # Get cci layer with shape of mrj (lm * cell * commodity)
-    #     #   (multipliers such as 1.05 meaning a 5% increase compared to `YR_CAL_BASE`)
-    #     cci_mrj = self.CLIMATE_CHANGE_IMPACT_xr.interp(year=yr_cal, kwargs={"fill_value": "extrapolate"}).drop_vars('year')
-    #     cci_mrj = cci_mrj.where(cci_mrj.notnull(), 0)   # Replace NaNs with 0, NaN means a cell is not suitable for the land-use
+        # Get cci layer with shape of mrj (lm * cell * commodity)
+        #   (multipliers such as 1.05 meaning a 5% increase compared to `YR_CAL_BASE`)
+        cci_mrj = self.CLIMATE_CHANGE_IMPACT_xr.interp(year=yr_cal, kwargs={"fill_value": "extrapolate"}).drop_vars('year')
+        cci_mrj = cci_mrj.where(cci_mrj.notnull(), 0)   # Replace NaNs with 0, NaN means a cell is not suitable for the land-use
         
-    #     # Get yield trend stats with shape of mp (lm * product)
-    #     #   (multipliers such as 1.05 meaning a 5% increase compared to `YR_CAL_BASE`)
-    #     yield_trend_mp = self.BAU_PROD_INCR_xr.sel(year=yr_cal, drop=True)
+        # Get yield trend stats with shape of mp (lm * product)
+        #   (multipliers such as 1.05 meaning a 5% increase compared to `YR_CAL_BASE`)
+        yield_trend_mp = self.BAU_PROD_INCR_xr.sel(year=yr_cal, drop=True)
         
-    #     # Calculate total impact from CCI and yield trend
-    #     total_impact_CCI_yield_trend_mrc = xr.dot(xr.dot(cci_mrj, self.lu2pr_xr, dim='lu') * yield_trend_mp, self.pr2cm_xr, dim='product')
+        # Calculate total impact from CCI and yield trend
+        total_impact_CCI_yield_trend_mrc = xr.dot(xr.dot(cci_mrj, self.lu2pr_xr, dim='lu') * yield_trend_mp, self.pr2cm_xr, dim='product')
         
-    #     total_production_CCI_yield_trend_c = (
-    #         (self.prod_lyr_base_ag_mrc * total_impact_CCI_yield_trend_mrc).sum(['cell','lm']).compute()
-    #         + (self.prod_lyr_base_non_ag_rc * total_impact_CCI_yield_trend_mrc.sum(dim='lm')).sum(['cell']).compute()
-    #         + (self.prod_lyr_base_am_amrc * total_impact_CCI_yield_trend_mrc).sum(['cell','am', 'lm']).compute()
-    #     ).compute().values
-        
-    #     delta_production_CCI_yield_trend_c = (total_production_CCI_yield_trend_c - self.BASE_YR_production_t)
-        
-        
-    #     # Calculate land-use change impact
-    #     sim_years = sorted(set([self.YR_CAL_BASE]) | set(settings.SIM_YEARS))   # `Y_CAL_BASE` is always included
-    #     if yr_cal == self.YR_CAL_BASE:
-    #         prev_year = self.YR_CAL_BASE
-    #     else:
-    #         prev_year = sim_years[sim_years.index(yr_cal) - 1]
-            
-    #     production_prev = np.array(self.prod_data[prev_year]['Production'])
-    #     delta_production_lucc_c = production_prev - total_production_CCI_yield_trend_c
-        
-        
-    #     return delta_production_lucc_c + delta_production_CCI_yield_trend_c
+        total_production_CCI_yield_trend_c = (
+            (self.prod_lyr_base_ag_mrc * total_impact_CCI_yield_trend_mrc).sum(['cell','lm']).compute()
+            + (self.prod_lyr_base_non_ag_rc * total_impact_CCI_yield_trend_mrc.sum(dim='lm')).sum(['cell']).compute()
+            + (self.prod_lyr_base_am_amrc * total_impact_CCI_yield_trend_mrc).sum(['cell','am', 'lm']).compute()
+        ).compute().values
+
+        return total_production_CCI_yield_trend_c
+    
     
     
     def get_elasticity_multiplier(self, yr_cal:int):
@@ -1850,17 +1837,10 @@ class Data:
         Returns:
             dict: A dictionary with land use as keys and elasticity multipliers as values.
         '''
-        
-        # Get previous year
-        sim_years = sorted(set([self.YR_CAL_BASE]) | set(settings.SIM_YEARS))   # `Y_CAL_BASE` is always included
-        if yr_cal == self.YR_CAL_BASE:
-            prev_year = self.YR_CAL_BASE
-        else:
-            prev_year = sim_years[sim_years.index(yr_cal) - 1]
-            
+
         # Get supply delta (0-based ratio)
         supply_base_yr = self.BASE_YR_production_t
-        supply_prev_yr = np.array(self.prod_data[prev_year]['Production'])
+        supply_prev_yr = self.get_production_impact_stats_from_CCI_and_yield_change(yr_cal)
         delta_supply = (supply_prev_yr - supply_base_yr) / supply_base_yr 
         
         # Get demand delta (0-based ratio)

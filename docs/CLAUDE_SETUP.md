@@ -6,11 +6,11 @@ This document covers environment setup, common commands, and configuration param
 
 ### Environment Creation
 ```bash
-# Create and activate conda environment from requirements.toml
-conda env create -f requirements.toml
+# Create and activate conda environment from requirements.yml
+conda env create -f requirements.yml
 conda activate luto
 
-# Note: All dependencies including gurobipy, numpy_financial, and tables are included in requirements.toml
+# Note: All dependencies including gurobipy, numpy_financial, and tables are included in requirements.yml
 ```
 
 ### GUROBI License

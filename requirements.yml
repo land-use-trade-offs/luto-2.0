@@ -27,8 +27,10 @@ dependencies:
   - nbformat==5.10.4
   - netcdf4=1.7.2
   - cf_xarray==0.10.9
+  - plotly==6.5.0
+  - ipywidgets==8.1.8
   - pip
   - pip:
-      - gurobipy==11.0.2
+      - gurobipy==12.0.0
       - numpy_financial==1.0.0
       - tables==3.9.2
