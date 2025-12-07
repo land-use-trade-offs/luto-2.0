@@ -345,7 +345,7 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
     """
 
     # Get the commodity quantity dataarrays (sptial layers, (tonnes/KL)/(cell))
-    ag_q_mrc, non_ag_p_rc, am_p_amrc = data.get_production_lyr(yr_cal)
+    ag_q_mrc, non_ag_p_rc, am_p_amrc = data.get_actual_production_lyr(yr_cal)
 
     # Expand dimension (has to be after calculation to avoid double counting)
     ag_q_mrc = xr.concat([ag_q_mrc.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL']), ag_q_mrc], dim='lm')
