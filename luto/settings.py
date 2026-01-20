@@ -363,10 +363,16 @@ AG_MANAGEMENTS_TO_LAND_USES = {
 
     'HIR - Beef':               ['Beef - natural land'],
     'HIR - Sheep':              ['Sheep - natural land'],
-    'Utility Solar PV':         ['Unallocated - modified land','Beef - modified land', 'Sheep - modified land', 'Dairy - modified land'
+    'Utility Solar PV':         [#Unallocated lands
+                                'Unallocated - modified land',
+                                # Livestock
+                                'Beef - modified land','Beef - natural land','Sheep - natural land','Sheep - modified land', 'Dairy - modified land',
                                 # Cropping:
                                 'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',], 
-    'Onshore Wind':             ['Unallocated - modified land','Beef - modified land', 'Sheep - modified land', 'Dairy - modified land',
+    'Onshore Wind':             [#Unallocated lands
+                                'Unallocated - modified land',
+                                # Livestock
+                                'Beef - modified land','Beef - natural land','Sheep - natural land','Sheep - modified land', 'Dairy - modified land',
                                 # Cropping:
                                 'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
                                 # Intensive Cropping:
@@ -439,35 +445,15 @@ SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
 
 
 # -------------- Renewable energy parameters ------------------------
-# Renewable Energy Generation Density (MW/km²) keyed by normalized technology strings
-GENERATION_DENSITY = {
-    'Utility Solar PV': 150,    # MW/km²
-    'Onshore Wind': 7.2,  # MW/km²
-}
+# Base directory for RE inputs
+RE_INPUT_BASE = os.path.join('input', 'RE Module')
 
-def get_generation_density(lm_name: str) -> float:
-    """
-    Return the generation density (MW/km²) for the given land management name.
-    
-    Parameters
-    ----------
-    lm_name : str
-        Normalized management type e.g., 'Utility Solar PV' or 'Onshore Wind'
-    
-    Returns
-    -------
-    float
-        Generation density in MW/km²
-    
-    Raises
-    ------
-    ValueError
-        If management type is unknown.
-    """
-    try:
-        return GENERATION_DENSITY[lm_name]
-    except KeyError:
-        raise ValueError(f"Unknown land management name: {lm_name}")
+# Sub-directory definitions
+RE_PATHS = {
+    'capex': os.path.join(RE_INPUT_BASE, 'capex'),
+    'opex': os.path.join(RE_INPUT_BASE, 'opex'),
+    'dlf': os.path.join(RE_INPUT_BASE, 'distribution_loss_factor')
+}
 
 # --------------Renewable energy target parameters ---------------------------- #  
 # User selects the renewable energy target aggregation level: 'state' or 'NRM'

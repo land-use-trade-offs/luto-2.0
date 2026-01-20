@@ -234,10 +234,6 @@ def get_sheep_hir_effect_b_mrj(data: Data, ag_b_mrj: np.ndarray) -> np.ndarray:
         
     return b_mrj_effect
 
-
-<<<<<<< Updated upstream
-def get_ag_mgt_biodiversity_matrices(data:Data, ag_b_mrj: np.ndarray, yr_idx: int):
-=======
 def get_utility_solar_pv_effect_b_mrj(data:Data, ag_b_mrj: np.ndarray, yr_idx: int):
     """
     Gets biodiversity impacts of using Utility Solar PV
@@ -288,7 +284,6 @@ def get_onshore_wind_effect_b_mrj(data:Data, ag_b_mrj: np.ndarray, yr_idx: int):
 
 
 def get_agricultural_management_biodiversity_matrices(data:Data, ag_b_mrj: np.ndarray, yr_idx: int):
->>>>>>> Stashed changes
     """
     Calculate the biodiversity matrices for different agricultural management practices.
 

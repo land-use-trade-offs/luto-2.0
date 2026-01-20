@@ -35,8 +35,8 @@ MGMT_TO_PRODUCT = {
 }
 
 MGMT_CONFIG = {
-    "Utility Solar PV": {"gd": 150},  # in MW/km^2 as per data
-    "Onshore Wind": {"gd": 7.2}
+    "Utility Solar PV": {"gd": 45},  # MW/km^2 for Utility Solar PV. Reduced from 150 based on Gemini recommendation: https://gemini.google.com/share/ba5673113a82
+    "Onshore Wind": {"gd": 4},    # MW/km^2 for Onshore Wind. Reduced from 7.2 based on Gemini recommendation:  https://gemini.google.com/share/ba5673113a82
 }
 
 def compute_solar_yield_per_ha(cf_raster, dlf_raster, mw_per_ha):
@@ -69,7 +69,7 @@ def get_quantity_renewable(data, pr: str, lm: int, yr_idx: int):
         raise KeyError(f"Unknown management type '{tech_name}' for renewable")
 
     cf = load_capacity_factor_raster(lm, data)
-    dlf = load_dlf_raster(lm, data)
+    dlf = load_dlf_raster(lm, data, data.YR_CAL_BASE + yr_idx)
 
     mw_per_ha = MGMT_CONFIG[lm_name]["gd"] / 100  # Convert MW/km^2 to MW/ha
 

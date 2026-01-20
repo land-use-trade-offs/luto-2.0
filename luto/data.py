@@ -40,6 +40,7 @@ from scipy.interpolate import interp1d
 from math import ceil
 from dataclasses import dataclass
 from scipy.ndimage import distance_transform_edt
+from settings import TIMESTEPS, RE_PATHS
 
 
 
@@ -797,14 +798,14 @@ class Data:
         ############# Capacity factor and distance loss factor rasters #################
         # Paths for capacity factor rasters
         CF_RASTER_PATHS = {
-            "Utility Solar PV": r"T:\GitHub\luto-2.0\input\RE Module\pv_capacity.tif",
-            "Onshore Wind": r"T:\GitHub\luto-2.0\input\RE Module\AUS_capacity-factor_IEC2.tif"
+            "Utility Solar PV": r"T:\GitHub\luto-2.0\input\RE Module\capacity_factor\pv_capacity.tif",
+            "Onshore Wind": r"T:\GitHub\luto-2.0\input\RE Module\capacity_factor\AUS_capacity-factor_IEC2.tif"
         }
 
         # Paths for distribution loss factor rasters
         DLF_RASTER_PATHS = {
-            "Utility Solar PV": r"T:\GitHub\luto-2.0\input\RE Module\dlf_aus_solar.tif",
-            "Onshore Wind": r"T:\GitHub\luto-2.0\input\RE Module\dlf_aus_wind.tif"
+            "Utility Solar PV": r"T:\GitHub\luto-2.0\input\RE Module\\distribution_loss_factor\{year}\transmission_loss_{year}.tif",
+            "Onshore Wind": r"T:\GitHub\luto-2.0\input\RE Module\distribution_loss_factor\{year}\transmission_loss_{year}.tif"
         }
 
         def load_capacity_factor_raster(lm: int, data) -> np.ndarray:
@@ -827,9 +828,9 @@ class Data:
                 cf_data = src.read(1)
             return cf_data.astype(np.float32)
 
-        def load_dlf_raster(lm: int, data) -> np.ndarray:
+        def load_dlf_raster(lm: int, data, year: int) -> np.ndarray:
             """
-            Load distribution loss factor raster for given land management index `lm`.
+            Load distribution loss factor raster for given land management index `lm` and `year`.
             """
             tech_name = data.LANDMANS[lm]
             if "solar" in tech_name.lower():
@@ -839,9 +840,11 @@ class Data:
             else:
                 raise KeyError(f"No distribution loss factor raster defined for management '{tech_name}'")
 
-            path = DLF_RASTER_PATHS.get(key)
-            if path is None:
-                raise FileNotFoundError(f"Distribution loss factor raster file not found for '{key}'")
+            path_template = DLF_RASTER_PATHS.get(key)
+            if path_template is None:
+                raise FileNotFoundError(f"Distribution loss factor raster file template not found for '{key}'")
+            
+            path = path_template.format(year=year)
 
             with rasterio.open(path) as src:
                 dlf_data = src.read(1)
@@ -849,7 +852,7 @@ class Data:
 
 
         ################ Load Utility solar PV data ######################
-        solar_pv_file = os.path.join(settings.INPUT_DIR, 'XXXX_Bundle_SPV.xlsx')
+        solar_pv_file = os.path.join(settings.INPUT_DIR, '20260105_Bundle_SPV.xlsx')
 
         # Validate file exists
         if not os.path.exists(solar_pv_file):
@@ -862,11 +865,14 @@ class Data:
             SOLAR_PV_CROPPING_DATA = pd.read_excel(solar_pv_file, sheet_name='Solar PV (cropping)', index_col='Year')
             SOLAR_PV_HORTICULTURE_DATA = pd.read_excel(solar_pv_file, sheet_name='Solar PV (horticulture)', index_col='Year') 
             SOLAR_PV_LIVESTOCK_DATA = pd.read_excel(solar_pv_file, sheet_name='Solar PV (livestock)', index_col='Year')
+            SOLAR_PV_UNALLOCATED_DATA = pd.read_excel(solar_pv_file, sheet_name='Solar PV (unallocated)', index_col='Year')
     
             # Validate required columns exist
-            required_columns = ['Productivity', 'Revenue', 'Annual Cost Per Ha (A$2010/yr)', 'Biodiversity_compatability']
-            for data_name, data in [('cropping', SOLAR_PV_CROPPING_DATA), ('horticulture', SOLAR_PV_HORTICULTURE_DATA), 
-                            ('livestock', SOLAR_PV_LIVESTOCK_DATA)]:
+            required_columns = ['Productivity', 'Establishment_Cost_Multiplier','OM_Cost_Multiplier','Revenue', 'Annual Cost Per Ha (A$2010/yr)', 'Biodiversity_compatability','IMPACTS_water_retention','INPUT-wrt_water-required']
+            for data_name, data in [('cropping', SOLAR_PV_CROPPING_DATA), 
+                                    ('horticulture', SOLAR_PV_HORTICULTURE_DATA),
+                                    ('livestock', SOLAR_PV_LIVESTOCK_DATA),
+                                    ('unallocated', SOLAR_PV_UNALLOCATED_DATA)]:
                 missing_cols = [col for col in required_columns if col not in data.columns]
                 if missing_cols:
                     print(f"Warning: Missing columns in {data_name} data: {missing_cols}")
@@ -884,13 +890,16 @@ class Data:
             for lu in ['Dairy - modified land', 'Beef - modified land', 'Sheep - modified land']:
                 self.SOLAR_PV_DATA[lu] = SOLAR_PV_LIVESTOCK_DATA
 
+            for lu in ['Unallocated - modified land']:
+                self.SOLAR_PV_DATA[lu] = SOLAR_PV_UNALLOCATED_DATA
+
             print(f"✓ Successfully loaded Solar PV data for {len(self.SOLAR_PV_DATA)} land use types")
     
         except Exception as e:
             raise ValueError(f"Error loading Solar PV data: {e}")
 
         ################## Load Onshore wind data ######################
-        onshore_wind_file = os.path.join(settings.INPUT_DIR, 'XXXX_Bundle_Wind.xlsx')
+        onshore_wind_file = os.path.join(settings.INPUT_DIR, '20260105_Bundle_Wind.xlsx')
 
         # Validate file exists
         if not os.path.exists(onshore_wind_file):
@@ -903,12 +912,14 @@ class Data:
             ONSHORE_WIND_CROPPING_DATA = pd.read_excel(onshore_wind_file, sheet_name='Onshore Wind (cropping)', index_col='Year')
             ONSHORE_WIND_HORTICULTURE_DATA = pd.read_excel(onshore_wind_file, sheet_name='Onshore Wind (horticulture)', index_col='Year') 
             ONSHORE_WIND_LIVESTOCK_DATA = pd.read_excel(onshore_wind_file, sheet_name='Onshore Wind (livestock)', index_col='Year')
+            ONSHORE_WIND_UNALLOCATED_DATA = pd.read_excel(onshore_wind_file, sheet_name='Onshore Wind (unallocated)', index_col='Year')
 
             # Validate required columns exist
-            required_columns = ['Productivity', 'Revenue', 'Annual Cost Per Ha (A$2010/yr)', 'Biodiversity_compatability']
+            required_columns = ['Productivity', 'Establishment_Cost_Multiplier','OM_Cost_Multiplier','Revenue', 'Annual Cost Per Ha (A$2010/yr)', 'Biodiversity_compatability','IMPACTS_water_retention','INPUT-wrt_water-required']
             for data_name, data in [('cropping', ONSHORE_WIND_CROPPING_DATA), 
                                 ('horticulture', ONSHORE_WIND_HORTICULTURE_DATA), 
-                                ('livestock', ONSHORE_WIND_LIVESTOCK_DATA)]:
+                                ('livestock', ONSHORE_WIND_LIVESTOCK_DATA)
+                                ('unallocated', ONSHORE_WIND_UNALLOCATED_DATA)]:
                 missing_cols = [col for col in required_columns if col not in data.columns]
                 if missing_cols:
                     print(f"Warning: Missing columns in {data_name} wind data: {missing_cols}")
@@ -925,6 +936,9 @@ class Data:
             
             for lu in ['Dairy - modified land', 'Beef - modified land', 'Sheep - modified land']:
                 self.ONSHORE_WIND_DATA[lu] = ONSHORE_WIND_LIVESTOCK_DATA
+
+            for lu in ['Unallocated - modified land']:
+                self.ONSHORE_WIND_DATA[lu] = ONSHORE_WIND_UNALLOCATED_DATA
 
             print(f"✓ Successfully loaded onshore wind data for {len(self.ONSHORE_WIND_DATA)} land use types")
 
