@@ -26,8 +26,9 @@ import luto.settings as settings
 from typing import Dict
 from scipy.interpolate import interp1d
 
-### Quantification of electricity yields from renewable energy land management strategies ###
-from luto.data import load_capacity_factor_raster, load_dlf_raster
+# ---------------------------------------------------------------------------
+# RE Quantity Configuration
+# ---------------------------------------------------------------------------
 
 MGMT_TO_PRODUCT = {
     "Utility Solar PV": "UTILITY SOLAR PV - ELECTRICITY",
@@ -35,9 +36,14 @@ MGMT_TO_PRODUCT = {
 }
 
 MGMT_CONFIG = {
-    "Utility Solar PV": {"gd": 45},  # MW/km^2 for Utility Solar PV. Reduced from 150 based on Gemini recommendation: https://gemini.google.com/share/ba5673113a82
-    "Onshore Wind": {"gd": 4},    # MW/km^2 for Onshore Wind. Reduced from 7.2 based on Gemini recommendation:  https://gemini.google.com/share/ba5673113a82
+    # MW/km^2. Reduced based on recommendations.
+    "Utility Solar PV": {"gd": 45}, # 45 MW/km^2
+    "Onshore Wind": {"gd": 4},  # 4 MW/km^2
 }
+
+# ---------------------------------------------------------------------------
+# RE Quantity Calculation Helper Functions
+# ---------------------------------------------------------------------------
 
 def compute_solar_yield_per_ha(cf_raster, dlf_raster, mw_per_ha):
     """
@@ -53,13 +59,20 @@ def compute_wind_yield_per_ha(cf_raster, dlf_raster, mw_per_ha):
     hours = 8760
     return mw_per_ha * cf_raster * hours * (1 - dlf_raster)
 
+# ---------------------------------------------------------------------------
+# RE Quantity Calculation Functions
+# ---------------------------------------------------------------------------
+
 def get_quantity_renewable(data, pr: str, lm: int, yr_idx: int):
     """
-    Return electricity yield [MWh] for renewable product `pr` under management index `lm` for year index `yr_idx`.
+    Return electricity yield [MWh] for renewable product `pr` under management 
+    index `lm` for year index `yr_idx`.
     """
+    # 1. Validation
     if pr not in ["UTILITY SOLAR PV - ELECTRICITY", "ONSHORE WIND - ELECTRICITY"]:
         raise KeyError(f"Unknown renewable product '{pr}'")
 
+    # 2. Identify Management Name
     tech_name = data.LANDMANS[lm]
     if "solar" in tech_name.lower():
         lm_name = "Utility Solar PV"
@@ -68,19 +81,40 @@ def get_quantity_renewable(data, pr: str, lm: int, yr_idx: int):
     else:
         raise KeyError(f"Unknown management type '{tech_name}' for renewable")
 
-    cf = load_capacity_factor_raster(lm, data)
-    dlf = load_dlf_raster(lm, data, data.YR_CAL_BASE + yr_idx)
+    # 3. Retrieve Pre-loaded Data
+    # Calculate the actual simulation year (e.g., 2025) to look up dynamic data
+    current_year = data.YR_CAL_BASE + yr_idx
 
+    # A. Capacity Factor (Static)
+    # We access the dictionary created in Data.__init__
+    try:
+        cf = data.cf_static[lm_name]
+    except KeyError:
+        raise KeyError(f"Capacity Factor data missing for {lm_name} in data.cf_static")
+
+    # B. Distribution Loss Factor (Dynamic)
+    # We access the dictionary keyed by Year
+    try:
+        dlf = data.dlf_dynamic[current_year]
+    except KeyError:
+        raise KeyError(f"DLF data missing for year {current_year} in data.dlf_dynamic")
+
+    # 4. Determine Generation Density
     mw_per_ha = MGMT_CONFIG[lm_name]["gd"] / 100  # Convert MW/km^2 to MW/ha
 
+    # 5. Compute Yield per Hectare
     if lm_name == "Utility Solar PV":
         yield_per_ha = compute_solar_yield_per_ha(cf, dlf, mw_per_ha)
     elif lm_name == "Onshore Wind":
         yield_per_ha = compute_wind_yield_per_ha(cf, dlf, mw_per_ha)
     else:
-        raise KeyError(f"Unknown land management name '{lm_name}' for renewable yield")
+        # Should be caught above, but safe fallback
+        raise KeyError(f"Unknown land management name '{lm_name}'")
 
+    # 6. Convert to Total Yield (MWh)
+    # Multiply by the cell area (ha)
     quantity = yield_per_ha * data.REAL_AREA
+    
     return quantity.astype(np.float32)
 
 #Main function to pull yield raster for a given management type

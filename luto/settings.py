@@ -124,7 +124,6 @@ RESFACTOR = 13      # set to 1 to run at full spatial resolution, > 1 to run at 
 # The step size for the temporal domain (years)
 SIM_YEARS =  list(range(2020,2051,10))
 
-
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
 # OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)

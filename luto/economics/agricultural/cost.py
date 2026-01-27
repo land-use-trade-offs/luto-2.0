@@ -188,29 +188,97 @@ def get_cost_lvstk(data:Data, lu, lm, yr_idx):
         )
     )
 
-def get_cost(data:Data, lu, lm, yr_idx):
-    """Return production cost <unit: $/cell> of `lu`+`lm` in `yr_idx` as np array.
+# ---------------------------------------------------------------------------
+# Renewable Energy Cost Calculator
+# ---------------------------------------------------------------------------
 
-    Args:
-        data (object/module): Data object or module. Assumes fields like in `luto.data`.
-        lu (str): Land use (e.g. 'Winter cereals').
-        lm (str): Land management (e.g. 'dry', 'irr', 'org').
-        yr_idx (int): Number of years post base-year ('YR_CAL_BASE').
-
-    Returns
-        np.array: Production cost <unit: $/cell> of `lu`+`lm` in `yr_idx`.
-
-    Raises:
-        KeyError: If land use `lu` is not found in `data.LANDUSES`.
+def get_cost_renewable(data: Data, lu, lm, yr_idx):
     """
-    # If it is a crop, it is known how to get the costs.
+    Return renewable energy production cost [AUD/cell] of `lm` in `yr_idx`.
+    
+    Retrieves dynamic CAPEX and OPEX rasters loaded in data.py.
+    """
+    yr_cal = data.YR_CAL_BASE + yr_idx
+    tech_name = data.LANDMANS[lm]
+    
+    # A. Identify Technology & Retrieve Dynamic Data
+    # ------------------------------------------------------------------
+    if "solar" in tech_name.lower():
+        tech_key = "Utility Solar PV"
+        # Access dynamic dictionaries created in data.py
+        try:
+            capex_map = data.solar_capex_dynamic[yr_cal]
+            opex_map = data.solar_opex_dynamic[yr_cal]
+        except KeyError:
+             raise KeyError(f"Missing Solar cost data for year {yr_cal}")
+             
+    elif "wind" in tech_name.lower():
+        tech_key = "Onshore Wind"
+        try:
+            capex_map = data.wind_capex_dynamic[yr_cal]
+            opex_map = data.wind_opex_dynamic[yr_cal]
+        except KeyError:
+             raise KeyError(f"Missing Wind cost data for year {yr_cal}")
+    else:
+        # Fallback for safety
+        return pd.DataFrame(
+            np.zeros((data.NCELLS, 2)), 
+            columns=pd.MultiIndex.from_product([[lu], [lm], ['Establishment cost', 'Operating cost']])
+        )
+
+    # B. Calculate Costs per Cell
+    # ------------------------------------------------------------------
+    # Input maps are usually $/ha. Convert to $/cell.
+    # We use numpy masking to ensure we don't multiply NaNs.
+    
+    # Establishment (CAPEX)
+    cost_est = capex_map * data.REAL_AREA
+    cost_est = np.nan_to_num(cost_est, nan=0.0).astype(np.float32)
+
+    # Operating (OPEX)
+    cost_op = opex_map * data.REAL_AREA
+    cost_op = np.nan_to_num(cost_op, nan=0.0).astype(np.float32)
+
+    # C. Format Output
+    # ------------------------------------------------------------------
+    costs_stacked = np.stack([cost_est, cost_op]).T
+    
+    return pd.DataFrame(
+        costs_stacked,
+        columns=pd.MultiIndex.from_product([
+            [lu], 
+            [lm], 
+            ['Establishment cost', 'Operating cost']
+        ])
+    )
+
+def get_cost(data:Data, lu, lm, yr_idx):
+    """
+    Return production cost <unit: $/cell>.
+    Updated to handle Renewable Energy and Unallocated Lands.
+    """
+    
+    # 1. Check for Renewable Energy
+    # -----------------------------------------------------------
+    lm_name = data.LANDMANS[lm]
+    if lm_name in ["Utility Solar PV", "Onshore Wind"]:
+        return get_cost_renewable(data, lu, lm, yr_idx)
+
+    # 2. Check for Crops
+    # -----------------------------------------------------------
     if lu in data.LU_CROPS:
         return get_cost_crop(data, lu, lm, yr_idx)
 
+    # 3. Check for Livestock
+    # -----------------------------------------------------------
     elif lu in data.LU_LVSTK:
         return get_cost_lvstk(data, lu, lm, yr_idx)
 
-    elif lu in data.AGRICULTURAL_LANDUSES:
+    # 4. Handle Unallocated / Non-Production Lands
+    # -----------------------------------------------------------
+    # Explicitly return zero cost DataFrame for valid LUTO land uses
+    # that don't produce ag commodities (like Unallocated).
+    elif lu in data.AGRICULTURAL_LANDUSES or "Unallocated" in lu:
         return pd.DataFrame(
             np.zeros(data.NCELLS),
             columns=pd.MultiIndex.from_product([[lu], [lm], ['Area cost']])
@@ -525,78 +593,87 @@ def get_sheep_hir_effect_c_mrj(data: Data, yr_idx: int):
 
 def get_utility_solar_pv_effect_c_mrj(data: Data, c_mrj, yr_idx):
     """
-    Applies Utility Solar PV cost effects separately for establishment and O&M to the cost data.
+    Applies Utility Solar PV cost effects.
+    Calculates: (Base Ag Cost * Multiplier) + (Solar CAPEX + OPEX)
     """
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Utility Solar PV']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
     yr_cal = data.YR_CAL_BASE + yr_idx
 
-    # Initialize new effects matrix
     new_c_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
 
     if not settings.AG_MANAGEMENTS['Utility Solar PV']:
         return new_c_mrj
 
-    for j_idx, lu in enumerate(land_uses):
-        # Retrieve multipliers (use 1.0 if missing)
-        est_mult = data.UTILITY_SOLAR_PV_DATA[lu].loc[yr_cal, 'Establishment_Cost_Multiplier']
-        est_mult = est_mult if not np.isnan(est_mult) else 1.0
+    # Identify Solar Index for the helper function
+    try:
+        solar_lm_idx = data.LANDMANS.index('Utility Solar PV')
+    except ValueError:
+        raise ValueError("'Utility Solar PV' not found in data.LANDMANS")
 
+    for lu_idx, lu in enumerate(land_uses):
+        # A. Agricultural Cost Delta
+        # -------------------------------------------------------
+        # We assume the multiplier applies to the aggregated base cost (c_mrj)
+        # since robust decomposition into Est/OM components is not guaranteed.
+        
+        # Use OM multiplier as proxy for general annual cost adjustment
         om_mult = data.UTILITY_SOLAR_PV_DATA[lu].loc[yr_cal, 'OM_Cost_Multiplier']
         om_mult = om_mult if not np.isnan(om_mult) else 1.0
+        
+        j = lu_codes[lu_idx]
+        ag_cost_delta = c_mrj[:, :, j] * (om_mult - 1)
 
-        # Decompose original cost into establishment and O&M if possible
-        # For illustration, assume access to base components:
-        # c_mrj_est = establishment cost component
-        # c_mrj_om = O&M cost component
-        c_mrj_est = data.BASE_EST_COST[lu_codes[j_idx]]  # Shape: (NLMS, NCELLS)
-        c_mrj_om = data.BASE_OM_COST[lu_codes[j_idx]]    # Shape: (NLMS, NCELLS)
+        # B. Renewable Cost Addition
+        # -------------------------------------------------------
+        # Get total RE cost (Est + Op) per cell
+        re_cost_df = get_cost_renewable(data, lu, solar_lm_idx, yr_idx)
+        
+        # Sum columns (Est + Op) to get total financial cost per cell
+        re_total_cost = re_cost_df.sum(axis=1).values.astype(np.float32)
 
-        # Apply multipliers individually
-        adj_est = c_mrj_est * est_mult
-        adj_om = c_mrj_om * om_mult
-
-        # Sum to get total adjusted cost
-        new_c_mrj[:, :, j_idx] = adj_est + adj_om
+        # C. Combine
+        # -------------------------------------------------------
+        total_effect = ag_cost_delta + re_total_cost[np.newaxis, :]
+        new_c_mrj[:, :, lu_idx] = total_effect
 
     return new_c_mrj
 
 
 def get_onshore_wind_effect_c_mrj(data: Data, c_mrj, yr_idx):
     """
-    Applies Onshore Wind cost effects separately for establishment and O&M to the cost data.
+    Applies Onshore Wind cost effects.
+    Calculates: (Base Ag Cost * Multiplier) + (Wind CAPEX + OPEX)
     """
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Onshore Wind']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
     yr_cal = data.YR_CAL_BASE + yr_idx
 
-    # Initialize new effects matrix
     new_c_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
 
     if not settings.AG_MANAGEMENTS['Onshore Wind']:
         return new_c_mrj
 
-    for j_idx, lu in enumerate(land_uses):
-        # Retrieve multipliers (use 1.0 if missing)
-        est_mult = data.ONSHORE_WIND_DATA[lu].loc[yr_cal, 'Establishment_Cost_Multiplier']
-        est_mult = est_mult if not np.isnan(est_mult) else 1.0
+    try:
+        wind_lm_idx = data.LANDMANS.index('Onshore Wind')
+    except ValueError:
+        raise ValueError("'Onshore Wind' not found in data.LANDMANS")
 
+    for lu_idx, lu in enumerate(land_uses):
+        # A. Ag Cost Delta
         om_mult = data.ONSHORE_WIND_DATA[lu].loc[yr_cal, 'OM_Cost_Multiplier']
         om_mult = om_mult if not np.isnan(om_mult) else 1.0
+        
+        j = lu_codes[lu_idx]
+        ag_cost_delta = c_mrj[:, :, j] * (om_mult - 1)
 
-        # Decompose original cost into establishment and O&M if possible
-        # For illustration, assume access to base components:
-        # c_mrj_est = establishment cost component
-        # c_mrj_om = O&M cost component
-        c_mrj_est = data.BASE_EST_COST[lu_codes[j_idx]]  # Shape: (NLMS, NCELLS)
-        c_mrj_om = data.BASE_OM_COST[lu_codes[j_idx]]    # Shape: (NLMS, NCELLS)
+        # B. RE Cost Addition
+        re_cost_df = get_cost_renewable(data, lu, wind_lm_idx, yr_idx)
+        re_total_cost = re_cost_df.sum(axis=1).values.astype(np.float32)
 
-        # Apply multipliers individually
-        adj_est = c_mrj_est * est_mult
-        adj_om = c_mrj_om * om_mult
-
-        # Sum to get total adjusted cost
-        new_c_mrj[:, :, j_idx] = adj_est + adj_om
+        # C. Combine
+        total_effect = ag_cost_delta + re_total_cost[np.newaxis, :]
+        new_c_mrj[:, :, lu_idx] = total_effect
 
     return new_c_mrj
 

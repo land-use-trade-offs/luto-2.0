@@ -36,17 +36,20 @@ import luto.data as Data
 from data import load_establishment_cost_raster
 
 # Renewable energy eligibility criteria where establishment costs are non-zero
-def eligibility_by_establishment_cost(data: Data, lm: int):
+import numpy as np
+
+def eligibility_by_establishment_cost(data, lm: int):
     """
     Returns a Boolean mask indicating eligibility for the renewable energy technology 
     corresponding to the given land management index.
 
-    Eligibility is based on non-zero establishment costs in the corresponding raster.
+    Eligibility is based on non-zero establishment costs in the corresponding raster
+    (using the base year of the dynamic dataset).
     
     Parameters
     ----------
     data : Data
-        The main data object containing land management descriptions.
+        The main data object containing land management descriptions and dynamic cost dictionaries.
     lm : int
         Land management index representing renewable technology.
     
@@ -56,15 +59,35 @@ def eligibility_by_establishment_cost(data: Data, lm: int):
         Boolean mask raster of technological establishment eligibility.
     """
     tech_name = data.LANDMANS[lm]
+    
+    # 1. Determine which dynamic dictionary to access
     if 'solar' in tech_name.lower():
-        tech_key = 'Utility Solar PV'
+        # Access the dictionary created in Data.__init__
+        cost_dict = data.solar_capex_dynamic
     elif 'wind' in tech_name.lower():
-        tech_key = 'Onshore Wind'
+        # Access the dictionary created in Data.__init__
+        cost_dict = data.wind_capex_dynamic
     else:
         raise ValueError(f"Unknown renewable technology for land management '{tech_name}'")
 
-    cost_raster = load_establishment_cost_raster(tech_key)
-    eligible_mask = (cost_raster > 0) & (~np.isnan(cost_raster))
+    # 2. Retrieve a Representative Cost Raster
+    # Since we are defining spatial eligibility (where is it physically possible?),
+    # we use the data from the start of the simulation (Base Year).
+    # We find the minimum year key available in the dictionary.
+    base_year = min(cost_dict.keys())
+    
+    # Retrieve the xarray/numpy array for that year
+    cost_raster = cost_dict[base_year]
+
+    # 3. Create Validity Mask
+    # Check for Non-Zero and Non-NaN values
+    # Note: If cost_raster is an xarray, .values ensures we work with the raw numpy array
+    if hasattr(cost_raster, 'values'):
+        vals = cost_raster.values
+    else:
+        vals = cost_raster
+
+    eligible_mask = (vals > 0) & (~np.isnan(vals))
 
     return eligible_mask
 
