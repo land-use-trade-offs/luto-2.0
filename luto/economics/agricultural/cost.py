@@ -618,7 +618,7 @@ def get_utility_solar_pv_effect_c_mrj(data: Data, c_mrj, yr_idx):
         # since robust decomposition into Est/OM components is not guaranteed.
         
         # Use OM multiplier as proxy for general annual cost adjustment
-        om_mult = data.UTILITY_SOLAR_PV_DATA[lu].loc[yr_cal, 'OM_Cost_Multiplier']
+        om_mult = data.RENEWABLE_BUNDLE_SOLAR.query('Year == @yr_cal and Commodity == @lu')['OM_Cost_Multiplier'].item()
         om_mult = om_mult if not np.isnan(om_mult) else 1.0
         
         j = lu_codes[lu_idx]
@@ -661,7 +661,7 @@ def get_onshore_wind_effect_c_mrj(data: Data, c_mrj, yr_idx):
 
     for lu_idx, lu in enumerate(land_uses):
         # A. Ag Cost Delta
-        om_mult = data.ONSHORE_WIND_DATA[lu].loc[yr_cal, 'OM_Cost_Multiplier']
+        om_mult = data.RENEWABLE_BUNDLE_WIND.query('Year == @yr_cal and Commodity == @lu')['OM_Cost_Multiplier'].item()
         om_mult = om_mult if not np.isnan(om_mult) else 1.0
         
         j = lu_codes[lu_idx]

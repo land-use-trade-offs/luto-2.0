@@ -587,7 +587,7 @@ def get_utility_solar_pv_effect_r_mrj(data: Data, r_mrj, yr_idx):
     for lu_idx, lu in enumerate(land_uses):
         # A. Calculate Agricultural Revenue Adjustment (The Penalty/Multiplier)
         # -------------------------------------------------------------------
-        revenue_multiplier = data.UTILITY_SOLAR_PV_DATA[lu].loc[yr_cal, 'Revenue']
+        revenue_multiplier = data.RENEWABLE_BUNDLE_SOLAR.query('Year == @yr_cal and Commodity == @lu')['Revenue'].item()
         j = lu_codes[lu_idx]
         
         # Calculate the delta: Base * (Multiplier - 1)
@@ -637,7 +637,7 @@ def get_onshore_wind_effect_r_mrj(data: Data, r_mrj, yr_idx):
     # Update values
     for lu_idx, lu in enumerate(land_uses):
         # A. Agricultural Adjustment
-        revenue_multiplier = data.ONSHORE_WIND_DATA[lu].loc[yr_cal, 'Revenue']
+        revenue_multiplier = data.RENEWABLE_BUNDLE_WIND.query('Year == @yr_cal and Commodity == @lu')['Revenue'].item()
         j = lu_codes[lu_idx]
         
         ag_revenue_delta = r_mrj[:, :, j] * (revenue_multiplier - 1)

@@ -41,7 +41,6 @@ from scipy.interpolate import interp1d
 from math import ceil
 from dataclasses import dataclass
 from scipy.ndimage import distance_transform_edt
-from settings import SIM_YEARS
 
 
 
@@ -447,6 +446,13 @@ class Data:
         self.REGION_NRM_CODE = REGION_NRM_r['NRM_CODE']
         self.REGION_NRM_NAME = REGION_NRM_r['NRM_NAME']
         
+        REGION_STATE_r = pd.read_hdf(
+            os.path.join(settings.INPUT_DIR, "REGION_STATE_r.h5"), where=self.MASK
+        )
+        
+        self.REGION_STATE_CODE = REGION_STATE_r['STE_CODE11']
+        self.REGION_STATE_NAME = REGION_STATE_r['STE_NAME11']
+        
 
         ###############################################################
         # No-Go areas; Regional adoption constraints.
@@ -680,381 +686,26 @@ class Data:
             # Horticulture land uses
             self.BIOCHAR_DATA[lu] = horticulture_data
 
-        # ----------------------------------------------------------------
-        # RENEWABLE ENERGY DATA LOADING 
-        # ----------------------------------------------------------------
+
+
+        # #########################################################
+        # RENEWABLE ENERGY DATA LOADING                           #
+        # #########################################################
         print("\tLoading renewable energy data...", flush=True)
-                
-        # 1. Setup Directories
 
-        # RE module input directory
-        RE_INPUT_DIR = os.path.join(settings.INPUT_DIR, "RE Module")
+        # Renewable targets and prices
+        re_targets = pd.read_csv(f'{settings.INPUT_DIR}/renewable_targets.csv')
+        re_prices = pd.read_csv(f'{settings.INPUT_DIR}/renewable_elec_price_AUD_MWh.csv')
         
-        # NRM - State - ISP mapping path
-        NRM_MAPPING_PATH = os.path.join(RE_INPUT_DIR, "nrm_isp_zone_mapping.csv")
-
-        def _generate_state_raster(self):
-            """
-            Generates a State Index Raster by bridging:
-            NRM_CODE (H5) -> NRM_NAME (H5) -> STATE (CSV) -> PRICE_INDEX (Price CSV)
-            """
-        print("\tGenerating State Index Map for Electricity...", flush=True)
-
-        # -------------------------------------------------------------
-        # NRM-to-State Mapping
-        # -------------------------------------------------------------
-        if not os.path.exists(settings.NRM_MAPPING_PATH):
-             raise FileNotFoundError(f"NRM Mapping not found: {settings.NRM_MAPPING_PATH}")
-        
-        map_df = pd.read_csv(settings.NRM_MAPPING_PATH)
-        
-        # Create Dictionary: Name -> State (e.g. {'Burdekin': 'QLD'})
-        # Normalize strings (strip whitespace, uppercase) to ensure matches
-        map_df['Region Name'] = map_df['Region Name'].str.strip().str.upper()
-        map_df['State'] = map_df['State'].str.strip().str.upper()
-        
-        nrm_name_to_state = pd.Series(
-            map_df.State.values, 
-            index=map_df['Region Name']
-        ).to_dict()
-
-        # Identify Target State Indices from Price Data
-        # -------------------------------------------------------------
-        # e.g. {'QLD': 0, 'NSW': 1, 'VIC': 2...}
-        valid_states = list(self.ELECTRICITY_PRICES.columns)
-        state_to_idx = {s.strip().upper(): i for i, s in enumerate(valid_states)}
-        
-        # Build Lookup: NRM_CODE (Int) -> STATE_INDEX (Int)
-        # -------------------------------------------------------------
-        # We need to link the Codes in your H5 to the Names in your H5
-        
-        # Create a temporary DataFrame of the unique codes/names present in the model
-        # using the data you already loaded in __init__
-        unique_regions = pd.DataFrame({
-            'CODE': self.REGION_NRM_CODE,
-            'NAME': self.REGION_NRM_NAME
-        }).drop_duplicates()
-
-        # Initialize Lookup Array
-        # Size = Max Code + 1. Fill with -1 (No Data).
-        max_id = int(unique_regions['CODE'].max()) + 1
-        lookup_array = np.full(max_id, -1, dtype=np.int32)
-
-        for _, row in unique_regions.iterrows():
-            code = int(row['CODE'])
-            name_raw = str(row['NAME']).strip().upper()
-            
-            # Step A: Get State String from User CSV
-            state_str = nrm_name_to_state.get(name_raw)
-            
-            if state_str:
-                # Step B: Get State Index from Price Columns
-                state_idx = state_to_idx.get(state_str)
-                
-                if state_idx is not None:
-                    lookup_array[code] = state_idx
-                else:
-                    # State exists in mapping but not in Price file (e.g. 'External')
-                    pass
-            else:
-                # Region name in H5 not found in Mapping CSV
-                print(f"Warning: NRM Region '{name_raw}' (Code {code}) not found in mapping CSV.")
-
-        # Create the Raster
-        # -------------------------------------------------------------
-        # Apply the lookup to the integer code raster
-        # self.REGION_NRM_CODE is the array of codes from the H5
-        self.state_raster = lookup_array[self.REGION_NRM_CODE.values.astype(int)]
-        
-        # Ensure consistency with model mask
-        # (Assuming -1 indicates invalid/no price)
-        # If your model requires 0 for no data, adjust 'np.full' above.
-
-        # -------------------------------------------------------------
-        ##### DYNAMIC DATA LOADING #####
-        # -------------------------------------------------------------
-
-        # Define RE sub-directories
-        self.RE_DIRS = {
-            'capex': os.path.join(RE_INPUT_DIR, 'capex'),
-            'opex': os.path.join(RE_INPUT_DIR, 'opex'),
-            'dlf': os.path.join(RE_INPUT_DIR, 'distribution_loss_factor'),
-            'cf': os.path.join(RE_INPUT_DIR, 'capacity_factor')
-        }
-        # 1. Loading Static Files
-        # Load mapping of NRM regions to ISP zones
-        NRM_MAPPING_PATH = os.path.join(RE_INPUT_DIR, "nrm_isp_zone_mapping.csv")
-        # Load Electricity Prices (Result: Index=Year, Cols=State Strings)
-        self.ELEC_PRICE_PATH = os.path.join(RE_INPUT_DIR, 'elec_price_forecast.csv')
-        self.ELECTRICITY_PRICES = self._load_electricity_prices()
-
-        # 2. Setup Path Templates & Static Paths
-        # -- Cost Paths --
-        self.ESTABLISHMENT_COST_PATHS = {
-            "Utility Solar PV": os.path.join(self.RE_DIRS['capex'], "establishment_cost_solar_{year}.tif"),
-            "Onshore Wind": os.path.join(self.RE_DIRS['capex'], "establishment_cost_wind_{year}.tif"),
-        }
-        
-        self.OM_COST_PATHS = {
-            "Utility Solar PV": os.path.join(self.RE_DIRS['opex'], "om_cost_solar.tif"),
-            "Onshore Wind": os.path.join(self.RE_DIRS['opex'], "om_cost_wind.tif"),
-        }
-
-        # -- Yield Paths (DLF & Capacity Factor) --
-        self.DLF_RASTER_PATHS = {
-            'Utility Solar PV': os.path.join(self.RE_DIRS['dlf'], 'transmission_loss_{year}.tif'),
-            'Onshore Wind': os.path.join(self.RE_DIRS['dlf'], 'transmission_loss_{year}.tif')
-        }
-
-        self.CF_RASTER_PATHS = {
-            'Utility Solar PV': os.path.join(self.RE_DIRS['cf'], 'capacity_factor_solar.tif'),
-            'Onshore Wind': os.path.join(self.RE_DIRS['cf'], 'capacity_factor_wind.tif')
-        }
-
-        # 3. Initialize Storage Dictionaries
-        # Structure: { Year : np.ndarray (Masked) }
-        self.solar_capex_dynamic = {}
-        self.wind_capex_dynamic = {}
-        self.solar_opex_dynamic = {} 
-        self.wind_opex_dynamic = {}
-        self.dlf_dynamic = {} 
-        
-        # Structure: { Tech : np.ndarray (Masked) } -> Static Capacity Factors
-        self.cf_static = {} 
-
-        # 4. Load Static Data (Capacity Factors)
-        # These are generally static layers, loaded once.
-        self.cf_static['Utility Solar PV'] = self._load_capacity_factor_raster("Utility Solar PV")
-        self.cf_static['Onshore Wind'] = self._load_capacity_factor_raster("Onshore Wind")
-
-        # 5. Execution Loop: Iterate TIMESTEPS and load dynamic data
-        for year in TIMESTEPS:
-            # --- Load Solar Costs ---
-            self.solar_capex_dynamic[year] = self._load_establishment_cost_raster("Utility Solar PV", year)
-            self.solar_opex_dynamic[year]  = self._load_om_cost_raster("Utility Solar PV") 
-            
-            # --- Load Wind Costs ---
-            self.wind_capex_dynamic[year] = self._load_establishment_cost_raster("Onshore Wind", year)
-            self.wind_opex_dynamic[year]  = self._load_om_cost_raster("Onshore Wind")
-
-            # --- Load DLF (Distribution Loss Factors) ---
-            # Stored by year. We assume the path is the same for both techs per year.
-            # If they diverge later, you can split this into solar_dlf and wind_dlf.
-            self.dlf_dynamic[year] = self._load_dlf_raster("Utility Solar PV", year)
-
-        # ----------------------------------------------------------------
-        # FILE LOADING HELPERS
-        # ----------------------------------------------------------------
-
-        def _load_electricity_prices(self):
-            """
-            Loads state-based electricity prices.
-            1. Reads CSV.
-            2. Filters for 'Electricity' sector (safety check).
-            3. Converts units from c/kWh to $/MWh (x10).
-            4. Transposes so Year is the Index.
-            """
-            if not os.path.exists(self.ELEC_PRICE_PATH):
-                raise FileNotFoundError(f"Electricity price forecast not found: {self.ELEC_PRICE_PATH}")
-
-            # 1. Read CSV
-            df = pd.read_csv(self.ELEC_PRICE_PATH)
-
-            # 2. Filter (Optional safety if CSV contains other sectors)
-            if 'Sector' in df.columns:
-                df = df[df['Sector'] == 'Electricity']
-
-            # 3. Set Index to State for filtering
-            # We assume 'State' column contains 'QLD', 'NSW', etc.
-            df = df.set_index('State')
-
-            # 4. Clean Columns
-            # Keep only year columns (numeric). Drop metadata like Name, Unit, Sector.
-            year_cols = [c for c in df.columns if str(c).isdigit()]
-            df = df[year_cols]
-
-            # 5. Convert Units
-            # Input: c/kWh. Output: $/MWh.
-            # Factor: 10 (0.01 $/c * 1000 kWh/MWh)
-            df = df.astype(float) * 10.0
-
-            # 6. Transpose
-            # Result: Index = Years (Integers), Columns = States
-            df = df.T
-            df.index = df.index.astype(int)
-
-            return df
+        # Renewable energy ralated raster layers
+        re_layers = xr.load_dataset(f'{settings.INPUT_DIR}/renewable_energy_layers_1D.nc')
     
-        def load_establishment_cost_raster(self, tech_key, year):
-            """Loads establishment cost raster using path templates."""
-            path_template = self.ESTABLISHMENT_COST_PATHS.get(tech_key)
-            if not path_template:
-                raise ValueError(f"Establishment cost path not found for: {tech_key}")
-                
-            path = path_template.format(year=year)
-            
-            if not os.path.exists(path):
-                raise FileNotFoundError(f"Establishment cost raster not found: {path}")
-            
-            with rasterio.open(path) as src:
-                cost_array = src.read(1).astype(np.float32)
-
-            return self._apply_resfactor_and_mask(cost_array)
-
-        def load_om_cost_raster(self, tech_key):
-            """Loads O&M cost, with fallback to calculation if missing."""
-            path = self.OM_COST_PATHS.get(tech_key)
-            
-            # Logic: If file missing, calculate from Capex (using base year)
-            if not path or not os.path.exists(path):
-                print(f"O&M raster missing for {tech_key}. Calculating % of CAPEX...")
-                base_year = TIMESTEPS[0]
-                # Recursive call to get the base cost map
-                est_cost = self._load_establishment_cost_raster(tech_key, base_year)
-                om_percentage = 0.015 if "Solar" in tech_key else 0.02
-                return est_cost * om_percentage
-            
-            with rasterio.open(path) as src:
-                cost_array = src.read(1).astype(np.float32)
-                
-            return self._apply_resfactor_and_mask(cost_array)
-
-        def load_dlf_raster(self, tech_key, year):
-            """Loads DLF raster based on tech and year."""
-            path_template = self.DLF_RASTER_PATHS.get(tech_key)
-            if not path_template:
-                raise ValueError(f"DLF path template not found for: {tech_key}")
-
-            path = path_template.format(year=year)
-            
-            if not os.path.exists(path):
-                raise FileNotFoundError(f"DLF raster not found: {path}")
-
-            with rasterio.open(path) as src:
-                dlf_data = src.read(1).astype(np.float32)
-
-            return self._apply_resfactor_and_mask(dlf_data)
-
-        def load_capacity_factor_raster(self, tech_key):
-            """Loads static Capacity Factor raster."""
-            path = self.CF_RASTER_PATHS.get(tech_key)
-            if not path:
-                raise ValueError(f"Capacity factor path not found for: {tech_key}")
-            
-            if not os.path.exists(path):
-                raise FileNotFoundError(f"Capacity factor raster file not found: {path}")
-
-            with rasterio.open(path) as src:
-                cf_data = src.read(1).astype(np.float32)
-                
-            return self._apply_resfactor_and_mask(cf_data)
-
-        def apply_resfactor_and_mask(self, array):
-            """Centralized resfactoring logic to avoid code duplication."""
-            if settings.RESFACTOR > 1:
-                # Slicing logic: downsample by RESFACTOR/2 steps
-                resfactored = array[
-                    ::int(settings.RESFACTOR/2), 
-                    ::int(settings.RESFACTOR/2)
-                ]
-                # Apply the model mask (self.MASK must be defined in Data.__init__)
-                return resfactored[self.MASK]
-            else:
-                return array[self.MASK]
-            
-        ################ Load Utility solar PV multipliers ######################
-        solar_pv_file = os.path.join(settings.INPUT_DIR, '20260105_Bundle_SPV.xlsx')
-
-        # Validate file exists
-        if not os.path.exists(solar_pv_file):
-            raise FileNotFoundError(f"Solar PV data file not found: {solar_pv_file}")
-
-        self.SOLAR_PV_DATA = {}
-
-        try:
-            # Load with explicit error handling
-            SOLAR_PV_CROPPING_DATA = pd.read_excel(solar_pv_file, sheet_name='Solar PV (cropping)', index_col='Year')
-            SOLAR_PV_HORTICULTURE_DATA = pd.read_excel(solar_pv_file, sheet_name='Solar PV (horticulture)', index_col='Year') 
-            SOLAR_PV_LIVESTOCK_DATA = pd.read_excel(solar_pv_file, sheet_name='Solar PV (livestock)', index_col='Year')
-            SOLAR_PV_UNALLOCATED_DATA = pd.read_excel(solar_pv_file, sheet_name='Solar PV (unallocated)', index_col='Year')
-    
-            # Validate required columns exist
-            required_columns = ['Productivity', 'Establishment_Cost_Multiplier','OM_Cost_Multiplier','Revenue', 'Annual Cost Per Ha (A$2010/yr)', 'Biodiversity_compatability','IMPACTS_water_retention','INPUT-wrt_water-required']
-            for data_name, data in [('cropping', SOLAR_PV_CROPPING_DATA), 
-                                    ('horticulture', SOLAR_PV_HORTICULTURE_DATA),
-                                    ('livestock', SOLAR_PV_LIVESTOCK_DATA),
-                                    ('unallocated', SOLAR_PV_UNALLOCATED_DATA)]:
-                missing_cols = [col for col in required_columns if col not in data.columns]
-                if missing_cols:
-                    print(f"Warning: Missing columns in {data_name} data: {missing_cols}")
-
-            # Assign data to land uses
-            for lu in ['Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds',
-                'Winter cereals', 'Winter legumes', 'Winter oilseeds', 
-                'Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables']:
-                self.SOLAR_PV_DATA[lu] = SOLAR_PV_CROPPING_DATA
-            
-            for lu in ['Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears',
-                'Plantation fruit', 'Stone fruit', 'Tropical stone fruit']:
-                self.SOLAR_PV_DATA[lu] = SOLAR_PV_HORTICULTURE_DATA
-            
-            for lu in ['Dairy - modified land', 'Beef - modified land', 'Sheep - modified land']:
-                self.SOLAR_PV_DATA[lu] = SOLAR_PV_LIVESTOCK_DATA
-
-            for lu in ['Unallocated - modified land']:
-                self.SOLAR_PV_DATA[lu] = SOLAR_PV_UNALLOCATED_DATA
-
-            print(f"✓ Successfully loaded Solar PV data for {len(self.SOLAR_PV_DATA)} land use types")
-    
-        except Exception as e:
-            raise ValueError(f"Error loading Solar PV data: {e}")
-
-        ################## Load Onshore wind data ######################
-        onshore_wind_file = os.path.join(settings.INPUT_DIR, '20260105_Bundle_Wind.xlsx')
-
-        # Validate file exists
-        if not os.path.exists(onshore_wind_file):
-            raise FileNotFoundError(f"Onshore wind data file not found: {onshore_wind_file}")
-
-        self.ONSHORE_WIND_DATA = {}
-
-        try:
-            # Load with explicit error handling
-            ONSHORE_WIND_CROPPING_DATA = pd.read_excel(onshore_wind_file, sheet_name='Onshore Wind (cropping)', index_col='Year')
-            ONSHORE_WIND_HORTICULTURE_DATA = pd.read_excel(onshore_wind_file, sheet_name='Onshore Wind (horticulture)', index_col='Year') 
-            ONSHORE_WIND_LIVESTOCK_DATA = pd.read_excel(onshore_wind_file, sheet_name='Onshore Wind (livestock)', index_col='Year')
-            ONSHORE_WIND_UNALLOCATED_DATA = pd.read_excel(onshore_wind_file, sheet_name='Onshore Wind (unallocated)', index_col='Year')
-
-            # Validate required columns exist
-            required_columns = ['Productivity', 'Establishment_Cost_Multiplier','OM_Cost_Multiplier','Revenue', 'Annual Cost Per Ha (A$2010/yr)', 'Biodiversity_compatability','IMPACTS_water_retention','INPUT-wrt_water-required']
-            for data_name, data in [('cropping', ONSHORE_WIND_CROPPING_DATA), 
-                                ('horticulture', ONSHORE_WIND_HORTICULTURE_DATA), 
-                                ('livestock', ONSHORE_WIND_LIVESTOCK_DATA)
-                                ('unallocated', ONSHORE_WIND_UNALLOCATED_DATA)]:
-                missing_cols = [col for col in required_columns if col not in data.columns]
-                if missing_cols:
-                    print(f"Warning: Missing columns in {data_name} wind data: {missing_cols}")
-
-            # Assign data to land uses
-            for lu in ['Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds',
-                    'Winter cereals', 'Winter legumes', 'Winter oilseeds', 
-                    'Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables']:
-                self.ONSHORE_WIND_DATA[lu] = ONSHORE_WIND_CROPPING_DATA
-            
-            for lu in ['Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears',
-                    'Plantation fruit', 'Stone fruit', 'Tropical stone fruit']:
-                self.ONSHORE_WIND_DATA[lu] = ONSHORE_WIND_HORTICULTURE_DATA
-            
-            for lu in ['Dairy - modified land', 'Beef - modified land', 'Sheep - modified land']:
-                self.ONSHORE_WIND_DATA[lu] = ONSHORE_WIND_LIVESTOCK_DATA
-
-            for lu in ['Unallocated - modified land']:
-                self.ONSHORE_WIND_DATA[lu] = ONSHORE_WIND_UNALLOCATED_DATA
-
-            print(f"✓ Successfully loaded onshore wind data for {len(self.ONSHORE_WIND_DATA)} land use types")
-
-        except Exception as e:
-            raise ValueError(f"Error loading onshore wind data: {e}")
+        
+        # Renewable bundle data (productivity impacts, cost multipliers, etc)
+        renewable_bundle = pd.read_csv(f'{settings.INPUT_DIR}/renewable_energy_bundle.csv')
+        self.RENEWABLE_BUNDLE_WIND = renewable_bundle.query('Lever == "Onshore Wind"')
+        self.RENEWABLE_BUNDLE_SOLAR = renewable_bundle.query('Lever == "Utility Solar PV"')
+        
 
     
 

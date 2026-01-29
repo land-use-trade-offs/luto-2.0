@@ -664,7 +664,7 @@ def get_utility_solar_pv_effect_q_mrj(data, q_mrj, yr_idx):
 
     # Update values in the new matrix using the correct multiplier for each LU
     for lu_idx, lu in enumerate(land_uses):
-        productivity_multiplier = data.UTILITY_SOLAR_PV_DATA[lu].loc[yr_cal, 'Productivity']
+        productivity_multiplier = data.RENEWABLE_BUNDLE_SOLAR.query('Year == @yr_cal and Commodity == @lu')['Productivity'].item()
         if productivity_multiplier != 1:
             j = lu_codes[lu_idx]
             new_q_mrj[:, :, lu_idx] = q_mrj[:, :, j] * (productivity_multiplier - 1)
@@ -689,7 +689,7 @@ def get_onshore_wind_effect_q_mrj(data, q_mrj, yr_idx):
 
     # Update values in the new matrix using the correct multiplier for each LU
     for lu_idx, lu in enumerate(land_uses):
-        productivity_multiplier = data.ONSHORE_WIND_DATA[lu].loc[yr_cal, 'Productivity']
+        productivity_multiplier = data.RENEWABLE_BUNDLE_WIND.query('Year == @yr_cal and Commodity == @lu')['Productivity'].item()
         if productivity_multiplier != 1:
             j = lu_codes[lu_idx]
             new_q_mrj[:, :, lu_idx] = q_mrj[:, :, j] * (productivity_multiplier - 1)

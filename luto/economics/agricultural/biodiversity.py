@@ -252,7 +252,7 @@ def get_utility_solar_pv_effect_b_mrj(data:Data, ag_b_mrj: np.ndarray, yr_idx: i
     if not settings.AG_MANAGEMENTS['Utility Solar PV']:
         return b_mrj_effect
     for lu_idx, lu in enumerate(land_uses):
-        biodiv_impact = data.UTILITY_SOLAR_PV_DATA[lu].loc[yr_cal, 'Biodiversity_compatability']
+        biodiv_impact = data.RENEWABLE_BUNDLE_SOLAR.query('Year == @yr_cal and Commodity == @lu')['Biodiversity_compatability'].item()
         if biodiv_impact != 1:
             j = lu_codes[lu_idx]
             b_mrj_effect[:, :, lu_idx] = ag_b_mrj[:, :, j] * (biodiv_impact - 1)
@@ -276,7 +276,7 @@ def get_onshore_wind_effect_b_mrj(data:Data, ag_b_mrj: np.ndarray, yr_idx: int):
     if not settings.AG_MANAGEMENTS['Onshore Wind']:
         return b_mrj_effect
     for lu_idx, lu in enumerate(land_uses):
-        biodiv_impact = data.ONSHORE_WIND_DATA[lu].loc[yr_cal, 'Biodiversity_compatability']
+        biodiv_impact = data.RENEWABLE_BUNDLE_WIND.query('Year == @yr_cal and Commodity == @lu')['Biodiversity_compatability'].item()
         if biodiv_impact != 1:
             j = lu_codes[lu_idx]
             b_mrj_effect[:, :, lu_idx] = ag_b_mrj[:, :, j] * (biodiv_impact - 1)

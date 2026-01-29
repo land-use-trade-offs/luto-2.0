@@ -64,6 +64,7 @@ def create_new_dataset():
     bio_GBF4_inpath = bio_GBF2_inpath
     bio_GBF8_inpath = 'N:/Data-Master/Biodiversity/Environmental-suitability/Annual-species-suitability_20-year_snapshots_5km_to_NetCDF/'
     bio_NES_Zonation_inpath = bio_GBF4_inpath
+    renewable_energy_inpath = 'N:/Data-Master/Renewable Energy/processed'
     
 
 
@@ -204,6 +205,13 @@ def create_new_dataset():
     # Copy biodiversity NES Zonation files
     shutil.copyfile(bio_NES_Zonation_inpath + 'bio_NES_Zonation.nc', outpath + 'bio_NES_Zonation.nc')
     
+    # Copy renewable energy data files
+    shutil.copyfile(f'{renewable_energy_inpath}/renewable_targets.csv', outpath + 'renewable_targets.csv')
+    shutil.copyfile(f'{renewable_energy_inpath}/renewable_elec_price_AUD_MWh.csv', outpath + 'renewable_elec_price_AUD_MWh.csv')
+    shutil.copyfile(f'{renewable_energy_inpath}/renewable_energy_layers_1D.nc', outpath + 'renewable_energy_layers_1D.nc')
+    shutil.copyfile(f'{renewable_energy_inpath}/renewable_energy_bundle.csv', outpath + 'renewable_energy_bundle.csv')
+
+
 
     ############### Read data
 
@@ -337,7 +345,8 @@ def create_new_dataset():
     REGION_NRM_r = zones[['NRM_CODE', 'NRM_NAME']]  # NRM regions
     REGION_NRM_r.to_hdf(outpath + 'REGION_NRM_r.h5', key='REGION_NRM_r', mode='w', format='table', index=False, complevel=9)
     
-    
+    REGION_STATE_r = zones[['STE_CODE11', 'STE_NAME11']]  # State regions
+    REGION_STATE_r.to_hdf(outpath + 'REGION_STATE_r.h5', key='REGION_STATE_r', mode='w', format='table', index=False, complevel=9)
 
     ################# Regional adoption constraints
     
