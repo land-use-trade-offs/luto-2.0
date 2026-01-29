@@ -311,60 +311,6 @@ def get_sheep_hir_effect_t_mrj(data):
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep']
     return np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
-def get_utility_solar_pv_effect_t_mrj(data, yr_idx):
-    """
-    Calculate establishment-related transition costs for Utility Solar PV
-    as a 3D array indexed by management (m), cell (r), and land use (j) for year yr_idx.
-    """
-    if not AG_MANAGEMENTS.get('Utility Solar PV', False):
-        return np.zeros((data.NLMS, data.NCELLS, data.NPRS), dtype=np.float32)
-
-    yr_cal = data.YR_BASE + yr_idx
-
-    est_cost_raster = load_establishment_cost_raster('Utility PV')  # Spatial raster (e.g., $/ha)
-    est_cost_per_cell = est_cost_raster * data.REAL_AREA  # Convert per ha to per cell
-
-    est_cost_amortised = tools.amortise(est_cost_per_cell)  # Amortise over lifetime
-
-    effect_array = np.zeros((data.NLMS, data.NCELLS, data.NPRS), dtype=np.float32)
-
-    solar_lus = AG_MANAGEMENTS_TO_LAND_USES['Utility Solar PV']
-    lu_indices = [data.DESC_TO_AGLU[lu] for lu in solar_lus]
-
-    for m in range(data.NLMS):
-        for j in lu_indices:
-            effect_array[m, :, j] = est_cost_amortised
-
-    return effect_array
-
-
-def get_onshore_wind_effect_t_mrj(data, yr_idx):
-    """
-    Calculate establishment-related transition costs for Onshore Wind
-    as a 3D array indexed by management (m), cell (r), and land use (j) for year yr_idx.
-    """
-    if not AG_MANAGEMENTS.get('Onshore Wind', False):
-        return np.zeros((data.NLMS, data.NCELLS, data.NPRS), dtype=np.float32)
-
-    yr_cal = data.YR_BASE + yr_idx
-
-    est_cost_raster = load_establishment_cost_raster('Onshore Wind')
-    est_cost_per_cell = est_cost_raster * data.REAL_AREA
-
-    est_cost_amortised = tools.amortise(est_cost_per_cell)
-
-    effect_array = np.zeros((data.NLMS, data.NCELLS, data.NPRS), dtype=np.float32)
-
-    wind_lus = AG_MANAGEMENTS_TO_LAND_USES['Onshore Wind']
-    lu_indices = [data.DESC_TO_AGLU[lu] for lu in wind_lus]
-
-    for m in range(data.NLMS):
-        for j in lu_indices:
-            effect_array[m, :, j] = est_cost_amortised
-
-    return effect_array
-
-
 def get_agricultural_management_transition_matrices(data: Data, t_mrj, yr_idx) -> Dict[str, np.ndarray]:
     
     asparagopsis_data = get_asparagopsis_effect_t_mrj(data)                     
@@ -375,9 +321,7 @@ def get_agricultural_management_transition_matrices(data: Data, t_mrj, yr_idx) -
     biochar_data = get_biochar_effect_t_mrj(data)                               
     beef_hir_data = get_beef_hir_effect_t_mrj(data)                             
     sheep_hir_data = get_sheep_hir_effect_t_mrj(data)   
-    utility_solar_data = get_utility_solar_pv_effect_t_mrj(data)
-    onshore_wind_data = get_onshore_wind_effect_t_mrj(data)                      
-
+                  
     return {
         'Asparagopsis taxiformis': asparagopsis_data,
         'Precision Agriculture': precision_agriculture_data,
@@ -386,9 +330,7 @@ def get_agricultural_management_transition_matrices(data: Data, t_mrj, yr_idx) -
         'AgTech EI': agtech_ei_data,
         'Biochar': biochar_data,
         'HIR - Beef': beef_hir_data,
-        'HIR - Sheep': sheep_hir_data,
-        'Utility Solar PV': utility_solar_data,
-        'Onshore Wind': onshore_wind_data
+        'HIR - Sheep': sheep_hir_data
     }
 
 
@@ -492,30 +434,6 @@ def get_sheep_hir_adoption_limit(data: Data):
 
     return hir_limits
 
-def get_utility_solar_pv_adoption_limit(data: Data, yr_idx):
-    """
-    Gets the adoption limit of Utility Solar PV for each possible land use.
-    """
-    solar_pv_limits = {}
-    yr_cal = data.YR_CAL_BASE + yr_idx
-    for lu in AG_MANAGEMENTS_TO_LAND_USES['Utility Solar PV']:
-        j = data.DESC2AGLU[lu]
-        solar_pv_limits[j] = data.UTILITY_SOLAR_PV_DATA[lu].loc[yr_cal, 'Technical_Adoption']
-
-    return solar_pv_limits
-
-def get_onshore_wind_adoption_limit(data: Data, yr_idx):
-    """
-    Gets the adoption limit of Onshore Wind for each possible land use.
-    """
-    wind_limits = {}
-    yr_cal = data.YR_CAL_BASE + yr_idx
-    for lu in AG_MANAGEMENTS_TO_LAND_USES['Onshore Wind']:
-        j = data.DESC2AGLU[lu]
-        wind_limits[j] = data.ONS_WIND_DATA[lu].loc[yr_cal, 'Technical_Adoption']
-
-    return wind_limits
-
 def get_agricultural_management_adoption_limits(data: Data, yr_idx) -> Dict[str, dict]:
     """
     An adoption limit represents the maximum percentage of cells (for each land use) that can utilise
@@ -531,9 +449,7 @@ def get_agricultural_management_adoption_limits(data: Data, yr_idx) -> Dict[str,
     ag_management_data['Biochar'] = get_biochar_adoption_limit(data, yr_idx)                                if AG_MANAGEMENTS['Biochar'] else {data.DESC2AGLU[lu]: 0 for lu in AG_MANAGEMENTS_TO_LAND_USES['Biochar']}
     ag_management_data['HIR - Beef'] = get_beef_hir_adoption_limit(data)                                    if AG_MANAGEMENTS['HIR - Beef'] else {data.DESC2AGLU[lu]: 0 for lu in AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef']}
     ag_management_data['HIR - Sheep'] = get_sheep_hir_adoption_limit(data)                                  if AG_MANAGEMENTS['HIR - Sheep'] else {data.DESC2AGLU[lu]: 0 for lu in AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep']}
-    ag_management_data['Utility Solar PV'] = get_utility_solar_pv_adoption_limit(data, yr_idx)              if AG_MANAGEMENTS['Utility Solar PV'] else {data.DESC2AGLU[lu]: 0 for lu in AG_MANAGEMENTS_TO_LAND_USES['Utility Solar PV']}
-    ag_management_data['Onshore Wind'] = get_onshore_wind_adoption_limit(data, yr_idx)                      if AG_MANAGEMENTS['Onshore Wind'] else {data.DESC2AGLU[lu]: 0 for lu in AG_MANAGEMENTS_TO_LAND_USES['Onshore Wind']}
-
+   
     return ag_management_data
 
 

@@ -414,70 +414,51 @@ def get_sheep_hir_effect_w_mrj(data, yr_idx):
 
 def get_utility_solar_pv_effect_w_mrj(data, yr_idx):
     """
-    Applies the effects of using Utility Solar PV to the water net yield data
-    for all relevant agr. land uses.
+    Gets water use impacts of using Utility Solar PV
 
     Parameters
-    - data: The data object containing relevant information.
-    - w_mrj <unit:ML/cell>: The water net yield data for all land uses.
-    - yr_idx: The index of the year.
+    - data: The input data object containing information about NLMS and NCELLS.
 
     Returns
-    - w_mrj_effect <unit:ML/cell>: The updated water net yield data with Utility Solar PV applied.
+    - new_b_mrj: A numpy array representing the water impacts of using Utility Solar PV.
     """
-
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Utility Solar PV']
     lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
     yr_cal = data.YR_CAL_BASE + yr_idx
-
-    wreq_mrj = get_wreq_matrices(data, yr_idx)
-
     # Set up the effects matrix
-    w_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
-
-    # Update values in the new matrix using the correct multiplier for each LU
+    b_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)   
+    if not settings.AG_MANAGEMENTS['Utility Solar PV']:
+        return b_mrj_effect
     for lu_idx, lu in enumerate(land_uses):
-        multiplier = data.UTILITY_SOLAR_PV_DATA[lu].loc[yr_cal, "Water_use"]
-        if multiplier != 1:
+        water_impact = data.RENEWABLE_BUNDLE_SOLAR.query('Year == @yr_cal and Commodity == @lu')['INPUT-wrt_water-required'].item()
+        if water_impact != 1:
             j = lu_codes[lu_idx]
-            # The effect is: new value = old value * multiplier - old value
-            # E.g. a multiplier of .95 means a 5% reduction in water used.
-            # Since the effect applies to water use, it effects the net yield negatively.
-            w_mrj_effect[:, :, lu_idx] = wreq_mrj[:, :, j] * (1- multiplier)
-
-    return w_mrj_effect
+            b_mrj_effect[:, :, lu_idx] = ag_b_mrj[:, :, j] * (water_impact - 1)
+    return b_mrj_effect
 
 def get_onshore_wind_effect_w_mrj(data, yr_idx):
     """
-    Applies the effects of using Onshore Wind to the water net yield data
-    for all relevant agr. land uses.
+    Gets water use impacts of using Onshore Wind
 
     Parameters
-    - data: The data object containing relevant information.
-    - w_mrj <unit:ML/cell>: The water net yield data for all land uses.
-    - yr_idx: The index of the year.
+    - data: The input data object containing information about NLMS and NCELLS.
 
     Returns
-    - w_mrj_effect <unit:ML/cell>: The updated water net yield data with Onshore Wind applied.
+    - new_b_mrj: A numpy array representing the water impacts of using Onshore Wind.
     """
-
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Onshore Wind']
     lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
-    yr_cal = data.YR_CAL_BASE + yr_idx  
-    wreq_mrj = get_wreq_matrices(data, yr_idx)
+    yr_cal = data.YR_CAL_BASE + yr_idx
     # Set up the effects matrix
-    w_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)   
-    # Update values in the new matrix using the correct multiplier for each LU
+    b_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)   
+    if not settings.AG_MANAGEMENTS['Onshore Wind']:
+        return b_mrj_effect
     for lu_idx, lu in enumerate(land_uses):
-        multiplier = data.ONS_WIND_DATA[lu].loc[yr_cal, "Water_use"]
-        if multiplier != 1:
+        water_impact = data.RENEWABLE_BUNDLE_WIND.query('Year == @yr_cal and Commodity == @lu')['INPUT-wrt_water-required'].item()
+        if water_impact != 1:
             j = lu_codes[lu_idx]
-            # The effect is: new value = old value * multiplier - old value
-            # E.g. a multiplier of .95 means a 5% reduction in water used.
-            # Since the effect applies to water use, it effects the net yield negatively.
-            w_mrj_effect[:, :, lu_idx] = wreq_mrj[:, :, j] * (1- multiplier)
-    return w_mrj_effect
-
+            b_mrj_effect[:, :, lu_idx] = ag_b_mrj[:, :, j] * (water_impact - 1)
+    return b_mrj_effect
 
 def get_agricultural_management_water_matrices(data, yr_idx) -> dict[str, np.ndarray]:
     
