@@ -195,30 +195,22 @@ def get_rev_lvstk( data:Data   # Data object.
 
 def get_rev_renewable(data, lu, lm, yr_idx):
     """
-    Return renewable energy revenue [AUD/cell] of `lm` in `yr_idx`.
+    Return renewable energy revenue [AUD/cell] of `lm` (string) in `yr_idx`.
     
     This function:
     1. Calculates electricity yield (MWh) via `get_quantity_renewable`.
     2. Retrieves the annual electricity price vector for the simulation year.
     3. Maps prices to cells using the `state_raster` (NRM->State bridge).
     4. Returns total revenue per cell.
-
-    Arguments:
-        data: Data object (containing state_raster, ELECTRICITY_PRICES, etc.)
-        lu: Land Use string (kept for interface consistency)
-        lm: Management index (int)
-        yr_idx: Simulation year index (0, 1, 2...)
     """
     
     # -----------------------------------------------------------------------
     # 1. Identify Technology & Product
     # -----------------------------------------------------------------------
-    tech_name_raw = data.LANDMANS[lm]
-    
-    # Robust mapping to the product keys used in quantity.py
-    if "solar" in tech_name_raw.lower():
+    # lm is expected to be the string name directly
+    if "solar" in lm.lower():
         tech_key = "Utility Solar PV"
-    elif "wind" in tech_name_raw.lower():
+    elif "wind" in lm.lower():
         tech_key = "Onshore Wind"
     else:
         # If passed a non-RE management (safety fallback), return zeros
@@ -232,6 +224,7 @@ def get_rev_renewable(data, lu, lm, yr_idx):
     # -----------------------------------------------------------------------
     # 2. Get Quantity (MWh per cell)
     # -----------------------------------------------------------------------
+    # Pass 'lm' (string) directly to the corrected quantity function
     quantity_mwh = get_quantity_renewable(data, product_name, lm, yr_idx)
 
     # -----------------------------------------------------------------------
@@ -239,47 +232,31 @@ def get_rev_renewable(data, lu, lm, yr_idx):
     # -----------------------------------------------------------------------
     yr_cal = data.YR_CAL_BASE + yr_idx
     
-    # Validation: Ensure year exists in forecast
     if yr_cal not in data.ELECTRICITY_PRICES.index:
          raise KeyError(f"Year {yr_cal} missing from ELECTRICITY_PRICES forecast.")
 
     # A. Retrieve Annual Prices Vector
-    # Returns numpy array of prices: [Price_State0, Price_State1, Price_State2...]
-    # corresponding to the columns in your price CSV (QLD, NSW, etc.)
     annual_prices = data.ELECTRICITY_PRICES.loc[yr_cal].values
 
     # B. Map Prices to the Grid (Vectorized Lookup)
-    # We use the 'state_raster' (integers) to pick the price from 'annual_prices'.
-    
-    # Initialize price map with zeros (float32)
     price_map = np.zeros(data.NCELLS, dtype=np.float32)
-    
-    # Create mask for valid cells:
-    # 1. Must be within the model mask (data.mask == 1)
-    # 2. Must have a valid state mapping (state_raster != -1)
     valid_cells = (data.mask == 1) & (data.state_raster != -1)
     
-    # Apply Fancy Indexing:
-    # For every valid cell, use its state index (e.g., 0) to grab the price (e.g., 27.5)
+    # Apply Fancy Indexing using the state raster
     price_map[valid_cells] = annual_prices[data.state_raster[valid_cells]]
 
     # -----------------------------------------------------------------------
     # 4. Calculate Revenue ($/cell)
     # -----------------------------------------------------------------------
-    # Revenue = Yield (MWh) * Price ($/MWh)
     rev_total = quantity_mwh * price_map
 
     # -----------------------------------------------------------------------
     # 5. Format Output
     # -----------------------------------------------------------------------
-    # Return MultiIndex DataFrame compatible with LUTO2 standard reporting
-    
-    result_df = pd.DataFrame(
+    return pd.DataFrame(
         rev_total,
         columns=pd.MultiIndex.from_tuples([(lu, lm, 'Electricity')])
     )
-    
-    return result_df
 
 def get_rev(data, lu, lm, yr_idx):
     """
@@ -288,9 +265,8 @@ def get_rev(data, lu, lm, yr_idx):
     
     # 1. Check for Renewable Energy Management
     # ----------------------------------------------------------------
-    # Returns Elec Revenue if lm is Renewable Energy, else continues.
-    lm_name = data.LANDMANS[lm]
-    if lm_name in ["Utility Solar PV", "Onshore Wind"]:
+    # lm is passed as a string from get_rev_matrix loop (data.LANDMANS)
+    if lm in ["Utility Solar PV", "Onshore Wind"]:
         return get_rev_renewable(data, lu, lm, yr_idx)
 
     # 2. Check for Cropping
@@ -300,8 +276,6 @@ def get_rev(data, lu, lm, yr_idx):
 
     # 3. Check for Non-Agricultural / Unallocated Lands
     # ----------------------------------------------------------------
-    # Explicitly return ZERO for these lands to prevent them hitting the 
-    # livestock calculator and crashing the model.
     if "Unallocated" in lu or "Destocked" in lu:
         return pd.DataFrame(
             np.zeros((data.NCELLS, 1), dtype=np.float32),
@@ -555,11 +529,6 @@ def get_sheep_hir_effect_r_mrj(data: Data, r_mrj):
 
     return r_mrj_effect
 
-import numpy as np
-import settings
-# Import the revenue calculator we built previously
-from economics.agricultural.revenue import get_rev_renewable 
-
 def get_utility_solar_pv_effect_r_mrj(data: Data, r_mrj, yr_idx):
     """
     Applies the effects of Utility Solar PV to the revenue data
@@ -570,48 +539,37 @@ def get_utility_solar_pv_effect_r_mrj(data: Data, r_mrj, yr_idx):
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
     yr_cal = data.YR_CAL_BASE + yr_idx
 
-    # Set up the effects matrix
     new_r_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
     if not settings.AG_MANAGEMENTS['Utility Solar PV']:
         return new_r_mrj
 
-    # 1. Identify the specific Management Index for Solar
-    # We need this to tell get_rev_renewable which technology to price
-    try:
-        solar_lm_idx = data.LANDMANS.index('Utility Solar PV')
-    except ValueError:
-        raise ValueError("'Utility Solar PV' not found in data.LANDMANS list.")
+    # Define LM string directly
+    solar_lm_name = 'Utility Solar PV'
 
     # Update values in the new matrix
     for lu_idx, lu in enumerate(land_uses):
-        # A. Calculate Agricultural Revenue Adjustment (The Penalty/Multiplier)
-        # -------------------------------------------------------------------
-        revenue_multiplier = data.RENEWABLE_BUNDLE_SOLAR.query('Year == @yr_cal and Commodity == @lu')['Revenue'].item()
+        # A. Calculate Agricultural Revenue Adjustment
+        try:
+            revenue_multiplier = data.RENEWABLE_BUNDLE_SOLAR.query(
+                'Year == @yr_cal and Commodity == @lu'
+            )['Revenue'].item()
+        except (ValueError, KeyError):
+            revenue_multiplier = 1.0
+
         j = lu_codes[lu_idx]
-        
-        # Calculate the delta: Base * (Multiplier - 1)
-        # Shape: (NLMS, NCELLS)
         ag_revenue_delta = r_mrj[:, :, j] * (revenue_multiplier - 1)
 
-        # B. Calculate Electricity Revenue (The Gain)
-        # -------------------------------------------------------------------
-        # Returns DataFrame, extract values -> Shape (NCELLS,)
-        elec_rev_df = get_rev_renewable(data, lu, solar_lm_idx, yr_idx)
+        # B. Calculate Electricity Revenue
+        # Pass string name 'solar_lm_name', not an index
+        elec_rev_df = get_rev_renewable(data, lu, solar_lm_name, yr_idx)
         elec_rev_values = elec_rev_df.values.flatten().astype(np.float32)
 
         # C. Combine Effects
-        # -------------------------------------------------------------------
-        # We add the electricity revenue to the agricultural delta.
-        # Broadcasting: (NLMS, NCELLS) + (NCELLS,) -> (NLMS, NCELLS)
-        # This assumes electricity revenue is the same regardless of underlying 
-        # base management (e.g. 'irr' vs 'dry'), which is standard.
         total_effect = ag_revenue_delta + elec_rev_values[np.newaxis, :]
-
         new_r_mrj[:, :, lu_idx] = total_effect
 
     return new_r_mrj
-
 
 def get_onshore_wind_effect_r_mrj(data: Data, r_mrj, yr_idx):
     """
@@ -622,33 +580,33 @@ def get_onshore_wind_effect_r_mrj(data: Data, r_mrj, yr_idx):
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
     yr_cal = data.YR_CAL_BASE + yr_idx
 
-    # Set up the effects matrix
     new_r_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
     if not settings.AG_MANAGEMENTS['Onshore Wind']:
         return new_r_mrj
 
-    # 1. Identify Management Index for Wind
-    try:
-        wind_lm_idx = data.LANDMANS.index('Onshore Wind')
-    except ValueError:
-        raise ValueError("'Onshore Wind' not found in data.LANDMANS list.")
+    # Define LM string directly
+    wind_lm_name = 'Onshore Wind'
 
-    # Update values
     for lu_idx, lu in enumerate(land_uses):
         # A. Agricultural Adjustment
-        revenue_multiplier = data.RENEWABLE_BUNDLE_WIND.query('Year == @yr_cal and Commodity == @lu')['Revenue'].item()
+        try:
+            revenue_multiplier = data.RENEWABLE_BUNDLE_WIND.query(
+                'Year == @yr_cal and Commodity == @lu'
+            )['Revenue'].item()
+        except (ValueError, KeyError):
+            revenue_multiplier = 1.0
+
         j = lu_codes[lu_idx]
-        
         ag_revenue_delta = r_mrj[:, :, j] * (revenue_multiplier - 1)
 
         # B. Electricity Revenue
-        elec_rev_df = get_rev_renewable(data, lu, wind_lm_idx, yr_idx)
+        # Pass string name 'wind_lm_name'
+        elec_rev_df = get_rev_renewable(data, lu, wind_lm_name, yr_idx)
         elec_rev_values = elec_rev_df.values.flatten().astype(np.float32)
 
         # C. Combine
         total_effect = ag_revenue_delta + elec_rev_values[np.newaxis, :]
-
         new_r_mrj[:, :, lu_idx] = total_effect
 
     return new_r_mrj

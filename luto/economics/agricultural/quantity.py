@@ -63,37 +63,34 @@ def compute_wind_yield_per_ha(cf_raster, dlf_raster, mw_per_ha):
 # RE Quantity Calculation Functions
 # ---------------------------------------------------------------------------
 
-def get_quantity_renewable(data, pr: str, lm: int, yr_idx: int):
+def get_quantity_renewable(data, pr: str, lm: str, yr_idx: int):
     """
     Return electricity yield [MWh] for renewable product `pr` under management 
-    index `lm` for year index `yr_idx`.
+    `lm` (string) for year index `yr_idx`.
     """
     # 1. Validation
     if pr not in ["UTILITY SOLAR PV - ELECTRICITY", "ONSHORE WIND - ELECTRICITY"]:
         raise KeyError(f"Unknown renewable product '{pr}'")
 
     # 2. Identify Management Name
-    tech_name = data.LANDMANS[lm]
-    if "solar" in tech_name.lower():
+    # lm is expected to be the string name directly (e.g. "Utility Solar PV")
+    if "solar" in lm.lower():
         lm_name = "Utility Solar PV"
-    elif "wind" in tech_name.lower():
+    elif "wind" in lm.lower():
         lm_name = "Onshore Wind"
     else:
-        raise KeyError(f"Unknown management type '{tech_name}' for renewable")
+        raise KeyError(f"Unknown management type '{lm}' for renewable")
 
     # 3. Retrieve Pre-loaded Data
-    # Calculate the actual simulation year (e.g., 2025) to look up dynamic data
     current_year = data.YR_CAL_BASE + yr_idx
 
     # A. Capacity Factor (Static)
-    # We access the dictionary created in Data.__init__
     try:
         cf = data.cf_static[lm_name]
     except KeyError:
         raise KeyError(f"Capacity Factor data missing for {lm_name} in data.cf_static")
 
     # B. Distribution Loss Factor (Dynamic)
-    # We access the dictionary keyed by Year
     try:
         dlf = data.dlf_dynamic[current_year]
     except KeyError:
@@ -108,11 +105,9 @@ def get_quantity_renewable(data, pr: str, lm: int, yr_idx: int):
     elif lm_name == "Onshore Wind":
         yield_per_ha = compute_wind_yield_per_ha(cf, dlf, mw_per_ha)
     else:
-        # Should be caught above, but safe fallback
         raise KeyError(f"Unknown land management name '{lm_name}'")
 
     # 6. Convert to Total Yield (MWh)
-    # Multiply by the cell area (ha)
     quantity = yield_per_ha * data.REAL_AREA
     
     return quantity.astype(np.float32)
@@ -343,24 +338,8 @@ def get_quantity_crop(data, pr, lm, yr_idx):
     return quantity
 
 def get_quantity(data, pr, lm, yr_idx):
-    """Return yield <unit: t/cell> of `pr`+`lm` in `yr_idx` as 1D Numpy array.
-
-    Args:
-        data (object/module): Data object or module.
-        pr (str): Product produced.
-        lm (str): Land management.
-        yr_idx (int): Number of years post base-year ('YR_CAL_BASE').
-
-    Returns
-        numpy.ndarray: 1D Numpy array representing the yield <unit: t/cell>.
-
-    Raises:
-        KeyError: If the land use `pr` is not found in the data.
-
-    Notes:
-        - Assumes fields like in `luto.data`.
-        - If it is a crop, it is known how to get the quantities.
-        - Apply productivity increase multiplier by product. Essentially, this is a total factor productivity increase.
+    """
+    Return yield <unit: t/cell> of `pr`+`lm` in `yr_idx`.
     """
     # If it is a crop, it is known how to get the quantities.
     if pr in data.PR_CROPS:
@@ -368,15 +347,15 @@ def get_quantity(data, pr, lm, yr_idx):
     elif pr in data.PR_LVSTK:
         q = get_quantity_lvstk(data, pr, lm, yr_idx)
     elif pr in ["UTILITY SOLAR PV - ELECTRICITY", "ONSHORE WIND - ELECTRICITY"]:
+        # lm is passed as a string here
         q = get_quantity_renewable(data, pr, lm, yr_idx)
     else:
         raise KeyError(f"Land use '{pr}' not found in data.")
 
-    # Apply productivity increase multiplier by product. Essentially, this is a total factor productivity increase.
+    # Apply productivity increase multiplier by product.
     q *= data.BAU_PROD_INCR[lm, pr][yr_idx]
 
     return q
-
 
 def get_quantity_matrix(data, lm, yr_idx):
     """
@@ -647,54 +626,69 @@ def get_sheep_hir_effect_q_mrp(data, q_mrp):
 
     return q_mrp_effect
 
-def get_utility_solar_pv_effect_q_mrj(data, q_mrj, yr_idx):
+def get_utility_solar_pv_effect_q_mrp(data, q_mrp, yr_idx):
     """
-    Applies the effects of Utility Solar PV to the quantity data
-    for all relevant agricultural land uses.
+    Applies the effects of Utility Solar PV to the quantity data.
+    Maps land-use productivity multipliers to their associated products.
     """
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Utility Solar PV']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
     yr_cal = data.YR_CAL_BASE + yr_idx
 
-    # Set up the effects matrix
-    new_q_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+    # Initialize output matrix with dimensions (NLMS, NCELLS, NPRS)
+    new_q_mrp = np.zeros((data.NLMS, data.NCELLS, data.NPRS)).astype(np.float32)
 
     if not settings.AG_MANAGEMENTS['Utility Solar PV']:
-        return new_q_mrj
+        return new_q_mrp
 
-    # Update values in the new matrix using the correct multiplier for each LU
-    for lu_idx, lu in enumerate(land_uses):
-        productivity_multiplier = data.RENEWABLE_BUNDLE_SOLAR.query('Year == @yr_cal and Commodity == @lu')['Productivity'].item()
+    # Iterate through land uses affected by Solar PV
+    for lu, j in zip(land_uses, lu_codes):
+        try:
+            productivity_multiplier = data.RENEWABLE_BUNDLE_SOLAR.query(
+                'Year == @yr_cal and Commodity == @lu'
+            )['Productivity'].item()
+        except (ValueError, KeyError):
+            productivity_multiplier = 1.0
+
         if productivity_multiplier != 1:
-            j = lu_codes[lu_idx]
-            new_q_mrj[:, :, lu_idx] = q_mrj[:, :, j] * (productivity_multiplier - 1)
+            # Apply to all products associated with this land use
+            for p in range(data.NPRS):
+                if data.LU2PR[p, j]:
+                    # Calculate delta: q_mrp * (mult - 1)
+                    new_q_mrp[:, :, p] = q_mrp[:, :, p] * (productivity_multiplier - 1)
 
-    return new_q_mrj
+    return new_q_mrp
 
 
-def get_onshore_wind_effect_q_mrj(data, q_mrj, yr_idx):
+def get_onshore_wind_effect_q_mrp(data, q_mrp, yr_idx):
     """
-    Applies the effects of Onshore Wind to the quantity data
-    for all relevant agricultural land uses.
+    Applies the effects of Onshore Wind to the quantity data.
+    Maps land-use productivity multipliers to their associated products.
     """
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Onshore Wind']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
     yr_cal = data.YR_CAL_BASE + yr_idx
 
-    # Set up the effects matrix
-    new_q_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+    # Initialize output matrix with dimensions (NLMS, NCELLS, NPRS)
+    new_q_mrp = np.zeros((data.NLMS, data.NCELLS, data.NPRS)).astype(np.float32)
 
     if not settings.AG_MANAGEMENTS['Onshore Wind']:
-        return new_q_mrj
+        return new_q_mrp
 
-    # Update values in the new matrix using the correct multiplier for each LU
-    for lu_idx, lu in enumerate(land_uses):
-        productivity_multiplier = data.RENEWABLE_BUNDLE_WIND.query('Year == @yr_cal and Commodity == @lu')['Productivity'].item()
+    for lu, j in zip(land_uses, lu_codes):
+        try:
+            productivity_multiplier = data.RENEWABLE_BUNDLE_WIND.query(
+                'Year == @yr_cal and Commodity == @lu'
+            )['Productivity'].item()
+        except (ValueError, KeyError):
+            productivity_multiplier = 1.0
+
         if productivity_multiplier != 1:
-            j = lu_codes[lu_idx]
-            new_q_mrj[:, :, lu_idx] = q_mrj[:, :, j] * (productivity_multiplier - 1)
+            for p in range(data.NPRS):
+                if data.LU2PR[p, j]:
+                    new_q_mrp[:, :, p] = q_mrp[:, :, p] * (productivity_multiplier - 1)
 
-    return new_q_mrj
+    return new_q_mrp
 
 def get_agricultural_management_quantity_matrices(data, q_mrp, yr_idx) -> Dict[str, np.ndarray]:
     """
@@ -719,7 +713,7 @@ def get_agricultural_management_quantity_matrices(data, q_mrp, yr_idx) -> Dict[s
     ag_mam_q_mrp['Biochar'] = get_biochar_effect_q_mrp(data, q_mrp, yr_idx)                                 
     ag_mam_q_mrp['HIR - Beef'] = get_beef_hir_effect_q_mrp(data, q_mrp)                                     
     ag_mam_q_mrp['HIR - Sheep'] = get_sheep_hir_effect_q_mrp(data, q_mrp)     
-    ag_mam_q_mrp['Utility Solar PV'] = get_utility_solar_pv_effect_q_mrj(data, q_mrp, yr_idx)
-    ag_mam_q_mrp['Onshore Wind'] = get_onshore_wind_effect_q_mrj(data, q_mrp, yr_idx)                     
+    ag_mam_q_mrp['Utility Solar PV'] = get_utility_solar_pv_effect_q_mrp(data, q_mrp, yr_idx)
+    ag_mam_q_mrp['Onshore Wind'] = get_onshore_wind_effect_q_mrp(data, q_mrp, yr_idx)                     
 
     return {am:ag_mam_q_mrp[am] for am in settings.AG_MANAGEMENTS if settings.AG_MANAGEMENTS[am]}
