@@ -311,6 +311,79 @@ def get_sheep_hir_effect_t_mrj(data):
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep']
     return np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
+def get_utility_solar_pv_effect_t_mrj(data, yr_idx):
+    """
+    Calculate establishment-related transition costs for Utility Solar PV
+    as a 3D array indexed by management (m), cell (r), and land use (j) for year yr_idx.
+    
+    UPDATED: Uses dynamic CAPEX maps and returns Upfront cost (no amortisation).
+    """
+    if not settings.AG_MANAGEMENTS.get('Utility Solar PV', False):
+        return np.zeros((data.NLMS, data.NCELLS, data.NPRS), dtype=np.float32)
+
+    yr_cal = data.YR_CAL_BASE + yr_idx
+
+    # Retrieve Dynamic CAPEX
+    try:
+        capex_map = data.solar_capex_dynamic[yr_cal]
+    except KeyError:
+        raise KeyError(f"Missing Solar CAPEX data for year {yr_cal}")
+
+    # Calculate upfront cost per cell
+    est_cost_per_cell = capex_map * data.REAL_AREA
+    
+    # Handle NaNs
+    est_cost_per_cell = np.nan_to_num(est_cost_per_cell, nan=0.0).astype(np.float32)
+
+    # Apply to Matrix
+    effect_array = np.zeros((data.NLMS, data.NCELLS, data.NPRS), dtype=np.float32)
+    solar_lus = settings.AG_MANAGEMENTS_TO_LAND_USES['Utility Solar PV']
+    lu_indices = [data.DESC2AGLU[lu] for lu in solar_lus]
+
+    for m in range(data.NLMS):
+        for j in lu_indices:
+            # Assign upfront cost directly
+            effect_array[m, :, j] = est_cost_per_cell
+
+    return effect_array
+
+
+def get_onshore_wind_effect_t_mrj(data, yr_idx):
+    """
+    Calculate establishment-related transition costs for Onshore Wind
+    as a 3D array indexed by management (m), cell (r), and land use (j) for year yr_idx.
+    
+    UPDATED: Uses dynamic CAPEX maps and returns Upfront cost (no amortisation).
+    """
+    if not settings.AG_MANAGEMENTS.get('Onshore Wind', False):
+        return np.zeros((data.NLMS, data.NCELLS, data.NPRS), dtype=np.float32)
+
+    yr_cal = data.YR_CAL_BASE + yr_idx
+
+    # Retrieve Dynamic CAPEX
+    try:
+        capex_map = data.wind_capex_dynamic[yr_cal]
+    except KeyError:
+        raise KeyError(f"Missing Wind CAPEX data for year {yr_cal}")
+
+    # Calculate upfront cost per cell
+    est_cost_per_cell = capex_map * data.REAL_AREA
+    
+    # Handle NaNs
+    est_cost_per_cell = np.nan_to_num(est_cost_per_cell, nan=0.0).astype(np.float32)
+
+    # Apply to Matrix
+    effect_array = np.zeros((data.NLMS, data.NCELLS, data.NPRS), dtype=np.float32)
+    wind_lus = settings.AG_MANAGEMENTS_TO_LAND_USES['Onshore Wind']
+    lu_indices = [data.DESC2AGLU[lu] for lu in wind_lus]
+
+    for m in range(data.NLMS):
+        for j in lu_indices:
+            # Assign upfront cost directly
+            effect_array[m, :, j] = est_cost_per_cell
+
+    return effect_array
+
 def get_agricultural_management_transition_matrices(data: Data, t_mrj, yr_idx) -> Dict[str, np.ndarray]:
     
     asparagopsis_data = get_asparagopsis_effect_t_mrj(data)                     
@@ -320,7 +393,9 @@ def get_agricultural_management_transition_matrices(data: Data, t_mrj, yr_idx) -
     agtech_ei_data = get_agtech_ei_effect_t_mrj(data)                           
     biochar_data = get_biochar_effect_t_mrj(data)                               
     beef_hir_data = get_beef_hir_effect_t_mrj(data)                             
-    sheep_hir_data = get_sheep_hir_effect_t_mrj(data)   
+    sheep_hir_data = get_sheep_hir_effect_t_mrj(data)
+    utility_solar_pv_data = get_utility_solar_pv_effect_t_mrj(data)
+    onshore_wind_data = get_onshore_wind_effect_t_mrj(data)
                   
     return {
         'Asparagopsis taxiformis': asparagopsis_data,
@@ -330,7 +405,9 @@ def get_agricultural_management_transition_matrices(data: Data, t_mrj, yr_idx) -
         'AgTech EI': agtech_ei_data,
         'Biochar': biochar_data,
         'HIR - Beef': beef_hir_data,
-        'HIR - Sheep': sheep_hir_data
+        'HIR - Sheep': sheep_hir_data,
+        'Utility Solar PV': utility_solar_pv_data,
+        'Onshore Wind': onshore_wind_data
     }
 
 

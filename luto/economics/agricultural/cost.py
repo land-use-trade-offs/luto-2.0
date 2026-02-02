@@ -196,33 +196,30 @@ def get_cost_renewable(data: Data, lu, lm, yr_idx):
     """
     Return renewable energy production cost [AUD/cell] of `lm` in `yr_idx`.
     
-    Args:
-        data: Data object.
-        lu: Land Use (string).
-        lm: Land Management Name (string, e.g., "Utility Solar PV").
-        yr_idx: Year index.
+    UPDATED: Returns OPEX only. Establishment costs (CAPEX) are now handled 
+    exclusively in transitions.py to prevent double-counting.
     """
     yr_cal = data.YR_CAL_BASE + yr_idx
+    tech_name = data.LANDMANS[lm]
     
     # A. Identify Technology & Retrieve Dynamic Data
     # ------------------------------------------------------------------
-    # lm is now expected to be the string name directly
-    if "solar" in lm.lower():
+    if "solar" in tech_name.lower():
         tech_key = "Utility Solar PV"
+        # We only need OPEX here given cost.py represents ongoing cell costs.
         try:
-            capex_map = data.solar_capex_dynamic[yr_cal]
             opex_map = data.solar_opex_dynamic[yr_cal]
         except KeyError:
              raise KeyError(f"Missing Solar cost data for year {yr_cal}")
              
-    elif "wind" in lm.lower():
+    elif "wind" in tech_name.lower():
         tech_key = "Onshore Wind"
         try:
-            capex_map = data.wind_capex_dynamic[yr_cal]
             opex_map = data.wind_opex_dynamic[yr_cal]
         except KeyError:
              raise KeyError(f"Missing Wind cost data for year {yr_cal}")
     else:
+        # Fallback for safety
         return pd.DataFrame(
             np.zeros((data.NCELLS, 2)), 
             columns=pd.MultiIndex.from_product([[lu], [lm], ['Establishment cost', 'Operating cost']])
@@ -230,8 +227,14 @@ def get_cost_renewable(data: Data, lu, lm, yr_idx):
 
     # B. Calculate Costs per Cell
     # ------------------------------------------------------------------
-    cost_est = np.nan_to_num(capex_map * data.REAL_AREA, nan=0.0).astype(np.float32)
-    cost_op = np.nan_to_num(opex_map * data.REAL_AREA, nan=0.0).astype(np.float32)
+    
+    # Establishment (CAPEX) - ZEROED OUT
+    # Handled in transitions.py. Kept as zero-column to maintain DataFrame structure.
+    cost_est = np.zeros(data.NCELLS, dtype=np.float32)
+
+    # Operating (OPEX)
+    cost_op = opex_map * data.REAL_AREA
+    cost_op = np.nan_to_num(cost_op, nan=0.0).astype(np.float32)
 
     # C. Format Output
     # ------------------------------------------------------------------
@@ -241,7 +244,7 @@ def get_cost_renewable(data: Data, lu, lm, yr_idx):
         costs_stacked,
         columns=pd.MultiIndex.from_product([
             [lu], 
-            [lm],  # Now guarantees this is a string, matching crop/lvstk outputs
+            [lm], 
             ['Establishment cost', 'Operating cost']
         ])
     )
@@ -625,13 +628,13 @@ def get_utility_solar_pv_effect_c_mrj(data: Data, c_mrj, yr_idx):
         j = lu_codes[lu_idx]
         ag_cost_delta = c_mrj[:, :, j] * (om_mult - 1)
 
-        # B. Renewable Cost Addition (Direct CAPEX + OPEX)
+        # B. Renewable Cost Addition (Direct OPEX) - capex is included via transitions.py
         # -------------------------------------------------------
         # Retrieve the renewable specific costs for this land use and tech
         # Note: We pass 'solar_lm_name' (string), not an index.
         re_cost_df = get_cost_renewable(data, lu, solar_lm_name, yr_idx)
         
-        # Sum the columns (Establishment + Operating) to get total cost per cell
+        # Retrieve OPEX cost to get ongoing costs per cell
         re_total_cost = re_cost_df.sum(axis=1).values.astype(np.float32)
 
         # C. Combine and Assign
