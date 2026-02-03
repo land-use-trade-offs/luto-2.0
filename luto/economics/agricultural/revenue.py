@@ -25,11 +25,10 @@ Pure functions to calculate economic profit from land use.
 
 import numpy as np
 import pandas as pd
-from economics.agricultural import quantity
 import luto.settings as settings 
 
 from luto.data import Data
-from luto.economics.agricultural.quantity import get_yield_pot, get_quantity, lvs_veg_types, get_quantity_renewable, MGMT_TO_PRODUCT
+from luto.economics.agricultural.quantity import get_yield_pot, get_quantity, lvs_veg_types, get_quantity_renewable
 from luto.economics.agricultural.ghg import get_savanna_burning_effect_g_mrj
 
 def get_rev_crop( data:Data         # Data object.
@@ -219,7 +218,7 @@ def get_rev_renewable(data, lu, lm, yr_idx):
             columns=pd.MultiIndex.from_tuples([(lu, lm, 'Electricity')])
         )
     
-    product_name = MGMT_TO_PRODUCT[tech_key]
+    product_name = tech_key.capitalize() + " - Electricity"
 
     # -----------------------------------------------------------------------
     # 2. Get Quantity (MWh per cell)

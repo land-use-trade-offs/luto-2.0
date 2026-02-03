@@ -26,93 +26,32 @@ import luto.settings as settings
 from typing import Dict
 from scipy.interpolate import interp1d
 
-# ---------------------------------------------------------------------------
-# RE Quantity Configuration
-# ---------------------------------------------------------------------------
 
-MGMT_TO_PRODUCT = {
-    "Utility Solar PV": "UTILITY SOLAR PV - ELECTRICITY",
-    "Onshore Wind": "ONSHORE WIND - ELECTRICITY"
-}
 
-MGMT_CONFIG = {
-    # MW/km^2. Reduced based on recommendations.
-    "Utility Solar PV": {"gd": 45}, # 45 MW/km^2
-    "Onshore Wind": {"gd": 4},  # 4 MW/km^2
-}
-
-# ---------------------------------------------------------------------------
-# RE Quantity Calculation Helper Functions
-# ---------------------------------------------------------------------------
-
-def compute_solar_yield_per_ha(cf_raster, dlf_raster, mw_per_ha):
-    """
-    Compute Utility Solar PV electricity yield per cell [MWh/ha/year].
-    """
-    hours = 8760
-    return mw_per_ha * cf_raster * hours * (1 - dlf_raster)
-
-def compute_wind_yield_per_ha(cf_raster, dlf_raster, mw_per_ha):
-    """
-    Compute Onshore Wind electricity yield per cell [MWh/ha/year].
-    """
-    hours = 8760
-    return mw_per_ha * cf_raster * hours * (1 - dlf_raster)
-
-# ---------------------------------------------------------------------------
-# RE Quantity Calculation Functions
-# ---------------------------------------------------------------------------
-
-def get_quantity_renewable(data, pr: str, lm: str, yr_idx: int):
+def get_quantity_renewable(data, pr: str, yr_idx: int):
     """
     Return electricity yield [MWh] for renewable product `pr` under management 
     `lm` (string) for year index `yr_idx`.
     """
-    # 1. Validation
-    if pr not in ["UTILITY SOLAR PV - ELECTRICITY", "ONSHORE WIND - ELECTRICITY"]:
-        raise KeyError(f"Unknown renewable product '{pr}'")
 
-    # 2. Identify Management Name
-    # lm is expected to be the string name directly (e.g. "Utility Solar PV")
-    if "solar" in lm.lower():
-        lm_name = "Utility Solar PV"
-    elif "wind" in lm.lower():
-        lm_name = "Onshore Wind"
-    else:
-        raise KeyError(f"Unknown management type '{lm}' for renewable")
+    yr_cal = 2030 # data.YR_CAL_BASE + yr_idx: TODO, update to dynamic year when data available
+    re_type = pr.replace(' - ELECTRICITY', '')
+    re_lyr = data.RE_LAYERS.sel(Type=re_type, year=yr_cal)
+    
+    re_capture_percent = re_lyr['Capacity_percent_of_natural_energy']
+    re_loss_percent = re_lyr['Distribution_loss_percent_of_generation']
+    yield_per_ha = (
+        settings.RENEWABLE_NATURAL_ENERGY_MW_HA_HOUR[re_type]  
+        * re_capture_percent 
+        * (1 - re_loss_percent) 
+        * 365 * 24
+    )
 
-    # 3. Retrieve Pre-loaded Data
-    current_year = data.YR_CAL_BASE + yr_idx
-
-    # A. Capacity Factor (Static)
-    try:
-        cf = data.cf_static[lm_name]
-    except KeyError:
-        raise KeyError(f"Capacity Factor data missing for {lm_name} in data.cf_static")
-
-    # B. Distribution Loss Factor (Dynamic)
-    try:
-        dlf = data.dlf_dynamic[current_year]
-    except KeyError:
-        raise KeyError(f"DLF data missing for year {current_year} in data.dlf_dynamic")
-
-    # 4. Determine Generation Density
-    mw_per_ha = MGMT_CONFIG[lm_name]["gd"] / 100  # Convert MW/km^2 to MW/ha
-
-    # 5. Compute Yield per Hectare
-    if lm_name == "Utility Solar PV":
-        yield_per_ha = compute_solar_yield_per_ha(cf, dlf, mw_per_ha)
-    elif lm_name == "Onshore Wind":
-        yield_per_ha = compute_wind_yield_per_ha(cf, dlf, mw_per_ha)
-    else:
-        raise KeyError(f"Unknown land management name '{lm_name}'")
-
-    # 6. Convert to Total Yield (MWh)
     quantity = yield_per_ha * data.REAL_AREA
     
     return quantity.astype(np.float32)
 
-#Main function to pull yield raster for a given management type
+
 def lvs_veg_types(lu) -> tuple[str, str]:
     """Return livestock and vegetation types of the livestock land-use `lu`.
 
@@ -346,14 +285,15 @@ def get_quantity(data, pr, lm, yr_idx):
         q = get_quantity_crop(data, pr.capitalize(), lm, yr_idx)
     elif pr in data.PR_LVSTK:
         q = get_quantity_lvstk(data, pr, lm, yr_idx)
-    elif pr in ["UTILITY SOLAR PV - ELECTRICITY", "ONSHORE WIND - ELECTRICITY"]:
-        # lm is passed as a string here
-        q = get_quantity_renewable(data, pr, lm, yr_idx)
+    elif pr in data.PR_RENEWABLES:
+        q = get_quantity_renewable(data, pr, yr_idx)    # renewable energy not dependent on lm (i.e., dry/irr land)
     else:
         raise KeyError(f"Land use '{pr}' not found in data.")
 
-    # Apply productivity increase multiplier by product.
-    q *= data.BAU_PROD_INCR[lm, pr][yr_idx]
+    # Apply productivity increase multiplier by product. 
+    #   TODO: need to include renewable in this table. Current switch is just a temporary fix.
+    if pr not in data.PR_RENEWABLES:
+        q *= data.BAU_PROD_INCREASE_MULT[lm, pr][yr_idx]
 
     return q
 
@@ -370,7 +310,7 @@ def get_quantity_matrix(data, lm, yr_idx):
     - q_rp: A 2D Numpy array representing the quantities per cell per product.
     """
 
-    q_rp = np.zeros((data.NCELLS, len(data.PRODUCTS))).astype(np.float32)
+    q_rp = np.zeros((data.NCELLS, data.NPRS)).astype(np.float32)
     for j, pr in enumerate(data.PRODUCTS):
         q_rp[:, j] = get_quantity(data, pr, lm, yr_idx)
 
@@ -389,8 +329,7 @@ def get_quantity_matrices(data, yr_idx):
     Returns
     - q_mrp: A 3D Numpy array representing the matrix of quantities per cell.
     """
-    return np.stack(tuple( get_quantity_matrix(data, lm, yr_idx)
-                           for lm in data.LANDMANS ))
+    return np.stack(tuple( get_quantity_matrix(data, lm, yr_idx) for lm in data.LANDMANS ))
 
 
 def get_asparagopsis_effect_q_mrp(data, q_mrp, yr_idx):

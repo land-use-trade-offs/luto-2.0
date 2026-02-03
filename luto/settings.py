@@ -443,7 +443,19 @@ SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
 
 
 
-# -------------- Renewable energy parameters ------------------------
+# ---------------------------------------------------------------------------- #
+# Renewable energy parameters
+# ---------------------------------------------------------------------------- #
+
+RENEWABLE_NATURAL_ENERGY_MW_HA_HOUR = {
+    "UTILITY SOLAR PV": 0.45,
+    "ONSHORE WIND": 0.4,  
+}
+'''
+The per/ha capacity (MW/ha) for each renewable energy management type.
+'''
+
+
 # Base directory for RE inputs
 RE_INPUT_BASE = os.path.join('input', 'RE Module')
 
@@ -453,6 +465,8 @@ RE_PATHS = {
     'opex': os.path.join(RE_INPUT_BASE, 'opex'),
     'dlf': os.path.join(RE_INPUT_BASE, 'distribution_loss_factor')
 }
+
+
 
 # --------------Renewable energy target parameters ---------------------------- #  
 # User selects the renewable energy target aggregation level: 'state' or 'NRM'
@@ -468,6 +482,9 @@ def get_selected_nrm():
     if RE_TARGET_LEVEL.lower() == "nrm":
         return SELECTED_NRM
     return None
+
+
+
 
 # ---------------------------------------------------------------------------- #
 # Off-land commodity parameters

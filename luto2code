@@ -2723,7 +2723,7 @@ class Data:
 
         # Yield increases.
         fpath = os.path.join(settings.INPUT_DIR, "yieldincreases_bau2022.csv")
-        self.BAU_PROD_INCR = pd.read_csv(fpath, header=[0, 1]).astype(np.float32)
+        self.BAU_PROD_INCREASE_MULT = pd.read_csv(fpath, header=[0, 1]).astype(np.float32)
 
 
 
@@ -5963,7 +5963,7 @@ MGMT_TO_PRODUCT = {
     "Onshore Wind": "ONSHORE WIND - ELECTRICITY"
 }
 
-MGMT_CONFIG = {
+RENEWABLE_NATURAL_ENERGY_MW_HA_HOUR = {
     "Utility Solar PV": {"gd": 150},  # in MW/km^2 as per data
     "Onshore Wind": {"gd": 7.2}
 }
@@ -6000,7 +6000,7 @@ def get_quantity_renewable(data, pr: str, lm: int, yr_idx: int):
     cf = load_capacity_factor_raster(lm, data)
     dlf = load_dlf_raster(lm, data)
 
-    mw_per_ha = MGMT_CONFIG[lm_name]["gd"] / 100  # Convert MW/km^2 to MW/ha
+    mw_per_ha = RENEWABLE_NATURAL_ENERGY_MW_HA_HOUR[lm_name]["gd"] / 100  # Convert MW/km^2 to MW/ha
 
     if lm_name == "Utility Solar PV":
         yield_per_ha = compute_solar_yield_per_ha(cf, dlf, mw_per_ha)
@@ -6268,7 +6268,7 @@ def get_quantity(data, pr, lm, yr_idx):
         raise KeyError(f"Land use '{pr}' not found in data.")
 
     # Apply productivity increase multiplier by product. Essentially, this is a total factor productivity increase.
-    q *= data.BAU_PROD_INCR[lm, pr][yr_idx]
+    q *= data.BAU_PROD_INCREASE_MULT[lm, pr][yr_idx]
 
     return q
 

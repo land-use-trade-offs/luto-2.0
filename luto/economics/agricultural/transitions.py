@@ -33,10 +33,7 @@ import luto.economics.agricultural.ghg as ag_ghg
 from luto import settings
 import luto.tools as tools
 import luto.data as Data
-from data import load_establishment_cost_raster
 
-# Renewable energy eligibility criteria where establishment costs are non-zero
-import numpy as np
 
 def eligibility_by_establishment_cost(data, lm: int):
     """

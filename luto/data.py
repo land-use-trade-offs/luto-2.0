@@ -19,7 +19,6 @@
 
 import os
 import xarray as xr
-import rioxarray as rxr
 import numpy as np
 import pandas as pd
 import rasterio
@@ -694,13 +693,12 @@ class Data:
         print("\tLoading renewable energy data...", flush=True)
 
         # Renewable targets and prices
-        re_targets = pd.read_csv(f'{settings.INPUT_DIR}/renewable_targets.csv')
-        re_prices = pd.read_csv(f'{settings.INPUT_DIR}/renewable_elec_price_AUD_MWh.csv')
+        self.RE_TARGETS = pd.read_csv(f'{settings.INPUT_DIR}/renewable_targets.csv')
+        self.RE_PRICES = pd.read_csv(f'{settings.INPUT_DIR}/renewable_elec_price_AUD_MWh.csv')
         
         # Renewable energy ralated raster layers
-        re_layers = xr.load_dataset(f'{settings.INPUT_DIR}/renewable_energy_layers_1D.nc')
+        self.RE_LAYERS = xr.load_dataset(f'{settings.INPUT_DIR}/renewable_energy_layers_1D.nc').sel(cell=self.MASK)
     
-        
         # Renewable bundle data (productivity impacts, cost multipliers, etc)
         renewable_bundle = pd.read_csv(f'{settings.INPUT_DIR}/renewable_energy_bundle.csv')
         self.RENEWABLE_BUNDLE_WIND = renewable_bundle.query('Lever == "Onshore Wind"')
@@ -716,7 +714,7 @@ class Data:
 
         # Yield increases.
         fpath = os.path.join(settings.INPUT_DIR, "yieldincreases_bau2022.csv")
-        self.BAU_PROD_INCR = pd.read_csv(fpath, header=[0, 1]).astype(np.float32)
+        self.BAU_PROD_INCREASE_MULT = pd.read_csv(fpath, header=[0, 1]).astype(np.float32)
 
 
 
@@ -1068,7 +1066,7 @@ class Data:
         # Adjust demand data to the production data calculated using the base year layers;
         # The mismatch is caused by resfactoring spatial layers. Land uses of small size (i.e., other non-cereal crops) 
         # are distorted more under higher resfactoring.
-        self.D_CY *= (yr_cal_base_prod_data / self.D_CY[0])[None, :]
+        self.D_CY *= (yr_cal_base_prod_data[:-len(self.PR_RENEWABLES)] / self.D_CY[0])[None, :]  # TODO: temporary fix to skip renewable products.
         
         
         # Demand elasticity data
