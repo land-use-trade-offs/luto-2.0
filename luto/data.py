@@ -1766,8 +1766,15 @@ class Data:
         
         # Calculate year index (i.e., number of years since 2010)
         yr_idx = yr_cal - self.YR_CAL_BASE
-        lumap = self.lumaps[yr_cal]
         
+        # Get lumap of base year
+        sim_year = sorted(set([self.YR_CAL_BASE]) | set(settings.SIM_YEARS)) 
+        if yr_cal == self.YR_CAL_BASE:
+            lumap = self.lumaps[self.YR_CAL_BASE]
+        else:
+            prev_year = sim_year[sim_year.index(yr_cal)-1]
+            lumap = self.lumaps[prev_year]
+                
         # Get commodity matrices
         ag_q_mrp_xr = xr.DataArray(
             ag_quantity.get_quantity_matrices(self, yr_idx).astype(np.float32),
@@ -1903,32 +1910,6 @@ class Data:
         # Calculate price_multiplier (1-based ratio)
         price_delta = (delta_demand - delta_supply) / (self.elasticity_demand + self.elasticity_supply)
         elasticity_multiplier = (price_delta + 1).to_dataframe('multiplier')['multiplier'].to_dict()
-        
-        
-        for yr_cal in range(2010, 2051, 10):
-            # Get supply delta (0-based ratio)
-            supply_base_dvar_base_productivity = self.BASE_YR_production_t
-            supply_base_dvar_target_productivity = self.get_production_from_base_dvar_under_target_CCI_and_yield_change(yr_cal)
-            delta_supply = (supply_base_dvar_target_productivity - supply_base_dvar_base_productivity) / supply_base_dvar_base_productivity 
-            
-            # Get demand delta (0-based ratio)
-            demand_base_year = self.D_CY_xr.sel(year=self.YR_CAL_BASE)
-            demand_target_year = self.D_CY_xr.sel(year=yr_cal)
-            delta_demand = (demand_target_year - demand_base_year) / demand_base_year
-            
-            # Calculate price_multiplier (1-based ratio)
-            price_delta = (delta_demand - delta_supply) / (self.elasticity_demand + self.elasticity_supply)
-
-            df = pd.DataFrame({
-                'supply_base_dvar_target_productivity': supply_base_dvar_target_productivity,
-                'delta_supply': delta_supply,
-                'demand_base_year': demand_base_year,
-                'demand_target_year': demand_target_year,
-                'delta_demand': delta_demand,
-                'price_delta': price_delta,
-                'elasticity_multiplier': (price_delta + 1)
-            })
-        
         
         if settings.DYNAMIC_PRICE:
             return elasticity_multiplier
