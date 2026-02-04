@@ -188,106 +188,27 @@ def get_rev_lvstk( data:Data   # Data object.
     # Return revenue as numpy array.
     return rev_seperate
 
-# ---------------------------------------------------------------------------
-# Renewable Revenue Calculation Functions
-# ---------------------------------------------------------------------------
 
-def get_rev_renewable(data, lu, lm, yr_idx):
-    """
-    Return renewable energy revenue [AUD/cell] of `lm` (string) in `yr_idx`.
-    
-    This function:
-    1. Calculates electricity yield (MWh) via `get_quantity_renewable`.
-    2. Retrieves the annual electricity price vector for the simulation year.
-    3. Maps prices to cells using the `state_raster` (NRM->State bridge).
-    4. Returns total revenue per cell.
-    """
-    
-    # -----------------------------------------------------------------------
-    # 1. Identify Technology & Product
-    # -----------------------------------------------------------------------
-    # lm is expected to be the string name directly
-    if "solar" in lm.lower():
-        tech_key = "Utility Solar PV"
-    elif "wind" in lm.lower():
-        tech_key = "Onshore Wind"
-    else:
-        # If passed a non-RE management (safety fallback), return zeros
-        return pd.DataFrame(
-            np.zeros((data.NCELLS, 1), dtype=np.float32),
-            columns=pd.MultiIndex.from_tuples([(lu, lm, 'Electricity')])
-        )
-    
-    product_name = tech_key.capitalize() + " - Electricity"
-
-    # -----------------------------------------------------------------------
-    # 2. Get Quantity (MWh per cell)
-    # -----------------------------------------------------------------------
-    # Pass 'lm' (string) directly to the corrected quantity function
-    quantity_mwh = get_quantity_renewable(data, product_name, lm, yr_idx)
-
-    # -----------------------------------------------------------------------
-    # 3. Get Spatially Explicit (State-Based) Price ($/MWh)
-    # -----------------------------------------------------------------------
-    yr_cal = data.YR_CAL_BASE + yr_idx
-    
-    if yr_cal not in data.ELECTRICITY_PRICES.index:
-         raise KeyError(f"Year {yr_cal} missing from ELECTRICITY_PRICES forecast.")
-
-    # A. Retrieve Annual Prices Vector
-    annual_prices = data.ELECTRICITY_PRICES.loc[yr_cal].values
-
-    # B. Map Prices to the Grid (Vectorized Lookup)
-    price_map = np.zeros(data.NCELLS, dtype=np.float32)
-    valid_cells = (data.mask == 1) & (data.state_raster != -1)
-    
-    # Apply Fancy Indexing using the state raster
-    price_map[valid_cells] = annual_prices[data.state_raster[valid_cells]]
-
-    # -----------------------------------------------------------------------
-    # 4. Calculate Revenue ($/cell)
-    # -----------------------------------------------------------------------
-    rev_total = quantity_mwh * price_map
-
-    # -----------------------------------------------------------------------
-    # 5. Format Output
-    # -----------------------------------------------------------------------
-    return pd.DataFrame(
-        rev_total,
-        columns=pd.MultiIndex.from_tuples([(lu, lm, 'Electricity')])
-    )
 
 def get_rev(data, lu, lm, yr_idx):
     """
     Dispatcher function with Unallocated Land safety.
     """
-    
-    # 1. Check for Renewable Energy Management
-    # ----------------------------------------------------------------
-    # lm is passed as a string from get_rev_matrix loop (data.LANDMANS)
-    if lm in ["Utility Solar PV", "Onshore Wind"]:
-        return get_rev_renewable(data, lu, lm, yr_idx)
 
-    # 2. Check for Cropping
-    # ----------------------------------------------------------------
-    if lu in data.AGEC_CROPS['P1', lm].columns:
+    if lu in data.LU_CROPS:
         return get_rev_crop(data, lu, lm, yr_idx)
-
-    # 3. Check for Non-Agricultural / Unallocated Lands
-    # ----------------------------------------------------------------
-    if "Unallocated" in lu or "Destocked" in lu:
+    
+    elif lu in data.LU_LVSTK:
+        return get_rev_lvstk(data, lu, lm, yr_idx)
+    
+    elif lu in data.AGRICULTURAL_LANDUSES:
         return pd.DataFrame(
             np.zeros((data.NCELLS, 1), dtype=np.float32),
             columns=pd.MultiIndex.from_tuples([(lu, lm, 'None')])
         )
+    else:
+        raise KeyError(f"Land use '{lu}' not found in agricultural land uses.")
 
-    # 4. Default to Livestock
-    # ----------------------------------------------------------------
-    return get_rev_lvstk(data, lu, lm, yr_idx)
-
-# ---------------------------------------------------------------------------#
-# Revenue Matrix Calculation Functions
-# ---------------------------------------------------------------------------#
 
 def get_rev_matrix(data:Data, lm, yr_idx):
     """Return r_rj matrix of revenue/cell per lu under `lm` in `yr_idx`."""
@@ -299,6 +220,7 @@ def get_rev_matrix(data:Data, lm, yr_idx):
     )
     r_rjs = r_rjs.fillna(0)
     return r_rjs
+
 
 def get_rev_matrices(data:Data, yr_idx, aggregate:bool = True):
     """Return r_mrj matrix of revenue per cell as 3D Numpy array."""
@@ -543,37 +465,37 @@ def get_utility_solar_pv_effect_r_mrj(data: Data, r_mrj, yr_idx):
     if not settings.AG_MANAGEMENTS['Utility Solar PV']:
         return new_r_mrj
 
-    # Define LM string directly
-    solar_lm_name = 'Utility Solar PV'
-
-    # Update values in the new matrix
     for lu_idx, lu in enumerate(land_uses):
-        # A. Calculate Agricultural Revenue Adjustment
-        try:
-            revenue_multiplier = data.RENEWABLE_BUNDLE_SOLAR.query(
-                'Year == @yr_cal and Commodity == @lu'
-            )['Revenue'].item()
-        except (ValueError, KeyError):
-            revenue_multiplier = 1.0
 
+        # Get Utility Solar PV's impact on electricity revenue.
+        revenue_multiplier = data.RENEWABLE_BUNDLE_SOLAR.query('Year == @yr_cal and Commodity == @lu')
+        
+        if revenue_multiplier.empty:
+            print(f"Warning: No revenue multiplier found for {lu} in year {yr_cal} for Utility Solar PV. Using 1.0 as default.")
+            revenue_multiplier = 1.0
+        else:
+            revenue_multiplier = revenue_multiplier['Revenue'].item()
+            
         j = lu_codes[lu_idx]
         ag_revenue_delta = r_mrj[:, :, j] * (revenue_multiplier - 1)
 
-        # B. Calculate Electricity Revenue
-        # Pass string name 'solar_lm_name', not an index
-        elec_rev_df = get_rev_renewable(data, lu, solar_lm_name, yr_idx)
-        elec_rev_values = elec_rev_df.values.flatten().astype(np.float32)
+        # Get electricity revenue. TODO: prices now starts from 2021, need to start from 2010.
+        quantity_mwh = get_quantity_renewable(data, 'UTILITY SOLAR PV - ELECTRICITY', yr_idx)
 
-        # C. Combine Effects
-        total_effect = ag_revenue_delta + elec_rev_values[np.newaxis, :]
-        new_r_mrj[:, :, lu_idx] = total_effect
+        annual_prices = data.RE_PRICES.query('Year == @yr_cal').set_index('State')['Price_AUD_per_MWh'].to_dict()
+        annual_prices = {data.REGION_STATE_NAME2CODE[k]:v for k,v in annual_prices.items()}
+        price_map = np.vectorize(annual_prices.get, otypes=[np.float32])(data.REGION_STATE_CODE)
+
+        rev_total = quantity_mwh.data * price_map
+
+        # Assign electricity revenue values
+        new_r_mrj[:, :, lu_idx] = ag_revenue_delta + rev_total[None, :]
 
     return new_r_mrj
 
 def get_onshore_wind_effect_r_mrj(data: Data, r_mrj, yr_idx):
     """
     Applies the effects of Onshore Wind to the revenue data.
-    Adds: (Ag Revenue Change) + (New Electricity Revenue)
     """
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Onshore Wind']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
@@ -584,29 +506,31 @@ def get_onshore_wind_effect_r_mrj(data: Data, r_mrj, yr_idx):
     if not settings.AG_MANAGEMENTS['Onshore Wind']:
         return new_r_mrj
 
-    # Define LM string directly
-    wind_lm_name = 'Onshore Wind'
-
     for lu_idx, lu in enumerate(land_uses):
-        # A. Agricultural Adjustment
-        try:
-            revenue_multiplier = data.RENEWABLE_BUNDLE_WIND.query(
-                'Year == @yr_cal and Commodity == @lu'
-            )['Revenue'].item()
-        except (ValueError, KeyError):
-            revenue_multiplier = 1.0
 
+        # Get Onshore Wind's impact on electricity revenue.
+        revenue_multiplier = data.RENEWABLE_BUNDLE_WIND.query('Year == @yr_cal and Commodity == @lu')
+        
+        if revenue_multiplier.empty:
+            print(f"Warning: No revenue multiplier found for {lu} in year {yr_cal} for Onshore Wind. Using 1.0 as default.")
+            revenue_multiplier = 1.0
+        else:
+            revenue_multiplier = revenue_multiplier['Revenue'].item()
+            
         j = lu_codes[lu_idx]
         ag_revenue_delta = r_mrj[:, :, j] * (revenue_multiplier - 1)
 
-        # B. Electricity Revenue
-        # Pass string name 'wind_lm_name'
-        elec_rev_df = get_rev_renewable(data, lu, wind_lm_name, yr_idx)
-        elec_rev_values = elec_rev_df.values.flatten().astype(np.float32)
+        # Get electricity revenue. TODO: prices now starts from 2021, need to start from 2010.
+        quantity_mwh = get_quantity_renewable(data, 'ONSHORE WIND - ELECTRICITY', yr_idx)
 
-        # C. Combine
-        total_effect = ag_revenue_delta + elec_rev_values[np.newaxis, :]
-        new_r_mrj[:, :, lu_idx] = total_effect
+        annual_prices = data.RE_PRICES.query('Year == @yr_cal').set_index('State')['Price_AUD_per_MWh'].to_dict()
+        annual_prices = {data.REGION_STATE_NAME2CODE[k]:v for k,v in annual_prices.items()}
+        price_map = np.vectorize(annual_prices.get, otypes=[np.float32])(data.REGION_STATE_CODE)
+
+        rev_total = quantity_mwh.data * price_map
+
+        # Assign electricity revenue values
+        new_r_mrj[:, :, lu_idx] = ag_revenue_delta + rev_total[None, :]
 
     return new_r_mrj
 

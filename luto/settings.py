@@ -365,13 +365,13 @@ AG_MANAGEMENTS_TO_LAND_USES = {
     'Utility Solar PV':         [#Unallocated lands
                                 'Unallocated - modified land',
                                 # Livestock
-                                'Beef - modified land','Sheep - modified land', 'Dairy - modified land',
+                                'Beef - modified land', 'Sheep - modified land', 'Dairy - modified land',
                                 # Cropping:
                                 'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',], 
     'Onshore Wind':             [#Unallocated lands
                                 'Unallocated - modified land',
                                 # Livestock
-                                'Beef - modified land','Sheep - modified land', 'Dairy - modified land',
+                                'Beef - modified land', 'Sheep - modified land', 'Dairy - modified land',
                                 # Cropping:
                                 'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
                                 # Intensive Cropping:

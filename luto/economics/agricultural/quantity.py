@@ -31,7 +31,6 @@ from scipy.interpolate import interp1d
 def get_quantity_renewable(data, pr: str, yr_idx: int):
     """
     Return electricity yield [MWh] for renewable product `pr` under management 
-    `lm` (string) for year index `yr_idx`.
     """
 
     yr_cal = 2030 # data.YR_CAL_BASE + yr_idx: TODO, update to dynamic year when data available
@@ -582,13 +581,13 @@ def get_utility_solar_pv_effect_q_mrp(data, q_mrp, yr_idx):
 
     # Iterate through land uses affected by Solar PV
     for lu, j in zip(land_uses, lu_codes):
-        try:
-            productivity_multiplier = data.RENEWABLE_BUNDLE_SOLAR.query(
-                'Year == @yr_cal and Commodity == @lu'
-            )['Productivity'].item()
-        except (ValueError, KeyError):
+        # TODO: 'Hay'is missing. Need to add when data available.
+        productivity_multiplier = data.RENEWABLE_BUNDLE_SOLAR.query('Year == @yr_cal and Commodity == @lu')['Productivity']
+        if len(productivity_multiplier) == 0:
+            print(f"Warning: No productivity data for {lu} in year {yr_cal} for Solar-PV. Assuming no impact.")
             productivity_multiplier = 1.0
-
+        else:
+            productivity_multiplier = productivity_multiplier.item()
         if productivity_multiplier != 1:
             # Apply to all products associated with this land use
             for p in range(data.NPRS):
@@ -615,13 +614,7 @@ def get_onshore_wind_effect_q_mrp(data, q_mrp, yr_idx):
         return new_q_mrp
 
     for lu, j in zip(land_uses, lu_codes):
-        try:
-            productivity_multiplier = data.RENEWABLE_BUNDLE_WIND.query(
-                'Year == @yr_cal and Commodity == @lu'
-            )['Productivity'].item()
-        except (ValueError, KeyError):
-            productivity_multiplier = 1.0
-
+        productivity_multiplier = data.RENEWABLE_BUNDLE_WIND.query('Year == @yr_cal and Commodity == @lu')['Productivity'].item()
         if productivity_multiplier != 1:
             for p in range(data.NPRS):
                 if data.LU2PR[p, j]:

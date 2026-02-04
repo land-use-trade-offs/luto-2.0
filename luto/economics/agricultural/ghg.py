@@ -28,10 +28,8 @@ import numpy as np
 import pandas as pd
 
 from luto.data import Data
-import luto.tools as tools
 from luto import settings
-from luto.economics.agricultural.quantity import get_yield_pot
-from luto.economics.agricultural.quantity import lvs_veg_types
+from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types
 
 
 def get_ghg_crop(data:Data, lu, lm, aggregate):

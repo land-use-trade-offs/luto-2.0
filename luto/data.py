@@ -449,6 +449,7 @@ class Data:
             os.path.join(settings.INPUT_DIR, "REGION_STATE_r.h5"), where=self.MASK
         )
         
+        self.REGION_STATE_NAME2CODE = REGION_STATE_r.groupby('STE_NAME11', observed=True)['STE_CODE11'].first().to_dict()
         self.REGION_STATE_CODE = REGION_STATE_r['STE_CODE11']
         self.REGION_STATE_NAME = REGION_STATE_r['STE_NAME11']
         

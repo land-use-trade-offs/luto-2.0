@@ -482,9 +482,9 @@ def get_ag_man_r_mrj(data: Data, target_index, ag_r_mrj: np.ndarray):
     return output
 
 
-def get_ag_man_t_mrj(data: Data, target_index, ag_t_mrj: np.ndarray):
+def get_ag_man_t_mrj(data: Data):
     print('Getting agricultural management options\' transition cost effects...', flush = True)
-    output = ag_transition.get_agricultural_management_transition_matrices(data, ag_t_mrj, target_index)
+    output = ag_transition.get_agricultural_management_transition_matrices(data)
     return output
 
 
@@ -770,7 +770,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     
     ag_man_c_mrj = get_ag_man_c_mrj(data, target_index, ag_c_mrj)
     ag_man_r_mrj = get_ag_man_r_mrj(data, target_index, ag_r_mrj)
-    ag_man_t_mrj = get_ag_man_t_mrj(data, target_index, ag_t_mrj)
+    ag_man_t_mrj = get_ag_man_t_mrj(data)
     
     ag_obj_mrj, non_ag_obj_rk,  ag_man_objs=get_economic_mrj(
         ag_c_mrj,

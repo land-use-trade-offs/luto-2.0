@@ -252,7 +252,12 @@ def get_utility_solar_pv_effect_b_mrj(data:Data, ag_b_mrj: np.ndarray, yr_idx: i
     if not settings.AG_MANAGEMENTS['Utility Solar PV']:
         return b_mrj_effect
     for lu_idx, lu in enumerate(land_uses):
-        biodiv_impact = data.RENEWABLE_BUNDLE_SOLAR.query('Year == @yr_cal and Commodity == @lu')['Biodiversity_compatability'].item()
+        biodiv_impact = data.RENEWABLE_BUNDLE_SOLAR.query('Year == @yr_cal and Commodity == @lu')
+        if len(biodiv_impact) == 0:
+            print(f"Warning: No biodiversity impact data found for Utility Solar PV land-use '{lu}' in year {yr_cal}. Assuming no impact.")
+            biodiv_impact = 1.0
+        else:
+            biodiv_impact = biodiv_impact['Biodiversity_compatability'].item()
         if biodiv_impact != 1:
             j = lu_codes[lu_idx]
             b_mrj_effect[:, :, lu_idx] = ag_b_mrj[:, :, j] * (biodiv_impact - 1)
