@@ -468,18 +468,10 @@ def get_utility_solar_pv_effect_r_mrj(data: Data, r_mrj, yr_idx):
     for lu_idx, lu in enumerate(land_uses):
 
         # Get Utility Solar PV's impact on electricity revenue.
-        revenue_multiplier = data.RENEWABLE_BUNDLE_SOLAR.query('Year == @yr_cal and Commodity == @lu')
-        
-        if revenue_multiplier.empty:
-            print(f"Warning: No revenue multiplier found for {lu} in year {yr_cal} for Utility Solar PV. Using 1.0 as default.")
-            revenue_multiplier = 1.0
-        else:
-            revenue_multiplier = revenue_multiplier['Revenue'].item()
-            
+        revenue_multiplier = data.RENEWABLE_BUNDLE_SOLAR.query('Year == @yr_cal and Commodity == @lu')['Revenue'].item()
         j = lu_codes[lu_idx]
         ag_revenue_delta = r_mrj[:, :, j] * (revenue_multiplier - 1)
 
-        # Get electricity revenue. TODO: prices now starts from 2021, need to start from 2010.
         quantity_mwh = get_quantity_renewable(data, 'UTILITY SOLAR PV - ELECTRICITY', yr_idx)
 
         annual_prices = data.RE_PRICES.query('Year == @yr_cal').set_index('State')['Price_AUD_per_MWh'].to_dict()
@@ -520,7 +512,6 @@ def get_onshore_wind_effect_r_mrj(data: Data, r_mrj, yr_idx):
         j = lu_codes[lu_idx]
         ag_revenue_delta = r_mrj[:, :, j] * (revenue_multiplier - 1)
 
-        # Get electricity revenue. TODO: prices now starts from 2021, need to start from 2010.
         quantity_mwh = get_quantity_renewable(data, 'ONSHORE WIND - ELECTRICITY', yr_idx)
 
         annual_prices = data.RE_PRICES.query('Year == @yr_cal').set_index('State')['Price_AUD_per_MWh'].to_dict()

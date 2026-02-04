@@ -581,13 +581,7 @@ def get_utility_solar_pv_effect_q_mrp(data, q_mrp, yr_idx):
 
     # Iterate through land uses affected by Solar PV
     for lu, j in zip(land_uses, lu_codes):
-        # TODO: 'Hay'is missing. Need to add when data available.
-        productivity_multiplier = data.RENEWABLE_BUNDLE_SOLAR.query('Year == @yr_cal and Commodity == @lu')['Productivity']
-        if len(productivity_multiplier) == 0:
-            print(f"Warning: No productivity data for {lu} in year {yr_cal} for Solar-PV. Assuming no impact.")
-            productivity_multiplier = 1.0
-        else:
-            productivity_multiplier = productivity_multiplier.item()
+        productivity_multiplier = data.RENEWABLE_BUNDLE_SOLAR.query('Year == @yr_cal and Commodity == @lu')['Productivity'].item()
         if productivity_multiplier != 1:
             # Apply to all products associated with this land use
             for p in range(data.NPRS):

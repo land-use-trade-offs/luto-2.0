@@ -533,12 +533,7 @@ def get_utility_solar_pv_effect_c_mrj(data: Data, c_mrj, yr_idx):
 
     for lu_idx, lu in enumerate(land_uses):
 
-        om_mult = data.RENEWABLE_BUNDLE_SOLAR.query('Year == @yr_cal and Commodity == @lu')
-        if om_mult.empty:
-            print(f"Warning: No operationg cost multiplier found for {lu} in year {yr_cal} for Utility Solar PV. Using 1.0 as default.")
-            om_mult = 1.0
-        else:
-            om_mult = om_mult['OM_Cost_Multiplier'].item()
+        om_mult = data.RENEWABLE_BUNDLE_SOLAR.query('Year == @yr_cal and Commodity == @lu')['OM_Cost_Multiplier'].item()
         
         # Cost of renewable energy impact on the original land-use
         #   i.e., 1.05 means a 5% increase in operating costs
