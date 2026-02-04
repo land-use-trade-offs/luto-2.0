@@ -425,16 +425,20 @@ def get_utility_solar_pv_effect_w_mrj(data, yr_idx):
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Utility Solar PV']
     lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
     yr_cal = data.YR_CAL_BASE + yr_idx
+
     # Set up the effects matrix
-    b_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)   
+    wreq_mrj = get_wreq_matrices(data, yr_idx)
+    w_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32) 
+    
     if not settings.AG_MANAGEMENTS['Utility Solar PV']:
-        return b_mrj_effect
+        return w_mrj_effect
+
     for lu_idx, lu in enumerate(land_uses):
         water_impact = data.RENEWABLE_BUNDLE_SOLAR.query('Year == @yr_cal and Commodity == @lu')['INPUT-wrt_water-required'].item()
         if water_impact != 1:
             j = lu_codes[lu_idx]
-            b_mrj_effect[:, :, lu_idx] = ag_b_mrj[:, :, j] * (water_impact - 1)
-    return b_mrj_effect
+            w_mrj_effect[:, :, lu_idx] = wreq_mrj[:, :, j] * (water_impact - 1)
+    return w_mrj_effect
 
 def get_onshore_wind_effect_w_mrj(data, yr_idx):
     """
@@ -449,16 +453,20 @@ def get_onshore_wind_effect_w_mrj(data, yr_idx):
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Onshore Wind']
     lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
     yr_cal = data.YR_CAL_BASE + yr_idx
+    
     # Set up the effects matrix
-    b_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)   
+    wreq_mrj = get_wreq_matrices(data, yr_idx)
+    w_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)  
+     
     if not settings.AG_MANAGEMENTS['Onshore Wind']:
-        return b_mrj_effect
+        return w_mrj_effect
+    
     for lu_idx, lu in enumerate(land_uses):
         water_impact = data.RENEWABLE_BUNDLE_WIND.query('Year == @yr_cal and Commodity == @lu')['INPUT-wrt_water-required'].item()
         if water_impact != 1:
             j = lu_codes[lu_idx]
-            b_mrj_effect[:, :, lu_idx] = ag_b_mrj[:, :, j] * (water_impact - 1)
-    return b_mrj_effect
+            w_mrj_effect[:, :, lu_idx] = wreq_mrj[:, :, j] * (water_impact - 1)
+    return w_mrj_effect
 
 def get_agricultural_management_water_matrices(data, yr_idx) -> dict[str, np.ndarray]:
     
