@@ -455,16 +455,10 @@ RENEWABLE_NATURAL_ENERGY_MW_HA_HOUR = {
 The per/ha capacity (MW/ha) for each renewable energy management type.
 '''
 
-
-# Base directory for RE inputs
-RE_INPUT_BASE = os.path.join('input', 'RE Module')
-
-# Sub-directory definitions
-RE_PATHS = {
-    'capex': os.path.join(RE_INPUT_BASE, 'capex'),
-    'opex': os.path.join(RE_INPUT_BASE, 'opex'),
-    'dlf': os.path.join(RE_INPUT_BASE, 'distribution_loss_factor')
-}
+RENEWABLES_PRODUCTS = [
+    'UTILITY SOLAR PV - ELECTRICITY',
+    'ONSHORE WIND - ELECTRICITY'
+]
 
 
 

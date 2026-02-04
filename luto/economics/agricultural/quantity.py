@@ -30,11 +30,20 @@ from scipy.interpolate import interp1d
 
 def get_quantity_renewable(data, pr: str, yr_idx: int):
     """
-    Return electricity yield [MWh] for renewable product `pr` under management 
+    Return electricity yield [MWh] for renewable product `pr`.
+    
+    Args:
+        data (object/module): Data object or module.
+        pr (str): Renewable product that defined in settings.RENEWABLES_PRODUCTS (e.g., 'UTILITY SOLAR PV - ELECTRICITY').
+        yr_idx (int): Number of years post base-year ('YR_CAL_BASE').
     """
 
     yr_cal = 2030 # data.YR_CAL_BASE + yr_idx: TODO, update to dynamic year when data available
     re_type = pr.replace(' - ELECTRICITY', '')
+    
+    if not pr in settings.RENEWABLES_PRODUCTS:
+        raise KeyError(f"Renewable product '{pr}' not found in settings.RENEWABLES_PRODUCTS.")
+    
     re_lyr = data.RE_LAYERS.sel(Type=re_type, year=yr_cal)
     
     re_capture_percent = re_lyr['Capacity_percent_of_natural_energy']
@@ -284,15 +293,13 @@ def get_quantity(data, pr, lm, yr_idx):
         q = get_quantity_crop(data, pr.capitalize(), lm, yr_idx)
     elif pr in data.PR_LVSTK:
         q = get_quantity_lvstk(data, pr, lm, yr_idx)
-    elif pr in data.PR_RENEWABLES:
-        q = get_quantity_renewable(data, pr, yr_idx)    # renewable energy not dependent on lm (i.e., dry/irr land)
+    elif pr in data.AGRICULTURAL_LANDUSES:              # Must be unallocated land use product, so return zeroes.
+        q = np.zeros((data.NCELLS)).astype(np.float32)
     else:
         raise KeyError(f"Land use '{pr}' not found in data.")
 
     # Apply productivity increase multiplier by product. 
-    #   TODO: need to include renewable in this table. Current switch is just a temporary fix.
-    if pr not in data.PR_RENEWABLES:
-        q *= data.BAU_PROD_INCREASE_MULT[lm, pr][yr_idx]
+    q *= data.BAU_PROD_INCREASE_MULT[lm, pr][yr_idx]
 
     return q
 

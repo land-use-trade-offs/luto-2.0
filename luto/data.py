@@ -287,15 +287,10 @@ class Data:
             'SHEEP - NATURAL LAND MEAT',
             'SHEEP - NATURAL LAND WOOL'
         ]
-        self.PR_RENEWABLES = [
-            'UTILITY SOLAR PV - ELECTRICITY',
-            'ONSHORE WIND - ELECTRICITY'
-        ]
+        
         # Sort each product category alphabetically, then concatenate
-        self.PR_CROPS.sort()
-        self.PR_LVSTK.sort()
-        self.PR_RENEWABLES.sort()
-        self.PRODUCTS = self.PR_CROPS + self.PR_LVSTK + self.PR_RENEWABLES
+        self.PRODUCTS = self.PR_CROPS + self.PR_LVSTK
+        self.PRODUCTS.sort()
 
         # Get number of products
         self.NPRS = len(self.PRODUCTS)
@@ -1067,7 +1062,7 @@ class Data:
         # Adjust demand data to the production data calculated using the base year layers;
         # The mismatch is caused by resfactoring spatial layers. Land uses of small size (i.e., other non-cereal crops) 
         # are distorted more under higher resfactoring.
-        self.D_CY *= (yr_cal_base_prod_data[:-len(self.PR_RENEWABLES)] / self.D_CY[0])[None, :]  # TODO: temporary fix to skip renewable products.
+        self.D_CY *= (yr_cal_base_prod_data / self.D_CY[0])[None, :]  
         
         
         # Demand elasticity data
