@@ -283,7 +283,7 @@ def get_onshore_wind_effect_b_mrj(data:Data, ag_b_mrj: np.ndarray, yr_idx: int):
     return b_mrj_effect
 
 
-def get_agricultural_management_biodiversity_matrices(data:Data, ag_b_mrj: np.ndarray, yr_idx: int):
+def get_ag_mgt_biodiversity_matrices(data:Data, ag_b_mrj: np.ndarray, yr_idx: int):
     """
     Calculate the biodiversity matrices for different agricultural management practices.
 
