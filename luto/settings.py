@@ -460,6 +460,16 @@ RENEWABLES_PRODUCTS = [
     'ONSHORE WIND - ELECTRICITY'
 ]
 
+RENEWABLES_ADOPTION_LIMITS = {
+    'UTILITY SOLAR PV': 1.0,  # Maximum proportion of land that can be used for Utility Solar PV
+    'ONSHORE WIND': 1.0,      # Maximum proportion of land that can be used for Onshore Wind
+}
+'''
+The maximum proportion of land that can be used for each renewable energy management type.
+For example, if RENEWABLES_ADOPTION_LIMITS['UTILITY SOLAR PV'] = 0.5, then at most 50% of 
+the land can be used for Utility Solar PV.
+'''
+
 
 
 # --------------Renewable energy target parameters ---------------------------- #  

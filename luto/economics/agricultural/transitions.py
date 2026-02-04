@@ -437,6 +437,28 @@ def get_sheep_hir_adoption_limit(data: Data):
 
     return hir_limits
 
+def get_utility_solar_pv_adoption_limit(data: Data):
+    """
+    Gets the adoption limit of Utility Solar PV for each possible land use.
+    """
+    solar_pv_limits = {}
+    for lu in settings.AG_MANAGEMENTS_TO_LAND_USES['Utility Solar PV']:
+        j = data.DESC2AGLU[lu]
+        solar_pv_limits[j] = 1
+        
+    return solar_pv_limits
+
+def get_onshore_wind_adoption_limit(data: Data):
+    """
+    Gets the adoption limit of Onshore Wind for each possible land use.
+    """
+    wind_limits = {}
+    for lu in settings.AG_MANAGEMENTS_TO_LAND_USES['Onshore Wind']:
+        j = data.DESC2AGLU[lu]
+        wind_limits[j] = 1
+        
+    return wind_limits
+
 def get_agricultural_management_adoption_limits(data: Data, yr_idx) -> Dict[str, dict]:
     """
     An adoption limit represents the maximum percentage of cells (for each land use) that can utilise
@@ -452,6 +474,8 @@ def get_agricultural_management_adoption_limits(data: Data, yr_idx) -> Dict[str,
     ag_management_data['Biochar'] = get_biochar_adoption_limit(data, yr_idx)                                if settings.AG_MANAGEMENTS['Biochar'] else {data.DESC2AGLU[lu]: 0 for lu in settings.AG_MANAGEMENTS_TO_LAND_USES['Biochar']}
     ag_management_data['HIR - Beef'] = get_beef_hir_adoption_limit(data)                                    if settings.AG_MANAGEMENTS['HIR - Beef'] else {data.DESC2AGLU[lu]: 0 for lu in settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef']}
     ag_management_data['HIR - Sheep'] = get_sheep_hir_adoption_limit(data)                                  if settings.AG_MANAGEMENTS['HIR - Sheep'] else {data.DESC2AGLU[lu]: 0 for lu in settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep']}
+    ag_management_data['Utility Solar PV'] = get_utility_solar_pv_adoption_limit(data)                      if settings.AG_MANAGEMENTS['Utility Solar PV'] else {data.DESC2AGLU[lu]: 0 for lu in settings.AG_MANAGEMENTS_TO_LAND_USES['Utility Solar PV']}
+    ag_management_data['Onshore Wind'] = get_onshore_wind_adoption_limit(data)                              if settings.AG_MANAGEMENTS['Onshore Wind'] else {data.DESC2AGLU[lu]: 0 for lu in settings.AG_MANAGEMENTS_TO_LAND_USES['Onshore Wind']}
    
     return ag_management_data
 

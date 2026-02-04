@@ -520,13 +520,16 @@ class LutoSolver:
                 adoption_limit = self._input_data.ag_man_limits[am][j]
 
                 # Sum of all usage of the AM option must be less than the limit
-                ag_man_vars_sum = gp.quicksum(
-                    self.X_ag_man_dry_vars_jr[am][j_idx, :]
-                ) + gp.quicksum(self.X_ag_man_irr_vars_jr[am][j_idx, :])
-
-                all_vars_sum = gp.quicksum(self.X_ag_dry_vars_jr[j, :]) + gp.quicksum(
-                    self.X_ag_irr_vars_jr[j, :]
+                ag_man_vars_sum = (
+                    gp.quicksum(self.X_ag_man_dry_vars_jr[am][j_idx, :]) 
+                    + gp.quicksum(self.X_ag_man_irr_vars_jr[am][j_idx, :])
                 )
+
+                all_vars_sum = (
+                    gp.quicksum(self.X_ag_dry_vars_jr[j, :]) 
+                    + gp.quicksum(self.X_ag_irr_vars_jr[j, :])
+                )
+                
                 constr = self.gurobi_model.addConstr(
                     ag_man_vars_sum <= adoption_limit * all_vars_sum,
                     name=f"const_ag_mam_adoption_limit_{am}_{j}".replace(" ", "_"),
