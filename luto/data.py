@@ -445,9 +445,10 @@ class Data:
         )
         
         self.REGION_STATE_NAME2CODE = REGION_STATE_r.groupby('STE_NAME11', observed=True)['STE_CODE11'].first().to_dict()
-        self.REGION_STATE_CODE = REGION_STATE_r['STE_CODE11']
-        self.REGION_STATE_NAME = REGION_STATE_r['STE_NAME11']
+        self.REGION_STATE_NAME2CODE = dict(sorted(self.REGION_STATE_NAME2CODE.items()))     # Make sure the dict is sorted by state name, makes it consistent with renewable target.
+        self.REGION_STATE_NAME2CODE.pop('Other Territories')                                # Remove 'Other Territories' from the dict.
         
+        self.REGION_STATE_CODE = REGION_STATE_r['STE_CODE11'].values
 
         ###############################################################
         # No-Go areas; Regional adoption constraints.
@@ -689,12 +690,22 @@ class Data:
         print("\tLoading renewable energy data...", flush=True)
 
         # Renewable targets and prices
-        self.RE_TARGETS = pd.read_csv(f'{settings.INPUT_DIR}/renewable_targets.csv')
-        self.RE_PRICES = pd.read_csv(f'{settings.INPUT_DIR}/renewable_elec_price_AUD_MWh.csv')
+        self.RENEWABLE_TARGETS = pd.read_csv(f'{settings.INPUT_DIR}/renewable_targets.csv').sort_values('STATE')    # Ensure targets are sorted by state for consistent mapping to region codes.
+        self.RENEWABLE_TARGETS['Renewable_Target_MWh'] = self.RENEWABLE_TARGETS['Renewable_Target_TWh'] * 1e6       # Convert TWh to MWh
+        
+        self.RENEWABLE_PRICES = pd.read_csv(f'{settings.INPUT_DIR}/renewable_elec_price_AUD_MWh.csv')
         
         # Renewable energy ralated raster layers
-        self.RE_LAYERS = xr.load_dataset(f'{settings.INPUT_DIR}/renewable_energy_layers_1D.nc').sel(cell=self.MASK)
-    
+        self.RENEWABLE_LAYERS = xr.load_dataset(f'{settings.INPUT_DIR}/renewable_energy_layers_1D.nc').sel(cell=self.MASK)
+        
+        # TODO: remove when all years of renewable layers are available. 
+        #   Now is a temporary fix to expand the 2010 layers across all years.
+        self.RENEWABLE_LAYERS = (
+            self.RENEWABLE_LAYERS
+            .squeeze('year', drop=True)
+            .expand_dims({'year': range(2010, 2051)})
+        )
+        
         # Renewable bundle data (productivity impacts, cost multipliers, etc)
         renewable_bundle = pd.read_csv(f'{settings.INPUT_DIR}/renewable_energy_bundle.csv')
         self.RENEWABLE_BUNDLE_WIND = renewable_bundle.query('Lever == "Onshore Wind"')
@@ -1640,7 +1651,6 @@ class Data:
 
         mask_arr_2d_resfactor = (self.LUMAP_2D_RESFACTORED != self.NODATA) & (self.LUMAP_2D_RESFACTORED != self.MASK_LU_CODE) 
         return arr_2d_xr_resfactored[mask_arr_2d_resfactor]
-    
 
     
     def get_resfactored_lumap(self) -> np.ndarray:

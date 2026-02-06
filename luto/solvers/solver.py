@@ -100,6 +100,7 @@ class LutoSolver:
         self.demand_penalty_constraints = []
         self.water_limit_constraints = []
         self.water_nyiled_exprs = {}
+        self.renewable_constraints = {}
         self.ghg_expr = None
         self.ghg_consts_ub = None
         self.ghg_consts_lb = None
@@ -147,6 +148,7 @@ class LutoSolver:
         self._add_biodiversity_constraints()
         self._add_regional_adoption_constraints()
         self._add_water_usage_limit_constraints() 
+        self._add_renewable_energy_constraints()
         
     def _setup_objective(self):
         """
@@ -708,6 +710,57 @@ class LutoSolver:
                 ) 
                 
             self.water_limit_constraints.append(constr)
+      
+
+    def _add_renewable_energy_constraints(self) -> None:
+        
+        if settings.RENEWABLE_ENERGY_CONSTRAINTS == "off":
+            print("│   └── TURNING OFF renewable energy constraints ...")
+            return
+        
+        for target_idx, (reg_name, reg_id) in enumerate(self._input_data.region_state_name2idx.items()):
+
+            reg_idx = np.where(self._input_data.region_state_r == reg_id)[0]
+            solar_energy_lyr = self._input_data.renewable_solar_r[reg_idx]
+            
+            target_raw_solar = self._input_data.limits["renewable_solar"][target_idx]
+            target_raw_wind = self._input_data.limits["renewable_wind"][target_idx]
+            
+            target_rescal_solar = self._input_data.limits["renewable_solar_rescale"][target_idx]
+            target_rescal_wind = self._input_data.limits["renewable_wind_rescale"][target_idx]
+            
+            print(f"│   │   ├── Adding renewable energy constraints for {reg_name} ...")
+            print(f"│   │   │   ├── target for solar is {target_raw_solar:5,.0f} Mwh")
+            print(f"│   │   │   └── target for wind is {target_raw_wind:5,.0f} Mwh")
+            
+            
+            for am, am_j_list in self._input_data.am2j.items():
+                
+                if am not in settings.RENEWABLES_OPTIONS or not settings.AG_MANAGEMENTS[am]:
+                    continue
+                
+                for j_idx,j in enumerate(am_j_list):
+                    X_ag_mam_dry_r = self.X_ag_man_dry_vars_jr[am][j_idx, reg_idx]
+                    X_ag_mam_irr_r = self.X_ag_man_irr_vars_jr[am][j_idx, reg_idx]
+                    
+                    self.renewable_constraints['solar'] = (
+                        self.gurobi_model.addConstr(
+                            gp.quicksum(X_ag_mam_dry_r * solar_energy_lyr)
+                            + gp.quicksum(X_ag_mam_irr_r * solar_energy_lyr)
+                            >= target_rescal_solar,
+                            name=f"renewable_solar_target_{am}_{reg_name}".replace(" ", "_")
+                        )
+                    )
+                    
+                    self.renewable_constraints['wind'] = (
+                        self.gurobi_model.addConstr(
+                            gp.quicksum(X_ag_mam_dry_r * self._input_data.renewable_wind_r[reg_idx])
+                            + gp.quicksum(X_ag_mam_irr_r * self._input_data.renewable_wind_r[reg_idx])
+                            >= target_rescal_wind,
+                            name=f"renewable_wind_target_{am}_{reg_name}".replace(" ", "_")
+                        )
+                    )
+                
 
 
     def _get_total_ghg_expr(self) -> gp.LinExpr:
@@ -1153,7 +1206,7 @@ class LutoSolver:
     def _add_GBF8_constraints(self) -> None:
                 
         if settings.BIODIVERSITY_TARGET_GBF_8 != "on":
-            print('│   │   ├── TURNING OFF constraints for biodiversity GBF 8...')
+            print('│   │   ├── TURNING OFF constraints for biodiversity GBF 8 ...')
             return
         
         s_limits = self._input_data.limits["GBF8_rescale"]
@@ -1219,7 +1272,7 @@ class LutoSolver:
     def _add_regional_adoption_constraints(self) -> None:
 
         if settings.REGIONAL_ADOPTION_CONSTRAINTS == "off":
-            print("│   │   ├── TURNING OFF constraints for regional adoption...")
+            print("│   │   └── TURNING OFF constraints for regional adoption ...")
             return
 
         # Add adoption constraints for agricultural land uses

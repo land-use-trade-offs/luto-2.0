@@ -541,7 +541,7 @@ def get_utility_solar_pv_effect_c_mrj(data: Data, c_mrj, yr_idx):
         ag_cost_delta = c_mrj[:, :, j] * (om_mult - 1)
 
         # Cost of renewable energy operation/maintenance
-        re_lyr = data.RE_LAYERS.sel(Type='UTILITY SOLAR PV', year=2030)  # TODO: Update to dynamic year when data available
+        re_lyr = data.RENEWABLE_LAYERS.sel(Type='Utility Solar PV', year=yr_cal)
         re_cost_operation_AUD_ha = re_lyr['Cost_of_operation'] * data.REAL_AREA
 
         # Assign combined cost effects to output matrix
@@ -585,7 +585,7 @@ def get_onshore_wind_effect_c_mrj(data: Data, c_mrj, yr_idx):
         ag_cost_delta = c_mrj[:, :, j] * (om_mult - 1)
 
         # Cost of renewable energy operation/maintenance
-        re_lyr = data.RE_LAYERS.sel(Type='ONSHORE WIND', year=2030)  # TODO: Update to dynamic year when data available
+        re_lyr = data.RENEWABLE_LAYERS.sel(Type='Onshore Wind', year=yr_cal) 
         re_cost_operation_AUD_ha = re_lyr['Cost_of_operation'] * data.REAL_AREA
 
         # Assign combined cost effects to output matrix

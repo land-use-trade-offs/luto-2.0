@@ -446,46 +446,43 @@ SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
 # ---------------------------------------------------------------------------- #
 # Renewable energy parameters
 # ---------------------------------------------------------------------------- #
+RENEWABLE_ENERGY_CONSTRAINTS = 'on'         # 'on' or 'off'
 
-RENEWABLE_NATURAL_ENERGY_MW_HA_HOUR = {
-    "UTILITY SOLAR PV": 0.45,
-    "ONSHORE WIND": 0.4,  
-}
-'''
-The per/ha capacity (MW/ha) for each renewable energy management type.
-'''
-
-RENEWABLES_PRODUCTS = [
-    'UTILITY SOLAR PV - ELECTRICITY',
-    'ONSHORE WIND - ELECTRICITY'
+RENEWABLES_OPTIONS = [
+    'Utility Solar PV',
+    'Onshore Wind'
 ]
 
+RENEWABLE_TARGET_SCENARIO =  'CNS25 - Accelerated Transition' # one of 'CNS25 - Accelerated Transition', 'CNS25 - Current Targets'
+'''
+The renewable energy target scenario to use when `RENEWABLE_ENERGY_CONSTRAINTS` is set to 'on'.
+One of 'CNS25 - Accelerated Transition' or 'CNS25 - Current Targets', 
+'''
+
+RE_TARGET_LEVEL = "STATE"  # options: "STATE", "NRM"; currently (20260205) only support STATE.
+'''
+The spatial level at which to apply the renewable energy targets when `RENEWABLE_ENERGY_CONSTRAINTS` is set to 'on'.
+Options include "STATE" or "NRM". Currently (20260205) only support STATE.
+'''
+
+RENEWABLE_NATURAL_ENERGY_MW_HA_HOUR = {
+    "Utility Solar PV": 0.45,
+    "Onshore Wind": 0.4,  
+}
+'''
+The per/ha capacity (Mw/ha) for each renewable energy management type.
+'''
+
+
 RENEWABLES_ADOPTION_LIMITS = {
-    'UTILITY SOLAR PV': 1.0,  # Maximum proportion of land that can be used for Utility Solar PV
-    'ONSHORE WIND': 1.0,      # Maximum proportion of land that can be used for Onshore Wind
+    'Utility Solar PV': 1.0,        # Maximum proportion of land that can be used for Utility Solar PV
+    'Onshore Wind': 1.0,            # Maximum proportion of land that can be used for Onshore Wind
 }
 '''
 The maximum proportion of land that can be used for each renewable energy management type.
-For example, if RENEWABLES_ADOPTION_LIMITS['UTILITY SOLAR PV'] = 0.5, then at most 50% of 
+For example, if RENEWABLES_ADOPTION_LIMITS['Utility Solar PV'] = 0.5, then at most 50% of 
 the land can be used for Utility Solar PV.
 '''
-
-
-
-# --------------Renewable energy target parameters ---------------------------- #  
-# User selects the renewable energy target aggregation level: 'state' or 'NRM'
-RE_TARGET_LEVEL = "state"  # options: "state", "NRM"
-
-# If 'NRM', optionally specify which NRMs to include; None means all
-SELECTED_NRM = None  # e.g., ["Mallee", "Corangamite"]
-
-def get_target_level():
-    return RE_TARGET_LEVEL
-
-def get_selected_nrm():
-    if RE_TARGET_LEVEL.lower() == "nrm":
-        return SELECTED_NRM
-    return None
 
 
 

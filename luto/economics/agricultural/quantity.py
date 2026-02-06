@@ -27,39 +27,6 @@ from typing import Dict
 from scipy.interpolate import interp1d
 
 
-
-def get_quantity_renewable(data, pr: str, yr_idx: int):
-    """
-    Return electricity yield [MWh] for renewable product `pr`.
-    
-    Args:
-        data (object/module): Data object or module.
-        pr (str): Renewable product that defined in settings.RENEWABLES_PRODUCTS (e.g., 'UTILITY SOLAR PV - ELECTRICITY').
-        yr_idx (int): Number of years post base-year ('YR_CAL_BASE').
-    """
-
-    yr_cal = 2030 # data.YR_CAL_BASE + yr_idx: TODO, update to dynamic year when data available
-    re_type = pr.replace(' - ELECTRICITY', '')
-    
-    if not pr in settings.RENEWABLES_PRODUCTS:
-        raise KeyError(f"Renewable product '{pr}' not found in settings.RENEWABLES_PRODUCTS.")
-    
-    re_lyr = data.RE_LAYERS.sel(Type=re_type, year=yr_cal)
-    
-    re_capture_percent = re_lyr['Capacity_percent_of_natural_energy']
-    re_loss_percent = re_lyr['Distribution_loss_percent_of_generation']
-    yield_per_ha = (
-        settings.RENEWABLE_NATURAL_ENERGY_MW_HA_HOUR[re_type]  
-        * re_capture_percent 
-        * (1 - re_loss_percent) 
-        * 365 * 24
-    )
-
-    quantity = yield_per_ha * data.REAL_AREA
-    
-    return quantity.astype(np.float32)
-
-
 def lvs_veg_types(lu) -> tuple[str, str]:
     """Return livestock and vegetation types of the livestock land-use `lu`.
 
@@ -650,3 +617,49 @@ def get_agricultural_management_quantity_matrices(data, q_mrp, yr_idx) -> Dict[s
     ag_mam_q_mrp['Onshore Wind'] = get_onshore_wind_effect_q_mrp(data, q_mrp, yr_idx)                     
 
     return {am:ag_mam_q_mrp[am] for am in settings.AG_MANAGEMENTS if settings.AG_MANAGEMENTS[am]}
+
+
+
+# Renewable quantity calculation.
+'''
+Renewable products are different to agricultural products.
+
+For agricultural products, the quantity is calculated as:
+    quantity_ag = yield_per_ha * real_area                          # Ag products produced without any ag-man
+    quantity_am = quantity_ag * (re_productivity_multiplier - 1)    # If ag-man applied, an additional quantity is introduced (positive or negative) depending on the multiplier.
+
+For renewable products, the quantity is calculated as:
+    quantity = Natural_energy * re_nature_energy_capture_percent * (1 - re_remain_percent_after_distribution) * 365 * 24 * real_area
+'''
+
+
+def get_quantity_renewable(data, re_type: str, yr_idx: int):
+    """
+    Return electricity yield [MWh] for renewable product `pr`.
+    
+    Args:
+        data (object/module): Data object or module.
+        re_type (str): Renewable product that defined in settings.RENEWABLES_OPTIONS (e.g., 'Utility Solar PV').
+        yr_idx (int): Number of years post base-year ('YR_CAL_BASE').
+    """
+
+    yr_cal = data.YR_CAL_BASE + yr_idx
+    
+    if not re_type in settings.RENEWABLES_OPTIONS:
+        raise KeyError(f"Renewable re_typeoduct '{re_type}' not found in settings.RENEWABLES_OPTIONS.")
+    
+    re_lyr = data.RENEWABLE_LAYERS.sel(Type=re_type, year=yr_cal)
+    
+    re_nature_energy_capture_percent = re_lyr['Capacity_percent_of_natural_energy']
+    re_remain_percent_after_distribution = re_lyr['Energy_remain_percent_after_distribution']
+    yield_per_ha = (
+        settings.RENEWABLE_NATURAL_ENERGY_MW_HA_HOUR[re_type]  
+        * re_nature_energy_capture_percent 
+        * (1 - re_remain_percent_after_distribution) 
+        * 365 * 24
+    )
+
+    quantity = yield_per_ha * data.REAL_AREA
+    
+    return quantity.data.astype(np.float32)
+

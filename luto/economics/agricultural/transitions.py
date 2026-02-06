@@ -254,7 +254,7 @@ def get_sheep_hir_effect_t_mrj(data):
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep']
     return np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
-def get_utility_solar_pv_effect_t_mrj(data):
+def get_utility_solar_pv_effect_t_mrj(data, yr_idx):
     """
     Calculate establishment-related transition costs for Utility Solar PV
     as a 3D array indexed by management (m), cell (r), and land use (j) for year yr_idx.
@@ -262,14 +262,14 @@ def get_utility_solar_pv_effect_t_mrj(data):
     UPDATED: Uses dynamic CAPEX maps and returns Upfront cost (no amortisation).
     """
     
-    yr_cal = 2030 # data.YR_CAL_BASE + yr_idx. TODO: replace with dynamic year when available
+    yr_cal = data.YR_CAL_BASE + yr_idx
     solar_lus = settings.AG_MANAGEMENTS_TO_LAND_USES['Utility Solar PV']
     
     if not settings.AG_MANAGEMENTS.get('Utility Solar PV', False):
         return np.zeros((data.NLMS, data.NCELLS, len(solar_lus)), dtype=np.float32)
 
     # Get upfront installation cost map (AUD/Cell)
-    capex_map = data.RE_LAYERS.sel(year=yr_cal, Type='UTILITY SOLAR PV')['Cost_of_install_AUD_ha'] * data.REAL_AREA
+    capex_map = data.RENEWABLE_LAYERS.sel(year=yr_cal, Type='Utility Solar PV')['Cost_of_install_AUD_ha'] * data.REAL_AREA
     
     # Assign to mrj matrix
     effect_array = np.zeros((data.NLMS, data.NCELLS, len(solar_lus)), dtype=np.float32)
@@ -282,7 +282,7 @@ def get_utility_solar_pv_effect_t_mrj(data):
     return effect_array
 
 
-def get_onshore_wind_effect_t_mrj(data):
+def get_onshore_wind_effect_t_mrj(data, yr_idx):
     """
     Calculate establishment-related transition costs for Onshore Wind
     as a 3D array indexed by management (m), cell (r), and land use (j) for year yr_idx.
@@ -290,14 +290,14 @@ def get_onshore_wind_effect_t_mrj(data):
     UPDATED: Uses dynamic CAPEX maps and returns Upfront cost (no amortisation).
     """
     
-    yr_cal = 2030 # data.YR_CAL_BASE + yr_idx. TODO: replace with dynamic year when available
+    yr_cal = data.YR_CAL_BASE + yr_idx
     wind_lus = settings.AG_MANAGEMENTS_TO_LAND_USES['Onshore Wind']
     
     if not settings.AG_MANAGEMENTS.get('Onshore Wind', False):
         return np.zeros((data.NLMS, data.NCELLS, data.NPRS), dtype=np.float32)
 
     # Get upfront installation cost map (AUD/Cell)
-    capex_map = data.RE_LAYERS.sel(year=yr_cal, Type='ONSHORE WIND')['Cost_of_install_AUD_ha'] * data.REAL_AREA
+    capex_map = data.RENEWABLE_LAYERS.sel(year=yr_cal, Type='Onshore Wind')['Cost_of_install_AUD_ha'] * data.REAL_AREA
     
     # Assign to mrj matrix
     effect_array = np.zeros((data.NLMS, data.NCELLS, len(wind_lus)), dtype=np.float32)
@@ -310,7 +310,7 @@ def get_onshore_wind_effect_t_mrj(data):
     return effect_array
 
 
-def get_agricultural_management_transition_matrices(data: Data) -> Dict[str, np.ndarray]:
+def get_agricultural_management_transition_matrices(data: Data, yr_idx) -> Dict[str, np.ndarray]:
     
     asparagopsis_data = get_asparagopsis_effect_t_mrj(data)                     
     precision_agriculture_data = get_precision_agriculture_effect_t_mrj(data)   
@@ -320,8 +320,8 @@ def get_agricultural_management_transition_matrices(data: Data) -> Dict[str, np.
     biochar_data = get_biochar_effect_t_mrj(data)                               
     beef_hir_data = get_beef_hir_effect_t_mrj(data)                             
     sheep_hir_data = get_sheep_hir_effect_t_mrj(data)
-    utility_solar_pv_data = get_utility_solar_pv_effect_t_mrj(data)
-    onshore_wind_data = get_onshore_wind_effect_t_mrj(data)
+    utility_solar_pv_data = get_utility_solar_pv_effect_t_mrj(data, yr_idx)
+    onshore_wind_data = get_onshore_wind_effect_t_mrj(data, yr_idx)
                   
     return {
         'Asparagopsis taxiformis': asparagopsis_data,
@@ -444,7 +444,7 @@ def get_utility_solar_pv_adoption_limit(data: Data):
     solar_pv_limits = {}
     for lu in settings.AG_MANAGEMENTS_TO_LAND_USES['Utility Solar PV']:
         j = data.DESC2AGLU[lu]
-        solar_pv_limits[j] = 1
+        solar_pv_limits[j] = settings.RENEWABLES_ADOPTION_LIMITS['Utility Solar PV']
         
     return solar_pv_limits
 
@@ -455,7 +455,7 @@ def get_onshore_wind_adoption_limit(data: Data):
     wind_limits = {}
     for lu in settings.AG_MANAGEMENTS_TO_LAND_USES['Onshore Wind']:
         j = data.DESC2AGLU[lu]
-        wind_limits[j] = 1
+        wind_limits[j] = settings.RENEWABLES_ADOPTION_LIMITS['Onshore Wind']
         
     return wind_limits
 
