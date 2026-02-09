@@ -65,6 +65,7 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 - **`luto/solvers/`**: Optimization solver interface and input data preparation
   - `solver.py`: GUROBI solver wrapper (LutoSolver class)
     - Biodiversity constraint methods: `_add_GBF2_constraints()`, `_add_GBF3_NVIS_constraints()`, `_add_GBF4_SNES_constraints()`, `_add_GBF4_ECNES_constraints()`, `_add_GBF8_constraints()`
+    - Renewable energy constraint method: `_add_renewable_energy_constraints()` — enforces state-level solar and wind generation targets
   - `input_data.py`: Prepares optimization model input data
     - Biodiversity data attributes use `*_pre_1750_area_*` naming (e.g., `GBF3_NVIS_pre_1750_area_vr`, `GBF4_SNES_pre_1750_area_sr`)
     - `rescale_solver_input_data()`: **In-place** rescaling of arrays to magnitude 0-1e3 for numerical stability
@@ -73,6 +74,7 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 - **`luto/economics/agricultural/`**: Agricultural land use economics
   - Revenue, cost, quantity, water, biodiversity, GHG calculations
   - Transition costs between agricultural land uses
+  - **Renewable energy** effects integrated across all economics modules (cost, revenue, quantity, water, biodiversity, transitions)
   - **Dynamic pricing** (`revenue.py`): Demand elasticity-based price adjustments
     - Calculates commodity price multipliers based on supply-demand dynamics
     - Uses elasticity coefficients and demand deltas from 2010 baseline
@@ -131,6 +133,16 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
   - `BIODIVERSITY_TARGET_GBF_4_ECNES`: Ecological Community NES ('on' or 'off')
   - `BIODIVERSITY_TARGET_GBF_8`: Species conservation targets ('on' or 'off')
 
+### Renewable Energy Settings
+- `RENEWABLE_ENERGY_CONSTRAINTS`: Enable renewable energy generation targets ('on' or 'off')
+- `RENEWABLES_OPTIONS`: Renewable energy types: `['Utility Solar PV', 'Onshore Wind']`
+- `RENEWABLE_TARGET_SCENARIO`: Target scenario ('CNS25 - Accelerated Transition' or 'CNS25 - Current Targets')
+- `RE_TARGET_LEVEL`: Spatial level for constraints ('STATE' or 'NRM'; only STATE currently supported)
+- `RENEWABLE_NATURAL_ENERGY_MW_HA_HOUR`: Per-hectare capacity (MW/ha) per renewable type
+- `RENEWABLES_ADOPTION_LIMITS`: Maximum adoption fraction per type (default: 1.0 for both)
+- Both renewable types are registered as non-reversible agricultural management options in `AG_MANAGEMENTS`
+- Compatible land uses differ: Solar PV excludes Hay; Wind includes Hay and horticulture crops
+
 ### Solver Configuration
 - `SOLVE_METHOD`: GUROBI algorithm (default: 2 for barrier method)
 - `THREADS`: Parallel threads for optimization
@@ -143,6 +155,7 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
    - Calculates demand deltas (change from 2010 baseline) for price adjustments
    - **Carbon data**: Loads NetCDF files using xarray, selects data at `CARBON_EFFECTS_WINDOW` age
    - Carbon sequestration components: Trees + Debris (aboveground, risk-discounted) + Soil (belowground)
+   - **Renewable energy data**: Loads targets (CSV), electricity prices (CSV), spatial layers (NetCDF), and bundle parameters (CSV)
 2. **Preprocessing**: `dataprep.py` processes raw data into model-ready formats
    - Copies demand elasticity data from source to input directory
    - **Carbon data preparation**: Converts 3D timeseries to NetCDF format with age dimension
@@ -153,8 +166,9 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
    - Elasticity multipliers computed as: `1 + (demand_delta / demand_elasticity)`
 4. **Solver Input**: `solvers/input_data.py` prepares optimization model data
    - Biodiversity matrices: GBF2 mask areas, GBF3 NVIS layers, GBF4 SNES/ECNES matrices, GBF8 species data
+   - Renewable energy: Solar/wind yield arrays (`renewable_solar_r`, `renewable_wind_r`), state region mapping, rescaled targets
    - Data rescaling: Arrays rescaled in-place to 0-1e3 magnitude for numerical stability
-5. **Optimization**: `solvers/solver.py` runs GUROBI optimization with biodiversity constraints
+5. **Optimization**: `solvers/solver.py` runs GUROBI optimization with biodiversity and renewable energy constraints
 6. **Output Generation**: `tools/write.py` writes results to `/output/`
    - Biodiversity outputs: GBF2/3/4/8 scores, species impacts, vegetation group restoration
 
@@ -259,6 +273,58 @@ The biodiversity module follows consistent naming conventions for GBF (Global Bi
    - ECNES: `get_GBF4_ECNES_matrix_sr(data)`
 4. **GBF8**: Species conservation
    - Function: `get_GBF8_species_matrices_sr(data, target_year)`
+
+## Renewable Energy Module
+
+The renewable energy module (REM) introduces solar and wind energy generation as agricultural management options, enabling optimization of land use to meet state-level renewable energy targets.
+
+### Architecture
+
+Renewable energy types (Utility Solar PV, Onshore Wind) are implemented as agricultural management options (`AG_MANAGEMENTS`). Each type has effects across all economics modules:
+
+- **`quantity.py`**: `get_quantity_renewable(data, re_type, yr_idx)` — core yield calculation (MWh per cell). Yield = `MW_HA_HR × capacity% × (1 - distribution_loss%) × 8760 × REAL_AREA`
+- **`revenue.py`**: `get_utility_solar_pv_effect_r_mrj()` / `get_onshore_wind_effect_r_mrj()` — agricultural revenue change + electricity revenue (quantity × state-level price)
+- **`cost.py`**: `get_utility_solar_pv_effect_c_mrj()` / `get_onshore_wind_effect_c_mrj()` — O&M cost multiplier on base ag costs + operational costs from spatial layers
+- **`transitions.py`**: `get_utility_solar_pv_effect_t_mrj()` / `get_onshore_wind_effect_t_mrj()` — upfront installation CAPEX (not amortized)
+- **`biodiversity.py`**: `get_utility_solar_pv_effect_b_mrj()` / `get_onshore_wind_effect_b_mrj()` — biodiversity compatibility impacts from bundle data
+- **`water.py`**: `get_utility_solar_pv_effect_w_mrj()` / `get_onshore_wind_effect_w_mrj()` — water requirement impacts
+
+### Solver Constraints
+
+`_add_renewable_energy_constraints()` in `solver.py` enforces state-level generation targets:
+- Separate constraints for solar and wind per state
+- Uses `renewable_solar_r` / `renewable_wind_r` yield arrays from `input_data.py`
+- Targets from `RENEWABLE_TARGETS` CSV, filtered by year and scenario
+- Rescaled for numerical stability (same pattern as biodiversity constraints)
+
+### Data Loading (`data.py`)
+
+- `RENEWABLE_TARGETS`: State-level generation targets (TWh → MWh) by year, scenario, and product
+- `RENEWABLE_PRICES`: State-level electricity prices (AUD/MWh) by year
+- `RENEWABLE_LAYERS`: NetCDF spatial layers with installation cost, operation cost, capacity %, and distribution loss %
+- `RENEWABLE_BUNDLE_SOLAR` / `RENEWABLE_BUNDLE_WIND`: Parameters per land use (productivity, revenue, O&M multiplier, biodiversity compatibility, water requirements)
+- `REGION_STATE_CODE` / `REGION_STATE_NAME2CODE`: State mapping for state-level constraint aggregation
+
+### Input Files Required
+
+| File | Format | Description |
+|------|--------|-------------|
+| `renewable_targets.csv` | CSV | Year, STATE, SCENARIO, PRODUCT, Renewable_Target_TWh |
+| `renewable_elec_price_AUD_MWh.csv` | CSV | Year, State, Price_AUD_per_MWh |
+| `renewable_energy_bundle.csv` | CSV | Year, Commodity, Lever, Productivity, Revenue, OM_Cost_Multiplier, Biodiversity_compatability, INPUT-wrt_water-required |
+| `renewable_energy_layers_1D.nc` | NetCDF | Spatial layers: Cost_of_install_AUD_ha, Cost_of_operation, Capacity_percent_of_natural_energy, Energy_remain_percent_after_distribution |
+
+### Compatible Land Uses
+
+- **Utility Solar PV**: Unallocated - modified land, Beef/Sheep/Dairy - modified land, Summer/Winter cereals/legumes/oilseeds
+- **Onshore Wind**: All Solar PV land uses + Hay, Cotton, Other non-cereal crops, Rice, Sugar, Vegetables
+
+### Key Design Notes
+
+- Both types are **non-reversible** once installed (`AG_MANAGEMENTS_REVERSIBLE = False`)
+- Adoption limits enforced via existing `const_ag_mam_adoption_limit` solver constraints
+- State-level pricing: electricity revenue uses state-specific prices mapped via `REGION_STATE_CODE`
+- Effects follow standard pattern: `base_value × (multiplier - 1)` for additive impacts
 
 ## Vue.js Reporting System Architecture
 
