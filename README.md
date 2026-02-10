@@ -231,6 +231,9 @@ settings.BIODIVERSITY_TARGET_GBF_8 = 'off'              # 'on' or 'off'
 
 settings.DYNAMIC_PRICE = False                          # Enable demand elasticity-based dynamic pricing
 
+settings.RENEWABLE_ENERGY_CONSTRAINTS = 'on'             # Enable renewable energy targets
+settings.RENEWABLE_TARGET_SCENARIO = 'CNS25 - Accelerated Transition'  # Target scenario
+
 # Load data with custom parameters
 data = sim.load_data()
 
@@ -286,9 +289,17 @@ LUTO2 behavior can be customized through the `luto.settings` module. Key paramet
 - `BIODIVERSITY_TARGET_GBF_4_ECNES`: Ecological Communities of National Environmental Significance ('on' or 'off')
 - `BIODIVERSITY_TARGET_GBF_8`: Species and group targets ('on' or 'off')
 
+### Renewable Energy Constraints
+- `RENEWABLE_ENERGY_CONSTRAINTS`: Enable/disable renewable energy generation targets ('on' or 'off')
+- `RENEWABLES_OPTIONS`: List of renewable energy types (`['Utility Solar PV', 'Onshore Wind']`)
+- `RENEWABLE_TARGET_SCENARIO`: Target scenario ('CNS25 - Accelerated Transition' or 'CNS25 - Current Targets')
+- `RE_TARGET_LEVEL`: Spatial level for targets ('STATE' or 'NRM')
+- `RENEWABLE_NATURAL_ENERGY_MW_HA_HOUR`: Per-hectare generation capacity (MW/ha) for each renewable type
+- `RENEWABLES_ADOPTION_LIMITS`: Maximum fraction of compatible land available for each renewable type (default: 1.0)
+
 ### Land Use Options
 - `NON_AG_LAND_USES`: Enable/disable non-agricultural land uses (Environmental Plantings, Carbon Plantings, etc.)
-- `AG_MANAGEMENTS`: Enable/disable agricultural management practices (Precision Agriculture, Biochar, etc.)
+- `AG_MANAGEMENTS`: Enable/disable agricultural management practices (Precision Agriculture, Biochar, Utility Solar PV, Onshore Wind, etc.)
 - `EXCLUDE_NO_GO_LU`: Whether to exclude certain land uses from specific areas
 
 ### Economic Parameters

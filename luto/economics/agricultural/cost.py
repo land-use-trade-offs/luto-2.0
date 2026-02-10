@@ -23,8 +23,6 @@
 Pure functions to calculate costs of commodities and alt. land uses.
 """
 
-
-
 import itertools
 import numpy as np
 import pandas as pd
@@ -33,7 +31,6 @@ from luto.data import Data
 import luto.settings as settings
 from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types, get_quantity
 from luto.settings import AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
-from luto.economics.agricultural.quantity import get_yield_pot, get_quantity, lvs_veg_types
 
 
 def get_cost_crop(data:Data, lu, lm, yr_idx):
@@ -192,21 +189,12 @@ def get_cost_lvstk(data:Data, lu, lm, yr_idx):
 
 
 def get_cost(data:Data, lu, lm, yr_idx):
-    """Return production cost <unit: $/cell> of `lu`+`lm` in `yr_idx` as np array.
-
-    Args:
-        data (object/module): Data object or module. Assumes fields like in `luto.data`.
-        lu (str): Land use (e.g. 'Winter cereals').
-        lm (str): Land management (e.g. 'dry', 'irr', 'org').
-        yr_idx (int): Number of years post base-year ('YR_CAL_BASE').
-
-    Returns
-        np.array: Production cost <unit: $/cell> of `lu`+`lm` in `yr_idx`.
-
-    Raises:
-        KeyError: If land use `lu` is not found in `data.LANDUSES`.
     """
-    # If it is a crop, it is known how to get the costs.
+    Return production cost <unit: $/cell>.
+    Updated to handle Renewable Energy and Unallocated Lands consistently.
+    """
+    
+
     if lu in data.LU_CROPS:
         return get_cost_crop(data, lu, lm, yr_idx)
 
@@ -526,6 +514,84 @@ def get_sheep_hir_effect_c_mrj(data: Data, yr_idx: int):
     
     return cost_mrj
 
+def get_utility_solar_pv_effect_c_mrj(data: Data, c_mrj, yr_idx):
+    """
+    Applies Utility Solar PV cost effects.
+    Calculates: (Base Ag Cost * Multiplier) + (Solar CAPEX + OPEX)
+    """
+
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Utility Solar PV']
+    lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
+    yr_cal = data.YR_CAL_BASE + yr_idx
+    
+    # Initialize output matrix: (LandManagements x Cells x LandUses)
+    new_c_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
+
+    # Return zeros if management is disabled globally
+    if not settings.AG_MANAGEMENTS['Utility Solar PV']:
+        return new_c_mrj
+
+    for lu_idx, lu in enumerate(land_uses):
+
+        om_mult = data.RENEWABLE_BUNDLE_SOLAR.query('Year == @yr_cal and Commodity == @lu')['OM_Cost_Multiplier'].item()
+        
+        # Cost of renewable energy impact on the original land-use
+        #   i.e., 1.05 means a 5% increase in operating costs
+        j = lu_codes[lu_idx]
+        ag_cost_delta = c_mrj[:, :, j] * (om_mult - 1)
+
+        # Cost of renewable energy operation/maintenance
+        re_lyr = data.RENEWABLE_LAYERS.sel(Type='Utility Solar PV', year=yr_cal)
+        re_cost_operation_AUD_ha = re_lyr['Cost_of_operation'] * data.REAL_AREA
+
+        # Assign combined cost effects to output matrix
+        new_c_mrj[:, :, lu_idx] = ag_cost_delta + re_cost_operation_AUD_ha.data[None, :]
+        
+
+    return new_c_mrj
+
+
+
+def get_onshore_wind_effect_c_mrj(data: Data, c_mrj, yr_idx):
+    """
+    Applies Onshore Wind cost effects.
+    Calculates: (Base Ag Cost * Multiplier) + (Wind CAPEX + OPEX)
+    """
+
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Onshore Wind']
+    lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
+    yr_cal = data.YR_CAL_BASE + yr_idx
+    
+    # Initialize output matrix: (LandManagements x Cells x LandUses)
+    new_c_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
+
+    # Return zeros if management is disabled globally
+    if not settings.AG_MANAGEMENTS['Onshore Wind']:
+        return new_c_mrj
+
+
+    for lu_idx, lu in enumerate(land_uses):
+
+        om_mult = data.RENEWABLE_BUNDLE_WIND.query('Year == @yr_cal and Commodity == @lu')
+        if om_mult.empty:
+            print(f"Warning: No operationg cost multiplier found for {lu} in year {yr_cal} for Onshore Wind. Using 1.0 as default.")
+            om_mult = 1.0
+        else:
+            om_mult = om_mult['OM_Cost_Multiplier'].item()
+        
+        # Cost of renewable energy impact on the original land-use
+        #   i.e., 1.05 means a 5% increase in operating costs
+        j = lu_codes[lu_idx]
+        ag_cost_delta = c_mrj[:, :, j] * (om_mult - 1)
+
+        # Cost of renewable energy operation/maintenance
+        re_lyr = data.RENEWABLE_LAYERS.sel(Type='Onshore Wind', year=yr_cal) 
+        re_cost_operation_AUD_ha = re_lyr['Cost_of_operation'] * data.REAL_AREA
+
+        # Assign combined cost effects to output matrix
+        new_c_mrj[:, :, lu_idx] = ag_cost_delta + re_cost_operation_AUD_ha.data[None, :]
+    return new_c_mrj
+
 
 def get_agricultural_management_cost_matrices(data: Data, c_mrj, yr_idx):
     """
@@ -549,6 +615,9 @@ def get_agricultural_management_cost_matrices(data: Data, c_mrj, yr_idx):
     ag_mam_c_mrj['AgTech EI'] = get_agtech_ei_effect_c_mrj(data, yr_idx)                            
     ag_mam_c_mrj['Biochar'] = get_biochar_effect_c_mrj(data, yr_idx)                                
     ag_mam_c_mrj['HIR - Beef'] = get_beef_hir_effect_c_mrj(data, yr_idx)                            
-    ag_mam_c_mrj['HIR - Sheep'] = get_sheep_hir_effect_c_mrj(data, yr_idx)                          
+    ag_mam_c_mrj['HIR - Sheep'] = get_sheep_hir_effect_c_mrj(data, yr_idx)   
+    ag_mam_c_mrj['Utility Solar PV'] = get_utility_solar_pv_effect_c_mrj(data, c_mrj, yr_idx)
+    ag_mam_c_mrj['Onshore Wind'] = get_onshore_wind_effect_c_mrj(data, c_mrj, yr_idx)
+                        
 
     return ag_mam_c_mrj

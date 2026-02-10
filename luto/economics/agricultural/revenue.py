@@ -28,7 +28,7 @@ import pandas as pd
 import luto.settings as settings 
 
 from luto.data import Data
-from luto.economics.agricultural.quantity import get_yield_pot, get_quantity, lvs_veg_types
+from luto.economics.agricultural.quantity import get_yield_pot, get_quantity, lvs_veg_types, get_quantity_renewable
 from luto.economics.agricultural.ghg import get_savanna_burning_effect_g_mrj
 
 def get_rev_crop( data:Data         # Data object.
@@ -166,32 +166,25 @@ def get_rev_lvstk( data:Data   # Data object.
     return rev_seperate
 
 
-def get_rev( data:Data    # Data object.
-            , lu           # Land use.
-            , lm           # Land management.
-            , yr_idx       # Number of years post base-year ('YR_CAL_BASE')
-            ):
-    """Return revenue from production [AUD/cell] of `lu`+`lm` in `yr_idx` as np array.
 
-    `data`: data object/module -- assumes fields like in `luto.data`.
-    `lu`: land use (e.g. 'Winter cereals').
-    `lm`: land management (e.g. 'dry', 'irr').
-    `yr_idx`: number of years from base year, counting from zero.
+def get_rev(data, lu, lm, yr_idx):
     """
-    # If it is a crop, it is known how to get the revenue.
+    Dispatcher function with Unallocated Land safety.
+    """
+
     if lu in data.LU_CROPS:
         return get_rev_crop(data, lu, lm, yr_idx)
-
+    
     elif lu in data.LU_LVSTK:
         return get_rev_lvstk(data, lu, lm, yr_idx)
-
+    
     elif lu in data.AGRICULTURAL_LANDUSES:
         return pd.DataFrame(
-            np.zeros((data.NCELLS, 1)).astype(np.float32),
-            columns=pd.MultiIndex.from_tuples([(lu, lm, 'Unallocated Land')])
+            np.zeros((data.NCELLS, 1), dtype=np.float32),
+            columns=pd.MultiIndex.from_tuples([(lu, lm, 'None')])
         )
     else:
-        raise KeyError(f"Land-use '{lu}' not found in data.LANDUSES")
+        raise KeyError(f"Land use '{lu}' not found in agricultural land uses.")
 
 
 def get_rev_matrix(data:Data, lm, yr_idx):
@@ -440,6 +433,80 @@ def get_sheep_hir_effect_r_mrj(data: Data, r_mrj):
 
     return r_mrj_effect
 
+def get_utility_solar_pv_effect_r_mrj(data: Data, r_mrj, yr_idx):
+    """
+    Applies the effects of Utility Solar PV to the revenue data
+    for all relevant agricultural land uses.
+    Adds: (Ag Revenue Change) + (New Electricity Revenue)
+    """
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Utility Solar PV']
+    lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
+    yr_cal = data.YR_CAL_BASE + yr_idx
+
+    new_r_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    if not settings.AG_MANAGEMENTS['Utility Solar PV']:
+        return new_r_mrj
+
+    for lu_idx, lu in enumerate(land_uses):
+
+        # Get Utility Solar PV's impact on electricity revenue.
+        revenue_multiplier = data.RENEWABLE_BUNDLE_SOLAR.query('Year == @yr_cal and Commodity == @lu')['Revenue'].item()
+        j = lu_codes[lu_idx]
+        ag_revenue_delta = r_mrj[:, :, j] * (revenue_multiplier - 1)
+
+        quantity_mwh = get_quantity_renewable(data, 'Utility Solar PV', yr_idx)
+
+        annual_prices = data.RENEWABLE_PRICES.query('Year == @yr_cal').set_index('State')['Price_AUD_per_MWh'].to_dict()
+        annual_prices = {data.REGION_STATE_NAME2CODE[k]:v for k,v in annual_prices.items()}
+        price_map = np.vectorize(annual_prices.get, otypes=[np.float32])(data.REGION_STATE_CODE)
+
+        rev_total = quantity_mwh.data * price_map
+
+        # Assign electricity revenue values
+        new_r_mrj[:, :, lu_idx] = ag_revenue_delta + rev_total[None, :]
+
+    return new_r_mrj
+
+def get_onshore_wind_effect_r_mrj(data: Data, r_mrj, yr_idx):
+    """
+    Applies the effects of Onshore Wind to the revenue data.
+    """
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Onshore Wind']
+    lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
+    yr_cal = data.YR_CAL_BASE + yr_idx
+
+    new_r_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    if not settings.AG_MANAGEMENTS['Onshore Wind']:
+        return new_r_mrj
+
+    for lu_idx, lu in enumerate(land_uses):
+
+        # Get Onshore Wind's impact on electricity revenue.
+        revenue_multiplier = data.RENEWABLE_BUNDLE_WIND.query('Year == @yr_cal and Commodity == @lu')
+        
+        if revenue_multiplier.empty:
+            print(f"Warning: No revenue multiplier found for {lu} in year {yr_cal} for Onshore Wind. Using 1.0 as default.")
+            revenue_multiplier = 1.0
+        else:
+            revenue_multiplier = revenue_multiplier['Revenue'].item()
+            
+        j = lu_codes[lu_idx]
+        ag_revenue_delta = r_mrj[:, :, j] * (revenue_multiplier - 1)
+
+        quantity_mwh = get_quantity_renewable(data, 'Onshore Wind', yr_idx)
+
+        annual_prices = data.RENEWABLE_PRICES.query('Year == @yr_cal').set_index('State')['Price_AUD_per_MWh'].to_dict()
+        annual_prices = {data.REGION_STATE_NAME2CODE[k]:v for k,v in annual_prices.items()}
+        price_map = np.vectorize(annual_prices.get, otypes=[np.float32])(data.REGION_STATE_CODE)
+
+        rev_total = quantity_mwh.data * price_map
+
+        # Assign electricity revenue values
+        new_r_mrj[:, :, lu_idx] = ag_revenue_delta + rev_total[None, :]
+
+    return new_r_mrj
 
 def get_agricultural_management_revenue_matrices(data:Data, r_mrj, yr_idx) -> dict[str, np.ndarray]:
     """
@@ -464,6 +531,8 @@ def get_agricultural_management_revenue_matrices(data:Data, r_mrj, yr_idx) -> di
     ag_mam_r_mrj['AgTech EI'] = get_agtech_ei_effect_r_mrj(data, r_mrj, yr_idx)                            
     ag_mam_r_mrj['Biochar'] = get_biochar_effect_r_mrj(data, r_mrj, yr_idx)                                
     ag_mam_r_mrj['HIR - Beef'] = get_beef_hir_effect_r_mrj(data, r_mrj)                                    
-    ag_mam_r_mrj['HIR - Sheep'] = get_sheep_hir_effect_r_mrj(data, r_mrj)                                  
+    ag_mam_r_mrj['HIR - Sheep'] = get_sheep_hir_effect_r_mrj(data, r_mrj)
+    ag_mam_r_mrj['Utility Solar PV'] = get_utility_solar_pv_effect_r_mrj(data, r_mrj, yr_idx)
+    ag_mam_r_mrj['Onshore Wind'] = get_onshore_wind_effect_r_mrj(data, r_mrj, yr_idx)                                  
 
     return ag_mam_r_mrj

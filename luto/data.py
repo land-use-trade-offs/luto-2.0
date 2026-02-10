@@ -17,8 +17,6 @@
 # You should have received a copy of the GNU General Public License along with
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
-
-
 import os
 import xarray as xr
 import numpy as np
@@ -289,8 +287,10 @@ class Data:
             'SHEEP - NATURAL LAND MEAT',
             'SHEEP - NATURAL LAND WOOL'
         ]
+        
+        # Sort each product category alphabetically, then concatenate
         self.PRODUCTS = self.PR_CROPS + self.PR_LVSTK
-        self.PRODUCTS.sort() # Ensure lexicographic order.
+        self.PRODUCTS.sort()
 
         # Get number of products
         self.NPRS = len(self.PRODUCTS)
@@ -481,6 +481,15 @@ class Data:
         self.REGION_NRM_CODE = REGION_NRM_r['NRM_CODE']
         self.REGION_NRM_NAME = REGION_NRM_r['NRM_NAME']
         
+        REGION_STATE_r = pd.read_hdf(
+            os.path.join(settings.INPUT_DIR, "REGION_STATE_r.h5"), where=self.MASK
+        )
+        
+        self.REGION_STATE_NAME2CODE = REGION_STATE_r.groupby('STE_NAME11', observed=True)['STE_CODE11'].first().to_dict()
+        self.REGION_STATE_NAME2CODE = dict(sorted(self.REGION_STATE_NAME2CODE.items()))     # Make sure the dict is sorted by state name, makes it consistent with renewable target.
+        self.REGION_STATE_NAME2CODE.pop('Other Territories')                                # Remove 'Other Territories' from the dict.
+        
+        self.REGION_STATE_CODE = REGION_STATE_r['STE_CODE11'].values
 
         ###############################################################
         # No-Go areas; Regional adoption constraints.
@@ -531,7 +540,9 @@ class Data:
         
 
         
-        ##################### Regional adoption zones
+        ################################
+        # Regional adoption zones
+        ################################
         if settings.REGIONAL_ADOPTION_CONSTRAINTS == "off":
             self.REGIONAL_ADOPTION_ZONES = None
             self.REGIONAL_ADOPTION_TARGETS = None
@@ -712,6 +723,36 @@ class Data:
             self.BIOCHAR_DATA[lu] = horticulture_data
 
 
+
+        # #########################################################
+        # RENEWABLE ENERGY DATA LOADING                           #
+        # #########################################################
+        print("\tLoading renewable energy data...", flush=True)
+
+        # Renewable targets and prices
+        self.RENEWABLE_TARGETS = pd.read_csv(f'{settings.INPUT_DIR}/renewable_targets.csv').sort_values('STATE')    # Ensure targets are sorted by state for consistent mapping to region codes.
+        self.RENEWABLE_TARGETS['Renewable_Target_MWh'] = self.RENEWABLE_TARGETS['Renewable_Target_TWh'] * 1e6       # Convert TWh to MWh
+        
+        self.RENEWABLE_PRICES = pd.read_csv(f'{settings.INPUT_DIR}/renewable_elec_price_AUD_MWh.csv')
+        
+        # Renewable energy ralated raster layers
+        self.RENEWABLE_LAYERS = xr.load_dataset(f'{settings.INPUT_DIR}/renewable_energy_layers_1D.nc').sel(cell=self.MASK)
+        
+        # TODO: remove when all years of renewable layers are available. 
+        #   Now is a temporary fix to expand the 2010 layers across all years.
+        self.RENEWABLE_LAYERS = (
+            self.RENEWABLE_LAYERS
+            .squeeze('year', drop=True)
+            .expand_dims({'year': range(2010, 2051)})
+        )
+        
+        # Renewable bundle data (productivity impacts, cost multipliers, etc)
+        renewable_bundle = pd.read_csv(f'{settings.INPUT_DIR}/renewable_energy_bundle.csv')
+        self.RENEWABLE_BUNDLE_WIND = renewable_bundle.query('Lever == "Onshore Wind"')
+        self.RENEWABLE_BUNDLE_SOLAR = renewable_bundle.query('Lever == "Utility Solar PV"')
+        
+
+    
 
         ###############################################################
         # Productivity data.
@@ -1721,7 +1762,6 @@ class Data:
 
         mask_arr_2d_resfactor = (self.LUMAP_2D_RESFACTORED != self.NODATA) & (self.LUMAP_2D_RESFACTORED != self.MASK_LU_CODE) 
         return arr_2d_xr_resfactored[mask_arr_2d_resfactor]
-    
 
     
     def get_resfactored_lumap(self) -> np.ndarray:

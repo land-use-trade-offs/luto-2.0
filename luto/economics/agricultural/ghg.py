@@ -23,16 +23,13 @@
 Pure functions to calculate greenhouse gas emissions by lm, lu.
 """
 
-
 import itertools
 import numpy as np
 import pandas as pd
 
 from luto.data import Data
-import luto.tools as tools
 from luto import settings
-from luto.economics.agricultural.quantity import get_yield_pot
-from luto.economics.agricultural.quantity import lvs_veg_types
+from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types
 
 
 def get_ghg_crop(data:Data, lu, lm, aggregate):
@@ -750,6 +747,45 @@ def get_sheep_hir_effect_g_mrj(data: Data, yr_idx):
 
     return g_mrj_effect
 
+def get_utility_solar_pv_effect_g_mrj(data: Data) -> np.ndarray:
+    """
+    Applies the effects of using solar PV to the GHG data
+    for all relevant agricultural land uses.
+    
+    Returns zero impact as solar PV installation has no direct 
+    impact on farm emissions - displacement benefits are handled 
+    by AusTIMES integration.
+    """
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Utility Solar PV']
+    
+    # Set up the effects matrix - all zeros for no impact
+    new_g_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+    
+    if not settings.AG_MANAGEMENTS['Utility Solar PV']:
+        return new_g_mrj
+    
+    # Return zeros - no direct emissions impact from solar installation
+    return new_g_mrj
+
+def get_onshore_wind_effect_g_mrj(data:Data) -> np.ndarray:
+    """
+    Applies the effects of using onshore wind to the GHG data
+    for all relevant agricultural land uses.
+    
+    Returns zero impact as onshore wind installation has no direct 
+    impact on farm emissions - displacement benefits are handled 
+    by AusTIMES integration.
+    """
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Onshore Wind']
+    
+    # Set up the effects matrix - all zeros for no impact
+    new_g_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+    
+    if not settings.AG_MANAGEMENTS['Onshore Wind']:
+        return new_g_mrj
+    
+    # Return zeros - no direct emissions impact from wind installation
+    return new_g_mrj
 
 def get_agricultural_management_ghg_matrices(data:Data, yr_idx) -> dict[str, np.ndarray]:
     """
@@ -771,7 +807,9 @@ def get_agricultural_management_ghg_matrices(data:Data, yr_idx) -> dict[str, np.
     agtech_ei_ghg_impact = get_agtech_ei_effect_g_mrj(data, yr_idx)                         
     biochar_ghg_impact = get_biochar_effect_g_mrj(data, yr_idx)                             
     beef_hir_ghg_impact = get_beef_hir_effect_g_mrj(data, yr_idx)                                   
-    sheep_hir_ghg_impact = get_sheep_hir_effect_g_mrj(data, yr_idx)                                 
+    sheep_hir_ghg_impact = get_sheep_hir_effect_g_mrj(data, yr_idx)
+    utility_solar_ghg_impact = get_utility_solar_pv_effect_g_mrj(data)
+    onshore_wind_ghg_impact = get_onshore_wind_effect_g_mrj(data)                                 
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,
@@ -782,4 +820,6 @@ def get_agricultural_management_ghg_matrices(data:Data, yr_idx) -> dict[str, np.
         'Biochar': biochar_ghg_impact,
         'HIR - Beef': beef_hir_ghg_impact,
         'HIR - Sheep': sheep_hir_ghg_impact,
+        'Utility Solar PV': utility_solar_ghg_impact,
+        'Onshore Wind': onshore_wind_ghg_impact
     }

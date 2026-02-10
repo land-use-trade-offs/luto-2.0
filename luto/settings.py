@@ -126,8 +126,7 @@ DYNAMIC_PRICE = False
 RESFACTOR = 13      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-SIM_YEARS =  list(range(2020,2051,10))
-
+SIM_YEARS =  list(range(2010, 2051, 1))
 
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
@@ -377,7 +376,21 @@ AG_MANAGEMENTS_TO_LAND_USES = {
 
     'HIR - Beef':               ['Beef - natural land'],
     'HIR - Sheep':              ['Sheep - natural land'],
-}
+    'Utility Solar PV':         [# Unallocated lands
+                                'Unallocated - modified land',
+                                # Livestock
+                                'Beef - modified land', 'Sheep - modified land', 'Dairy - modified land',
+                                # Cropping:
+                                'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds'], 
+    'Onshore Wind':             [#Unallocated lands
+                                'Unallocated - modified land',
+                                # Livestock
+                                'Beef - modified land', 'Sheep - modified land', 'Dairy - modified land',
+                                # Cropping:
+                                'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
+                                # Intensive Cropping:
+                                'Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables']
+                                }                                
 
 
 AG_MANAGEMENTS = {
@@ -389,6 +402,8 @@ AG_MANAGEMENTS = {
     'Biochar': True,
     'HIR - Beef': True,
     'HIR - Sheep': True,
+    'Utility Solar PV': True,
+    'Onshore Wind': True,
 }
 """
 The dictionary below contains a master list of all agricultural management options and
@@ -406,6 +421,8 @@ AG_MANAGEMENTS_REVERSIBLE = {
     'Biochar': True,
     'HIR - Beef': True,
     'HIR - Sheep': True,
+    'Utility Solar PV': False,
+    'Onshore Wind': False,
 }
 """
 The values of the below dictionary determine whether the model is allowed to abandon agricultural
@@ -438,6 +455,48 @@ HIR_CEILING_PERCENTAGE = 0.9
 BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
 SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
 
+
+
+# ---------------------------------------------------------------------------- #
+# Renewable energy parameters
+# ---------------------------------------------------------------------------- #
+RENEWABLE_ENERGY_CONSTRAINTS = 'on'         # 'on' or 'off'
+
+RENEWABLES_OPTIONS = [
+    'Utility Solar PV',
+    'Onshore Wind'
+]
+
+RENEWABLE_TARGET_SCENARIO =  'CNS25 - Accelerated Transition' # one of 'CNS25 - Accelerated Transition', 'CNS25 - Current Targets'
+'''
+The renewable energy target scenario to use when `RENEWABLE_ENERGY_CONSTRAINTS` is set to 'on'.
+One of 'CNS25 - Accelerated Transition' or 'CNS25 - Current Targets', 
+'''
+
+RE_TARGET_LEVEL = "STATE"  # options: "STATE", "NRM"; currently (20260205) only support STATE.
+'''
+The spatial level at which to apply the renewable energy targets when `RENEWABLE_ENERGY_CONSTRAINTS` is set to 'on'.
+Options include "STATE" or "NRM". Currently (20260205) only support STATE.
+'''
+
+RENEWABLE_NATURAL_ENERGY_MW_HA_HOUR = {
+    "Utility Solar PV": 0.45,
+    "Onshore Wind": 0.4,  
+}
+'''
+The per/ha capacity (Mw/ha) for each renewable energy management type.
+'''
+
+
+RENEWABLES_ADOPTION_LIMITS = {
+    'Utility Solar PV': 1.0,        # Maximum proportion of land that can be used for Utility Solar PV
+    'Onshore Wind': 1.0,            # Maximum proportion of land that can be used for Onshore Wind
+}
+'''
+The maximum proportion of land that can be used for each renewable energy management type.
+For example, if RENEWABLES_ADOPTION_LIMITS['Utility Solar PV'] = 0.5, then at most 50% of 
+the land can be used for Utility Solar PV.
+'''
 
 
 

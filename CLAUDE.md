@@ -65,19 +65,123 @@ python -c "import luto.simulation as sim; data = sim.load_data(); sim.run(data=d
 python luto/tools/create_task_runs/create_grid_search_tasks.py
 ```
 
-### Key File Locations
+## Architecture Overview
 
-- **Core**: `luto/simulation.py`, `luto/data.py`, `luto/settings.py`
-- **Solvers**: `luto/solvers/solver.py`, `luto/solvers/input_data.py`
-- **Economics**: `luto/economics/agricultural/`, `luto/economics/non_agricultural/`
-- **Output**: `luto/tools/write.py`, `luto/tools/report/create_report_layers.py`
-- **Vue.js**: `luto/tools/report/VUE_modules/views/`, `luto/tools/report/VUE_modules/data/`
+### Core Modules
+- **`luto/simulation.py`**: Main simulation engine and state management singleton
+- **`luto/data.py`**: Core data management, loading, and spatial data structures
+- **`luto/settings.py`**: Configuration parameters for all model aspects
+- **`luto/solvers/`**: Optimization solver interface and input data preparation
+  - `solver.py`: GUROBI solver wrapper (LutoSolver class)
+    - Biodiversity constraint methods: `_add_GBF2_constraints()`, `_add_GBF3_NVIS_constraints()`, `_add_GBF4_SNES_constraints()`, `_add_GBF4_ECNES_constraints()`, `_add_GBF8_constraints()`
+    - Renewable energy constraint method: `_add_renewable_energy_constraints()` — enforces state-level solar and wind generation targets
+  - `input_data.py`: Prepares optimization model input data
+    - Biodiversity data attributes use `*_pre_1750_area_*` naming (e.g., `GBF3_NVIS_pre_1750_area_vr`, `GBF4_SNES_pre_1750_area_sr`)
+    - `rescale_solver_input_data()`: **In-place** rescaling of arrays to magnitude 0-1e3 for numerical stability
 
-### Data Flow Summary
+### Economic Modules
+- **`luto/economics/agricultural/`**: Agricultural land use economics
+  - Revenue, cost, quantity, water, biodiversity, GHG calculations
+  - Transition costs between agricultural land uses
+  - **Renewable energy** effects integrated across all economics modules (cost, revenue, quantity, water, biodiversity, transitions)
+  - **Dynamic pricing** (`revenue.py`): Demand elasticity-based price adjustments
+    - Calculates commodity price multipliers based on supply-demand dynamics
+    - Uses elasticity coefficients and demand deltas from 2010 baseline
+    - Applied to crops and livestock (beef, sheep, dairy) when `DYNAMIC_PRICE` enabled
+  - **Biodiversity module** (`biodiversity.py`): GBF (Global Biodiversity Framework) calculations
+    - `get_GBF2_MASK_area()`: Returns GBF2 priority degraded areas (mask × real area)
+    - `get_GBF3_NVIS_matrices_vr()`: NVIS vegetation layer matrices for GBF3
+    - `get_GBF4_SNES_matrix_sr()`, `get_GBF4_ECNES_matrix_sr()`: Species/Ecological Community NES matrices
+    - Variable naming convention: `*_pre_1750_area_*` for baseline biodiversity area matrices
+- **`luto/economics/non_agricultural/`**: Non-agricultural land use economics
+  - Environmental plantings, carbon plantings, etc.
+- **`luto/economics/off_land_commodity/`**: Off-land commodity economics
 
-1. **Load** (`data.py`) → 2. **Preprocess** (`dataprep.py`) → 3. **Economics** (economic modules) → 4. **Solver Input** (`input_data.py`) → 5. **Optimize** (`solver.py`) → 6. **Output** (`write.py`)
+### Data Processing
+- **`luto/dataprep.py`**: Data preprocessing utilities
+  - **Carbon sequestration data**: Migrated from HDF5/pandas to NetCDF/xarray format
+  - Saves tree planting carbon data at specific ages (50, 60, 70, 80, 90 years)
+  - Uses compressed NetCDF encoding with chunking for efficient storage
+  - Format: `tCO2_ha_{type}.nc` where type is ep_block, ep_belt, ep_rip, cp_block, cp_belt, hir_block, hir_rip
+- **`luto/tools/spatializers.py`**: Spatial data processing and upsampling
+- **`luto/tools/write.py`**: Output writing and file generation
 
-### Output Structure
+### Utilities
+- **`luto/tools/create_task_runs/`**: Batch processing and grid search utilities
+- **`luto/tools/report/`**: Report generation and visualization
+  - `data_tools/`: Data processing for reports
+  - `map_tools/`: Spatial visualization utilities
+- **`luto/helpers.py`**: General utility functions
+
+## Key Configuration Parameters
+
+### Core Settings (`luto/settings.py`)
+- `SIM_YEARS`: Simulation time periods (default: 2020-2050 in 5-year steps)
+- `RESFACTOR`: Spatial resolution factor (1 = full resolution, >1 = coarser)
+- `SCENARIO`: Shared Socioeconomic Pathway (SSP1-SSP5)
+- `RCP`: Representative Concentration Pathway (e.g., 'rcp4p5')
+- `OBJECTIVE`: Optimization objective ('maxprofit' or 'mincost')
+
+### Economic Settings
+- `DYNAMIC_PRICE`: Enable demand elasticity-based dynamic pricing (default: False)
+- `AMORTISE_UPFRONT_COSTS`: Whether to amortize establishment costs (default: False)
+- `DISCOUNT_RATE`: Discount rate for economic calculations (default: 0.07)
+- `AMORTISATION_PERIOD`: Period for cost amortization in years (default: 30)
+
+### Environmental Constraints
+- `GHG_EMISSIONS_LIMITS`: Greenhouse gas targets ('off', 'low', 'medium', 'high')
+- `WATER_LIMITS`: Water yield constraints ('on' or 'off')
+- `CARBON_EFFECTS_WINDOW`: Years for carbon accumulation averaging (50, 60, 70, 80, or 90 years)
+  - Must match available NetCDF data ages in input files
+  - Determines annual sequestration rate by averaging total CO2 over this period
+  - Default: 50 years (follows S-curve logic with rapid early accumulation)
+- `BIODIVERSITY_TARGET_GBF_*`: Global Biodiversity Framework targets
+  - `BIODIVERSITY_TARGET_GBF_2`: Priority degraded areas restoration ('off' or percentage target)
+  - `BIODIVERSITY_TARGET_GBF_3_NVIS`: NVIS vegetation group targets ('off' or percentage target)
+  - `BIODIVERSITY_TARGET_GBF_4_SNES`: Species NES (National Environmental Significance) ('on' or 'off')
+  - `BIODIVERSITY_TARGET_GBF_4_ECNES`: Ecological Community NES ('on' or 'off')
+  - `BIODIVERSITY_TARGET_GBF_8`: Species conservation targets ('on' or 'off')
+
+### Renewable Energy Settings
+- `RENEWABLE_ENERGY_CONSTRAINTS`: Enable renewable energy generation targets ('on' or 'off')
+- `RENEWABLES_OPTIONS`: Renewable energy types: `['Utility Solar PV', 'Onshore Wind']`
+- `RENEWABLE_TARGET_SCENARIO`: Target scenario ('CNS25 - Accelerated Transition' or 'CNS25 - Current Targets')
+- `RE_TARGET_LEVEL`: Spatial level for constraints ('STATE' or 'NRM'; only STATE currently supported)
+- `RENEWABLE_NATURAL_ENERGY_MW_HA_HOUR`: Per-hectare capacity (MW/ha) per renewable type
+- `RENEWABLES_ADOPTION_LIMITS`: Maximum adoption fraction per type (default: 1.0 for both)
+- Both renewable types are registered as non-reversible agricultural management options in `AG_MANAGEMENTS`
+- Compatible land uses differ: Solar PV excludes Hay; Wind includes Hay and horticulture crops
+
+### Solver Configuration
+- `SOLVE_METHOD`: GUROBI algorithm (default: 2 for barrier method)
+- `THREADS`: Parallel threads for optimization
+- `FEASIBILITY_TOLERANCE`: Solver tolerance settings
+
+## Data Flow
+
+1. **Data Loading**: `luto.data.Data` class loads spatial datasets from `/input/`
+   - Loads demand scenarios and elasticity coefficients for dynamic pricing
+   - Calculates demand deltas (change from 2010 baseline) for price adjustments
+   - **Carbon data**: Loads NetCDF files using xarray, selects data at `CARBON_EFFECTS_WINDOW` age
+   - Carbon sequestration components: Trees + Debris (aboveground, risk-discounted) + Soil (belowground)
+   - **Renewable energy data**: Loads targets (CSV), electricity prices (CSV), spatial layers (NetCDF), and bundle parameters (CSV)
+2. **Preprocessing**: `dataprep.py` processes raw data into model-ready formats
+   - Copies demand elasticity data from source to input directory
+   - **Carbon data preparation**: Converts 3D timeseries to NetCDF format with age dimension
+   - Selects specific ages (50, 60, 70, 80, 90 years) for carbon accumulation data
+   - Applies chunked compression (zlib level 5) for efficient storage
+3. **Economic Calculations**: Economics modules calculate costs, revenues, transitions, biodiversity impacts
+   - Revenue calculations apply demand elasticity multipliers when `DYNAMIC_PRICE` enabled
+   - Elasticity multipliers computed as: `1 + (demand_delta / demand_elasticity)`
+4. **Solver Input**: `solvers/input_data.py` prepares optimization model data
+   - Biodiversity matrices: GBF2 mask areas, GBF3 NVIS layers, GBF4 SNES/ECNES matrices, GBF8 species data
+   - Renewable energy: Solar/wind yield arrays (`renewable_solar_r`, `renewable_wind_r`), state region mapping, rescaled targets
+   - Data rescaling: Arrays rescaled in-place to 0-1e3 magnitude for numerical stability
+5. **Optimization**: `solvers/solver.py` runs GUROBI optimization with biodiversity and renewable energy constraints
+6. **Output Generation**: `tools/write.py` writes results to `/output/`
+   - Biodiversity outputs: GBF2/3/4/8 scores, species impacts, vegetation group restoration
+
+## Output Structure
 
 Results saved in `/output/<timestamp>/`:
 - `DATA_REPORT/REPORT_HTML/index.html`: Interactive dashboard
@@ -92,14 +196,115 @@ Results saved in `/output/<timestamp>/`:
 **ALWAYS use `xr.dot()` instead of broadcasting for array operations:**
 
 ```python
-# ❌ BAD - Creates large intermediate arrays
-result = (matrix_A * matrix_B).sum(dim=['lu'])
+import xarray as xr
+# Load NetCDF and select specific age from CARBON_EFFECTS_WINDOW setting
+ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_block.nc"))
+ds = ds.sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
 
-# ✓ GOOD - Memory-efficient dot product
-result = xr.dot(matrix_A, matrix_B, dims=['lu'])
+# Calculate total sequestration with risk discounting
+total_co2 = (
+    (ds.EP_BLOCK_TREES_TOT_T_CO2_HA + ds.EP_BLOCK_DEBRIS_TOT_T_CO2_HA)
+    * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)  # Aboveground with risk discount
+    + ds.EP_BLOCK_SOIL_TOT_T_CO2_HA  # Belowground (no risk discount)
+).values / settings.CARBON_EFFECTS_WINDOW  # Average over window
 ```
 
-**Why?** Broadcasting creates intermediate arrays that can consume 50-80% more memory. `xr.dot()` is 2-4x faster and produces identical results. See [CLAUDE_SETUP.md](docs/CLAUDE_SETUP.md) for detailed examples and validation patterns.
+### Risk Discounting
+- **Aboveground carbon** (Trees + Debris): Discounted by fire risk and reversal risk
+- **Belowground carbon** (Soil): No risk discounting applied
+- Formula: `(AG_carbon × fire_risk% × (1 - RISK_OF_REVERSAL)) + BG_carbon`
+
+### Migration Notes
+- **Old format**: HDF5 files with pandas DataFrames, separate AG/BG columns
+- **New format**: NetCDF files with xarray Datasets, separate component variables
+- **Advantages**: Better compression, faster subsetting, age dimension flexibility, xarray integration
+- **CARBON_EFFECTS_WINDOW**: Must be one of [50, 60, 70, 80, 90] to match available data ages
+
+## Biodiversity Module Naming Conventions
+
+The biodiversity module follows consistent naming conventions for GBF (Global Biodiversity Framework) variables:
+
+### Variable Naming Pattern
+- **Pre-1750 baseline areas**: Use `*_pre_1750_area_*` suffix
+  - Examples: `GBF3_NVIS_pre_1750_area_vr`, `GBF4_SNES_pre_1750_area_sr`, `GBF8_pre_1750_area_sr`
+  - These represent baseline biodiversity area matrices before land use changes
+
+### Function Naming Pattern
+- **GBF constraint methods**: Use `_add_GBF{N}_{TYPE}_constraints()` format
+  - Examples: `_add_GBF2_constraints()`, `_add_GBF3_NVIS_constraints()`, `_add_GBF4_SNES_constraints()`
+  - Maintain consistency between method names and GBF target types
+
+### Data Structure Indices
+- `v, r`: Vegetation group (v) × cell (r) - used for GBF3 NVIS data
+- `s, r`: Species/community (s) × cell (r) - used for GBF4 and GBF8 data
+- `r`: Cell only - used for GBF2 mask data
+
+### Key GBF Modules
+1. **GBF2**: Priority degraded areas restoration
+   - Function: `get_GBF2_MASK_area(data)` returns mask × real area
+2. **GBF3**: NVIS major vegetation group targets
+   - Function: `get_GBF3_NVIS_matrices_vr(data)` returns vegetation layers
+3. **GBF4**: Species and Ecological Community NES
+   - SNES: `get_GBF4_SNES_matrix_sr(data)`
+   - ECNES: `get_GBF4_ECNES_matrix_sr(data)`
+4. **GBF8**: Species conservation
+   - Function: `get_GBF8_species_matrices_sr(data, target_year)`
+
+## Renewable Energy Module
+
+The renewable energy module (REM) introduces solar and wind energy generation as agricultural management options, enabling optimization of land use to meet state-level renewable energy targets.
+
+### Architecture
+
+Renewable energy types (Utility Solar PV, Onshore Wind) are implemented as agricultural management options (`AG_MANAGEMENTS`). Each type has effects across all economics modules:
+
+- **`quantity.py`**: `get_quantity_renewable(data, re_type, yr_idx)` — core yield calculation (MWh per cell). Yield = `MW_HA_HR × capacity% × (1 - distribution_loss%) × 8760 × REAL_AREA`
+- **`revenue.py`**: `get_utility_solar_pv_effect_r_mrj()` / `get_onshore_wind_effect_r_mrj()` — agricultural revenue change + electricity revenue (quantity × state-level price)
+- **`cost.py`**: `get_utility_solar_pv_effect_c_mrj()` / `get_onshore_wind_effect_c_mrj()` — O&M cost multiplier on base ag costs + operational costs from spatial layers
+- **`transitions.py`**: `get_utility_solar_pv_effect_t_mrj()` / `get_onshore_wind_effect_t_mrj()` — upfront installation CAPEX (not amortized)
+- **`biodiversity.py`**: `get_utility_solar_pv_effect_b_mrj()` / `get_onshore_wind_effect_b_mrj()` — biodiversity compatibility impacts from bundle data
+- **`water.py`**: `get_utility_solar_pv_effect_w_mrj()` / `get_onshore_wind_effect_w_mrj()` — water requirement impacts
+
+### Solver Constraints
+
+`_add_renewable_energy_constraints()` in `solver.py` enforces state-level generation targets:
+- Separate constraints for solar and wind per state
+- Uses `renewable_solar_r` / `renewable_wind_r` yield arrays from `input_data.py`
+- Targets from `RENEWABLE_TARGETS` CSV, filtered by year and scenario
+- Rescaled for numerical stability (same pattern as biodiversity constraints)
+
+### Data Loading (`data.py`)
+
+- `RENEWABLE_TARGETS`: State-level generation targets (TWh → MWh) by year, scenario, and product
+- `RENEWABLE_PRICES`: State-level electricity prices (AUD/MWh) by year
+- `RENEWABLE_LAYERS`: NetCDF spatial layers with installation cost, operation cost, capacity %, and distribution loss %
+- `RENEWABLE_BUNDLE_SOLAR` / `RENEWABLE_BUNDLE_WIND`: Parameters per land use (productivity, revenue, O&M multiplier, biodiversity compatibility, water requirements)
+- `REGION_STATE_CODE` / `REGION_STATE_NAME2CODE`: State mapping for state-level constraint aggregation
+
+### Input Files Required
+
+| File | Format | Description |
+|------|--------|-------------|
+| `renewable_targets.csv` | CSV | Year, STATE, SCENARIO, PRODUCT, Renewable_Target_TWh |
+| `renewable_elec_price_AUD_MWh.csv` | CSV | Year, State, Price_AUD_per_MWh |
+| `renewable_energy_bundle.csv` | CSV | Year, Commodity, Lever, Productivity, Revenue, OM_Cost_Multiplier, Biodiversity_compatability, INPUT-wrt_water-required |
+| `renewable_energy_layers_1D.nc` | NetCDF | Spatial layers: Cost_of_install_AUD_ha, Cost_of_operation, Capacity_percent_of_natural_energy, Energy_remain_percent_after_distribution |
+
+### Compatible Land Uses
+
+- **Utility Solar PV**: Unallocated - modified land, Beef/Sheep/Dairy - modified land, Summer/Winter cereals/legumes/oilseeds
+- **Onshore Wind**: All Solar PV land uses + Hay, Cotton, Other non-cereal crops, Rice, Sugar, Vegetables
+
+### Key Design Notes
+
+- Both types are **non-reversible** once installed (`AG_MANAGEMENTS_REVERSIBLE = False`)
+- Adoption limits enforced via existing `const_ag_mam_adoption_limit` solver constraints
+- State-level pricing: electricity revenue uses state-specific prices mapped via `REGION_STATE_CODE`
+- Effects follow standard pattern: `base_value × (multiplier - 1)` for additive impacts
+
+## Vue.js Reporting System Architecture
+
+The LUTO reporting system uses Vue.js 3 with a progressive selection pattern for data visualization.
 
 ### Naming Patterns
 

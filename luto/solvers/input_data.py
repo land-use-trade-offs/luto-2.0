@@ -75,7 +75,13 @@ class SolverInputData:
     ag_man_q_mrp: dict                                                  # Agricultural Management options' quantity effects.
     ag_man_limits: dict                                                 # Agricultural Management options' adoption limits.
     ag_man_lb_mrj: dict                                                 # Agricultural Management options' lower bounds.
-
+    
+    renewable_solar_r: np.ndarray                                       # Renewable energy - solar yield matrix.
+    renewable_wind_r: np.ndarray                                        # Renewable energy - wind yield matrix.
+    
+    region_state_r: np.ndarray                                          # Region state index for each cell.
+    region_state_name2idx: dict[str, int]                               # Map of region state names to indices.
+    
     water_region_indices: dict[int, np.ndarray]                         # Water region indices -> dict. Key: region.
     water_region_names: dict[int, str]                                  # Water yield for the BASE_YR based on historical water yield layers.
       
@@ -431,7 +437,7 @@ def get_non_ag_to_ag_t_mrj(data: Data, base_year:int, target_index: int):
 def get_non_ag_t_rk(data: Data, base_year):
     print('Getting non-agricultural transition cost matrices...', flush = True)
     output = non_ag_transition.get_non_ag_transition_matrix(data)
-    return output.astype(np.float32)
+    return output
 
 
 def get_ag_x_mrj(data: Data, base_year):
@@ -451,6 +457,23 @@ def get_ag_man_lb_mrj(data: Data, base_year):
     output = ag_transition.get_lower_bound_agricultural_management_matrices(data, base_year)
     return output
 
+def get_renewable_solar_r(data: Data, target_idx):
+    print('Getting renewable energy - solar yield matrix...', flush = True)
+    output = ag_quantity.get_quantity_renewable(data, 'Utility Solar PV', target_idx)
+    return output
+
+def get_renewable_wind_r(data: Data, target_idx):
+    print('Getting renewable energy - wind yield matrix...', flush = True)
+    output = ag_quantity.get_quantity_renewable(data, 'Onshore Wind', target_idx)
+    return output
+
+def get_region_state_r(data: Data):
+    print('Getting region state index for each cell...', flush = True)
+    return data.REGION_STATE_CODE
+
+def get_region_state_name2idx(data: Data):
+    print('Getting map of region state names to indices...', flush = True)
+    return data.REGION_STATE_NAME2CODE
 
 def get_non_ag_lb_rk(data: Data, base_year):
     print('Getting non-agricultural lower bound matrices...', flush = True)
@@ -482,9 +505,9 @@ def get_ag_man_r_mrj(data: Data, target_index, ag_r_mrj: np.ndarray):
     return output
 
 
-def get_ag_man_t_mrj(data: Data, target_index, ag_t_mrj: np.ndarray):
+def get_ag_man_t_mrj(data: Data, target_index):
     print('Getting agricultural management options\' transition cost effects...', flush = True)
-    output = ag_transition.get_agricultural_management_transition_matrices(data, ag_t_mrj, target_index)
+    output = ag_transition.get_agricultural_management_transition_matrices(data, target_index)
     return output
 
 
@@ -653,6 +676,36 @@ def get_GBF2_mask_idx(data: Data) -> np.ndarray:
     return np.where(data.BIO_GBF2_MASK_LDS)[0]
 
 
+def rescale_solver_input_data(arries:list) -> None:
+    """
+    !!!!!`Inplace`!!!!!! rescale the solver input data based on `settings.RESCALE_FACTOR` .
+    To resume the data, just multiply the arrays by the returned scale factor.
+    
+    After rescaling, the arrays will be rescaled to the magnitude (regardless of signs) between 0 and `settings.RESCALE_FACTOR` (default to 1e3).
+    """
+
+    max_vals = []
+    for arr in arries:
+        if isinstance(arr, np.ndarray):
+            arr = arr.astype(np.float32)
+            max_vals.append(max(arr.max(), abs(arr.min())))
+        elif isinstance(arr, dict):
+            # Assume all dictionaries are {str: np.ndarray}
+            max_vals.extend([max(v.max(), abs(v.min())) for v in arr.values()])
+    
+    scale = (np.max(max_vals) / settings.RESCALE_FACTOR).astype(np.float32)
+    
+    for arr in arries:
+        if isinstance(arr, dict):
+            # Update dictionary values in-place
+            for k in arr:
+                arr[k] /= scale
+        elif isinstance(arr, np.ndarray):
+            # Arrays are already updated in-place
+            arr /= scale
+
+    return scale
+
 def get_limits(data: Data, yr_cal: int, resale_factors) -> dict[str, Any]:
     """
     Gets the following limits for the solve:
@@ -667,6 +720,8 @@ def get_limits(data: Data, yr_cal: int, resale_factors) -> dict[str, Any]:
         'demand': None,
         'water': None,
         'ghg': None,
+        'renewable_solar': None,
+        'renewable_wind': None,
         'GBF2': None,
         'GBF3': None,
         'GBF4_SNES': None,
@@ -687,6 +742,13 @@ def get_limits(data: Data, yr_cal: int, resale_factors) -> dict[str, Any]:
     if settings.GHG_EMISSIONS_LIMITS != 'off':
         limits['ghg'] = data.GHG_TARGETS[yr_cal]
         limits['ghg_rescale'] = limits['ghg'] / resale_factors['GHG']
+        
+    if settings.RENEWABLE_ENERGY_CONSTRAINTS == 'on':
+        renewable_targets = data.RENEWABLE_TARGETS.query('Year == @yr_cal and SCENARIO == @settings.RENEWABLE_TARGET_SCENARIO ')
+        limits['renewable_solar'] = renewable_targets.query('PRODUCT == "Electricity - Solar"')['Renewable_Target_MWh'].values
+        limits['renewable_wind'] = renewable_targets.query('PRODUCT == "Electricity - Wind"')['Renewable_Target_MWh'].values
+        limits['renewable_solar_rescale'] = limits['renewable_solar'] / resale_factors['Renewable_Solar']
+        limits['renewable_wind_rescale'] = limits['renewable_wind'] / resale_factors['Renewable_Wind']
 
     if settings.BIODIVERSITY_TARGET_GBF_2 != 'off':
         limits["GBF2"] = data.get_GBF2_target_for_yr_cal(yr_cal)
@@ -720,36 +782,6 @@ def get_limits(data: Data, yr_cal: int, resale_factors) -> dict[str, Any]:
     return limits
 
 
-def rescale_solver_input_data(arries:list) -> None:
-    """
-    !!!!!`Inplace`!!!!!! rescale the solver input data based on `settings.RESCALE_FACTOR` .
-    To resume the data, just multiply the arrays by the returned scale factor.
-    
-    After rescaling, the arrays will be rescaled to the magnitude (regardless of signs) between 0 and 1e3.
-    """
-
-    max_vals = []
-    for arr in arries:
-        if isinstance(arr, np.ndarray):
-            arr = arr.astype(np.float32)
-            max_vals.append(max(arr.max(), abs(arr.min())))
-        elif isinstance(arr, dict):
-            # Assume all dictionaries are {str: np.ndarray}
-            max_vals.extend([max(v.max(), abs(v.min())) for v in arr.values()])
-    
-    scale = (np.max(max_vals) / settings.RESCALE_FACTOR).astype(np.float32)
-    
-    for arr in arries:
-        if isinstance(arr, dict):
-            # Update dictionary values in-place
-            for k in arr:
-                arr[k] /= scale
-        elif isinstance(arr, np.ndarray):
-            # Arrays are already updated in-place
-            arr /= scale
-
-    return scale
-
 
 def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputData:
     """
@@ -770,7 +802,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     
     ag_man_c_mrj = get_ag_man_c_mrj(data, target_index, ag_c_mrj)
     ag_man_r_mrj = get_ag_man_r_mrj(data, target_index, ag_r_mrj)
-    ag_man_t_mrj = get_ag_man_t_mrj(data, target_index, ag_t_mrj)
+    ag_man_t_mrj = get_ag_man_t_mrj(data, target_index)
     
     ag_obj_mrj, non_ag_obj_rk,  ag_man_objs=get_economic_mrj(
         ag_c_mrj,
@@ -815,6 +847,12 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     ag_man_limits=get_ag_man_limits(data, target_index)                            
     ag_man_lb_mrj=get_ag_man_lb_mrj(data, base_year)
     
+    renewable_solar_r=get_renewable_solar_r(data, target_index)
+    renewable_wind_r=get_renewable_wind_r(data, target_index)
+    
+    region_state_r = get_region_state_r(data)
+    region_state_name2idx = get_region_state_name2idx(data)
+    
     water_region_indices=get_w_region_indices(data)
     water_region_names=get_w_region_names(data)
     
@@ -838,7 +876,6 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     savanna_eligible_r=get_savanna_eligible_r(data)
     GBF2_mask_idx=get_GBF2_mask_idx(data)
 
-    
     scale_factors = {
         "Economy":       rescale_solver_input_data([ag_obj_mrj, non_ag_obj_rk, ag_man_objs]),
         "Demand":        rescale_solver_input_data([ag_q_mrp, non_ag_q_crk, ag_man_q_mrp]),
@@ -847,7 +884,17 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
             rescale_solver_input_data([ag_g_mrj, non_ag_g_rk, ag_man_g_mrj, ag_ghg_t_mrj])
             if settings.GHG_EMISSIONS_LIMITS != 'off' 
             else 1.0  
-        ),        
+        ),
+        'Renewable_Solar' : (
+            rescale_solver_input_data([renewable_solar_r])  
+            if settings.RENEWABLE_ENERGY_CONSTRAINTS == 'on' 
+            else 1.0
+        ),
+        'Renewable_Wind' : (
+            rescale_solver_input_data([renewable_wind_r])  
+            if settings.RENEWABLE_ENERGY_CONSTRAINTS == 'on' 
+            else 1.0
+        ),
         "Water":(
             rescale_solver_input_data([ag_w_mrj, non_ag_w_rk, ag_man_w_mrj])
             if settings.WATER_LIMITS == 'on'
@@ -937,6 +984,12 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_man_q_mrp,
         ag_man_limits,
         ag_man_lb_mrj,
+        
+        renewable_solar_r,
+        renewable_wind_r,
+        
+        region_state_r,
+        region_state_name2idx,
         
         water_region_indices,
         water_region_names,
