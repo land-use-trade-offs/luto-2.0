@@ -732,7 +732,7 @@ class Data:
         # Auxiliary Spatial Layers
         # (spatial layers not required for production calculation)
         ###############################################################
-        print("\tLoading auxiliary spatial layers data...", flush=True)
+        print("├── Loading auxiliary spatial layers data...", flush=True)
 
         # Load stream length data in metres of stream per cell
         self.STREAM_LENGTH = pd.read_hdf(
