@@ -266,7 +266,7 @@ def get_quantity(data, pr, lm, yr_idx):
         raise KeyError(f"Land use '{pr}' not found in data.")
 
     # Apply productivity increase multiplier by product. 
-    q *= data.BAU_PROD_INCREASE_MULT[lm, pr][yr_idx]
+    q *= data.BAU_PROD_INCR[lm, pr][yr_idx]
 
     return q
 
