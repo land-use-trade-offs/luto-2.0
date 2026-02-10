@@ -733,7 +733,9 @@ class Data:
         self.RENEWABLE_TARGETS = pd.read_csv(f'{settings.INPUT_DIR}/renewable_targets.csv').sort_values('STATE')    # Ensure targets are sorted by state for consistent mapping to region codes.
         self.RENEWABLE_TARGETS['Renewable_Target_MWh'] = self.RENEWABLE_TARGETS['Renewable_Target_TWh'] * 1e6       # Convert TWh to MWh
         
-        self.RENEWABLE_PRICES = pd.read_csv(f'{settings.INPUT_DIR}/renewable_elec_price_AUD_MWh.csv')
+        #self.RENEWABLE_PRICES = pd.read_csv(f'{settings.INPUT_DIR}/renewable_elec_price_AUD_MWh.csv')
+        self.SOLAR_PRICES = pd.read_csv(f'{settings.INPUT_DIR}/solar_elec_price_AUD_MWh.csv')
+        self.WIND_PRICES = pd.read_csv(f'{settings.INPUT_DIR}/wind_elec_price_AUD_MWh.csv')
         
         # Renewable energy ralated raster layers
         self.RENEWABLE_LAYERS = xr.load_dataset(f'{settings.INPUT_DIR}/renewable_energy_layers_1D.nc').sel(cell=self.MASK)

@@ -457,7 +457,7 @@ def get_utility_solar_pv_effect_r_mrj(data: Data, r_mrj, yr_idx):
 
         quantity_mwh = get_quantity_renewable(data, 'Utility Solar PV', yr_idx)
 
-        annual_prices = data.RENEWABLE_PRICES.query('Year == @yr_cal').set_index('State')['Price_AUD_per_MWh'].to_dict()
+        annual_prices = data.SOLAR_PRICES.query('Year == @yr_cal').set_index('State')['Price_AUD_per_MWh'].to_dict()
         annual_prices = {data.REGION_STATE_NAME2CODE[k]:v for k,v in annual_prices.items()}
         price_map = np.vectorize(annual_prices.get, otypes=[np.float32])(data.REGION_STATE_CODE)
 
@@ -497,7 +497,7 @@ def get_onshore_wind_effect_r_mrj(data: Data, r_mrj, yr_idx):
 
         quantity_mwh = get_quantity_renewable(data, 'Onshore Wind', yr_idx)
 
-        annual_prices = data.RENEWABLE_PRICES.query('Year == @yr_cal').set_index('State')['Price_AUD_per_MWh'].to_dict()
+        annual_prices = data.WIND_PRICES.query('Year == @yr_cal').set_index('State')['Price_AUD_per_MWh'].to_dict()
         annual_prices = {data.REGION_STATE_NAME2CODE[k]:v for k,v in annual_prices.items()}
         price_map = np.vectorize(annual_prices.get, otypes=[np.float32])(data.REGION_STATE_CODE)
 
