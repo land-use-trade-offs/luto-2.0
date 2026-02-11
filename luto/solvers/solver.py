@@ -722,6 +722,7 @@ class LutoSolver:
 
             reg_idx = np.where(self._input_data.region_state_r == reg_id)[0]
             solar_energy_lyr = self._input_data.renewable_solar_r[reg_idx]
+            wind_energy_lyr = self._input_data.renewable_wind_r[reg_idx]
             
             target_raw_solar = self._input_data.limits["renewable_solar"][target_idx]
             target_raw_wind = self._input_data.limits["renewable_wind"][target_idx]
@@ -754,8 +755,8 @@ class LutoSolver:
                     
                     self.renewable_constraints['wind'] = (
                         self.gurobi_model.addConstr(
-                            gp.quicksum(X_ag_mam_dry_r * self._input_data.renewable_wind_r[reg_idx])
-                            + gp.quicksum(X_ag_mam_irr_r * self._input_data.renewable_wind_r[reg_idx])
+                            gp.quicksum(X_ag_mam_dry_r * wind_energy_lyr)
+                            + gp.quicksum(X_ag_mam_irr_r * wind_energy_lyr)
                             >= target_rescal_wind,
                             name=f"renewable_wind_target_{am}_{reg_name}".replace(" ", "_")
                         )

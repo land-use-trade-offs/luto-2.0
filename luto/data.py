@@ -31,6 +31,7 @@ import luto.settings as settings
 import luto.economics.agricultural.quantity as ag_quantity
 import luto.economics.non_agricultural.quantity as non_ag_quantity
 import luto.economics.agricultural.water as ag_water
+from luto.tools.Manual_jupyter_books.helpers import arr_to_xr
 from luto.tools.spatializers import upsample_array
 
 from collections import defaultdict
@@ -39,7 +40,7 @@ from affine import Affine
 from scipy.interpolate import interp1d
 from math import ceil
 from dataclasses import dataclass
-from scipy.ndimage import distance_transform_edt
+from scipy.ndimage import distance_transform_edt, maximum_filter
 
 
 
@@ -145,19 +146,39 @@ class Data:
             self.GEO_META_FULLRES['dtype'] = 'float32'                                                                  # Set the data type to float32
             self.GEO_META_FULLRES['nodata'] = self.NODATA                                                               # Set the nodata value to -9999
 
+
         # Mask out non-agricultural, non-environmental plantings land (i.e., -1) from lumap 
-        # (True means included cells. Boolean dtype.)
         self.LUMASK = self.LUMAP_NO_RESFACTOR != self.MASK_LU_CODE                                                      # 1D (ij flattend);  `True` for land uses; `False` for desert, urban, water, etc
+        self.LUMASK_2D_FULLRES = np.nan_to_num(arr_to_xr(self, self.LUMASK))
+        
 
         # Return combined land-use and resfactor mask
         if settings.RESFACTOR > 1:
+            
+            # Get 2D coarsed array, where True means the res*res neighbourhood having >=1 land-use cells
             rf_mask = self.NLUM_MASK.copy()
-            nonzeroes = np.nonzero(rf_mask)
-            rf_mask[int(settings.RESFACTOR/2)::settings.RESFACTOR, int(settings.RESFACTOR/2)::settings.RESFACTOR] = 0
-            resmask = np.where(rf_mask[nonzeroes] == 0, True, False)
-            self.MASK = self.LUMASK * resmask
-            self.LUMAP_2D_RESFACTORED = self.LUMAP_2D_FULLRES[int(settings.RESFACTOR/2)::settings.RESFACTOR, int(settings.RESFACTOR/2)::settings.RESFACTOR]
+            have_lu_cells = maximum_filter(self.LUMASK_2D_FULLRES, size=settings.RESFACTOR)
+            have_lu_cell_downsampled = have_lu_cells[settings.RESFACTOR//2::settings.RESFACTOR, settings.RESFACTOR//2::settings.RESFACTOR]
+
+            # Get 2D fullres array, where True means 
+            #   - the cell is the center of a res*res neighbourhood ABD
+            #   - having >=1 land-use cells
+            lu_mask_fullres = np.zeros_like(rf_mask, dtype=bool)
+            lu_mask_fullres[settings.RESFACTOR//2::settings.RESFACTOR, settings.RESFACTOR//2::settings.RESFACTOR] = have_lu_cell_downsampled
+
+            # Get the coords (row, col) of the cells that are the center of a res*res neighbourhood having >=1 land-use cells
+            self.COORD_ROW_COL_FULLRES = np.argwhere(rf_mask & lu_mask_fullres).T
+            self.COORD_ROW_COL_RESFACTORED = (self.COORD_ROW_COL_FULLRES - (settings.RESFACTOR//2)) // settings.RESFACTOR
+            
+            # Get the 1D MASK for resfactoring all input datasets
+            #   - the length is the number cells in Australia (land only).
+            #   - the True values are the center of a res*res neighbourhood having >=1 land-use cells
+            rf_mask[self.COORD_ROW_COL_FULLRES[0], self.COORD_ROW_COL_FULLRES[1]] = 2
+            self.MASK = np.where(rf_mask[np.nonzero(self.NLUM_MASK)] == 2, True, False)
+            
+            self.LUMAP_2D_RESFACTORED = self.LUMAP_2D_FULLRES[settings.RESFACTOR//2::settings.RESFACTOR, settings.RESFACTOR//2::settings.RESFACTOR]
             self.GEO_META = self.update_geo_meta()
+            
         elif settings.RESFACTOR == 1:
             self.MASK = self.LUMASK
             self.GEO_META = self.GEO_META_FULLRES
@@ -1419,7 +1440,7 @@ class Data:
 
             # Process layers with resfactoring
             nvis_layers_arr = np.array(
-                [self.get_exact_resfactored_average_arr_without_lu_mask(arr) for arr in nvis_layers_sel],
+                [self.get_average_fraction_from_int_map(arr) for arr in nvis_layers_sel],
                 dtype=np.float32
             )
             nvis_layers_arr = nvis_layers_arr / 100.0  # Convert to percentage
@@ -1482,7 +1503,7 @@ class Data:
 
             # Process layers with resfactoring (IBRA already in correct units, no /100 needed)
             ibra_layers_arr = np.array(
-                [self.get_exact_resfactored_average_arr_without_lu_mask(arr) for arr in ibra_layers_sel],
+                [self.get_average_fraction_from_int_map(arr) for arr in ibra_layers_sel],
                 dtype=np.float32
             )
 
@@ -1541,7 +1562,7 @@ class Data:
             snes_arr_likely = BIO_GBF4_SPECIES_raw.sel(species=self.BIO_GBF4_SNES_LIKELY_SEL, presence='LIKELY')
             snes_arr_likely_maybe = BIO_GBF4_SPECIES_raw.sel(species=self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL, presence='LIKELY_AND_MAYBE')
             snes_arr = xr.concat([snes_arr_likely, snes_arr_likely_maybe], dim='species')
-            self.BIO_GBF4_SPECIES_LAYERS = np.array([self.get_exact_resfactored_average_arr_without_lu_mask(arr) for arr in snes_arr]) 
+            self.BIO_GBF4_SPECIES_LAYERS = np.array([self.get_average_fraction_from_int_map(arr) for arr in snes_arr]) 
         
         
         if settings.BIODIVERSITY_TARGET_GBF_4_SNES != 'off':
@@ -1579,7 +1600,7 @@ class Data:
             ecnes_arr_likely = BIO_GBF4_COMUNITY_raw.sel(species=self.BIO_GBF4_ECNES_LIKELY_SEL, presence='LIKELY').compute()
             ecnes_arr_likely_maybe = BIO_GBF4_COMUNITY_raw.sel(species=self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL, presence='LIKELY_AND_MAYBE').compute()
             ecnes_arr = xr.concat([ecnes_arr_likely, ecnes_arr_likely_maybe], dim='species')
-            self.BIO_GBF4_COMUNITY_LAYERS = np.array([self.get_exact_resfactored_average_arr_without_lu_mask(arr) for arr in ecnes_arr])
+            self.BIO_GBF4_COMUNITY_LAYERS = np.array([self.get_average_fraction_from_int_map(arr) for arr in ecnes_arr])
         
   
         
@@ -1723,47 +1744,35 @@ class Data:
             for idx_w, _ in enumerate(self.LANDMANS):
                 # Get the cells with the same ID and water supply
                 lu_arr = (self.LUMAP_NO_RESFACTOR == idx_lu) * (self.LMMAP_NO_RESFACTOR == idx_w)
-                lumap_mrj[idx_w, :, idx_lu] = self.get_exact_resfactored_average_arr_consider_lu_mask(lu_arr)        
+                lumap_mrj[idx_w, :, idx_lu] = self.get_average_fraction_from_int_map(lu_arr)        
                     
         return lumap_mrj
     
     
-    def get_exact_resfactored_average_arr_consider_lu_mask(self, arr: np.ndarray) -> np.ndarray:
-            
-        arr_2d = np.zeros_like(self.LUMAP_2D_FULLRES, dtype=np.float32)      # Create a 2D array of zeros with the same shape as the LUMAP_2D_FULLRES
-        np.place(arr_2d, self.NLUM_MASK == 1, arr)                           # Place the values of arr in the 2D array where the LUMAP_2D_RESFACTORED is equal to idx_lu
-
-        mask_arr_2d_resfactor = (self.LUMAP_2D_RESFACTORED != self.NODATA) & (self.LUMAP_2D_RESFACTORED != self.MASK_LU_CODE) 
-        mask_arr_2d_fullres = (self.LUMAP_2D_FULLRES != self.NODATA) & (self.LUMAP_2D_FULLRES != self.MASK_LU_CODE)
-
-        # Create a 2D array of IDs for the LUMAP_2D_RESFACTORED
-        id_arr_2d_resfactored = np.arange(self.LUMAP_2D_RESFACTORED.size).reshape(self.LUMAP_2D_RESFACTORED.shape)
-        id_arr_2d_fullres = upsample_array(self, id_arr_2d_resfactored, settings.RESFACTOR)
-
-        # Calculate the average value for each cell in the resfactored array
-        cell_count = np.bincount(id_arr_2d_fullres.flatten(), mask_arr_2d_fullres.flatten(), minlength=self.LUMAP_2D_RESFACTORED.size)
-        cell_sum = np.bincount(id_arr_2d_fullres.flatten(), arr_2d.flatten(), minlength=self.LUMAP_2D_RESFACTORED.size)
-        with np.errstate(divide='ignore', invalid='ignore'):                    # Ignore the division by zero warning
-            cell_avg = cell_sum / cell_count
-            cell_avg[~np.isfinite(cell_avg)] = 0                                # Set the NaN and Inf to 0
-            
-        # Reshape the 1D avg array to 2D array
-        cell_avg_2d = cell_avg.reshape(self.LUMAP_2D_RESFACTORED.shape)
-        return cell_avg_2d[mask_arr_2d_resfactor]
-    
-    
-    def get_exact_resfactored_average_arr_without_lu_mask(self, arr: np.ndarray) -> np.ndarray:
+    def get_average_fraction_from_int_map(self, arr: np.ndarray) -> np.ndarray:
+        '''
+        Calculate the average value for each resfactored cell, given the input arr is masked by the land-use mask
+        (has a length of the number of cells in the full-resolution 1D array, i.e., 6956407).
         
-        arr_2d = np.zeros_like(self.LUMAP_2D_FULLRES, dtype=np.float32)      # Create a 2D array of zeros with the same shape as the LUMAP_2D_FULLRES
-        np.place(arr_2d, self.NLUM_MASK == 1, arr)                           # Place the values of arr in the 2D array where the LUMAP_2D_RESFACTORED is equal to idx_lu
-        arr_2d = np.pad(arr_2d, ((0, settings.RESFACTOR), (0, settings.RESFACTOR)), mode='reflect')  
+        For example, with a 5x5 resfactor, if there are only 7 cells exist, the average value for this 
+        resfactored cell will be the (sum of 7 cells) / 25.
+        
+        Args:
+            arr (np.ndarray): A 1D array containing the values for the full-resolution array, should be the length of the number of cells in the full-resolution array (i.e., 6956407)
+            
+        Returns:
+            np.ndarray: A 1D array containing the average values for each cell in the 
+            resfactored array, with the same length as the number of cells in the resfactored array (i.e., 6956407)
+        '''
+        
+        arr_2d = np.zeros_like(self.LUMAP_2D_FULLRES, dtype=np.float32)         # Create a 2D array of zeros with the same shape as the LUMAP_2D_FULLRES
+        np.place(arr_2d, self.NLUM_MASK, arr)                                   # Place the values of arr in the 2D array where the LUMAP_2D_RESFACTORED is equal to idx_lu
 
         arr_2d_xr = xr.DataArray(arr_2d, dims=['y', 'x'])
-        arr_2d_xr_resfactored = arr_2d_xr.coarsen(x=settings.RESFACTOR, y=settings.RESFACTOR, boundary='trim').mean()
-        arr_2d_xr_resfactored = arr_2d_xr_resfactored.values[0:self.LUMAP_2D_RESFACTORED.shape[0], 0:self.LUMAP_2D_RESFACTORED.shape[1]]  
+        arr_2d_xr_resfactored = arr_2d_xr.coarsen(x=settings.RESFACTOR, y=settings.RESFACTOR, boundary='pad').mean()
+        arr_2d_xr_resfactored = arr_2d_xr_resfactored.values[0:self.LUMAP_2D_RESFACTORED.shape[0], 0:self.LUMAP_2D_RESFACTORED.shape[1]] 
 
-        mask_arr_2d_resfactor = (self.LUMAP_2D_RESFACTORED != self.NODATA) & (self.LUMAP_2D_RESFACTORED != self.MASK_LU_CODE) 
-        return arr_2d_xr_resfactored[mask_arr_2d_resfactor]
+        return arr_2d_xr_resfactored[self.COORD_ROW_COL_RESFACTORED[0], self.COORD_ROW_COL_RESFACTORED[1]]
 
     
     def get_resfactored_lumap(self) -> np.ndarray:

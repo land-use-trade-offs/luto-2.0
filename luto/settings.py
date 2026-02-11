@@ -123,10 +123,10 @@ DYNAMIC_PRICE = False
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 13      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 5      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-SIM_YEARS =  list(range(2010, 2051, 1))
+SIM_YEARS =  list(range(2010, 2051, 5))
 
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
@@ -460,7 +460,7 @@ SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
 # ---------------------------------------------------------------------------- #
 # Renewable energy parameters
 # ---------------------------------------------------------------------------- #
-RENEWABLE_ENERGY_CONSTRAINTS = 'on'         # 'on' or 'off'
+RENEWABLE_ENERGY_CONSTRAINTS = 'off'         # 'on' or 'off'
 
 RENEWABLES_OPTIONS = [
     'Utility Solar PV',
@@ -473,7 +473,7 @@ The renewable energy target scenario to use when `RENEWABLE_ENERGY_CONSTRAINTS` 
 One of 'CNS25 - Accelerated Transition' or 'CNS25 - Current Targets', 
 '''
 
-RE_TARGET_LEVEL = "STATE"  # options: "STATE", "NRM"; currently (20260205) only support STATE.
+RE_TARGET_LEVEL = "STATE"  # options: "STATE", "NRM"; TODO: currently (20260205) only support STATE, will add NRM in the future.
 '''
 The spatial level at which to apply the renewable energy targets when `RENEWABLE_ENERGY_CONSTRAINTS` is set to 'on'.
 Options include "STATE" or "NRM". Currently (20260205) only support STATE.
@@ -656,7 +656,7 @@ in order to enhance biodiversity and ecosystem functions and services, ecologica
 '''
 
 
-GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 20
+GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 40
 '''
 Based on Zonation alogrithm, the biodiversity feature coverage (an indicator of overall biodiversity benifits) is 
 more attached to high rank cells (rank is an indicator of importance/priority in biodiversity conservation). 

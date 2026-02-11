@@ -65,6 +65,7 @@ def arr_to_xr(data, arr:np.ndarray) -> xr.DataArray:
         The Data object that contains the metadata of the 2D array.  
     arr: np.ndarray
         The 1D array that will be converted to an xarray DataArray.
+        Should be either a full-res 1D arrary (len = 6956407) or a resfactored 1D array (len = data.MASK.sum()).
         
     Returns
     -------
@@ -82,11 +83,7 @@ def arr_to_xr(data, arr:np.ndarray) -> xr.DataArray:
     else:
         geo_meta = data.GEO_META
         arr_2d = data.LUMAP_2D_RESFACTORED.copy().astype(np.float32)
-        np.place(
-            arr_2d, 
-            (arr_2d != data.MASK_LU_CODE) & (arr_2d != data.NODATA), 
-            arr
-        )                    
+        arr_2d[*data.COORD_ROW_COL_RESFACTORED] = arr     
 
     # Mask the nodata values to nan
     arr_2d = np.where(arr_2d == data.NODATA, np.nan, arr_2d)   
