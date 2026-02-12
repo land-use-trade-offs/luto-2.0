@@ -288,7 +288,7 @@ Renewable energy types (Utility Solar PV, Onshore Wind) are implemented as agric
 | `renewable_targets.csv` | CSV | Year, STATE, SCENARIO, PRODUCT, Renewable_Target_TWh |
 | `renewable_elec_price_AUD_MWh.csv` | CSV | Year, State, Price_AUD_per_MWh |
 | `renewable_energy_bundle.csv` | CSV | Year, Commodity, Lever, Productivity, Revenue, OM_Cost_Multiplier, Biodiversity_compatability, INPUT-wrt_water-required |
-| `renewable_energy_layers_1D.nc` | NetCDF | Spatial layers: Cost_of_install_AUD_ha, Cost_of_operation, Capacity_percent_of_natural_energy, Energy_remain_percent_after_distribution |
+| `renewable_energy_layers_1D.nc` | NetCDF | Spatial layers: Cost_of_install_AUD_ha, Cost_of_operation, Capacity_percent_of_natural_energy, Energy_percent_loss_after_distribution |
 
 ### Compatible Land Uses
 

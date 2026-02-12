@@ -123,7 +123,7 @@ DYNAMIC_PRICE = False
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 5      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 13      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
 SIM_YEARS =  list(range(2010, 2051, 5))
@@ -460,7 +460,7 @@ SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
 # ---------------------------------------------------------------------------- #
 # Renewable energy parameters
 # ---------------------------------------------------------------------------- #
-RENEWABLE_ENERGY_CONSTRAINTS = 'off'         # 'on' or 'off'
+RENEWABLE_ENERGY_CONSTRAINTS = 'on'         # 'on' or 'off'
 
 RENEWABLES_OPTIONS = [
     'Utility Solar PV',

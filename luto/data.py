@@ -508,9 +508,11 @@ class Data:
         
         self.REGION_STATE_NAME2CODE = REGION_STATE_r.groupby('STE_NAME11', observed=True)['STE_CODE11'].first().to_dict()
         self.REGION_STATE_NAME2CODE = dict(sorted(self.REGION_STATE_NAME2CODE.items()))     # Make sure the dict is sorted by state name, makes it consistent with renewable target.
-        self.REGION_STATE_NAME2CODE.pop('Other Territories')                                # Remove 'Other Territories' from the dict.
+        if 'Other Territories' in self.REGION_STATE_NAME2CODE:
+            self.REGION_STATE_NAME2CODE.pop('Other Territories')                                # Remove 'Other Territories' from the dict.
         
         self.REGION_STATE_CODE = REGION_STATE_r['STE_CODE11'].values
+
 
         ###############################################################
         # No-Go areas; Regional adoption constraints.
@@ -1193,11 +1195,6 @@ class Data:
         
         # Convert to numpy array of shape (91, 26)
         self.D_CY = self.DEMAND_C.to_numpy(dtype = np.float32).T
-        
-        # Adjust demand data to the production data calculated using the base year layers;
-        # The mismatch is caused by resfactoring spatial layers. Land uses of small size (i.e., other non-cereal crops) 
-        # are distorted more under higher resfactoring.
-        self.D_CY *= (self.BASE_YR_production_t / self.D_CY[0])[None, :]
         self.D_CY_xr = xr.DataArray(
             self.D_CY, 
             dims=['year','Commodity'], 
