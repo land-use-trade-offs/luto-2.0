@@ -73,7 +73,7 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 - **`luto/settings.py`**: Configuration parameters for all model aspects
 - **`luto/solvers/`**: Optimization solver interface and input data preparation
   - `solver.py`: GUROBI solver wrapper (LutoSolver class)
-    - Biodiversity constraint methods: `_add_GBF2_constraints()`, `_add_GBF3_NVIS_constraints()`, `_add_GBF4_SNES_constraints()`, `_add_GBF4_ECNES_constraints()`, `_add_GBF8_constraints()`
+    - Biodiversity constraint methods: `_add_GBF2_constraints()`, `_add_GBF3_NVIS_constraints()`, `_add_GBF3_IBRA_constraints()`, `_add_GBF4_SNES_constraints()`, `_add_GBF4_ECNES_constraints()`, `_add_GBF8_constraints()`
     - Renewable energy constraint method: `_add_renewable_energy_constraints()` — enforces state-level solar and wind generation targets
   - `input_data.py`: Prepares optimization model input data
     - Biodiversity data attributes use `*_pre_1750_area_*` naming (e.g., `GBF3_NVIS_pre_1750_area_vr`, `GBF4_SNES_pre_1750_area_sr`)
@@ -91,10 +91,11 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
   - **Biodiversity module** (`biodiversity.py`): GBF (Global Biodiversity Framework) calculations
     - `get_GBF2_MASK_area()`: Returns GBF2 priority degraded areas (mask × real area)
     - `get_GBF3_NVIS_matrices_vr()`: NVIS vegetation layer matrices for GBF3
+    - `get_GBF3_IBRA_matrices_vr()`: IBRA bioregion layer matrices for GBF3
     - `get_GBF4_SNES_matrix_sr()`, `get_GBF4_ECNES_matrix_sr()`: Species/Ecological Community NES matrices
     - Variable naming convention: `*_pre_1750_area_*` for baseline biodiversity area matrices
 - **`luto/economics/non_agricultural/`**: Non-agricultural land use economics
-  - Environmental plantings, carbon plantings, etc.
+  - Environmental plantings, riparian plantings, agroforestry, carbon plantings, BECCS, destocked natural land
 - **`luto/economics/off_land_commodity/`**: Off-land commodity economics
 
 ### Data Processing
@@ -116,11 +117,24 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 ## Key Configuration Parameters
 
 ### Core Settings (`luto/settings.py`)
-- `SIM_YEARS`: Simulation time periods (default: 2020-2050 in 5-year steps)
+- `VERSION`: Model version identifier (current: '2.3')
+- `SSP`: Shared Socioeconomic Pathway code (e.g., '245' for SSP2-RCP4.5)
+- `SCENARIO`: Auto-derived from SSP (e.g., 'SSP2')
+- `RCP`: Auto-derived from SSP (e.g., 'rcp4p5')
+- `SIM_YEARS`: Simulation time periods (default: 2010-2050 in 5-year steps; 2010 is base year)
 - `RESFACTOR`: Spatial resolution factor (1 = full resolution, >1 = coarser)
-- `SCENARIO`: Shared Socioeconomic Pathway (SSP1-SSP5)
-- `RCP`: Representative Concentration Pathway (e.g., 'rcp4p5')
 - `OBJECTIVE`: Optimization objective ('maxprofit' or 'mincost')
+
+### Scenario Settings
+- `DIET_DOM`: Domestic diet option ('BAU', 'FLX', 'VEG', 'VGN')
+- `DIET_GLOB`: Global diet option (varies by year)
+- `CONVERGENCE`: Dietary transformation target year (2050 or 2100)
+- `IMPORT_TREND`: Import trend assumption ('Static' or 'Trend')
+- `WASTE`: Waste multiplier (1 or 0.5)
+- `FEED_EFFICIENCY`: Livestock feed efficiency ('BAU' or 'High')
+- `APPLY_DEMAND_MULTIPLIERS`: Enable demand scenario effects (True/False)
+- `AG_YIELD_MULT`: Agricultural yield multiplier (default: 1.15 = 15% increase)
+- `CO2_FERT`: CO2 fertilization effects ('on' or 'off')
 
 ### Economic Settings
 - `DYNAMIC_PRICE`: Enable demand elasticity-based dynamic pricing (default: False)
@@ -130,14 +144,18 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 
 ### Environmental Constraints
 - `GHG_EMISSIONS_LIMITS`: Greenhouse gas targets ('off', 'low', 'medium', 'high')
+- `GHG_CONSTRAINT_TYPE`: Hard or soft GHG constraint ('hard' or 'soft')
 - `WATER_LIMITS`: Water yield constraints ('on' or 'off')
+- `WATER_CONSTRAINT_TYPE`: Hard or soft water constraint ('hard' or 'soft')
 - `CARBON_EFFECTS_WINDOW`: Years for carbon accumulation averaging (50, 60, 70, 80, or 90 years)
   - Must match available NetCDF data ages in input files
   - Determines annual sequestration rate by averaging total CO2 over this period
   - Default: 50 years (follows S-curve logic with rapid early accumulation)
 - `BIODIVERSITY_TARGET_GBF_*`: Global Biodiversity Framework targets
-  - `BIODIVERSITY_TARGET_GBF_2`: Priority degraded areas restoration ('off' or percentage target)
-  - `BIODIVERSITY_TARGET_GBF_3_NVIS`: NVIS vegetation group targets ('off' or percentage target)
+  - `BIODIVERSITY_TARGET_GBF_2`: Priority degraded areas restoration ('off', 'low', 'medium', 'high')
+  - `GBF2_CONSTRAINT_TYPE`: Hard or soft GBF2 constraint ('hard' or 'soft')
+  - `BIODIVERSITY_TARGET_GBF_3_NVIS`: NVIS vegetation group targets ('off', 'medium', 'high', 'USER_DEFINED')
+  - `BIODIVERSITY_TARGET_GBF_3_IBRA`: IBRA bioregion targets ('off', 'medium', 'high', 'USER_DEFINED')
   - `BIODIVERSITY_TARGET_GBF_4_SNES`: Species NES (National Environmental Significance) ('on' or 'off')
   - `BIODIVERSITY_TARGET_GBF_4_ECNES`: Ecological Community NES ('on' or 'off')
   - `BIODIVERSITY_TARGET_GBF_8`: Species conservation targets ('on' or 'off')
@@ -154,8 +172,20 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 
 ### Solver Configuration
 - `SOLVE_METHOD`: GUROBI algorithm (default: 2 for barrier method)
-- `THREADS`: Parallel threads for optimization
-- `FEASIBILITY_TOLERANCE`: Solver tolerance settings
+- `THREADS`: Parallel threads for optimization (default: min(32, cpu_count))
+- `FEASIBILITY_TOLERANCE`: Solver tolerance (default: 1e-2, relaxed from 1e-6)
+- `OPTIMALITY_TOLERANCE`: Optimality tolerance (default: 1e-2)
+- `BARRIER_CONVERGENCE_TOLERANCE`: Barrier method convergence (default: 1e-5)
+- `RESCALE_FACTOR`: Rescaling magnitude for numerical stability (default: 1e3)
+- `SOLVER_WEIGHT_DEMAND`: Demand deviation weight in objective (default: 1)
+- `SOLVER_WEIGHT_GHG`: GHG deviation weight in objective (default: 1)
+- `SOLVER_WEIGHT_WATER`: Water deviation weight in objective (default: 1)
+
+### Output Writing Configuration
+- `WRITE_PARALLEL`: Enable parallel output writing (default: True)
+- `WRITE_THREADS`: Number of parallel write threads (default: min(6, cpu_count))
+- `WRITE_REPORT_MAX_MEM_GB`: Max memory for report generation (default: 64)
+- `WRITE_CHUNK_SIZE`: Chunk size for NetCDF writing (default: 4096)
 
 ## Data Flow
 
@@ -164,7 +194,7 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
    - Calculates demand deltas (change from 2010 baseline) for price adjustments
    - **Carbon data**: Loads NetCDF files using xarray, selects data at `CARBON_EFFECTS_WINDOW` age
    - Carbon sequestration components: Trees + Debris (aboveground, risk-discounted) + Soil (belowground)
-   - **Renewable energy data**: Loads targets (CSV), electricity prices (CSV), spatial layers (NetCDF), and bundle parameters (CSV)
+   - **Renewable energy data**: Loads targets (CSV), electricity prices (separate CSV per type: solar, wind), spatial layers (NetCDF), and bundle parameters (CSV)
 2. **Preprocessing**: `dataprep.py` processes raw data into model-ready formats
    - Copies demand elasticity data from source to input directory
    - **Carbon data preparation**: Converts 3D timeseries to NetCDF format with age dimension
@@ -174,7 +204,7 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
    - Revenue calculations apply demand elasticity multipliers when `DYNAMIC_PRICE` enabled
    - Elasticity multipliers computed as: `1 + (demand_delta / demand_elasticity)`
 4. **Solver Input**: `solvers/input_data.py` prepares optimization model data
-   - Biodiversity matrices: GBF2 mask areas, GBF3 NVIS layers, GBF4 SNES/ECNES matrices, GBF8 species data
+   - Biodiversity matrices: GBF2 mask areas, GBF3 NVIS layers, GBF3 IBRA layers, GBF4 SNES/ECNES matrices, GBF8 species data
    - Renewable energy: Solar/wind yield arrays (`renewable_solar_r`, `renewable_wind_r`), state region mapping, rescaled targets
    - Data rescaling: Arrays rescaled in-place to 0-1e3 magnitude for numerical stability
 5. **Optimization**: `solvers/solver.py` runs GUROBI optimization with biodiversity and renewable energy constraints
@@ -231,23 +261,25 @@ The biodiversity module follows consistent naming conventions for GBF (Global Bi
 
 ### Function Naming Pattern
 - **GBF constraint methods**: Use `_add_GBF{N}_{TYPE}_constraints()` format
-  - Examples: `_add_GBF2_constraints()`, `_add_GBF3_NVIS_constraints()`, `_add_GBF4_SNES_constraints()`
+  - Examples: `_add_GBF2_constraints()`, `_add_GBF3_NVIS_constraints()`, `_add_GBF3_IBRA_constraints()`, `_add_GBF4_SNES_constraints()`
   - Maintain consistency between method names and GBF target types
 
 ### Data Structure Indices
-- `v, r`: Vegetation group (v) × cell (r) - used for GBF3 NVIS data
+- `v, r`: Vegetation group / bioregion (v) × cell (r) - used for GBF3 NVIS and IBRA data
 - `s, r`: Species/community (s) × cell (r) - used for GBF4 and GBF8 data
 - `r`: Cell only - used for GBF2 mask data
 
 ### Key GBF Modules
 1. **GBF2**: Priority degraded areas restoration
    - Function: `get_GBF2_MASK_area(data)` returns mask × real area
-2. **GBF3**: NVIS major vegetation group targets
+2. **GBF3 NVIS**: NVIS major vegetation group targets
    - Function: `get_GBF3_NVIS_matrices_vr(data)` returns vegetation layers
-3. **GBF4**: Species and Ecological Community NES
+3. **GBF3 IBRA**: IBRA bioregion targets
+   - Function: `get_GBF3_IBRA_matrices_vr(data)` returns bioregion layers
+4. **GBF4**: Species and Ecological Community NES
    - SNES: `get_GBF4_SNES_matrix_sr(data)`
    - ECNES: `get_GBF4_ECNES_matrix_sr(data)`
-4. **GBF8**: Species conservation
+5. **GBF8**: Species conservation
    - Function: `get_GBF8_species_matrices_sr(data, target_year)`
 
 ## Renewable Energy Module
@@ -276,7 +308,8 @@ Renewable energy types (Utility Solar PV, Onshore Wind) are implemented as agric
 ### Data Loading (`data.py`)
 
 - `RENEWABLE_TARGETS`: State-level generation targets (TWh → MWh) by year, scenario, and product
-- `RENEWABLE_PRICES`: State-level electricity prices (AUD/MWh) by year
+- `SOLAR_PRICES`: State-level solar electricity prices (AUD/MWh) by year
+- `WIND_PRICES`: State-level wind electricity prices (AUD/MWh) by year
 - `RENEWABLE_LAYERS`: NetCDF spatial layers with installation cost, operation cost, capacity %, and distribution loss %
 - `RENEWABLE_BUNDLE_SOLAR` / `RENEWABLE_BUNDLE_WIND`: Parameters per land use (productivity, revenue, O&M multiplier, biodiversity compatibility, water requirements)
 - `REGION_STATE_CODE` / `REGION_STATE_NAME2CODE`: State mapping for state-level constraint aggregation
@@ -286,7 +319,8 @@ Renewable energy types (Utility Solar PV, Onshore Wind) are implemented as agric
 | File | Format | Description |
 |------|--------|-------------|
 | `renewable_targets.csv` | CSV | Year, STATE, SCENARIO, PRODUCT, Renewable_Target_TWh |
-| `renewable_elec_price_AUD_MWh.csv` | CSV | Year, State, Price_AUD_per_MWh |
+| `renewable_price_AUD_MWh_solar.csv` | CSV | Year, State, Price_AUD_per_MWh (solar) |
+| `renewable_price_AUD_MWh_wind.csv` | CSV | Year, State, Price_AUD_per_MWh (wind) |
 | `renewable_energy_bundle.csv` | CSV | Year, Commodity, Lever, Productivity, Revenue, OM_Cost_Multiplier, Biodiversity_compatability, INPUT-wrt_water-required |
 | `renewable_energy_layers_1D.nc` | NetCDF | Spatial layers: Cost_of_install_AUD_ha, Cost_of_operation, Capacity_percent_of_natural_energy, Energy_percent_loss_after_distribution |
 
@@ -301,6 +335,9 @@ Renewable energy types (Utility Solar PV, Onshore Wind) are implemented as agric
 - Adoption limits enforced via existing `const_ag_mam_adoption_limit` solver constraints
 - State-level pricing: electricity revenue uses state-specific prices mapped via `REGION_STATE_CODE`
 - Effects follow standard pattern: `base_value × (multiplier - 1)` for additive impacts
+- **GHG effects return zeros**: No direct on-farm GHG impact; displacement benefits handled externally via AusTIMES energy model
+- **Separate rescaling**: Solar and wind yield arrays are rescaled independently (`Renewable_Solar` / `Renewable_Wind` scale factors)
+- **ACT excluded**: Australian Capital Territory skipped in state-level constraints
 
 ## Vue.js Reporting System Architecture
 

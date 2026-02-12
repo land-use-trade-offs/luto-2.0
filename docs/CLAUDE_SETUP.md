@@ -54,11 +54,24 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 ## Key Configuration Parameters
 
 ### Core Settings (`luto/settings.py`)
-- `SIM_YEARS`: Simulation time periods (default: 2020-2050 in 5-year steps)
+- `VERSION`: Model version identifier (current: '2.3')
+- `SSP`: Shared Socioeconomic Pathway code (e.g., '245' for SSP2-RCP4.5)
+- `SCENARIO`: Auto-derived from SSP (e.g., 'SSP2')
+- `RCP`: Auto-derived from SSP (e.g., 'rcp4p5')
+- `SIM_YEARS`: Simulation time periods (default: 2010-2050 in 5-year steps; 2010 is base year)
 - `RESFACTOR`: Spatial resolution factor (1 = full resolution, >1 = coarser)
-- `SCENARIO`: Shared Socioeconomic Pathway (SSP1-SSP5)
-- `RCP`: Representative Concentration Pathway (e.g., 'rcp4p5')
 - `OBJECTIVE`: Optimization objective ('maxprofit' or 'mincost')
+
+### Scenario Settings
+- `DIET_DOM`: Domestic diet option ('BAU', 'FLX', 'VEG', 'VGN')
+- `DIET_GLOB`: Global diet option (varies by year)
+- `CONVERGENCE`: Dietary transformation target year (2050 or 2100)
+- `IMPORT_TREND`: Import trend assumption ('Static' or 'Trend')
+- `WASTE`: Waste multiplier (1 or 0.5)
+- `FEED_EFFICIENCY`: Livestock feed efficiency ('BAU' or 'High')
+- `APPLY_DEMAND_MULTIPLIERS`: Enable demand scenario effects (True/False)
+- `AG_YIELD_MULT`: Agricultural yield multiplier (default: 1.15 = 15% increase)
+- `CO2_FERT`: CO2 fertilization effects ('on' or 'off')
 
 ### Economic Settings
 - `DYNAMIC_PRICE`: Enable demand elasticity-based dynamic pricing (default: False)
@@ -68,22 +81,55 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 
 ### Environmental Constraints
 - `GHG_EMISSIONS_LIMITS`: Greenhouse gas targets ('off', 'low', 'medium', 'high')
+- `GHG_CONSTRAINT_TYPE`: Hard or soft constraint ('hard' or 'soft')
 - `WATER_LIMITS`: Water yield constraints ('on' or 'off')
+- `WATER_CONSTRAINT_TYPE`: Hard or soft constraint ('hard' or 'soft')
+- `WATER_CLIMATE_CHANGE_IMPACT`: Apply climate change to water yields ('on' or 'off')
+- `WATER_STRESS`: Historical yield requirement fraction (default: 0.6 = 60%)
 - `CARBON_EFFECTS_WINDOW`: Years for carbon accumulation averaging (50, 60, 70, 80, or 90 years)
   - Must match available NetCDF data ages in input files
   - Determines annual sequestration rate by averaging total CO2 over this period
   - Default: 50 years (follows S-curve logic with rapid early accumulation)
 - `BIODIVERSITY_TARGET_GBF_*`: Global Biodiversity Framework targets
-  - `BIODIVERSITY_TARGET_GBF_2`: Priority degraded areas restoration ('off' or percentage target)
-  - `BIODIVERSITY_TARGET_GBF_3_NVIS`: NVIS vegetation group targets ('off' or percentage target)
+  - `BIODIVERSITY_TARGET_GBF_2`: Priority degraded areas restoration ('off', 'low', 'medium', 'high')
+  - `GBF2_CONSTRAINT_TYPE`: Hard or soft constraint ('hard' or 'soft')
+  - `BIODIVERSITY_TARGET_GBF_3_NVIS`: NVIS vegetation group targets ('off', 'medium', 'high', 'USER_DEFINED')
+  - `BIODIVERSITY_TARGET_GBF_3_IBRA`: IBRA bioregion targets ('off', 'medium', 'high', 'USER_DEFINED')
   - `BIODIVERSITY_TARGET_GBF_4_SNES`: Species NES (National Environmental Significance) ('on' or 'off')
   - `BIODIVERSITY_TARGET_GBF_4_ECNES`: Ecological Community NES ('on' or 'off')
   - `BIODIVERSITY_TARGET_GBF_8`: Species conservation targets ('on' or 'off')
 
+### Renewable Energy Settings
+- `RENEWABLE_ENERGY_CONSTRAINTS`: Enable renewable energy generation targets ('on' or 'off')
+- `RENEWABLES_OPTIONS`: Renewable energy types: `['Utility Solar PV', 'Onshore Wind']`
+- `RENEWABLE_TARGET_SCENARIO`: Target scenario ('CNS25 - Accelerated Transition' or 'CNS25 - Current Targets')
+- `RE_TARGET_LEVEL`: Spatial level for constraints ('STATE' or 'NRM'; only STATE currently supported)
+- `RENEWABLE_NATURAL_ENERGY_MW_HA_HOUR`: Per-hectare capacity (MW/ha) per renewable type
+- `RENEWABLES_ADOPTION_LIMITS`: Maximum adoption fraction per type (default: 1.0 for both)
+
 ### Solver Configuration
 - `SOLVE_METHOD`: GUROBI algorithm (default: 2 for barrier method)
-- `THREADS`: Parallel threads for optimization
-- `FEASIBILITY_TOLERANCE`: Solver tolerance settings
+- `THREADS`: Parallel threads for optimization (default: min(32, cpu_count))
+- `FEASIBILITY_TOLERANCE`: Solver tolerance (default: 1e-2, relaxed from 1e-6)
+- `OPTIMALITY_TOLERANCE`: Optimality tolerance (default: 1e-2)
+- `BARRIER_CONVERGENCE_TOLERANCE`: Barrier method convergence (default: 1e-5)
+- `RESCALE_FACTOR`: Rescaling magnitude for numerical stability (default: 1e3)
+
+### Output Writing Configuration
+- `WRITE_PARALLEL`: Enable parallel output writing (default: True)
+- `WRITE_THREADS`: Number of parallel write threads (default: min(6, cpu_count))
+- `WRITE_REPORT_MAX_MEM_GB`: Max memory for report generation (default: 64)
+- `WRITE_CHUNK_SIZE`: Chunk size for NetCDF writing (default: 4096)
+
+### No-Go Areas & Regional Adoption
+- `EXCLUDE_NO_GO_LU`: Enforce no-go area constraints (True/False)
+- `REGIONAL_ADOPTION_CONSTRAINTS`: Regional adoption limits ('off', 'on', 'NON_AG_UNIFORM')
+- `REGIONAL_ADOPTION_ZONE`: Zone type ('NRM_CODE', 'LGA_CODE', etc.)
+
+### Land-Use Culling
+- `CULL_MODE`: Land-use culling mode ('absolute', 'percentage', 'none')
+- `MAX_LAND_USES_PER_CELL`: Max land uses per cell if absolute culling (default: 12)
+- `LAND_USAGE_CULL_PERCENTAGE`: Culling percentage if percentage mode (default: 0.15)
 
 ## Memory and Performance
 

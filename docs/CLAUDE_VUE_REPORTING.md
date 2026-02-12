@@ -121,7 +121,8 @@ All reporting views follow the progressive selection pattern:
 - **Dynamic ChartData Structure**: Biodiversity data is conditionally loaded based on scenario settings
   - **Conditional Loading Logic**: Only load GBF scripts when corresponding targets are not 'off':
     - `BIODIVERSITY_TARGET_GBF_2 !== 'off'` → loads GBF2 data
-    - `BIODIVERSITY_TARGET_GBF_3_NVIS !== 'off'` → loads GBF3 data
+    - `BIODIVERSITY_TARGET_GBF_3_NVIS !== 'off'` → loads GBF3 NVIS data
+    - `BIODIVERSITY_TARGET_GBF_3_IBRA !== 'off'` → loads GBF3 IBRA data
     - `BIODIVERSITY_TARGET_GBF_4_SNES !== 'off'` → loads GBF4 (SNES) data
     - `BIODIVERSITY_TARGET_GBF_4_ECNES !== 'off'` → loads GBF4 (ECNES) data
     - `BIODIVERSITY_TARGET_GBF_8 !== 'off'` → loads GBF8 (SPECIES & GROUP) data
@@ -136,7 +137,7 @@ All reporting views follow the progressive selection pattern:
   if (runScenario.value['BIODIVERSITY_TARGET_GBF_2'] !== 'off') {
     ChartData.value['Biodiversity']['GBF2'] = window[chartOverview_bio_GBF2['name']];
   }
-  // ... similar pattern for GBF3, GBF4, GBF8
+  // ... similar pattern for GBF3 NVIS, GBF3 IBRA, GBF4, GBF8
   ```
 
 - **Chart Data** (when loaded):
@@ -146,14 +147,14 @@ All reporting views follow the progressive selection pattern:
   - `BIO_GBF2_split_Am_1_Landuse`: `Region → [series]` (conditional - simplified, no Water/AgMgt levels)
   - `BIO_GBF2_split_Am_2_Agri-Management`: `Region → [series]` (conditional - with AgMgt categories: `"ALL"`, `"Early dry-season savanna burning"`, `"Human-induced regeneration (Beef)"`, `"Human-induced regeneration (Sheep)"`)
   - `BIO_GBF2_split_NonAg_1_Landuse`: `Region → [series]` (conditional - simplified)
-  - `BIO_GBF3_*`, `BIO_GBF4_*`, `BIO_GBF8_*`: Similar structures for other GBF targets (conditional loading)
+  - `BIO_GBF3_NVIS_*`, `BIO_GBF3_IBRA_*`, `BIO_GBF4_*`, `BIO_GBF8_*`: Similar structures for other GBF targets (conditional loading)
 
 - **Map Data**:
   - `map_bio_quality_*`: Always available (quality data always loaded)
   - `map_bio_GBF2_Ag`: `Water → Landuse → Year → {img_str, bounds, min_max}` (conditional - standard pattern)
   - `map_bio_GBF2_Am`: `Water → Landuse → Year → {img_str, bounds, min_max}` (conditional - standard pattern)
   - `map_bio_GBF2_NonAg`: `Landuse → Year → {img_str, bounds, min_max}` (conditional - simplified, no Water level)
-  - `map_bio_GBF3_*`, `map_bio_GBF4_*`, `map_bio_GBF8_*`: Similar structures for other GBF targets (conditional loading)
+  - `map_bio_GBF3_NVIS_*`, `map_bio_GBF3_IBRA_*`, `map_bio_GBF4_*`, `map_bio_GBF8_*`: Similar structures for other GBF targets (conditional loading)
 
 - **Implementation Notes**:
   - **Script Loading Order**: Conditional GBF scripts loaded after base scripts but before ChartData construction

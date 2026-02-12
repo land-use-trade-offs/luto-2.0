@@ -4,11 +4,19 @@ This document describes the output file structure, NetCDF format specifications,
 
 ## Output Directory Structure
 
-Results are saved in `/output/<timestamp>/`:
-- `DATA_REPORT/REPORT_HTML/index.html`: Interactive HTML dashboard
-- Spatial outputs: NetCDF files (xarray format) for mapping
-- Data tables: CSV files with numerical results
-- Logs: Execution logs and performance metrics
+Results are saved in `/output/<timestamp>_RF<resfactor>_<year_range>/`:
+- `DATA_REPORT/`: Vue.js reporting interface
+  - `VUE_modules/`: Vue.js frontend (views, data, services, routes)
+  - `index.html`: Main entry point
+  - Chart data JSON/JS files
+  - Spatial layer JSON files
+- `out_<year>/`: Per-year output subdirectories (e.g., `out_2010/`, `out_2015/`, ...)
+  - NetCDF files: Spatial outputs (`xr_dvar_*.nc`, `xr_revenue_*.nc`, `xr_ghg_*.nc`, etc.)
+  - CSV files: Data tables (`crosstab_*.csv`, `quantity_*.csv`, etc.)
+- `model_run_settings.txt`: All model settings for this run
+- `LUTO_RUN_.log`: Execution log
+- `memory_usage.log`: Memory profiling log
+- `Data_RES<resfactor>.lz4`: Serialized Data object (joblib + lz4 compression)
 
 ## NetCDF Output Format and Structure
 
