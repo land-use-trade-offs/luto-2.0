@@ -1,49 +1,44 @@
-# Ignore the following folders:
-.spyproject/
+# Python
 **/__pycache__/
-.vscode/**
-.vscode-upload.json
-
-/jinzhu_inspect_code/*
-/jinzhu_inspect_code
-
-luto/.ipynb_checkpoints/*
-pyproject.toml
-anthropic.yml
-
-# Report js files
-luto/tools/report/VUE_modules/data/*.js
-luto/tools/report/VUE_modules/data/map_layers
+**/.ipynb_checkpoints/
+.hypothesis
 
 # Virtual environments
-venv
+venv/
 
-# History files
+# IDEs and editors
+.vscode/
+.spyproject/
 .history/
+.vscode-upload.json
+
+# Claude Code
+.claude/
 
 # Input/output data
 input/**
 output/**
 
-# Gurobi environment & logging
+# Gurobi
 gurobi.env
 gurobi.log
 
-# Testing
-.hypothesis
+# Report generated files
+luto/tools/report/VUE_modules/data/*.js
+luto/tools/report/VUE_modules/data/map_layers/
 
-# Except this very file:
-!.gitignore
+# Documentation builds
+docs/manual/
 
-# Some potential temporary files
+# Project-specific scratch
+jinzhu_inspect_code/
+pyproject.toml
+anthropic.yml
+
+# Temporary and archive files
+*.tmp
 *.zip
 *.dat
 *.log
-
-# The mannual build files
-/docs/manual/*
-
-*.tmp
-**/*.7z
-.vscode-upload.json
-.claude/settings.local.json
+*.7z
+nul
