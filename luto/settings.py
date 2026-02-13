@@ -402,8 +402,8 @@ AG_MANAGEMENTS = {
     'Biochar': True,
     'HIR - Beef': True,
     'HIR - Sheep': True,
-    'Utility Solar PV': True,
-    'Onshore Wind': True,
+    'Utility Solar PV': None,   # Set later based on RENEWABLE_ENERGY_CONSTRAINTS
+    'Onshore Wind': None,       # Set later based on RENEWABLE_ENERGY_CONSTRAINTS
 }
 """
 The dictionary below contains a master list of all agricultural management options and
@@ -421,8 +421,8 @@ AG_MANAGEMENTS_REVERSIBLE = {
     'Biochar': True,
     'HIR - Beef': True,
     'HIR - Sheep': True,
-    'Utility Solar PV': False,
-    'Onshore Wind': False,
+    'Utility Solar PV': False,  # Can not abandon Utility Solar PV once adopted due to the long lifespan and high transition costs
+    'Onshore Wind': False,      # Can not abandon Onshore Wind once adopted due to the long lifespan and high transition costs
 }
 """
 The values of the below dictionary determine whether the model is allowed to abandon agricultural
@@ -461,6 +461,15 @@ SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
 # Renewable energy parameters
 # ---------------------------------------------------------------------------- #
 RENEWABLE_ENERGY_CONSTRAINTS = 'on'         # 'on' or 'off'
+
+if RENEWABLE_ENERGY_CONSTRAINTS == 'on':
+    AG_MANAGEMENTS['Utility Solar PV'] = True
+    AG_MANAGEMENTS['Onshore Wind'] = True
+elif RENEWABLE_ENERGY_CONSTRAINTS == 'off':
+    AG_MANAGEMENTS['Utility Solar PV'] = False
+    AG_MANAGEMENTS['Onshore Wind'] = False
+else:    
+    raise ValueError("Invalid value for RENEWABLE_ENERGY_CONSTRAINTS. Must be 'on' or 'off'.")
 
 RENEWABLES_OPTIONS = [
     'Utility Solar PV',
@@ -582,6 +591,22 @@ The weight of the deviations from target in the objective function.
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'                     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
 WATER_CLIMATE_CHANGE_IMPACT = 'on'      # 'on' or 'off'. 'off' will turn off climate change impact on water yields.
+'''
+    When 'on', model will consider water yield change driven by climate change.
+
+    Note the cxtreme CCI target relaxation (see water.py:get_water_target_inside_LUTO_by_CCI):
+    1. Compute extreme CCI delta per region: the minimum water yield change across all SIM_YEARS
+       (via get_water_delta_by_extreme_CCI_for_whole_region), assuming land use stays constant,
+       combining inside-LUTO Ag-land and outside-LUTO CCI deltas.
+    2. Compute extreme scenario water availability per region:
+           wny_extreme_CCI = wny_inside_LUTO + wny_outside_LUTO - wreq_domestic + CCI_extreme_stress
+       where wreq_domestic is domestic/industrial water demand (positive), and CCI_extreme_stress
+       is the worst-case yield reduction from step 1 (negative).
+    3. Compare against historical target: wny_hist_target = hist_level * WATER_STRESS
+    4. If wny_extreme_CCI < wny_hist_target, the target is relaxed to wny_extreme_CCI to avoid
+       solver infeasibility. The inside-LUTO target = relaxed_target - wny_outside_LUTO.
+       Otherwise, the standard target applies: wny_hist_target - wny_outside_LUTO.
+'''
 
 WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
 # WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)
@@ -612,7 +637,20 @@ WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Div
     https://chinawaterrisk.org/resources/analysis-reviews/aqueduct-global-water-stress-rankings/ 
 """
 
-WATER_STRESS = 0.6                                      # Aqueduct limit catchments, 0.6 means the water yield in a region must be >= 60% of the historical water yield
+WATER_STRESS = 0.6                                      
+'''
+    Aqueduct limit catchments, 0.6 means the water yield in a region must be >= 60% of the historical water yield.
+    The safe and just Earth system boundaries suggests a water stress of. We tried but it would lead to infeasibility
+    issues in the model.
+
+    There are two notes for calculating the water yield targets at watershed regions level:
+     - The domestic/industrial water use is subtracted from total available water when computing
+       the extreme climate scenario yield: wny_extreme_CCI = inside + outside - domestic + CCI_extreme_stress
+     - If the extreme climate change scenario makes a region's water yield fall below the historical
+       target (hist_level * WATER_STRESS), the target is relaxed to the extreme scenario level to
+       avoid infeasibility. The inside-LUTO target is then derived by subtracting the outside-LUTO
+       contribution: wny_inside_LUTO_target = raw_target - wny_outside_LUTO
+'''
 
 # Consider livestock drinking water (0 [off] or 1 [on]) ***** Livestock drinking water can cause infeasibility issues with water constraint in Pilbara
 LIVESTOCK_DRINKING_WATER = 1

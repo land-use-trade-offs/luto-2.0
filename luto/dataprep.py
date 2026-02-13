@@ -67,10 +67,10 @@ def create_new_dataset():
     renewable_energy_inpath = 'N:/Data-Master/Renewable Energy/processed'
     
 
-
     # Set data output paths
     raw_data = RAW_DATA + '/' # '../raw_data/'
     outpath = INPUT_DIR + '/'
+
 
     # Delete the data folders' contents
     for file in os.scandir(outpath):

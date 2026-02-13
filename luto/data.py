@@ -1161,8 +1161,9 @@ class Data:
         demand_multipliers = demand_multipliers.T
         demand_multipliers.columns.name = 'YEAR'
         demand_multipliers.index.name = 'COMMODITY'
-            
 
+        # Cache for elasticity multipliers (keyed by yr_cal)
+        self.DEMAND_ELASTICITY_MUL = {}
 
         # Load demand data (actual production (tonnes, ML) by commodity) - from demand model
         dd = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'demand_projections.h5'))
@@ -1940,29 +1941,35 @@ class Data:
         '''
         Get the elasticity multiplier for a given year and land use.
         yr_cal: year (int).
-        
+
         Returns:
             dict: A dictionary with land use as keys and elasticity multipliers as values.
         '''
 
+        # Return cached result if available for this year
+        if yr_cal in self.DEMAND_ELASTICITY_MUL:
+            return self.DEMAND_ELASTICITY_MUL[yr_cal]
+
         # Get supply delta (0-based ratio)
         supply_base_dvar_base_productivity = self.BASE_YR_production_t
         supply_base_dvar_target_productivity = self.get_production_from_base_dvar_under_target_CCI_and_yield_change(yr_cal)
-        delta_supply = (supply_base_dvar_target_productivity - supply_base_dvar_base_productivity) / supply_base_dvar_base_productivity 
-        
+        delta_supply = (supply_base_dvar_target_productivity - supply_base_dvar_base_productivity) / supply_base_dvar_base_productivity
+
         # Get demand delta (0-based ratio)
         demand_base_year = self.D_CY_xr.sel(year=self.YR_CAL_BASE)
         demand_target_year = self.D_CY_xr.sel(year=yr_cal)
         delta_demand = (demand_target_year - demand_base_year) / demand_base_year
-        
+
         # Calculate price_multiplier (1-based ratio)
         price_delta = (delta_demand - delta_supply) / (self.elasticity_demand + self.elasticity_supply)
         elasticity_multiplier = (price_delta + 1).to_dataframe('multiplier')['multiplier'].to_dict()
-        
+
         if settings.DYNAMIC_PRICE:
-            return elasticity_multiplier
+            self.DEMAND_ELASTICITY_MUL[yr_cal] = elasticity_multiplier
         else:
-            return {k: 1 for k in elasticity_multiplier.keys()}
+            self.DEMAND_ELASTICITY_MUL[yr_cal] = {k: 1 for k in elasticity_multiplier.keys()}
+
+        return self.DEMAND_ELASTICITY_MUL[yr_cal]
     
     
     
