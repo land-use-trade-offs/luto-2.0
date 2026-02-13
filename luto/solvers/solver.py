@@ -731,15 +731,12 @@ class LutoSolver:
 
         for target_idx, (reg_name, reg_id) in enumerate(self._input_data.region_state_name2idx.items()):
 
-            if reg_name == 'Australian Capital Territory':
-                print(f"│   │   ├── Skipping renewable energy constraints for {reg_name} ...")
-                continue
-
             reg_idx = np.where(self._input_data.region_state_r == reg_id)[0]
             print(f"│   │   ├── Adding renewable energy constraints for {reg_name} ...")
 
 
             for am, energy_r, limit_key, re_label in re_types:
+                
                 if not settings.AG_MANAGEMENTS[am]: continue
                 target_raw = self._input_data.limits[limit_key][target_idx]
                 target_rescal = self._input_data.limits[f"{limit_key}_rescale"][target_idx]
@@ -759,7 +756,7 @@ class LutoSolver:
                 if am_exprs:
                     self.renewable_constraints[f'{re_label}_{reg_name}'] = (
                         self.gurobi_model.addConstr(
-                            gp.quicksum(am_exprs) >= target_rescal,
+                            gp.quicksum(am_exprs) == target_rescal,
                             name=f"renewable_{re_label}_target_{reg_name}".replace(" ", "_")
                         )
                     )
