@@ -34,6 +34,7 @@ from luto import settings
 from luto.data import Data
 from luto.solvers.input_data import get_input_data
 from luto.solvers.solver import LutoSolver
+from luto.tools.inspect_iis import analyze_iis
 from luto.tools.write import write_outputs
 from luto.tools import (
     LogToFile,
@@ -200,7 +201,8 @@ def solve_timeseries(data: Data, years_to_run: list[int]) -> None:
                 luto_solver.gurobi_model.computeIIS()
                 iis_path = f"{data.path}/debug_model_{base_year}_{target_year}.ilp"
                 luto_solver.gurobi_model.write(iis_path)
-                print(f"Saved IIS to {iis_path}")
+                print(f"Analyzed IIS and saved to {iis_path}")
+                analyze_iis(iis_path, data)
 
             print('\n')
             break

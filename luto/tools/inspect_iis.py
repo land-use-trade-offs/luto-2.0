@@ -5,171 +5,74 @@ Parses the ILP file exported after `model.computeIIS()` + `model.write(...)`,
 then maps variable/constraint names back to human-readable land uses, cells,
 management options, and constraint types.
 
-Usage:
-    python jinzhu_inspect_code/inspect_iis.py <path_to_ilp_file>
+Usage (from within a simulation):
+    from luto.tools.inspect_iis import analyze_iis
+    analyze_iis(ilp_path, data)
 
-If no argument is given, defaults to the latest debug ILP file.
+Or standalone (loads data automatically):
+    python -m luto.tools.inspect_iis <path_to_ilp_file>
 """
 
+import io
 import re
 import sys
 import os
 import textwrap
-from collections import Counter, defaultdict
-from pathlib import Path
-
 import pandas as pd
+import luto.settings as settings
+
+from collections import Counter, defaultdict
+from contextlib import redirect_stdout
+from pathlib import Path
+from luto.tools import am_name_snake_case
+
+
 
 # ──────────────────────────── lookup tables ───────────────────────────────
 
-# Agricultural land uses (index → name), matches input/ag_landuses.csv
-AG_LU_NAMES = {
-    0: "Apples",
-    1: "Beef - modified land",
-    2: "Beef - natural land",
-    3: "Citrus",
-    4: "Cotton",
-    5: "Dairy - modified land",
-    6: "Dairy - natural land",
-    7: "Grapes",
-    8: "Hay",
-    9: "Nuts",
-    10: "Other non-cereal crops",
-    11: "Pears",
-    12: "Plantation fruit",
-    13: "Rice",
-    14: "Sheep - modified land",
-    15: "Sheep - natural land",
-    16: "Stone fruit",
-    17: "Sugar",
-    18: "Summer cereals",
-    19: "Summer legumes",
-    20: "Summer oilseeds",
-    21: "Tropical stone fruit",
-    22: "Unallocated - modified land",
-    23: "Unallocated - natural land",
-    24: "Vegetables",
-    25: "Winter cereals",
-    26: "Winter legumes",
-    27: "Winter oilseeds",
-}
+def build_lookup_tables(data):
+    """
+    Build all lookup tables from the data object.
 
-# Non-agricultural land uses (index → name), from settings.NON_AG_LAND_USES
-NON_AG_LU_NAMES = {
-    0: "Environmental Plantings",
-    1: "Riparian Plantings",
-    2: "Sheep Agroforestry",
-    3: "Beef Agroforestry",
-    4: "Carbon Plantings (Block)",
-    5: "Sheep Carbon Plantings (Belt)",
-    6: "Beef Carbon Plantings (Belt)",
-    7: "BECCS",
-    8: "Destocked - natural land",
-}
+    Returns a dict with keys:
+        AG_LU_NAMES, NON_AG_LU_NAMES, AM_SNAKE_TO_DISPLAY,
+        DESC2AGLU, AM2J, COMMODITY_NAMES
+    """
+    # Agricultural land uses (index → name) from data.AGLU2DESC
+    AG_LU_NAMES = {k: v for k, v in data.AGLU2DESC.items() if k >= 0}
 
-# Agricultural management snake_case → display name
-AM_SNAKE_TO_DISPLAY = {
-    "asparagopsis_taxiformis": "Asparagopsis taxiformis",
-    "precision_agriculture": "Precision Agriculture",
-    "ecological_grazing": "Ecological Grazing",
-    "savanna_burning": "Savanna Burning",
-    "agtech_ei": "AgTech EI",
-    "biochar": "Biochar",
-    "hir_-_beef": "HIR - Beef",
-    "hir_-_sheep": "HIR - Sheep",
-    "utility_solar_pv": "Utility Solar PV",
-    "onshore_wind": "Onshore Wind",
-}
+    # Non-agricultural land uses (index → name), 0-based for ILP variable indexing
+    NON_AG_LU_NAMES = {i: lu for i, lu in enumerate(data.NON_AGRICULTURAL_LANDUSES)}
 
-# AG_MANAGEMENTS_TO_LAND_USES — j_idx within each AM maps to these land uses
-AM_TO_LU_NAMES = {
-    "Asparagopsis taxiformis": [
-        "Beef - modified land", "Sheep - modified land",
-        "Dairy - natural land", "Dairy - modified land",
-    ],
-    "Precision Agriculture": [
-        "Hay", "Summer cereals", "Summer legumes", "Summer oilseeds",
-        "Winter cereals", "Winter legumes", "Winter oilseeds",
-        "Cotton", "Other non-cereal crops", "Rice", "Sugar", "Vegetables",
-        "Apples", "Citrus", "Grapes", "Nuts", "Pears", "Plantation fruit",
-        "Stone fruit", "Tropical stone fruit",
-    ],
-    "Ecological Grazing": [
-        "Beef - modified land", "Sheep - modified land", "Dairy - modified land",
-    ],
-    "Savanna Burning": [
-        "Beef - natural land", "Dairy - natural land",
-        "Sheep - natural land", "Unallocated - natural land",
-    ],
-    "AgTech EI": [
-        "Hay", "Summer cereals", "Summer legumes", "Summer oilseeds",
-        "Winter cereals", "Winter legumes", "Winter oilseeds",
-        "Cotton", "Other non-cereal crops", "Rice", "Sugar", "Vegetables",
-        "Apples", "Citrus", "Grapes", "Nuts", "Pears", "Plantation fruit",
-        "Stone fruit", "Tropical stone fruit",
-    ],
-    "Biochar": [
-        "Hay", "Summer cereals", "Summer legumes", "Summer oilseeds",
-        "Winter cereals", "Winter legumes", "Winter oilseeds",
-        "Apples", "Citrus", "Grapes", "Nuts", "Pears", "Plantation fruit",
-        "Stone fruit", "Tropical stone fruit",
-    ],
-    "HIR - Beef": ["Beef - natural land"],
-    "HIR - Sheep": ["Sheep - natural land"],
-    "Utility Solar PV": [
-        "Unallocated - modified land",
-        "Beef - modified land", "Sheep - modified land", "Dairy - modified land",
-        "Summer cereals", "Summer legumes", "Summer oilseeds",
-        "Winter cereals", "Winter legumes", "Winter oilseeds",
-    ],
-    "Onshore Wind": [
-        "Unallocated - modified land",
-        "Beef - modified land", "Sheep - modified land", "Dairy - modified land",
-        "Hay", "Summer cereals", "Summer legumes", "Summer oilseeds",
-        "Winter cereals", "Winter legumes", "Winter oilseeds",
-        "Cotton", "Other non-cereal crops", "Rice", "Sugar", "Vegetables",
-    ],
-}
+    # Agricultural management snake_case → display name
+    # Built from all AM keys in settings (enabled or not), using the same
+    # snake_case transform as the solver: am_name_snake_case()
+    AM_SNAKE_TO_DISPLAY = {
+        am_name_snake_case(am): am
+        for am in settings.AG_MANAGEMENTS
+    }
 
-# Build the DESC2AGLU mapping (land use name → j index)
-DESC2AGLU = {v: k for k, v in AG_LU_NAMES.items()}
+    # Land use name → j index
+    DESC2AGLU = data.DESC2AGLU
 
-# Build am2j: AM name → list of j indices (matching solver's am2j property)
-AM2J = {}
-for am_name, lu_list in AM_TO_LU_NAMES.items():
-    AM2J[am_name] = [DESC2AGLU[lu] for lu in lu_list]
+    # AM name → list of j indices
+    AM2J = {
+        am: [DESC2AGLU[lu] for lu in lu_list]
+        for am, lu_list in settings.AG_MANAGEMENTS_TO_LAND_USES.items()
+        if am in settings.AG_MANAGEMENTS
+    }
 
-# Commodity names (index → name), derived from products list
-# Products = sorted(crop products + livestock products)
-# Commodities = sorted, deduplicated, lowercase, collapse NATURAL/MODIFIED
-COMMODITY_NAMES = {
-    0: "apples",
-    1: "beef lexp",
-    2: "beef meat",
-    3: "citrus",
-    4: "cotton",
-    5: "dairy",
-    6: "grapes",
-    7: "hay",
-    8: "nuts",
-    9: "other non-cereal crops",
-    10: "pears",
-    11: "plantation fruit",
-    12: "rice",
-    13: "sheep lexp",
-    14: "sheep meat",
-    15: "sheep wool",
-    16: "stone fruit",
-    17: "sugar",
-    18: "summer cereals",
-    19: "summer legumes",
-    20: "summer oilseeds",
-    21: "tropical stone fruit",
-    22: "vegetables",
-    23: "winter cereals",
-    24: "winter legumes",
-    25: "winter oilseeds",
-}
+    # Commodity names (index → name) from data.COMMODITIES (sorted list)
+    COMMODITY_NAMES = {i: name for i, name in enumerate(data.COMMODITIES)}
+
+    return {
+        "AG_LU_NAMES": AG_LU_NAMES,
+        "NON_AG_LU_NAMES": NON_AG_LU_NAMES,
+        "AM_SNAKE_TO_DISPLAY": AM_SNAKE_TO_DISPLAY,
+        "DESC2AGLU": DESC2AGLU,
+        "AM2J": AM2J,
+        "COMMODITY_NAMES": COMMODITY_NAMES,
+    }
 
 
 # ──────────────────────────── parsers ─────────────────────────────────────
@@ -217,9 +120,12 @@ def parse_ilp(filepath: str):
 
 # ──────────────────────────── decoders ────────────────────────────────────
 
-def decode_var(var_name: str) -> dict:
+def decode_var(var_name: str, luts: dict) -> dict:
     """Decode a variable name into human-readable components."""
     info = {"raw": var_name}
+    AG_LU_NAMES = luts["AG_LU_NAMES"]
+    NON_AG_LU_NAMES = luts["NON_AG_LU_NAMES"]
+    AM_SNAKE_TO_DISPLAY = luts["AM_SNAKE_TO_DISPLAY"]
 
     # X_ag_dry_{j}_{r}  or  X_ag_irr_{j}_{r}
     m = re.match(r"X_ag_(dry|irr)_(\d+)_(\d+)", var_name)
@@ -287,9 +193,11 @@ def decode_var(var_name: str) -> dict:
     return info
 
 
-def decode_constraint(name: str) -> dict:
+def decode_constraint(name: str, luts: dict) -> dict:
     """Decode a constraint name into human-readable components."""
     info = {"raw": name}
+    AG_LU_NAMES = luts["AG_LU_NAMES"]
+    AM_SNAKE_TO_DISPLAY = luts["AM_SNAKE_TO_DISPLAY"]
 
     # const_cell_usage_{r}
     m = re.match(r"const_cell_usage_(\d+)", name)
@@ -407,7 +315,7 @@ def decode_constraint(name: str) -> dict:
     return info
 
 
-def decode_bound(bound_line: str) -> dict:
+def decode_bound(bound_line: str, luts: dict) -> dict:
     """Decode a bound line (e.g., 'X_ag_dry_23_0 = 1' or '0.5 <= X_ag_dry_1_5 <= 1')."""
     info = {"raw": bound_line}
 
@@ -417,7 +325,7 @@ def decode_bound(bound_line: str) -> dict:
         lb = float(m.group(1))
         var_name = m.group(2)
         ub = float(m.group(3))
-        var_info = decode_var(var_name)
+        var_info = decode_var(var_name, luts)
         info.update({
             "var": var_info,
             "operator": "range",
@@ -432,7 +340,7 @@ def decode_bound(bound_line: str) -> dict:
     if m:
         var_name = m.group(1)
         value = float(m.group(2))
-        var_info = decode_var(var_name)
+        var_info = decode_var(var_name, luts)
         info.update({"var": var_info, "operator": "=", "value": value})
         return info
 
@@ -441,7 +349,7 @@ def decode_bound(bound_line: str) -> dict:
     if m:
         var_name = m.group(1)
         value = float(m.group(2))
-        var_info = decode_var(var_name)
+        var_info = decode_var(var_name, luts)
         info.update({"var": var_info, "operator": ">=", "value": value})
         return info
 
@@ -450,7 +358,7 @@ def decode_bound(bound_line: str) -> dict:
     if m:
         var_name = m.group(1)
         value = float(m.group(2))
-        var_info = decode_var(var_name)
+        var_info = decode_var(var_name, luts)
         info.update({"var": var_info, "operator": "<=", "value": value})
         return info
 
@@ -459,7 +367,7 @@ def decode_bound(bound_line: str) -> dict:
     if m:
         var_name = m.group(1)
         ub = float(m.group(2))
-        var_info = decode_var(var_name)
+        var_info = decode_var(var_name, luts)
         info.update({"var": var_info, "operator": "free_ub", "value": 0, "ub": ub})
         return info
 
@@ -467,7 +375,7 @@ def decode_bound(bound_line: str) -> dict:
     m = re.match(r"(\S+)\s+free", bound_line)
     if m:
         var_name = m.group(1)
-        var_info = decode_var(var_name)
+        var_info = decode_var(var_name, luts)
         info.update({"var": var_info, "operator": "free", "value": 0})
         return info
 
@@ -476,10 +384,110 @@ def decode_bound(bound_line: str) -> dict:
     return info
 
 
+# ──────────────────────────── analysis helpers ────────────────────────────
+
+def _var_category(var_info):
+    """Descriptive category for a decoded variable, used for grouping."""
+    vtype = var_info.get("type", "?")
+    if vtype == "ag_man":
+        return f"ag_man ({var_info.get('am_name', '?')})"
+    if vtype == "ag":
+        return f"ag ({var_info.get('land_mgmt', '?')})"
+    if vtype == "non_ag":
+        return f"non_ag ({var_info.get('lu_name', '?')})"
+    return vtype
+
+
+def _constraint_label(dec, commodity_names):
+    """Build a human-readable label for a decoded constraint."""
+    ctype = dec["type"]
+    if ctype == "adoption_limit":
+        return f"ADOPTION LIMIT: {dec['am_name']} on {dec['lu_name']} (j={dec['lu_idx']})"
+    if ctype == "demand":
+        c = dec.get("commodity_idx", "?")
+        return f"DEMAND: commodity {c} = {commodity_names.get(c, f'Unknown({c})')}"
+    if ctype == "bio_GBF2":
+        return "BIODIVERSITY GBF2: Priority degraded area restoration"
+    if ctype == "bio_GBF3_NVIS":
+        return f"BIODIVERSITY GBF3 NVIS: {dec.get('vegetation_group', '?')}"
+    if ctype == "bio_GBF3_IBRA":
+        return f"BIODIVERSITY GBF3 IBRA: {dec.get('bioregion', '?')}"
+    if ctype == "bio_GBF4_SNES":
+        return f"BIODIVERSITY GBF4 SNES: {dec.get('species', '?')}"
+    if ctype == "bio_GBF4_ECNES":
+        return f"BIODIVERSITY GBF4 ECNES: {dec.get('community', '?')}"
+    if ctype == "bio_GBF8":
+        return f"BIODIVERSITY GBF8: {dec.get('species', '?')}"
+    if ctype == "water_limit":
+        return f"WATER LIMIT: {dec.get('region', '?')}"
+    if ctype == "renewable_target":
+        return f"RENEWABLE TARGET: {dec.get('re_type', '?')} in {dec.get('state', '?')}"
+    if ctype == "ghg_limit":
+        return f"GHG LIMIT: {dec.get('subtype', '?')}"
+    if ctype == "regional_adoption":
+        return (f"REGIONAL ADOPTION: {dec.get('category', '?')} "
+                f"{dec.get('lu_name', '?')} (region={dec.get('region_id', '?')})")
+    # Fallback for unknown / future constraint types
+    return f"{ctype.upper()}: {dec.get('raw', '?')}"
+
+
+def _extract_body_vars(body):
+    """Extract variable names from a constraint body string."""
+    return set(re.findall(r'(X_[A-Za-z0-9_]+|V\[\d+\]|E|W\[\d+\])', body))
+
+
+# ──────────────────────────── output tee ──────────────────────────────────
+
+class _TeeIO:
+    """Write to both the real stdout and a StringIO buffer."""
+
+    def __init__(self, real_stdout):
+        self._real = real_stdout
+        self._buf = io.StringIO()
+
+    def write(self, s):
+        self._real.write(s)
+        self._buf.write(s)
+
+    def flush(self):
+        self._real.flush()
+
+    def getvalue(self):
+        return self._buf.getvalue()
+
+
 # ──────────────────────────── analysis ────────────────────────────────────
 
-def analyze_iis(filepath: str):
-    """Full IIS analysis: parse, decode, summarize, and identify conflicts."""
+def analyze_iis(filepath: str, data):
+    """Full IIS analysis: parse, decode, summarize, and identify conflicts.
+
+    All printed output is also saved to ``iis_analysis_summary.txt``
+    next to the input ``.ilp`` file.
+
+    Parameters
+    ----------
+    filepath : str
+        Path to the Gurobi .ilp file.
+    data : luto.data.Data
+        The LUTO data object, used to build lookup tables dynamically.
+    """
+    tee = _TeeIO(sys.stdout)
+
+    # Redirect all print() inside _analyze_iis_inner to the tee
+    with redirect_stdout(tee):
+        _analyze_iis_inner(filepath, data)
+
+    # Write captured output to summary file
+    summary_path = os.path.join(os.path.dirname(filepath), "iis_analysis_summary.txt")
+    with open(summary_path, "w", encoding="utf-8") as f:
+        f.write(tee.getvalue())
+    print(f"\nSummary saved to: {summary_path}")
+
+
+def _analyze_iis_inner(filepath: str, data):
+    """Core IIS analysis logic (all output via print)."""
+    luts = build_lookup_tables(data)
+    COMMODITY_NAMES = luts["COMMODITY_NAMES"]
 
     print(f"{'='*80}")
     print(f"IIS ANALYSIS: {Path(filepath).name}")
@@ -494,7 +502,7 @@ def analyze_iis(filepath: str):
     constraint_types = Counter()
     decoded_constraints = []
     for name, body in constraints:
-        dec = decode_constraint(name)
+        dec = decode_constraint(name, luts)
         decoded_constraints.append((name, body, dec))
         constraint_types[dec["type"]] += 1
 
@@ -509,7 +517,7 @@ def analyze_iis(filepath: str):
     var_types = Counter()
     decoded_bounds = []
     for bline in bounds:
-        dec = decode_bound(bline)
+        dec = decode_bound(bline, luts)
         decoded_bounds.append(dec)
         var_info = dec.get("var", {})
         vtype = var_info.get("type", "unknown")
@@ -536,13 +544,16 @@ def analyze_iis(filepath: str):
             cells_in_bounds.add(var_info["cell"])
 
     all_cells = cells_in_constraints | cells_in_bounds
-    print(f"  Cells in constraints : {len(cells_in_constraints):,d}")
-    print(f"  Cells in bounds      : {len(cells_in_bounds):,d}")
-    print(f"  Total unique cells   : {len(all_cells):,d}")
-    print(f"  Cell range           : [{min(all_cells)}, {max(all_cells)}]")
+    if all_cells:
+        print(f"  Cells in constraints : {len(cells_in_constraints):,d}")
+        print(f"  Cells in bounds      : {len(cells_in_bounds):,d}")
+        print(f"  Total unique cells   : {len(all_cells):,d}")
+        print(f"  Cell range           : [{min(all_cells)}, {max(all_cells)}]")
+    else:
+        print("  No cell-level variables found in IIS.")
     print()
 
-    # ── 4. Non-trivial constraints (the "global" constraints causing conflict) ──
+    # ── 4. Global constraints (non cell-level) ──
     print(f"\n[4] GLOBAL CONSTRAINTS IN IIS (non cell-level)")
     print("-" * 60)
     print("These are the high-level targets/limits that conflict with cell-level decisions:\n")
@@ -552,247 +563,216 @@ def analyze_iis(filepath: str):
         if dec["type"] not in ("cell_usage", "ag_mam_usage"):
             global_constraints.append((name, body, dec))
 
-    for name, body, dec in global_constraints:
-        ctype = dec["type"]
-
-        if ctype == "adoption_limit":
-            print(f"  ADOPTION LIMIT: {dec['am_name']} on {dec['lu_name']} (j={dec['lu_idx']})")
-            # Extract the adoption fraction from body
-            m = re.search(r"<=\s*0", body)
-            if m:
-                print(f"    -> RHS = 0 (forces adoption to zero or below)")
-            else:
-                # Try to find the coefficient
-                print(f"    -> Body (truncated): {body[:200]}...")
-
-        elif ctype == "demand":
-            c = dec["commodity_idx"]
-            cm_name = COMMODITY_NAMES.get(c, f"Unknown({c})")
-            print(f"  DEMAND PENALTY: commodity {c} = {cm_name}")
-            # Show first few terms
+    if not global_constraints:
+        print("  No global constraints found in IIS.")
+        print("  The infeasibility is purely at the cell level.\n")
+    else:
+        for name, body, dec in global_constraints:
+            label = _constraint_label(dec, COMMODITY_NAMES)
+            print(f"  {label}")
+            # Extract and show operator + RHS from constraint body
+            rhs_m = re.search(r'(>=|<=|=)\s*([\d.e+-]+)\s*$', body)
+            if rhs_m:
+                print(f"    -> {rhs_m.group(1)} {rhs_m.group(2)} (rescaled)")
             print(f"    -> Body (truncated): {body[:200]}...")
+            print()
 
-        elif ctype == "bio_GBF2":
-            print(f"  BIODIVERSITY GBF2: Priority degraded area restoration")
-            # Extract RHS
-            m = re.search(r">=\s*([\d.e+-]+)", body)
-            if m:
-                print(f"    -> Target (rescaled) >= {m.group(1)}")
-            print(f"    -> Body (truncated): {body[:200]}...")
-
-        elif ctype == "bio_GBF3_NVIS":
-            print(f"  BIODIVERSITY GBF3 NVIS: {dec.get('vegetation_group', '?')}")
-        elif ctype == "bio_GBF3_IBRA":
-            print(f"  BIODIVERSITY GBF3 IBRA: {dec.get('bioregion', '?')}")
-        elif ctype == "bio_GBF4_SNES":
-            print(f"  BIODIVERSITY GBF4 SNES: {dec.get('species', '?')}")
-        elif ctype == "bio_GBF4_ECNES":
-            print(f"  BIODIVERSITY GBF4 ECNES: {dec.get('community', '?')}")
-        elif ctype == "bio_GBF8":
-            print(f"  BIODIVERSITY GBF8: {dec.get('species', '?')}")
-        elif ctype == "water_limit":
-            print(f"  WATER LIMIT: {dec.get('region', '?')}")
-        elif ctype == "renewable_target":
-            print(f"  RENEWABLE TARGET: {dec.get('re_type', '?')} in {dec.get('state', '?')}")
-        elif ctype == "ghg_limit":
-            print(f"  GHG LIMIT: {dec.get('subtype', '?')}")
-        else:
-            print(f"  {ctype}: {name}")
-
-        print()
-
-    # ── 5. Analyze variable lower-bound conflicts ──
-    print(f"\n[5] VARIABLE LOWER BOUNDS ANALYSIS")
+    # ── 5. Variable bounds analysis ──
+    print(f"\n[5] VARIABLE BOUNDS ANALYSIS")
     print("-" * 60)
-    print("Variables forced to non-zero values (lower bounds > 0 from previous year lock-in):\n")
+    print("Variables with non-trivial bounds (forced by previous-year lock-in or solver logic):\n")
 
-    # Separate locked-in variables (lb close to 1) vs weakly constrained
-    locked_in = []   # lb >= 0.5
-    weakly_lb = []   # 0 < lb < 0.5
+    # Collect variables with effective lower bounds > 0
+    # Includes: >= val, = val (where val > 0), range lb..ub (where lb > 0)
+    locked_in = []             # effective lb >= 0.5
+    weakly_lb = []             # 0 < effective lb < 0.5
+    locked_var_names = set()   # raw var names, for cross-referencing with constraint bodies
+
     for dec in decoded_bounds:
         op = dec.get("operator")
-        val = dec.get("value")
         var_info = dec.get("var", {})
-        if op == ">=" and val is not None and val > 0:
-            if val >= 0.5:
-                locked_in.append((var_info, val))
+        raw_name = var_info.get("raw", "")
+
+        # Determine effective lower bound
+        eff_lb = None
+        if op in (">=", "=") and dec.get("value", 0) > 0:
+            eff_lb = dec["value"]
+        elif op == "range" and dec.get("lb", 0) > 0:
+            eff_lb = dec["lb"]
+
+        if eff_lb is not None:
+            locked_var_names.add(raw_name)
+            if eff_lb >= 0.5:
+                locked_in.append((var_info, eff_lb))
             else:
-                weakly_lb.append((var_info, val))
+                weakly_lb.append((var_info, eff_lb))
 
-    # Summarize locked-in by type
-    locked_by_type = Counter()
-    locked_cells_by_am = defaultdict(list)
-    for var_info, val in locked_in:
-        vtype = var_info.get("type", "?")
-        if vtype == "ag_man":
-            am = var_info.get("am_name", "?")
-            key = f"ag_man: {am}"
-            locked_cells_by_am[am].append((var_info.get("cell"), var_info.get("lu_name", "?"), val))
-        elif vtype == "ag":
-            key = f"ag ({var_info.get('land_mgmt', '?')})"
-        elif vtype == "non_ag":
-            key = f"non_ag ({var_info.get('lu_name', '?')})"
-        else:
-            key = vtype
-        locked_by_type[key] += 1
+    # Group by descriptive category
+    locked_by_category = defaultdict(list)
+    for var_info, val in locked_in + weakly_lb:
+        cat = _var_category(var_info)
+        locked_by_category[cat].append((var_info, val))
 
-    print(f"  Variables locked in (lb >= 0.5): {len(locked_in):,d}")
-    print(f"  Variables weakly bounded (0 < lb < 0.5): {len(weakly_lb):,d}")
+    print(f"  Variables locked (lb >= 0.5)        : {len(locked_in):,d}")
+    print(f"  Variables weakly bounded (0<lb<0.5) : {len(weakly_lb):,d}")
     print()
-    print("  Locked-in breakdown:")
-    for key, count in locked_by_type.most_common():
-        print(f"    {key:50s} : {count:>6,d}")
+    if locked_by_category:
+        print("  Breakdown by category:")
+        for cat, items in sorted(locked_by_category.items(), key=lambda x: -len(x[1])):
+            strong = sum(1 for _, v in items if v >= 0.5)
+            weak = len(items) - strong
+            print(f"    {cat:50s} : {len(items):>6,d}  ({strong} locked, {weak} weak)")
     print()
 
     # ── 6. Conflict diagnosis ──
     print(f"\n[6] CONFLICT DIAGNOSIS")
     print("=" * 80)
-    print(textwrap.dedent("""
+    print(textwrap.dedent("""\
     The IIS identifies the MINIMAL set of constraints + bounds that together
     are infeasible. Removing ANY ONE element would make the rest feasible.
-
-    The conflict arises because:
     """))
 
-    # Identify which cells are locked to renewable energy (onshore wind / solar PV)
-    renewable_locked_cells = defaultdict(list)
-    for var_info, val in locked_in:
-        if var_info.get("type") == "ag_man" and var_info.get("am_name") in ("Onshore Wind", "Utility Solar PV"):
-            cell = var_info.get("cell")
-            am = var_info.get("am_name")
-            lu = var_info.get("lu_name", "?")
-            lm = var_info.get("land_mgmt", "?")
-            renewable_locked_cells[am].append((cell, lu, lm, val))
-
-    # Identify which cells are locked to non-ag land uses
-    nonag_locked_cells = defaultdict(list)
-    for dec in decoded_bounds:
-        op = dec.get("operator")
-        val = dec.get("value")
-        var_info = dec.get("var", {})
-        if var_info.get("type") == "non_ag" and op == ">=" and val is not None and val > 0:
-            nonag_locked_cells[var_info.get("lu_name", "?")].append((var_info.get("cell"), val))
-
-    # Print cell-level lock-ins
-    if renewable_locked_cells:
-        for am, cells in renewable_locked_cells.items():
-            locked_count = len([c for c in cells if c[3] >= 0.5])
-            weak_count = len(cells) - locked_count
-            print(f"  [RENEWABLE] {am}: {len(cells)} cells in IIS "
-                  f"({locked_count} locked >=0.5, {weak_count} weakly bounded)")
-            # Show sample cells
-            sample = sorted(cells, key=lambda x: -x[3])[:10]
-            for cell, lu, lm, val in sample:
-                print(f"    cell {cell:>6d}: {lm:>9s} {lu:<30s} lb={val:.6f}")
-            if len(cells) > 10:
-                print(f"    ... and {len(cells) - 10} more cells")
-            print()
-
-    if nonag_locked_cells:
-        for lu, cells in nonag_locked_cells.items():
-            locked = [c for c in cells if c[1] >= 0.5]
-            print(f"  [NON-AG] {lu}: {len(cells)} cells in IIS ({len(locked)} locked >=0.5)")
-            sample = sorted(cells, key=lambda x: -x[1])[:5]
-            for cell, val in sample:
-                print(f"    cell {cell:>6d}: lb={val:.6f}")
-            if len(cells) > 5:
-                print(f"    ... and {len(cells) - 5} more cells")
-            print()
-
-    # Print how global constraints conflict with cell-level decisions
-    print("\n  CONSTRAINT INTERACTIONS:")
+    # ── 6a. Lock-in detail ──
+    print("  [6a] LOCK-IN DETAILS")
     print("  " + "-" * 60)
 
-    # Find cells that appear in BOTH: ag management usage constraints AND bounds
-    # These are cells where the AM variable is forced (by lb) but also constrained
-    # to be <= the ag variable, which itself may be constrained by cell_usage = 1
+    if not locked_by_category:
+        print("  No variables are locked by bounds (lb > 0).")
+        print("  The infeasibility is purely between constraint targets.\n")
+    else:
+        for cat, items in sorted(locked_by_category.items(), key=lambda x: -len(x[1])):
+            strong = sum(1 for _, v in items if v >= 0.5)
+            print(f"\n  [{cat}]: {len(items)} variables ({strong} locked >= 0.5)")
+            # Show sample cells (top 5 by bound value)
+            sample = sorted(items, key=lambda x: -x[1])[:5]
+            for var_info, val in sample:
+                cell = var_info.get("cell", "?")
+                parts = [
+                    var_info.get("land_mgmt", ""),
+                    var_info.get("am_name", ""),
+                    var_info.get("lu_name", ""),
+                ]
+                desc = " ".join(p for p in parts if p)
+                print(f"    cell {str(cell):>6s}: {desc:<45s} lb={val:.6f}")
+            if len(items) > 5:
+                print(f"    ... and {len(items) - 5} more")
+        print()
 
-    # Collect cells from adoption limit constraints
-    adoption_limit_info = []
-    for name, body, dec in decoded_constraints:
-        if dec["type"] == "adoption_limit":
-            am = dec["am_name"]
-            lu = dec["lu_name"]
-            j = dec["lu_idx"]
-            adoption_limit_info.append((am, lu, j))
+    # ── 6b. Global constraint feasibility ──
+    print("\n  [6b] GLOBAL CONSTRAINT FEASIBILITY")
+    print("  " + "-" * 60)
+    print("  For each global constraint, how many of its variables are locked vs free:\n")
 
-    if adoption_limit_info:
-        print("\n  ADOPTION LIMITS in IIS:")
-        for am, lu, j in adoption_limit_info:
-            # Count how many cells are locked for this AM + lu combo
-            if am in locked_cells_by_am:
-                relevant = [(c, l, v) for c, l, v in locked_cells_by_am[am]
-                            if l == lu or True]  # show all for this AM
-                print(f"    {am} on {lu} (j={j}): {len(relevant)} cells locked in this AM")
+    constraint_pressure = []
+    for name, body, dec in global_constraints:
+        body_vars = _extract_body_vars(body)
+        n_body = len(body_vars)
+        locked_in_body = body_vars & locked_var_names
+        n_locked = len(locked_in_body)
+        n_free = n_body - n_locked
 
-    # Identify the conflict pattern
-    print("\n\n  CONFLICT SUMMARY:")
+        # Extract operator and RHS
+        rhs_m = re.search(r'(>=|<=|=)\s*([\d.e+-]+)\s*$', body)
+        op_str = rhs_m.group(1) if rhs_m else "?"
+        rhs_str = rhs_m.group(2) if rhs_m else "?"
+
+        constraint_pressure.append((name, dec, n_body, n_locked, n_free, op_str, rhs_str))
+
+        label = _constraint_label(dec, COMMODITY_NAMES)
+        pct_locked = (n_locked / n_body * 100) if n_body > 0 else 0
+        print(f"  {label}")
+        print(f"    Variables: {n_body:,d} total | {n_locked:,d} locked ({pct_locked:.0f}%) | {n_free:,d} free")
+        if rhs_m:
+            print(f"    Target: {op_str} {rhs_str} (rescaled)")
+        if n_body > 0 and pct_locked >= 80:
+            print(f"    *** HIGH PRESSURE: {pct_locked:.0f}% of variables locked ***")
+        print()
+
+    # ── 6c. Conflict summary ──
+    print("\n  [6c] CONFLICT SUMMARY")
     print("  " + "=" * 60)
 
-    # Build explanation
+    # Cell budget analysis
+    cell_usage_cells = {dec["cell"] for _, _, dec in decoded_constraints if dec["type"] == "cell_usage"}
+    locked_cells = set()
+    for var_info, val in locked_in:
+        cell = var_info.get("cell")
+        if cell is not None:
+            locked_cells.add(cell)
+
+    free_cells = cell_usage_cells - locked_cells
+    overlap = cell_usage_cells & locked_cells
+
+    if cell_usage_cells:
+        print(f"\n  Cell budget:")
+        print(f"    Cells with cell_usage constraint : {len(cell_usage_cells):,d}")
+        print(f"    Cells locked (lb >= 0.5)         : {len(locked_cells):,d}")
+        print(f"    Overlap (locked + cell_usage)     : {len(overlap):,d}")
+        print(f"    Free cells (not locked)           : {len(free_cells):,d}")
+
+    # Rank constraints by lock-in pressure
+    if constraint_pressure:
+        print(f"\n  Constraints ranked by lock-in pressure:")
+        ranked = sorted(constraint_pressure, key=lambda x: (-(x[3] / (x[2] or 1)), -x[3]))
+        for name, dec, n_body, n_locked, n_free, op_str, rhs_str in ranked:
+            pct = (n_locked / n_body * 100) if n_body > 0 else 0
+            label = _constraint_label(dec, COMMODITY_NAMES)
+            print(f"    {pct:5.1f}% locked | {n_free:>6,d} free | {label}")
+
+    # Data-driven explanations
     explanations = []
 
-    # Check for cell_usage + locked renewables conflict
-    cell_usage_cells = {dec["cell"] for _, _, dec in decoded_constraints if dec["type"] == "cell_usage"}
-    re_locked_cells_set = set()
-    for am, cells in renewable_locked_cells.items():
-        for cell, lu, lm, val in cells:
-            if val >= 0.5:
-                re_locked_cells_set.add(cell)
-
-    overlap_re_cell = cell_usage_cells & re_locked_cells_set
-    if overlap_re_cell:
+    # Explanation: Lock-in pressure
+    if locked_in and overlap:
+        cat_cells = defaultdict(set)
+        for var_info, val in locked_in:
+            cat = _var_category(var_info)
+            cell = var_info.get("cell")
+            if cell is not None:
+                cat_cells[cat].add(cell)
+        top_cats = sorted(cat_cells.items(), key=lambda x: -len(x[1]))[:3]
+        cat_desc = ", ".join(f"{cat} ({len(cells):,d} cells)" for cat, cells in top_cats)
         explanations.append(
-            f"  {len(overlap_re_cell):,d} cells have RENEWABLE ENERGY installations locked in "
-            f"(non-reversible from previous years).\n"
-            f"  These cells' ag management vars are forced to ~1.0 (via lower bounds),\n"
-            f"  which forces the underlying ag land use variable to ~1.0 as well\n"
-            f"  (via ag_mam_usage constraints: X_ag_man <= X_ag).\n"
-            f"  This leaves NO room for other land uses on these cells."
+            f"{len(overlap):,d} cells are locked by prior-year decisions, "
+            f"leaving only {len(free_cells):,d} free cells.\n"
+            f"  Main lock-in categories: {cat_desc}\n"
+            f"  These cells cannot be reassigned, reducing feasible space for all global constraints."
         )
 
-    if global_constraints:
-        for name, body, dec in global_constraints:
-            ctype = dec["type"]
-            if ctype == "bio_GBF2":
-                explanations.append(
-                    f"  The GBF2 BIODIVERSITY constraint requires a minimum area of priority\n"
-                    f"  degraded land to be restored. This needs certain cells to adopt land uses\n"
-                    f"  with high biodiversity contribution, potentially conflicting with\n"
-                    f"  cells locked into renewable energy or other non-reversible uses."
-                )
-            elif ctype == "demand":
-                c = dec.get("commodity_idx", "?")
-                cm_name = COMMODITY_NAMES.get(c, f"Unknown({c})")
-                explanations.append(
-                    f"  DEMAND constraint for '{cm_name}' (commodity {c}) requires minimum production.\n"
-                    f"  Cells locked into non-reversible uses (renewable energy, non-ag plantings)\n"
-                    f"  cannot produce this commodity, reducing available production capacity."
-                )
-            elif ctype == "adoption_limit":
-                explanations.append(
-                    f"  ADOPTION LIMIT for {dec['am_name']} on {dec['lu_name']}: the total\n"
-                    f"  area using this management option is bounded. When cells from previous\n"
-                    f"  years are locked in, new cells cannot compensate."
-                )
-            elif ctype == "water_limit":
-                explanations.append(
-                    f"  WATER constraint for {dec.get('region', '?')}: net water yield must\n"
-                    f"  exceed a minimum. Land use changes locked in from prior years\n"
-                    f"  may reduce water yield below the target."
-                )
-            elif ctype == "renewable_target":
-                explanations.append(
-                    f"  RENEWABLE TARGET for {dec.get('re_type', '?')} in {dec.get('state', '?')}:\n"
-                    f"  state-level generation target requires cells to install renewables,\n"
-                    f"  but this may conflict with other constraints on the same cells."
-                )
+    # Explanation: High-pressure constraints
+    for name, dec, n_body, n_locked, n_free, op_str, rhs_str in constraint_pressure:
+        pct = (n_locked / n_body * 100) if n_body > 0 else 0
+        if pct >= 50:
+            label = _constraint_label(dec, COMMODITY_NAMES)
+            explanations.append(
+                f"{label}:\n"
+                f"  {pct:.0f}% of its variables are locked, leaving only {n_free:,d} free "
+                f"variables to meet the target ({op_str} {rhs_str})."
+            )
 
+    # Explanation: Pure constraint competition (no lock-ins)
+    if len(global_constraints) > 1 and not locked_in:
+        gc_labels = [_constraint_label(dec, COMMODITY_NAMES) for _, _, dec in global_constraints]
+        explanations.append(
+            f"No variables are locked, but {len(global_constraints)} global constraints "
+            f"compete for the same cell allocations:\n"
+            + "\n".join(f"  - {lbl}" for lbl in gc_labels)
+            + "\n  The constraint targets are mutually incompatible."
+        )
+
+    if not explanations:
+        explanations.append(
+            "No dominant conflict pattern detected from automated analysis.\n"
+            "  Review the global constraints and variable bounds above for manual diagnosis."
+        )
+
+    print(f"\n  Diagnosis:")
     for i, expl in enumerate(explanations, 1):
         print(f"\n  [{i}] {expl}")
+    print()
 
     # ── 7. Cell overlap analysis ──
-    print(f"\n\n[7] CELL OVERLAP ANALYSIS")
+    print(f"\n[7] CELL OVERLAP ANALYSIS")
     print("-" * 60)
 
     # Find cells that appear in multiple constraint types
@@ -805,7 +785,7 @@ def analyze_iis(filepath: str):
     multi_constrained = {c: types for c, types in cell_to_constraint_types.items() if len(types) > 1}
     if multi_constrained:
         type_combos = Counter()
-        for c, types in multi_constrained.items():
+        for _, types in multi_constrained.items():
             type_combos[frozenset(types)] += 1
 
         print(f"  Cells appearing in multiple constraint types: {len(multi_constrained):,d}")
@@ -813,6 +793,8 @@ def analyze_iis(filepath: str):
         print("  Most common constraint-type combinations:")
         for combo, count in type_combos.most_common(10):
             print(f"    {count:>5,d} cells: {' + '.join(sorted(combo))}")
+    else:
+        print("  No cells appear in multiple constraint types.")
     print()
 
     # ── 8. Export detailed cell list ──
@@ -884,4 +866,7 @@ if __name__ == "__main__":
         print(f"ERROR: File not found: {ilp_path}")
         sys.exit(1)
 
-    analyze_iis(ilp_path)
+    # Load data for standalone usage
+    import luto.simulation as sim
+    data = sim.load_data()
+    analyze_iis(ilp_path, data)
