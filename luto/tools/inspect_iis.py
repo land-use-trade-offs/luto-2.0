@@ -88,10 +88,10 @@ def parse_ilp(filepath: str):
 
     # Locate sections
     subj_idx = content.index("Subject To")
-    bounds_idx = content.index("\nBounds\n")
+    bounds_idx = content.index("Bounds\n")
 
     constraints_block = content[subj_idx + len("Subject To"):bounds_idx]
-    bounds_block = content[bounds_idx + len("\nBounds\n"):]
+    bounds_block = content[bounds_idx + len("Bounds\n"):]
 
     # ── Parse constraints ──
     # Constraint names start at column 1 (with leading space) and end with ':'
@@ -109,7 +109,7 @@ def parse_ilp(filepath: str):
 
     # ── Parse bounds ──
     bounds = []
-    for line in bounds_block.strip().split("\n"):
+    for line in bounds_block.strip().split(""):
         line = line.strip()
         if not line or line == "End":
             continue
@@ -481,7 +481,7 @@ def analyze_iis(filepath: str, data):
     summary_path = os.path.join(os.path.dirname(filepath), "iis_analysis_summary.txt")
     with open(summary_path, "w", encoding="utf-8") as f:
         f.write(tee.getvalue())
-    print(f"\nSummary saved to: {summary_path}")
+    print(f"Summary saved to: {summary_path}", flush=True)
 
 
 def _analyze_iis_inner(filepath: str, data):
@@ -489,15 +489,15 @@ def _analyze_iis_inner(filepath: str, data):
     luts = build_lookup_tables(data)
     COMMODITY_NAMES = luts["COMMODITY_NAMES"]
 
-    print(f"{'='*80}")
-    print(f"IIS ANALYSIS: {Path(filepath).name}")
-    print(f"{'='*80}\n")
+    print(f"{'='*80}", flush=True)
+    print(f"IIS ANALYSIS: {Path(filepath).name}", flush=True)
+    print(f"{'='*80}\n", flush=True)
 
     constraints, bounds = parse_ilp(filepath)
 
     # ── 1. Constraint summary ──
-    print(f"[1] CONSTRAINT SUMMARY ({len(constraints)} constraints in IIS)")
-    print("-" * 60)
+    print(f"[1] CONSTRAINT SUMMARY ({len(constraints)} constraints in IIS)", flush=True)
+    print("-" * 60, flush=True)
 
     constraint_types = Counter()
     decoded_constraints = []
@@ -507,12 +507,12 @@ def _analyze_iis_inner(filepath: str, data):
         constraint_types[dec["type"]] += 1
 
     for ctype, count in constraint_types.most_common():
-        print(f"  {ctype:40s} : {count:>6,d}")
-    print()
+        print(f"  {ctype:40s} : {count:>6,d}", flush=True)
+    print(flush=True)
 
     # ── 2. Variable (bounds) summary ──
-    print(f"\n[2] VARIABLE BOUNDS SUMMARY ({len(bounds)} variable bounds in IIS)")
-    print("-" * 60)
+    print(f"[2] VARIABLE BOUNDS SUMMARY ({len(bounds)} variable bounds in IIS)", flush=True)
+    print("-" * 60, flush=True)
 
     var_types = Counter()
     decoded_bounds = []
@@ -526,12 +526,12 @@ def _analyze_iis_inner(filepath: str, data):
         var_types[vtype] += 1
 
     for vt, count in var_types.most_common():
-        print(f"  {vt:40s} : {count:>6,d}")
-    print()
+        print(f"  {vt:40s} : {count:>6,d}", flush=True)
+    print(flush=True)
 
     # ── 3. Cells involved in IIS ──
-    print(f"\n[3] CELLS INVOLVED IN IIS")
-    print("-" * 60)
+    print(f"[3] CELLS INVOLVED IN IIS", flush=True)
+    print("-" * 60, flush=True)
 
     cells_in_constraints = set()
     cells_in_bounds = set()
@@ -545,18 +545,18 @@ def _analyze_iis_inner(filepath: str, data):
 
     all_cells = cells_in_constraints | cells_in_bounds
     if all_cells:
-        print(f"  Cells in constraints : {len(cells_in_constraints):,d}")
-        print(f"  Cells in bounds      : {len(cells_in_bounds):,d}")
-        print(f"  Total unique cells   : {len(all_cells):,d}")
-        print(f"  Cell range           : [{min(all_cells)}, {max(all_cells)}]")
+        print(f"  Cells in constraints : {len(cells_in_constraints):,d}", flush=True)
+        print(f"  Cells in bounds      : {len(cells_in_bounds):,d}", flush=True)
+        print(f"  Total unique cells   : {len(all_cells):,d}", flush=True)
+        print(f"  Cell range           : [{min(all_cells)}, {max(all_cells)}]", flush=True)
     else:
-        print("  No cell-level variables found in IIS.")
-    print()
+        print("  No cell-level variables found in IIS.", flush=True)
+    print(flush=True)
 
     # ── 4. Global constraints (non cell-level) ──
-    print(f"\n[4] GLOBAL CONSTRAINTS IN IIS (non cell-level)")
-    print("-" * 60)
-    print("These are the high-level targets/limits that conflict with cell-level decisions:\n")
+    print(f"[4] GLOBAL CONSTRAINTS IN IIS (non cell-level)", flush=True)
+    print("-" * 60, flush=True)
+    print("These are the high-level targets/limits that conflict with cell-level decisions:\n", flush=True)
 
     global_constraints = []
     for name, body, dec in decoded_constraints:
@@ -564,23 +564,23 @@ def _analyze_iis_inner(filepath: str, data):
             global_constraints.append((name, body, dec))
 
     if not global_constraints:
-        print("  No global constraints found in IIS.")
-        print("  The infeasibility is purely at the cell level.\n")
+        print("  No global constraints found in IIS.", flush=True)
+        print("  The infeasibility is purely at the cell level.\n", flush=True)
     else:
         for name, body, dec in global_constraints:
             label = _constraint_label(dec, COMMODITY_NAMES)
-            print(f"  {label}")
+            print(f"  {label}", flush=True)
             # Extract and show operator + RHS from constraint body
             rhs_m = re.search(r'(>=|<=|=)\s*([\d.e+-]+)\s*$', body)
             if rhs_m:
-                print(f"    -> {rhs_m.group(1)} {rhs_m.group(2)} (rescaled)")
-            print(f"    -> Body (truncated): {body[:200]}...")
-            print()
+                print(f"    -> {rhs_m.group(1)} {rhs_m.group(2)} (rescaled)", flush=True)
+            print(f"    -> Body (truncated): {body[:200]}...", flush=True)
+            print(flush=True)
 
     # ── 5. Variable bounds analysis ──
-    print(f"\n[5] VARIABLE BOUNDS ANALYSIS")
-    print("-" * 60)
-    print("Variables with non-trivial bounds (forced by previous-year lock-in or solver logic):\n")
+    print(f"[5] VARIABLE BOUNDS ANALYSIS", flush=True)
+    print("-" * 60, flush=True)
+    print("Variables with non-trivial bounds (forced by previous-year lock-in or solver logic):\n", flush=True)
 
     # Collect variables with effective lower bounds > 0
     # Includes: >= val, = val (where val > 0), range lb..ub (where lb > 0)
@@ -613,36 +613,36 @@ def _analyze_iis_inner(filepath: str, data):
         cat = _var_category(var_info)
         locked_by_category[cat].append((var_info, val))
 
-    print(f"  Variables locked (lb >= 0.5)        : {len(locked_in):,d}")
-    print(f"  Variables weakly bounded (0<lb<0.5) : {len(weakly_lb):,d}")
-    print()
+    print(f"  Variables locked (lb >= 0.5)        : {len(locked_in):,d}", flush=True)
+    print(f"  Variables weakly bounded (0<lb<0.5) : {len(weakly_lb):,d}", flush=True)
+    print(flush=True)
     if locked_by_category:
-        print("  Breakdown by category:")
+        print("  Breakdown by category:", flush=True)
         for cat, items in sorted(locked_by_category.items(), key=lambda x: -len(x[1])):
             strong = sum(1 for _, v in items if v >= 0.5)
             weak = len(items) - strong
-            print(f"    {cat:50s} : {len(items):>6,d}  ({strong} locked, {weak} weak)")
-    print()
+            print(f"    {cat:50s} : {len(items):>6,d}  ({strong} locked, {weak} weak)", flush=True)
+    print(flush=True)
 
     # ── 6. Conflict diagnosis ──
-    print(f"\n[6] CONFLICT DIAGNOSIS")
-    print("=" * 80)
+    print(f"[6] CONFLICT DIAGNOSIS", flush=True)
+    print("=" * 80, flush=True)
     print(textwrap.dedent("""\
     The IIS identifies the MINIMAL set of constraints + bounds that together
     are infeasible. Removing ANY ONE element would make the rest feasible.
-    """))
+    """), flush=True)
 
     # ── 6a. Lock-in detail ──
-    print("  [6a] LOCK-IN DETAILS")
-    print("  " + "-" * 60)
+    print("  [6a] LOCK-IN DETAILS", flush=True)
+    print("  " + "-" * 60, flush=True)
 
     if not locked_by_category:
-        print("  No variables are locked by bounds (lb > 0).")
-        print("  The infeasibility is purely between constraint targets.\n")
+        print("  No variables are locked by bounds (lb > 0).", flush=True)
+        print("  The infeasibility is purely between constraint targets.\n", flush=True)
     else:
         for cat, items in sorted(locked_by_category.items(), key=lambda x: -len(x[1])):
             strong = sum(1 for _, v in items if v >= 0.5)
-            print(f"\n  [{cat}]: {len(items)} variables ({strong} locked >= 0.5)")
+            print(f"  [{cat}]: {len(items)} variables ({strong} locked >= 0.5)", flush=True)
             # Show sample cells (top 5 by bound value)
             sample = sorted(items, key=lambda x: -x[1])[:5]
             for var_info, val in sample:
@@ -653,15 +653,15 @@ def _analyze_iis_inner(filepath: str, data):
                     var_info.get("lu_name", ""),
                 ]
                 desc = " ".join(p for p in parts if p)
-                print(f"    cell {str(cell):>6s}: {desc:<45s} lb={val:.6f}")
+                print(f"    cell {str(cell):>6s}: {desc:<45s} lb={val:.6f}", flush=True)
             if len(items) > 5:
-                print(f"    ... and {len(items) - 5} more")
-        print()
+                print(f"    ... and {len(items) - 5} more", flush=True)
+        print(flush=True)
 
     # ── 6b. Global constraint feasibility ──
-    print("\n  [6b] GLOBAL CONSTRAINT FEASIBILITY")
-    print("  " + "-" * 60)
-    print("  For each global constraint, how many of its variables are locked vs free:\n")
+    print("  [6b] GLOBAL CONSTRAINT FEASIBILITY", flush=True)
+    print("  " + "-" * 60, flush=True)
+    print("  For each global constraint, how many of its variables are locked vs free:\n", flush=True)
 
     constraint_pressure = []
     for name, body, dec in global_constraints:
@@ -680,17 +680,17 @@ def _analyze_iis_inner(filepath: str, data):
 
         label = _constraint_label(dec, COMMODITY_NAMES)
         pct_locked = (n_locked / n_body * 100) if n_body > 0 else 0
-        print(f"  {label}")
-        print(f"    Variables: {n_body:,d} total | {n_locked:,d} locked ({pct_locked:.0f}%) | {n_free:,d} free")
+        print(f"  {label}", flush=True)
+        print(f"    Variables: {n_body:,d} total | {n_locked:,d} locked ({pct_locked:.0f}%) | {n_free:,d} free", flush=True)
         if rhs_m:
-            print(f"    Target: {op_str} {rhs_str} (rescaled)")
+            print(f"    Target: {op_str} {rhs_str} (rescaled)", flush=True)
         if n_body > 0 and pct_locked >= 80:
-            print(f"    *** HIGH PRESSURE: {pct_locked:.0f}% of variables locked ***")
-        print()
+            print(f"    *** HIGH PRESSURE: {pct_locked:.0f}% of variables locked ***", flush=True)
+        print(flush=True)
 
     # ── 6c. Conflict summary ──
-    print("\n  [6c] CONFLICT SUMMARY")
-    print("  " + "=" * 60)
+    print("  [6c] CONFLICT SUMMARY", flush=True)
+    print("  " + "=" * 60, flush=True)
 
     # Cell budget analysis
     cell_usage_cells = {dec["cell"] for _, _, dec in decoded_constraints if dec["type"] == "cell_usage"}
@@ -704,20 +704,20 @@ def _analyze_iis_inner(filepath: str, data):
     overlap = cell_usage_cells & locked_cells
 
     if cell_usage_cells:
-        print(f"\n  Cell budget:")
-        print(f"    Cells with cell_usage constraint : {len(cell_usage_cells):,d}")
-        print(f"    Cells locked (lb >= 0.5)         : {len(locked_cells):,d}")
-        print(f"    Overlap (locked + cell_usage)     : {len(overlap):,d}")
-        print(f"    Free cells (not locked)           : {len(free_cells):,d}")
+        print(f"  Cell budget:", flush=True)
+        print(f"    Cells with cell_usage constraint : {len(cell_usage_cells):,d}", flush=True)
+        print(f"    Cells locked (lb >= 0.5)         : {len(locked_cells):,d}", flush=True)
+        print(f"    Overlap (locked + cell_usage)     : {len(overlap):,d}", flush=True)
+        print(f"    Free cells (not locked)           : {len(free_cells):,d}", flush=True)
 
     # Rank constraints by lock-in pressure
     if constraint_pressure:
-        print(f"\n  Constraints ranked by lock-in pressure:")
+        print(f"  Constraints ranked by lock-in pressure:", flush=True)
         ranked = sorted(constraint_pressure, key=lambda x: (-(x[3] / (x[2] or 1)), -x[3]))
         for name, dec, n_body, n_locked, n_free, op_str, rhs_str in ranked:
             pct = (n_locked / n_body * 100) if n_body > 0 else 0
             label = _constraint_label(dec, COMMODITY_NAMES)
-            print(f"    {pct:5.1f}% locked | {n_free:>6,d} free | {label}")
+            print(f"    {pct:5.1f}% locked | {n_free:>6,d} free | {label}", flush=True)
 
     # Data-driven explanations
     explanations = []
@@ -756,8 +756,8 @@ def _analyze_iis_inner(filepath: str, data):
         explanations.append(
             f"No variables are locked, but {len(global_constraints)} global constraints "
             f"compete for the same cell allocations:\n"
-            + "\n".join(f"  - {lbl}" for lbl in gc_labels)
-            + "\n  The constraint targets are mutually incompatible."
+            + "".join(f"  - {lbl}" for lbl in gc_labels)
+            + "  The constraint targets are mutually incompatible."
         )
 
     if not explanations:
@@ -766,14 +766,14 @@ def _analyze_iis_inner(filepath: str, data):
             "  Review the global constraints and variable bounds above for manual diagnosis."
         )
 
-    print(f"\n  Diagnosis:")
+    print(f"  Diagnosis:", flush=True)
     for i, expl in enumerate(explanations, 1):
-        print(f"\n  [{i}] {expl}")
-    print()
+        print(f"  [{i}] {expl}", flush=True)
+    print(flush=True)
 
     # ── 7. Cell overlap analysis ──
-    print(f"\n[7] CELL OVERLAP ANALYSIS")
-    print("-" * 60)
+    print(f"[7] CELL OVERLAP ANALYSIS", flush=True)
+    print("-" * 60, flush=True)
 
     # Find cells that appear in multiple constraint types
     cell_to_constraint_types = defaultdict(set)
@@ -788,14 +788,14 @@ def _analyze_iis_inner(filepath: str, data):
         for _, types in multi_constrained.items():
             type_combos[frozenset(types)] += 1
 
-        print(f"  Cells appearing in multiple constraint types: {len(multi_constrained):,d}")
-        print()
-        print("  Most common constraint-type combinations:")
+        print(f"  Cells appearing in multiple constraint types: {len(multi_constrained):,d}", flush=True)
+        print(flush=True)
+        print("  Most common constraint-type combinations:", flush=True)
         for combo, count in type_combos.most_common(10):
-            print(f"    {count:>5,d} cells: {' + '.join(sorted(combo))}")
+            print(f"    {count:>5,d} cells: {' + '.join(sorted(combo))}", flush=True)
     else:
-        print("  No cells appear in multiple constraint types.")
-    print()
+        print("  No cells appear in multiple constraint types.", flush=True)
+    print(flush=True)
 
     # ── 8. Export detailed cell list ──
     output_dir = os.path.dirname(filepath)
@@ -820,8 +820,8 @@ def _analyze_iis_inner(filepath: str, data):
     if rows:
         df = pd.DataFrame(rows)
         df.to_csv(csv_path, index=False)
-        print(f"\n[8] Detailed cell list exported to: {csv_path}")
-        print(f"    Total rows: {len(df):,d}")
+        print(f"[8] Detailed cell list exported to: {csv_path}", flush=True)
+        print(f"    Total rows: {len(df):,d}", flush=True)
 
     # Also export constraint list
     csv_constr_path = os.path.join(output_dir, "iis_analysis_constraints.csv")
@@ -842,12 +842,12 @@ def _analyze_iis_inner(filepath: str, data):
     if constr_rows:
         df_c = pd.DataFrame(constr_rows)
         df_c.to_csv(csv_constr_path, index=False)
-        print(f"    Constraint list exported to: {csv_constr_path}")
-        print(f"    Total constraints: {len(df_c):,d}")
+        print(f"    Constraint list exported to: {csv_constr_path}", flush=True)
+        print(f"    Total constraints: {len(df_c):,d}", flush=True)
 
-    print(f"\n{'='*80}")
-    print("ANALYSIS COMPLETE")
-    print(f"{'='*80}")
+    print(f"{'='*80}", flush=True)
+    print("ANALYSIS COMPLETE", flush=True)
+    print(f"{'='*80}", flush=True)
 
 
 # ──────────────────────────── main ────────────────────────────────────────
@@ -863,7 +863,7 @@ if __name__ == "__main__":
         )
 
     if not os.path.isfile(ilp_path):
-        print(f"ERROR: File not found: {ilp_path}")
+        print(f"ERROR: File not found: {ilp_path}", flush=True)
         sys.exit(1)
 
     # Load data for standalone usage
