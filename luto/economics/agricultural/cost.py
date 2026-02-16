@@ -542,7 +542,13 @@ def get_utility_solar_pv_effect_c_mrj(data: Data, c_mrj, yr_idx):
 
         # Cost of renewable energy operation/maintenance
         re_lyr = data.RENEWABLE_LAYERS.sel(Type='Utility Solar PV', year=yr_cal)
-        re_cost_operation_AUD_ha = re_lyr['Cost_of_operation'] * data.REAL_AREA
+        re_cost_operation_AUD_ha = (
+            re_lyr['Cost_of_operation_AUD_kw'] 
+            * 1000                                                  # Convert from AUD/kW to AUD/MW
+            * 0.6944                                                # Adjust AUD from 2024 to 2010
+            * settings.INSTALL_CAPACITY_MW_HA['Utility Solar PV']   # Convert from AUD/MW to AUD/ha 
+            * data.REAL_AREA                                        # Convert from AUD/ha to AUD/cell 
+        )
 
         # Assign combined cost effects to output matrix
         new_c_mrj[:, :, lu_idx] = ag_cost_delta + re_cost_operation_AUD_ha.data[None, :]
@@ -586,7 +592,13 @@ def get_onshore_wind_effect_c_mrj(data: Data, c_mrj, yr_idx):
 
         # Cost of renewable energy operation/maintenance
         re_lyr = data.RENEWABLE_LAYERS.sel(Type='Onshore Wind', year=yr_cal) 
-        re_cost_operation_AUD_ha = re_lyr['Cost_of_operation'] * data.REAL_AREA
+        re_cost_operation_AUD_ha = (
+            re_lyr['Cost_of_operation_AUD_kw'] 
+            * 1000                                                  # Convert from AUD/kW to AUD/MW
+            * 0.6944                                                # Adjust AUD from 2024 to 2010
+            * settings.INSTALL_CAPACITY_MW_HA['Onshore Wind']       # Convert from AUD/MW to AUD/ha
+            * data.REAL_AREA                                        # Convert from AUD/ha to AUD/cell
+        )
 
         # Assign combined cost effects to output matrix
         new_c_mrj[:, :, lu_idx] = ag_cost_delta + re_cost_operation_AUD_ha.data[None, :]

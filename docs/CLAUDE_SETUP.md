@@ -104,7 +104,7 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 - `RENEWABLES_OPTIONS`: Renewable energy types: `['Utility Solar PV', 'Onshore Wind']`
 - `RENEWABLE_TARGET_SCENARIO`: Target scenario ('CNS25 - Accelerated Transition' or 'CNS25 - Current Targets')
 - `RE_TARGET_LEVEL`: Spatial level for constraints ('STATE' or 'NRM'; only STATE currently supported)
-- `RENEWABLE_NATURAL_ENERGY_MW_HA_HOUR`: Per-hectare capacity (MW/ha) per renewable type
+- `INSTALL_CAPACITY_MW_HA`: Per-hectare capacity (MW/ha) per renewable type
 - `RENEWABLES_ADOPTION_LIMITS`: Maximum adoption fraction per type (default: 1.0 for both)
 
 ### Solver Configuration

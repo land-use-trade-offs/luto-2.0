@@ -294,7 +294,7 @@ LUTO2 behavior can be customized through the `luto.settings` module. Key paramet
 - `RENEWABLES_OPTIONS`: List of renewable energy types (`['Utility Solar PV', 'Onshore Wind']`)
 - `RENEWABLE_TARGET_SCENARIO`: Target scenario ('CNS25 - Accelerated Transition' or 'CNS25 - Current Targets')
 - `RE_TARGET_LEVEL`: Spatial level for targets ('STATE' or 'NRM')
-- `RENEWABLE_NATURAL_ENERGY_MW_HA_HOUR`: Per-hectare generation capacity (MW/ha) for each renewable type
+- `INSTALL_CAPACITY_MW_HA`: Per-hectare generation capacity (MW/ha) for each renewable type
 - `RENEWABLES_ADOPTION_LIMITS`: Maximum fraction of compatible land available for each renewable type (default: 1.0)
 
 ### Land Use Options

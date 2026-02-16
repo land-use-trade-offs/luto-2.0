@@ -488,9 +488,9 @@ The spatial level at which to apply the renewable energy targets when `RENEWABLE
 Options include "STATE" or "NRM". Currently (20260205) only support STATE.
 '''
 
-RENEWABLE_NATURAL_ENERGY_MW_HA_HOUR = {
+INSTALL_CAPACITY_MW_HA = {
     "Utility Solar PV": 0.45,
-    "Onshore Wind": 0.4,  
+    "Onshore Wind": 0.04,  
 }
 '''
 The per/ha capacity (Mw/ha) for each renewable energy management type.

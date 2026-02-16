@@ -165,7 +165,7 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 - `RENEWABLES_OPTIONS`: Renewable energy types: `['Utility Solar PV', 'Onshore Wind']`
 - `RENEWABLE_TARGET_SCENARIO`: Target scenario ('CNS25 - Accelerated Transition' or 'CNS25 - Current Targets')
 - `RE_TARGET_LEVEL`: Spatial level for constraints ('STATE' or 'NRM'; only STATE currently supported)
-- `RENEWABLE_NATURAL_ENERGY_MW_HA_HOUR`: Per-hectare capacity (MW/ha) per renewable type
+- `INSTALL_CAPACITY_MW_HA`: Per-hectare capacity (MW/ha) per renewable type
 - `RENEWABLES_ADOPTION_LIMITS`: Maximum adoption fraction per type (default: 1.0 for both)
 - Both renewable types are registered as non-reversible agricultural management options in `AG_MANAGEMENTS`
 - Compatible land uses differ: Solar PV excludes Hay; Wind includes Hay and horticulture crops
@@ -322,7 +322,7 @@ Renewable energy types (Utility Solar PV, Onshore Wind) are implemented as agric
 | `renewable_price_AUD_MWh_solar.csv` | CSV | Year, State, Price_AUD_per_MWh (solar) |
 | `renewable_price_AUD_MWh_wind.csv` | CSV | Year, State, Price_AUD_per_MWh (wind) |
 | `renewable_energy_bundle.csv` | CSV | Year, Commodity, Lever, Productivity, Revenue, OM_Cost_Multiplier, Biodiversity_compatability, INPUT-wrt_water-required |
-| `renewable_energy_layers_1D.nc` | NetCDF | Spatial layers: Cost_of_install_AUD_ha, Cost_of_operation, Capacity_percent_of_natural_energy, Energy_percent_remain_after_distribution |
+| `renewable_energy_layers_1D.nc` | NetCDF | Spatial layers: Cost_of_install_AUD_kw, Cost_of_operation_AUD_kw, Capacity_percent_of_natural_energy, Energy_percent_remain_after_distribution |
 
 ### Compatible Land Uses
 
