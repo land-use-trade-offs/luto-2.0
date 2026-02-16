@@ -124,7 +124,8 @@ RENAME_AM = {
     'Biochar': "Biochar (soil amendment)",
     'HIR - Beef': "Human-induced regeneration (Beef)",
     'HIR - Sheep': "Human-induced regeneration (Sheep)",
-
+    'Utility Solar PV': "Utility Solar PV",
+    'Onshore Wind': "Onshore wind"
 }
 
 RENAME_NON_AG = {
