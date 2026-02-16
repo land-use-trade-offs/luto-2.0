@@ -137,7 +137,7 @@ def get_yield_pot(data, lvstype, vegtype, lm, yr_idx):
     yield_pot *= get_ccimpact(data, lu, lm, yr_idx)
 
     # Here we can add a productivity multiplier for sustainable intensification to increase pasture growth and yield potential (i.e., head/ha)
-    # yield_pot *= yield_mult  ***Still to do***
+    yield_pot *= settings.AG_YIELD_MULT  # ***Still to do***, now [20251027] only use a constant multiplier from settings
 
     return yield_pot
 
@@ -163,8 +163,8 @@ def get_quantity_lvstk(data, pr, lm, yr_idx):
     # Get livestock and land cover type.
     lvstype, vegtype = lvs_veg_types(pr)
 
-    # Get the yield potential.
-    yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
+    # Get the yield potential. Since [20251027], here uses a constant multiplier from settings for production intensification
+    yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx) * settings.AG_YIELD_MULT
 
     # Determine base quantity case-by-case.
 
@@ -266,7 +266,7 @@ def get_quantity(data, pr, lm, yr_idx):
         raise KeyError(f"Land use '{pr}' not found in data.")
 
     # Apply productivity increase multiplier by product. 
-    q *= data.BAU_PROD_INCREASE_MULT[lm, pr][yr_idx]
+    q *= data.BAU_PROD_INCR[lm, pr][yr_idx]
 
     return q
 
@@ -651,11 +651,11 @@ def get_quantity_renewable(data, re_type: str, yr_idx: int):
     re_lyr = data.RENEWABLE_LAYERS.sel(Type=re_type, year=yr_cal)
     
     re_nature_energy_capture_percent = re_lyr['Capacity_percent_of_natural_energy']
-    re_remain_percent_after_distribution = re_lyr['Energy_remain_percent_after_distribution']
+    re_percent_remain_after_distribution = re_lyr['Energy_percent_remain_after_distribution']
     yield_per_ha = (
         settings.RENEWABLE_NATURAL_ENERGY_MW_HA_HOUR[re_type]  
         * re_nature_energy_capture_percent 
-        * (1 - re_remain_percent_after_distribution) 
+        * re_percent_remain_after_distribution 
         * 365 * 24
     )
 

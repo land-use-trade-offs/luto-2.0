@@ -124,7 +124,8 @@ RENAME_AM = {
     'Biochar': "Biochar (soil amendment)",
     'HIR - Beef': "Human-induced regeneration (Beef)",
     'HIR - Sheep': "Human-induced regeneration (Sheep)",
-
+    'Utility Solar PV': "Utility Solar PV",
+    'Onshore Wind': "Onshore wind"
 }
 
 RENAME_NON_AG = {
@@ -153,7 +154,7 @@ NON_AG_LANDUSE_RAW = [i for i in NON_AG_LANDUSE_RAW if settings.NON_AG_LAND_USES
 
 # Merge the land uses
 LANDUSE_ALL_RAW = AG_LANDUSE + NON_AG_LANDUSE_RAW
-LANDUSE_ALL_RENAMED = ['Agri-Management'] + AG_LANDUSE + list(RENAME_NON_AG.values())  + ['Outside LUTO study area'] 
+LANDUSE_ALL_RENAMED = ['Agri-Management', 'ALL'] + AG_LANDUSE + list(RENAME_NON_AG.values())  + ['Outside LUTO study area'] 
 
 
 
@@ -238,6 +239,7 @@ pattern_path = {
 }
 
 COLORS_LU = dict(zip(LANDUSE_ALL_RENAMED, cycle(COLORS)))
+COLORS_LU.update({'ALL': "#E8E8E8"})
 COLORS_LU.update({'Outside LUTO study area': "#C7BFBF"})
 COLORS_LU.update({'Agri-Management': "#D5F100"})
 COLORS_LM = dict(zip(['Dryland', 'Irrigated'], ["#f7a35c", "#7cb5ec"]))

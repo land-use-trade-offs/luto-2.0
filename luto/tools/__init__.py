@@ -23,14 +23,11 @@
 Pure helper functions and other tools.
 """
 
-import gc
 import sys
 import os.path
-import threading
 import time
 import traceback
 import functools
-import tracemalloc
 
 import pandas as pd
 import numpy as np
@@ -446,26 +443,50 @@ def get_cells_using_ag_landuse(lumap: np.ndarray, j: int) -> np.ndarray:
     return np.where(lumap == j)[0]
 
 
-def ag_mrj_to_xr(data, arr):
-    return xr.DataArray(
+def ag_mrj_to_xr(data, arr: np.ndarray, threshold: float = 0.01) -> xr.DataArray:
+    """Convert agricultural dvar array to xarray DataArray with automatic masking.
+
+    Masks out cells where the sum across all land uses is less than 0.01.
+    """
+    xr_arr = xr.DataArray(
         arr,
         dims=['lm', 'cell', 'lu'],
         coords={'lm': data.LANDMANS,
                 'cell': np.arange(data.NCELLS),
                 'lu': data.AGRICULTURAL_LANDUSES}
-    )
+    ).astype(np.float32)
 
-def non_ag_rk_to_xr(data, arr):
-    return xr.DataArray(
+    # Mask out cells with very small values
+    ag_mask = (abs(xr_arr.sum(['lu','lm'])) > threshold).values
+    xr_arr = xr_arr.where(ag_mask[None,:,None], 0)
+
+    return xr_arr
+
+def non_ag_rk_to_xr(data, arr: np.ndarray, threshold: float = 0.01) -> xr.DataArray:
+    """Convert non-agricultural dvar array to xarray DataArray with automatic masking.
+
+    Masks out cells where the sum across all land uses is less than 0.01.
+    """
+    xr_arr = xr.DataArray(
         arr,
         dims=['cell', 'lu'],
         coords={'cell': np.arange(data.NCELLS),
                 'lu': data.NON_AGRICULTURAL_LANDUSES}
-    )
+    ).astype(np.float32)
 
-def am_mrj_to_xr(data, am_mrj_dict):
+    # Mask out cells with very small values
+    non_ag_mask = (abs(xr_arr.sum('lu')) > threshold).values
+    xr_arr = xr_arr.where(non_ag_mask[..., None], 0)
+
+    return xr_arr
+
+def am_mrj_to_xr(data, am_mrj_dict: dict, threshold: float = 0.01) -> xr.DataArray:
+    """Convert agricultural management dvar dict to xarray DataArray with automatic masking.
+
+    Masks out cells where the sum across all agricultural management types is less than 0.01.
+    """
     emp_arr_xr = xr.DataArray(
-        np.full((data.N_AG_MANS, data.NLMS, data.NCELLS, data.N_AG_LUS), np.nan),
+        np.zeros((data.N_AG_MANS, data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32),
         dims=['am', 'lm', 'cell', 'lu'],
         coords={'am': data.AG_MAN_DESC,
                 'lm': data.LANDMANS,
@@ -476,11 +497,16 @@ def am_mrj_to_xr(data, am_mrj_dict):
     for am,lu in data.AG_MAN_LU_DESC.items():
         if emp_arr_xr.loc[am, :, :, lu].shape == am_mrj_dict[am].shape:
             # If the shape is the same, just assign the value
-            emp_arr_xr.loc[am, :, :, lu] = am_mrj_dict[am]  
+            emp_arr_xr.loc[am, :, :, lu] = am_mrj_dict[am]
         else:
             # Otherwise, assign the array at index of the land use
             lu_idx = [data.DESC2AGLU[i] for i in settings.AG_MANAGEMENTS_TO_LAND_USES[am]]
-            emp_arr_xr.loc[am, :, :, lu] = am_mrj_dict[am][:,:, lu_idx]   
+            emp_arr_xr.loc[am, :, :, lu] = am_mrj_dict[am][:,:, lu_idx]
+
+    # Mask out cells with very small values
+    am_mask = (abs(emp_arr_xr.sum(['am','lm','lu'])) > threshold).values
+    emp_arr_xr = emp_arr_xr.where(am_mask[None,None,:,None], 0)
+
     return emp_arr_xr
 
 
@@ -651,101 +677,3 @@ def log_memory_usage(output_dir=settings.OUTPUT_DIR, mode='a', interval=1, stop_
             file.flush()
             time.sleep(interval)
 
-
-# Enhanced memory monitoring helper functions            
-memory_log = []
-monitoring = False
-monitor_thread = None
-baseline_memory = 0  # Store the baseline memory at start
-
-def monitor_memory(interval=0.01):
-    """
-    Memory monitoring focused on Working Set delta from baseline.
-    Runs in a thread, logs memory usage every `interval` seconds.
-    """
-    process = psutil.Process(os.getpid())
-    
-    while monitoring:
-        try:
-            memory_info = process.memory_info()
-            
-            # Check if working set is available and use consistently
-            has_wset = hasattr(memory_info, 'wset')
-            
-            if has_wset:
-                current_wset_mb = memory_info.wset / 1024 ** 2
-            else:
-                current_wset_mb = memory_info.rss / 1024 ** 2
-            
-            # Calculate delta from baseline
-            delta_mb = current_wset_mb - baseline_memory
-            
-            # Store delta memory info
-            memory_log.append({
-                'time': time.time(),
-                'wset_mb': current_wset_mb,
-                'delta_mb': delta_mb
-            })
-            
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
-            break
-            
-        time.sleep(interval)
-
-def start_memory_monitor():
-    """
-    Start Working Set memory monitoring with baseline measurement.
-    Clears previous logs and starts monitoring from current memory usage.
-    """
-    global monitoring, monitor_thread, baseline_memory
-    
-    # Clear previous log
-    memory_log.clear()
-    
-    # Force garbage collection to get clean baseline
-    gc.collect()
-    
-    # Get baseline memory usage
-    process = psutil.Process(os.getpid())
-    memory_info = process.memory_info()
-    
-    has_wset = hasattr(memory_info, 'wset')
-    if has_wset:
-        baseline_memory = memory_info.wset / 1024 ** 2
-    else:
-        baseline_memory = memory_info.rss / 1024 ** 2
-        
-    # Start monitoring
-    monitoring = True
-    monitor_thread = threading.Thread(target=monitor_memory, daemon=True)
-    monitor_thread.start()
-    
-    print("Delta memory monitoring started")
-
-def stop_memory_monitor():
-    """
-    Stop memory monitoring and return delta analysis.
-    Returns a plot showing only the incremental memory usage.
-    """
-    global monitoring
-    
-    monitoring = False
-    if monitor_thread:
-        monitor_thread.join()
-    
-    if not memory_log:
-        print("No memory data collected")
-        return None
-    
-    # Convert to DataFrame
-    df = pd.DataFrame(memory_log)
-    df['Time'] = df['time'] - df['time'].min()
-
-    # Delta memory plot (main focus)
-    plt.plot(df['Time'], df['delta_mb'])
-    plt.xlabel('Time (s)')
-    plt.ylabel('Delta Memory (MB)')
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
-    
-    return plt

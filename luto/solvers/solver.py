@@ -416,7 +416,7 @@ class LutoSolver:
         penalty_demand = (
             gp.quicksum(
                 self.V[c] * self._input_data.scale_factors['Demand'] * price
-                for c, price in enumerate(self._input_data.economic_BASE_YR_prices)
+                for c, price in enumerate(self._input_data.economic_prices)
             ) 
             * settings.SOLVER_WEIGHT_DEMAND
             / 1e6  # Convert to million AUD
@@ -712,52 +712,52 @@ class LutoSolver:
             self.water_limit_constraints.append(constr)
       
 
+
     def _add_renewable_energy_constraints(self) -> None:
-        
+
         if settings.RENEWABLE_ENERGY_CONSTRAINTS == "off":
             print("│   └── TURNING OFF renewable energy constraints ...")
             return
-        
+
+        print("│   └── Adding constraints for renewable energy production targets ...")
+
+
+        # Group the renewable energy types, input data, 
+        re_types = [
+            ('Utility Solar PV', self._input_data.renewable_solar_r, 'renewable_solar', 'solar'),
+            ('Onshore Wind',     self._input_data.renewable_wind_r,  'renewable_wind',  'wind'),
+        ]
+
+
         for target_idx, (reg_name, reg_id) in enumerate(self._input_data.region_state_name2idx.items()):
 
             reg_idx = np.where(self._input_data.region_state_r == reg_id)[0]
-            solar_energy_lyr = self._input_data.renewable_solar_r[reg_idx]
-            
-            target_raw_solar = self._input_data.limits["renewable_solar"][target_idx]
-            target_raw_wind = self._input_data.limits["renewable_wind"][target_idx]
-            
-            target_rescal_solar = self._input_data.limits["renewable_solar_rescale"][target_idx]
-            target_rescal_wind = self._input_data.limits["renewable_wind_rescale"][target_idx]
-            
             print(f"│   │   ├── Adding renewable energy constraints for {reg_name} ...")
-            print(f"│   │   │   ├── target for solar is {target_raw_solar:5,.0f} Mwh")
-            print(f"│   │   │   └── target for wind is {target_raw_wind:5,.0f} Mwh")
-            
-            
-            for am, am_j_list in self._input_data.am2j.items():
+
+
+            for am, energy_r, limit_key, re_label in re_types:
                 
-                if am not in settings.RENEWABLES_OPTIONS or not settings.AG_MANAGEMENTS[am]:
-                    continue
-                
-                for j_idx,j in enumerate(am_j_list):
-                    X_ag_mam_dry_r = self.X_ag_man_dry_vars_jr[am][j_idx, reg_idx]
-                    X_ag_mam_irr_r = self.X_ag_man_irr_vars_jr[am][j_idx, reg_idx]
-                    
-                    self.renewable_constraints['solar'] = (
-                        self.gurobi_model.addConstr(
-                            gp.quicksum(X_ag_mam_dry_r * solar_energy_lyr)
-                            + gp.quicksum(X_ag_mam_irr_r * solar_energy_lyr)
-                            >= target_rescal_solar,
-                            name=f"renewable_solar_target_{am}_{reg_name}".replace(" ", "_")
-                        )
+                if not settings.AG_MANAGEMENTS[am]: continue
+                target_raw = self._input_data.limits[limit_key][target_idx]
+                target_rescal = self._input_data.limits[f"{limit_key}_rescale"][target_idx]
+                print(f"│   │   │   ├── target for {re_label} is {target_raw:5,.0f} Mwh")
+
+                am_exprs = []
+                for j_idx, j in enumerate(self._input_data.am2j[am]):
+                    j_cells = np.union1d(self._input_data.ag_lu2cells[0, j], self._input_data.ag_lu2cells[1, j])
+                    reg_AND_j_cells = np.intersect1d(j_cells, reg_idx)
+                    if not reg_AND_j_cells.size:continue
+                    energy_lyr = energy_r[reg_AND_j_cells]
+                    am_exprs.append(
+                        gp.quicksum(self.X_ag_man_dry_vars_jr[am][j_idx, reg_AND_j_cells] * energy_lyr)
+                        + gp.quicksum(self.X_ag_man_irr_vars_jr[am][j_idx, reg_AND_j_cells] * energy_lyr)
                     )
-                    
-                    self.renewable_constraints['wind'] = (
+
+                if am_exprs:
+                    self.renewable_constraints[f'{re_label}_{reg_name}'] = (
                         self.gurobi_model.addConstr(
-                            gp.quicksum(X_ag_mam_dry_r * self._input_data.renewable_wind_r[reg_idx])
-                            + gp.quicksum(X_ag_mam_irr_r * self._input_data.renewable_wind_r[reg_idx])
-                            >= target_rescal_wind,
-                            name=f"renewable_wind_target_{am}_{reg_name}".replace(" ", "_")
+                            gp.quicksum(am_exprs) == target_rescal,
+                            name=f"renewable_{re_label}_target_{reg_name}".replace(" ", "_")
                         )
                     )
                 
