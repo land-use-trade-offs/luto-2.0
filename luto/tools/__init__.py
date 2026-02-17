@@ -485,29 +485,32 @@ def am_mrj_to_xr(data, am_mrj_dict: dict, threshold: float = 0.01) -> xr.DataArr
 
     Masks out cells where the sum across all agricultural management types is less than 0.01.
     """
-    emp_arr_xr = xr.DataArray(
-        np.zeros((data.N_AG_MANS, data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32),
+    arr = np.zeros((data.N_AG_MANS, data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
+
+    for am_idx, (am, lu_names) in enumerate(data.AG_MAN_LU_DESC.items()):
+        lu_idxs = [data.DESC2AGLU[lu] for lu in lu_names]
+        src = am_mrj_dict[am]
+
+        if src.shape[-1] == len(lu_idxs):
+            for j, li in enumerate(lu_idxs):
+                arr[am_idx, :, :, li] = src[:, :, j]
+        else:
+            src_lu_idxs = [data.DESC2AGLU[i] for i in settings.AG_MANAGEMENTS_TO_LAND_USES[am]]
+            for j, li in enumerate(lu_idxs):
+                arr[am_idx, :, :, li] = src[:, :, src_lu_idxs[j]]
+
+    # Mask out cells with very small values
+    cell_sum = np.abs(arr).sum(axis=(0, 1, 3))
+    arr[:, :, cell_sum <= threshold, :] = 0
+
+    return xr.DataArray(
+        arr,
         dims=['am', 'lm', 'cell', 'lu'],
         coords={'am': data.AG_MAN_DESC,
                 'lm': data.LANDMANS,
                 'cell': np.arange(data.NCELLS),
                 'lu': data.AGRICULTURAL_LANDUSES}
     )
-
-    for am,lu in data.AG_MAN_LU_DESC.items():
-        if emp_arr_xr.loc[am, :, :, lu].shape == am_mrj_dict[am].shape:
-            # If the shape is the same, just assign the value
-            emp_arr_xr.loc[am, :, :, lu] = am_mrj_dict[am]
-        else:
-            # Otherwise, assign the array at index of the land use
-            lu_idx = [data.DESC2AGLU[i] for i in settings.AG_MANAGEMENTS_TO_LAND_USES[am]]
-            emp_arr_xr.loc[am, :, :, lu] = am_mrj_dict[am][:,:, lu_idx]
-
-    # Mask out cells with very small values
-    am_mask = (abs(emp_arr_xr.sum(['am','lm','lu'])) > threshold).values
-    emp_arr_xr = emp_arr_xr.where(am_mask[None,None,:,None], 0)
-
-    return emp_arr_xr
 
 
 def map_desc_to_dvar_index(category: str,

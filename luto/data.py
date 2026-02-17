@@ -761,7 +761,7 @@ class Data:
         self.WIND_PRICES = pd.read_csv(f'{settings.INPUT_DIR}/renewable_price_AUD_MWh_wind.csv')
         
         # Renewable energy ralated raster layers
-        self.RENEWABLE_LAYERS = xr.load_dataset(f'{settings.INPUT_DIR}/renewable_energy_layers_1D.nc').sel(cell=self.MASK)
+        self.RENEWABLE_LAYERS = xr.load_dataset(f'{settings.INPUT_DIR}/renewable_energy_layers_1D.nc').isel(cell=self.MASK)
         
         # TODO: remove when all years of renewable layers are available. 
         #   Now is a temporary fix to expand the 2010 layers across all years.
@@ -859,7 +859,9 @@ class Data:
         fire_risk = fr_df[fr_dict[settings.FIRE_RISK]]
 
         # Load environmental plantings (block) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
-        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_block.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
+        #   NOTE: Use .sel(age=...).load().isel(cell=self.MASK) instead of .sel(cell=self.MASK) 
+        #   to avoid slow xarray label-based indexing on large cell dimensions
+        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_block.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW).load().isel(cell=self.MASK)
         self.EP_BLOCK_AVG_T_CO2_HA_PER_YR = (
             (ds['EP_BLOCK_TREES_T_CO2_HA'] + ds['EP_BLOCK_DEBRIS_T_CO2_HA'])
             * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
@@ -867,7 +869,7 @@ class Data:
         ).values / settings.CARBON_EFFECTS_WINDOW
 
         # Load environmental plantings (belt) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
-        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_belt.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
+        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_belt.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW).load().isel(cell=self.MASK)
         self.EP_BELT_AVG_T_CO2_HA_PER_YR = (
             (ds['EP_BELT_TREES_T_CO2_HA'] + ds['EP_BELT_DEBRIS_T_CO2_HA'])
             * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
@@ -875,7 +877,7 @@ class Data:
         ).values / settings.CARBON_EFFECTS_WINDOW
 
         # Load environmental plantings (riparian) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
-        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_rip.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
+        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_rip.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW).load().isel(cell=self.MASK)
         self.EP_RIP_AVG_T_CO2_HA_PER_YR = (
             (ds['EP_RIP_TREES_T_CO2_HA'] + ds['EP_RIP_DEBRIS_T_CO2_HA'])
             * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
@@ -883,7 +885,7 @@ class Data:
         ).values / settings.CARBON_EFFECTS_WINDOW
 
         # Load carbon plantings (block) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
-        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_cp_block.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
+        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_cp_block.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW).load().isel(cell=self.MASK)
         self.CP_BLOCK_AVG_T_CO2_HA_PER_YR = (
             (ds['CP_BLOCK_TREES_T_CO2_HA'] + ds['CP_BLOCK_DEBRIS_T_CO2_HA'])
             * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
@@ -891,7 +893,7 @@ class Data:
         ).values / settings.CARBON_EFFECTS_WINDOW
 
         # Load farm forestry [i.e. carbon plantings (belt)] GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
-        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_cp_belt.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
+        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_cp_belt.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW).load().isel(cell=self.MASK)
         self.CP_BELT_AVG_T_CO2_HA_PER_YR = (
             (ds['CP_BELT_TREES_T_CO2_HA'] + ds['CP_BELT_DEBRIS_T_CO2_HA'])
             * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
@@ -1100,21 +1102,21 @@ class Data:
         print("├── Calculating base year productivity", flush=True)
         
         (
-            self.prod_base_yr_potential_ag_mrp, 
-            self.prod_base_yr_potential_non_ag_rp, 
+            self.prod_base_yr_potential_ag_mrp,
+            self.prod_base_yr_potential_non_ag_rp,
             self.prod_base_yr_potential_am_amrp
         ) = self.get_potential_production_lyr(self.YR_CAL_BASE)
-        
+
         (
-            self.prod_base_yr_actual_ag_mrc, 
-            self.prod_base_yr_actual_non_ag_rc, 
+            self.prod_base_yr_actual_ag_mrc,
+            self.prod_base_yr_actual_non_ag_rc,
             self.prod_base_yr_actual_am_amrc
         ) = self.get_actual_production_lyr(self.YR_CAL_BASE)
-        
+
         yr_cal_base_prod_data = (
             self.prod_base_yr_actual_ag_mrc.sum(['cell','lm'])
-            + self.prod_base_yr_actual_non_ag_rc.sum(['cell']) 
-            + self.prod_base_yr_actual_am_amrc.sum(['cell', 'am', 'lm'])  
+            + self.prod_base_yr_actual_non_ag_rc.sum(['cell'])
+            + self.prod_base_yr_actual_am_amrc.sum(['cell', 'am', 'lm'])
         ).compute().values
         
         self.add_production_data(self.YR_CAL_BASE, "Production", yr_cal_base_prod_data)
@@ -1861,7 +1863,7 @@ class Data:
         ).assign_coords(
             region=('cell', self.REGION_NRM_NAME),
         )
-        
+
         return (ag_q_mrp_xr.compute(), non_ag_crk_xr.compute(), ag_man_q_amrp_xr.compute())
     
     
@@ -1901,7 +1903,7 @@ class Data:
         ag_q_mrc = xr.dot((xr.dot(ag_X_mrj_xr, self.lu2pr_xr, dims=['lu']) * ag_q_mrp_xr), self.pr2cm_xr, dims=['product'])
         non_ag_p_rc = xr.dot(non_ag_X_rk_xr, non_ag_crk_xr, dims=['lu'])
         am_p_amrc = xr.dot((xr.dot(ag_man_X_amrj_xr, self.lu2pr_xr, dims=['lu']) * ag_man_q_amrp_xr), self.pr2cm_xr, dims=['product'])
-        
+
         return ag_q_mrc, non_ag_p_rc, am_p_amrc
     
     
@@ -1922,18 +1924,18 @@ class Data:
 
         # Get potential production layers
         ag_q_mrp_xr_target_yr, non_ag_crk_xr_target_yr, ag_man_q_amrp_xr_target_yr = self.get_potential_production_lyr(yr_cal)
-        
-        # Calculate total impact 
+
+        # Calculate total impact
         ag_production_c = xr.dot(
-            xr.dot(ag_X_mrj_xr, self.lu2pr_xr, dims=['lu']) * ag_q_mrp_xr_target_yr, self.pr2cm_xr, 
+            xr.dot(ag_X_mrj_xr, self.lu2pr_xr, dims=['lu']) * ag_q_mrp_xr_target_yr, self.pr2cm_xr,
             dim=['cell', 'lm','product']
         ).compute()
         non_ag_production_c = xr.dot(non_ag_X_rk_xr, non_ag_crk_xr_target_yr, dims=['cell', 'lu'])
         am_p_amrc = xr.dot(
-            (xr.dot(ag_man_X_amrj_xr, self.lu2pr_xr, dims=['lu']) * ag_man_q_amrp_xr_target_yr), self.pr2cm_xr, 
+            (xr.dot(ag_man_X_amrj_xr, self.lu2pr_xr, dims=['lu']) * ag_man_q_amrp_xr_target_yr), self.pr2cm_xr,
             dims=['am', 'cell', 'lm','product']
         )
-        
+
         return (ag_production_c.compute() + non_ag_production_c.compute() + am_p_amrc.compute())
     
     

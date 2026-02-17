@@ -488,7 +488,7 @@ def get_agricultural_management_water_matrices(data, yr_idx) -> dict[str, np.nda
 
 
 
-def get_climate_change_impact_whole_region(data, yr_cal):
+def get_climate_change_impact_whole_region(data, yr_cal, ag_dvar_mrj, wny_base_mrj):
     '''
     Calculate the climate change impact on water yield change for Ag-land and Outside-LUTO regions.
 
@@ -500,6 +500,10 @@ def get_climate_change_impact_whole_region(data, yr_cal):
         The data object containing the necessary input data.
     yr_cal : int
         The calendar year for which to calculate the climate change impact.
+    ag_dvar_mrj : xr.DataArray
+        Pre-computed ag decision variable xarray with region_id coordinate.
+    wny_base_mrj : np.ndarray
+        Pre-computed base-year water net yield matrix (yr_idx=0).
 
     Returns
     -------
@@ -508,17 +512,16 @@ def get_climate_change_impact_whole_region(data, yr_cal):
     '''
 
     yr_idx = yr_cal - data.YR_CAL_BASE
-    ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.AG_L_MRJ).assign_coords(region_id=('cell', data.WATER_REGION_ID))
 
     # Get water yield change led by climate change
-    ag_w_mrj_CCI = get_water_net_yield_matrices(data, yr_idx) -  get_water_net_yield_matrices(data, 0)
+    ag_w_mrj_CCI = get_water_net_yield_matrices(data, yr_idx) - wny_base_mrj
     wny_outside_luto_study_area_CCI = (
-        np.array(list(data.WATER_OUTSIDE_LUTO_BY_CCI.loc[yr_cal].to_dict().values())) 
+        np.array(list(data.WATER_OUTSIDE_LUTO_BY_CCI.loc[yr_cal].to_dict().values()))
         - np.array(list(data.WATER_OUTSIDE_LUTO_BY_CCI.loc[data.YR_CAL_BASE].to_dict().values()))
     )
 
     CCI_impact = (
-            (ag_w_mrj_CCI * ag_dvar_mrj).groupby('region_id').sum(['cell','lm', 'lu']) 
+            (ag_w_mrj_CCI * ag_dvar_mrj).groupby('region_id').sum(['cell','lm', 'lu'])
             + wny_outside_luto_study_area_CCI
         ).to_dataframe('Delta (ML)'
         ).reset_index(
@@ -527,34 +530,37 @@ def get_climate_change_impact_whole_region(data, yr_cal):
     return CCI_impact
 
 
-def get_water_delta_by_extreme_CCI_for_whole_region(data):
+def get_water_delta_by_extreme_CCI_for_whole_region(data, wny_base_mrj):
     """
     Get the extreme climate change impact on water yield change for the whole region.
     """
+    # Pre-compute ag_dvar xarray once (same for all years)
+    ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.AG_L_MRJ).assign_coords(region_id=('cell', data.WATER_REGION_ID))
+
     water_delta_extreme_by_CCI = pd.DataFrame()
     for year in sorted(settings.SIM_YEARS):
         water_delta_extreme_by_CCI = pd.concat([
             water_delta_extreme_by_CCI,
-            get_climate_change_impact_whole_region(data, year) 
+            get_climate_change_impact_whole_region(data, year, ag_dvar_mrj, wny_base_mrj)
         ])
-        
+
     return water_delta_extreme_by_CCI.groupby('region_id')['Delta (ML)'].agg('min').to_dict()
 
 
-def get_wny_inside_LUTO_by_CCI_for_base_yr(data):
+def get_wny_inside_LUTO_by_CCI_for_base_yr(data, wny_base_mrj):
     """
     Return water net yield for watershed regions at the BASE_YR.
 
     Parameters
         data (object): The data object containing the required data.
+        wny_base_mrj (np.ndarray): Pre-computed base-year water net yield matrix.
 
     Returns
         dict[int, float]: A dictionary with the following structure:
         - key: region ID
         - value: water net yield for this region (ML)
     """
-    wny_inside_mrj = get_water_net_yield_matrices(data, 0)
-    wny_base_yr_inside_r = np.einsum('mrj,mrj->r', wny_inside_mrj, data.AG_L_MRJ)
+    wny_base_yr_inside_r = np.einsum('mrj,mrj->r', wny_base_mrj, data.AG_L_MRJ)
     wny_base_yr_inside_regions = {k:v for k,v in enumerate(np.bincount(data.WATER_REGION_ID, wny_base_yr_inside_r))}
 
     return wny_base_yr_inside_regions
@@ -578,9 +584,12 @@ def get_water_target_inside_LUTO_by_CCI(data):
         - value: water net yield limit for this region (ML)
     """
 
+    # Pre-compute base-year water net yield matrix once (avoids redundant ~940MB allocations)
+    wny_base_mrj = get_water_net_yield_matrices(data, 0)
+
     wny_base_yr_outside_LUTO = data.WATER_OUTSIDE_LUTO_BY_CCI.loc[data.YR_CAL_BASE].to_dict()
-    wny_base_yr_inside_LUTO = get_wny_inside_LUTO_by_CCI_for_base_yr(data)
-    wny_extreme_delta = get_water_delta_by_extreme_CCI_for_whole_region(data)
+    wny_base_yr_inside_LUTO = get_wny_inside_LUTO_by_CCI_for_base_yr(data, wny_base_mrj)
+    wny_extreme_delta = get_water_delta_by_extreme_CCI_for_whole_region(data, wny_base_mrj)
     wreq_domestic = data.WATER_USE_DOMESTIC
     
     # Get inside LUTO targets based on historical level
