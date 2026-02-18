@@ -25,7 +25,6 @@ Pure functions to calculate economic profit from land use.
 
 import numpy as np
 import pandas as pd
-import xarray as xr
 import luto.settings as settings 
 
 from luto.data import Data

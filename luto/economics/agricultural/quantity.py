@@ -650,8 +650,8 @@ def get_quantity_renewable(data, re_type: str, yr_idx: int):
     
     re_lyr = data.RENEWABLE_LAYERS.sel(Type=re_type, year=yr_cal)
     
-    re_nature_energy_capture_percent = re_lyr['Capacity_percent_of_natural_energy']
-    re_percent_remain_after_distribution = re_lyr['Energy_percent_remain_after_distribution']
+    re_nature_energy_capture_percent = re_lyr['capacity_factor_multiplier']
+    re_percent_remain_after_distribution = re_lyr['distribution_loss_factor_multiplier']
     yield_per_ha = (
         settings.INSTALL_CAPACITY_MW_HA[re_type] 
         * re_nature_energy_capture_percent          
