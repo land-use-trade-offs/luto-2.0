@@ -123,7 +123,7 @@ DYNAMIC_PRICE = False
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 1      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 5        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
 SIM_YEARS =  list(range(2010, 2051, 5))
@@ -421,8 +421,8 @@ AG_MANAGEMENTS_REVERSIBLE = {
     'Biochar': True,
     'HIR - Beef': True,
     'HIR - Sheep': True,
-    'Utility Solar PV': False,  # Can not abandon Utility Solar PV once adopted due to the long lifespan and high transition costs
-    'Onshore Wind': False,      # Can not abandon Onshore Wind once adopted due to the long lifespan and high transition costs
+    'Utility Solar PV': True,  # Can not abandon Utility Solar PV once adopted due to the long lifespan and high transition costs
+    'Onshore Wind': True,      # Can not abandon Onshore Wind once adopted due to the long lifespan and high transition costs
 }
 """
 The values of the below dictionary determine whether the model is allowed to abandon agricultural
