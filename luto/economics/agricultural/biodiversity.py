@@ -30,7 +30,19 @@ from luto import tools
 from luto.data import Data
 
 
-################################ Functions below calculate biodiversity matrices for the bio-objective of the solover ################################
+################################################################
+#       Functions for the bio-objective of the solover         #
+################################################################
+'''
+Bio-objective refers to the global objective that maximises biodiversity,
+which is calculated using the biodiversity score matrices (b_mrj) by land 
+management, cell, and land-use type.
+
+It is for the general biodiversity of all species of the whole Australia, 
+different from the biodiversity constraints which are for specific species 
+(e.g., GBF2-GBF4, GBF8) or specific areas (NRM, STATE ...).
+'''
+
 def get_bio_quality_score_mrj(data:Data):
     """
     Return b_mrj biodiversity score matrices by land management, cell, and land-use type.
@@ -234,6 +246,54 @@ def get_sheep_hir_effect_b_mrj(data: Data, ag_b_mrj: np.ndarray) -> np.ndarray:
         
     return b_mrj_effect
 
+def get_utility_solar_pv_effect_b_mrj(data:Data, ag_b_mrj: np.ndarray, yr_idx: int):
+    """
+    Gets biodiversity impacts of using Utility Solar PV
+
+    Parameters
+    - data: The input data object containing information about NLMS and NCELLS.
+
+    Returns
+    - new_b_mrj: A numpy array representing the biodiversity impacts of using Utility Solar PV.
+    """
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Utility Solar PV']
+    lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
+    yr_cal = data.YR_CAL_BASE + yr_idx
+    # Set up the effects matrix
+    b_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)   
+    if not settings.AG_MANAGEMENTS['Utility Solar PV']:
+        return b_mrj_effect
+    for lu_idx, lu in enumerate(land_uses):
+        biodiv_impact = data.RENEWABLE_BUNDLE_SOLAR.query('Year == @yr_cal and Commodity == @lu')['Biodiversity_compatability'].item()
+        if biodiv_impact != 1:
+            j = lu_codes[lu_idx]
+            b_mrj_effect[:, :, lu_idx] = ag_b_mrj[:, :, j] * (biodiv_impact - 1)
+    return b_mrj_effect
+
+def get_onshore_wind_effect_b_mrj(data:Data, ag_b_mrj: np.ndarray, yr_idx: int):
+    """
+    Gets biodiversity impacts of using Onshore Wind
+
+    Parameters
+    - data: The input data object containing information about NLMS and NCELLS.
+
+    Returns
+    - new_b_mrj: A numpy array representing the biodiversity impacts of using Onshore Wind.
+    """
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Onshore Wind']
+    lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
+    yr_cal = data.YR_CAL_BASE + yr_idx
+    # Set up the effects matrix
+    b_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)   
+    if not settings.AG_MANAGEMENTS['Onshore Wind']:
+        return b_mrj_effect
+    for lu_idx, lu in enumerate(land_uses):
+        biodiv_impact = data.RENEWABLE_BUNDLE_WIND.query('Year == @yr_cal and Commodity == @lu')['Biodiversity_compatability'].item()
+        if biodiv_impact != 1:
+            j = lu_codes[lu_idx]
+            b_mrj_effect[:, :, lu_idx] = ag_b_mrj[:, :, j] * (biodiv_impact - 1)
+    return b_mrj_effect
+
 
 def get_ag_mgt_biodiversity_matrices(data:Data, ag_b_mrj: np.ndarray, yr_idx: int):
     """
@@ -254,7 +314,9 @@ def get_ag_mgt_biodiversity_matrices(data:Data, ag_b_mrj: np.ndarray, yr_idx: in
     agtech_ei_data = get_agtech_ei_effect_b_mrj(data)                               
     biochar_data = get_biochar_effect_b_mrj(data, ag_b_mrj, yr_idx)                 
     beef_hir_data = get_beef_hir_effect_b_mrj(data, ag_b_mrj)                       
-    sheep_hir_data = get_sheep_hir_effect_b_mrj(data, ag_b_mrj)                     
+    sheep_hir_data = get_sheep_hir_effect_b_mrj(data, ag_b_mrj)
+    solar_pv_data = get_utility_solar_pv_effect_b_mrj(data, ag_b_mrj, yr_idx)
+    wind_data = get_onshore_wind_effect_b_mrj(data, ag_b_mrj, yr_idx)                  
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,
@@ -265,13 +327,35 @@ def get_ag_mgt_biodiversity_matrices(data:Data, ag_b_mrj: np.ndarray, yr_idx: in
         'Biochar': biochar_data,
         'HIR - Beef': beef_hir_data,
         'HIR - Sheep': sheep_hir_data,
+        'Utility Solar PV': solar_pv_data,
+        'Onshore Wind': wind_data,
     }
 
 
 
 
-################################ Functions below calculate biodiversity matrices for the bio-constraints of the solover ################################
+################################################################
+#       Functions for the bio-constraint of the solover        #
+################################################################
+'''
+Bio-constraint refers to the specific biodiversity constraints (e.g., GBF2-GBF4, GBF8) 
+that require certain levels of biodiversity to be achieved for specific species or areas.
 
+It is different from the bio-objective which is for the general biodiversity of all 
+species of the whole Australia.
+
+The logic is that we think the pre-1750 biodiversity levels (GBF2-GBF4, GBF8) are the 'baseline' 
+biodiversity levels that we want to achieve for specific species or areas.
+
+Current land-use has the biodiversity contribution scores that is a proportion to the baseline 
+biodiversity levels. For example, Apple land is 0.3, then it can achieve 30% biodiversity to pre-1750.
+
+Ag-Man will increase the biodiversity contribution scores by a certain amount.
+For example, if Biochar[Apple] is 1.2, then applying Biochar on Apple land can increase the biodiversity 
+score by 20% (compared to 'pre-1750' land), thus the biodiversity contribution of Biochar for Apple land is 0.2.
+'''
+
+# Functions to calculate biodiversity scores for pre-1750 times.
 def get_GBF2_MASK_area(data:Data) -> np.ndarray:
     return data.BIO_GBF2_MASK * data.REAL_AREA
 
@@ -340,6 +424,8 @@ def get_GBF8_matrix_sr(data:Data, target_year: int):
     )
 
 
+
+# Functions to calculate ag/ag-man biodiversity contributions
 def get_ag_biodiversity_contribution(data:Data) -> np.ndarray:
     """
     Return b_j biodiversity contribution matrices by land-use type.
@@ -357,6 +443,16 @@ def get_ag_management_biodiversity_contribution(
     data:Data,
     yr_cal: int,
 ) -> dict[str, dict[int, np.ndarray]]:
+    '''
+    Return the biodiversity contribution of each agricultural management practice by land-use type.
+    
+    - If settings.AG_MANAGEMENTS['Biochar'] is True, then the biodiversity contribution 
+      of Biochar for land-use j is calculated as (data.BIOCHAR_DATA[lu].loc[yr_cal, 'Biodiversity_impact'] - 1),
+      where lu is the land-use corresponding to land-use code j. 
+      
+    - If settings.AG_MANAGEMENTS['Biochar'] is False, then the biodiversity contribution 
+      of Biochar for all land-use types is 0.
+    '''
     
     am_contr_dict = {}
     
@@ -411,6 +507,16 @@ def get_ag_management_biodiversity_contribution(
                 )  
             )
             for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep'])
+        }
+    if settings.AG_MANAGEMENTS['Utility Solar PV']:
+        am_contr_dict['Utility Solar PV'] = {
+            j_idx: (data.RENEWABLE_BUNDLE_SOLAR.query('Year == @yr_cal and Commodity == @lu')['Biodiversity_compatability'].item() - 1) * np.ones(data.NCELLS).astype(np.float32)
+            for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Utility Solar PV'])
+        }
+    if settings.AG_MANAGEMENTS['Onshore Wind']:
+        am_contr_dict['Onshore Wind'] = {
+            j_idx: (data.RENEWABLE_BUNDLE_WIND.query('Year == @yr_cal and Commodity == @lu')['Biodiversity_compatability'].item() - 1) * np.ones(data.NCELLS).astype(np.float32)
+            for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Onshore Wind'])
         }
     
     return am_contr_dict

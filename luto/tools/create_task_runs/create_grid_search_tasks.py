@@ -19,6 +19,7 @@
 
 
 import numpy as np
+import pandas as pd
 from luto.tools.create_task_runs.helpers import (
     get_settings_df,
     get_grid_search_param_df,
@@ -27,7 +28,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20251009_RES5_DIFF_CARBON_WINDOW_AND_DYNAMIC_PRICES" # Do not include the trailing slash (/) in the end of the path
+TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20251129_RES1_MEM_TEST/"
 
 
 # Set the grid search parameters
@@ -35,8 +36,9 @@ grid_search = {
     ###############################################################
     # Task run settings for submitting the job to the cluster
     ###############################################################
-    'MEM': ['60GB'],
-    'NCPUS':[15],
+    'MEM': ['300GB'],
+    'WRITE_REPORT_MAX_MEM_GB': [300],                                       # Max memory for writing report (in GB)
+    'NCPUS':[24],
     'TIME': ['5:00:00'],
     'QUEUE': ['normalsr'],                                                  # normalsr for CPU, hugemembw for memory intensive jobs
     
@@ -45,8 +47,8 @@ grid_search = {
     # Working settings for the model run
     ###############################################################
     'OBJECTIVE': ['maxprofit'],                                             # 'maxprofit' or 'mincost'
-    'RESFACTOR': [5],
-    'SIM_YEARS': [list(range(2020,2051,5))],                                # Years to run the model 
+    'RESFACTOR': [1],
+    'SIM_YEARS': [[2020, 2050]],                                # Years to run the model 
     'WRITE_THREADS': [2],
     
  
@@ -56,30 +58,43 @@ grid_search = {
     
     
     # --------------- Scenarios ---------------
-    'SSP': ['245'],                                                         #'126', '245', '370', '585'
-    'CARBON_EFFECTS_WINDOW': list(range(50, 91, 10)),                                  
+    'SSP': ['245'],                                                         # '126', '245', '370', '585'
+    'CARBON_EFFECTS_WINDOW': [60],
+    'CO2_FERT': ['off'],                                                    # 'on' or 'off'
+    'AG_YIELD_MULT': [1.0],                                                 # Agricultural yield multiplier for productivity intensification. E.g., 1.1 means 10% increase in yields.
+    'APPLY_DEMAND_MULTIPLIERS': [True],                                     # True or False. Whether to apply demand multipliers from AusTIME model.
+    'NON_AG_LAND_USES' : [{
+        'Environmental Plantings': True,
+        'Riparian Plantings': True,
+        'Sheep Agroforestry': True,
+        'Beef Agroforestry': True,
+        'Carbon Plantings (Block)': False,
+        'Sheep Carbon Plantings (Belt)': False,
+        'Beef Carbon Plantings (Belt)': False,
+        'BECCS': False,
+        'Destocked - natural land': True,
+    }],                                
     
     # --------------- Economics ---------------
-    'DYNAMIC_PRICE' : [True, False],                                        # True or False
-    'BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR': [100],  # AUD/ha/year       
-    'SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR':[100],  # AUD/ha/year  
+    'DYNAMIC_PRICE' : [False],                                              # True or False
+    'BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR': [100],                     # AUD/ha/year       
+    'SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR':[100],                     # AUD/ha/year  
 
     # --------------- Target deviation weight ---------------
     'SOLVER_WEIGHT_DEMAND': [1], 
     'SOLVER_WEIGHT_GHG': [1],
     'SOLVER_WEIGHT_WATER': [1],
-    'SOLVER_WEIGHT_GBF2': [1],
 
 
     # --------------- Social license ---------------
     'EXCLUDE_NO_GO_LU': [False],                                            # True or False
     'REGIONAL_ADOPTION_CONSTRAINTS': ['off'],                               # 'off', 'on', 'NON_AG_UNIFORM'    
-    'REGIONAL_ADOPTION_NON_AG_UNIFORM': [15],                               # Only work under 'NON_AG_UNIFORM'; None or numbers between 0-100 (both inclusive);  E.g., 5 means each non-ag land can not exceed 5% adoption in every region
+    'REGIONAL_ADOPTION_NON_AG_UNIFORM': [5],                                # Only work under 'NON_AG_UNIFORM'; None or numbers between 0-100 (both inclusive);  E.g., 5 means each non-ag land can not exceed 5% adoption in every region
     'REGIONAL_ADOPTION_ZONE': ['NRM_CODE'],                                 # One of 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
 
 
     # --------------- GHG settings ---------------
-    'GHG_EMISSIONS_LIMITS': ['high'],                                       # 'off', 'low', 'medium', 'high'
+    'GHG_EMISSIONS_LIMITS': ['low'],                                        # 'off', 'low', 'high'
     'CARBON_PRICES_FIELD': ['CONSTANT'],
     'GHG_CONSTRAINT_TYPE': ['hard'],                                        # 'hard' or 'soft'
     'USE_GHG_SCOPE_1': [True],                                              # True or False
@@ -95,10 +110,10 @@ grid_search = {
     # --------------- Biodiversity overall ---------------
     'CONTRIBUTION_PERCENTILE': ['USER_DEFINED'],                            # One of [10, 25, 50, 75, 90], or 'USER_DEFINED'              
     'CONNECTIVITY_SOURCE': ['NCI'],
-    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [40],                    # Percentage of degraded areas to cut in GBF2 priority areas
     
     # --------------- Biodiversity settings - GBF 2 ---------------
     'BIODIVERSITY_TARGET_GBF_2': ['high'],                                  # 'off', 'low', 'medium', 'high'
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [20],                    # Percentage of degraded areas to cut in GBF2 priority areas
     'GBF2_CONSTRAINT_TYPE': ['hard'],                                       # 'hard' or 'soft'
 
     # --------------- Biodiversity settings - GBF 3 ---------------
@@ -118,16 +133,12 @@ grid_search = {
     'SOLVE_WEIGHT_BETA':  [0.5],         
     
     
-    #-------------------- Diet BAU --------------------
-    'DIET_DOM': ['BAU',],                                                   # 'BAU' or 'FLX'
-    'DIET_GLOB': ['BAU',],                                                  # 'BAU' or 'FLX'
+    #-------------------- Dietary --------------------
+    'DIET_DOM': ['BAU'],                                                    # 'BAU', 'FLX', 'VEG', 'VGN'
+    'DIET_GLOB': ['BAU'],                                                   # 'BAU' or 'FLX'
     'WASTE': [1],                                                           # 1 or 0.5
     'FEED_EFFICIENCY': ['BAU'],                                             # 'BAU' or 'High'
-    #---------------------Diet FLX --------------------
-    # 'DIET_DOM': ['FLX',],                                                 # 'BAU' or 'FLX'
-    # 'DIET_GLOB': ['FLX',],                                                # 'BAU' or 'FLX'
-    # 'WASTE': [0.5],                                                       # 1 or 0.5
-    # 'FEED_EFFICIENCY': ['High'],                                          # 'BAU' or 'High'
+    'IMPORT_TREND':['Static'],                                              # 'Static' or 'Trend'
 }
 
 
@@ -144,8 +155,8 @@ if __name__ == '__main__':
     # Create the grid settings parameters
     default_settings_df = get_settings_df(TASK_ROOT_DIR)
     grid_search_param_df = get_grid_search_param_df(grid_search)
-    grid_search_settings_df = get_grid_search_settings_df(TASK_ROOT_DIR, default_settings_df, grid_search_param_df)
-    
+
+
     # Remove unnecessary runs
     rm_idx = []
     for idx, row in grid_search_param_df.iterrows():
@@ -157,8 +168,10 @@ if __name__ == '__main__':
     grid_search_param_df.to_csv(f'{TASK_ROOT_DIR}/grid_search_parameters.csv', index=False)
     print(f'Removed {len(set(rm_idx))} unnecessary runs!')
     
+
     # Get full settings df
     grid_search_settings_df = get_grid_search_settings_df(TASK_ROOT_DIR, default_settings_df, grid_search_param_df)
+    
 
     # 1) Submit task to a single linux machine, and run simulations parallely
     # create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='single', n_workers=min(len(grid_search_param_df), 100))

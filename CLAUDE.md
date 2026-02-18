@@ -6,53 +6,62 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 LUTO2 is the Land-Use Trade-Offs Model Version 2, an integrated land systems optimization model for Australia. It simulates optimal spatial arrangement of land use and management decisions to achieve climate and biodiversity targets while maintaining economic productivity. The model uses GUROBI optimization solver and processes large spatial datasets.
 
-## Development Environment Setup
+## Documentation Structure
 
-### Environment Creation
+The LUTO2 documentation is split into themed files for better memory efficiency. **Read the relevant documentation file based on your current task**:
+
+### 📁 [docs/CLAUDE_SETUP.md](docs/CLAUDE_SETUP.md)
+**Read this when working on:**
+- Environment setup and dependencies
+- Running tests or simulations
+- Configuring model parameters (settings.py)
+- Setting up GUROBI license
+- Performance optimization and memory management
+- Memory profiling with `@trace_mem_usage` decorator
+- **xr.dot() optimization** (CRITICAL: use `xr.dot()` instead of broadcasting for memory efficiency)
+
+### 📁 [docs/CLAUDE_ARCHITECTURE.md](docs/CLAUDE_ARCHITECTURE.md)
+**Read this when working on:**
+- Core simulation engine (simulation.py, data.py)
+- Economic modules (agricultural, non-agricultural, off-land)
+- Solver integration (GUROBI, optimization)
+- Biodiversity calculations (GBF framework)
+- Data flow and preprocessing (dataprep.py)
+- Dynamic pricing and demand elasticity
+
+### 📁 [docs/CLAUDE_OUTPUT.md](docs/CLAUDE_OUTPUT.md)
+**Read this when working on:**
+- NetCDF output format and structure
+- Mosaic layer generation (write.py)
+- **Valid layers implementation pattern** (memory/disk optimization)
+- save2nc() optimization
+- create_report_layers.py workflow
+- Carbon sequestration data format
+- Data transformation pipeline (1D→2D→EPSG:3857→RGBA→base64)
+- Dimension hierarchies (Ag, Am, NonAg, GHG, Economics)
+
+### 📁 [docs/CLAUDE_VUE_REPORTING.md](docs/CLAUDE_VUE_REPORTING.md)
+**Read this when working on:**
+- Vue.js 3 reporting interface
+- Progressive selection pattern
+- Cascade watcher implementation
+- Data hierarchies for all modules (Area, Economics, GHG, Production, Water, Biodiversity, DVAR)
+- Chart vs Map data structures
+- Special cases (Economics dual series, Biodiversity conditional loading)
+- File structure (views, data, services, routes)
+
+## Quick Reference
+
+### Common Development Commands
+
 ```bash
-# Create and activate conda environment
-conda env create -f luto/tools/create_task_runs/bash_scripts/conda_env.yml
-conda activate luto
-
-# Install additional pip dependencies (gurobipy, numpy_financial, tables)
-pip install gurobipy==11.0.2 numpy_financial==1.0.0 tables==3.9.2
-```
-
-### GUROBI License
-LUTO2 requires a GUROBI optimization solver license. Academic licenses are available at gurobi.com. Place your `gurobi.lic` file in the appropriate directory as specified by GUROBI documentation.
-
-### Input Data
-The model requires approximately 40GB of input data that must be obtained separately by contacting b.bryan@deakin.edu.au. Input data goes in the `/input/` directory.
-
-## Common Development Commands
-
-### Testing
-```bash
-# Run all tests from repository root
+# Testing
 python -m pytest
 
-# Run tests with specific patterns
-python -m pytest luto/tests/
-```
+# Run simulation
+python -c "import luto.simulation as sim; data = sim.load_data(); sim.run(data=data)"
 
-### Running Simulations
-```python
-# Basic simulation
-import luto.simulation as sim
-data = sim.load_data()
-results = sim.run(data=data)
-
-# With custom settings
-import luto.settings as settings
-settings.RESFACTOR = 10  # Coarser spatial resolution
-settings.SIM_YEARS = [2010, 2020, 2030]
-data = sim.load_data()
-sim.run(data=data)
-```
-
-### Batch Processing
-```bash
-# Use tools for creating and managing batch runs
+# Batch processing
 python luto/tools/create_task_runs/create_grid_search_tasks.py
 ```
 
@@ -64,7 +73,8 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 - **`luto/settings.py`**: Configuration parameters for all model aspects
 - **`luto/solvers/`**: Optimization solver interface and input data preparation
   - `solver.py`: GUROBI solver wrapper (LutoSolver class)
-    - Biodiversity constraint methods: `_add_GBF2_constraints()`, `_add_GBF3_NVIS_constraints()`, `_add_GBF4_SNES_constraints()`, `_add_GBF4_ECNES_constraints()`, `_add_GBF8_constraints()`
+    - Biodiversity constraint methods: `_add_GBF2_constraints()`, `_add_GBF3_NVIS_constraints()`, `_add_GBF3_IBRA_constraints()`, `_add_GBF4_SNES_constraints()`, `_add_GBF4_ECNES_constraints()`, `_add_GBF8_constraints()`
+    - Renewable energy constraint method: `_add_renewable_energy_constraints()` — enforces state-level solar and wind generation targets
   - `input_data.py`: Prepares optimization model input data
     - Biodiversity data attributes use `*_pre_1750_area_*` naming (e.g., `GBF3_NVIS_pre_1750_area_vr`, `GBF4_SNES_pre_1750_area_sr`)
     - `rescale_solver_input_data()`: **In-place** rescaling of arrays to magnitude 0-1e3 for numerical stability
@@ -73,6 +83,7 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 - **`luto/economics/agricultural/`**: Agricultural land use economics
   - Revenue, cost, quantity, water, biodiversity, GHG calculations
   - Transition costs between agricultural land uses
+  - **Renewable energy** effects integrated across all economics modules (cost, revenue, quantity, water, biodiversity, transitions)
   - **Dynamic pricing** (`revenue.py`): Demand elasticity-based price adjustments
     - Calculates commodity price multipliers based on supply-demand dynamics
     - Uses elasticity coefficients and demand deltas from 2010 baseline
@@ -80,10 +91,11 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
   - **Biodiversity module** (`biodiversity.py`): GBF (Global Biodiversity Framework) calculations
     - `get_GBF2_MASK_area()`: Returns GBF2 priority degraded areas (mask × real area)
     - `get_GBF3_NVIS_matrices_vr()`: NVIS vegetation layer matrices for GBF3
+    - `get_GBF3_IBRA_matrices_vr()`: IBRA bioregion layer matrices for GBF3
     - `get_GBF4_SNES_matrix_sr()`, `get_GBF4_ECNES_matrix_sr()`: Species/Ecological Community NES matrices
     - Variable naming convention: `*_pre_1750_area_*` for baseline biodiversity area matrices
 - **`luto/economics/non_agricultural/`**: Non-agricultural land use economics
-  - Environmental plantings, carbon plantings, etc.
+  - Environmental plantings, riparian plantings, agroforestry, carbon plantings, BECCS, destocked natural land
 - **`luto/economics/off_land_commodity/`**: Off-land commodity economics
 
 ### Data Processing
@@ -105,11 +117,24 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 ## Key Configuration Parameters
 
 ### Core Settings (`luto/settings.py`)
-- `SIM_YEARS`: Simulation time periods (default: 2020-2050 in 5-year steps)
+- `VERSION`: Model version identifier (current: '2.3')
+- `SSP`: Shared Socioeconomic Pathway code (e.g., '245' for SSP2-RCP4.5)
+- `SCENARIO`: Auto-derived from SSP (e.g., 'SSP2')
+- `RCP`: Auto-derived from SSP (e.g., 'rcp4p5')
+- `SIM_YEARS`: Simulation time periods (default: 2010-2050 in 5-year steps; 2010 is base year)
 - `RESFACTOR`: Spatial resolution factor (1 = full resolution, >1 = coarser)
-- `SCENARIO`: Shared Socioeconomic Pathway (SSP1-SSP5)
-- `RCP`: Representative Concentration Pathway (e.g., 'rcp4p5')
 - `OBJECTIVE`: Optimization objective ('maxprofit' or 'mincost')
+
+### Scenario Settings
+- `DIET_DOM`: Domestic diet option ('BAU', 'FLX', 'VEG', 'VGN')
+- `DIET_GLOB`: Global diet option (varies by year)
+- `CONVERGENCE`: Dietary transformation target year (2050 or 2100)
+- `IMPORT_TREND`: Import trend assumption ('Static' or 'Trend')
+- `WASTE`: Waste multiplier (1 or 0.5)
+- `FEED_EFFICIENCY`: Livestock feed efficiency ('BAU' or 'High')
+- `APPLY_DEMAND_MULTIPLIERS`: Enable demand scenario effects (True/False)
+- `AG_YIELD_MULT`: Agricultural yield multiplier (default: 1.15 = 15% increase)
+- `CO2_FERT`: CO2 fertilization effects ('on' or 'off')
 
 ### Economic Settings
 - `DYNAMIC_PRICE`: Enable demand elasticity-based dynamic pricing (default: False)
@@ -119,22 +144,48 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 
 ### Environmental Constraints
 - `GHG_EMISSIONS_LIMITS`: Greenhouse gas targets ('off', 'low', 'medium', 'high')
+- `GHG_CONSTRAINT_TYPE`: Hard or soft GHG constraint ('hard' or 'soft')
 - `WATER_LIMITS`: Water yield constraints ('on' or 'off')
+- `WATER_CONSTRAINT_TYPE`: Hard or soft water constraint ('hard' or 'soft')
 - `CARBON_EFFECTS_WINDOW`: Years for carbon accumulation averaging (50, 60, 70, 80, or 90 years)
   - Must match available NetCDF data ages in input files
   - Determines annual sequestration rate by averaging total CO2 over this period
   - Default: 50 years (follows S-curve logic with rapid early accumulation)
 - `BIODIVERSITY_TARGET_GBF_*`: Global Biodiversity Framework targets
-  - `BIODIVERSITY_TARGET_GBF_2`: Priority degraded areas restoration ('off' or percentage target)
-  - `BIODIVERSITY_TARGET_GBF_3_NVIS`: NVIS vegetation group targets ('off' or percentage target)
+  - `BIODIVERSITY_TARGET_GBF_2`: Priority degraded areas restoration ('off', 'low', 'medium', 'high')
+  - `GBF2_CONSTRAINT_TYPE`: Hard or soft GBF2 constraint ('hard' or 'soft')
+  - `BIODIVERSITY_TARGET_GBF_3_NVIS`: NVIS vegetation group targets ('off', 'medium', 'high', 'USER_DEFINED')
+  - `BIODIVERSITY_TARGET_GBF_3_IBRA`: IBRA bioregion targets ('off', 'medium', 'high', 'USER_DEFINED')
   - `BIODIVERSITY_TARGET_GBF_4_SNES`: Species NES (National Environmental Significance) ('on' or 'off')
   - `BIODIVERSITY_TARGET_GBF_4_ECNES`: Ecological Community NES ('on' or 'off')
   - `BIODIVERSITY_TARGET_GBF_8`: Species conservation targets ('on' or 'off')
 
+### Renewable Energy Settings
+- `RENEWABLE_ENERGY_CONSTRAINTS`: Enable renewable energy generation targets ('on' or 'off')
+- `RENEWABLES_OPTIONS`: Renewable energy types: `['Utility Solar PV', 'Onshore Wind']`
+- `RENEWABLE_TARGET_SCENARIO`: Target scenario ('CNS25 - Accelerated Transition' or 'CNS25 - Current Targets')
+- `RE_TARGET_LEVEL`: Spatial level for constraints ('STATE' or 'NRM'; only STATE currently supported)
+- `INSTALL_CAPACITY_MW_HA`: Per-hectare capacity (MW/ha) per renewable type
+- `RENEWABLES_ADOPTION_LIMITS`: Maximum adoption fraction per type (default: 1.0 for both)
+- Both renewable types are registered as non-reversible agricultural management options in `AG_MANAGEMENTS`
+- Compatible land uses differ: Solar PV excludes Hay; Wind includes Hay and horticulture crops
+
 ### Solver Configuration
 - `SOLVE_METHOD`: GUROBI algorithm (default: 2 for barrier method)
-- `THREADS`: Parallel threads for optimization
-- `FEASIBILITY_TOLERANCE`: Solver tolerance settings
+- `THREADS`: Parallel threads for optimization (default: min(32, cpu_count))
+- `FEASIBILITY_TOLERANCE`: Solver tolerance (default: 1e-2, relaxed from 1e-6)
+- `OPTIMALITY_TOLERANCE`: Optimality tolerance (default: 1e-2)
+- `BARRIER_CONVERGENCE_TOLERANCE`: Barrier method convergence (default: 1e-5)
+- `RESCALE_FACTOR`: Rescaling magnitude for numerical stability (default: 1e3)
+- `SOLVER_WEIGHT_DEMAND`: Demand deviation weight in objective (default: 1)
+- `SOLVER_WEIGHT_GHG`: GHG deviation weight in objective (default: 1)
+- `SOLVER_WEIGHT_WATER`: Water deviation weight in objective (default: 1)
+
+### Output Writing Configuration
+- `WRITE_PARALLEL`: Enable parallel output writing (default: True)
+- `WRITE_THREADS`: Number of parallel write threads (default: min(6, cpu_count))
+- `WRITE_REPORT_MAX_MEM_GB`: Max memory for report generation (default: 64)
+- `WRITE_CHUNK_SIZE`: Chunk size for NetCDF writing (default: 4096)
 
 ## Data Flow
 
@@ -143,6 +194,7 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
    - Calculates demand deltas (change from 2010 baseline) for price adjustments
    - **Carbon data**: Loads NetCDF files using xarray, selects data at `CARBON_EFFECTS_WINDOW` age
    - Carbon sequestration components: Trees + Debris (aboveground, risk-discounted) + Soil (belowground)
+   - **Renewable energy data**: Loads targets (CSV), electricity prices (separate CSV per type: solar, wind), spatial layers (NetCDF), and bundle parameters (CSV)
 2. **Preprocessing**: `dataprep.py` processes raw data into model-ready formats
    - Copies demand elasticity data from source to input directory
    - **Carbon data preparation**: Converts 3D timeseries to NetCDF format with age dimension
@@ -152,59 +204,27 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
    - Revenue calculations apply demand elasticity multipliers when `DYNAMIC_PRICE` enabled
    - Elasticity multipliers computed as: `1 + (demand_delta / demand_elasticity)`
 4. **Solver Input**: `solvers/input_data.py` prepares optimization model data
-   - Biodiversity matrices: GBF2 mask areas, GBF3 NVIS layers, GBF4 SNES/ECNES matrices, GBF8 species data
+   - Biodiversity matrices: GBF2 mask areas, GBF3 NVIS layers, GBF3 IBRA layers, GBF4 SNES/ECNES matrices, GBF8 species data
+   - Renewable energy: Solar/wind yield arrays (`renewable_solar_r`, `renewable_wind_r`), state region mapping, rescaled targets
    - Data rescaling: Arrays rescaled in-place to 0-1e3 magnitude for numerical stability
-5. **Optimization**: `solvers/solver.py` runs GUROBI optimization with biodiversity constraints
+5. **Optimization**: `solvers/solver.py` runs GUROBI optimization with biodiversity and renewable energy constraints
 6. **Output Generation**: `tools/write.py` writes results to `/output/`
    - Biodiversity outputs: GBF2/3/4/8 scores, species impacts, vegetation group restoration
 
 ## Output Structure
 
-Results are saved in `/output/<timestamp>/`:
-- `DATA_REPORT/REPORT_HTML/index.html`: Interactive HTML dashboard
-- Spatial outputs: GeoTIFF files for mapping
-- Data tables: CSV files with numerical results
-- Logs: Execution logs and performance metrics
+Results saved in `/output/<timestamp>/`:
+- `DATA_REPORT/REPORT_HTML/index.html`: Interactive dashboard
+- NetCDF files: Spatial outputs (xarray format)
+- CSV files: Data tables
+- Logs: Execution logs and metrics
 
-## Memory and Performance
+## Important Conventions
 
-- Minimum 16GB RAM (32GB recommended for large simulations)
-- Model complexity requires substantial computational resources
-- Use `RESFACTOR > 1` for testing and development to reduce memory usage
-- Monitor memory usage with built-in logging utilities
+### Memory Optimization: xr.dot() Pattern (CRITICAL)
 
-## Testing Framework
+**ALWAYS use `xr.dot()` instead of broadcasting for array operations:**
 
-- Uses pytest with hypothesis for property-based testing
-- Tests focus on robustness of core functionality
-- Run tests before making significant changes to ensure model integrity
-
-## Carbon Sequestration Data Format
-
-The carbon sequestration data has been migrated from HDF5/pandas format to NetCDF/xarray format for improved performance and flexibility.
-
-### Data Structure
-- **Format**: NetCDF (.nc) files with compressed chunking
-- **Dimensions**: `age` × `cell` (age dimension contains specific tree ages, cell dimension covers all spatial cells)
-- **Available ages**: 50, 60, 70, 80, 90 years (selected from full timeseries)
-- **Encoding**: zlib compression (level 5) with chunk size (1, 6956407)
-
-### Carbon Components
-Each NetCDF file contains three data variables representing different carbon pools:
-1. **Trees**: Aboveground biomass in trees (`*_TREES_T_CO2_HA` or `*_TREES_TOT_T_CO2_HA`)
-2. **Debris**: Aboveground debris/litter (`*_DEBRIS_T_CO2_HA` or `*_DEBRIS_TOT_T_CO2_HA`)
-3. **Soil**: Belowground soil carbon (`*_SOIL_T_CO2_HA` or `*_SOIL_TOT_T_CO2_HA`)
-
-### File Naming Convention
-- Environmental Plantings (Block): `tCO2_ha_ep_block.nc`
-- Environmental Plantings (Belt): `tCO2_ha_ep_belt.nc`
-- Environmental Plantings (Riparian): `tCO2_ha_ep_rip.nc`
-- Carbon Plantings (Block): `tCO2_ha_cp_block.nc`
-- Carbon Plantings (Belt): `tCO2_ha_cp_belt.nc`
-- Human-Induced Regeneration (Block): `tCO2_ha_hir_block.nc`
-- Human-Induced Regeneration (Riparian): `tCO2_ha_hir_rip.nc`
-
-### Data Loading Pattern
 ```python
 import xarray as xr
 # Load NetCDF and select specific age from CARBON_EFFECTS_WINDOW setting
@@ -241,350 +261,128 @@ The biodiversity module follows consistent naming conventions for GBF (Global Bi
 
 ### Function Naming Pattern
 - **GBF constraint methods**: Use `_add_GBF{N}_{TYPE}_constraints()` format
-  - Examples: `_add_GBF2_constraints()`, `_add_GBF3_NVIS_constraints()`, `_add_GBF4_SNES_constraints()`
+  - Examples: `_add_GBF2_constraints()`, `_add_GBF3_NVIS_constraints()`, `_add_GBF3_IBRA_constraints()`, `_add_GBF4_SNES_constraints()`
   - Maintain consistency between method names and GBF target types
 
 ### Data Structure Indices
-- `v, r`: Vegetation group (v) × cell (r) - used for GBF3 NVIS data
+- `v, r`: Vegetation group / bioregion (v) × cell (r) - used for GBF3 NVIS and IBRA data
 - `s, r`: Species/community (s) × cell (r) - used for GBF4 and GBF8 data
 - `r`: Cell only - used for GBF2 mask data
 
 ### Key GBF Modules
 1. **GBF2**: Priority degraded areas restoration
    - Function: `get_GBF2_MASK_area(data)` returns mask × real area
-2. **GBF3**: NVIS major vegetation group targets
+2. **GBF3 NVIS**: NVIS major vegetation group targets
    - Function: `get_GBF3_NVIS_matrices_vr(data)` returns vegetation layers
-3. **GBF4**: Species and Ecological Community NES
+3. **GBF3 IBRA**: IBRA bioregion targets
+   - Function: `get_GBF3_IBRA_matrices_vr(data)` returns bioregion layers
+4. **GBF4**: Species and Ecological Community NES
    - SNES: `get_GBF4_SNES_matrix_sr(data)`
    - ECNES: `get_GBF4_ECNES_matrix_sr(data)`
-4. **GBF8**: Species conservation
+5. **GBF8**: Species conservation
    - Function: `get_GBF8_species_matrices_sr(data, target_year)`
+
+## Renewable Energy Module
+
+The renewable energy module (REM) introduces solar and wind energy generation as agricultural management options, enabling optimization of land use to meet state-level renewable energy targets.
+
+### Architecture
+
+Renewable energy types (Utility Solar PV, Onshore Wind) are implemented as agricultural management options (`AG_MANAGEMENTS`). Each type has effects across all economics modules:
+
+- **`quantity.py`**: `get_quantity_renewable(data, re_type, yr_idx)` — core yield calculation (MWh per cell). Yield = `MW_HA_HR × capacity% × (1 - distribution_loss%) × 8760 × REAL_AREA`
+- **`revenue.py`**: `get_utility_solar_pv_effect_r_mrj()` / `get_onshore_wind_effect_r_mrj()` — agricultural revenue change + electricity revenue (quantity × state-level price)
+- **`cost.py`**: `get_utility_solar_pv_effect_c_mrj()` / `get_onshore_wind_effect_c_mrj()` — O&M cost multiplier on base ag costs + operational costs from spatial layers
+- **`transitions.py`**: `get_utility_solar_pv_effect_t_mrj()` / `get_onshore_wind_effect_t_mrj()` — upfront installation CAPEX (not amortized)
+- **`biodiversity.py`**: `get_utility_solar_pv_effect_b_mrj()` / `get_onshore_wind_effect_b_mrj()` — biodiversity compatibility impacts from bundle data
+- **`water.py`**: `get_utility_solar_pv_effect_w_mrj()` / `get_onshore_wind_effect_w_mrj()` — water requirement impacts
+
+### Solver Constraints
+
+`_add_renewable_energy_constraints()` in `solver.py` enforces state-level generation targets:
+- Separate constraints for solar and wind per state
+- Uses `renewable_solar_r` / `renewable_wind_r` yield arrays from `input_data.py`
+- Targets from `RENEWABLE_TARGETS` CSV, filtered by year and scenario
+- Rescaled for numerical stability (same pattern as biodiversity constraints)
+
+### Data Loading (`data.py`)
+
+- `RENEWABLE_TARGETS`: State-level generation targets (TWh → MWh) by year, scenario, and product
+- `SOLAR_PRICES`: State-level solar electricity prices (AUD/MWh) by year
+- `WIND_PRICES`: State-level wind electricity prices (AUD/MWh) by year
+- `RENEWABLE_LAYERS`: NetCDF spatial layers with installation cost, operation cost, capacity %, and distribution loss %
+- `RENEWABLE_BUNDLE_SOLAR` / `RENEWABLE_BUNDLE_WIND`: Parameters per land use (productivity, revenue, O&M multiplier, biodiversity compatibility, water requirements)
+- `REGION_STATE_CODE` / `REGION_STATE_NAME2CODE`: State mapping for state-level constraint aggregation
+
+### Input Files Required
+
+| File | Format | Description |
+|------|--------|-------------|
+| `renewable_targets.csv` | CSV | Year, STATE, SCENARIO, PRODUCT, Renewable_Target_TWh |
+| `renewable_price_AUD_MWh_solar.csv` | CSV | Year, State, Price_AUD_per_MWh (solar) |
+| `renewable_price_AUD_MWh_wind.csv` | CSV | Year, State, Price_AUD_per_MWh (wind) |
+| `renewable_energy_bundle.csv` | CSV | Year, Commodity, Lever, Productivity, Revenue, OM_Cost_Multiplier, Biodiversity_compatability, INPUT-wrt_water-required |
+| `renewable_energy_layers_1D.nc` | NetCDF | Spatial layers: Cost_of_install_AUD_kw, Cost_of_operation_AUD_kw, capacity_factor_multiplier, distribution_loss_factor_multiplier |
+
+### Compatible Land Uses
+
+- **Utility Solar PV**: Unallocated - modified land, Beef/Sheep/Dairy - modified land, Summer/Winter cereals/legumes/oilseeds
+- **Onshore Wind**: All Solar PV land uses + Hay, Cotton, Other non-cereal crops, Rice, Sugar, Vegetables
+
+### Key Design Notes
+
+- Both types are **non-reversible** once installed (`AG_MANAGEMENTS_REVERSIBLE = False`)
+- Adoption limits enforced via existing `const_ag_mam_adoption_limit` solver constraints
+- State-level pricing: electricity revenue uses state-specific prices mapped via `REGION_STATE_CODE`
+- Effects follow standard pattern: `base_value × (multiplier - 1)` for additive impacts
+- **GHG effects return zeros**: No direct on-farm GHG impact; displacement benefits handled externally via AusTIMES energy model
+- **Separate rescaling**: Solar and wind yield arrays are rescaled independently (`Renewable_Solar` / `Renewable_Wind` scale factors)
+- **ACT excluded**: Australian Capital Territory skipped in state-level constraints
 
 ## Vue.js Reporting System Architecture
 
 The LUTO reporting system uses Vue.js 3 with a progressive selection pattern for data visualization.
 
-### Progressive Selection Pattern
+### Naming Patterns
 
-All reporting views follow the progressive selection pattern:
+- **Biodiversity variables**: `*_pre_1750_area_*` for baseline matrices
+- **GBF functions**: `_add_GBF{N}_{TYPE}_constraints()`, `get_GBF{N}_*()`
+- **Carbon files**: `tCO2_ha_{ep,cp,hir}_{block,belt,rip}.nc`
 
-1. **Data Loading**: Use `chartRegister`/`mapRegister` from `ChartService`/`MapService`
-2. **Progressive Buttons**: Dynamic buttons generated from data structure keys
-3. **Cascading Watchers**: Downstream selections auto-update when upstream changes
-4. **Reactive Data**: `selectMapData`/`selectChartData` computed properties
-5. **Data Readiness**: `mapReady`/`chartReady` computed validation
+### NetCDF Dimensions
 
-### Complete Data Structure Hierarchies
+- **Ag**: `lm[ALL,dry,irr] → lu[ALL,...] → year → cell`
+- **Am**: `am[ALL,...] → lm[ALL,dry,irr] → lu[ALL,...] → year → cell`
+- **NonAg**: `lu[ALL,...] → year → cell`
 
-#### AREA MODULE
-- **Chart Data**:
-  - `Area_Ag`: `Region → Water → [series]`
-  - `Area_Am`: `Region → AgMgt → Water → [series]`
-  - `Area_NonAg`: `Region → [series]` (simplified, no Water level)
-- **Map Data**: `Water → Landuse → Year → {img_str, bounds, min_max}`
+### JSON Output Hierarchies (Map vs Chart)
 
-#### ECONOMICS MODULE (Special Case - Complex Validation Required)
-- **Chart Data (SINGLE FILES containing BOTH Cost & Revenue)**:
-  - `Economics_Ag`: `Region → "ALL" → "ALL" → [mixed series array]` (aggregated, no Water/Landuse selection needed)
-  - `Economics_Am`: `Region → "ALL" → "ALL" → [mixed series array]` (aggregated, no AgMgt selection needed)
-  - `Economics_overview_Non_Ag`: `Region → [mixed series array]` (simplified)
-  - **Dual Series Structure**: Cost (`id: null`) + Revenue (`id: name`) mixed in same array
-  - **Chart Independence**: Cost/Revenue button does NOT affect chart data access - always shows both
-- **Map Data (SEPARATE FILES for Cost vs Revenue)**:
-  - `map_cost_Ag`: `Water → Landuse → Year → {img_str, bounds, min_max}`
-  - `map_cost_Am`: `AgMgt → Water → Landuse → Year → {img_str, bounds, min_max}`
-  - `map_cost_NonAg`: `Landuse → Year → {img_str, bounds, min_max}` (simplified)
-  - `map_revenue_Ag`: `Water → Landuse → Year → {img_str, bounds, min_max}` 
-  - `map_revenue_Am`: `AgMgt → Water → Landuse → Year → {img_str, bounds, min_max}`
-  - `map_revenue_NonAg`: `Landuse → Year → {img_str, bounds, min_max}` (simplified)
-- **Critical Implementation Details**:
-  - **Different AgMgt Categories**: Cost and Revenue have DIFFERENT AgMgt categories (MAP data only):
-    - **Cost AgMgt**: `"ALL"`, `"Agricultural technology (energy)"`, `"Agricultural technology (fertiliser)"`, `"Biochar (soil amendment)"`, `"Early dry-season savanna burning"`, `"Human-induced regeneration (Beef)"`, `"Human-induced regeneration (Sheep)"`, `"Methane reduction (livestock)"`
-    - **Revenue AgMgt**: `"ALL"`, `"Agricultural technology (energy)"`, `"Agricultural technology (fertiliser)"`, `"Biochar (soil amendment)"`, `"Human-induced regeneration (Beef)"`, `"Human-induced regeneration (Sheep)"`, `"Methane reduction (livestock)"` (missing `"Early dry-season savanna burning"`)
-  - **Chart vs Map Structure Mismatch**: Ag Mgt chart data is aggregated while map data uses AgMgt hierarchy
-  - **Validation Required**: Must validate AgMgt selection exists in current Cost/Revenue data (MAP only)
-  - **Combined Watcher**: Watch both `[selectCostRevenue, selectCategory]` with immediate: true
-  - **Selection Reset**: Reset AgMgt selection if it doesn't exist in new data structure
-  - **Safe Access**: Use optional chaining (`?.`) in selectMapData with fallback `|| {}`
-  - **Chart Access**: Both Ag and Ag Mgt charts use `chartData["ALL"]["ALL"]` (no selections needed)
-- **UI Pattern**: Cost/Revenue buttons affect MAP selection ONLY, charts ALWAYS show both cost & revenue series
+**IMPORTANT**: Map and Chart JSON files have different dimension hierarchies:
 
-#### GHG MODULE
-- **Chart Data**:
-  - `GHG_Ag`: `Region → "ALL" → Water → [series]` (no Landuse breakdown)
-  - `GHG_Am`: `Region → AgMgt → Water → [series]` (has AgMgt breakdown)
-  - `GHG_NonAg`: `Region → [series]` (simplified)
-- **Map Data**: 
-  - `map_GHG_Ag`: `Water → Landuse → Year → {img_str, bounds, min_max}`
-  - `map_GHG_Am`: `AgMgt → Water → Landuse → Year → {img_str, bounds, min_max}` (AgMgt first, then Water)
-  - `map_GHG_NonAg`: `Landuse → Year → {img_str, bounds, min_max}` (simplified)
+**Map JSON (Spatial Layers)**:
+- **Ag**: `lm → lu → source (if applicable for GHG/Economics) → year`
+- **Am**: `am → lm → lu → source (if applicable) → year`
+- **NonAg**: `lu → year`
 
-#### PRODUCTION MODULE
-- **Chart Data**:
-  - `Production_Ag`: `Region → Water → [series]`
-  - `Production_Am`: `Region → AgMgt → Water → [series]`
-  - `Production_NonAg`: `Region → [series]` (simplified)
-- **Map Data**: `map_quantities_*` follows standard Water → Landuse → Year pattern
+**Chart JSON (Time Series)**:
+- **Ag**: `region → lm → lu` (array of series)
+- **Am**: `region → lm → lu → source (if applicable) → am` (array of series)
+- **NonAg**: `region → lu` (array of series)
 
-#### WATER MODULE
-- **Chart Data**:
-  - `Water_Ag_NRM`: `Region → Water → [series]` (water property included)
-  - `Water_Am_NRM`: `Region → AgMgt → Water → [series]`
-  - `Water_NonAg_NRM`: `Region → [series]` (simplified)
-- **Map Data**: 
-  - `map_water_yield_Ag`: `Water → Landuse → Year → {img_str, bounds, min_max}`
-  - `map_water_yield_Am`: `AgMgt → Water → Landuse → Year → {img_str, bounds, min_max}` (AgMgt first, then Water)
-  - `map_water_yield_NonAg`: `Landuse → Year → {img_str, bounds, min_max}` (simplified)
+**Key Difference**: Map JSON places `source` before `year`, while Chart JSON places `source` before the final series array (Am only). See [CLAUDE_OUTPUT.md](docs/CLAUDE_OUTPUT.md) for detailed examples.
 
-#### BIODIVERSITY MODULE (Dynamic/Conditional Loading)
-- **Dynamic ChartData Structure**: Biodiversity data is conditionally loaded based on scenario settings
-  - **Conditional Loading Logic**: Only load GBF scripts when corresponding targets are not 'off':
-    - `BIODIVERSITY_TARGET_GBF_2 !== 'off'` → loads GBF2 data
-    - `BIODIVERSITY_TARGET_GBF_3_NVIS !== 'off'` → loads GBF3 data
-    - `BIODIVERSITY_TARGET_GBF_4_SNES !== 'off'` → loads GBF4 (SNES) data
-    - `BIODIVERSITY_TARGET_GBF_4_ECNES !== 'off'` → loads GBF4 (ECNES) data
-    - `BIODIVERSITY_TARGET_GBF_8 !== 'off'` → loads GBF8 (SPECIES & GROUP) data
-- **Dynamic ChartData Construction**: Base structure created first, then GBF data added conditionally:
-  ```javascript
-  // Base structure always includes Quality data
-  ChartData.value['Biodiversity'] = {
-    'Quality': window[chartOverview_bio_quality['name']]
-  };
-  // Then conditionally add GBF data based on scenario settings
-  if (runScenario.value['BIODIVERSITY_TARGET_GBF_2'] !== 'off') {
-    ChartData.value['Biodiversity']['GBF2'] = window[chartOverview_bio_GBF2['name']];
-  }
-  // ... similar pattern for GBF3, GBF4, GBF8
-  ```
-- **Chart Data** (when loaded):
-  - `BIO_quality_overview_1_Type`: `Region → [series]` (always loaded - simplified overview)
-  - `BIO_GBF2_overview_1_Type`: `Region → [series]` (conditional - Agricultural Landuse, Agricultural Management, Non-Agricultural Land-use)
-  - `BIO_GBF2_split_Ag_1_Landuse`: `Region → [series]` (conditional - simplified, no Water/AgMgt levels)
-  - `BIO_GBF2_split_Am_1_Landuse`: `Region → [series]` (conditional - simplified, no Water/AgMgt levels)
-  - `BIO_GBF2_split_Am_2_Agri-Management`: `Region → [series]` (conditional - with AgMgt categories: `"ALL"`, `"Early dry-season savanna burning"`, `"Human-induced regeneration (Beef)"`, `"Human-induced regeneration (Sheep)"`)
-  - `BIO_GBF2_split_NonAg_1_Landuse`: `Region → [series]` (conditional - simplified)
-  - `BIO_GBF3_*`, `BIO_GBF4_*`, `BIO_GBF8_*`: Similar structures for other GBF targets (conditional loading)
-- **Map Data**:
-  - `map_bio_quality_*`: Always available (quality data always loaded)
-  - `map_bio_GBF2_Ag`: `Water → Landuse → Year → {img_str, bounds, min_max}` (conditional - standard pattern)
-  - `map_bio_GBF2_Am`: `Water → Landuse → Year → {img_str, bounds, min_max}` (conditional - standard pattern)
-  - `map_bio_GBF2_NonAg`: `Landuse → Year → {img_str, bounds, min_max}` (conditional - simplified, no Water level)
-  - `map_bio_GBF3_*`, `map_bio_GBF4_*`, `map_bio_GBF8_*`: Similar structures for other GBF targets (conditional loading)
-- **Implementation Notes**:
-  - **Script Loading Order**: Conditional GBF scripts loaded after base scripts but before ChartData construction
-  - **Error Handling**: Views must handle cases where expected GBF data may not be available
-  - **UI Adaptation**: Biodiversity view buttons/options should adapt to available data structure
-  - **Memory Optimization**: Only loads necessary data files based on scenario configuration
+### Vue.js Progressive Selection Hierarchies
 
-#### DVAR MODULE (Decision Variables - Map-Only Module)
-- **Map Data (Simplified Hierarchy)**:
-  - `map_dvar_Ag`: `Landuse → Year → {img_str, bounds, min_max}` (direct landuse access)
-  - `map_dvar_Am`: `AgMgt → Year → {img_str, bounds, min_max}` (direct agmgt access)  
-  - `map_dvar_NonAg`: `Landuse → Year → {img_str, bounds, min_max}` (direct landuse access)
-  - `map_dvar_mosaic`: Contains overview categories:
-    - `"Land-use"`: `Year → {img_str, bounds, min_max}`
-    - `"Water-supply"`: `Year → {img_str, bounds, min_max}` 
-    - `"Agricultural Land-use"`: `Year → {img_str, bounds, min_max}`
-    - `"Agricultural Management"`: `Year → {img_str, bounds, min_max}`
-    - `"Non-Agricultural Land-use"`: `Year → {img_str, bounds, min_max}`
-- **Composite Structure**: Map.js creates combined structure:
-  - Categories: `"Land-use"`, `"Water-supply"`, `"Ag"`, `"Ag Mgt"`, `"Non-Ag"`
-  - Each category combines "ALL" from mosaic + individual items from specific files
-  - Final hierarchy: `Category → Landuse/AgMgt → Year → {img_str, bounds, min_max}`
+- **Standard Full**: Category → AgMgt → Water → Landuse
+- **Standard Simple**: Category → Water → Landuse
+- **NonAg Simplified**: Category → Landuse
+- **DVAR Simplified**: Category → Landuse/AgMgt → Year
 
-### Key Patterns
+## Getting Started
 
-#### Progressive Selection Hierarchies
-1. **Standard Full**: Category → AgMgt → Water → Landuse
-2. **Standard Simple**: Category → Water → Landuse  
-3. **NonAg Simplified**: Category → Landuse (no Water/AgMgt levels)
-4. **DVAR Simplified**: Category → Landuse/AgMgt → Year (map-only, direct access)
+1. **New to the project?** Start with [CLAUDE_SETUP.md](docs/CLAUDE_SETUP.md) for environment setup
+2. **Working on core model logic?** See [CLAUDE_ARCHITECTURE.md](docs/CLAUDE_ARCHITECTURE.md)
+3. **Working on output generation?** See [CLAUDE_OUTPUT.md](docs/CLAUDE_OUTPUT.md)
+4. **Working on the reporting UI?** See [CLAUDE_VUE_REPORTING.md](docs/CLAUDE_VUE_REPORTING.md)
 
-#### Water Level Options
-- **Ag/AgMgt**: `"ALL"`, `"Dryland"`, `"Irrigated"`
-- **NonAg**: No Water level (simplified structure)
-
-#### AgMgt Options (where applicable)
-- `"ALL"`, `"AgTech EI"`, `"Asparagopsis taxiformis"`, `"Biochar"`, `"Precision Agriculture"`
-
-#### Map vs Chart Data
-- **Charts**: Always end with array of series objects `[{name, data, type, color}]`
-- **Maps**: Always end with object `{img_str: "base64...", bounds: [...], min_max: [...]}`
-
-### Implementation Guidelines
-
-1. **Data Validation**: Always check data readiness at each hierarchy level before accessing
-2. **Progressive Watchers**: Use the standardized cascade pattern (see "Progressive Selection Cascade Watchers" section below)
-   - Follow the exact watcher implementation pattern from Area.js
-   - Never manually clear selections - let the cascade pattern handle it automatically
-3. **Special Cases**:
-   - Economics: Handle dual Cost/Revenue series in same array with combined watcher pattern
-   - NonAg: Handle simplified structures without Water/AgMgt levels
-   - Biodiversity: **Dynamic/Conditional Loading** - GBF data conditionally loaded based on scenario settings; Quality data always available; mixed structures where most use simplified `Region → [series]`, but `BIO_*_Am_2_Agri-Management` files have AgMgt categories; map data follows standard patterns with some NonAg files simplified; views must adapt to potentially missing GBF data
-4. **UI Conditions**: Use proper `v-if` conditions based on category selections
-5. **Data Access**: Use optional chaining (`?.`) for safe property access
-6. **Code Consistency**: All views must follow the same cascade watcher pattern for maintainability
-
-### Progressive Selection Cascade Watchers
-
-All Vue.js reporting views implement a standardized cascade pattern for progressive selection that automatically handles downstream option updates when upstream selections change.
-
-#### Core Pattern (Area.js, Biodiversity.js, GHG.js, Production.js, Water.js)
-
-**Watch Order**: `selectCategory` → `selectWater` → `selectAgMgt` → `selectLanduse`
-
-```javascript
-// 1. Category watcher handles ALL downstream cascading
-watch(selectCategory, (newCategory, oldCategory) => {
-  // Save previous selections before switching
-  if (oldCategory) {
-    if (oldCategory === "Ag") {
-      previousSelections.value["Ag"] = { water: selectWater.value, landuse: selectLanduse.value };
-    } else if (oldCategory === "Ag Mgt") {
-      previousSelections.value["Ag Mgt"] = { agMgt: selectAgMgt.value, water: selectWater.value, landuse: selectLanduse.value };
-    } else if (oldCategory === "Non-Ag") {
-      previousSelections.value["Non-Ag"] = { landuse: selectLanduse.value };
-    }
-  }
-
-  // Handle ALL downstream variables with cascading pattern
-  if (newCategory === "Ag Mgt") {
-    availableAgMgt.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]] || {});
-    const prevAgMgt = previousSelections.value["Ag Mgt"].agMgt;
-    selectAgMgt.value = (prevAgMgt && availableAgMgt.value.includes(prevAgMgt)) ? prevAgMgt : (availableAgMgt.value[0] || '');
-    
-    availableWater.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value] || {});
-    const prevWater = previousSelections.value["Ag Mgt"].water;
-    selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
-    
-    availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value][selectWater.value] || {});
-    const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
-    selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
-  } else if (newCategory === "Ag") {
-    availableWater.value = Object.keys(window[mapRegister["Ag"]["name"]] || {});
-    const prevWater = previousSelections.value["Ag"].water;
-    selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
-    
-    availableLanduse.value = Object.keys(window[mapRegister["Ag"]["name"]][selectWater.value] || {});
-    const prevLanduse = previousSelections.value["Ag"].landuse;
-    selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
-  } else if (newCategory === "Non-Ag") {
-    availableLanduse.value = Object.keys(window[mapRegister["Non-Ag"]["name"]] || {});
-    const prevLanduse = previousSelections.value["Non-Ag"].landuse;
-    selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
-  }
-});
-
-// 2. Water watcher handles downstream landuse cascading
-watch(selectWater, (newWater) => {
-  // Save current water selection
-  if (selectCategory.value === "Ag") {
-    previousSelections.value["Ag"].water = newWater;
-  } else if (selectCategory.value === "Ag Mgt") {
-    previousSelections.value["Ag Mgt"].water = newWater;
-  }
-
-  // Handle ALL downstream variables
-  if (selectCategory.value === "Ag") {
-    availableLanduse.value = Object.keys(window[mapRegister["Ag"]["name"]][newWater] || {});
-    const prevLanduse = previousSelections.value["Ag"].landuse;
-    selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
-  } else if (selectCategory.value === "Ag Mgt") {
-    availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value][newWater] || {});
-    const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
-    selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
-  }
-});
-
-// 3. AgMgt watcher handles downstream water + landuse cascading  
-watch(selectAgMgt, (newAgMgt) => {
-  // Save current agMgt selection
-  if (selectCategory.value === "Ag Mgt") {
-    previousSelections.value["Ag Mgt"].agMgt = newAgMgt;
-    
-    // Handle ALL downstream variables with cascading pattern
-    availableWater.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][newAgMgt] || {});
-    const prevWater = previousSelections.value["Ag Mgt"].water;
-    selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
-    
-    availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][newAgMgt][selectWater.value] || {});
-    const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
-    selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
-  }
-});
-
-// 4. Landuse watcher only saves selection (no downstream)
-watch(selectLanduse, (newLanduse) => {
-  // Save current landuse selection
-  if (selectCategory.value === "Ag") {
-    previousSelections.value["Ag"].landuse = newLanduse;
-  } else if (selectCategory.value === "Ag Mgt") {
-    previousSelections.value["Ag Mgt"].landuse = newLanduse;
-  } else if (selectCategory.value === "Non-Ag") {
-    previousSelections.value["Non-Ag"].landuse = newLanduse;
-  }
-});
-```
-
-#### Special Pattern (Economics.js)
-
-Economics uses a combined watcher pattern due to its dual Cost/Revenue structure:
-
-```javascript
-// Combined watcher for Cost/Revenue + Category changes
-watch([selectCostRevenue, selectCategory], ([newCostRevenue, newCategory], [oldCostRevenue, oldCategory]) => {
-  if (!newCategory) return;
-
-  // Save previous selections before switching (only when category changes)
-  if (oldCategory && oldCategory !== newCategory) {
-    // ... save previous selections
-  }
-  
-  // Handle cascading based on current Cost/Revenue selection
-  if (newCategory === "Ag Mgt") {
-    const currentMapData = window[mapRegister[newCostRevenue]["Ag Mgt"]["name"]];
-    // ... cascade all downstream selections using currentMapData
-  }
-  // ... other categories
-}, { immediate: true });
-```
-
-#### Key Principles
-
-1. **No Manual Clearing**: NEVER manually clear arrays or selections (e.g., `availableAgMgt.value = []`)
-   - The progressive pattern handles this automatically
-   - Manual clearing creates unnecessary complexity
-
-2. **Cascading Flow**: Each watcher handles ALL its downstream selections
-   - `selectCategory` → handles AgMgt, Water, Landuse
-   - `selectAgMgt` → handles Water, Landuse  
-   - `selectWater` → handles Landuse
-   - `selectLanduse` → no downstream (just saves)
-
-3. **Previous Selection Memory**: Always try to restore previous valid selections
-   ```javascript
-   const prevSelection = previousSelections.value[category].field;
-   selectField.value = (prevSelection && availableOptions.includes(prevSelection)) 
-     ? prevSelection 
-     : (availableOptions[0] || 'ALL');
-   ```
-
-4. **Data Structure Consistency**: Use the map data structure as the source of truth for available options
-   ```javascript
-   availableOptions.value = Object.keys(window[mapRegister[category]["name"]] || {});
-   ```
-
-#### Benefits
-
-- **Maintainable**: Consistent pattern across all views
-- **Memory Efficient**: No unnecessary data structures or operations
-- **User Friendly**: Preserves user selections when switching between categories
-- **Robust**: Handles edge cases with fallback selections
-- **Clean**: Eliminates complex conditional clearing logic
-
-### File Structure
-- **Views**: `/luto/tools/report/VUE_modules/views/` - Main view components
-- **Chart Data**: `/luto/tools/report/VUE_modules/data/` - Chart data files (68 total)
-- **Map Data**: `/luto/tools/report/VUE_modules/data/map_layers/` - Map layer files
-- **Services**: `/luto/tools/report/VUE_modules/services/` - ChartService/MapService registrations
-- **Routes**: `/luto/tools/report/VUE_modules/routes/route.js` - Vue router configuration
+**Remember**: Only read the documentation file relevant to your current task to minimize memory usage!

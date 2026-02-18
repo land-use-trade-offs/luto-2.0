@@ -239,7 +239,7 @@ def create_task_runs(
     
     # Run the tasks in parallel
     tasks = [delayed(task_wraper)(col) for col in custom_settings.columns]
-    for result in tqdm(Parallel(n_jobs=n_workers, return_as='generator')(tasks), total=len(tasks)):
+    for result in tqdm(Parallel(n_jobs=n_workers, return_as='generator_unordered')(tasks), total=len(tasks)):
         pass
 
 
@@ -348,7 +348,7 @@ def process_GHG_data(json_dir_path):
     json_data = get_json_data_from_zip(json_dir_path, 'GHG_overview_sum.js')
     return return_df_plain(json_data)
 
-def process_bio_obj_data(json_dir_path):
+def process_bio_data(json_dir_path):
     json_data = get_json_data_from_zip(json_dir_path, 'BIO_GBF2_overview_sum.js')
     return return_df_plain(json_data)
 
@@ -362,7 +362,7 @@ def get_report_df(json_dir_path, run_paras):
     df_economy = process_economic_data(json_dir_path)
     df_ghg = process_GHG_data(json_dir_path)
     df_demand_deviation = process_production_deviation_data(json_dir_path)
-    df_bio_pct = process_bio_obj_data(json_dir_path)
+    df_bio_pct = process_bio_data(json_dir_path)
 
     report_df = pd.concat([
         df_area_all_lu.assign(Type='Area_broad_category_ha'),
@@ -390,7 +390,7 @@ def process_task_root_dirs(task_root_dir, n_workers=10):
         run_paras = grid_search_params.query(f'run_idx == {int(run_idx)}').to_dict(orient='records')[0]
 
         # Depending on output structure, the report can be found in different places
-        json_dir_path = os.path.join(task_root_dir, run_dir, 'Run_Archive.zip')
+        json_dir_path = os.path.join(task_root_dir, 'Report_Data', f'Run_{run_idx}.zip')
         if not os.path.exists(json_dir_path):
             print(f'Warning: No output found for {run_dir}, skipping...')
             continue
@@ -399,7 +399,7 @@ def process_task_root_dirs(task_root_dir, n_workers=10):
         
     # Concatenate the results, only keep the columns with more than 1 unique value
     out_df = pd.concat(
-        tqdm(Parallel(n_jobs=n_workers, return_as='generator')(tasks), total=len(tasks)), 
+        tqdm(Parallel(n_jobs=n_workers, return_as='generator_unordered')(tasks), total=len(tasks)), 
         ignore_index=True
     )
     

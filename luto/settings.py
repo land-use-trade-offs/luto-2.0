@@ -60,7 +60,7 @@ SSP = '245'
 RCP = 'rcp' + SSP[1] + 'p' + SSP[2] # Representative Concentration Pathway string identifier e.g., 'rcp4p5'.
 
 # Set demand parameters which define requirements for Australian production of agricultural commodities
-SCENARIO = 'SSP' + SSP[0] # SSP1, SSP2, SSP3, SSP4, SSP5
+SCENARIO = 'SSP' + SSP[0]           # SSP1, SSP2, SSP3, SSP4, SSP5
 DIET_DOM = 'BAU'                    # 'BAU', 'FLX', 'VEG', 'VGN' - domestic diets in Australia
 DIET_GLOB = 'BAU'                   # 'BAU', 'FLX', 'VEG', 'VGN' - global diets
 CONVERGENCE = 2050                  # 2050 or 2100 - date at which dietary transformation is completed (velocity of transformation)
@@ -68,8 +68,12 @@ IMPORT_TREND = 'Static'             # 'Static' (assumes 2010 shares of imports f
 WASTE = 1                           # 1 for full waste, 0.5 for half waste
 FEED_EFFICIENCY = 'BAU'             # 'BAU' or 'High'
 
+# Set the demand and supply multipliers
+APPLY_DEMAND_MULTIPLIERS = True     # True or False. Whether to apply demand multipliers from AusTIME model.
+AG_YIELD_MULT = 1.15                # Agricultural yield multiplier for productivity intensification. E.g., 1.1 means 10% increase in yields.
+
 # Add CO2 fertilisation effects on agricultural production from GAEZ v4
-CO2_FERT = 'off'   # or 'off'
+CO2_FERT = 'off'   # 'on' or 'off'
 
 # Number of years over which to spread (average) soil carbon accumulation (from Mosnier et al. 2022 and Johnson et al. 2021)
 CARBON_EFFECTS_WINDOW = 50 # 50, 60, 70, 80, or 90 
@@ -110,7 +114,7 @@ DISCOUNT_RATE = 0.07     # 0.05 = 5% pa.
 AMORTISATION_PERIOD = 30 # years
 
 # Set whether to use demand elasticity when calculating commodity prices
-DYNAMIC_PRICE = True
+DYNAMIC_PRICE = False
 
 
 
@@ -119,11 +123,10 @@ DYNAMIC_PRICE = True
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 13      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 10        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-SIM_YEARS =  list(range(2020,2051,10))
-
+SIM_YEARS =  list(range(2010, 2051, 5))
 
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
@@ -161,8 +164,18 @@ the model sensitive to variations in input data.
 # ---------------------------------------------------------------------------- #
 # Geographical raster writing parameters
 # ---------------------------------------------------------------------------- #
-PARALLEL_WRITE = True                       # If to use parallel processing to write GeoTiffs: True or False
-WRITE_THREADS = min(10, os.cpu_count())     # The Threads to use for map making, only work with PARALLEL_WRITE = True
+WRITE_PARALLEL = True                       # If to use parallel processing to write GeoTiffs: True or False
+WRITE_THREADS = min(6, os.cpu_count())      # The Threads to use for map making, only work with WRITE_PARALLEL = True
+
+WRITE_REPORT_MAX_MEM_GB = 64                # The maximum memory (in GB) to use for writing report layers.
+                                            #   Estimated based on the 0.5 GB MEM usage when RESFACTOR = 13 
+                                            #   (for example, for RESFACTOR = 5, the MEM usage will be 0.5 * (13/5)^2 = 3.4 GB).
+
+WRITE_CHUNK_SIZE = 4096                     # The processing size of each chunk during writeing process. 
+                                            #   E.g., layer of ~200 k cells (under chunk size of 1024) will create ~200 chunks.
+                                            #   This makes memory usage to be ~1/200 of the original size.
+
+
 
 # ---------------------------------------------------------------------------- #
 # Gurobi parameters
@@ -187,9 +200,9 @@ BARRIER_CONVERGENCE_TOLERANCE = 1e-5      # Range from 1e-2 to 1e-8 (default), t
 CROSSOVER = 0
 
 # Parameters for dealing with numerical issues. NUMERIC_FOCUS = 2 fixes most things but roughly doubles solve time.
-SCALE_FLAG = -1     # Scales the rows and columns of the model to improve the numerical properties of the constraint matrix. -1: Auto, 0: No scaling, 1: equilibrium scaling (First scale each row to make its largest nonzero entry to be magnitude one, then scale each column to max-norm 1), 2: geometric scaling, 3: multi-pass equilibrium scaling. Testing revealed that 1 tripled solve time, 3 led to numerical problems.
+SCALE_FLAG = 0      # Scales the rows and columns of the model to improve the numerical properties of the constraint matrix. -1: Auto, 0: No scaling, 1: equilibrium scaling (First scale each row to make its largest nonzero entry to be magnitude one, then scale each column to max-norm 1), 2: geometric scaling, 3: multi-pass equilibrium scaling. Testing revealed that 1 tripled solve time, 3 led to numerical problems.
 NUMERIC_FOCUS = 0   # Controls the degree to which the code attempts to detect and manage numerical issues. Default (0) makes an automatic choice, with a slight preference for speed. Settings 1-3 increasingly shift the focus towards being more careful in numerical computations. NUMERIC_FOCUS = 1 is ok, but 2 increases solve time by ~4x
-BARHOMOGENOUS = 1   # Useful for recognizing infeasibility or unboundedness. At the default setting (-1), it is only used when barrier solves a node relaxation for a MIP model. 0 = off, 1 = on. It is a bit slower than the default algorithm (3x slower in testing).
+BARHOMOGENOUS = -1   # Useful for recognizing infeasibility or unboundedness. At the default setting (-1), it is only used when barrier solves a node relaxation for a MIP model. 0 = off, 1 = on. It is a bit slower than the default algorithm (3x slower in testing).
 
 # Number of threads to use in parallel algorithms (e.g., barrier)
 THREADS = min(32, os.cpu_count())
@@ -363,7 +376,21 @@ AG_MANAGEMENTS_TO_LAND_USES = {
 
     'HIR - Beef':               ['Beef - natural land'],
     'HIR - Sheep':              ['Sheep - natural land'],
-}
+    'Utility Solar PV':         [# Unallocated lands
+                                'Unallocated - modified land',
+                                # Livestock
+                                'Beef - modified land', 'Sheep - modified land', 'Dairy - modified land',
+                                # Cropping:
+                                'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds'], 
+    'Onshore Wind':             [#Unallocated lands
+                                'Unallocated - modified land',
+                                # Livestock
+                                'Beef - modified land', 'Sheep - modified land', 'Dairy - modified land',
+                                # Cropping:
+                                'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
+                                # Intensive Cropping:
+                                'Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables']
+                                }                                
 
 
 AG_MANAGEMENTS = {
@@ -375,6 +402,8 @@ AG_MANAGEMENTS = {
     'Biochar': True,
     'HIR - Beef': True,
     'HIR - Sheep': True,
+    'Utility Solar PV': None,   # Set later based on RENEWABLE_ENERGY_CONSTRAINTS
+    'Onshore Wind': None,       # Set later based on RENEWABLE_ENERGY_CONSTRAINTS
 }
 """
 The dictionary below contains a master list of all agricultural management options and
@@ -392,6 +421,8 @@ AG_MANAGEMENTS_REVERSIBLE = {
     'Biochar': True,
     'HIR - Beef': True,
     'HIR - Sheep': True,
+    'Utility Solar PV': True,  # Can not abandon Utility Solar PV once adopted due to the long lifespan and high transition costs
+    'Onshore Wind': True,      # Can not abandon Onshore Wind once adopted due to the long lifespan and high transition costs
 }
 """
 The values of the below dictionary determine whether the model is allowed to abandon agricultural
@@ -426,6 +457,57 @@ SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
 
 
 
+# ---------------------------------------------------------------------------- #
+# Renewable energy parameters
+# ---------------------------------------------------------------------------- #
+RENEWABLE_ENERGY_CONSTRAINTS = 'on'         # 'on' or 'off'
+
+if RENEWABLE_ENERGY_CONSTRAINTS == 'on':
+    AG_MANAGEMENTS['Utility Solar PV'] = True
+    AG_MANAGEMENTS['Onshore Wind'] = True
+elif RENEWABLE_ENERGY_CONSTRAINTS == 'off':
+    AG_MANAGEMENTS['Utility Solar PV'] = False
+    AG_MANAGEMENTS['Onshore Wind'] = False
+else:    
+    raise ValueError("Invalid value for RENEWABLE_ENERGY_CONSTRAINTS. Must be 'on' or 'off'.")
+
+RENEWABLES_OPTIONS = [
+    'Utility Solar PV',
+    'Onshore Wind'
+]
+
+RENEWABLE_TARGET_SCENARIO =  'CNS25 - Accelerated Transition' # one of 'CNS25 - Accelerated Transition', 'CNS25 - Current Targets'
+'''
+The renewable energy target scenario to use when `RENEWABLE_ENERGY_CONSTRAINTS` is set to 'on'.
+One of 'CNS25 - Accelerated Transition' or 'CNS25 - Current Targets', 
+'''
+
+RE_TARGET_LEVEL = "STATE"  # options: "STATE", "NRM"; TODO: currently (20260205) only support STATE, will add NRM in the future.
+'''
+The spatial level at which to apply the renewable energy targets when `RENEWABLE_ENERGY_CONSTRAINTS` is set to 'on'.
+Options include "STATE" or "NRM". Currently (20260205) only support STATE.
+'''
+
+INSTALL_CAPACITY_MW_HA = {
+    "Utility Solar PV": 0.45,
+    "Onshore Wind": 0.04,  
+}
+'''
+The per/ha capacity (Mw/ha) for each renewable energy management type.
+'''
+
+
+RENEWABLES_ADOPTION_LIMITS = {
+    'Utility Solar PV': 1.0,        # Maximum proportion of land that can be used for Utility Solar PV
+    'Onshore Wind': 1.0,            # Maximum proportion of land that can be used for Onshore Wind
+}
+'''
+The maximum proportion of land that can be used for each renewable energy management type.
+For example, if RENEWABLES_ADOPTION_LIMITS['Utility Solar PV'] = 0.5, then at most 50% of 
+the land can be used for Utility Solar PV.
+'''
+
+
 
 
 # ---------------------------------------------------------------------------- #
@@ -442,10 +524,9 @@ EGGS_AVG_WEIGHT = 60  # Average weight of an egg in grams
 
 # Take data from 'GHG_targets.xlsx', 
 GHG_TARGETS_DICT = {
-    'off':      None,
-    'low':      '1.8C (67%) excl. avoided emis SCOPE1',
-    'medium':   '1.5C (50%) excl. avoided emis SCOPE1',
-    'high':     '1.5C (67%) excl. avoided emis SCOPE1',
+    'off':     None,
+    'low':    '1.8C 67%',
+    'high':   '1.5C 50%',
 }
 
 # Greenhouse gas emissions limits and parameters *******************************
@@ -456,8 +537,10 @@ GHG_EMISSIONS_LIMITS = 'high'        # 'off', 'low', 'medium', or 'high'
     - '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)' 
 - Assuming agriculture is responsible to sequester carbon emissions not including electricity emissions and  off-land emissions 
     - '1.5C (67%) excl. avoided emis', '1.5C (50%) excl. avoided emis', or '1.8C (67%) excl. avoided emis'
-- Assuming agriculture is responsible to sequester carbon emissions only in the scope 1 emissions (i.e., direct emissions from land-use and livestock types)
+- Assuming agriculture is responsible to sequester carbon emissions only in the scope 1 emissions (i.e., direct emissions From-land-use and livestock types)
     - '1.5C (67%) excl. avoided emis SCOPE1', '1.5C (50%) excl. avoided emis SCOPE1', or '1.8C (67%) excl. avoided emis SCOPE1'
+- When turning off the 'Carbon Planttings', including block/belt, use the following options:
+    - '1.5C 50%', '1.8C 67%'
 '''
   	  	  
 
@@ -508,6 +591,22 @@ The weight of the deviations from target in the objective function.
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'                     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
 WATER_CLIMATE_CHANGE_IMPACT = 'on'      # 'on' or 'off'. 'off' will turn off climate change impact on water yields.
+'''
+    When 'on', model will consider water yield change driven by climate change.
+
+    Note the cxtreme CCI target relaxation (see water.py:get_water_target_inside_LUTO_by_CCI):
+    1. Compute extreme CCI delta per region: the minimum water yield change across all SIM_YEARS
+       (via get_water_delta_by_extreme_CCI_for_whole_region), assuming land use stays constant,
+       combining inside-LUTO Ag-land and outside-LUTO CCI deltas.
+    2. Compute extreme scenario water availability per region:
+           wny_extreme_CCI = wny_inside_LUTO + wny_outside_LUTO - wreq_domestic + CCI_extreme_stress
+       where wreq_domestic is domestic/industrial water demand (positive), and CCI_extreme_stress
+       is the worst-case yield reduction from step 1 (negative).
+    3. Compare against historical target: wny_hist_target = hist_level * WATER_STRESS
+    4. If wny_extreme_CCI < wny_hist_target, the target is relaxed to wny_extreme_CCI to avoid
+       solver infeasibility. The inside-LUTO target = relaxed_target - wny_outside_LUTO.
+       Otherwise, the standard target applies: wny_hist_target - wny_outside_LUTO.
+'''
 
 WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
 # WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)
@@ -538,7 +637,20 @@ WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Div
     https://chinawaterrisk.org/resources/analysis-reviews/aqueduct-global-water-stress-rankings/ 
 """
 
-WATER_STRESS = 0.6                                      # Aqueduct limit catchments, 0.6 means the water yield in a region must be >= 60% of the historical water yield
+WATER_STRESS = 0.6                                      
+'''
+    Aqueduct limit catchments, 0.6 means the water yield in a region must be >= 60% of the historical water yield.
+    The safe and just Earth system boundaries suggests a water stress of. We tried but it would lead to infeasibility
+    issues in the model.
+
+    There are two notes for calculating the water yield targets at watershed regions level:
+     - The domestic/industrial water use is subtracted from total available water when computing
+       the extreme climate scenario yield: wny_extreme_CCI = inside + outside - domestic + CCI_extreme_stress
+     - If the extreme climate change scenario makes a region's water yield fall below the historical
+       target (hist_level * WATER_STRESS), the target is relaxed to the extreme scenario level to
+       avoid infeasibility. The inside-LUTO target is then derived by subtracting the outside-LUTO
+       contribution: wny_inside_LUTO_target = raw_target - wny_outside_LUTO
+'''
 
 # Consider livestock drinking water (0 [off] or 1 [on]) ***** Livestock drinking water can cause infeasibility issues with water constraint in Pilbara
 LIVESTOCK_DRINKING_WATER = 1
@@ -612,8 +724,9 @@ Essentially, the biodiversity quality layer determines how important (0-100) a c
       related to the Environment Protection and Biodiversity Conservation Act 1999 (EPBC Act). 
     - If choosing one of the 'ECNES_likely|may' layers, you assume that the overal biodiversity is determined by ecological
       communities related to the Environment Protection and Biodiversity Conservation Act 1999 (EPBC Act).
-
-The MNES is a merge (simple concatenating) of the SNES and ECNES species communities. 
+    - If choosing one of the 'MNES_likely|may' layers, you assume that the overal biodiversity is determined by both SNES 
+      and ECNES species communities, where each community is treated as a species, and the Zonation algorith sees each
+      community and species equally important.
 
 To understand the 'Suitability' layer, refer to 
     https://academic.oup.com/gigascience/article/doi/10.1093/gigascience/giae002/7619364

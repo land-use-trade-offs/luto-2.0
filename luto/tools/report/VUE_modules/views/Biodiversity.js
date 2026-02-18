@@ -6,7 +6,6 @@ window.BiodiversityView = {
     const chartRegister = window.ChartService.chartCategories["Biodiversity"]["quality"];
     const mapRegister = window.MapService.mapCategories["Biodiversity"]["quality"];
     const loadScript = window.loadScriptWithTracking;
-    const mosaicMap = window.MapService.mapCategories["Dvar"]["Mosaic"];
 
     // View identification for memory management
     const VIEW_NAME = "Biodiversity";
@@ -50,58 +49,39 @@ window.BiodiversityView = {
     const isDrawerOpen = ref(false);
 
     // Reactive data
-    const mapData = computed(() => {
-      if (!dataLoaded.value) {
-        return {};
-      }
-      let mapDataWithALL = JSON.parse(JSON.stringify(window[mapRegister[selectCategory.value]["name"]]));
-      let mapDataWithMosaic = JSON.parse(JSON.stringify(window[mosaicMap['name']]));
-      if (selectCategory.value === "Ag") {
-        mapDataWithALL[selectWater.value] = {
-          "ALL": mapDataWithMosaic['Agricultural Land-use'],
-          ...mapDataWithALL[selectWater.value]
-        }
-      } else if (selectCategory.value === "Ag Mgt") {
-        mapDataWithALL[selectAgMgt.value][selectWater.value] = {
-          "ALL": mapDataWithMosaic['Agricultural Management'],
-          ...mapDataWithALL[selectAgMgt.value][selectWater.value]
-        }
-      } else if (selectCategory.value === "Non-Ag") {
-        mapDataWithALL = {
-          "ALL": mapDataWithMosaic['Non-Agricultural Land-use'],
-          ...mapDataWithALL
-        }
-      }
-      return mapDataWithALL;
-    });
-    const chartData = computed(() => {
-      if (selectCategory.value === "Ag Mgt") {
-        const datasetName = chartRegister["Ag Mgt"]["name"];
-        return window[datasetName][selectRegion.value];
-      } else {
-        const datasetName = chartRegister[selectCategory.value]["name"];
-        return window[datasetName][selectRegion.value];
-      }
-    });
     const selectMapData = computed(() => {
       if (!dataLoaded.value) {
         return {};
       }
+
+      let mapData = JSON.parse(JSON.stringify(window[mapRegister[selectCategory.value]["name"]]));
+
       if (selectCategory.value === "Ag") {
-        return mapData.value[selectWater.value][selectLanduse.value][selectYear.value];
+        return mapData[selectWater.value][selectLanduse.value][selectYear.value];
       }
       else if (selectCategory.value === "Ag Mgt") {
-        return mapData.value?.[selectAgMgt.value][selectWater.value][selectLanduse.value][selectYear.value];
+        return mapData?.[selectAgMgt.value][selectWater.value][selectLanduse.value][selectYear.value];
       }
       else if (selectCategory.value === "Non-Ag") {
-        return mapData.value[selectLanduse.value][selectYear.value];
+        return mapData[selectLanduse.value][selectYear.value];
       }
     });
     const selectChartData = computed(() => {
       if (!dataLoaded.value) {
         return {};
       }
-      let seriesData = chartData.value || [];
+
+      let chartData;
+      if (selectCategory.value === "Ag Mgt") {
+        const datasetName = chartRegister["Ag Mgt"]["name"];
+        chartData = window[datasetName][selectRegion.value];
+      } else {
+        const datasetName = chartRegister[selectCategory.value]["name"];
+        chartData = window[datasetName][selectRegion.value];
+      }
+
+      let seriesData = chartData || [];
+
       return {
         ...window["Chart_default_options"],
         chart: {
@@ -125,7 +105,6 @@ window.BiodiversityView = {
     onMounted(async () => {
       await loadScript("./data/Supporting_info.js", "Supporting_info", VIEW_NAME);
       await loadScript("./data/chart_option/Chart_default_options.js", "Chart_default_options", VIEW_NAME);
-      await loadScript(mosaicMap['path'], mosaicMap['name'], VIEW_NAME);
 
       await loadScript(mapRegister["Ag"]["path"], mapRegister["Ag"]["name"], VIEW_NAME);
       await loadScript(mapRegister["Ag Mgt"]["path"], mapRegister["Ag Mgt"]["name"], VIEW_NAME);
@@ -176,21 +155,21 @@ window.BiodiversityView = {
         const prevWater = previousSelections.value["Ag Mgt"].water;
         selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
 
-        availableLanduse.value = ["ALL", ...Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value][selectWater.value] || {})];
+        availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value][selectWater.value]);
         const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
-        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
+        selectLanduse.value = availableLanduse.value[0];
       } else if (newCategory === "Ag") {
         availableWater.value = Object.keys(window[mapRegister["Ag"]["name"]] || {});
         const prevWater = previousSelections.value["Ag"].water;
         selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
 
-        availableLanduse.value = ["ALL", ...Object.keys(window[mapRegister["Ag"]["name"]][selectWater.value] || {})];
+        availableLanduse.value = Object.keys(window[mapRegister["Ag"]["name"]][selectWater.value]);
         const prevLanduse = previousSelections.value["Ag"].landuse;
-        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
+        selectLanduse.value = availableLanduse.value[0];
       } else if (newCategory === "Non-Ag") {
-        availableLanduse.value = ["ALL", ...Object.keys(window[mapRegister["Non-Ag"]["name"]] || {})];
+        availableLanduse.value = Object.keys(window[mapRegister["Non-Ag"]["name"]]);
         const prevLanduse = previousSelections.value["Non-Ag"].landuse;
-        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
+        selectLanduse.value = availableLanduse.value[0];
       }
     });
 
@@ -204,13 +183,13 @@ window.BiodiversityView = {
 
       // Handle ALL downstream variables
       if (selectCategory.value === "Ag") {
-        availableLanduse.value = ["ALL", ...Object.keys(window[mapRegister["Ag"]["name"]][newWater] || {})];
+        availableLanduse.value = Object.keys(window[mapRegister["Ag"]["name"]][newWater]);
         const prevLanduse = previousSelections.value["Ag"].landuse;
-        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
+        selectLanduse.value = availableLanduse.value[0];
       } else if (selectCategory.value === "Ag Mgt") {
-        availableLanduse.value = ["ALL", ...Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value][newWater] || {})];
+        availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value][newWater]);
         const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
-        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
+        selectLanduse.value = availableLanduse.value[0];
       }
     });
 
@@ -224,9 +203,9 @@ window.BiodiversityView = {
         const prevWater = previousSelections.value["Ag Mgt"].water;
         selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
 
-        availableLanduse.value = ["ALL", ...Object.keys(window[mapRegister["Ag Mgt"]["name"]][newAgMgt][selectWater.value] || {})];
+        availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][newAgMgt][selectWater.value]);
         const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
-        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
+        selectLanduse.value = availableLanduse.value[0];
       }
     });
 

@@ -100,6 +100,7 @@ class LutoSolver:
         self.demand_penalty_constraints = []
         self.water_limit_constraints = []
         self.water_nyiled_exprs = {}
+        self.renewable_constraints = {}
         self.ghg_expr = None
         self.ghg_consts_ub = None
         self.ghg_consts_lb = None
@@ -147,6 +148,7 @@ class LutoSolver:
         self._add_biodiversity_constraints()
         self._add_regional_adoption_constraints()
         self._add_water_usage_limit_constraints() 
+        self._add_renewable_energy_constraints()
         
     def _setup_objective(self):
         """
@@ -414,7 +416,7 @@ class LutoSolver:
         penalty_demand = (
             gp.quicksum(
                 self.V[c] * self._input_data.scale_factors['Demand'] * price
-                for c, price in enumerate(self._input_data.economic_BASE_YR_prices)
+                for c, price in enumerate(self._input_data.economic_prices)
             ) 
             * settings.SOLVER_WEIGHT_DEMAND
             / 1e6  # Convert to million AUD
@@ -520,13 +522,16 @@ class LutoSolver:
                 adoption_limit = self._input_data.ag_man_limits[am][j]
 
                 # Sum of all usage of the AM option must be less than the limit
-                ag_man_vars_sum = gp.quicksum(
-                    self.X_ag_man_dry_vars_jr[am][j_idx, :]
-                ) + gp.quicksum(self.X_ag_man_irr_vars_jr[am][j_idx, :])
-
-                all_vars_sum = gp.quicksum(self.X_ag_dry_vars_jr[j, :]) + gp.quicksum(
-                    self.X_ag_irr_vars_jr[j, :]
+                ag_man_vars_sum = (
+                    gp.quicksum(self.X_ag_man_dry_vars_jr[am][j_idx, :]) 
+                    + gp.quicksum(self.X_ag_man_irr_vars_jr[am][j_idx, :])
                 )
+
+                all_vars_sum = (
+                    gp.quicksum(self.X_ag_dry_vars_jr[j, :]) 
+                    + gp.quicksum(self.X_ag_irr_vars_jr[j, :])
+                )
+                
                 constr = self.gurobi_model.addConstr(
                     ag_man_vars_sum <= adoption_limit * all_vars_sum,
                     name=f"const_ag_mam_adoption_limit_{am}_{j}".replace(" ", "_"),
@@ -705,6 +710,65 @@ class LutoSolver:
                 ) 
                 
             self.water_limit_constraints.append(constr)
+      
+
+
+    def _add_renewable_energy_constraints(self) -> None:
+
+        if settings.RENEWABLE_ENERGY_CONSTRAINTS == "off":
+            print("│   └── TURNING OFF renewable energy constraints ...")
+            return
+
+        print("│   └── Adding constraints for renewable energy production targets ...")
+
+
+        # Group the renewable energy types, input data, 
+        re_types = [
+            ('Utility Solar PV', self._input_data.renewable_solar_r, 'renewable_solar', 'solar'),
+            ('Onshore Wind',     self._input_data.renewable_wind_r,  'renewable_wind',  'wind'),
+        ]
+        
+        # Pop Australian Capital Territory out of the region_state_name2idx
+        #   as its renewable energy target is being merged to NSW
+        self._input_data.region_state_name2idx.pop('Australian Capital Territory', None)
+
+        for target_idx, (reg_name, reg_id) in enumerate(self._input_data.region_state_name2idx.items()):
+
+            if reg_name == 'Australian Capital Territory':
+                print(f"│   │   │    Skipping {reg_name} as its target being merged to NSW ...")
+                continue
+            
+            reg_idx = np.where(self._input_data.region_state_r == reg_id)[0]
+            print(f"│   │   ├── Adding renewable energy constraints for {reg_name} ...")
+
+
+            for am, energy_r, limit_key, re_label in re_types:
+                
+                if not settings.AG_MANAGEMENTS[am]: continue
+                
+                target_raw = self._input_data.limits[limit_key][target_idx]
+                target_rescal = self._input_data.limits[f"{limit_key}_rescale"][target_idx]
+                print(f"│   │   │   ├── target for {re_label} is {target_raw:5,.0f} Mwh")
+
+                am_exprs = []
+                for j_idx, j in enumerate(self._input_data.am2j[am]):
+                    j_cells = np.union1d(self._input_data.ag_lu2cells[0, j], self._input_data.ag_lu2cells[1, j])
+                    reg_AND_j_cells = np.intersect1d(j_cells, reg_idx)
+                    if not reg_AND_j_cells.size:continue
+                    energy_lyr = energy_r[reg_AND_j_cells]
+                    am_exprs.append(
+                        gp.quicksum(self.X_ag_man_dry_vars_jr[am][j_idx, reg_AND_j_cells] * energy_lyr)
+                        + gp.quicksum(self.X_ag_man_irr_vars_jr[am][j_idx, reg_AND_j_cells] * energy_lyr)
+                    )
+
+                if am_exprs:
+                    self.renewable_constraints[f'{re_label}_{reg_name}'] = (
+                        self.gurobi_model.addConstr(
+                            gp.quicksum(am_exprs) == target_rescal,
+                            name=f"renewable_{re_label}_target_{reg_name}".replace(" ", "_")
+                        )
+                    )
+                
 
 
     def _get_total_ghg_expr(self) -> gp.LinExpr:
@@ -1150,7 +1214,7 @@ class LutoSolver:
     def _add_GBF8_constraints(self) -> None:
                 
         if settings.BIODIVERSITY_TARGET_GBF_8 != "on":
-            print('│   │   ├── TURNING OFF constraints for biodiversity GBF 8...')
+            print('│   │   ├── TURNING OFF constraints for biodiversity GBF 8 ...')
             return
         
         s_limits = self._input_data.limits["GBF8_rescale"]
@@ -1216,7 +1280,7 @@ class LutoSolver:
     def _add_regional_adoption_constraints(self) -> None:
 
         if settings.REGIONAL_ADOPTION_CONSTRAINTS == "off":
-            print("│   │   ├── TURNING OFF constraints for regional adoption...")
+            print("│   │   └── TURNING OFF constraints for regional adoption ...")
             return
 
         # Add adoption constraints for agricultural land uses

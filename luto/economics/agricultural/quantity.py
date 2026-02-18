@@ -17,13 +17,9 @@
 # You should have received a copy of the GNU General Public License along with
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
-
-
 """
-Pure functions for calculating the production quantities of agricutlural commodities.
+Pure functions for calculating the production quantities of agricultural commodities.
 """
-
-
 import numpy as np
 import luto.settings as settings
 
@@ -66,7 +62,7 @@ def lvs_veg_types(lu) -> tuple[str, str]:
     return lvstype, vegtype
 
 
-
+# Climate change impact function
 def get_ccimpact(data, lu, lm, yr_idx):
     """
     Return climate change impact multiplier at (zero-based) year index.
@@ -141,7 +137,7 @@ def get_yield_pot(data, lvstype, vegtype, lm, yr_idx):
     yield_pot *= get_ccimpact(data, lu, lm, yr_idx)
 
     # Here we can add a productivity multiplier for sustainable intensification to increase pasture growth and yield potential (i.e., head/ha)
-    # yield_pot *= yield_mult  ***Still to do***
+    yield_pot *= settings.AG_YIELD_MULT  # ***Still to do***, now [20251027] only use a constant multiplier from settings
 
     return yield_pot
 
@@ -167,8 +163,8 @@ def get_quantity_lvstk(data, pr, lm, yr_idx):
     # Get livestock and land cover type.
     lvstype, vegtype = lvs_veg_types(pr)
 
-    # Get the yield potential.
-    yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
+    # Get the yield potential. Since [20251027], here uses a constant multiplier from settings for production intensification
+    yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx) * settings.AG_YIELD_MULT
 
     # Determine base quantity case-by-case.
 
@@ -255,42 +251,24 @@ def get_quantity_crop(data, pr, lm, yr_idx):
 
     return quantity
 
-
 def get_quantity(data, pr, lm, yr_idx):
-    """Return yield <unit: t/cell> of `pr`+`lm` in `yr_idx` as 1D Numpy array.
-
-    Args:
-        data (object/module): Data object or module.
-        pr (str): Product produced.
-        lm (str): Land management.
-        yr_idx (int): Number of years post base-year ('YR_CAL_BASE').
-
-    Returns
-        numpy.ndarray: 1D Numpy array representing the yield <unit: t/cell>.
-
-    Raises:
-        KeyError: If the land use `pr` is not found in the data.
-
-    Notes:
-        - Assumes fields like in `luto.data`.
-        - If it is a crop, it is known how to get the quantities.
-        - Apply productivity increase multiplier by product. Essentially, this is a total factor productivity increase.
+    """
+    Return yield <unit: t/cell> of `pr`+`lm` in `yr_idx`.
     """
     # If it is a crop, it is known how to get the quantities.
     if pr in data.PR_CROPS:
         q = get_quantity_crop(data, pr.capitalize(), lm, yr_idx)
-
     elif pr in data.PR_LVSTK:
         q = get_quantity_lvstk(data, pr, lm, yr_idx)
-
+    elif pr in data.AGRICULTURAL_LANDUSES:              # Must be unallocated land use product, so return zeroes.
+        q = np.zeros((data.NCELLS)).astype(np.float32)
     else:
         raise KeyError(f"Land use '{pr}' not found in data.")
 
-    # Apply productivity increase multiplier by product. Essentially, this is a total factor productivity increase.
+    # Apply productivity increase multiplier by product. 
     q *= data.BAU_PROD_INCR[lm, pr][yr_idx]
 
     return q
-
 
 def get_quantity_matrix(data, lm, yr_idx):
     """
@@ -305,7 +283,7 @@ def get_quantity_matrix(data, lm, yr_idx):
     - q_rp: A 2D Numpy array representing the quantities per cell per product.
     """
 
-    q_rp = np.zeros((data.NCELLS, len(data.PRODUCTS))).astype(np.float32)
+    q_rp = np.zeros((data.NCELLS, data.NPRS)).astype(np.float32)
     for j, pr in enumerate(data.PRODUCTS):
         q_rp[:, j] = get_quantity(data, pr, lm, yr_idx)
 
@@ -324,8 +302,7 @@ def get_quantity_matrices(data, yr_idx):
     Returns
     - q_mrp: A 3D Numpy array representing the matrix of quantities per cell.
     """
-    return np.stack(tuple( get_quantity_matrix(data, lm, yr_idx)
-                           for lm in data.LANDMANS ))
+    return np.stack(tuple( get_quantity_matrix(data, lm, yr_idx) for lm in data.LANDMANS ))
 
 
 def get_asparagopsis_effect_q_mrp(data, q_mrp, yr_idx):
@@ -561,6 +538,57 @@ def get_sheep_hir_effect_q_mrp(data, q_mrp):
 
     return q_mrp_effect
 
+def get_utility_solar_pv_effect_q_mrp(data, q_mrp, yr_idx):
+    """
+    Applies the effects of Utility Solar PV to the quantity data.
+    Maps land-use productivity multipliers to their associated products.
+    """
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Utility Solar PV']
+    lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
+    yr_cal = data.YR_CAL_BASE + yr_idx
+
+    # Initialize output matrix with dimensions (NLMS, NCELLS, NPRS)
+    new_q_mrp = np.zeros((data.NLMS, data.NCELLS, data.NPRS)).astype(np.float32)
+
+    if not settings.AG_MANAGEMENTS['Utility Solar PV']:
+        return new_q_mrp
+
+    # Iterate through land uses affected by Solar PV
+    for lu, j in zip(land_uses, lu_codes):
+        productivity_multiplier = data.RENEWABLE_BUNDLE_SOLAR.query('Year == @yr_cal and Commodity == @lu')['Productivity'].item()
+        if productivity_multiplier != 1:
+            # Apply to all products associated with this land use
+            for p in range(data.NPRS):
+                if data.LU2PR[p, j]:
+                    # Calculate delta: q_mrp * (mult - 1)
+                    new_q_mrp[:, :, p] = q_mrp[:, :, p] * (productivity_multiplier - 1)
+
+    return new_q_mrp
+
+
+def get_onshore_wind_effect_q_mrp(data, q_mrp, yr_idx):
+    """
+    Applies the effects of Onshore Wind to the quantity data.
+    Maps land-use productivity multipliers to their associated products.
+    """
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Onshore Wind']
+    lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
+    yr_cal = data.YR_CAL_BASE + yr_idx
+
+    # Initialize output matrix with dimensions (NLMS, NCELLS, NPRS)
+    new_q_mrp = np.zeros((data.NLMS, data.NCELLS, data.NPRS)).astype(np.float32)
+
+    if not settings.AG_MANAGEMENTS['Onshore Wind']:
+        return new_q_mrp
+
+    for lu, j in zip(land_uses, lu_codes):
+        productivity_multiplier = data.RENEWABLE_BUNDLE_WIND.query('Year == @yr_cal and Commodity == @lu')['Productivity'].item()
+        if productivity_multiplier != 1:
+            for p in range(data.NPRS):
+                if data.LU2PR[p, j]:
+                    new_q_mrp[:, :, p] = q_mrp[:, :, p] * (productivity_multiplier - 1)
+
+    return new_q_mrp
 
 def get_agricultural_management_quantity_matrices(data, q_mrp, yr_idx) -> Dict[str, np.ndarray]:
     """
@@ -584,6 +612,54 @@ def get_agricultural_management_quantity_matrices(data, q_mrp, yr_idx) -> Dict[s
     ag_mam_q_mrp['AgTech EI'] = get_agtech_ei_effect_q_mrp(data, q_mrp, yr_idx)                             
     ag_mam_q_mrp['Biochar'] = get_biochar_effect_q_mrp(data, q_mrp, yr_idx)                                 
     ag_mam_q_mrp['HIR - Beef'] = get_beef_hir_effect_q_mrp(data, q_mrp)                                     
-    ag_mam_q_mrp['HIR - Sheep'] = get_sheep_hir_effect_q_mrp(data, q_mrp)                                   
+    ag_mam_q_mrp['HIR - Sheep'] = get_sheep_hir_effect_q_mrp(data, q_mrp)     
+    ag_mam_q_mrp['Utility Solar PV'] = get_utility_solar_pv_effect_q_mrp(data, q_mrp, yr_idx)
+    ag_mam_q_mrp['Onshore Wind'] = get_onshore_wind_effect_q_mrp(data, q_mrp, yr_idx)                     
 
     return {am:ag_mam_q_mrp[am] for am in settings.AG_MANAGEMENTS if settings.AG_MANAGEMENTS[am]}
+
+
+
+# Renewable quantity calculation.
+'''
+Renewable products are different to agricultural products.
+
+For agricultural products, the quantity is calculated as:
+    quantity_ag = yield_per_ha * real_area                          # Ag products produced without any ag-man
+    quantity_am = quantity_ag * (re_productivity_multiplier - 1)    # If ag-man applied, an additional quantity is introduced (positive or negative) depending on the multiplier.
+
+For renewable products, the quantity is calculated as:
+    quantity = Natural_energy * re_nature_energy_capture_percent * (1 - re_remain_percent_after_distribution) * 365 * 24 * real_area
+'''
+
+
+def get_quantity_renewable(data, re_type: str, yr_idx: int):
+    """
+    Return electricity yield [MWh] for renewable product `pr`.
+    
+    Args:
+        data (object/module): Data object or module.
+        re_type (str): Renewable product that defined in settings.RENEWABLES_OPTIONS (e.g., 'Utility Solar PV').
+        yr_idx (int): Number of years post base-year ('YR_CAL_BASE').
+    """
+
+    yr_cal = data.YR_CAL_BASE + yr_idx
+    
+    if not re_type in settings.RENEWABLES_OPTIONS:
+        raise KeyError(f"Renewable re_typeoduct '{re_type}' not found in settings.RENEWABLES_OPTIONS.")
+    
+    re_lyr = data.RENEWABLE_LAYERS.sel(Type=re_type, year=yr_cal)
+    
+    re_nature_energy_capture_percent = re_lyr['capacity_factor_multiplier']
+    re_percent_remain_after_distribution = re_lyr['distribution_loss_factor_multiplier']
+    yield_per_ha = (
+        settings.INSTALL_CAPACITY_MW_HA[re_type] 
+        * re_nature_energy_capture_percent          
+        * re_percent_remain_after_distribution 
+        * 365 * 24
+    )
+
+    quantity = yield_per_ha * data.REAL_AREA
+    
+    return quantity.data.astype(np.float32)
+

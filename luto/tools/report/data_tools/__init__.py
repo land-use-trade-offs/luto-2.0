@@ -19,9 +19,15 @@
 
 import os
 import re
+import base64
+import numpy as np
 import pandas as pd
 
-from luto.tools.report.data_tools.parameters import YR_BASE
+from io import BytesIO
+from PIL import Image
+
+from luto import settings
+from luto.tools.report.data_tools.parameters import RENAME_AM_NON_AG, YR_BASE
 
 
 def extract_dtype_from_path(path):
@@ -49,6 +55,7 @@ def extract_dtype_from_path(path):
             'quantity':['quantity'],
             'revenue':['revenue'],
             'cost':['cost'],
+            'profit':['profit'],
             'biodiversity':['biodiversity'],
             # Maps (GeoTIFFs)
             'ammap':['ammap'],
@@ -130,7 +137,7 @@ def get_all_files(data_root):
     # Report the unknown files
     unknown_files = file_paths.query('category == "Unknown"')
     if not unknown_files.empty:
-        print(f"Unknown files found: {unknown_files['path'].tolist()}")
+        print(f"Unknown files found: \n\t{'\n\t'.join(unknown_files['path'].tolist())}")
         
     # Remove rows with category = 'Unknown'
     file_paths = file_paths.query('category != "Unknown"').reset_index(drop=True)
@@ -138,4 +145,134 @@ def get_all_files(data_root):
 
     return file_paths
 
+
+def array_to_base64(arr_4band: np.ndarray) -> dict:
+    image = Image.fromarray(arr_4band, 'RGBA')
+    buffered = BytesIO()
+    image.save(buffered, format="PNG")
+    img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+    
+    return {'img_str': 'data:image/png;base64,' + img_str}
+
+
+def tuple_dict_to_nested(flat_dict):
+    nested_dict = {}
+    for key_tuple, value in flat_dict.items():
+        current_level = nested_dict
+        for key in key_tuple[:-1]:
+            if key not in current_level:
+                current_level[key] = {}
+            current_level = current_level[key]
+        current_level[key_tuple[-1]] = value
+    return nested_dict
+        
+        
+def hex_color_to_numeric(hex: str) -> tuple:
+    hex = hex.lstrip('#')
+    if len(hex) == 6:
+        hex = hex + 'FF'  # Add full opacity if alpha is not provided
+    return tuple(int(hex[i:i+2], 16) for i in (0, 2, 4, 6))
+
+
+def rename_reorder_hierarchy(sel: dict) -> dict:
+    '''
+    Rename and reorder the dimensions. The order is finally used as the hierarchy in the map JSON files.
+    
+    The order is:
+    1. 'am' (Agricultural Management)
+    2. 'lm' (Water Supply)
+    3. Other dimensions:
+        - such as "Source" for GHG, or 'Type' for economic data.
+        - Or profit/revenue/cost data.
+    4. 'lu' (Land-use) has to be the lowest level in the hierarchy.
+    '''
+    sel_rename = {}
+    # 1: 'am'
+    if 'am' in sel:
+        sel_rename['am'] = RENAME_AM_NON_AG.get(sel['am'], sel['am'])
+    # 2: 'lm'
+    if 'lm' in sel:
+        sel_rename['lm'] =  {'irr': 'Irrigated', 'dry': 'Dryland'}.get(sel['lm'], sel['lm'])
+        
+    # 3-1: Commodity dimensions
+    if 'Commodity' in sel:
+        commodity = sel['Commodity'].capitalize()
+        sel_rename['Commodity'] = {
+            'All': 'ALL',
+            'Sheep lexp': 'Sheep live export',
+            'Beef lexp': 'Beef live export'
+        }.get(commodity, commodity)
+
+    # 3-2: Profit/Revenue/Cost
+    leftover_keys = set(sel.keys()) - set(sel_rename.keys()) - {'lu'}
+    for key in leftover_keys:
+        sel_rename[key] = {
+            'Operation-cost': 'Cost (operation)',
+            'Transition-cost-ag2ag': 'Cost (trans Ag2Ag)',
+            'Transition-cost-ag2nonag': 'Cost (trans Ag2NonAg)',
+            'Transition-cost-nonag2ag': 'Cost (trans NonAg2Ag)',
+            'Transition-cost-agMgt': 'Cost (trans AgMgt)',
+        }.get(sel[key], sel[key])
+        
+    # 4 last: 'lu'
+    if 'lu' in sel:
+        sel_rename['lu'] = RENAME_AM_NON_AG.get(sel['lu'], sel['lu'])
+        
+        
+    return sel_rename
+
+
+def get_map_legend() -> dict:
+
+    color_csvs = {
+        'lumap': 'luto/tools/report/VUE_modules/assets/lumap_colors_grouped.csv',
+        'lm': 'luto/tools/report/VUE_modules/assets/lm_colors.csv',
+        'ag': 'luto/tools/report/VUE_modules/assets/lumap_colors.csv',
+        'non_ag': 'luto/tools/report/VUE_modules/assets/non_ag_colors.csv',
+        'am': 'luto/tools/report/VUE_modules/assets/ammap_colors.csv',
+        'float': 'luto/tools/report/VUE_modules/assets/float_img_colors.csv'
+    }
+    
+    # Remove land-uses and ag managements that are not used, this excludes them from showing in the map legend
+    rm_lus = [i for i in settings.NON_AG_LAND_USES if not settings.NON_AG_LAND_USES[i]]
+    rm_ams = [i for i in settings.AG_MANAGEMENTS if not settings.AG_MANAGEMENTS[i]]
+    rm_items = rm_lus + rm_ams
+    
+    return {
+        'lumap': {
+            'color_csv': color_csvs['lumap'], 
+            'legend': {
+                RENAME_AM_NON_AG.get(k,k):v for k,v in pd.read_csv(color_csvs['lumap']).set_index('lu_desc')['lu_color_HEX'].to_dict().items() 
+                if k not in rm_items
+            }
+        },
+        'lm': {
+            'color_csv': color_csvs['lm'],
+            'legend': pd.read_csv(color_csvs['lm']).set_index('lu_desc')['lu_color_HEX'].to_dict()
+        },
+        'ag': {
+            'color_csv': color_csvs['ag'],
+            'legend': pd.read_csv(color_csvs['ag']).set_index('lu_desc')['lu_color_HEX'].to_dict()
+        },
+        'non_ag': {
+            'color_csv': color_csvs['non_ag'],
+            'legend': {
+                RENAME_AM_NON_AG.get(k,k):v for k,v in pd.read_csv(color_csvs['non_ag']).set_index('lu_desc')['lu_color_HEX'].to_dict().items() 
+                if k not in rm_items
+            }
+        },
+        'am': {
+            'color_csv': color_csvs['am'],
+            'legend': {
+                RENAME_AM_NON_AG.get(k,k):v for k,v in pd.read_csv(color_csvs['am']).set_index('lu_desc')['lu_color_HEX'].to_dict().items() 
+                if k not in rm_items
+            }
+        },
+        'float': {
+            'color_csv': color_csvs['float'],
+            'legend': pd.read_csv(color_csvs['float']).set_index('lu_code')['lu_color_HEX'].to_dict()
+        }
+    }
+    
+    
 

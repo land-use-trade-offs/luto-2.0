@@ -103,9 +103,31 @@ luto/                                    # Main package directory
 input/                                   # Input data directory (requires separate download)
 output/                                  # Simulation outputs with interactive HTML reports
 docs/                                    # Documentation files
-requirements.txt                         # Python package dependencies
+requirements.yml                        # Python package dependencies (conda environment spec)
 pyproject.toml                           # Project configuration
 ```
+
+## Memory Profiling and Monitoring
+
+LUTO2 includes a built-in memory monitoring tool (`luto.tools.mem_monitor`) for tracking memory usage with live visualization. This is particularly useful for optimizing memory-intensive functions and identifying memory bottlenecks.
+
+### Using the Memory Monitor as a Decorator
+
+The **recommended way** to monitor memory usage is using the `@trace_mem_usage` decorator. It automatically handles starting, monitoring, and cleanup:
+
+```python
+from luto.tools.mem_monitor import trace_mem_usage
+
+@trace_mem_usage
+def my_expensive_function(data):
+    """This function's memory usage will be automatically monitored."""
+    result = process_large_data(data)
+    return result
+
+# Usage - monitoring happens automatically
+result = my_expensive_function(my_data)
+```
+
 
 ## Troubleshooting
 
@@ -115,6 +137,7 @@ pyproject.toml                           # Project configuration
 - Ensure you have at least 32 GB RAM available
 - Close other applications during simulation
 - Consider running smaller scenarios first
+- Use the memory monitor to identify memory-intensive operations
 
 **GUROBI License Issues:**
 - Verify your license file location
@@ -158,8 +181,8 @@ cd luto-2.0
 ### 2. Set Up Environment
 
 ```bash
-# Create and activate the LUTO environment
-conda env create -f luto/tools/create_task_runs/bash_scripts/conda_env.yml
+# Create and activate the LUTO environment from requirements.yml
+conda env create -f requirements.yml
 conda activate luto
 ```
 
@@ -207,6 +230,9 @@ settings.BIODIVERSITY_TARGET_GBF_4_ECNES = 'off'        # 'on' or 'off'
 settings.BIODIVERSITY_TARGET_GBF_8 = 'off'              # 'on' or 'off'
 
 settings.DYNAMIC_PRICE = False                          # Enable demand elasticity-based dynamic pricing
+
+settings.RENEWABLE_ENERGY_CONSTRAINTS = 'on'             # Enable renewable energy targets
+settings.RENEWABLE_TARGET_SCENARIO = 'CNS25 - Accelerated Transition'  # Target scenario
 
 # Load data with custom parameters
 data = sim.load_data()
@@ -263,9 +289,17 @@ LUTO2 behavior can be customized through the `luto.settings` module. Key paramet
 - `BIODIVERSITY_TARGET_GBF_4_ECNES`: Ecological Communities of National Environmental Significance ('on' or 'off')
 - `BIODIVERSITY_TARGET_GBF_8`: Species and group targets ('on' or 'off')
 
+### Renewable Energy Constraints
+- `RENEWABLE_ENERGY_CONSTRAINTS`: Enable/disable renewable energy generation targets ('on' or 'off')
+- `RENEWABLES_OPTIONS`: List of renewable energy types (`['Utility Solar PV', 'Onshore Wind']`)
+- `RENEWABLE_TARGET_SCENARIO`: Target scenario ('CNS25 - Accelerated Transition' or 'CNS25 - Current Targets')
+- `RE_TARGET_LEVEL`: Spatial level for targets ('STATE' or 'NRM')
+- `INSTALL_CAPACITY_MW_HA`: Per-hectare generation capacity (MW/ha) for each renewable type
+- `RENEWABLES_ADOPTION_LIMITS`: Maximum fraction of compatible land available for each renewable type (default: 1.0)
+
 ### Land Use Options
 - `NON_AG_LAND_USES`: Enable/disable non-agricultural land uses (Environmental Plantings, Carbon Plantings, etc.)
-- `AG_MANAGEMENTS`: Enable/disable agricultural management practices (Precision Agriculture, Biochar, etc.)
+- `AG_MANAGEMENTS`: Enable/disable agricultural management practices (Precision Agriculture, Biochar, Utility Solar PV, Onshore Wind, etc.)
 - `EXCLUDE_NO_GO_LU`: Whether to exclude certain land uses from specific areas
 
 ### Economic Parameters
@@ -282,7 +316,7 @@ LUTO2 behavior can be customized through the `luto.settings` module. Key paramet
 - `VERBOSE`: Control solver output verbosity
 
 ### Output Control
-- `PARALLEL_WRITE`: Use parallel processing for output generation
+- `WRITE_PARALLEL`: Use parallel processing for output generation
 - `RESFACTOR`: Spatial resolution factor (1 = full resolution, >1 = coarser)
 
 Refer to `luto/settings.py` for a complete list of configurable parameters and detailed descriptions.

@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License along with
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
-import os
+import os, pathlib
 import shutil
 import zipfile
 import luto.simulation as sim
@@ -30,21 +30,35 @@ sim.run(data=data)
 
 
 # Set up report directory and archive path
-report_dir = f"{data.path}"
-archive_path ='./Run_Archive.zip'
+output_dir = pathlib.Path(data.path).absolute()
+simulation_root = output_dir.parent.parent
+
+run_idx = simulation_root.name
+report_data_dir = simulation_root.parent / 'Report_Data'
+report_data_dir.mkdir(parents=True, exist_ok=True)
+
+report_zip_path = report_data_dir / f'{run_idx}.zip'
+archive_path = output_dir.parent.parent / 'Run_Archive.zip'
+
 
 
 # Zip the output directory, and remove the original directory
-with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-    for root, dirs, files in os.walk(report_dir):
+with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as run_zip,\
+    zipfile.ZipFile(report_zip_path, 'w', zipfile.ZIP_DEFLATED) as report_zip: 
+    for root, dirs, files in os.walk(simulation_root): 
+        files = [f for f in files if f != 'Run_Archive.zip']  # Exclude existing zip files
         for file in files:
-            abs_path = os.path.join(root, file)
-            rel_path = os.path.relpath(abs_path, start=report_dir)
-            zipf.write(abs_path, arcname=rel_path)
+            abs_path = pathlib.Path(root) / file 
+            if 'DATA_REPORT' in abs_path.as_posix():
+                zip_path = abs_path.relative_to(output_dir)
+                report_zip.write(abs_path, arcname=zip_path)
+            else:
+                zip_path = abs_path.relative_to(simulation_root)
+                run_zip.write(abs_path, arcname=zip_path)
 
 
 # Remove all files after archiving
-for item in os.listdir('.'):
+for item in os.listdir(simulation_root):
     if item != 'Run_Archive.zip':
         try:
             if os.path.isfile(item) or os.path.islink(item):

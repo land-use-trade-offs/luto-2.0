@@ -64,12 +64,13 @@ def create_new_dataset():
     bio_GBF4_inpath = bio_GBF2_inpath
     bio_GBF8_inpath = 'N:/Data-Master/Biodiversity/Environmental-suitability/Annual-species-suitability_20-year_snapshots_5km_to_NetCDF/'
     bio_NES_Zonation_inpath = bio_GBF4_inpath
+    renewable_energy_inpath = 'N:/Data-Master/Renewable Energy/processed'
     
-
 
     # Set data output paths
     raw_data = RAW_DATA + '/' # '../raw_data/'
     outpath = INPUT_DIR + '/'
+
 
     # Delete the data folders' contents
     for file in os.scandir(outpath):
@@ -97,7 +98,7 @@ def create_new_dataset():
     # Demand and elasticity data
     shutil.copyfile(f'{demand_scenarios_inpath}/All_LUTO_demand_scenarios_with_convergences.csv',  raw_data + 'All_LUTO_demand_scenarios_with_convergences.csv')
     shutil.copyfile(f'{demand_elasticity_inpath}/Elasticities_Table.csv', outpath + 'demand_elasticity.csv')
-    
+    shutil.copyfile(f'{luto_1D_inpath}/20251023_CNS25 Pathways AusTIMES data.xlsx', outpath + 'AusTIMES_demand_multiplier.xlsx')
     
     # Read raw BECCS data from CSIRO and save as HDF5
     BECCS_raw = pd.read_pickle(BECCS_inpath + 'df_info_best_grid_20211116.pkl')
@@ -108,7 +109,7 @@ def create_new_dataset():
     shutil.copyfile(nlum_inpath + 'NLUM_2010-11_mask.tif', outpath + 'NLUM_2010-11_mask.tif')
     shutil.copyfile(nlum_inpath + 'ag_landuses.csv', outpath + 'ag_landuses.csv')
 
-    shutil.copyfile(luto_1D_inpath + 'GHG_targets_20250411.xlsx', outpath + 'GHG_targets.xlsx')
+    shutil.copyfile(luto_1D_inpath + 'GHG_targets_20251023.xlsx', outpath + 'GHG_targets.xlsx')
     shutil.copyfile(luto_1D_inpath + 'carbon_prices_20240612.xlsx', outpath + 'carbon_prices.xlsx')
     shutil.copyfile(luto_1D_inpath + 'ag_price_multipliers_20240612.xlsx', outpath + 'ag_price_multipliers.xlsx')
     shutil.copyfile(luto_1D_inpath + 'cost_multipliers_20240612.xlsx', outpath + 'cost_multipliers.xlsx')
@@ -204,6 +205,14 @@ def create_new_dataset():
     # Copy biodiversity NES Zonation files
     shutil.copyfile(bio_NES_Zonation_inpath + 'bio_NES_Zonation.nc', outpath + 'bio_NES_Zonation.nc')
     
+    # Copy renewable energy data files
+    shutil.copyfile(f'{renewable_energy_inpath}/renewable_targets.csv', outpath + 'renewable_targets.csv')
+    shutil.copyfile(f'{renewable_energy_inpath}/renewable_energy_layers_1D.nc', outpath + 'renewable_energy_layers_1D.nc')
+    shutil.copyfile(f'{renewable_energy_inpath}/renewable_energy_bundle.csv', outpath + 'renewable_energy_bundle.csv')
+    shutil.copyfile(f'{renewable_energy_inpath}/renewable_price_AUD_MWh_solar.csv', outpath + 'renewable_price_AUD_MWh_solar.csv')
+    shutil.copyfile(f'{renewable_energy_inpath}/renewable_price_AUD_MWh_wind.csv', outpath + 'renewable_price_AUD_MWh_wind.csv')
+
+
 
     ############### Read data
 
@@ -337,7 +346,8 @@ def create_new_dataset():
     REGION_NRM_r = zones[['NRM_CODE', 'NRM_NAME']]  # NRM regions
     REGION_NRM_r.to_hdf(outpath + 'REGION_NRM_r.h5', key='REGION_NRM_r', mode='w', format='table', index=False, complevel=9)
     
-    
+    REGION_STATE_r = zones[['STE_CODE11', 'STE_NAME11']]  # State regions
+    REGION_STATE_r.to_hdf(outpath + 'REGION_STATE_r.h5', key='REGION_STATE_r', mode='w', format='table', index=False, complevel=9)
 
     ################# Regional adoption constraints
     
