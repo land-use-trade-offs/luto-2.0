@@ -1022,6 +1022,13 @@ def process_production_data(files, SAVE_DIR, years):
     quantity_ag_non_all = quantity_ag.query('Water_supply != "ALL"').copy()
     quantity_am_non_all = quantity_am.query('Water_supply != "ALL"').copy()
     
+    
+    # Fill 0 for empty non-agr dataframe
+    if quantity_non_ag.empty:
+        quantity_non_ag = pd.DataFrame(
+        [{'Commodity': 'beef meat', 'Type': 'Non_Agricultural', 'Year': 2050, 'region':'ACT', 'Production (t/KL)': 0},
+         {'Commodity': 'beef meat', 'Type': 'Non_Agricultural', 'Year': 2020, 'region':'AUSTRALIA', 'Production (t/KL)': 0}]
+        ).assign(Commodity = lambda x: x['Commodity'].str.capitalize())
 
 
     # -------------------- Demand --------------------
