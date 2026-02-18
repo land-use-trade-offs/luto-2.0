@@ -73,20 +73,20 @@ def arr_to_xr(data, arr:np.ndarray) -> xr.DataArray:
     '''
     
     # Get the geo metadata of the array
-    if arr.size == data.LUMAP_NO_RESFACTOR.size:
+    if arr.size == data.LUMASK.size:
         geo_meta = data.GEO_META_FULLRES
         arr_2d = np.full(data.NLUM_MASK.shape, data.NODATA).astype(np.float32) 
         np.place(arr_2d, data.NLUM_MASK, arr)
-    elif arr.size == data.MASK.sum():
+    elif arr.size == data.LUMASK.sum():
         arr_fulllen = np.zeros(data.NCELLS, dtype=np.float32)
         np.place(arr_fulllen, data.MASK, arr)
         geo_meta = data.GEO_META_FULLRES
         arr_2d = np.full(data.NLUM_MASK.shape, data.NODATA).astype(np.float32) 
-        np.place(arr_2d, data.MASK, arr_fulllen)
+        np.place(arr_2d, data.NLUM_MASK, arr_fulllen)
     else:
         geo_meta = data.GEO_META
         arr_2d = data.LUMAP_2D_RESFACTORED.copy().astype(np.float32)
-        np.place(arr_2d, data.MASK, arr)  
+        arr_2d[*data.COORD_ROW_COL_RESFACTORED] = arr
 
     # Mask the nodata values to nan
     arr_2d = np.where(arr_2d == data.NODATA, np.nan, arr_2d)   
