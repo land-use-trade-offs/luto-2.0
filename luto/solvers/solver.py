@@ -727,10 +727,17 @@ class LutoSolver:
             ('Utility Solar PV', self._input_data.renewable_solar_r, 'renewable_solar', 'solar'),
             ('Onshore Wind',     self._input_data.renewable_wind_r,  'renewable_wind',  'wind'),
         ]
-
+        
+        # Pop Australian Capital Territory out of the region_state_name2idx
+        #   as its renewable energy target is being merged to NSW
+        self._input_data.region_state_name2idx.pop('Australian Capital Territory', None)
 
         for target_idx, (reg_name, reg_id) in enumerate(self._input_data.region_state_name2idx.items()):
 
+            if reg_name == 'Australian Capital Territory':
+                print(f"│   │   │    Skipping {reg_name} as its target being merged to NSW ...")
+                continue
+            
             reg_idx = np.where(self._input_data.region_state_r == reg_id)[0]
             print(f"│   │   ├── Adding renewable energy constraints for {reg_name} ...")
 
@@ -738,6 +745,7 @@ class LutoSolver:
             for am, energy_r, limit_key, re_label in re_types:
                 
                 if not settings.AG_MANAGEMENTS[am]: continue
+                
                 target_raw = self._input_data.limits[limit_key][target_idx]
                 target_rescal = self._input_data.limits[f"{limit_key}_rescale"][target_idx]
                 print(f"│   │   │   ├── target for {re_label} is {target_raw:5,.0f} Mwh")
