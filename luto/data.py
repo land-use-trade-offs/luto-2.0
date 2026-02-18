@@ -183,6 +183,8 @@ class Data:
             self.MASK = self.LUMASK
             self.GEO_META = self.GEO_META_FULLRES
             self.LUMAP_2D_RESFACTORED = self.LUMAP_2D_FULLRES
+            self.COORD_ROW_COL_FULLRES = np.argwhere(self.NLUM_MASK == 1).T
+            self.COORD_ROW_COL_RESFACTORED = self.COORD_ROW_COL_FULLRES
         else:
             raise KeyError("Resfactor setting invalid")
         
@@ -508,8 +510,9 @@ class Data:
         
         self.REGION_STATE_NAME2CODE = REGION_STATE_r.groupby('STE_NAME11', observed=True)['STE_CODE11'].first().to_dict()
         self.REGION_STATE_NAME2CODE = dict(sorted(self.REGION_STATE_NAME2CODE.items()))     # Make sure the dict is sorted by state name, makes it consistent with renewable target.
+        
         if 'Other Territories' in self.REGION_STATE_NAME2CODE:
-            self.REGION_STATE_NAME2CODE.pop('Other Territories')                                # Remove 'Other Territories' from the dict.
+            self.REGION_STATE_NAME2CODE.pop('Other Territories')                            # Remove 'Other Territories' from the dict.
         
         self.REGION_STATE_CODE = REGION_STATE_r['STE_CODE11'].values
 
