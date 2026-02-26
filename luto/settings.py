@@ -476,6 +476,11 @@ RENEWABLES_OPTIONS = [
     'Onshore Wind'
 ]
 
+RENEWABLE_SCENARIO = 'step_change' # one of 'step_change', 'reimagined_transition', 'accelerated_transition'
+'''
+The renewable energy transmission scenario to use determining which TIF inputs to load.
+'''
+
 RENEWABLE_TARGET_SCENARIO =  'CNS25 - Accelerated Transition' # one of 'CNS25 - Accelerated Transition', 'CNS25 - Current Targets'
 '''
 The renewable energy target scenario to use when `RENEWABLE_ENERGY_CONSTRAINTS` is set to 'on'.
