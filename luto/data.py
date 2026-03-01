@@ -1416,13 +1416,20 @@ class Data:
                 self.BIO_GBF2_MASK
             )
             
-            self.BIO_GBF2_BASE_YR = np.einsum(
-                'j,mrj,r,r->r',
-                np.array(list(self.BIO_HABITAT_CONTRIBUTION_LOOK_UP.values())),
-                self.AG_L_MRJ,      # lumap in proportion representation if resfactored
-                self.BIO_GBF2_MASK,
-                self.REAL_AREA
-            ) - (self.SAVBURN_ELIGIBLE * self.BIO_GBF2_MASK * (1 - settings.BIO_CONTRIBUTION_LDS) * self.REAL_AREA)
+            self.BIO_GBF2_BASE_YR = (
+                np.einsum(
+                    'j,mrj,r,r->r',
+                    np.array(list(self.BIO_HABITAT_CONTRIBUTION_LOOK_UP.values())),
+                    self.AG_L_MRJ,      # lumap in proportion representation if resfactored
+                    self.BIO_GBF2_MASK,
+                    self.REAL_AREA
+                ) - (
+                    self.SAVBURN_ELIGIBLE 
+                    * self.BIO_GBF2_MASK 
+                    * (1 - settings.BIO_CONTRIBUTION_LDS) 
+                    * self.REAL_AREA
+                )
+            ) * self.AG_MASK_PROPORTION_R
               
         
         ###############################################################
@@ -2088,7 +2095,7 @@ class Data:
             The priority degrade areas conservation target for the given year.
         """
         
-        bio_habitat_score_baseline_sum = (self.BIO_GBF2_MASK * self.REAL_AREA).sum()
+        bio_habitat_score_baseline_sum = (self.BIO_GBF2_MASK * self.REAL_AREA * self.AG_MASK_PROPORTION_R).sum()
         bio_habitat_score_base_yr_sum = self.BIO_GBF2_BASE_YR.sum()
         bio_habitat_score_base_yr_proportion = bio_habitat_score_base_yr_sum / bio_habitat_score_baseline_sum
 
