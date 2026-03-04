@@ -1605,7 +1605,7 @@ class Data:
             self.BIO_GBF4_SPECIES_LAYERS = np.array([self.get_average_fraction_from_int_map(arr) for arr in snes_arr]) 
         
         
-        if settings.BIODIVERSITY_TARGET_GBF_4_SNES != 'off':
+        if settings.BIODIVERSITY_TARGET_GBF_4_ECNES != 'off':
             print("│   ├── Loading environmental significance data (ECNES)", flush=True)
         
         

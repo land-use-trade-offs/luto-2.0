@@ -875,7 +875,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     GBF4_SNES_pre_1750_area_sr=get_GBF4_SNES_pre_1750_area_sr(data)
     GBF4_SNES_names=get_GBF4_SNES_names(data)
     GBF4_ECNES_pre_1750_area_sr=get_GBF4_ECNES_pre_1750_area_sr(data)
-    GBF4_ECNES_names=get_GBF4_SNES_names(data)
+    GBF4_ECNES_names=get_GBF4_ECNES_names(data)
     GBF8_pre_1750_area_sr=get_GBF8_pre_1750_area_sr(data, target_year)
     GBF8_species_names=get_GBF8_species_names(data)
     GBF8_species_indices=get_GBF8_indices(data,target_year)

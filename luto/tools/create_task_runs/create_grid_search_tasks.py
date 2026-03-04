@@ -28,7 +28,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = "F:/Users/jinzhu/TEMP"
+TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/LUF_20260304_RE5"
 
 
 # Set the grid search parameters
