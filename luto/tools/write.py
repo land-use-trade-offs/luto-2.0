@@ -63,48 +63,36 @@ import luto.economics.non_agricultural.biodiversity as non_ag_biodiversity
 
 MAX_CELL_MAGNITUDE = (f := lambda: defaultdict(f))()
 # Arbitrary-depth nested defaultdict.
-# Innermost leaf: {yr_cal: value}; collapsed to a scalar via collapse_mag_dict().
+# Innermost leaf: list of scalar values accumulated across workers/years.
+
+# !uantiles to get a robust estimate of the magnitude for setting colorbar limits in the report.
+# This elinimates extreme values calculates using vanilla min/max.
+MIN_P, MAX_P = 0.005, 0.995
+
+def _get_mag(arr: xr.DataArray) -> list:
+    """Return [MIN_P-quantile, MAX_P-quantile] of non-zero values via numpy (avoids MultiIndex quantile bug)."""
+    vals = arr.where(arr != 0).compute().values.ravel()
+    return [float(np.nanquantile(vals, MIN_P)), float(np.nanquantile(vals, MAX_P))]
 
 
 def _mag_merge(contributions):
     """
     Merge per-worker magnitude contributions into `MAX_CELL_MAGNITUDE`.
 
-    contributions: {top_key: {sub_key: (yr, value)}}
-    value may be a (nested) dict; yr-keyed scalars are written at every leaf.
+    contributions: {top_key: {sub_key: tuple_or_dict}}
+    At each leaf, the tuple is extended into a flat list stored under '_vals'.
     """
-    def _apply(node, yr, val):
+    def _apply(node, val):
         if isinstance(val, dict):
             for k, v in val.items():
-                _apply(node[k], yr, v)
+                _apply(node[k], v)
         else:
-            node[yr] = val
+            if '_vals' not in node:
+                node['_vals'] = []
+            node['_vals'].extend(val)
 
-    for top_key, subs in contributions.items():
-        for sub_key, (yr, val) in subs.items():
-            _apply(MAX_CELL_MAGNITUDE[top_key][sub_key], yr, val)
-
-
-def collapse_mag_dict(mag_dict):
-    """Recursively collapse innermost {yr: scalar} dicts into max(values)."""
-    if not isinstance(next(iter(mag_dict.values())), defaultdict):
-        max_mag = np.array(list(mag_dict.values()), dtype=np.float32)
-        return int(max_mag[np.abs(max_mag).argmax()])
-    return {k: collapse_mag_dict(v) for k, v in mag_dict.items()}
-
-
-def _get_cell_magnitude(arr: xr.DataArray, dim=['cell']):
-    '''
-    Get the maximum magnitude of a layer across a dimension (e.g. cell) to help set colorbar limits in the report.
-    '''
-    arr = arr.compute()
-    mag = arr.where(arr != 0).quantile(0.97, dim=dim, skipna=True).astype(np.float32)
-    mag.data = np.nan_to_num(mag.data, nan=0.0)
-
-    if mag.size == 1:
-        return mag.item()
-    else:
-        return mag.to_pandas().to_dict()
+    for top_key, val in contributions.items():
+        _apply(MAX_CELL_MAGNITUDE[top_key], val)
 
 
 
@@ -179,9 +167,15 @@ def write_data(data: Data):
             
     # After all jobs are done, we collapse the MAX_CELL_MAGNITUDE dict to get the final maximum magnitudes 
     # for each variable, which can be used for setting colorbar limits in the report.
-    final_magnitudes = {var: collapse_mag_dict(mag_dict) for var, mag_dict in MAX_CELL_MAGNITUDE.items()}
+    def _defaultdict_to_dict(d):
+        if isinstance(d, defaultdict):
+            if '_vals' in d:
+                return [0.0 if np.isnan(v) else float(v) for v in d['_vals']]
+            return {k: _defaultdict_to_dict(v) for k, v in d.items()}
+        return d
+
     with open(os.path.join(data.path, 'max_cell_magnitudes.json'), 'w') as f:
-        json.dump(final_magnitudes, f, indent=2)
+        json.dump(_defaultdict_to_dict(MAX_CELL_MAGNITUDE), f, indent=2)
   
   
 
@@ -511,13 +505,15 @@ def write_dvar_area(data: Data, yr_cal, path):
     
     
     # Records cell magnitudes
-    return (f"Decision variable areas written for year {yr_cal}", {
+    area_magnitudes = {
         'area': {
-            'ag':     (yr_cal, _get_cell_magnitude(area_ag.sel(lm='ALL'), dim=['cell', 'lu'])),
-            'non_ag': (yr_cal, _get_cell_magnitude(area_non_ag, dim=['cell', 'lu'])),
-            'am':     (yr_cal, _get_cell_magnitude(area_am.sel(lm='ALL', lu='ALL'), dim=['cell'])),
+            'ag':     _get_mag(area_ag_cat),
+            'non_ag': _get_mag(area_non_ag_cat),
+            'am':     _get_mag(area_am_cat),
         }
-    })
+    }
+    
+    return (f"Decision variable areas written for year {yr_cal}", area_magnitudes)
 
 
 
@@ -704,13 +700,20 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
 
 
     # Record max cell value for report generation later (e.g., for setting colorbar limits)
-    return (f"Separate quantity production written for year {yr_cal}", {
-        'Production': {
-            'ag':     (yr_cal, _get_cell_magnitude(ag_q_mrc.sel(lm='ALL'))),
-            'non_ag': (yr_cal, _get_cell_magnitude(non_ag_p_rc)),
-            'am':     (yr_cal, _get_cell_magnitude(am_p_amrc.sel(lm='ALL').transpose('Commodity', ...))),
-        }
-    })
+    prod_magnitudes = {
+        'ag':     dict(zip(data.COMMODITIES, zip(ag_q_mrc.min(['lm','cell']).values, ag_q_mrc.max(['lm','cell']).values))),
+        'non_ag': dict(zip(data.COMMODITIES, zip(non_ag_p_rc.min('cell').values, non_ag_p_rc.max('cell').values))),
+        'am':     dict(zip(data.COMMODITIES, zip(am_p_amrc.min(['am','lm','cell']).values, am_p_amrc.max(['am','lm','cell']).values))),
+    }
+    
+    commodity_magnitudes = {'production': {}}
+    for cm in data.COMMODITIES:
+        commodity_magnitudes['production'][cm] = [*prod_magnitudes['ag'][cm], *prod_magnitudes['non_ag'][cm], *prod_magnitudes['am'][cm]]
+    
+    return (
+        f"Separate quantity production written for year {yr_cal}", 
+        commodity_magnitudes
+    )
 
 
 
@@ -896,15 +899,16 @@ def write_economics_ag(data: Data, yr_cal, path):
     _save2nc(profit_ag_valid_layers,         os.path.join(path, f'xr_economics_ag_profit_{yr_cal}.nc'))
     
     # Record cell magnitudes for report generation later (e.g., for setting colorbar limits)
-    return (f"Agricultural revenue and cost written for year {yr_cal}", {
+    magnitudes = {
         'Economics_ag': {
-            'ag_revenue':     (yr_cal, _get_cell_magnitude(xr_ag_rev.sel(lm='ALL', source='ALL'))),
-            'ag_cost':        (yr_cal, _get_cell_magnitude(xr_ag_cost.sel(lm='ALL', source='ALL'))),
-            'ag2ag_cost':     (yr_cal, _get_cell_magnitude(xr_ag2ag_cost.sel(lm='ALL', source='ALL'))),
-            'non_ag2ag_cost': (yr_cal, _get_cell_magnitude(xr_non_ag2ag_cost.sel(lm='ALL', source='ALL', from_lu='ALL'))),
-            'profit_ag':      (yr_cal, _get_cell_magnitude(xr_profit_ag.sel(lm='ALL'))),
+            'ag_revenue':    _get_mag(ag_rev_valid_layers),
+            'ag_cost':       _get_mag(ag_cost_valid_layers),
+            'ag2ag_cost':    _get_mag(ag2ag_cost_valid_layers),
+            'non_ag2ag_cost':_get_mag(non_ag2ag_cost_valid_layers),
+            'profit_ag':     _get_mag(profit_ag_valid_layers),
         }
-    })
+    }
+    return (f"Agricultural revenue and cost written for year {yr_cal}", magnitudes)
 
 
 
@@ -1018,14 +1022,15 @@ def write_economics_ag_man(data: Data, yr_cal, path):
     _save2nc(valid_layers_stack_profit,     os.path.join(path, f'xr_economics_am_profit_{yr_cal}.nc'))
     
     # Record cell magnitudes for report generation later (e.g., for setting colorbar limits)
-    return (f"Agricultural Management revenue and cost written for year {yr_cal}", {
+    magnitudes = {
         'Economics_am': {
-            'am_revenue':    (yr_cal, _get_cell_magnitude(xr_revenue_am.sel(lm='ALL', lu='ALL'))),
-            'am_cost':       (yr_cal, _get_cell_magnitude(xr_cost_am.sel(lm='ALL', lu='ALL'))),
-            'am_transition': (yr_cal, _get_cell_magnitude(xr_trans_am.sel(lm='ALL', lu='ALL'))),
-            'am_profit':     (yr_cal, _get_cell_magnitude(xr_profit_am.sel(lm='ALL', lu='ALL'))),
+            'am_revenue':   _get_mag(valid_layers_stack_rev),
+            'am_cost':      _get_mag(valid_layers_stack_cost),
+            'am_transition':_get_mag(valid_layers_stack_transition),
+            'am_profit':    _get_mag(valid_layers_stack_profit),
         }
-    })
+    }
+    return (f"Agricultural Management revenue and cost written for year {yr_cal}", magnitudes)
 
 
 
@@ -1149,15 +1154,16 @@ def write_economics_non_ag(data: Data, yr_cal, path):
     _save2nc(valid_layers_stack_profit,   os.path.join(path, f'xr_economics_non_ag_profit_{yr_cal}.nc'))
 
     # Record cell magnitudes for report generation later (e.g., for setting colorbar limits)
-    return (f"Non-agricultural revenue and cost written for year {yr_cal}", {
+    magnitudes = {
         'Economics_non_ag': {
-            'non_ag_revenue':        (yr_cal, _get_cell_magnitude(xr_revenue_non_ag.sel(lu='ALL'))),
-            'non_ag_cost':           (yr_cal, _get_cell_magnitude(xr_cost_non_ag.sel(lu='ALL'))),
-            'non_ag_to_non_ag_cost': (yr_cal, _get_cell_magnitude(xr_non_ag_to_non_ag.sel(lu='ALL'))),
-            'non_ag_to_ag_cost':     (yr_cal, _get_cell_magnitude(xr_non_ag_to_ag.sel(lu='ALL'))),
-            'non_ag_profit':         (yr_cal, _get_cell_magnitude(xr_non_ag_profit.sel(lu='ALL'))),
+            'non_ag_revenue':       _get_mag(valid_layers_stack_rev),
+            'non_ag_cost':          _get_mag(valid_layers_stack_cost),
+            'non_ag_to_non_ag_cost':_get_mag(valid_layers_stack_t_non_ag),
+            'non_ag_to_ag_cost':    _get_mag(valid_layers_stack_t_ag),
+            'non_ag_profit':        _get_mag(valid_layers_stack_profit),
         }
-    })
+    }
+    return (f"Non-agricultural revenue and cost written for year {yr_cal}", magnitudes)
 
 
 
@@ -2280,12 +2286,12 @@ def write_ghg_agricultural(data: Data, yr_cal: int, path: str):
 
     _save2nc(valid_layers_stack_ghg, os.path.join(path, f'xr_GHG_ag_{yr_cal}.nc'))
     
-    return (
-        f"Agricultural Land-use GHG emissions written for year {yr_cal}", {
+    magnitudes = {
         'ghg_emission': {
-            'ag': (yr_cal, _get_cell_magnitude(ghg_e.sel(lm='ALL', GHG_source='ALL', lu='ALL')))
+            'ag': _get_mag(valid_layers_stack_ghg),
         }
-    })
+    }
+    return (f"Agricultural Land-use GHG emissions written for year {yr_cal}", magnitudes)
         
 
 
@@ -2360,12 +2366,12 @@ def write_ghg_non_agricultural(data: Data, yr_cal: int, path: str):
     # Save xarray data to netCDF
     _save2nc(xr_ghg_non_ag_cat, os.path.join(path, f'xr_GHG_non_ag_{yr_cal}.nc'))
     
-    return (
-        f"Non-Agricultural Land-use GHG emissions written for year {yr_cal}", {
+    magnitudes = {
         'ghg_emission': {
-            'non_ag': (yr_cal, _get_cell_magnitude(xr_ghg_non_ag_cat.sum(dim='layer')))
+            'non_ag': _get_mag(xr_ghg_non_ag_cat),
         }
-    })
+    }
+    return (f"Non-Agricultural Land-use GHG emissions written for year {yr_cal}", magnitudes)
 
 
 
@@ -2439,12 +2445,12 @@ def write_ghg_agricultural_management(data: Data, yr_cal: int, path: str):
     # Save xarray data to netCDF
     _save2nc(valid_layers_stack_am_ghg, os.path.join(path, f'xr_GHG_ag_management_{yr_cal}.nc'))
 
-    return (
-        f"Agricultural Management GHG emissions written for year {yr_cal}", {
+    magnitudes = {
         'ghg_emission': {
-            'ag_man': (yr_cal, _get_cell_magnitude(valid_layers_stack_am_ghg.sum(dim='layer')))
+            'ag_man': _get_mag(valid_layers_stack_am_ghg),
         }
-    })
+    }
+    return (f"Agricultural Management GHG emissions written for year {yr_cal}", magnitudes)
 
 
 def write_ghg_transition_penalty(data: Data, yr_cal: int, path: str):
@@ -2518,12 +2524,12 @@ def write_ghg_transition_penalty(data: Data, yr_cal: int, path: str):
     transition_valid_layers = xr_ghg_transition.stack(layer=['Type', 'lm', 'lu']).sel(layer=valid_transition_layers).drop_vars('region').compute()
     _save2nc(transition_valid_layers, os.path.join(path, f'xr_transition_GHG_{yr_cal}.nc'))
     
-    return (
-        f"Land-use transition penalty GHG emissions written for year {yr_cal}", {
+    magnitudes = {
         'ghg_emission': {
-            'transition': (yr_cal, _get_cell_magnitude(xr_ghg_transition.sum(dim=['lm', 'Type', 'lu'])))
+            'transition': _get_mag(transition_valid_layers),
         }
-    })
+    }
+    return (f"Land-use transition penalty GHG emissions written for year {yr_cal}", magnitudes)
 
 
 
@@ -2784,9 +2790,9 @@ def write_water(data: Data, yr_cal, path):
         f"Water yield data written for year {yr_cal}",
         {
             'water_yield': {
-                'ag': _get_cell_magnitude(xr_ag_wny_cat.sum(dim='layer')),
-                'non_ag': _get_cell_magnitude(xr_non_ag_wny_cat.sum(dim='layer')),
-                'am': _get_cell_magnitude(xr_am_wny_cat.sum(dim='layer')),
+                'ag': (xr_ag_wny_cat.min().item(), xr_ag_wny_cat.max().item()),
+                'non_ag': (xr_non_ag_wny_cat.min().item(), xr_non_ag_wny_cat.max().item()),
+                'am': (xr_am_wny_cat.min().item(), xr_am_wny_cat.max().item()),
             }
         }
     )
@@ -2902,6 +2908,26 @@ def write_biodiversity_quality_scores(data: Data, yr_cal, path):
         value_name='Area Weighted Score (ha)',
         base_score=base_yr_score
     )
+    
+    # Create zeros values to fill the first row for am/non-ag if their df is empty
+    if priority_non_ag_df.empty:
+        priority_non_ag_df = pd.DataFrame({
+            'region': ['AUSTRALIA'],
+            'Year': [yr_cal],
+            'lu': ['Environmental Plantings'],
+            'Area Weighted Score (ha)': [0.0],
+            'Relative_Contribution_Percentage': [0.0]
+        })
+    if priority_am_df.empty:
+        priority_am_df = pd.DataFrame({
+            'region': ['AUSTRALIA'],
+            'Year': [yr_cal],
+            'am': ['ALL'],
+            'lm': ['dry'],
+            'lu': ['Apples'],
+            'Area Weighted Score (ha)': [0.0],
+            'Relative_Contribution_Percentage': [0.0]
+        })
 
 
     # Save the biodiversity scores
@@ -2973,15 +2999,15 @@ def write_biodiversity_quality_scores(data: Data, yr_cal, path):
     _save2nc(valid_layers_stack_all,    os.path.join(path, f'xr_biodiversity_overall_priority_all_{yr_cal}.nc'))
     
 
-    return (
-        f"Biodiversity overall priority scores written for year {yr_cal}",{
+    magnitudes = {
         'bio_quality': {
-            'ag':     (yr_cal, _get_cell_magnitude(xr_priority_ag.sel(lm='ALL', lu='ALL'))),
-            'non_ag': (yr_cal, _get_cell_magnitude(xr_priority_non_ag.sel(lu='ALL'))),
-            'am':     (yr_cal, _get_cell_magnitude(xr_priority_am.sel(lm='ALL', lu='ALL'))),
-            'all':    (yr_cal, _get_cell_magnitude(xr_priority_all.sel(Type='ALL')))
+            'ag':     _get_mag(valid_layers_stack_ag),
+            'non_ag': _get_mag(valid_layers_stack_non_ag),
+            'am':     _get_mag(valid_layers_stack_am),
+            'all':    _get_mag(valid_layers_stack_all),
         }
-    })
+    }
+    return (f"Biodiversity overall priority scores written for year {yr_cal}", magnitudes)
 
 
 

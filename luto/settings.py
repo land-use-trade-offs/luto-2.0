@@ -269,8 +269,8 @@ NON_AG_LAND_USES = {
     'Sheep Agroforestry': True,    
     'Beef Agroforestry': True,
     'Carbon Plantings (Block)': True,
-    'Sheep Carbon Plantings (Belt)': False, # [20260224] Truned off due to FullCAM (CP-Belt) issue
-    'Beef Carbon Plantings (Belt)': False,  # [20260224] Truned off due to FullCAM (CP-Belt) issue
+    'Sheep Carbon Plantings (Belt)': True,
+    'Beef Carbon Plantings (Belt)': True,
     'BECCS': False,
     'Destocked - natural land': True,
 }
@@ -463,7 +463,7 @@ SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
 # ---------------------------------------------------------------------------- #
 # Renewable energy parameters
 # ---------------------------------------------------------------------------- #
-RENEWABLE_ENERGY_CONSTRAINTS = 'on'         # 'on' or 'off'
+RENEWABLE_ENERGY_CONSTRAINTS = 'off'         # 'on' or 'off'
 
 if RENEWABLE_ENERGY_CONSTRAINTS == 'on':
     AG_MANAGEMENTS['Utility Solar PV'] = True

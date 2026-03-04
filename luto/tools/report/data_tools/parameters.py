@@ -544,15 +544,14 @@ COLORS = {
 }
 
 COLORS_FLOAT = {
-    101: '#E1E1E1FF',  # no-data grey
+    0: '#E1E1E1FF',  # no-data grey
     -1: '#00000000',  # outside study area transparent 
 
-    # 0-50: Blue tones 
-     0: '#000E2BFF',
-     1: '#00122FFF',
-     2: '#001433FF',
-     3: '#001637FF',
-     4: '#00183BFF',
+    # 1-50: Blue tones 
+     1: '#000E2BFF',
+     2: '#00122FFF',
+     3: '#001433FF',
+     4: '#001637FF',
      5: '#011A3FFF',
      6: '#011C43FF',
      7: '#011E47FF',

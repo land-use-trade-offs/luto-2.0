@@ -69,15 +69,15 @@ def map2base64(
             'legend': legend['legend'],
         }
     else:
-        # Map values to color codes: positives → red (51–100), negatives → blue (0–50), zeros → grey (101)
+        # Map values to color codes: positives → red (51–100), negatives → blue (1–50), zeros → grey (0)
         global_min, global_max = layer_magnitude
         vals = arr_sel.values.copy()
-        codes = np.full(vals.shape, 101, dtype=np.int8)  # default: no-data grey
+        codes = np.full(vals.shape, 0, dtype=np.int8)  # default: no-data grey
 
         if global_max > 0:
-            codes[vals > 0] = np.clip(51 + (vals[vals > 0] / global_max) * 49, 51, 100)
+            codes[vals > 0] = np.clip(51 + (vals[vals > 0] / global_max) * 50, 52, 100)
         if global_min < 0:
-            codes[vals < 0] = np.clip(50 + (vals[vals < 0] / abs(global_min)) * 50, 0, 50)
+            codes[vals < 0] = np.clip(50 + (vals[vals < 0] / abs(global_min)) * 50, 1, 49)
 
         arr_sel.values = codes
         min_max = (global_min, global_max)
@@ -115,7 +115,7 @@ def get_map2json(
     legend_int:dict, 
     legend_int_level:dict|str, 
     legend_float:dict, 
-    float_magnitude:int,
+    float_magnitude:tuple|dict,
     save_path:str, 
     ) -> None:
     
@@ -154,7 +154,10 @@ def get_map2json(
             if isInt:
                 legend = legend_int
                 layer_magnitude = None
-            else:
+            elif isinstance(float_magnitude, dict):
+                legend = legend_float
+                layer_magnitude = float_magnitude[sel['Commodity']]
+            elif isinstance(float_magnitude, tuple):
                 legend = legend_float
                 layer_magnitude = float_magnitude
             
@@ -246,9 +249,9 @@ def save_report_layer(raw_data_dir:str):
     files_area = files.query('base_name.str.contains("area")')
     
     area_magnitudes = (
-        cell_magnitudes['area']['ag'], 
-        cell_magnitudes['area']['non_ag'], 
-        *cell_magnitudes['area']['am'].values()
+        *cell_magnitudes['area']['ag'], 
+        *cell_magnitudes['area']['non_ag'], 
+        *cell_magnitudes['area']['am']
     )
     
     area_min_max = (min(area_magnitudes), max(area_magnitudes))
@@ -257,10 +260,6 @@ def save_report_layer(raw_data_dir:str):
     area_ag = files_area.query('base_name == "xr_area_agricultural_landuse"')
     get_map2json(area_ag, legend_ag, {'lu':'ALL'}, legend_float, area_min_max, f'{SAVE_DIR}/map_layers/map_area_Ag.js')
     print('│   ├── Area Ag layer saved.')
-    
-    # files_df,legend_int,legend_int_level,legend_float,float_magnitude,save_path = area_ag, legend_ag, {'lu':'ALL'}, legend_float, area_min_max, f'{SAVE_DIR}/map_layers/map_area_Ag.js'
-
-
 
     area_nonag = files_area.query('base_name == "xr_area_non_agricultural_landuse"')
     get_map2json(area_nonag, legend_non_ag, {'lu':'ALL'}, legend_float, area_min_max, f'{SAVE_DIR}/map_layers/map_area_NonAg.js')
@@ -278,10 +277,10 @@ def save_report_layer(raw_data_dir:str):
     files_bio = files.query('base_name.str.contains("biodiversity")')
     
     bio_magnitudes = (
-        cell_magnitudes['bio_quality']['ag'],
-        cell_magnitudes['bio_quality']['non_ag'],
-        *cell_magnitudes['bio_quality']['am'].values(),
-        cell_magnitudes['bio_quality']['all']
+        *cell_magnitudes['bio_quality']['ag'],
+        *cell_magnitudes['bio_quality']['non_ag'],
+        *cell_magnitudes['bio_quality']['am'],
+        *cell_magnitudes['bio_quality']['all']
     )
     
     bio_min_max = (min(bio_magnitudes), max(bio_magnitudes))
@@ -412,26 +411,26 @@ def save_report_layer(raw_data_dir:str):
     ####################################################
     
     ecnomic_magnitudes_ag = (
-        *cell_magnitudes['Economics_ag']['ag_revenue'].values(),
-        *cell_magnitudes['Economics_ag']['ag_cost'].values(),
-        *cell_magnitudes['Economics_ag']['profit_ag'].values()
+        *cell_magnitudes['Economics_ag']['ag_revenue'],
+        *cell_magnitudes['Economics_ag']['ag_cost'],
+        *cell_magnitudes['Economics_ag']['profit_ag']
     )
     ecnomic_magnitudes_nonag = (
-        *cell_magnitudes['Economics_am']['am_revenue'].values(),
-        *cell_magnitudes['Economics_am']['am_cost'].values(),
-        *cell_magnitudes['Economics_am']['am_profit'].values()
+        *cell_magnitudes['Economics_am']['am_revenue'],
+        *cell_magnitudes['Economics_am']['am_cost'],
+        *cell_magnitudes['Economics_am']['am_profit']
     )
     ecnomic_magnitudes_am = (
-        cell_magnitudes['Economics_non_ag']['non_ag_revenue'],
-        cell_magnitudes['Economics_non_ag']['non_ag_cost'],
-        cell_magnitudes['Economics_non_ag']['non_ag_profit']
+        *cell_magnitudes['Economics_non_ag']['non_ag_revenue'],
+        *cell_magnitudes['Economics_non_ag']['non_ag_cost'],
+        *cell_magnitudes['Economics_non_ag']['non_ag_profit']
     )
     economic_magnitudes_transition = (
-        *cell_magnitudes['Economics_ag']['ag2ag_cost'].values(),
-        *cell_magnitudes['Economics_ag']['non_ag2ag_cost'].values(),
-        *cell_magnitudes['Economics_am']['am_transition'].values(),
-        cell_magnitudes['Economics_non_ag']['non_ag_to_non_ag_cost'],
-        cell_magnitudes['Economics_non_ag']['non_ag_to_ag_cost']
+        *cell_magnitudes['Economics_ag']['ag2ag_cost'],
+        *cell_magnitudes['Economics_ag']['non_ag2ag_cost'],
+        *cell_magnitudes['Economics_am']['am_transition'],
+        *cell_magnitudes['Economics_non_ag']['non_ag_to_non_ag_cost'],
+        *cell_magnitudes['Economics_non_ag']['non_ag_to_ag_cost']
     )
     
     economic_min_max_ag = (min(ecnomic_magnitudes_ag), max(ecnomic_magnitudes_ag))
@@ -506,10 +505,10 @@ def save_report_layer(raw_data_dir:str):
     files_ghg = files.query('base_name.str.contains("GHG")')
     
     ghg_magnitudes = (
-        *cell_magnitudes['ghg_emission']['ag'].values(),
-        *cell_magnitudes['ghg_emission']['non_ag'].values(),
-        *cell_magnitudes['ghg_emission']['ag_man'].values(),
-        *cell_magnitudes['ghg_emission']['transition'].values(),
+        *cell_magnitudes['ghg_emission']['ag'],
+        *cell_magnitudes['ghg_emission']['non_ag'],
+        *cell_magnitudes['ghg_emission']['ag_man'],
+        # *cell_magnitudes['ghg_emission']['transition'],
     )
     
     ghg_min_max = (min(ghg_magnitudes), max(ghg_magnitudes))
@@ -533,17 +532,24 @@ def save_report_layer(raw_data_dir:str):
     ####################################################
 
     files_quantities = files.query('base_name.str.contains("quantities")')
+    
+    prod_magnitudes = cell_magnitudes['production']
+    prod_min_max = {k: (min(v), max(v)) for k, v in prod_magnitudes.items()}
 
     quantities_ag = files_quantities.query('base_name == "xr_quantities_agricultural"')
-    get_map2json(quantities_ag, legend_ag, {'Commodity':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_quantities_Ag.js')
+    get_map2json(quantities_ag, legend_ag, {'Commodity':'ALL'}, legend_float, prod_min_max, f'{SAVE_DIR}/map_layers/map_quantities_Ag.js')
     print('│   ├── Quantities Ag layer saved.')
+    
+    
+    # files_df,legend_int,legend_int_level,legend_float,float_magnitude,save_path = quantities_ag, legend_ag, {'Commodity':'ALL'}, legend_float, prod_min_max, f'{SAVE_DIR}/map_layers/map_quantities_Ag.js'
+    
 
     quantities_am = files_quantities.query('base_name == "xr_quantities_agricultural_management"')
-    get_map2json(quantities_am, legend_am, {'am':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_quantities_Am.js')
+    get_map2json(quantities_am, legend_am, {'Commodity':'ALL'}, legend_float, prod_min_max, f'{SAVE_DIR}/map_layers/map_quantities_Am.js')
     print('│   ├── Quantities Am layer saved.')
 
     quantities_nonag = files_quantities.query('base_name == "xr_quantities_non_agricultural"')
-    get_map2json(quantities_nonag, legend_non_ag, {'Commodity':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_quantities_NonAg.js')
+    get_map2json(quantities_nonag, legend_non_ag, {'Commodity':'ALL'}, legend_float, prod_min_max, f'{SAVE_DIR}/map_layers/map_quantities_NonAg.js')
     print('│   ├── Quantities Non-Ag layer saved.')
 
 
@@ -571,9 +577,9 @@ def save_report_layer(raw_data_dir:str):
     files_water = files.query('base_name.str.contains("water_yield")')
     
     water_magnitudes = (
-        *cell_magnitudes['water_yield']['ag'].values(),
-        *cell_magnitudes['water_yield']['non_ag'].values(),
-        *cell_magnitudes['water_yield']['ag_man'].values(),
+        *cell_magnitudes['water_yield']['ag'],
+        *cell_magnitudes['water_yield']['non_ag'],
+        *cell_magnitudes['water_yield']['am'],
     )
 
     water_min_max = (min(water_magnitudes), max(water_magnitudes))
