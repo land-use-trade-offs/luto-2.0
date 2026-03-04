@@ -40,7 +40,7 @@ This document describes the core architecture, modules, and data flow of LUTO2.
   - `get_GBF4_SNES_matrix_sr()`, `get_GBF4_ECNES_matrix_sr()`: Species/Ecological Community NES matrices
   - `get_GBF8_matrix_sr()`: Species conservation matrices
   - Variable naming convention: `*_pre_1750_area_*` for baseline biodiversity area matrices
-- **Agricultural management options** (10 types): Asparagopsis taxiformis, Precision Agriculture, Ecological Grazing, Savanna Burning, AgTech EI, Biochar, HIR-Beef, HIR-Sheep, Utility Solar PV, Onshore Wind
+- **Agricultural Management options** (10 types): Asparagopsis taxiformis, Precision Agriculture, Ecological Grazing, Savanna Burning, AgTech EI, Biochar, HIR-Beef, HIR-Sheep, Utility Solar PV, Onshore Wind
 
 ### Non-Agricultural Economics (`luto/economics/non_agricultural/`)
 - Environmental plantings, riparian plantings, sheep/beef agroforestry, carbon plantings (block/belt), BECCS, destocked natural land

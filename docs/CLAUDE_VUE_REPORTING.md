@@ -92,7 +92,7 @@ Bounds stored as `[[lat_min, lon_min], [lat_max, lon_max]]` for Leaflet `imageOv
 | Layer type | Examples | Rendering |
 |------------|---------|-----------|
 | **Integer** | DVAR, lumap | Pixel = land-use code → RGBA lookup from `COLOR_AG/AM/NON_AG` |
-| **Float** | Economics, GHG, Water, Biodiversity | Clip 1st–99th percentile, normalize 0–100, map through `COLORS_FLOAT`; store raw `min_max` for colorbar |
+| **Float** | Economics, GHG, Water, Biodiversity | Clip 1st–99th percentile, normalize 0–100, map through `COLORS_FLOAT_POSITIVE`; store raw `min_max` for colorbar |
 
 ### Step 7 — PNG → base64
 

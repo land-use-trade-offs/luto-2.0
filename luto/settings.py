@@ -168,7 +168,7 @@ the model sensitive to variations in input data.
 # Geographical raster writing parameters
 # ---------------------------------------------------------------------------- #
 WRITE_PARALLEL = True                       # If to use parallel processing to write GeoTiffs: True or False
-WRITE_THREADS = min(6, os.cpu_count())      # The Threads to use for map making, only work with WRITE_PARALLEL = True
+WRITE_THREADS = min(12, os.cpu_count())     # The Threads to use for map making, only work with WRITE_PARALLEL = True
 
 WRITE_REPORT_MAX_MEM_GB = 64                # The maximum memory (in GB) to use for writing report layers.
                                             #   Estimated based on the 0.5 GB MEM usage when RESFACTOR = 13 

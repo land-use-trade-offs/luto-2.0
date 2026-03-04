@@ -103,7 +103,7 @@ luto/                                    # Main package directory
 input/                                   # Input data directory (requires separate download)
 output/                                  # Simulation outputs with interactive HTML reports
 docs/                                    # Documentation files
-requirements.yml                        # Python package dependencies (conda environment spec)
+requirements.yml                         # Python package dependencies (conda environment spec)
 pyproject.toml                           # Project configuration
 ```
 

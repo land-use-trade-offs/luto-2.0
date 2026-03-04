@@ -295,7 +295,7 @@ Key locations where xr.dot() is used in LUTO2:
 - [write.py:424](luto/tools/write.py#L424) - Commodity production calculations
 - [write.py:652](luto/tools/write.py#L652) - Agricultural profit aggregation
 - [write.py:758](luto/tools/write.py#L758) - Non-agricultural profit aggregation
-- [write.py:840](luto/tools/write.py#L840) - Agricultural management profit
+- [write.py:840](luto/tools/write.py#L840) - Agricultural Management profit
 - [write.py:1266](luto/tools/write.py#L1266) - Ag-to-ag transition costs (dimension elimination)
 - [write.py:1987](luto/tools/write.py#L1987) - GHG emissions calculation
 
