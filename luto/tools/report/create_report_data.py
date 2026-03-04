@@ -104,9 +104,8 @@ def save_report_data(raw_data_dir:str):
 
     # Execute jobs in parallel
     num_jobs = len(jobs)
-    results = list(Parallel(n_jobs=num_jobs, return_as='generator_unordered')(jobs))
-    for i, out in enumerate(results):
-        if i < len(results) - 1:
+    for i, out in enumerate(Parallel(n_jobs=num_jobs, return_as='generator_unordered')(jobs)):
+        if i < num_jobs - 1:
             print(f"│   ├── {out}")
         else:
             print(f"│   └── {out}")
@@ -120,21 +119,21 @@ def process_area_data(files, SAVE_DIR, lu_group_map):
 
     ag_dvar_dfs = area_dvar_paths.query('base_name == "area_agricultural_landuse"').reset_index(drop=True)
     ag_dvar_area = pd.concat([pd.read_csv(path) for path in ag_dvar_dfs['path']], ignore_index=True)
-    ag_dvar_area['Source'] = 'Agricultural land-use'
+    ag_dvar_area['Source'] = 'Agricultural Land-use'
     ag_dvar_area['Category'] = ag_dvar_area['Land-use'].map(lu_group_map)
     ag_dvar_area['Area (ha)'] = ag_dvar_area['Area (ha)'].round(2)
     ag_dvar_area_non_all = ag_dvar_area.query('Water_supply != "ALL"').copy()
 
     non_ag_dvar_dfs = area_dvar_paths.query('base_name == "area_non_agricultural_landuse"').reset_index(drop=True)
-    non_ag_dvar_area = pd.concat([pd.read_csv(path) for path in non_ag_dvar_dfs['path'] if not pd.read_csv(path).empty], ignore_index=True)
-    non_ag_dvar_area['Land-use'] = non_ag_dvar_area['Land-use'].replace(RENAME_NON_AG)
+    non_ag_dvar_area = pd.concat([df for path in non_ag_dvar_dfs['path'] if not (df := pd.read_csv(path)).empty], ignore_index=True)
+    non_ag_dvar_area['Land-use'] = non_ag_dvar_area['Land-use'].replace(RENAME_NON_AG).infer_objects(copy=False)
     non_ag_dvar_area['Category'] = non_ag_dvar_area['Land-use'].map(lu_group_map)
     non_ag_dvar_area['Source'] = 'Non-Agricultural Land-use'
     non_ag_dvar_area['Area (ha)'] = non_ag_dvar_area['Area (ha)'].round(2)
 
     am_dvar_dfs = area_dvar_paths.query('base_name == "area_agricultural_management"').reset_index(drop=True)
-    am_dvar_area = pd.concat([pd.read_csv(path) for path in am_dvar_dfs['path'] if not pd.read_csv(path).empty], ignore_index=True)
-    am_dvar_area = am_dvar_area.replace(RENAME_AM_NON_AG)
+    am_dvar_area = pd.concat([df for path in am_dvar_dfs['path'] if not (df := pd.read_csv(path)).empty], ignore_index=True)
+    am_dvar_area = am_dvar_area.replace(RENAME_AM_NON_AG).infer_objects(copy=False)
     am_dvar_area['Source'] = 'Agricultural Management'
     am_dvar_area['Area (ha)'] = am_dvar_area['Area (ha)'].round(2)
     am_dvar_area_non_all = am_dvar_area.query('Water_supply != "ALL" and `Land-use` != "ALL"').copy()
@@ -212,7 +211,7 @@ def process_area_data(files, SAVE_DIR, lu_group_map):
         elif col == 'Category':
             df_wide['color'] = df_wide['name'].apply(lambda x: COLORS[x])
         elif col == 'Source':
-            df_wide['name_order'] = df_wide['name'].apply(lambda x: ['Agricultural Management', 'Agricultural land-use', 'Non-Agricultural Land-use'].index(x))
+            df_wide['name_order'] = df_wide['name'].apply(lambda x: ['Agricultural Management', 'Agricultural Land-use', 'Non-Agricultural Land-use'].index(x))
             df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
             df_wide['color'] = df_wide['name'].apply(lambda x: COLORS[x])
 
@@ -314,54 +313,54 @@ def process_economics_data(files, SAVE_DIR):
     # -------------------- Get the revenue and cost data --------------------
     revenue_ag_df = files.query('base_name == "economics_ag_revenue"').reset_index(drop=True)
     revenue_ag_df = pd.concat([pd.read_csv(path) for path in revenue_ag_df['path']], ignore_index=True)
-    revenue_ag_df = revenue_ag_df.replace(RENAME_AM_NON_AG).assign(Source='Agricultural land-use (revenue)')
+    revenue_ag_df = revenue_ag_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False).assign(Source='Agricultural Land-use (revenue)')
     revenue_ag_df_non_all = revenue_ag_df.query('Water_supply != "ALL" and Type != "ALL"')
 
     cost_ag_df = files.query('base_name == "economics_ag_cost"').reset_index(drop=True)
     cost_ag_df = pd.concat([pd.read_csv(path) for path in cost_ag_df['path']], ignore_index=True)
-    cost_ag_df = cost_ag_df.replace(RENAME_AM_NON_AG).assign(Source='Agricultural land-use (cost)')
+    cost_ag_df = cost_ag_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False).assign(Source='Agricultural Land-use (cost)')
     cost_ag_df['Value ($)'] = cost_ag_df['Value ($)'] * -1          # Convert cost to negative value
     cost_ag_df_non_all = cost_ag_df.query('Water_supply != "ALL" and Type != "ALL"')
 
     revenue_am_df = files.query('base_name == "economics_am_revenue"').reset_index(drop=True)
-    revenue_am_df = pd.concat([pd.read_csv(path) for path in revenue_am_df['path']], ignore_index=True)
-    revenue_am_df = revenue_am_df.replace(RENAME_AM_NON_AG).assign(Source='Agricultural Management (revenue)')
+    revenue_am_df = pd.concat([df for path in revenue_am_df['path'] if not (df := pd.read_csv(path)).empty], ignore_index=True)
+    revenue_am_df = revenue_am_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False).assign(Source='Agricultural Management (revenue)')
     revenue_am_df_non_all = revenue_am_df.query('Water_supply != "ALL" and `Land-use` != "ALL"')
 
     cost_am_df = files.query('base_name == "economics_am_cost"').reset_index(drop=True)
-    cost_am_df = pd.concat([pd.read_csv(path) for path in cost_am_df['path']], ignore_index=True)
-    cost_am_df = cost_am_df.replace(RENAME_AM_NON_AG).assign(Source='Agricultural Management (cost)')
+    cost_am_df = pd.concat([df for path in cost_am_df['path'] if not (df := pd.read_csv(path)).empty], ignore_index=True)
+    cost_am_df = cost_am_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False).assign(Source='Agricultural Management (cost)')
     cost_am_df['Value ($)'] = cost_am_df['Value ($)'] * -1          # Convert cost to negative value
     cost_am_df_non_all = cost_am_df.query('Water_supply != "ALL" and `Land-use` != "ALL"')
 
     revenue_non_ag_df = files.query('base_name == "economics_non_ag_revenue"').reset_index(drop=True)
-    revenue_non_ag_df = pd.concat([pd.read_csv(path) for path in revenue_non_ag_df['path']], ignore_index=True)
-    revenue_non_ag_df = revenue_non_ag_df.replace(RENAME_AM_NON_AG).assign(Source='Non-Agricultural Land-use (revenue)')
+    revenue_non_ag_df = pd.concat([df for path in revenue_non_ag_df['path'] if not (df := pd.read_csv(path)).empty], ignore_index=True)
+    revenue_non_ag_df = revenue_non_ag_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False).assign(Source='Non-Agricultural Land-use (revenue)')
 
     cost_non_ag_df = files.query('base_name == "economics_non_ag_cost"').reset_index(drop=True)
-    cost_non_ag_df = pd.concat([pd.read_csv(path) for path in cost_non_ag_df['path']], ignore_index=True)
-    cost_non_ag_df = cost_non_ag_df.replace(RENAME_AM_NON_AG).assign(Source='Non-Agricultural Land-use (cost)')
+    cost_non_ag_df = pd.concat([df for path in cost_non_ag_df['path'] if not (df := pd.read_csv(path)).empty], ignore_index=True)
+    cost_non_ag_df = cost_non_ag_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False).assign(Source='Non-Agricultural Land-use (cost)')
     cost_non_ag_df['Value ($)'] = cost_non_ag_df['Value ($)'] * -1  # Convert cost to negative value
 
-    cost_transition_ag2ag_df = files.query('base_name == "transition_cost_ag2ag"').reset_index(drop=True)
-    cost_transition_ag2ag_df = pd.concat([pd.read_csv(path) for path in cost_transition_ag2ag_df['path'] if not pd.read_csv(path).empty], ignore_index=True)
-    cost_transition_ag2ag_df = cost_transition_ag2ag_df.replace(RENAME_AM_NON_AG).assign(Source='Transition cost (Ag2Ag)')
+    cost_transition_ag2ag_df = files.query('base_name == "transition_ag2ag_cost"').reset_index(drop=True)
+    cost_transition_ag2ag_df = pd.concat([df for path in cost_transition_ag2ag_df['path'] if not (df := pd.read_csv(path)).empty], ignore_index=True)
+    cost_transition_ag2ag_df = cost_transition_ag2ag_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False).assign(Source='Transition cost (Ag2Ag)')
     cost_transition_ag2ag_df['Value ($)'] = cost_transition_ag2ag_df['Cost ($)']  * -1          # Convert cost to negative value
     cost_transition_ag2ag_df_non_all = cost_transition_ag2ag_df.query(
         '`From-land-use` != "ALL" and `To-land-use` != "ALL" and Type != "ALL" '
         ).copy()
 
-    cost_transition_ag2non_ag_df = files.query('base_name == "transition_cost_ag2non_ag"').reset_index(drop=True)
-    cost_transition_ag2non_ag_df = pd.concat([pd.read_csv(path) for path in cost_transition_ag2non_ag_df['path'] if not pd.read_csv(path).empty], ignore_index=True)
-    cost_transition_ag2non_ag_df = cost_transition_ag2non_ag_df.replace(RENAME_AM_NON_AG).assign(Source='Transition cost (Ag2Non-Ag)')
+    cost_transition_ag2non_ag_df = files.query('base_name == "transition_ag2nonag_cost"').reset_index(drop=True)
+    cost_transition_ag2non_ag_df = pd.concat([df for path in cost_transition_ag2non_ag_df['path'] if not (df := pd.read_csv(path)).empty], ignore_index=True)
+    cost_transition_ag2non_ag_df = cost_transition_ag2non_ag_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False).assign(Source='Transition cost (Ag2Non-Ag)')
     cost_transition_ag2non_ag_df['Value ($)'] = cost_transition_ag2non_ag_df['Cost ($)'] * -1   # Convert cost to negative value
     cost_transition_ag2non_ag_df_non_all = cost_transition_ag2non_ag_df.query(
         '`From-land-use` != "ALL" and `To-land-use` != "ALL" and `Cost-type` != "ALL" '
         ).copy()
 
-    cost_transition_non_ag2ag_df = files.query('base_name == "transition_cost_non_ag2ag"').reset_index(drop=True)
-    cost_transition_non_ag2ag_df = pd.concat([pd.read_csv(path) for path in cost_transition_non_ag2ag_df['path'] if not pd.read_csv(path).empty], ignore_index=True)
-    cost_transition_non_ag2ag_df = cost_transition_non_ag2ag_df.replace(RENAME_AM_NON_AG).assign(Source='Transition cost (Non-Ag2Ag)').dropna(subset=['Cost ($)'])
+    cost_transition_non_ag2ag_df = files.query('base_name == "transition_nonag2ag_cost"').reset_index(drop=True)
+    cost_transition_non_ag2ag_df = pd.concat([df for path in cost_transition_non_ag2ag_df['path'] if not (df := pd.read_csv(path)).empty], ignore_index=True)
+    cost_transition_non_ag2ag_df = cost_transition_non_ag2ag_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False).assign(Source='Transition cost (Non-Ag2Ag)').dropna(subset=['Cost ($)'])
     cost_transition_non_ag2ag_df['Value ($)'] = cost_transition_non_ag2ag_df['Cost ($)'] * -1   # Convert cost to negative value
     cost_transition_non_ag2ag_df_non_all = cost_transition_non_ag2ag_df.query(
         '`From-land-use` != "ALL" and `To-land-use` != "ALL"'
@@ -384,10 +383,10 @@ def process_economics_data(files, SAVE_DIR):
         ).reset_index(drop=True)
 
     order = [
-        'Agricultural land-use (revenue)',
+        'Agricultural Land-use (revenue)',
         'Agricultural Management (revenue)',
         'Non-Agricultural Land-use (revenue)',
-        'Agricultural land-use (cost)',
+        'Agricultural Land-use (cost)',
         'Agricultural Management (cost)',
         'Non-Agricultural Land-use (cost)',
         'Transition cost (Ag2Ag)',
@@ -610,6 +609,7 @@ def process_economics_data(files, SAVE_DIR):
     cost_ag_df = cost_ag_df.assign(Rev_Cost='Cost')
 
     economics_ag = pd.concat([revenue_ag_df, cost_ag_df]
+        ).query('`Land-use` != "ALL"'
         ).round({'Value ($)': 2}
         ).query('abs(`Value ($)`) > 1'
         ).reset_index(drop=True)
@@ -653,7 +653,7 @@ def process_economics_data(files, SAVE_DIR):
     cost_am_df = cost_am_df.assign(Rev_Cost='Cost')
 
     economics_am = pd.concat([revenue_am_df, cost_am_df]
-        ).query('Water_supply != "ALL" and `Land-use` != "ALL"'
+        ).query('`Land-use` != "ALL"'
         ).round({'Value ($)': 2}
         ).query('abs(`Value ($)`) > 1'
         ).reset_index(drop=True)
@@ -998,8 +998,10 @@ def process_production_data(files, SAVE_DIR, years):
     quantity_df = pd.concat([pd.read_csv(path) for path in quantity_df['path']])\
         .assign(Commodity = lambda x: x['Commodity'].str.capitalize())\
         .replace({'Sheep lexp': 'Sheep live export', 'Beef lexp': 'Beef live export'})\
+        .infer_objects(copy=False)\
         .assign(group = lambda x: x['Commodity'].map(COMMIDOTY_GROUP.get))\
         .replace(RENAME_AM_NON_AG)\
+        .infer_objects(copy=False)\
         .query(f'Year.isin({years}) and abs(`Production (t/KL)`) > 1')\
         .query('Commodity != "All"')\
         .round({'`Production (t/KL)`': 2})
@@ -1025,10 +1027,12 @@ def process_production_data(files, SAVE_DIR, years):
     DEMAND_DATA = get_demand_df()\
         .query(f'Year.isin({years}) and abs(`Quantity (tonnes, KL)`) > 1')\
         .replace({'Beef lexp': 'Beef live export', 'Sheep lexp': 'Sheep live export'})\
+        .infer_objects(copy=False)\
         .set_index(['Commodity', 'Type', 'Year'])\
         .reindex(COMMODITIES_ALL, level=0)\
         .reset_index()\
         .replace(RENAME_AM_NON_AG)\
+        .infer_objects(copy=False)\
         .assign(group = lambda x: x['Commodity'].map(COMMIDOTY_GROUP.get))
 
     # Convert imports to negative values, making it below zero in the stacked column chart
@@ -1125,7 +1129,7 @@ def process_production_data(files, SAVE_DIR, years):
     # -------------------- Overview: Australia production achievement (%) --------------------
     quantity_diff = files.query('base_name == "quantity_comparison"').reset_index(drop=True)
     quantity_diff = pd.concat([pd.read_csv(path) for path in quantity_diff['path']], ignore_index=True)
-    quantity_diff = quantity_diff.replace({'Sheep lexp': 'Sheep live export', 'Beef lexp': 'Beef live export'})
+    quantity_diff = quantity_diff.replace({'Sheep lexp': 'Sheep live export', 'Beef lexp': 'Beef live export'}).infer_objects(copy=False)
     quantity_diff = quantity_diff[['Year','Commodity','Prop_diff (%)']].rename(columns={'Prop_diff (%)': 'Demand Achievement (%)'})
 
     mask_AUS = quantity_diff.groupby('Commodity'
@@ -1263,21 +1267,21 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
 
     GHG_ag = GHG_files.query('base_name.str.contains("agricultural_landuse")').reset_index(drop=True)
     GHG_ag = pd.concat([pd.read_csv(path) for path in GHG_ag['path']], ignore_index=True)
-    GHG_ag = GHG_ag.replace(GHG_NAMES).round({'Value (t CO2e)': 2})
+    GHG_ag = GHG_ag.replace(GHG_NAMES).infer_objects(copy=False).round({'Value (t CO2e)': 2})
     GHG_ag_non_all = GHG_ag.query('Water_supply != "ALL" and Source != "ALL"').reset_index(drop=True)
     
     GHG_non_ag = GHG_files.query('base_name.str.contains("no_ag_reduction")').reset_index(drop=True)
-    GHG_non_ag = pd.concat([pd.read_csv(path) for path in GHG_non_ag['path'] if not pd.read_csv(path).empty], ignore_index=True)
-    GHG_non_ag = GHG_non_ag.replace(RENAME_AM_NON_AG).round({'Value (t CO2e)': 2})
+    GHG_non_ag = pd.concat([df for path in GHG_non_ag['path'] if not (df := pd.read_csv(path)).empty], ignore_index=True)
+    GHG_non_ag = GHG_non_ag.replace(RENAME_AM_NON_AG).infer_objects(copy=False).round({'Value (t CO2e)': 2})
     
     GHG_ag_man = GHG_files.query('base_name.str.contains("agricultural_management")').reset_index(drop=True)
-    GHG_ag_man = pd.concat([pd.read_csv(path) for path in GHG_ag_man['path'] if not pd.read_csv(path).empty], ignore_index=True)
-    GHG_ag_man = GHG_ag_man.replace(RENAME_AM_NON_AG).round({'Value (t CO2e)': 2})
+    GHG_ag_man = pd.concat([df for path in GHG_ag_man['path'] if not (df := pd.read_csv(path)).empty], ignore_index=True)
+    GHG_ag_man = GHG_ag_man.replace(RENAME_AM_NON_AG).infer_objects(copy=False).round({'Value (t CO2e)': 2})
     GHG_ag_man_non_all = GHG_ag_man.query('Water_supply != "ALL" and `Land-use` != "ALL"').reset_index(drop=True)
     
     GHG_transition = GHG_files.query('base_name.str.contains("transition_penalty")').reset_index(drop=True)
-    GHG_transition = pd.concat([pd.read_csv(path) for path in GHG_transition['path'] if not pd.read_csv(path).empty], ignore_index=True)
-    GHG_transition = GHG_transition.replace(RENAME_AM_NON_AG).round({'Value (t CO2e)': 2})
+    GHG_transition = pd.concat([df for path in GHG_transition['path'] if not (df := pd.read_csv(path)).empty], ignore_index=True)
+    GHG_transition = GHG_transition.replace(RENAME_AM_NON_AG).infer_objects(copy=False).round({'Value (t CO2e)': 2})
     GHG_transition = GHG_transition.query('Type != "ALL" and Water_supply != "ALL"').reset_index(drop=True)
 
     GHG_off_land = GHG_files.query('base_name.str.contains("offland_commodity")')
@@ -1290,7 +1294,7 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
             'CO2': 'Carbon Dioxide (CO2)',
             'CH4': 'Methane (CH4)',
             'N2O': 'Nitrous Oxide (N2O)'
-        })
+        }).infer_objects(copy=False)
 
     GHG_land = pd.concat([GHG_ag, GHG_non_ag, GHG_ag_man, GHG_transition], axis=0)\
         .query('abs(`Value (t CO2e)`) > 1')\
@@ -1313,7 +1317,7 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
     GHG_limit_wide = list(map(list,zip(GHG_limit['Year'],GHG_limit['Value (t CO2e)'])))
     
     order_GHG = [
-        'Agricultural land-use',
+        'Agricultural Land-use',
         'Agricultural Management',
         'Non-Agricultural Land-use',
         'Off-land emissions',
@@ -1509,7 +1513,7 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
 
 
     # -------------------- GHG by agricultural land-use --------------------
-    GHG_ag = GHG_land.query('Type == "Agricultural land-use"') 
+    GHG_ag = GHG_land.query('Type == "Agricultural Land-use" and `Land-use` != "ALL"')
     GHG_CO2 = GHG_ag.query('~Source.isin(@GHG_CATEGORY.keys())').copy()
     GHG_CO2['GHG Category'] = 'CO2'
 
@@ -1523,10 +1527,10 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
     GHG_ag_emissions_long = pd.concat([GHG_CO2, GHG_nonCO2], axis=0).reset_index(drop=True)
     GHG_ag_emissions_long['GHG Category'] = GHG_ag_emissions_long['GHG Category']\
         .replace({
-            'CH4': 'Methane (CH4)', 
-            'N2O': 'Nitrous Oxide (N2O)', 
+            'CH4': 'Methane (CH4)',
+            'N2O': 'Nitrous Oxide (N2O)',
             'CO2': 'Carbon Dioxide (CO2)'
-        })
+        }).infer_objects(copy=False)
 
     df_wide = GHG_ag_emissions_long\
         .groupby(['region', 'Source', 'Water_supply', 'Land-use', 'Year'])[['Value (t CO2e)']]\
@@ -1646,6 +1650,7 @@ def process_water_data(files, SAVE_DIR):
     water_net_yield_watershed = pd.concat([water_net_yield_watershed_region, water_net_yield_watershed_AUS], ignore_index=True)
     water_net_yield_watershed = water_net_yield_watershed\
         .replace(RENAME_AM_NON_AG)\
+        .infer_objects(copy=False)\
         .query('abs(`Water Net Yield (ML)`) > 1e-4')\
         .rename(columns={'Water Net Yield (ML)': 'Value (ML)'})
     water_net_yield_watershed_non_all = water_net_yield_watershed\
@@ -1775,6 +1780,7 @@ def process_water_data(files, SAVE_DIR):
         .assign(region_NRM='AUSTRALIA')
     water_net_yield_NRM_region = pd.concat([water_net_yield_NRM_region_region, water_net_yield_NRM_region_AUS])\
         .replace(RENAME_AM_NON_AG)\
+        .infer_objects(copy=False)\
         .query('abs(`Water Net Yield (ML)`) > 1e-4')\
         .rename(columns={'Water Net Yield (ML)': 'Value (ML)'})
     water_net_yield_NRM_region_non_all = water_net_yield_NRM_region\
@@ -1851,7 +1857,7 @@ def process_water_data(files, SAVE_DIR):
         
     
     # Ag
-    water_ag = water_net_yield_NRM_region_non_all.query('Type == "Agricultural land-use"')
+    water_ag = water_net_yield_NRM_region_non_all.query('Type == "Agricultural Land-use"')
     
     water_overview_ag = water_ag\
         .groupby(['region_NRM', 'Landuse', 'Year'])[['Value (ML)']]\
@@ -1938,7 +1944,7 @@ def process_water_data(files, SAVE_DIR):
 
     # -------------------- Water yield for Ag by NRM --------------------
     water_ag_AUS = water_net_yield_NRM_region\
-        .query('Type == "Agricultural land-use"')\
+        .query('Type == "Agricultural Land-use"')\
         .groupby(['Water Supply', 'Landuse', 'Year',])[['Value (ML)']]\
         .sum(numeric_only=True)\
         .reset_index()\
@@ -1946,7 +1952,7 @@ def process_water_data(files, SAVE_DIR):
         
     water_ag = pd.concat([
         water_ag_AUS,
-        water_net_yield_NRM_region.query('Type == "Agricultural land-use"').rename(columns={'region_NRM': 'region'})
+        water_net_yield_NRM_region.query('Type == "Agricultural Land-use"').rename(columns={'region_NRM': 'region'})
         ], ignore_index=True)
     
     df_region_wide = water_ag.groupby(['region', 'Water Supply', 'Landuse'])[['Year','Value (ML)']]\
@@ -2076,11 +2082,12 @@ def process_biodiversity_data(files, SAVE_DIR):
     bio_paths = files.query(filter_str).reset_index(drop=True)
     bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])\
         .replace(RENAME_AM_NON_AG)\
+        .infer_objects(copy=False)\
         .rename(columns={'Contribution Relative to Base Year Level (%)': 'Value (%)'})\
         .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
         .round({'Value (%)': 6})
     bio_df_non_all = bio_df.query('Water_supply != "ALL" and Landuse != "ALL"')
-    bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural land-use"').copy()
+    bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural Land-use"').copy()
     bio_df_am_non_all = bio_df_non_all.query('Type == "Agricultural Management"').copy()
     bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"').copy()
     
@@ -2240,7 +2247,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         
         
     # ---------------- Overall quality - Ag ----------------
-    bio_df_ag = bio_df.query('Type == "Agricultural land-use"').copy()
+    bio_df_ag = bio_df.query('Type == "Agricultural Land-use" and Landuse != "ALL"').copy()
     bio_df_wide = bio_df_ag.groupby(['region', 'Water_supply', 'Landuse'])[['Year','Value (%)']]\
         .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
         .reset_index()
@@ -2309,7 +2316,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         
         
     # ---------------- Overall quality - Non-Ag ----------------
-    bio_df_nonag = bio_df.query('Type == "Non-Agricultural Land-use"').copy()
+    bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"').copy()
     df_wide = bio_df_nonag.groupby(['region', 'Landuse'])[['Year','Value (%)']]\
         .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
         .reset_index()
@@ -2342,12 +2349,13 @@ def process_biodiversity_data(files, SAVE_DIR):
         bio_paths = files.query(filter_str).reset_index(drop=True)
         bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
         bio_df = bio_df.replace(RENAME_AM_NON_AG)\
+            .infer_objects(copy=False)\
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)'})\
             .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
             .round({'Value (%)': 2})
-            
+
         bio_df_non_all = bio_df.query('Water_supply != "ALL" and Landuse != "ALL"')
-        bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural land-use"')
+        bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural Land-use"')
         bio_df_am_non_all = bio_df_non_all.query('Type == "Agricultural Management"')
         bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"')
         
@@ -2485,7 +2493,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             
             
         # ---------------- (GBF2) Ag  ----------------
-        bio_df_ag = bio_df.query('Type == "Agricultural land-use"').copy()
+        bio_df_ag = bio_df.query('Type == "Agricultural Land-use" and Landuse != "ALL"').copy()
         df_region = bio_df_ag\
             .groupby(['region', 'Water_supply', 'Landuse'])[['Year', 'Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
@@ -2557,7 +2565,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             
             
         # ---------------- (GBF2) Non-Ag  ----------------
-        bio_df_nonag = bio_df.query('Type == "Non-Agricultural Land-use"').copy()
+        bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"').copy()
         df_region = bio_df_nonag\
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
@@ -2594,13 +2602,14 @@ def process_biodiversity_data(files, SAVE_DIR):
         '''.strip().replace('\n','')
         
         bio_paths = files.query(filter_str).reset_index(drop=True)
-        bio_df = pd.concat([pd.read_csv(path, low_memory=False) for path in bio_paths['path']])
+        bio_df = pd.concat([df for path in bio_paths['path'] if not (df := pd.read_csv(path, low_memory=False)).empty])
         bio_df = bio_df.replace(RENAME_AM_NON_AG)\
+            .infer_objects(copy=False)\
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)', 'Vegetation Group': 'species'})\
             .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
             .round(6)
         bio_df_non_all = bio_df.query('Water_supply != "ALL" and Landuse != "ALL"')
-        bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural land-use"')
+        bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural Land-use"')
         bio_df_am_non_all = bio_df_non_all.query('Type == "Agricultural Management"')
         bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"')
         
@@ -2738,7 +2747,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             
             
         # ---------------- (GBF3-NVIS) - Ag  ----------------
-        bio_df_ag = bio_df.query('Type == "Agricultural land-use"').copy()
+        bio_df_ag = bio_df.query('Type == "Agricultural Land-use" and Landuse != "ALL"').copy()
 
         df_wide = bio_df_ag\
             .groupby(['region', 'species', 'Water_supply', 'Landuse'])[['Year', 'Value (%)']]\
@@ -2814,7 +2823,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             f.write(';\n')
             
         # ---------------- (GBF3-NVIS) - Non-Ag  ----------------
-        bio_df_nonag = bio_df.query('Type == "Non-Agricultural Land-use"').copy()
+        bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"').copy()
         
         df_wide = bio_df_nonag\
             .groupby(['region', 'species', 'Landuse'])[['Year', 'Value (%)']]\
@@ -2847,13 +2856,14 @@ def process_biodiversity_data(files, SAVE_DIR):
         '''.strip().replace('\n','')
 
         bio_paths = files.query(filter_str).reset_index(drop=True)
-        bio_df = pd.concat([pd.read_csv(path, low_memory=False) for path in bio_paths['path']])
+        bio_df = pd.concat([df for path in bio_paths['path'] if not (df := pd.read_csv(path, low_memory=False)).empty])
         bio_df = bio_df.replace(RENAME_AM_NON_AG)\
+            .infer_objects(copy=False)\
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)', 'IBRA Bioregion': 'species'})\
             .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
             .round(6)
         bio_df_non_all = bio_df.query('Water_supply != "ALL" and Landuse != "ALL"')
-        bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural land-use"')
+        bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural Land-use"')
         bio_df_am_non_all = bio_df_non_all.query('Type == "Agricultural Management"')
         bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"')
 
@@ -2991,7 +3001,7 @@ def process_biodiversity_data(files, SAVE_DIR):
 
 
         # ---------------- (GBF3-IBRA) - Ag  ----------------
-        bio_df_ag = bio_df.query('Type == "Agricultural land-use"').copy()
+        bio_df_ag = bio_df.query('Type == "Agricultural Land-use" and Landuse != "ALL"').copy()
 
         df_wide = bio_df_ag\
             .groupby(['region', 'species', 'Water_supply', 'Landuse'])[['Year', 'Value (%)']]\
@@ -3067,7 +3077,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             f.write(';\n')
 
         # ---------------- (GBF3-IBRA) - Non-Ag  ----------------
-        bio_df_nonag = bio_df.query('Type == "Non-Agricultural Land-use"').copy()
+        bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"').copy()
 
         df_wide = bio_df_nonag\
             .groupby(['region', 'species', 'Landuse'])[['Year', 'Value (%)']]\
@@ -3102,13 +3112,14 @@ def process_biodiversity_data(files, SAVE_DIR):
         '''.strip().replace('\n', '')
         
         bio_paths = files.query(filter_str).reset_index(drop=True)
-        bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
+        bio_df = pd.concat([df for path in bio_paths['path'] if not (df := pd.read_csv(path)).empty])
         bio_df = bio_df.replace(RENAME_AM_NON_AG)\
+            .infer_objects(copy=False)\
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)'})\
             .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
             .round(6)
         bio_df_non_all = bio_df.query('Water_supply != "ALL" and Landuse != "ALL"')
-        bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural land-use"')
+        bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural Land-use"')
         bio_df_am_non_all = bio_df_non_all.query('Type == "Agricultural Management"')
         bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"')
 
@@ -3238,7 +3249,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             f.write(';\n')
 
         # ---------------- (GBF4 SNES) Ag  ----------------
-        bio_df_ag = bio_df.query('Type == "Agricultural land-use"').copy()
+        bio_df_ag = bio_df.query('Type == "Agricultural Land-use" and Landuse != "ALL"').copy()
 
         df_wide = bio_df_ag\
             .groupby(['region', 'species', 'Water_supply', 'Landuse'])[['Year', 'Value (%)']]\
@@ -3314,7 +3325,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             f.write(';\n')
 
         # ---------------- (GBF4 SNES) Non-ag  ----------------
-        bio_df_nonag = bio_df.query('Type == "Non-Agricultural Land-use"').copy()
+        bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"').copy()
 
         df_wide = bio_df_nonag\
             .groupby(['region', 'species', 'Landuse'])[['Year', 'Value (%)']]\
@@ -3346,14 +3357,15 @@ def process_biodiversity_data(files, SAVE_DIR):
     if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == 'on':
         
         bio_paths = files.query('base_name.str.contains("biodiversity_GBF4_ECNES_scores")')
-        bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
+        bio_df = pd.concat([df for path in bio_paths['path'] if not (df := pd.read_csv(path)).empty])
         bio_df = bio_df.replace(RENAME_AM_NON_AG)\
+            .infer_objects(copy=False)\
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)'})\
             .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
             .round(6)
 
         bio_df_non_all = bio_df.query('Water_supply != "ALL" and Landuse != "ALL"')
-        bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural land-use"')
+        bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural Land-use"')
         bio_df_am_non_all = bio_df_non_all.query('Type == "Agricultural Management"')
         bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"')
 
@@ -3482,7 +3494,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             f.write(';\n')
 
         # ---------------- (GBF4 ECNES) Ag  ----------------
-        bio_df_ag = bio_df.query('Type == "Agricultural land-use"').copy()
+        bio_df_ag = bio_df.query('Type == "Agricultural Land-use" and Landuse != "ALL"').copy()
 
         df_wide = bio_df_ag\
             .groupby(['region', 'species', 'Water_supply', 'Landuse'])[['Year', 'Value (%)']]\
@@ -3558,7 +3570,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             f.write(';\n')
 
         # ---------------- (GBF4 ECNES) Non-ag  ----------------
-        bio_df_nonag = bio_df.query('Type == "Non-Agricultural Land-use"').copy()
+        bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"').copy()
 
         df_wide = bio_df_nonag\
             .groupby(['region', 'species', 'Landuse'])[['Year', 'Value (%)']]\
@@ -3597,14 +3609,15 @@ def process_biodiversity_data(files, SAVE_DIR):
         '''.strip().replace('\n','')
         
         bio_paths = files.query(filter_str).reset_index(drop=True)
-        bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
+        bio_df = pd.concat([df for path in bio_paths['path'] if not (df := pd.read_csv(path)).empty])
         bio_df = bio_df.replace(RENAME_AM_NON_AG)\
+            .infer_objects(copy=False)\
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)', 'Species':'species'})\
             .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
             .round(6)
 
         bio_df_non_all = bio_df.query('Water_supply != "ALL" and Landuse != "ALL"')
-        bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural land-use"')
+        bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural Land-use"')
         bio_df_am_non_all = bio_df_non_all.query('Type == "Agricultural Management"')
         bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"')
 
@@ -3730,7 +3743,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             f.write(';\n')
 
         # ---------------- (GBF8 SPECIES) Ag  ----------------
-        bio_df_ag = bio_df.query('Type == "Agricultural land-use"').copy()
+        bio_df_ag = bio_df.query('Type == "Agricultural Land-use" and Landuse != "ALL"').copy()
 
         df_wide = bio_df_ag\
             .groupby(['region', 'species', 'Water_supply', 'Landuse'])[['Year', 'Value (%)']]\
@@ -3806,7 +3819,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             f.write(';\n')
 
         # ---------------- (GBF8 SPECIES) Non-ag  ----------------
-        bio_df_nonag = bio_df.query('Type == "Non-Agricultural Land-use"').copy()
+        bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"').copy()
 
         df_wide = bio_df_nonag\
             .groupby(['region', 'species', 'Landuse'])[['Year', 'Value (%)']]\
@@ -3837,14 +3850,15 @@ def process_biodiversity_data(files, SAVE_DIR):
     
         # ---------------- (GBF8 GROUP)  ----------------
         bio_paths = files.query('base_name.str.contains("biodiversity_GBF8_groups_scores")')
-        bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
+        bio_df = pd.concat([df for path in bio_paths['path'] if not (df := pd.read_csv(path)).empty])
         bio_df = bio_df.replace(RENAME_AM_NON_AG)\
+            .infer_objects(copy=False)\
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)', 'Group':'species'})\
             .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
             .round(6)
 
         bio_df_non_all = bio_df.query('Water_supply != "ALL" and Landuse != "ALL"')
-        bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural land-use"')
+        bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural Land-use"')
         bio_df_am_non_all = bio_df_non_all.query('Type == "Agricultural Management"')
         bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"')
 
@@ -3970,7 +3984,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             f.write(';\n')
 
         # ---------------- (GBF8 GROUP) Ag  ----------------
-        bio_df_ag = bio_df.query('Type == "Agricultural land-use"').copy()
+        bio_df_ag = bio_df.query('Type == "Agricultural Land-use" and Landuse != "ALL"').copy()
 
         df_wide = bio_df_ag\
             .groupby(['region', 'species', 'Water_supply', 'Landuse'])[['Year', 'Value (%)']]\
@@ -4046,7 +4060,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             f.write(';\n')
 
         # ---------------- (GBF8 GROUP) Non-ag  ----------------
-        bio_df_nonag = bio_df.query('Type == "Non-Agricultural Land-use"').copy()
+        bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"').copy()
 
         df_wide = bio_df_nonag\
             .groupby(['region', 'species', 'Landuse'])[['Year', 'Value (%)']]\
