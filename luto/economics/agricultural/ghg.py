@@ -253,13 +253,13 @@ def get_ghg_matrices(data:Data, yr_idx, aggregate=True):
         return ghg_df
 
 
-def get_ghg_unall_natural_to_lvstk_natural(data:Data, lumap) -> np.ndarray:
+def get_ghg_unall_natural_to_lvstk_natural(data:Data, base_lumap) -> np.ndarray:
     """
     Gets the one-off greenhouse gas penalties for transitioning unallocated natural land to livestock natural land.
     
     Parameters
         data (object): The data object containing relevant information.
-        lumap (1D array): The lumap object containing land use mapping.
+        base_lumap (1D array): The base_lumap object containing land use mapping.
 
     Returns
         np.ndarray, <unit : t/cell>.
@@ -272,23 +272,23 @@ def get_ghg_unall_natural_to_lvstk_natural(data:Data, lumap) -> np.ndarray:
     for to_lu in data.LU_LVSTK_NATURAL:
 
         ghg_unall_natural_to_lvstk_natural_r = (
-            data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR[lumap == un_allow_code] 
+            data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR[base_lumap == un_allow_code] 
             * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[to_lu])
-            * data.REAL_AREA[lumap == un_allow_code]
+            * data.REAL_AREA[base_lumap == un_allow_code]
         ) 
         
-        ghg_unall_natural_to_lvstk_natural_rj[lumap == un_allow_code, to_lu] = ghg_unall_natural_to_lvstk_natural_r
+        ghg_unall_natural_to_lvstk_natural_rj[base_lumap == un_allow_code, to_lu] = ghg_unall_natural_to_lvstk_natural_r
             
     return np.stack([ghg_unall_natural_to_lvstk_natural_rj] * 2)
 
 
-def get_ghg_lvstk_natural_to_modified(data:Data, lumap) -> np.ndarray:
+def get_ghg_lvstk_natural_to_modified(data:Data, base_lumap) -> np.ndarray:
     """
     Gets the one-off greenhouse gas penalties for transitioning livestock natural land to modified land.
     
     Parameters
         data (object): The data object containing relevant information.
-        lumap (1D array): The lumap object containing land use mapping.
+        base_lumap (1D array): The base_lumap object containing land use mapping.
 
     Returns
         np.ndarray, <unit : t/cell>.
@@ -301,24 +301,24 @@ def get_ghg_lvstk_natural_to_modified(data:Data, lumap) -> np.ndarray:
         for to_lu in data.LU_MODIFIED_LAND:
             # Get GHG penalties from current land use to future land use
             ghg_lvstk_natural_to_modified_r = (
-                data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR[lumap == from_lu] 
+                data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR[base_lumap == from_lu] 
                 * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[to_lu])
-                * data.REAL_AREA[lumap == from_lu]
+                * data.REAL_AREA[base_lumap == from_lu]
             ) 
             
             # Assign the penalties to the transition matrices
-            ghg_lvstk_natural_to_modified_rj[lumap == from_lu, to_lu] = ghg_lvstk_natural_to_modified_r
+            ghg_lvstk_natural_to_modified_rj[base_lumap == from_lu, to_lu] = ghg_lvstk_natural_to_modified_r
         
     return np.stack([ghg_lvstk_natural_to_modified_rj] * 2)
 
 
-def get_ghg_unall_natural_to_modified(data:Data, lumap) -> np.ndarray:
+def get_ghg_unall_natural_to_modified(data:Data, base_lumap) -> np.ndarray:
     """
     Gets the one-off greenhouse gas penalties for transitioning unallocated natural land to modified land.
 
     Parameters
         data (object): The data object containing relevant information.
-        lumap (1D array): The lumap object containing land use mapping.
+        base_lumap (1D array): The base_lumap object containing land use mapping.
 
     Returns
         np.ndarray, <unit : t/cell>.
@@ -330,25 +330,25 @@ def get_ghg_unall_natural_to_modified(data:Data, lumap) -> np.ndarray:
     for to_lu in data.LU_MODIFIED_LAND:
         # Get GHG penalties from current land use to future land use
         ghg_unall_natural_to_modified_r = (
-            data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR[lumap == un_allow_code] 
+            data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR[base_lumap == un_allow_code] 
             * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[to_lu])
-            * data.REAL_AREA[lumap == un_allow_code]
+            * data.REAL_AREA[base_lumap == un_allow_code]
         ) 
         
         # Assign the penalties to the transition matrices
-        ghg_unall_natural_to_modified_rj[lumap == un_allow_code, to_lu] = ghg_unall_natural_to_modified_r
+        ghg_unall_natural_to_modified_rj[base_lumap == un_allow_code, to_lu] = ghg_unall_natural_to_modified_r
 
     return np.stack([ghg_unall_natural_to_modified_rj] * 2)
 
 
-def get_ghg_transition_emissions(data:Data, lumap, separate=False) -> np.ndarray:
+def get_ghg_transition_emissions(data:Data, base_lumap, separate=False) -> np.ndarray:
     """
     Get the one-off greenhouse gas penalties for transitioning between land uses.
 
     Parameters
     ----------
       data (object): The data object containing relevant information.
-      lumap (np.ndarray): The lumap object containing land use mapping.
+      base_lumap (np.ndarray): The base_lumap object containing land use mapping.
       separate (bool): Whether to return the penalties for each transition separately.
 
     Returns
@@ -357,9 +357,9 @@ def get_ghg_transition_emissions(data:Data, lumap, separate=False) -> np.ndarray
     """
    
     ghg_lvstck_natural_to_unall_natural = np.zeros_like(data.AG_L_MRJ, dtype=np.float32)   # No land can transited to unall-natural, here use a full zero array for consistency
-    ghg_lvstck_natural_to_modified = get_ghg_lvstk_natural_to_modified(data, lumap)
-    ghg_unall_natural_to_lvstck_natural = get_ghg_unall_natural_to_lvstk_natural(data, lumap)
-    ghg_unall_natural_to_modified = get_ghg_unall_natural_to_modified(data, lumap)
+    ghg_lvstck_natural_to_modified = get_ghg_lvstk_natural_to_modified(data, base_lumap)
+    ghg_unall_natural_to_lvstck_natural = get_ghg_unall_natural_to_lvstk_natural(data, base_lumap)
+    ghg_unall_natural_to_modified = get_ghg_unall_natural_to_modified(data, base_lumap)
     
     if separate:
         ghg_trainsition_penalties = {
