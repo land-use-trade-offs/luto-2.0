@@ -1428,8 +1428,9 @@ class Data:
                     * self.BIO_GBF2_MASK 
                     * (1 - settings.BIO_CONTRIBUTION_LDS) 
                     * self.REAL_AREA
+                    * self.AG_MASK_PROPORTION_R
                 )
-            ) * self.AG_MASK_PROPORTION_R
+            ) 
               
         
         ###############################################################
