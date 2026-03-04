@@ -75,9 +75,12 @@ def map2base64(
         codes = np.full(vals.shape, 0, dtype=np.int8)  # default: no-data grey
 
         if global_max > 0:
-            codes[vals > 0] = np.clip(51 + (vals[vals > 0] / global_max) * 50, 52, 100)
+            codes[vals > 0] = np.clip(51 + (vals[vals > 0] / global_max) * 50, 51, 100)
         if global_min < 0:
             codes[vals < 0] = np.clip(50 + (vals[vals < 0] / abs(global_min)) * 50, 1, 49)
+        
+        # Set values in the range [48,52) to 0 (grey) to avoid color confusion around zero 
+        codes[(codes >= 48) & (codes <= 52)] = 0
 
         arr_sel.values = codes
         min_max = (global_min, global_max)
@@ -260,6 +263,9 @@ def save_report_layer(raw_data_dir:str):
     area_ag = files_area.query('base_name == "xr_area_agricultural_landuse"')
     get_map2json(area_ag, legend_ag, {'lu':'ALL'}, legend_float, area_min_max, f'{SAVE_DIR}/map_layers/map_area_Ag.js')
     print('│   ├── Area Ag layer saved.')
+    
+    
+    # files_df,legend_int,legend_int_level,legend_float,float_magnitude,save_path = area_ag, legend_ag, {'lu':'ALL'}, legend_float, area_min_max, f'{SAVE_DIR}/map_layers/map_area_Ag.js'
 
     area_nonag = files_area.query('base_name == "xr_area_non_agricultural_landuse"')
     get_map2json(area_nonag, legend_non_ag, {'lu':'ALL'}, legend_float, area_min_max, f'{SAVE_DIR}/map_layers/map_area_NonAg.js')
@@ -539,10 +545,6 @@ def save_report_layer(raw_data_dir:str):
     quantities_ag = files_quantities.query('base_name == "xr_quantities_agricultural"')
     get_map2json(quantities_ag, legend_ag, {'Commodity':'ALL'}, legend_float, prod_min_max, f'{SAVE_DIR}/map_layers/map_quantities_Ag.js')
     print('│   ├── Quantities Ag layer saved.')
-    
-    
-    # files_df,legend_int,legend_int_level,legend_float,float_magnitude,save_path = quantities_ag, legend_ag, {'Commodity':'ALL'}, legend_float, prod_min_max, f'{SAVE_DIR}/map_layers/map_quantities_Ag.js'
-    
 
     quantities_am = files_quantities.query('base_name == "xr_quantities_agricultural_management"')
     get_map2json(quantities_am, legend_am, {'Commodity':'ALL'}, legend_float, prod_min_max, f'{SAVE_DIR}/map_layers/map_quantities_Am.js')
