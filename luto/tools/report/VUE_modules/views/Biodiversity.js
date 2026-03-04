@@ -24,31 +24,31 @@ window.BiodiversityView = {
 
     // Metric display labels (internal keys must match MapService/ChartService)
     const METRIC_LABELS = {
-      'quality':     'Quality',
-      'GBF2':        'GBF2',
-      'GBF3_NVIS':   'GBF3 NVIS',
-      'GBF3_IBRA':   'GBF3 IBRA',
-      'GBF4_SNES':   'GBF4 SNES',
-      'GBF4_ECNES':  'GBF4 ECNES',
-      'GBF8_GROUP':  'GBF8 Group',
-      'GBF8_SPECIES':'GBF8 Species',
+      'quality': 'Quality',
+      'GBF2': 'GBF2',
+      'GBF3_NVIS': 'GBF3 NVIS',
+      'GBF3_IBRA': 'GBF3 IBRA',
+      'GBF4_SNES': 'GBF4 SNES',
+      'GBF4_ECNES': 'GBF4 ECNES',
+      'GBF8_GROUP': 'GBF8 Group',
+      'GBF8_SPECIES': 'GBF8 Species',
     };
 
     // Metric → Supporting_info setting key (null = always available)
     const METRIC_TO_SETTING = {
-      'quality':     null,
-      'GBF2':        'BIODIVERSITY_TARGET_GBF_2',
-      'GBF3_NVIS':   'BIODIVERSITY_TARGET_GBF_3_NVIS',
-      'GBF3_IBRA':   'BIODIVERSITY_TARGET_GBF_3_IBRA',
-      'GBF4_SNES':   'BIODIVERSITY_TARGET_GBF_4_SNES',
-      'GBF4_ECNES':  'BIODIVERSITY_TARGET_GBF_4_ECNES',
-      'GBF8_GROUP':  'BIODIVERSITY_TARGET_GBF_8',
-      'GBF8_SPECIES':'BIODIVERSITY_TARGET_GBF_8',
+      'quality': null,
+      'GBF2': 'BIODIVERSITY_TARGET_GBF_2',
+      'GBF3_NVIS': 'BIODIVERSITY_TARGET_GBF_3_NVIS',
+      'GBF3_IBRA': 'BIODIVERSITY_TARGET_GBF_3_IBRA',
+      'GBF4_SNES': 'BIODIVERSITY_TARGET_GBF_4_SNES',
+      'GBF4_ECNES': 'BIODIVERSITY_TARGET_GBF_4_ECNES',
+      'GBF8_GROUP': 'BIODIVERSITY_TARGET_GBF_8',
+      'GBF8_SPECIES': 'BIODIVERSITY_TARGET_GBF_8',
     };
 
     // Available selections
     const availableMetrics = ref(['quality']);
-    const availableCategories = ["Ag", "Ag Mgt", "Non-Ag"];
+    const availableCategories = ["Sum", "Ag", "Ag Mgt", "Non-Ag"];
     const availableAgMgt = ref([]);
     const availableWater = ref([]);
     const availableLanduse = ref([]);
@@ -62,10 +62,23 @@ window.BiodiversityView = {
 
     // Previous selections memory (per category)
     const previousSelections = ref({
-      "Ag":     { water: "", landuse: "" },
+      "Sum": { landuse: "" },
+      "Ag": { water: "", landuse: "" },
       "Ag Mgt": { agMgt: "", water: "", landuse: "" },
       "Non-Ag": { landuse: "" }
     });
+
+    // Display labels for the "Sum" category's Type dimension
+    const SUM_TYPE_LABELS = { 'ALL': 'ALL', 'ag': 'Ag', 'non-ag': 'Non-Ag', 'ag-man': 'Ag Mgt' };
+    // Map Type key → series name in BIO_*_overview_sum chart data
+    const SUM_TYPE_TO_SERIES = {
+      'ag': 'Agricultural Land-use',
+      'ag-man': 'Agricultural Management',
+      'non-ag': 'Non-Agricultural Land-use',
+    };
+    function formatLanduse(val) {
+      return (selectCategory.value === 'Sum') ? (SUM_TYPE_LABELS[val] || val) : val;
+    }
 
     // UI state
     const dataLoaded = ref(false);
@@ -74,11 +87,19 @@ window.BiodiversityView = {
     // Cascade helper — reads from mapRegister[selectMetric]
     function doCascade(category) {
       const mr = mapRegister[selectMetric.value];
-      const agData   = window[mr?.["Ag"]?.["name"]];
-      const amData   = window[mr?.["Ag Mgt"]?.["name"]];
+      const sumData = window[mr?.["Sum"]?.["name"]];
+      const agData = window[mr?.["Ag"]?.["name"]];
+      const amData = window[mr?.["Ag Mgt"]?.["name"]];
       const nonAgData = window[mr?.["Non-Ag"]?.["name"]];
 
-      if (category === "Ag") {
+      if (category === "Sum") {
+        availableAgMgt.value = [];
+        availableWater.value = [];
+        availableLanduse.value = Object.keys(sumData || {});
+        const prevLU = previousSelections.value["Sum"].landuse;
+        selectLanduse.value = (prevLU && availableLanduse.value.includes(prevLU)) ? prevLU : (availableLanduse.value[0] || '');
+
+      } else if (category === "Ag") {
         availableWater.value = Object.keys(agData || {});
         const prevWater = previousSelections.value["Ag"].water;
         selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
@@ -108,6 +129,7 @@ window.BiodiversityView = {
     }
 
     // Reactive data
+    // map_bio_*_All:   Type → Year  (Sum category)
     // map_bio_*_Ag:    Water → LU → Year
     // map_bio_*_Am:    AgMgt → Water → LU → Year
     // map_bio_*_NonAg: LU → Year
@@ -115,7 +137,9 @@ window.BiodiversityView = {
       if (!dataLoaded.value) return {};
       const mr = mapRegister[selectMetric.value];
       const mapData = window[mr?.[selectCategory.value]?.["name"]];
-      if (selectCategory.value === "Ag") {
+      if (selectCategory.value === "Sum") {
+        return mapData?.[selectLanduse.value]?.[selectYear.value] || {};
+      } else if (selectCategory.value === "Ag") {
         return mapData?.[selectWater.value]?.[selectLanduse.value]?.[selectYear.value] || {};
       } else if (selectCategory.value === "Ag Mgt") {
         return mapData?.[selectAgMgt.value]?.[selectWater.value]?.[selectLanduse.value]?.[selectYear.value] || {};
@@ -128,13 +152,19 @@ window.BiodiversityView = {
     // BIO_*_Ag chart:    Region → Water → [series(name=LU)]
     // BIO_*_Am chart:    Region → AgMgt → Water → [series(name=LU)]
     // BIO_*_NonAg chart: Region → [series(name=LU)]
+    // Sum: no chart data available
     const selectChartData = computed(() => {
       if (!dataLoaded.value) return {};
       const cr = chartRegister[selectMetric.value];
       const chartData = window[cr?.[selectCategory.value]?.["name"]]?.[selectRegion.value];
       let seriesData;
 
-      if (selectCategory.value === "Ag") {
+      if (selectCategory.value === "Sum") {
+        const sumEntry = chartRegister[selectMetric.value]?.['overview']?.['sum'];
+        const sumData = window[sumEntry?.['name']]?.[selectRegion.value] || [];
+        const filterName = SUM_TYPE_TO_SERIES[selectLanduse.value];
+        seriesData = filterName ? sumData.filter(s => s.name === filterName) : sumData;
+      } else if (selectCategory.value === "Ag") {
         seriesData = chartData?.[selectWater.value] || [];
         seriesData = seriesData.filter(s => selectLanduse.value === "ALL" || s.name === selectLanduse.value);
       } else if (selectCategory.value === "Ag Mgt") {
@@ -149,7 +179,6 @@ window.BiodiversityView = {
         chart: { height: 440 },
         yAxis: { title: { text: availableUnit["Biodiversity"] } },
         series: seriesData || [],
-        colors: window["Supporting_info"].colors,
       };
     });
 
@@ -182,14 +211,16 @@ window.BiodiversityView = {
         const mr = mapRegister[metric];
         const cr = chartRegister[metric];
         if (mr) {
-          await loadScript(mr["Ag"]["path"],     mr["Ag"]["name"],     VIEW_NAME);
+          if (mr["Sum"]) await loadScript(mr["Sum"]["path"], mr["Sum"]["name"], VIEW_NAME);
+          await loadScript(mr["Ag"]["path"], mr["Ag"]["name"], VIEW_NAME);
           await loadScript(mr["Ag Mgt"]["path"], mr["Ag Mgt"]["name"], VIEW_NAME);
           await loadScript(mr["Non-Ag"]["path"], mr["Non-Ag"]["name"], VIEW_NAME);
         }
         if (cr) {
-          await loadScript(cr["Ag"]["path"],     cr["Ag"]["name"],     VIEW_NAME);
+          await loadScript(cr["Ag"]["path"], cr["Ag"]["name"], VIEW_NAME);
           await loadScript(cr["Ag Mgt"]["path"], cr["Ag Mgt"]["name"], VIEW_NAME);
           await loadScript(cr["Non-Ag"]["path"], cr["Non-Ag"]["name"], VIEW_NAME);
+          if (cr["overview"]?.["sum"]) await loadScript(cr["overview"]["sum"]["path"], cr["overview"]["sum"]["name"], VIEW_NAME);
         }
       }
 
@@ -220,7 +251,9 @@ window.BiodiversityView = {
     // Progressive selection chain watchers
     watch(selectCategory, (newCategory, oldCategory) => {
       // Save previous selections before switching
-      if (oldCategory === "Ag") {
+      if (oldCategory === "Sum") {
+        previousSelections.value["Sum"] = { landuse: selectLanduse.value };
+      } else if (oldCategory === "Ag") {
         previousSelections.value["Ag"] = { water: selectWater.value, landuse: selectLanduse.value };
       } else if (oldCategory === "Ag Mgt") {
         previousSelections.value["Ag Mgt"] = { agMgt: selectAgMgt.value, water: selectWater.value, landuse: selectLanduse.value };
@@ -264,7 +297,9 @@ window.BiodiversityView = {
     });
 
     watch(selectLanduse, (newLanduse) => {
-      if (selectCategory.value === "Ag") {
+      if (selectCategory.value === "Sum") {
+        previousSelections.value["Sum"].landuse = newLanduse;
+      } else if (selectCategory.value === "Ag") {
         previousSelections.value["Ag"].landuse = newLanduse;
       } else if (selectCategory.value === "Ag Mgt") {
         previousSelections.value["Ag Mgt"].landuse = newLanduse;
@@ -292,6 +327,7 @@ window.BiodiversityView = {
       selectWater,
       selectLanduse,
 
+      formatLanduse,
       selectMapData,
       selectChartData,
 
@@ -362,8 +398,8 @@ window.BiodiversityView = {
           </button>
         </div>
 
-        <!-- Water options (Ag and Ag Mgt) -->
-        <div v-if="selectCategory !== 'Non-Ag' && dataLoaded && availableWater.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
+        <!-- Water options (Ag and Ag Mgt only) -->
+        <div v-if="selectCategory !== 'Non-Ag' && selectCategory !== 'Sum' && dataLoaded && availableWater.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
           <span class="text-[0.8rem] mr-1 font-medium">Water:</span>
           <button v-for="(val, key) in availableWater" :key="key"
             @click="selectWater = val"
@@ -373,14 +409,14 @@ window.BiodiversityView = {
           </button>
         </div>
 
-        <!-- Landuse options -->
+        <!-- Landuse options (for Sum: shows Type dimension values) -->
         <div v-if="dataLoaded" class="flex flex-wrap gap-1 max-w-[300px]">
-          <span class="text-[0.8rem] mr-1 font-medium">Landuse:</span>
+          <span class="text-[0.8rem] mr-1 font-medium">{{ selectCategory === 'Sum' ? 'Type:' : 'Landuse:' }}</span>
           <button v-for="(val, key) in availableLanduse" :key="key"
             @click="selectLanduse = val"
             class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
             :class="{'bg-sky-500 text-white': selectLanduse === val}">
-            {{ val }}
+            {{ formatLanduse(val) }}
           </button>
         </div>
       </div>
