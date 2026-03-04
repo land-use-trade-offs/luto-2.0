@@ -36,10 +36,10 @@ grid_search = {
     ###############################################################
     # Task run settings for submitting the job to the cluster
     ###############################################################
-    'MEM': ['300GB'],
-    'WRITE_REPORT_MAX_MEM_GB': [300],                                       # Max memory for writing report (in GB)
-    'NCPUS':[24],
-    'TIME': ['5:00:00'],
+    'MEM': ['64GB'],
+    'WRITE_REPORT_MAX_MEM_GB': [64],                                       # Max memory for writing report (in GB)
+    'NCPUS':[16],
+    'TIME': ['10:00:00'],
     'QUEUE': ['normalsr'],                                                  # normalsr for CPU, hugemembw for memory intensive jobs
     
  
@@ -47,9 +47,9 @@ grid_search = {
     # Working settings for the model run
     ###############################################################
     'OBJECTIVE': ['maxprofit'],                                             # 'maxprofit' or 'mincost'
-    'RESFACTOR': [1],
-    'SIM_YEARS': [range(2020,2051,5)],                                            # Years to run the model (2020-2060 per LUF Report 2026)
-    'WRITE_THREADS': [2],
+    'RESFACTOR': [5],
+    'SIM_YEARS': [range(2020,2051,5)],                                      # Years to run the model (2020-2060 per LUF Report 2026)
+    'WRITE_THREADS': [4],
     
  
     ###############################################################
