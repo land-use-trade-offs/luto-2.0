@@ -701,14 +701,15 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
 
     # Record max cell value for report generation later (e.g., for setting colorbar limits)
     prod_magnitudes = {
-        'ag':     dict(zip(data.COMMODITIES, zip(ag_q_mrc.min(['lm','cell']).values, ag_q_mrc.max(['lm','cell']).values))),
-        'non_ag': dict(zip(data.COMMODITIES, zip(non_ag_p_rc.min('cell').values, non_ag_p_rc.max('cell').values))),
-        'am':     dict(zip(data.COMMODITIES, zip(am_p_amrc.min(['am','lm','cell']).values, am_p_amrc.max(['am','lm','cell']).values))),
+        'ag':     {cm: _get_mag(ag_q_mrc.sel(Commodity=cm)) for cm in data.COMMODITIES},
+        'non_ag': {cm: _get_mag(non_ag_p_rc.sel(Commodity=cm)) for cm in data.COMMODITIES},
+        'am':     {cm: _get_mag(am_p_amrc.sel(Commodity=cm)) for cm in data.COMMODITIES},
     }
     
     commodity_magnitudes = {'production': {}}
     for cm in data.COMMODITIES:
-        commodity_magnitudes['production'][cm] = [*prod_magnitudes['ag'][cm], *prod_magnitudes['non_ag'][cm], *prod_magnitudes['am'][cm]]
+        vals = [*prod_magnitudes['ag'][cm], *prod_magnitudes['non_ag'][cm], *prod_magnitudes['am'][cm]]
+        commodity_magnitudes['production'][cm] = [i for i in vals if not np.isnan(i)]  # Filter out None values (in case some categories don't produce certain commodities)
     
     return (
         f"Separate quantity production written for year {yr_cal}", 
