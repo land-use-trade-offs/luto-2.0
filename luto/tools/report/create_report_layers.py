@@ -41,7 +41,7 @@ from luto.tools.report.data_tools.parameters import (
     COLOR_AM, 
     COLOR_NON_AG, 
     COLOR_LUMAP, 
-    COLORS_FLOAT,
+    COLORS_FLOAT
 )
 
 
@@ -52,7 +52,8 @@ def map2base64(
     arr_sel:xr.DataArray, 
     isInt:bool, 
     legend:dict, 
-    hierarchy_tp:tuple
+    hierarchy_tp:tuple,
+    layer_magnitude:int,
 ) -> tuple:
 
     # Get an template rio-xarray, it will be used to convert 1D array to its 2D map format
@@ -60,27 +61,37 @@ def map2base64(
         rxr_arr = rxr_ds['layer'].astype('float32')         # Use float32 to allow NaN values
         rxr_crs = rxr_ds['spatial_ref'].attrs['crs_wkt']
 
-    img_attrs = {}
+    # Set legend and metadata based on type
     if isInt:
+        # layer_magnitude is None in this case
         img_attrs = {
             'intOrFloat': 'int',
-            'legend': legend['legend']
+            'legend': legend['legend'],
         }
     else:
-        # Normalize the layer to 0-100 as integer
-        min_val, max_val = np.nanpercentile(arr_sel.values, [1, 99])
-        arr_sel = arr_sel.clip(min_val, max_val)
-        arr_sel.values = (arr_sel - min_val) / (max_val - min_val) * 100
+        # Map values to color codes: positives → red (51–100), negatives → blue (0–50), zeros → grey (101)
+        global_min, global_max = layer_magnitude
+        vals = arr_sel.values.copy()
+        codes = np.full(vals.shape, 101, dtype=np.int8)  # default: no-data grey
+
+        if global_max > 0:
+            codes[vals > 0] = np.clip(51 + (vals[vals > 0] / global_max) * 49, 51, 100)
+        if global_min < 0:
+            codes[vals < 0] = np.clip(50 + (vals[vals < 0] / abs(global_min)) * 50, 0, 50)
+
+        arr_sel.values = codes
+        min_max = (global_min, global_max)
+
         arr_sel = arr_sel.astype(np.float32)
         img_attrs = {
             'intOrFloat': 'float',
             'legend': legend['legend'],
-            'min_max': (min_val, max_val)
+            'min_max': min_max,
         }
 
     # Convert the 1D array to a 2D array
-    np.place(rxr_arr.data, rxr_arr.data>=0, arr_sel.values)     # Negative values in the template are outside LUTO area
-    rxr_arr = xr.where(rxr_arr<0, np.nan, rxr_arr)              # Set negative values to NaN, which will be transparent in the final map
+    np.place(rxr_arr.data, rxr_arr.data >= 0, arr_sel.values)     # Negative values in the template are outside LUTO area
+    rxr_arr = xr.where(rxr_arr < 0, np.nan, rxr_arr)              # Set negative values to NaN, which will be transparent in the final map
     # Get the bounds
     rxr_arr = rxr_arr.rio.write_crs(rxr_crs)
     bbox = rxr_arr.rio.bounds()
@@ -104,6 +115,7 @@ def get_map2json(
     legend_int:dict, 
     legend_int_level:dict|str, 
     legend_float:dict, 
+    float_magnitude:int,
     save_path:str, 
     ) -> None:
     
@@ -117,7 +129,7 @@ def get_map2json(
     tasks = []
     for _,row in files_df.iterrows():
         
-        xr_arr = cfxr.decode_compress_to_multi_index(xr.open_dataset(row['path'], chunks={}), 'layer')['data']
+        xr_arr = cfxr.decode_compress_to_multi_index(xr.load_dataset(row['path'], chunks={}), 'layer')['data']
         ds_template = f'{os.path.dirname(row['path'])}/xr_map_template_{row['Year']}.nc'
         valid_layers = xr_arr['layer'].to_index().to_frame().to_dict(orient='records')
         
@@ -141,11 +153,13 @@ def get_map2json(
             # Set legend and metadata based on type
             if isInt:
                 legend = legend_int
+                layer_magnitude = None
             else:
                 legend = legend_float
-
+                layer_magnitude = float_magnitude
+            
             tasks.append(
-                delayed(map2base64)(ds_template, arr_sel, isInt, legend, hierarchy_tp)
+                delayed(map2base64)(ds_template, arr_sel, isInt, legend, hierarchy_tp, layer_magnitude)
             )    
             
     # Gather results and save to JSON
@@ -171,6 +185,10 @@ def get_map2json(
 def save_report_layer(raw_data_dir:str):
     
     SAVE_DIR = f'{raw_data_dir}/DATA_REPORT/data'
+    
+    # Load the cell magnitudes for all layers, which will be used to set colorbar limits in the report
+    with open(f'{raw_data_dir}/max_cell_magnitudes.json', 'r') as f:
+        cell_magnitudes = json.load(f)
 
     # Create the directory if it does not exist
     if not os.path.exists(f'{SAVE_DIR}/map_layers'):
@@ -196,7 +214,7 @@ def save_report_layer(raw_data_dir:str):
     #                   1) LUMAP Layer                 #
     ####################################################
     lumap_ly = files.query('base_name == "xr_map_lumap"')
-    get_map2json(lumap_ly, legend_lumap, 'lm', None, f'{SAVE_DIR}/map_layers/map_dvar_lumap.js')
+    get_map2json(lumap_ly, legend_lumap, 'lm', None, None, f'{SAVE_DIR}/map_layers/map_dvar_lumap.js')
     print('│   ├── LUMAP layer saved.')
 
 
@@ -205,16 +223,18 @@ def save_report_layer(raw_data_dir:str):
     #                   2) Dvar Layer                  #
     ####################################################
     
+    dvar_min_max = (0, 1)
+
     dvar_ag = files.query('base_name == "xr_dvar_ag"')
-    get_map2json(dvar_ag, legend_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_dvar_Ag.js')
+    get_map2json(dvar_ag, legend_ag, {'lu':'ALL'}, legend_float, dvar_min_max, f'{SAVE_DIR}/map_layers/map_dvar_Ag.js')
     print('│   ├── Dvar Ag layer saved.')
 
     dvar_am = files.query('base_name == "xr_dvar_am"')
-    get_map2json(dvar_am, legend_am, {'am':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_dvar_Am.js')
+    get_map2json(dvar_am, legend_am, {'am':'ALL'}, legend_float, dvar_min_max, f'{SAVE_DIR}/map_layers/map_dvar_Am.js')
     print('│   ├── Dvar Am layer saved.')
 
     dvar_nonag = files.query('base_name == "xr_dvar_non_ag"')
-    get_map2json(dvar_nonag, legend_non_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_dvar_NonAg.js')
+    get_map2json(dvar_nonag, legend_non_ag, {'lu':'ALL'}, legend_float, dvar_min_max, f'{SAVE_DIR}/map_layers/map_dvar_NonAg.js')
     print('│   ├── Dvar Non-Ag layer saved.')
     
     
@@ -224,19 +244,31 @@ def save_report_layer(raw_data_dir:str):
     ####################################################
 
     files_area = files.query('base_name.str.contains("area")')
+    
+    area_magnitudes = (
+        cell_magnitudes['area']['ag'], 
+        cell_magnitudes['area']['non_ag'], 
+        *cell_magnitudes['area']['am'].values()
+    )
+    
+    area_min_max = (min(area_magnitudes), max(area_magnitudes))
+    
 
     area_ag = files_area.query('base_name == "xr_area_agricultural_landuse"')
-    get_map2json(area_ag, legend_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_area_Ag.js')
+    get_map2json(area_ag, legend_ag, {'lu':'ALL'}, legend_float, area_min_max, f'{SAVE_DIR}/map_layers/map_area_Ag.js')
     print('│   ├── Area Ag layer saved.')
+    
+    # files_df,legend_int,legend_int_level,legend_float,float_magnitude,save_path = area_ag, legend_ag, {'lu':'ALL'}, legend_float, area_min_max, f'{SAVE_DIR}/map_layers/map_area_Ag.js'
 
-    area_am = files_area.query('base_name == "xr_area_agricultural_management"')
-    get_map2json(area_am, legend_am, {'am':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_area_Am.js')
-    print('│   ├── Area Am layer saved.')
+
 
     area_nonag = files_area.query('base_name == "xr_area_non_agricultural_landuse"')
-    get_map2json(area_nonag, legend_non_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_area_NonAg.js')
+    get_map2json(area_nonag, legend_non_ag, {'lu':'ALL'}, legend_float, area_min_max, f'{SAVE_DIR}/map_layers/map_area_NonAg.js')
     print('│   ├── Area Non-Ag layer saved.')
 
+    area_am = files_area.query('base_name == "xr_area_agricultural_management"')
+    get_map2json(area_am, legend_am, {'am':'ALL'}, legend_float, area_min_max, f'{SAVE_DIR}/map_layers/map_area_Am.js')
+    print('│   ├── Area Am layer saved.')
 
 
     ####################################################
@@ -245,114 +277,131 @@ def save_report_layer(raw_data_dir:str):
 
     files_bio = files.query('base_name.str.contains("biodiversity")')
     
-    # Overall priority
+    bio_magnitudes = (
+        cell_magnitudes['bio_quality']['ag'],
+        cell_magnitudes['bio_quality']['non_ag'],
+        *cell_magnitudes['bio_quality']['am'].values(),
+        cell_magnitudes['bio_quality']['all']
+    )
+    
+    bio_min_max = (min(bio_magnitudes), max(bio_magnitudes))
+    
+    
+    # Quality layers
     bio_overall_ag = files_bio.query('base_name == "xr_biodiversity_overall_priority_ag"')
-    get_map2json(bio_overall_ag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_overall_Ag.js')
+    get_map2json(bio_overall_ag, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_overall_Ag.js')
     print('│   ├── Biodiversity Overall Ag layer saved.')
 
+    bio_overall_nonag = files_bio.query('base_name == "xr_biodiversity_overall_priority_non_ag"')
+    get_map2json(bio_overall_nonag, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_overall_NonAg.js')
+    print('│   ├── Biodiversity Overall Non-Ag layer saved.')
+
     bio_overall_am = files_bio.query('base_name == "xr_biodiversity_overall_priority_ag_management"')
-    get_map2json(bio_overall_am, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_overall_Am.js')
+    get_map2json(bio_overall_am, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_overall_Am.js')
     print('│   ├── Biodiversity Overall Am layer saved.')
 
-    bio_overall_nonag = files_bio.query('base_name == "xr_biodiversity_overall_priority_non_ag"')
-    get_map2json(bio_overall_nonag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_overall_NonAg.js')
-    print('│   ├── Biodiversity Overall Non-Ag layer saved.')
+    bio_overall_all = files_bio.query('base_name == "xr_biodiversity_overall_priority_all"')
+    get_map2json(bio_overall_all, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_overall_All.js')
+    print('│   ├── Biodiversity Overall All layer saved.')
 
 
     # GBF2
     if settings.BIODIVERSITY_TARGET_GBF_2 != 'off':
         bio_GBF2_ag = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_ag"')
-        get_map2json(bio_GBF2_ag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Ag.js')
+        get_map2json(bio_GBF2_ag, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Ag.js')
         print('│   ├── Biodiversity GBF2 Ag layer saved.')
 
         bio_GBF2_am = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_ag_management"')
-        get_map2json(bio_GBF2_am, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Am.js')
+        get_map2json(bio_GBF2_am, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Am.js')
         print('│   ├── Biodiversity GBF2 Am layer saved.')
 
         bio_GBF2_nonag = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_non_ag"')
-        get_map2json(bio_GBF2_nonag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF2_NonAg.js')
+        get_map2json(bio_GBF2_nonag, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF2_NonAg.js')
         print('│   ├── Biodiversity GBF2 Non-Ag layer saved.')
+        
+    # TODO: need to create cell magnitude and determine colorbar limit for these GBF layers.
+    # Now just use the quality magnitude, which could be incorrect for specific GBFs.
 
     # GBF3-NVIS
     if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off':
         bio_GBF3_NVIS_ag = files_bio.query('base_name == "xr_biodiversity_GBF3_NVIS_ag"')
-        get_map2json(bio_GBF3_NVIS_ag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_Ag.js')
+        get_map2json(bio_GBF3_NVIS_ag, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_Ag.js')
         print('│   ├── Biodiversity GBF3_NVIS Ag layer saved.')
 
         bio_GBF3_NVIS_am = files_bio.query('base_name == "xr_biodiversity_GBF3_NVIS_ag_management"')
-        get_map2json(bio_GBF3_NVIS_am, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_Am.js')
+        get_map2json(bio_GBF3_NVIS_am, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_Am.js')
         print('│   ├── Biodiversity GBF3_NVIS Am layer saved.')
 
         bio_GBF3_NVIS_nonag = files_bio.query('base_name == "xr_biodiversity_GBF3_NVIS_non_ag"')
-        get_map2json(bio_GBF3_NVIS_nonag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_NonAg.js')
+        get_map2json(bio_GBF3_NVIS_nonag, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_NonAg.js')
         print('│   ├── Biodiversity GBF3_NVIS Non-Ag layer saved.')
 
     # GBF3-IBRA
     if settings.BIODIVERSITY_TARGET_GBF_3_IBRA != 'off':
         bio_GBF3_IBRA_ag = files_bio.query('base_name == "xr_biodiversity_GBF3_IBRA_ag"')
-        get_map2json(bio_GBF3_IBRA_ag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF3_IBRA_Ag.js')
+        get_map2json(bio_GBF3_IBRA_ag, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF3_IBRA_Ag.js')
         print('│   ├── Biodiversity GBF3_IBRA Ag layer saved.')
 
         bio_GBF3_IBRA_am = files_bio.query('base_name == "xr_biodiversity_GBF3_IBRA_ag_management"')
-        get_map2json(bio_GBF3_IBRA_am, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF3_IBRA_Am.js')
+        get_map2json(bio_GBF3_IBRA_am, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF3_IBRA_Am.js')
         print('│   ├── Biodiversity GBF3_IBRA Am layer saved.')
 
         bio_GBF3_IBRA_nonag = files_bio.query('base_name == "xr_biodiversity_GBF3_IBRA_non_ag"')
-        get_map2json(bio_GBF3_IBRA_nonag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF3_IBRA_NonAg.js')
+        get_map2json(bio_GBF3_IBRA_nonag, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF3_IBRA_NonAg.js')
         print('│   ├── Biodiversity GBF3_IBRA Non-Ag layer saved.')
 
     # GBF4-SNES
     if settings.BIODIVERSITY_TARGET_GBF_4_SNES != 'off':
         bio_GBF4_SNES_ag = files_bio.query('base_name == "xr_biodiversity_GBF4_SNES_ag"')
-        get_map2json(bio_GBF4_SNES_ag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_Ag.js')
+        get_map2json(bio_GBF4_SNES_ag, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_Ag.js')
         print('│   ├── Biodiversity GBF4_SNES Ag layer saved.')
 
         bio_GBF4_SNES_am = files_bio.query('base_name == "xr_biodiversity_GBF4_SNES_ag_management"')
-        get_map2json(bio_GBF4_SNES_am, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_Am.js')
+        get_map2json(bio_GBF4_SNES_am, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_Am.js')
         print('│   ├── Biodiversity GBF4_SNES Am layer saved.')
 
         bio_GBF4_SNES_nonag = files_bio.query('base_name == "xr_biodiversity_GBF4_SNES_non_ag"')
-        get_map2json(bio_GBF4_SNES_nonag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_NonAg.js')
+        get_map2json(bio_GBF4_SNES_nonag, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_NonAg.js')
         print('│   ├── Biodiversity GBF4_SNES Non-Ag layer saved.')
 
     # GBF4_ECNES
     if settings.BIODIVERSITY_TARGET_GBF_4_ECNES != 'off':
         bio_GBF4_ECNES_ag = files_bio.query('base_name == "xr_biodiversity_GBF4_ECNES_ag"')
-        get_map2json(bio_GBF4_ECNES_ag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_Ag.js')
+        get_map2json(bio_GBF4_ECNES_ag, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_Ag.js')
         print('│   ├── Biodiversity GBF4_ECNES Ag layer saved.')
 
         bio_GBF4_ECNES_am = files_bio.query('base_name == "xr_biodiversity_GBF4_ECNES_ag_management"')
-        get_map2json(bio_GBF4_ECNES_am, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_Am.js')
+        get_map2json(bio_GBF4_ECNES_am, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_Am.js')
         print('│   ├── Biodiversity GBF4_ECNES Am layer saved.')
 
         bio_GBF4_ECNES_nonag = files_bio.query('base_name == "xr_biodiversity_GBF4_ECNES_non_ag"')
-        get_map2json(bio_GBF4_ECNES_nonag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_NonAg.js')
+        get_map2json(bio_GBF4_ECNES_nonag, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_NonAg.js')
         print('│   ├── Biodiversity GBF4_ECNES Non-Ag layer saved.')
 
     # GBF8
     if settings.BIODIVERSITY_TARGET_GBF_8 != 'off':
         bio_GBF8_ag = files_bio.query('base_name == "xr_biodiversity_GBF8_species_ag"')
-        get_map2json(bio_GBF8_ag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF8_Ag.js')
+        get_map2json(bio_GBF8_ag, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF8_Ag.js')
         print('│   ├── Biodiversity GBF8 Ag layer saved.')
 
         bio_GBF8_am = files_bio.query('base_name == "xr_biodiversity_GBF8_species_ag_management"')
-        get_map2json(bio_GBF8_am, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF8_Am.js')
+        get_map2json(bio_GBF8_am, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF8_Am.js')
         print('│   ├── Biodiversity GBF8 Am layer saved.')
 
         bio_GBF8_nonag = files_bio.query('base_name == "xr_biodiversity_GBF8_species_non_ag"')
-        get_map2json(bio_GBF8_nonag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF8_NonAg.js')
+        get_map2json(bio_GBF8_nonag, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF8_NonAg.js')
         print('│   ├── Biodiversity GBF8 Non-Ag layer saved.')
 
         bio_GBF8_ag_group = files_bio.query('base_name == "xr_biodiversity_GBF8_groups_ag"')
-        get_map2json(bio_GBF8_ag_group, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF8_groups_Ag.js')
+        get_map2json(bio_GBF8_ag_group, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF8_groups_Ag.js')
         print('│   ├── Biodiversity GBF8 Groups Ag layer saved.')
 
         bio_GBF8_am_group = files_bio.query('base_name == "xr_biodiversity_GBF8_groups_ag_management"')
-        get_map2json(bio_GBF8_am_group, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF8_groups_Am.js')
+        get_map2json(bio_GBF8_am_group, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF8_groups_Am.js')
         print('│   ├── Biodiversity GBF8 Groups Am layer saved.')
 
         bio_GBF8_nonag_group = files_bio.query('base_name == "xr_biodiversity_GBF8_groups_non_ag"')
-        get_map2json(bio_GBF8_nonag_group, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_bio_GBF8_groups_NonAg.js')
+        get_map2json(bio_GBF8_nonag_group, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF8_groups_NonAg.js')
         print('│   ├── Biodiversity GBF8 Groups Non-Ag layer saved.')
 
     
@@ -362,55 +411,83 @@ def save_report_layer(raw_data_dir:str):
     #                    5) Economics                  #
     ####################################################
     
+    ecnomic_magnitudes_ag = (
+        *cell_magnitudes['Economics_ag']['ag_revenue'].values(),
+        *cell_magnitudes['Economics_ag']['ag_cost'].values(),
+        *cell_magnitudes['Economics_ag']['profit_ag'].values()
+    )
+    ecnomic_magnitudes_nonag = (
+        *cell_magnitudes['Economics_am']['am_revenue'].values(),
+        *cell_magnitudes['Economics_am']['am_cost'].values(),
+        *cell_magnitudes['Economics_am']['am_profit'].values()
+    )
+    ecnomic_magnitudes_am = (
+        cell_magnitudes['Economics_non_ag']['non_ag_revenue'],
+        cell_magnitudes['Economics_non_ag']['non_ag_cost'],
+        cell_magnitudes['Economics_non_ag']['non_ag_profit']
+    )
+    economic_magnitudes_transition = (
+        *cell_magnitudes['Economics_ag']['ag2ag_cost'].values(),
+        *cell_magnitudes['Economics_ag']['non_ag2ag_cost'].values(),
+        *cell_magnitudes['Economics_am']['am_transition'].values(),
+        cell_magnitudes['Economics_non_ag']['non_ag_to_non_ag_cost'],
+        cell_magnitudes['Economics_non_ag']['non_ag_to_ag_cost']
+    )
+    
+    economic_min_max_ag = (min(ecnomic_magnitudes_ag), max(ecnomic_magnitudes_ag))
+    economic_min_max_nonag = (min(ecnomic_magnitudes_nonag), max(ecnomic_magnitudes_nonag))
+    economic_min_max_am = (min(ecnomic_magnitudes_am), max(ecnomic_magnitudes_am))
+    economic_min_max_transition = (min(economic_magnitudes_transition), max(economic_magnitudes_transition))
+
     # ---------------- Profit ----------------
     profit_ag = files.query('base_name == "xr_economics_ag_profit"')
-    get_map2json(profit_ag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_economics_Ag_profit.js')
+    get_map2json(profit_ag, None, None, legend_float, economic_min_max_ag, f'{SAVE_DIR}/map_layers/map_economics_Ag_profit.js')
     print('│   ├── Economics Ag profit layer saved.')
 
     profit_am = files.query('base_name == "xr_economics_am_profit"')
-    get_map2json(profit_am, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_economics_Am_profit.js')
+    get_map2json(profit_am, None, None, legend_float, economic_min_max_am, f'{SAVE_DIR}/map_layers/map_economics_Am_profit.js')
     print('│   ├── Economics Am profit layer saved.')
 
     profit_nonag = files.query('base_name == "xr_economics_non_ag_profit"')
-    get_map2json(profit_nonag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_economics_NonAg_profit.js')
+    get_map2json(profit_nonag, None, None, legend_float, economic_min_max_nonag, f'{SAVE_DIR}/map_layers/map_economics_NonAg_profit.js')
     print('│   ├── Economics NonAg profit layer saved.')
 
 
     # ---------------- Revenue ----------------
     revenue_ag = files.query('base_name == "xr_economics_ag_revenue"')
-    get_map2json(revenue_ag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_economics_Ag_revenue.js')
+    get_map2json(revenue_ag, None, None, legend_float, economic_min_max_ag, f'{SAVE_DIR}/map_layers/map_economics_Ag_revenue.js')
     print('│   ├── Economics Ag revenue layer saved.')
 
     revenue_am = files.query('base_name == "xr_economics_am_revenue"')
-    get_map2json(revenue_am, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_economics_Am_revenue.js')
+    get_map2json(revenue_am, None, None, legend_float, economic_min_max_am, f'{SAVE_DIR}/map_layers/map_economics_Am_revenue.js')
     print('│   ├── Economics Am revenue layer saved.')
-
+    
     revenue_nonag = files.query('base_name == "xr_economics_non_ag_revenue"')
-    get_map2json(revenue_nonag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_economics_NonAg_revenue.js')
+    get_map2json(revenue_nonag, None, None, legend_float, economic_min_max_nonag, f'{SAVE_DIR}/map_layers/map_economics_NonAg_revenue.js')
     print('│   ├── Economics NonAg revenue layer saved.')
 
 
     # ---------------- Cost ----------------
     cost_ag = files.query('base_name == "xr_economics_ag_cost"')
-    get_map2json(cost_ag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_economics_Ag_cost.js')
+    get_map2json(cost_ag, None, None, legend_float, economic_min_max_ag, f'{SAVE_DIR}/map_layers/map_economics_Ag_cost.js')
     print('│   ├── Economics Ag cost layer saved.')
 
     cost_am = files.query('base_name == "xr_economics_am_cost"')
-    get_map2json(cost_am, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_economics_Am_cost.js')
+    get_map2json(cost_am, None, None, legend_float, economic_min_max_am, f'{SAVE_DIR}/map_layers/map_economics_Am_cost.js')
     print('│   ├── Economics Am cost layer saved.')
 
     cost_nonag = files.query('base_name == "xr_economics_non_ag_cost"')
-    get_map2json(cost_nonag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_economics_NonAg_cost.js')
+    get_map2json(cost_nonag, None, None, legend_float, economic_min_max_nonag, f'{SAVE_DIR}/map_layers/map_economics_NonAg_cost.js')
     print('│   ├── Economics NonAg cost layer saved.')
 
 
     # ---------------- Transition Cost ----------------
     cost_trans_ag2ag = files.query('base_name == "xr_economics_ag_transition_ag2ag"')
-    get_map2json(cost_trans_ag2ag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_economics_Ag_transition_ag2ag.js')
+    get_map2json(cost_trans_ag2ag, None, None, legend_float, economic_min_max_ag, f'{SAVE_DIR}/map_layers/map_economics_Ag_transition_ag2ag.js')
     print('│   ├── Economics Ag transition ag2ag layer saved.')
 
     cost_trans_ag2nonag = files.query('base_name == "xr_economics_ag_transition_non_ag2ag"')
-    get_map2json(cost_trans_ag2nonag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_economics_Ag_transition_ag2nonag.js')
+    get_map2json(cost_trans_ag2nonag, None, None, legend_float, economic_min_max_nonag, f'{SAVE_DIR}/map_layers/map_economics_Ag_transition_ag2nonag.js')
     print('│   ├── Economics Ag transition ag2nonag layer saved.')
 
     # AgMgt has 0 transition cost, so skipping
@@ -427,17 +504,26 @@ def save_report_layer(raw_data_dir:str):
     ####################################################
 
     files_ghg = files.query('base_name.str.contains("GHG")')
+    
+    ghg_magnitudes = (
+        *cell_magnitudes['ghg_emission']['ag'].values(),
+        *cell_magnitudes['ghg_emission']['non_ag'].values(),
+        *cell_magnitudes['ghg_emission']['ag_man'].values(),
+        *cell_magnitudes['ghg_emission']['transition'].values(),
+    )
+    
+    ghg_min_max = (min(ghg_magnitudes), max(ghg_magnitudes))
 
     ghg_ag = files_ghg.query('base_name == "xr_GHG_ag"')
-    get_map2json(ghg_ag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_GHG_Ag.js')
+    get_map2json(ghg_ag, None, None, legend_float, ghg_min_max, f'{SAVE_DIR}/map_layers/map_GHG_Ag.js')
     print('│   ├── GHG Ag layer saved.')
 
     ghg_am = files_ghg.query('base_name == "xr_GHG_ag_management"')
-    get_map2json(ghg_am, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_GHG_Am.js')
+    get_map2json(ghg_am, None, None, legend_float, ghg_min_max, f'{SAVE_DIR}/map_layers/map_GHG_Am.js')
     print('│   ├── GHG Am layer saved.')
 
     ghg_nonag = files_ghg.query('base_name == "xr_GHG_non_ag"')
-    get_map2json(ghg_nonag, None, None, legend_float, f'{SAVE_DIR}/map_layers/map_GHG_NonAg.js')
+    get_map2json(ghg_nonag, None, None, legend_float, ghg_min_max, f'{SAVE_DIR}/map_layers/map_GHG_NonAg.js')
     print('│   ├── GHG Non-Ag layer saved.')
 
 
@@ -483,15 +569,23 @@ def save_report_layer(raw_data_dir:str):
     ####################################################
 
     files_water = files.query('base_name.str.contains("water_yield")')
+    
+    water_magnitudes = (
+        *cell_magnitudes['water_yield']['ag'].values(),
+        *cell_magnitudes['water_yield']['non_ag'].values(),
+        *cell_magnitudes['water_yield']['ag_man'].values(),
+    )
+
+    water_min_max = (min(water_magnitudes), max(water_magnitudes))
 
     water_ag = files_water.query('base_name == "xr_water_yield_ag"')
-    get_map2json(water_ag, legend_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_water_yield_Ag.js')
+    get_map2json(water_ag, None, None, legend_float, water_min_max, f'{SAVE_DIR}/map_layers/map_water_yield_Ag.js')
     print('│   ├── Water Yield Ag layer saved.')
 
     water_am = files_water.query('base_name == "xr_water_yield_ag_management"')
-    get_map2json(water_am, legend_am, {'am':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_water_yield_Am.js')
+    get_map2json(water_am, None, None, legend_float, water_min_max, f'{SAVE_DIR}/map_layers/map_water_yield_Am.js')
     print('│   ├── Water Yield Am layer saved.')
 
     water_nonag = files_water.query('base_name == "xr_water_yield_non_ag"')
-    get_map2json(water_nonag, legend_non_ag, {'lu':'ALL'}, legend_float, f'{SAVE_DIR}/map_layers/map_water_yield_NonAg.js')
+    get_map2json(water_nonag, None, None, legend_float, water_min_max, f'{SAVE_DIR}/map_layers/map_water_yield_NonAg.js')
     print('│   └── Water Yield Non-Ag layer saved.')
