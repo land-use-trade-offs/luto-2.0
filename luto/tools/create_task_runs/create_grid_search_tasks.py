@@ -48,7 +48,7 @@ grid_search = {
     ###############################################################
     'OBJECTIVE': ['maxprofit'],                                             # 'maxprofit' or 'mincost'
     'RESFACTOR': [1],
-    'SIM_YEARS': [[2020, 2050]],                                            # Years to run the model
+    'SIM_YEARS': [range(2020,2051,5)],                                            # Years to run the model (2020-2060 per LUF Report 2026)
     'WRITE_THREADS': [2],
     
  
@@ -58,7 +58,7 @@ grid_search = {
     
     
     # --------------- Scenarios ---------------
-    'SSP': ['245'],                                                         # '126', '245', '370', '585'
+    'SSP': ['245'],                                                         # Core: SSP2-RCP4.5. Add '585' separately for higher climate impacts sensitivity (lower priority, LUF Report 2026)
     'CARBON_EFFECTS_WINDOW': [60],
     'CO2_FERT': ['off'],                                                    # 'on' or 'off'
     'APPLY_DEMAND_MULTIPLIERS': [True],                                     # True or False. Whether to apply demand multipliers from AusTIME model.
@@ -67,15 +67,28 @@ grid_search = {
         'Riparian Plantings': True,
         'Sheep Agroforestry': True,
         'Beef Agroforestry': True,
-        'Carbon Plantings (Block)': False,
-        'Sheep Carbon Plantings (Belt)': False,
-        'Beef Carbon Plantings (Belt)': False,
+        'Carbon Plantings (Block)': True,           # ON per LUF Report 2026
+        'Sheep Carbon Plantings (Belt)': True,      # ON per LUF Report 2026
+        'Beef Carbon Plantings (Belt)': True,       # ON per LUF Report 2026
         'BECCS': False,
         'Destocked - natural land': True,
+    }],
+    # All enabled land uses REVERSIBLE except Destocked (IRREVERSIBLE) per LUF Report 2026
+    # NOTE: settings.py default is the opposite — this override is required
+    'NON_AG_LAND_USES_REVERSIBLE': [{
+        'Environmental Plantings': True,
+        'Riparian Plantings': True,
+        'Sheep Agroforestry': True,
+        'Beef Agroforestry': True,
+        'Carbon Plantings (Block)': True,
+        'Sheep Carbon Plantings (Belt)': True,
+        'Beef Carbon Plantings (Belt)': True,
+        'BECCS': False,
+        'Destocked - natural land': False,          # IRREVERSIBLE per LUF Report 2026
     }],                                
     
     # --------------- Economics ---------------
-    'DYNAMIC_PRICE' : [False],                                              # True or False
+    'DYNAMIC_PRICE' : [True],                                               # True or False (ON per LUF Report 2026)
     'BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR': [100],                     # AUD/ha/year       
     'SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR':[100],                     # AUD/ha/year  
 
@@ -87,13 +100,13 @@ grid_search = {
 
     # --------------- Social license ---------------
     'EXCLUDE_NO_GO_LU': [False],                                            # True or False
-    'REGIONAL_ADOPTION_CONSTRAINTS': ['off'],                               # 'off', 'on', 'NON_AG_UNIFORM'    
-    'REGIONAL_ADOPTION_NON_AG_UNIFORM': [5],                                # Only work under 'NON_AG_UNIFORM'; None or numbers between 0-100 (both inclusive);  E.g., 5 means each non-ag land can not exceed 5% adoption in every region
+    'REGIONAL_ADOPTION_CONSTRAINTS': ['off', 'NON_AG_UNIFORM'],             # 'off' = core; 'NON_AG_UNIFORM' = sensitivity (LUF Report 2026)
+    'REGIONAL_ADOPTION_NON_AG_UNIFORM': [5, 10, 15],                        # Sensitivity: 5% target, test 10% and 15% (LUF Report 2026)
     'REGIONAL_ADOPTION_ZONE': ['NRM_CODE'],                                 # One of 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
 
 
     # --------------- GHG settings ---------------
-    'GHG_EMISSIONS_LIMITS': ['low'],                                        # 'off', 'low', 'medium', 'high'
+    'GHG_EMISSIONS_LIMITS': ['low', 'high'],                                # 'low'=core 1.8C 67%; 'high'=higher ambition 1.5C 50% (LUF Report 2026)
     'CARBON_PRICES_FIELD': ['CONSTANT'],
     'GHG_CONSTRAINT_TYPE': ['hard'],                                        # 'hard' or 'soft'
     'USE_GHG_SCOPE_1': [True],                                              # True or False
@@ -106,12 +119,12 @@ grid_search = {
     'INCLUDE_WATER_LICENSE_COSTS': [1],
     
     # --------------- Biodiversity overall ---------------
-    'CONTRIBUTION_PERCENTILE': ['USER_DEFINED'],                            # One of [10, 25, 50, 75, 90], or 'USER_DEFINED'              
+    'CONTRIBUTION_PERCENTILE': ['USER_DEFINED'],                            # 50th percentile of HCAS per LUF Report 2026 (was 'USER_DEFINED')
     'CONNECTIVITY_SOURCE': ['NCI'],
     
     # --------------- Biodiversity settings - GBF 2 ---------------
     'BIODIVERSITY_TARGET_GBF_2': ['high'],                                  # 'off', 'low', 'medium', 'high'
-    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [20],                    # Percentage of degraded areas to cut in GBF2 priority areas
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [15, 20, 25, 30, 40, 50], # Core: [15,20,25,30] (20%=central); Higher ambition adds [30,40,50] (LUF Report 2026)
     'GBF2_CONSTRAINT_TYPE': ['hard'],                                       # 'hard' or 'soft'
 
     # --------------- Biodiversity settings - GBF 3 ---------------
@@ -120,13 +133,13 @@ grid_search = {
 
     # --------------- Biodiversity settings - GBF 4 ---------------
     'BIODIVERSITY_TARGET_GBF_4_SNES': ['off'],                              # 'on' or 'off'.
-    'BIODIVERSITY_TARGET_GBF_4_ECNES': ['off'],                             # 'on' or 'off'.
+    'BIODIVERSITY_TARGET_GBF_4_ECNES': ['off', 'on'],                       # 'off'=core; 'on'=MNES biodiversity sensitivity (LUF Report 2026)
 
     # --------------- Biodiversity settings - GBF 8 ---------------
     'BIODIVERSITY_TARGET_GBF_8': ['off'],                                   # 'on' or 'off'
 
     # --------------- Renewable energy ---------------
-    'RENEWABLE_ENERGY_CONSTRAINTS': ['on'],                                 # 'on' or 'off'
+    'RENEWABLE_ENERGY_CONSTRAINTS': ['off'],                                # 'off' per LUF Report 2026 (Solar and Wind both OFF)
     'RENEWABLE_TARGET_SCENARIO': ['CNS25 - Accelerated Transition'],        # 'CNS25 - Accelerated Transition', 'CNS25 - Current Targets'
 
     ###############################################################
@@ -141,7 +154,7 @@ grid_search = {
     'DIET_GLOB': ['BAU'],                                                   # 'BAU' or 'FLX'
     'WASTE': [1],                                                           # 1 or 0.5
     'FEED_EFFICIENCY': ['BAU'],                                             # 'BAU' or 'High'
-    'IMPORT_TREND':['Static'],                                              # 'Static' or 'Trend'
+    'IMPORT_TREND':['Trend'],                                               # 'Trend' per LUF Report 2026 (was 'Static')
 }
 
 
