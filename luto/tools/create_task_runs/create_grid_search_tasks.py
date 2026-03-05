@@ -28,7 +28,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/LUF_20260304_RE5"
+TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/LUF_20260305_RE5"
 
 
 # Set the grid search parameters
@@ -73,20 +73,7 @@ grid_search = {
         'BECCS': False,
         'Destocked - natural land': True,
     }],
-    # All enabled land uses REVERSIBLE except Destocked (IRREVERSIBLE) per LUF Report 2026
-    # NOTE: settings.py default is the opposite — this override is required
-    'NON_AG_LAND_USES_REVERSIBLE': [{
-        'Environmental Plantings': True,
-        'Riparian Plantings': True,
-        'Sheep Agroforestry': True,
-        'Beef Agroforestry': True,
-        'Carbon Plantings (Block)': True,
-        'Sheep Carbon Plantings (Belt)': True,
-        'Beef Carbon Plantings (Belt)': True,
-        'BECCS': False,
-        'Destocked - natural land': False,          # IRREVERSIBLE per LUF Report 2026
-    }],                                
-    
+
     # --------------- Economics ---------------
     'DYNAMIC_PRICE' : [True],                                               # True or False (ON per LUF Report 2026)
     'BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR': [100],                     # AUD/ha/year       
