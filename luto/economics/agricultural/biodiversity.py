@@ -28,6 +28,7 @@ import numpy as np
 from luto import settings
 from luto import tools
 from luto.data import Data
+from functools import lru_cache
 
 
 ################################################################
@@ -426,6 +427,7 @@ def get_GBF8_matrix_sr(data:Data, target_year: int):
 
 
 # Functions to calculate ag/ag-man biodiversity contributions
+@lru_cache(maxsize=1)
 def get_ag_biodiversity_contribution(data:Data) -> np.ndarray:
     """
     Return b_j biodiversity contribution matrices by land-use type.
@@ -439,6 +441,7 @@ def get_ag_biodiversity_contribution(data:Data) -> np.ndarray:
     return np.array(list(data.BIO_HABITAT_CONTRIBUTION_LOOK_UP.values()))
 
 
+@lru_cache(maxsize=1)
 def get_ag_management_biodiversity_contribution(
     data:Data,
     yr_cal: int,

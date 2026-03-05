@@ -31,6 +31,7 @@ from luto.data import Data
 import luto.settings as settings
 from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types, get_quantity
 from luto.settings import AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
+from functools import lru_cache
 
 
 def get_cost_crop(data:Data, lu, lm, yr_idx):
@@ -230,6 +231,7 @@ def get_cost_matrix(data:Data, lm, yr_idx):
     return cost.fillna(0)
 
 
+@lru_cache(maxsize=1)
 def get_cost_matrices(data:Data, yr_idx, aggregate=True):
     """
     Return agricultural c_mrj matrix <unit: $/cell> as 3D Numpy array.
@@ -542,7 +544,13 @@ def get_utility_solar_pv_effect_c_mrj(data: Data, c_mrj, yr_idx):
 
         # Cost of renewable energy operation/maintenance
         re_lyr = data.RENEWABLE_LAYERS.sel(Type='Utility Solar PV', year=yr_cal)
-        re_cost_operation_AUD_ha = re_lyr['Cost_of_operation'] * data.REAL_AREA
+        re_cost_operation_AUD_ha = (
+            re_lyr['Cost_of_operation_AUD_kw'] 
+            * 1000                                                  # Convert from AUD/kW to AUD/MW
+            * 0.6944                                                # Adjust AUD from 2024 to 2010
+            * settings.INSTALL_CAPACITY_MW_HA['Utility Solar PV']   # Convert from AUD/MW to AUD/ha 
+            * data.REAL_AREA                                        # Convert from AUD/ha to AUD/cell 
+        )
 
         # Assign combined cost effects to output matrix
         new_c_mrj[:, :, lu_idx] = ag_cost_delta + re_cost_operation_AUD_ha.data[None, :]
@@ -586,7 +594,13 @@ def get_onshore_wind_effect_c_mrj(data: Data, c_mrj, yr_idx):
 
         # Cost of renewable energy operation/maintenance
         re_lyr = data.RENEWABLE_LAYERS.sel(Type='Onshore Wind', year=yr_cal) 
-        re_cost_operation_AUD_ha = re_lyr['Cost_of_operation'] * data.REAL_AREA
+        re_cost_operation_AUD_ha = (
+            re_lyr['Cost_of_operation_AUD_kw'] 
+            * 1000                                                  # Convert from AUD/kW to AUD/MW
+            * 0.6944                                                # Adjust AUD from 2024 to 2010
+            * settings.INSTALL_CAPACITY_MW_HA['Onshore Wind']       # Convert from AUD/MW to AUD/ha
+            * data.REAL_AREA                                        # Convert from AUD/ha to AUD/cell
+        )
 
         # Assign combined cost effects to output matrix
         new_c_mrj[:, :, lu_idx] = ag_cost_delta + re_cost_operation_AUD_ha.data[None, :]

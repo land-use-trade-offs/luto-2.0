@@ -1,383 +1,404 @@
 # LUTO2 Vue.js Reporting System
 
-This document describes the Vue.js 3 reporting system architecture, data hierarchies, and progressive selection patterns.
-
-## Progressive Selection Pattern
-
-All reporting views follow the progressive selection pattern:
-
-1. **Data Loading**: Use `chartRegister`/`mapRegister` from `ChartService`/`MapService`
-2. **Progressive Buttons**: Dynamic buttons generated from data structure keys
-3. **Cascading Watchers**: Downstream selections auto-update when upstream changes
-4. **Reactive Data**: `selectMapData`/`selectChartData` computed properties
-5. **Data Readiness**: `mapReady`/`chartReady` computed validation
-
-## Complete Data Structure Hierarchies
-
-**IMPORTANT**: Map JSON and Chart JSON files have **different dimension hierarchies**. See [CLAUDE_OUTPUT.md](CLAUDE_OUTPUT.md) for detailed comparison.
-
-### General Hierarchy Rules
-
-**Map JSON Files** (Spatial Layers):
-- **Ag**: `lm → lu → source (if applicable) → year`
-- **Am**: `am → lm → lu → source (if applicable) → year`
-- **NonAg**: `lu → year`
-
-**Chart JSON Files** (Time Series Data):
-- **Ag**: `region → lm → lu` (array of series)
-- **Am**: `region → lm → lu → source (if applicable) → am` (array of series)
-- **NonAg**: `region → lu` (array of series)
-
-**Key Difference**:
-- Map JSON places `source` before `year` (when applicable for GHG/Economics)
-- Chart JSON for Am places `source` before the final series array (indexed by `am`)
-- Chart JSON for Ag aggregates sources within the series (no separate source dimension)
-
-### AREA MODULE
-
-- **Chart Data**:
-  - `Area_Ag`: `Region → Water → [series]`
-  - `Area_Am`: `Region → Water → Landuse → [series]` (series indexed by am)
-  - `Area_NonAg`: `Region → [series]` (simplified, no Water level)
-- **Map Data**:
-  - `map_area_Ag`: `Water → Landuse → Year → {img_str, bounds, min_max}`
-  - `map_area_Am`: `AgMgt → Water → Landuse → Year → {img_str, bounds, min_max}`
-  - `map_area_NonAg`: `Landuse → Year → {img_str, bounds, min_max}`
-
-### ECONOMICS MODULE (Special Case)
-
-**Critical: Complex validation required due to dual Cost/Revenue structure**
-
-- **Chart Data (SINGLE FILES containing BOTH Cost & Revenue)**:
-  - `Economics_Ag`: `Region → "ALL" → "ALL" → [mixed series array]` (aggregated, no Water/Landuse selection needed)
-  - `Economics_Am`: `Region → "ALL" → "ALL" → [mixed series array]` (aggregated, no AgMgt selection needed)
-  - `Economics_overview_Non_Ag`: `Region → [mixed series array]` (simplified)
-  - **Dual Series Structure**: Cost (`id: null`) + Revenue (`id: name`) mixed in same array
-  - **Chart Independence**: Cost/Revenue button does NOT affect chart data access - always shows both
-
-- **Map Data (SEPARATE FILES for Cost vs Revenue)**:
-  - `map_cost_Ag`: `Water → Landuse → Year → {img_str, bounds, min_max}`
-  - `map_cost_Am`: `AgMgt → Water → Landuse → Year → {img_str, bounds, min_max}`
-  - `map_cost_NonAg`: `Landuse → Year → {img_str, bounds, min_max}` (simplified)
-  - `map_revenue_Ag`: `Water → Landuse → Year → {img_str, bounds, min_max}`
-  - `map_revenue_Am`: `AgMgt → Water → Landuse → Year → {img_str, bounds, min_max}`
-  - `map_revenue_NonAg`: `Landuse → Year → {img_str, bounds, min_max}` (simplified)
-
-- **Critical Implementation Details**:
-  - **Different AgMgt Categories**: Cost and Revenue have DIFFERENT AgMgt categories (MAP data only):
-    - **Cost AgMgt**: `"ALL"`, `"Agricultural technology (energy)"`, `"Agricultural technology (fertiliser)"`, `"Biochar (soil amendment)"`, `"Early dry-season savanna burning"`, `"Human-induced regeneration (Beef)"`, `"Human-induced regeneration (Sheep)"`, `"Methane reduction (livestock)"`
-    - **Revenue AgMgt**: `"ALL"`, `"Agricultural technology (energy)"`, `"Agricultural technology (fertiliser)"`, `"Biochar (soil amendment)"`, `"Human-induced regeneration (Beef)"`, `"Human-induced regeneration (Sheep)"`, `"Methane reduction (livestock)"` (missing `"Early dry-season savanna burning"`)
-  - **Chart vs Map Structure Mismatch**: Ag Mgt chart data is aggregated while map data uses AgMgt hierarchy
-  - **Validation Required**: Must validate AgMgt selection exists in current Cost/Revenue data (MAP only)
-  - **Combined Watcher**: Watch both `[selectCostRevenue, selectCategory]` with immediate: true
-  - **Selection Reset**: Reset AgMgt selection if it doesn't exist in new data structure
-  - **Safe Access**: Use optional chaining (`?.`) in selectMapData with fallback `|| {}`
-  - **Chart Access**: Both Ag and Ag Mgt charts use `chartData["ALL"]["ALL"]` (no selections needed)
-
-- **UI Pattern**: Cost/Revenue buttons affect MAP selection ONLY, charts ALWAYS show both cost & revenue series
-
-### GHG MODULE
-
-**Note**: GHG has an additional `source` dimension for emission sources (e.g., "Enteric Fermentation", "Manure", "Chemical Application").
-
-- **Chart Data**:
-  - `GHG_Ag`: `Region → "ALL" → Water → [series]` (sources aggregated within series, no separate source dimension)
-  - `GHG_Am`: `Region → Water → Landuse → [series]` (series indexed by am, sources aggregated)
-  - `GHG_NonAg`: `Region → [series]` (simplified)
-
-- **Map Data**:
-  - `map_GHG_Ag`: `Water → Landuse → Source → Year → {img_str, bounds, min_max}` (source before year)
-  - `map_GHG_Am`: `AgMgt → Water → Landuse → Source → Year → {img_str, bounds, min_max}` (source before year)
-  - `map_GHG_NonAg`: `Landuse → Year → {img_str, bounds, min_max}` (no sources for NonAg)
-
-### PRODUCTION MODULE
-
-- **Chart Data**:
-  - `Production_Ag`: `Region → Water → [series]`
-  - `Production_Am`: `Region → Water → Landuse → [series]` (series indexed by am)
-  - `Production_NonAg`: `Region → [series]` (simplified)
-
-- **Map Data**:
-  - `map_quantities_Ag`: `Water → Landuse → Commodity → Year → {img_str, bounds, min_max}`
-  - `map_quantities_Am`: `AgMgt → Water → Landuse → Commodity → Year → {img_str, bounds, min_max}`
-  - `map_quantities_NonAg`: `Landuse → Commodity → Year → {img_str, bounds, min_max}`
-
-### WATER MODULE
-
-- **Chart Data**:
-  - `Water_Ag_NRM`: `Region → Water → [series]`
-  - `Water_Am_NRM`: `Region → Water → Landuse → [series]` (series indexed by am)
-  - `Water_NonAg_NRM`: `Region → [series]` (simplified)
-
-- **Map Data**:
-  - `map_water_yield_Ag`: `Water → Landuse → Year → {img_str, bounds, min_max}`
-  - `map_water_yield_Am`: `AgMgt → Water → Landuse → Year → {img_str, bounds, min_max}`
-  - `map_water_yield_NonAg`: `Landuse → Year → {img_str, bounds, min_max}`
-
-### BIODIVERSITY MODULE (Dynamic/Conditional Loading)
-
-**Critical: Data conditionally loaded based on scenario settings**
-
-- **Dynamic ChartData Structure**: Biodiversity data is conditionally loaded based on scenario settings
-  - **Conditional Loading Logic**: Only load GBF scripts when corresponding targets are not 'off':
-    - `BIODIVERSITY_TARGET_GBF_2 !== 'off'` → loads GBF2 data
-    - `BIODIVERSITY_TARGET_GBF_3_NVIS !== 'off'` → loads GBF3 NVIS data
-    - `BIODIVERSITY_TARGET_GBF_3_IBRA !== 'off'` → loads GBF3 IBRA data
-    - `BIODIVERSITY_TARGET_GBF_4_SNES !== 'off'` → loads GBF4 (SNES) data
-    - `BIODIVERSITY_TARGET_GBF_4_ECNES !== 'off'` → loads GBF4 (ECNES) data
-    - `BIODIVERSITY_TARGET_GBF_8 !== 'off'` → loads GBF8 (SPECIES & GROUP) data
-
-- **Dynamic ChartData Construction**: Base structure created first, then GBF data added conditionally:
-  ```javascript
-  // Base structure always includes Quality data
-  ChartData.value['Biodiversity'] = {
-    'Quality': window[chartOverview_bio_quality['name']]
-  };
-  // Then conditionally add GBF data based on scenario settings
-  if (runScenario.value['BIODIVERSITY_TARGET_GBF_2'] !== 'off') {
-    ChartData.value['Biodiversity']['GBF2'] = window[chartOverview_bio_GBF2['name']];
-  }
-  // ... similar pattern for GBF3 NVIS, GBF3 IBRA, GBF4, GBF8
-  ```
-
-- **Chart Data** (when loaded):
-  - `BIO_quality_overview_1_Type`: `Region → [series]` (always loaded - simplified overview)
-  - `BIO_GBF2_overview_1_Type`: `Region → [series]` (conditional - Agricultural Landuse, Agricultural Management, Non-Agricultural Land-use)
-  - `BIO_GBF2_split_Ag_1_Landuse`: `Region → [series]` (conditional - simplified, no Water/AgMgt levels)
-  - `BIO_GBF2_split_Am_1_Landuse`: `Region → [series]` (conditional - simplified, no Water/AgMgt levels)
-  - `BIO_GBF2_split_Am_2_Agri-Management`: `Region → [series]` (conditional - with AgMgt categories: `"ALL"`, `"Early dry-season savanna burning"`, `"Human-induced regeneration (Beef)"`, `"Human-induced regeneration (Sheep)"`)
-  - `BIO_GBF2_split_NonAg_1_Landuse`: `Region → [series]` (conditional - simplified)
-  - `BIO_GBF3_NVIS_*`, `BIO_GBF3_IBRA_*`, `BIO_GBF4_*`, `BIO_GBF8_*`: Similar structures for other GBF targets (conditional loading)
-
-- **Map Data**:
-  - `map_bio_quality_*`: Always available (quality data always loaded)
-  - `map_bio_GBF2_Ag`: `Water → Landuse → Year → {img_str, bounds, min_max}` (conditional - standard pattern)
-  - `map_bio_GBF2_Am`: `Water → Landuse → Year → {img_str, bounds, min_max}` (conditional - standard pattern)
-  - `map_bio_GBF2_NonAg`: `Landuse → Year → {img_str, bounds, min_max}` (conditional - simplified, no Water level)
-  - `map_bio_GBF3_NVIS_*`, `map_bio_GBF3_IBRA_*`, `map_bio_GBF4_*`, `map_bio_GBF8_*`: Similar structures for other GBF targets (conditional loading)
-
-- **Implementation Notes**:
-  - **Script Loading Order**: Conditional GBF scripts loaded after base scripts but before ChartData construction
-  - **Error Handling**: Views must handle cases where expected GBF data may not be available
-  - **UI Adaptation**: Biodiversity view buttons/options should adapt to available data structure
-  - **Memory Optimization**: Only loads necessary data files based on scenario configuration
-
-### DVAR MODULE (Decision Variables - Map-Only)
-
-- **Map Data (Simplified Hierarchy)**:
-  - `map_dvar_Ag`: `Landuse → Year → {img_str, bounds, min_max}` (direct landuse access)
-  - `map_dvar_Am`: `AgMgt → Year → {img_str, bounds, min_max}` (direct agmgt access)
-  - `map_dvar_NonAg`: `Landuse → Year → {img_str, bounds, min_max}` (direct landuse access)
-  - `map_dvar_lumap`: Contains overview categories:
-    - `"Land-use"`: `Year → {img_str, bounds, min_max}`
-    - `"Water-supply"`: `Year → {img_str, bounds, min_max}`
-    - `"Agricultural Land-use"`: `Year → {img_str, bounds, min_max}`
-    - `"Agricultural Management"`: `Year → {img_str, bounds, min_max}`
-    - `"Non-Agricultural Land-use"`: `Year → {img_str, bounds, min_max}`
-
-- **Composite Structure**: Map.js creates combined structure:
-  - Categories: `"Land-use"`, `"Water-supply"`, `"Ag"`, `"Ag Mgt"`, `"Non-Ag"`
-  - Each category combines "ALL" from mosaic + individual items from specific files
-  - Final hierarchy: `Category → Landuse/AgMgt → Year → {img_str, bounds, min_max}`
-
-## Key Patterns
-
-### Progressive Selection Hierarchies
-
-1. **Standard Full**: Category → AgMgt → Water → Landuse
-2. **Standard Simple**: Category → Water → Landuse
-3. **NonAg Simplified**: Category → Landuse (no Water/AgMgt levels)
-4. **DVAR Simplified**: Category → Landuse/AgMgt → Year (map-only, direct access)
-
-### Water Level Options
-
-- **Ag/AgMgt**: `"ALL"`, `"Dryland"`, `"Irrigated"`
-- **NonAg**: No Water level (simplified structure)
-
-### AgMgt Options (where applicable)
-
-- `"ALL"`, `"AgTech EI"`, `"Asparagopsis taxiformis"`, `"Biochar"`, `"Precision Agriculture"`
-
-### Map vs Chart Data
-
-- **Charts**: Always end with array of series objects `[{name, data, type, color}]`
-- **Maps**: Always end with object `{img_str: "base64...", bounds: [...], min_max: [...]}`
-
-## Implementation Guidelines
-
-1. **Data Validation**: Always check data readiness at each hierarchy level before accessing
-2. **Progressive Watchers**: Use the standardized cascade pattern (see "Progressive Selection Cascade Watchers" section below)
-   - Follow the exact watcher implementation pattern from Area.js
-   - Never manually clear selections - let the cascade pattern handle it automatically
-3. **Special Cases**:
-   - Economics: Handle dual Cost/Revenue series in same array with combined watcher pattern
-   - NonAg: Handle simplified structures without Water/AgMgt levels
-   - Biodiversity: **Dynamic/Conditional Loading** - GBF data conditionally loaded based on scenario settings; Quality data always available; mixed structures where most use simplified `Region → [series]`, but `BIO_*_Am_2_Agri-Management` files have AgMgt categories; map data follows standard patterns with some NonAg files simplified; views must adapt to potentially missing GBF data
-4. **UI Conditions**: Use proper `v-if` conditions based on category selections
-5. **Data Access**: Use optional chaining (`?.`) for safe property access
-6. **Code Consistency**: All views must follow the same cascade watcher pattern for maintainability
-
-## Progressive Selection Cascade Watchers
-
-All Vue.js reporting views implement a standardized cascade pattern for progressive selection that automatically handles downstream option updates when upstream selections change.
-
-### Core Pattern (Area.js, Biodiversity.js, GHG.js, Production.js, Water.js)
-
-**Watch Order**: `selectCategory` → `selectWater` → `selectAgMgt` → `selectLanduse`
-
-```javascript
-// 1. Category watcher handles ALL downstream cascading
-watch(selectCategory, (newCategory, oldCategory) => {
-  // Save previous selections before switching
-  if (oldCategory) {
-    if (oldCategory === "Ag") {
-      previousSelections.value["Ag"] = { water: selectWater.value, landuse: selectLanduse.value };
-    } else if (oldCategory === "Ag Mgt") {
-      previousSelections.value["Ag Mgt"] = { agMgt: selectAgMgt.value, water: selectWater.value, landuse: selectLanduse.value };
-    } else if (oldCategory === "Non-Ag") {
-      previousSelections.value["Non-Ag"] = { landuse: selectLanduse.value };
-    }
-  }
-
-  // Handle ALL downstream variables with cascading pattern
-  if (newCategory === "Ag Mgt") {
-    availableAgMgt.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]] || {});
-    const prevAgMgt = previousSelections.value["Ag Mgt"].agMgt;
-    selectAgMgt.value = (prevAgMgt && availableAgMgt.value.includes(prevAgMgt)) ? prevAgMgt : (availableAgMgt.value[0] || '');
-
-    availableWater.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value] || {});
-    const prevWater = previousSelections.value["Ag Mgt"].water;
-    selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
-
-    availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value][selectWater.value] || {});
-    const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
-    selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
-  } else if (newCategory === "Ag") {
-    availableWater.value = Object.keys(window[mapRegister["Ag"]["name"]] || {});
-    const prevWater = previousSelections.value["Ag"].water;
-    selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
-
-    availableLanduse.value = Object.keys(window[mapRegister["Ag"]["name"]][selectWater.value] || {});
-    const prevLanduse = previousSelections.value["Ag"].landuse;
-    selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
-  } else if (newCategory === "Non-Ag") {
-    availableLanduse.value = Object.keys(window[mapRegister["Non-Ag"]["name"]] || {});
-    const prevLanduse = previousSelections.value["Non-Ag"].landuse;
-    selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
-  }
-});
-
-// 2. Water watcher handles downstream landuse cascading
-watch(selectWater, (newWater) => {
-  // Save current water selection
-  if (selectCategory.value === "Ag") {
-    previousSelections.value["Ag"].water = newWater;
-  } else if (selectCategory.value === "Ag Mgt") {
-    previousSelections.value["Ag Mgt"].water = newWater;
-  }
-
-  // Handle ALL downstream variables
-  if (selectCategory.value === "Ag") {
-    availableLanduse.value = Object.keys(window[mapRegister["Ag"]["name"]][newWater] || {});
-    const prevLanduse = previousSelections.value["Ag"].landuse;
-    selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
-  } else if (selectCategory.value === "Ag Mgt") {
-    availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value][newWater] || {});
-    const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
-    selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
-  }
-});
-
-// 3. AgMgt watcher handles downstream water + landuse cascading
-watch(selectAgMgt, (newAgMgt) => {
-  // Save current agMgt selection
-  if (selectCategory.value === "Ag Mgt") {
-    previousSelections.value["Ag Mgt"].agMgt = newAgMgt;
-
-    // Handle ALL downstream variables with cascading pattern
-    availableWater.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][newAgMgt] || {});
-    const prevWater = previousSelections.value["Ag Mgt"].water;
-    selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
-
-    availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][newAgMgt][selectWater.value] || {});
-    const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
-    selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || 'ALL');
-  }
-});
-
-// 4. Landuse watcher only saves selection (no downstream)
-watch(selectLanduse, (newLanduse) => {
-  // Save current landuse selection
-  if (selectCategory.value === "Ag") {
-    previousSelections.value["Ag"].landuse = newLanduse;
-  } else if (selectCategory.value === "Ag Mgt") {
-    previousSelections.value["Ag Mgt"].landuse = newLanduse;
-  } else if (selectCategory.value === "Non-Ag") {
-    previousSelections.value["Non-Ag"].landuse = newLanduse;
-  }
-});
-```
-
-### Special Pattern (Economics.js)
-
-Economics uses a combined watcher pattern due to its dual Cost/Revenue structure:
-
-```javascript
-// Combined watcher for Cost/Revenue + Category changes
-watch([selectCostRevenue, selectCategory], ([newCostRevenue, newCategory], [oldCostRevenue, oldCategory]) => {
-  if (!newCategory) return;
-
-  // Save previous selections before switching (only when category changes)
-  if (oldCategory && oldCategory !== newCategory) {
-    // ... save previous selections
-  }
-
-  // Handle cascading based on current Cost/Revenue selection
-  if (newCategory === "Ag Mgt") {
-    const currentMapData = window[mapRegister[newCostRevenue]["Ag Mgt"]["name"]];
-    // ... cascade all downstream selections using currentMapData
-  }
-  // ... other categories
-}, { immediate: true });
-```
-
-### Key Principles
-
-1. **No Manual Clearing**: NEVER manually clear arrays or selections (e.g., `availableAgMgt.value = []`)
-   - The progressive pattern handles this automatically
-   - Manual clearing creates unnecessary complexity
-
-2. **Cascading Flow**: Each watcher handles ALL its downstream selections
-   - `selectCategory` → handles AgMgt, Water, Landuse
-   - `selectAgMgt` → handles Water, Landuse
-   - `selectWater` → handles Landuse
-   - `selectLanduse` → no downstream (just saves)
-
-3. **Previous Selection Memory**: Always try to restore previous valid selections
-   ```javascript
-   const prevSelection = previousSelections.value[category].field;
-   selectField.value = (prevSelection && availableOptions.includes(prevSelection))
-     ? prevSelection
-     : (availableOptions[0] || 'ALL');
-   ```
-
-4. **Data Structure Consistency**: Use the map data structure as the source of truth for available options
-   ```javascript
-   availableOptions.value = Object.keys(window[mapRegister[category]["name"]] || {});
-   ```
-
-### Benefits
-
-- **Maintainable**: Consistent pattern across all views
-- **Memory Efficient**: No unnecessary data structures or operations
-- **User Friendly**: Preserves user selections when switching between categories
-- **Robust**: Handles edge cases with fallback selections
-- **Clean**: Eliminates complex conditional clearing logic
+Vue.js 3 dashboard (`DATA_REPORT/REPORT_HTML/index.html`) that renders LUTO simulation outputs as interactive maps and charts. No build step — all JS files are loaded via `<script>` tags from local `data/` directories.
 
 ## File Structure
 
-- **Views**: `/luto/tools/report/VUE_modules/views/` - Main view components
-- **Chart Data**: `/luto/tools/report/VUE_modules/data/` - Chart data files (68 total)
-- **Map Data**: `/luto/tools/report/VUE_modules/data/map_layers/` - Map layer files
-- **Services**: `/luto/tools/report/VUE_modules/services/` - ChartService/MapService registrations
-- **Routes**: `/luto/tools/report/VUE_modules/routes/route.js` - Vue router configuration
+| Path | Purpose |
+|------|---------|
+| `VUE_modules/views/` | View components (one per module) |
+| `VUE_modules/services/MapService.js` | Map file registry: `module → category → mapType → {path, name}` |
+| `VUE_modules/services/ChartService.js` | Chart file registry: `module → category → {path, name}` |
+| `VUE_modules/data/map_layers/` | Pre-rendered base64 PNG map tiles (`.js` files) |
+| `VUE_modules/data/` | Chart time-series data (`.js` files) |
+| `VUE_modules/routes/route.js` | Vue Router configuration |
+
+---
+
+## xarray → Base64 Map Pipeline
+
+How simulation outputs (`write.py` NetCDF) become the base64 PNG tiles rendered in Leaflet.
+
+### Pipeline overview
+
+```
+write.py: xarray (1D cells) → stack dims → valid-layer filter → NetCDF
+    ↓
+create_report_layers.py: decode MultiIndex → iterate layers → rename/reorder
+    ↓ per layer
+map2base64(): 1D → 2D raster → reproject EPSG:3857 → RGBA render → PNG base64
+    ↓
+tuple_dict_to_nested(): flat tuple keys → nested dict
+    ↓
+window["map_name"] = { Water: { Source: { LU: { Year: {img_str, bounds, ...} } } } };
+```
+
+### Step 1 — Stack dims and save NetCDF (`write.py`)
+
+```python
+xr_stacked = xr_data.stack(layer=['lm', 'source', 'lu']).sel(layer=valid_layers)
+_save2nc(xr_stacked, f'xr_economics_ag_cost_{yr_cal}.nc')
+```
+
+- All dims except `cell` are compressed into a `layer` MultiIndex (via `cf_xarray`).
+- Only layers with non-zero AUS aggregates are kept (`valid_layers`), reducing file size.
+- **Stacking order defines the JSON hierarchy.** Canonical order enforced by `rename_reorder_hierarchy` (see below).
+
+### Step 2 — Decode and iterate (`create_report_layers.py → get_map2json`)
+
+```python
+xr_arr = cfxr.decode_compress_to_multi_index(xr.open_dataset(path), 'layer')['data']
+for sel in xr_arr['layer'].to_index().to_frame().to_dict(orient='records'):
+    # sel = {'lm': 'ALL', 'source': 'Area cost', 'lu': 'Apples'}
+    arr_sel = xr_arr.sel(**sel)              # 1D cell array
+    sel_rename = rename_reorder_hierarchy(sel)
+    hierarchy_tp = tuple(sel_rename.values()) + (year,)
+    # → ('ALL', 'Area cost', 'Apples', 2020)
+```
+
+### Step 3 — Canonical hierarchy order (`data_tools/__init__.py → rename_reorder_hierarchy`)
+
+Enforces a fixed nesting order and human-readable labels for all map files:
+
+```
+1. am   → renamed via RENAME_AM_NON_AG
+2. lm   → 'dry' → 'Dryland', 'irr' → 'Irrigated', 'ALL' → 'ALL'
+3. other dims (source, type, commodity, …)
+4. lu / from_lu  ← always last (land-use is the bottom-level UI selection)
+```
+
+`from_lu` (used in transition ag2nonag) is treated identically to `lu` — placed last.
+
+### Step 4 — 1D → 2D raster remap (`map2base64`)
+
+```python
+# Template: 2D grid, each cell's position stored as its index value; negatives = outside LUTO area
+np.place(rxr_arr.data, rxr_arr.data >= 0, arr_sel.values)
+rxr_arr = xr.where(rxr_arr < 0, np.nan, rxr_arr)   # outside → transparent
+```
+
+### Step 5 — Reproject to Web Mercator
+
+```python
+rxr_arr = rxr_arr.rio.write_crs(rxr_crs)            # native CRS (GDA2020 / EPSG:7844)
+bbox    = rxr_arr.rio.bounds()                       # capture lat/lon bounds before reproject
+rxr_arr = rxr_arr.rio.reproject('EPSG:3857')         # Leaflet uses Web Mercator
+```
+
+Bounds stored as `[[lat_min, lon_min], [lat_max, lon_max]]` for Leaflet `imageOverlay`.
+
+### Step 6 — Integer vs float rendering
+
+| Layer type | Examples | Rendering |
+|------------|---------|-----------|
+| **Integer** | DVAR, lumap | Pixel = land-use code → RGBA lookup from `COLOR_AG/AM/NON_AG` |
+| **Float** | Economics, GHG, Water, Biodiversity | Clip 1st–99th percentile, normalize 0–100, map through `COLORS_FLOAT_POSITIVE`; store raw `min_max` for colorbar |
+
+### Step 7 — PNG → base64
+
+```python
+arr_4band = np.zeros((H, W, 4), dtype='uint8')
+for code, rgba in color_dict.items():
+    arr_4band[rxr_arr == code] = rgba
+img_str = 'data:image/png;base64,' + base64.b64encode(
+    Image.fromarray(arr_4band, 'RGBA').save(buf, 'PNG') or buf.getvalue()
+).decode()
+```
+
+### Step 8 — Write `.js` file
+
+```python
+output = tuple_dict_to_nested(output)   # flat tuple keys → nested dict
+# writes: window["map_economics_Ag_cost"] = { "ALL": { "Area cost": { "Apples": { "2020": {...} } } } };
+```
+
+Loaded as a `<script>` tag — no server or bundler needed, works from `file://`.
+
+---
+
+## Module Data Structures
+
+**General rules:**
+- **Map files**: end at `Year → {img_str, bounds, intOrFloat, legend, min_max}`. Max hierarchy: `am → lm → [source] → lu → year` (`source` only in Ag for GHG/Economics; absent from Am).
+- **Chart files**: end at `[series array]` where each series is `{name, data, type, color}`.
+- **MapService**: `module → Category → MapType → {path, name}` (Economics); simpler `module → Category → {path, name}` for other modules.
+
+### Area
+
+| | Ag | Am | NonAg |
+|-|----|----|-------|
+| **Chart** | `Region → Water → [series]` | `Region → Water → LU → [series]` (indexed by am) | `Region → [series]` |
+| **Map** | `Water → LU → Year` | `AgMgt → Water → LU → Year` | `LU → Year` |
+
+### Economics
+
+**UI selection order**: Category → Map Type → (AgMgt) → Water → (Source) → Landuse
+
+The economics module is unique: map files are split by both Category and Map Type; charts always show all series regardless of map type.
+
+**Chart files** (one per category, contain both cost & revenue mixed):
+
+| File | Hierarchy |
+|------|-----------|
+| `Economics_Ag` | `Region → "ALL" → "ALL" → [series]` |
+| `Economics_Am` | `Region → "ALL" → "ALL" → [series]` |
+| `Economics_Non_Ag` | `Region → [series]` |
+
+**Map files** — Ag (5 map types):
+
+| Map Type | Hierarchy | Source level? |
+|----------|-----------|---------------|
+| `map_economics_Ag_profit` | `Water → LU → Year` | No |
+| `map_economics_Ag_revenue` | `Water → Source → LU → Year` | Yes |
+| `map_economics_Ag_cost` | `Water → Source → LU → Year` | Yes |
+| `map_economics_Ag_transition_ag2ag` | `Water → Source → LU → Year` | Yes |
+| `map_economics_Ag_transition_ag2nonag` | `Water → Source → LU → Year` | Yes (`from_lu` treated as LU) |
+
+**Map files** — Am (3 map types, no Source level):
+
+`map_economics_Am_{profit/revenue/cost}` → `AgMgt → Water → LU → Year`
+
+**Map files** — NonAg (3 map types, no Water/Source level):
+
+`map_economics_NonAg_{profit/revenue/cost}` → `LU → Year`
+
+**MapService structure**: `Economics → {Ag/Am/NonAg} → {MapType} → {path, name}`
+- `availableMapTypes = Object.keys(mapRegister[category])` — dynamic (5 for Ag, 3 for Am/NonAg)
+- Source level shown only when `category === "Ag" && mapType !== "Profit"` (`hasSourceLevel` computed)
+
+### GHG
+
+| | Ag | Am | NonAg |
+|-|----|----|-------|
+| **Chart** | `Region → Water → Source → [series(name=LU)]` | `Region → Water → LU → [series(name=AgMgt)]` | `Region → [series(name=LU)]` |
+| **Map** | `Water → Source → LU → Year` | `AgMgt → Water → LU → Year` | `LU → Year` |
+
+Source values (Ag only): emission type e.g. `"Enteric Fermentation"`, `"Manure"`, `"Chemical Application"`.
+
+**GHG Ag** adds `selectSource` state (between Water and LU). Cascade: Category → Water → Source → LU. `previousSelections["Ag"] = { water, source, landuse }`.
+
+**GHG Am** has no Source level — cascade: Category → AgMgt → Water → LU.
+
+### Production
+
+| | Ag | Am | NonAg |
+|-|----|----|-------|
+| **Chart** | `Region → Water → [series]` | `Region → Water → LU → [series]` | `Region → [series]` |
+| **Map** | `Water → LU → Commodity → Year` | `AgMgt → Water → LU → Commodity → Year` | `LU → Commodity → Year` |
+
+### Water
+
+| | Ag | Am | NonAg |
+|-|----|----|-------|
+| **Chart** | `Region → Water → [series(name=LU)]` | `Region → Water → LU → [series(name=AgMgt)]` | `Region → [series(name=LU)]` |
+| **Map** | `Water → LU → Year` | `AgMgt → Water → LU → Year` | `LU → Year` |
+
+**Note**: Water Am chart series are indexed by **AgMgt name** (filtered by `selectAgMgt`), unlike other modules where Am series are indexed by LU.
+
+### Biodiversity (Metric + Conditional Loading)
+
+Biodiversity adds a **Metric** selection level on top of the standard Category → AgMgt → Water → LU hierarchy. Metrics map to GBF targets; `quality` is always available.
+
+**MapService/ChartService access**: `mapRegister["Biodiversity"][metric][category]` (not `["Biodiversity"]["quality"]`).
+
+**Available metrics and their `settings.py` gating key:**
+
+| Metric key | Display label | Settings key | Always loaded? |
+|-----------|--------------|-------------|---------------|
+| `quality` | Quality | — | Yes |
+| `GBF2` | GBF2 | `BIODIVERSITY_TARGET_GBF_2` | If ≠ 'off' |
+| `GBF3_NVIS` | GBF3 NVIS | `BIODIVERSITY_TARGET_GBF_3_NVIS` | If ≠ 'off' |
+| `GBF3_IBRA` | GBF3 IBRA | `BIODIVERSITY_TARGET_GBF_3_IBRA` | If ≠ 'off' |
+| `GBF4_SNES` | GBF4 SNES | `BIODIVERSITY_TARGET_GBF_4_SNES` | If ≠ 'off' |
+| `GBF4_ECNES` | GBF4 ECNES | `BIODIVERSITY_TARGET_GBF_4_ECNES` | If ≠ 'off' |
+| `GBF8_GROUP` | GBF8 Group | `BIODIVERSITY_TARGET_GBF_8` | If ≠ 'off' |
+| `GBF8_SPECIES` | GBF8 Species | `BIODIVERSITY_TARGET_GBF_8` | If ≠ 'off' |
+
+**Selection state**: `selectMetric` → `selectCategory` → `selectAgMgt` → `selectWater` → `selectLanduse`.
+
+**Cascade on metric change**: calls `doCascade(selectCategory.value)` to re-populate available options from `mapRegister[selectMetric][category]`.
+
+**Chart hierarchy:**
+- Ag: `Region → Water → [series(name=LU)]`
+- Am: `Region → AgMgt → Water → [series(name=LU)]`
+- NonAg: `Region → [series(name=LU)]`
+
+**Map files**: standard patterns — `Water → LU → Year` for Ag, `AgMgt → Water → LU → Year` for Am, `LU → Year` for NonAg.
+
+**`selectMapData` access:**
+```javascript
+// Ag:    mapData?.[selectWater]?.[selectLanduse]?.[year]
+// Am:    mapData?.[selectAgMgt]?.[selectWater]?.[selectLanduse]?.[year]
+// NonAg: mapData?.[selectLanduse]?.[year]
+// (mapData = window[mapRegister[selectMetric][selectCategory]["name"]])
+```
+
+### DVAR (Map-only)
+
+The view composes a combined data structure from multiple files:
+
+| Source file | Keys available |
+|-------------|----------------|
+| `map_dvar_lumap` | `"Land-use"`, `"Water-supply"`, `"Agricultural Land-use"`, `"Agricultural Management"`, `"Non-Agricultural Land-use"` → `Year` |
+| `map_dvar_Ag` | `LU → Year` |
+| `map_dvar_Am` | `AgMgt → Year` |
+| `map_dvar_NonAg` | `LU → Year` |
+
+Final composed hierarchy: `Category → LU/AgMgt → Year`
+
+---
+
+## Progressive Selection Pattern
+
+All views use the same pattern: cascading reactive selections drive `selectMapData` (computed) which reads the nested JS object.
+
+### Hierarchy types
+
+| Pattern | Modules | Button order |
+|---------|---------|--------------|
+| Standard Full | Area, Production, Water | Category → AgMgt → Water → LU |
+| GHG | GHG | Category → AgMgt → Water → LU (Am); Category → Water → Source → LU (Ag) |
+| Biodiversity | Biodiversity | Metric → Category → AgMgt → Water → LU |
+| NonAg Simplified | NonAg in all modules | Category → LU |
+| DVAR | DVAR | Category → LU/AgMgt → Year |
+| Economics Extended | Economics | Category → MapType → (AgMgt) → Water → (Source) → LU |
+
+### Standard cascade watchers (Area, Production, Water)
+
+Four watchers in fixed order — each handles all its downstream options:
+
+```javascript
+// 1. Category → saves previous, populates AgMgt/Water/LU
+watch(selectCategory, (newCat, oldCat) => {
+  if (oldCat) previousSelections.value[oldCat] = { agMgt: ..., water: ..., landuse: ... };
+  if (newCat === "Ag Mgt") {
+    availableAgMgt.value   = Object.keys(window[mapRegister["Ag Mgt"]["name"]] || {});
+    selectAgMgt.value      = restore(prev.agMgt, availableAgMgt) || availableAgMgt.value[0];
+    availableWater.value   = Object.keys(amData?.[selectAgMgt.value] || {});
+    selectWater.value      = restore(prev.water, availableWater) || availableWater.value[0];
+    availableLanduse.value = Object.keys(amData?.[selectAgMgt.value]?.[selectWater.value] || {});
+    selectLanduse.value    = restore(prev.landuse, availableLanduse) || availableLanduse.value[0];
+  } else if (newCat === "Ag") { /* water → lu */ }
+  else if (newCat === "Non-Ag") { /* lu only */ }
+});
+
+// 2. AgMgt → Water → LU  (Ag Mgt only)
+watch(selectAgMgt, ...);
+
+// 3. Water → LU
+watch(selectWater, ...);
+
+// 4. LU → save only
+watch(selectLanduse, ...);
+```
+
+**Rule**: Never manually clear `available*` arrays — always overwrite with new values. Each watcher handles ALL its downstream selections in one pass.
+
+### GHG cascade
+
+GHG follows the standard pattern but **Ag adds `selectSource`** between Water and LU:
+
+```javascript
+// Ag category cascade: Water → Source → LU
+watch(selectWater, (newWater) => {
+  if (selectCategory.value === "Ag") {
+    availableSource.value = Object.keys(agData?.[newWater] || {});
+    selectSource.value = restore(prev.source, availableSource) || availableSource.value[0];
+    availableLanduse.value = Object.keys(agData?.[newWater]?.[selectSource.value] || {});
+    selectLanduse.value = restore(prev.landuse) || availableLanduse.value[0];
+  } // Am: standard Water → LU (no source)
+});
+
+watch(selectSource, (newSource) => {
+  if (selectCategory.value !== "Ag") return;
+  availableLanduse.value = Object.keys(agData?.[selectWater.value]?.[newSource] || {});
+  selectLanduse.value = restore(prev.landuse) || availableLanduse.value[0];
+});
+```
+
+### Biodiversity cascade
+
+Biodiversity wraps all cascade logic in a `doCascade(category)` helper to support the extra `selectMetric` dimension:
+
+```javascript
+function doCascade(category) {
+  const mr = mapRegister[selectMetric.value];  // metric-level lookup
+  const agData   = window[mr?.["Ag"]?.["name"]];
+  const amData   = window[mr?.["Ag Mgt"]?.["name"]];
+  const nonAgData = window[mr?.["Non-Ag"]?.["name"]];
+  // ... same cascade logic as standard, but using metric-keyed data
+}
+
+// Both category and metric changes call doCascade
+watch(selectCategory, (newCat, oldCat) => { /* save prev */ doCascade(newCat); });
+watch(selectMetric,   () => doCascade(selectCategory.value));
+```
+
+### Economics cascade watchers
+
+Economics adds a `selectMapType` level and a conditional `selectSource` level:
+
+```javascript
+// Combined watcher: category + mapType drive everything downstream
+watch([selectCategory, selectMapType], ([newCat, newMapType], [oldCat]) => {
+  if (oldCat && oldCat !== newCat) saveSelections(oldCat);
+
+  availableMapTypes.value = Object.keys(mapRegister[newCat] || {});
+
+  // If mapType invalid for new category → restore previous or use first, then re-fire
+  if (!availableMapTypes.value.includes(newMapType)) {
+    selectMapType.value = previousSelections.value[newCat]?.mapType
+      || availableMapTypes.value[0];
+    return;
+  }
+  cascadeAll(newCat, newMapType);
+}, { immediate: true });
+
+// Source → LU  (Ag non-Profit only)
+const hasSourceLevel = computed(() => selectCategory.value === "Ag" && selectMapType.value !== "Profit");
+watch(selectSource, (newSource) => {
+  if (!hasSourceLevel.value) return;
+  availableLanduse.value = Object.keys(mapData[selectWater.value][newSource] || {});
+  selectLanduse.value = restore(prev.landuse) || availableLanduse.value[0];
+});
+```
+
+**Cascading flow**:
+`[category, mapType]` → AgMgt → Water → Source (if Ag non-Profit) → LU → save
+
+**`previousSelections` fields**:
+- `"Ag"`: `{ mapType, water, source, landuse }`
+- `"Ag Mgt"`: `{ mapType, agMgt, water, landuse }`
+- `"Non-Ag"`: `{ mapType, landuse }`
+
+### `selectMapData` access patterns
+
+Always use optional chaining: `mapData?.[a]?.[b]?.[c] || {}`.
+
+```javascript
+// Standard Ag (Area, Production, Water, Biodiversity)
+mapData?.[selectWater]?.[selectLanduse]?.[year]
+// Standard Am
+mapData?.[selectAgMgt]?.[selectWater]?.[selectLanduse]?.[year]
+// Standard NonAg
+mapData?.[selectLanduse]?.[year]
+
+// GHG Ag (has Source level between Water and LU)
+mapData?.[selectWater]?.[selectSource]?.[selectLanduse]?.[year]
+// GHG Am (no Source)
+mapData?.[selectAgMgt]?.[selectWater]?.[selectLanduse]?.[year]
+
+// Biodiversity: mapData = window[mapRegister[selectMetric][selectCategory]["name"]]
+//   Ag:    mapData?.[selectWater]?.[selectLanduse]?.[year]
+//   Am:    mapData?.[selectAgMgt]?.[selectWater]?.[selectLanduse]?.[year]
+//   NonAg: mapData?.[selectLanduse]?.[year]
+
+// Economics Ag Profit
+mapData?.[selectWater]?.[selectLanduse]?.[year]
+// Economics Ag Revenue/Cost/Transition (has Source level)
+mapData?.[selectWater]?.[selectSource]?.[selectLanduse]?.[year]
+// Economics Am
+mapData?.[selectAgMgt]?.[selectWater]?.[selectLanduse]?.[year]
+// Economics NonAg
+mapData?.[selectLanduse]?.[year]
+```

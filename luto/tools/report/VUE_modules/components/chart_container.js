@@ -1,4 +1,5 @@
 window.Highchart = {
+  name: 'Highchart',
   props: {
     chartData: {
       type: Object,

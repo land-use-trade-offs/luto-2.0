@@ -540,6 +540,7 @@ def get_transition_matrix_ag2nonag(
 
 
 # TODO: Need to check the logic of transition cost, espcially the water cost.
+#   The REAL_AREA being multiplied twice for w_delta_mrj
 def get_env_plantings_to_ag(data: Data, yr_idx, lumap, lmmap, separate=False) -> np.ndarray|dict:
     """
     Get transition costs from environmental plantings to agricultural land uses for each cell.
@@ -1067,7 +1068,7 @@ def get_transition_matrix_nonag2ag(data: Data, yr_idx, lumap, lmmap, separate=Fa
     return np.add.reduce(non_ag_to_agr_t_matrices)
 
 
-def get_non_ag_transition_matrix(data: Data) -> np.ndarray:
+def get_non_ag_to_non_ag_transition_matrix(data: Data) -> np.ndarray:
     """
     Get the matrix that contains transition costs for non-agricultural land uses. 
     There are no transition costs for non-agricultural land uses, therefore the matrix is filled with zeros.

@@ -1,8 +1,9 @@
 window.NotFound = {
+  name: 'NotFound',
   setup() {
     return {};
   },
-  template: `
+  template: /*html*/`
     <div class="flex flex-col items-center justify-center h-screen">
       <h1 class="text-2xl font-bold mb-4 text-center">404 Not Found</h1>
       <p class="text-center">The page you are looking for does not exist.</p>

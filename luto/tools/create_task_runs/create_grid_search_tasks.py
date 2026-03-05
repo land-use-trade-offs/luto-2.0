@@ -28,7 +28,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20251129_RES1_MEM_TEST/"
+TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/LUF_20260305_RE5"
 
 
 # Set the grid search parameters
@@ -36,10 +36,10 @@ grid_search = {
     ###############################################################
     # Task run settings for submitting the job to the cluster
     ###############################################################
-    'MEM': ['300GB'],
-    'WRITE_REPORT_MAX_MEM_GB': [300],                                       # Max memory for writing report (in GB)
-    'NCPUS':[24],
-    'TIME': ['5:00:00'],
+    'MEM': ['64GB'],
+    'WRITE_REPORT_MAX_MEM_GB': [64],                                       # Max memory for writing report (in GB)
+    'NCPUS':[16],
+    'TIME': ['10:00:00'],
     'QUEUE': ['normalsr'],                                                  # normalsr for CPU, hugemembw for memory intensive jobs
     
  
@@ -47,9 +47,9 @@ grid_search = {
     # Working settings for the model run
     ###############################################################
     'OBJECTIVE': ['maxprofit'],                                             # 'maxprofit' or 'mincost'
-    'RESFACTOR': [1],
-    'SIM_YEARS': [[2020, 2050]],                                # Years to run the model 
-    'WRITE_THREADS': [2],
+    'RESFACTOR': [5],
+    'SIM_YEARS': [range(2020,2051,5)],                                      # Years to run the model (2020-2060 per LUF Report 2026)
+    'WRITE_THREADS': [4],
     
  
     ###############################################################
@@ -58,25 +58,24 @@ grid_search = {
     
     
     # --------------- Scenarios ---------------
-    'SSP': ['245'],                                                         # '126', '245', '370', '585'
+    'SSP': ['245'],                                                         # Core: SSP2-RCP4.5. Add '585' separately for higher climate impacts sensitivity (lower priority, LUF Report 2026)
     'CARBON_EFFECTS_WINDOW': [60],
     'CO2_FERT': ['off'],                                                    # 'on' or 'off'
-    'AG_YIELD_MULT': [1.0],                                                 # Agricultural yield multiplier for productivity intensification. E.g., 1.1 means 10% increase in yields.
     'APPLY_DEMAND_MULTIPLIERS': [True],                                     # True or False. Whether to apply demand multipliers from AusTIME model.
     'NON_AG_LAND_USES' : [{
         'Environmental Plantings': True,
         'Riparian Plantings': True,
         'Sheep Agroforestry': True,
         'Beef Agroforestry': True,
-        'Carbon Plantings (Block)': False,
-        'Sheep Carbon Plantings (Belt)': False,
-        'Beef Carbon Plantings (Belt)': False,
+        'Carbon Plantings (Block)': True,           # ON per LUF Report 2026
+        'Sheep Carbon Plantings (Belt)': True,      # ON per LUF Report 2026
+        'Beef Carbon Plantings (Belt)': True,       # ON per LUF Report 2026
         'BECCS': False,
         'Destocked - natural land': True,
-    }],                                
-    
+    }],
+
     # --------------- Economics ---------------
-    'DYNAMIC_PRICE' : [False],                                              # True or False
+    'DYNAMIC_PRICE' : [True],                                               # True or False (ON per LUF Report 2026)
     'BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR': [100],                     # AUD/ha/year       
     'SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR':[100],                     # AUD/ha/year  
 
@@ -88,13 +87,13 @@ grid_search = {
 
     # --------------- Social license ---------------
     'EXCLUDE_NO_GO_LU': [False],                                            # True or False
-    'REGIONAL_ADOPTION_CONSTRAINTS': ['off'],                               # 'off', 'on', 'NON_AG_UNIFORM'    
-    'REGIONAL_ADOPTION_NON_AG_UNIFORM': [5],                                # Only work under 'NON_AG_UNIFORM'; None or numbers between 0-100 (both inclusive);  E.g., 5 means each non-ag land can not exceed 5% adoption in every region
+    'REGIONAL_ADOPTION_CONSTRAINTS': ['off', 'NON_AG_UNIFORM'],             # 'off' = core; 'NON_AG_UNIFORM' = sensitivity (LUF Report 2026)
+    'REGIONAL_ADOPTION_NON_AG_UNIFORM': [5, 10, 15],                        # Sensitivity: 5% target, test 10% and 15% (LUF Report 2026)
     'REGIONAL_ADOPTION_ZONE': ['NRM_CODE'],                                 # One of 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
 
 
     # --------------- GHG settings ---------------
-    'GHG_EMISSIONS_LIMITS': ['low'],                                        # 'off', 'low', 'high'
+    'GHG_EMISSIONS_LIMITS': ['low', 'high'],                                # 'low'=core 1.8C 67%; 'high'=higher ambition 1.5C 50% (LUF Report 2026)
     'CARBON_PRICES_FIELD': ['CONSTANT'],
     'GHG_CONSTRAINT_TYPE': ['hard'],                                        # 'hard' or 'soft'
     'USE_GHG_SCOPE_1': [True],                                              # True or False
@@ -104,27 +103,31 @@ grid_search = {
     'WATER_REGION_DEF':['Drainage Division'],                               # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
     'WATER_LIMITS': ['on'],                                                 # 'on' or 'off'
     'WATER_CONSTRAINT_TYPE': ['hard'],                                      # 'hard' or 'soft'
-    'WATER_PENALTY': [1e-5],
     'INCLUDE_WATER_LICENSE_COSTS': [1],
     
     # --------------- Biodiversity overall ---------------
-    'CONTRIBUTION_PERCENTILE': ['USER_DEFINED'],                            # One of [10, 25, 50, 75, 90], or 'USER_DEFINED'              
+    'CONTRIBUTION_PERCENTILE': ['USER_DEFINED'],                            # 50th percentile of HCAS per LUF Report 2026 (was 'USER_DEFINED')
     'CONNECTIVITY_SOURCE': ['NCI'],
     
     # --------------- Biodiversity settings - GBF 2 ---------------
     'BIODIVERSITY_TARGET_GBF_2': ['high'],                                  # 'off', 'low', 'medium', 'high'
-    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [20],                    # Percentage of degraded areas to cut in GBF2 priority areas
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [15, 20, 25, 30, 40, 50], # Core: [15,20,25,30] (20%=central); Higher ambition adds [30,40,50] (LUF Report 2026)
     'GBF2_CONSTRAINT_TYPE': ['hard'],                                       # 'hard' or 'soft'
 
     # --------------- Biodiversity settings - GBF 3 ---------------
     'BIODIVERSITY_TARGET_GBF_3_NVIS': ['off'],                              # 'off', 'medium', 'high', 'USER_DEFINED'
-    
+    'BIODIVERSITY_TARGET_GBF_3_IBRA': ['off'],                              # 'off', 'medium', 'high', 'USER_DEFINED'
+
     # --------------- Biodiversity settings - GBF 4 ---------------
     'BIODIVERSITY_TARGET_GBF_4_SNES': ['off'],                              # 'on' or 'off'.
-    'BIODIVERSITY_TARGET_GBF_4_ECNES': ['off'],                             # 'on' or 'off'.
+    'BIODIVERSITY_TARGET_GBF_4_ECNES': ['off', 'on'],                       # 'off'=core; 'on'=MNES biodiversity sensitivity (LUF Report 2026)
 
     # --------------- Biodiversity settings - GBF 8 ---------------
     'BIODIVERSITY_TARGET_GBF_8': ['off'],                                   # 'on' or 'off'
+
+    # --------------- Renewable energy ---------------
+    'RENEWABLE_ENERGY_CONSTRAINTS': ['off'],                                # 'off' per LUF Report 2026 (Solar and Wind both OFF)
+    'RENEWABLE_TARGET_SCENARIO': ['CNS25 - Accelerated Transition'],        # 'CNS25 - Accelerated Transition', 'CNS25 - Current Targets'
 
     ###############################################################
     # Scenario settings for the model run
@@ -138,7 +141,7 @@ grid_search = {
     'DIET_GLOB': ['BAU'],                                                   # 'BAU' or 'FLX'
     'WASTE': [1],                                                           # 1 or 0.5
     'FEED_EFFICIENCY': ['BAU'],                                             # 'BAU' or 'High'
-    'IMPORT_TREND':['Static'],                                              # 'Static' or 'Trend'
+    'IMPORT_TREND':['Trend'],                                               # 'Trend' per LUF Report 2026 (was 'Static')
 }
 
 

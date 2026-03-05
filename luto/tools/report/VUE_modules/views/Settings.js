@@ -1,7 +1,9 @@
 window.SettingsView = {
+  name: 'SettingsView',
   setup(props, { emit }) {
     const { ref, onMounted, watch, computed } = Vue;
     const loadScript = window.loadScript;
+    const VIEW_NAME = "Settings";
 
     // Tab management
     const activeTab = ref('settings');
@@ -20,7 +22,7 @@ window.SettingsView = {
       },
       'Diet & Consumption': {
         icon: '🍽️',
-        keywords: ['DIET_DOM', 'DIET_GLOB', 'WASTE', 'FEED_EFFICIENCY', 'CONVERGENCE', 'IMPORT_TREND', 'OFF_LAND_COMMODITIES', 'EGGS_AVG_WEIGHT']
+        keywords: ['DIET_DOM', 'DIET_GLOB', 'WASTE', 'FEED_EFFICIENCY', 'CONVERGENCE', 'IMPORT_TREND', 'OFF_LAND_COMMODITIES', 'EGGS_AVG_WEIGHT', 'APPLY_DEMAND_MULTIPLIERS', 'PRODUCTIVITY_TREND']
       },
       'Economic Parameters': {
         icon: '💰',
@@ -86,6 +88,10 @@ window.SettingsView = {
         icon: '🥚',
         keywords: ['OFF_LAND_COMMODITIES', 'EGGS_AVG_WEIGHT', 'PORK', 'CHICKEN', 'AQUACULTURE']
       },
+      'Renewable Energy': {
+        icon: '⚡',
+        keywords: ['RENEWABLE', 'RENEWABLES', 'RE_TARGET', 'INSTALL_CAPACITY']
+      },
       'Other Settings': {
         icon: '⚙️',
         keywords: ['CULL_MODE', 'MAX_LAND_USES_PER_CELL', 'LAND_USAGE_CULL_PERCENTAGE', 'NON_AGRICULTURAL_LU_BASE_CODE']
@@ -104,7 +110,8 @@ window.SettingsView = {
       { key: 'SOLVE', label: 'Solver' },
       { key: 'COST', label: 'Costs' },
       { key: 'DIET', label: 'Diet' },
-      { key: 'REGIONAL', label: 'Regional' }
+      { key: 'REGIONAL', label: 'Regional' },
+      { key: 'RENEWABLE', label: 'Renewable Energy' }
     ]);
 
     // Helper functions
@@ -219,7 +226,7 @@ window.SettingsView = {
       }
     });
 
-    return {
+    const _state = {
       activeTab,
       searchTerm,
       activeFilter,
@@ -229,42 +236,43 @@ window.SettingsView = {
       getValueClass,
       chartMemLogData,
     };
+    window._debug[VIEW_NAME] = _state;
+    return _state;
   },
 
-  template: `
-    <div class="min-h-screen p-5" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-      <div class="max-w-7xl mx-auto" style="backdrop-filter: blur(16px); background: rgba(255, 255, 255, 0.95);" class="rounded-3xl p-8 shadow-2xl">
-        
+  template: /*html*/`
+    <div class="p-6">
+
         <!-- Header -->
-        <div class="text-center mb-10 p-6 rounded-2xl text-white shadow-lg" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
-          <h1 class="text-2xl md:text-3xl font-bold mb-3">Model Settings & Logs</h1>
-          <p class="text-sm opacity-90"><strong>Configuration Overview and Memory Usage</strong></p>
+        <div class="mb-6">
+          <h1 class="text-2xl font-bold text-gray-800 mb-1">Model Settings & Logs</h1>
+          <p class="text-sm text-gray-500">Configuration Overview and Memory Usage</p>
         </div>
 
         <!-- Tab Navigation -->
-        <div class="mb-8">
-          <div class="flex space-x-1 bg-gray-100 p-1 rounded-lg">
-            <button 
+        <div class="mb-6">
+          <div class="inline-flex border-b border-gray-200">
+            <button
               @click="activeTab = 'settings'"
               :class="[
-                'flex-1 py-2 px-3 rounded-md text-sm font-medium transition-all duration-200',
-                activeTab === 'settings' 
-                  ? 'bg-white text-blue-600 shadow-md' 
-                  : 'text-gray-600 hover:text-gray-800'
+                'py-2 px-4 text-sm font-medium border-b-2 transition-all duration-200 -mb-px',
+                activeTab === 'settings'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               ]"
             >
-              ⚙️ Model Settings
+              Model Settings
             </button>
-            <button 
+            <button
               @click="activeTab = 'memory'"
               :class="[
-                'flex-1 py-2 px-3 rounded-md text-sm font-medium transition-all duration-200',
-                activeTab === 'memory' 
-                  ? 'bg-white text-blue-600 shadow-md' 
-                  : 'text-gray-600 hover:text-gray-800'
+                'py-2 px-4 text-sm font-medium border-b-2 transition-all duration-200 -mb-px',
+                activeTab === 'memory'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               ]"
             >
-              📊 Memory Log
+              Memory Log
             </button>
           </div>
         </div>
@@ -272,34 +280,33 @@ window.SettingsView = {
         <!-- Settings Tab Content -->
         <div v-if="activeTab === 'settings'">
           <!-- Statistics -->
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-5 mb-8">
-            <div v-for="(stat, index) in stats" :key="index" 
-                 class="text-white p-5 rounded-2xl text-center shadow-lg transition-all duration-300 hover:transform hover:translateY(-2px)"
-                 style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-              <div class="text-xl md:text-2xl font-bold mb-2">{{ stat.value }}</div>
-              <div class="text-xs opacity-90">{{ stat.label }}</div>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div v-for="(stat, index) in stats" :key="index"
+                 class="bg-blue-50 border border-blue-200 p-4 rounded-lg text-center">
+              <div class="text-xl font-bold text-blue-700 mb-1">{{ stat.value }}</div>
+              <div class="text-xs text-blue-500">{{ stat.label }}</div>
             </div>
           </div>
 
           <!-- Search and Filters -->
-          <div class="mb-8 space-y-4">
-            <div class="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center">
-              <input 
+          <div class="mb-6 space-y-3">
+            <div class="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center">
+              <input
                 v-model="searchTerm"
-                type="text" 
-                placeholder="🔍 Search parameters..."
-                class="flex-1 min-w-64 px-3 py-2 border-2 border-gray-200 rounded-full text-sm transition-all duration-300 focus:outline-none focus:border-blue-400 focus:shadow-lg bg-white"
+                type="text"
+                placeholder="Search parameters..."
+                class="flex-1 min-w-64 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 bg-white"
               >
-              <div class="flex flex-wrap gap-3">
-                <button 
-                  v-for="filter in filterButtons" 
+              <div class="flex flex-wrap gap-2">
+                <button
+                  v-for="filter in filterButtons"
                   :key="filter.key"
                   @click="activeFilter = filter.key"
                   :class="[
-                    'px-3 py-2 border-2 rounded-full cursor-pointer transition-all duration-300 hover:transform hover:translateY(-2px) text-xs',
-                    activeFilter === filter.key 
-                      ? 'bg-blue-500 text-white border-blue-500 shadow-lg' 
-                      : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-blue-500 hover:text-white hover:border-blue-500'
+                    'px-3 py-1.5 border rounded-lg cursor-pointer transition-all duration-200 text-xs',
+                    activeFilter === filter.key
+                      ? 'bg-blue-500 text-white border-blue-500'
+                      : 'bg-white text-gray-600 border-gray-300 hover:bg-blue-50 hover:border-blue-300'
                   ]"
                 >
                   {{ filter.label }}
@@ -309,33 +316,33 @@ window.SettingsView = {
           </div>
 
           <!-- Parameters Grid -->
-          <div v-if="filteredCategories.length === 0" class="text-center text-gray-500 italic p-10 bg-gray-50 rounded-xl text-sm">
+          <div v-if="filteredCategories.length === 0" class="text-center text-gray-500 italic p-10 bg-gray-50 rounded-lg text-sm">
             No parameters found matching your search.
           </div>
-          
-          <div v-else class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-            <div 
-              v-for="(category, index) in filteredCategories" 
+
+          <div v-else class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div
+              v-for="(category, index) in filteredCategories"
               :key="category.name"
-              class="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 transition-all duration-300 hover:transform hover:translateY(-5px)"
+              class="bg-white rounded-lg p-5 border border-gray-200"
             >
-              <h3 class="text-sm font-bold text-gray-800 mb-5 pb-3 border-b-2 border-blue-400 flex items-center gap-3">
-                <span class="text-lg">{{ category.icon }}</span>
+              <h3 class="text-sm font-bold text-gray-800 mb-4 pb-2 border-b-2 border-blue-400 flex items-center gap-2">
+                <span class="text-base">{{ category.icon }}</span>
                 {{ category.name }} ({{ category.params.length }})
               </h3>
-              
+
               <div class="space-y-0">
-                <div 
-                  v-for="param in category.params" 
+                <div
+                  v-for="param in category.params"
                   :key="param.parameter"
-                  class="flex justify-between items-start gap-4 py-3 border-b border-gray-100 last:border-b-0 hover:bg-blue-50 hover:mx-[-1.5rem] hover:px-6 hover:rounded-lg transition-all duration-200 min-h-[3rem]"
+                  class="flex justify-between items-start gap-3 py-2 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors duration-150 min-h-[2.5rem]"
                 >
                   <span class="font-semibold text-gray-700 text-xs flex-1 min-w-0 max-w-[50%]" style="word-wrap: break-word; word-break: break-word; hyphens: auto; line-height: 1.4;">
                     {{ param.parameter }}
                   </span>
-                  <span 
+                  <span
                     :class="[
-                      'font-medium text-xs font-mono flex-1 min-w-0 max-w-[50%] px-2 py-1 rounded-lg',
+                      'font-medium text-xs font-mono flex-1 min-w-0 max-w-[50%] px-2 py-1 rounded',
                       getValueClass(param.val)
                     ]"
                     :title="param.val"
@@ -350,18 +357,16 @@ window.SettingsView = {
         </div>
 
         <!-- Memory Log Tab Content -->
-        <div v-if="activeTab === 'memory'" class="bg-white rounded-2xl p-6 shadow-lg">
+        <div v-if="activeTab === 'memory'" class="bg-white rounded-lg p-5 border border-gray-200">
           <div class="flex items-center justify-start mb-4">
-            <span class="text-lg mr-3">📊</span>
             <h2 class="text-lg font-bold text-gray-800">Memory Usage Log</h2>
           </div>
-          <hr class="border-gray-300 mb-6">
+          <hr class="border-gray-200 mb-6">
           <div class="h-[600px]">
             <chart-container class="w-full h-full rounded-lg" :chartData="chartMemLogData"/>
           </div>
         </div>
 
-      </div>
     </div>
   `,
 };

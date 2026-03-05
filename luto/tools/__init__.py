@@ -23,11 +23,13 @@
 Pure helper functions and other tools.
 """
 
+import re
 import sys
 import os.path
 import time
 import traceback
 import functools
+from contextlib import redirect_stdout, redirect_stderr
 
 import pandas as pd
 import numpy as np
@@ -485,29 +487,32 @@ def am_mrj_to_xr(data, am_mrj_dict: dict, threshold: float = 0.01) -> xr.DataArr
 
     Masks out cells where the sum across all agricultural management types is less than 0.01.
     """
-    emp_arr_xr = xr.DataArray(
-        np.zeros((data.N_AG_MANS, data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32),
+    arr = np.zeros((data.N_AG_MANS, data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
+
+    for am_idx, (am, lu_names) in enumerate(data.AG_MAN_LU_DESC.items()):
+        lu_idxs = [data.DESC2AGLU[lu] for lu in lu_names]
+        src = am_mrj_dict[am]
+
+        if src.shape[-1] == len(lu_idxs):
+            for j, li in enumerate(lu_idxs):
+                arr[am_idx, :, :, li] = src[:, :, j]
+        else:
+            src_lu_idxs = [data.DESC2AGLU[i] for i in settings.AG_MANAGEMENTS_TO_LAND_USES[am]]
+            for j, li in enumerate(lu_idxs):
+                arr[am_idx, :, :, li] = src[:, :, src_lu_idxs[j]]
+
+    # Mask out cells with very small values
+    cell_sum = np.abs(arr).sum(axis=(0, 1, 3))
+    arr[:, :, cell_sum <= threshold, :] = 0
+
+    return xr.DataArray(
+        arr,
         dims=['am', 'lm', 'cell', 'lu'],
         coords={'am': data.AG_MAN_DESC,
                 'lm': data.LANDMANS,
                 'cell': np.arange(data.NCELLS),
                 'lu': data.AGRICULTURAL_LANDUSES}
     )
-
-    for am,lu in data.AG_MAN_LU_DESC.items():
-        if emp_arr_xr.loc[am, :, :, lu].shape == am_mrj_dict[am].shape:
-            # If the shape is the same, just assign the value
-            emp_arr_xr.loc[am, :, :, lu] = am_mrj_dict[am]
-        else:
-            # Otherwise, assign the array at index of the land use
-            lu_idx = [data.DESC2AGLU[i] for i in settings.AG_MANAGEMENTS_TO_LAND_USES[am]]
-            emp_arr_xr.loc[am, :, :, lu] = am_mrj_dict[am][:,:, lu_idx]
-
-    # Mask out cells with very small values
-    am_mask = (abs(emp_arr_xr.sum(['am','lm','lu'])) > threshold).values
-    emp_arr_xr = emp_arr_xr.where(am_mask[None,None,:,None], 0)
-
-    return emp_arr_xr
 
 
 def map_desc_to_dvar_index(category: str,
@@ -578,56 +583,48 @@ def set_path() -> str:
                 os.mkdir(p)
   
 
+class _TeeIO:
+    """Write to both an original stream and a log file, adding timestamps."""
+
+    _ts_re = re.compile(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} - ')
+
+    def __init__(self, orig_stream, file):
+        self._orig = orig_stream
+        self._file = file
+
+    def write(self, buf):
+        if buf.strip() and not self._ts_re.match(buf):
+            buf = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - {buf}"
+        self._file.write(buf)
+        self._orig.write(buf)
+
+    def flush(self):
+        self._file.flush()
+
+
 class LogToFile:
-    def __init__(self, log_path, mode:str='a'):
+    def __init__(self, log_path, mode: str = 'a'):
         self.log_path_stdout = f"{log_path}_stdout.log"
         self.log_path_stderr = f"{log_path}_stderr.log"
         self.mode = mode
+        os.makedirs(os.path.dirname(self.log_path_stdout), exist_ok=True)
+        os.makedirs(os.path.dirname(self.log_path_stderr), exist_ok=True)
 
     def __call__(self, func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            with open(self.log_path_stdout, self.mode) as file_stdout, open(self.log_path_stderr, self.mode) as file_stderr:
-                original_stdout = sys.stdout
-                original_stderr = sys.stderr
+            with (
+                open(self.log_path_stdout, self.mode) as f_out,
+                open(self.log_path_stderr, self.mode) as f_err,
+                redirect_stdout(_TeeIO(sys.stdout, f_out)),
+                redirect_stderr(_TeeIO(sys.stderr, f_err)),
+            ):
                 try:
-                    sys.stdout = self.StreamToLogger(file_stdout, original_stdout)
-                    sys.stderr = self.StreamToLogger(file_stderr, original_stderr)
                     return func(*args, **kwargs)
-                except Exception as e:
-                    # Capture the full traceback
-                    exc_info = traceback.format_exc()
-                    # Log the traceback to stderr log before re-raising the exception
-                    sys.stderr.write(exc_info + '\n')
-                    raise  # Re-raise the caught exception to propagate it
-                finally:
-                    # Reset stdout and stderr
-                    sys.stdout = original_stdout
-                    sys.stderr = original_stderr
+                except Exception:
+                    sys.stderr.write(traceback.format_exc() + '\n')
+                    raise
         return wrapper
-
-    class StreamToLogger(object):
-        def __init__(self, file, orig_stream=None):
-            self.file = file
-            self.orig_stream = orig_stream
-
-        def write(self, buf):
-            if buf.strip():  # Check if buf is just whitespace/newline
-                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                formatted_buf = f"{timestamp} - {buf}"
-            else:
-                formatted_buf = buf  # If buf is just a newline/whitespace, don't prepend timestamp
-
-            # Write to the original stream if it exists
-            if self.orig_stream:
-                self.orig_stream.write(formatted_buf)
-            
-            # Write to the log file
-            self.file.write(formatted_buf)
-
-        def flush(self):
-            # Ensure content is written to disk
-            self.file.flush()
             
             
 

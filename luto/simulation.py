@@ -127,7 +127,7 @@ def run(
     return _run()
 
 
-def solve_timeseries(data: Data, years_to_run: list[int]) -> None:
+def solve_timeseries(data: Data, years_to_run: list[int], analyze_iis:bool=False) -> None:
 
     for step in range(len(years_to_run) - 1):
         base_year = years_to_run[step]
@@ -185,7 +185,7 @@ def solve_timeseries(data: Data, years_to_run: list[int]) -> None:
 
         print(f'Processing for {target_year} completed in {round(time.time() - start_time)} seconds\n\n' )
         
-        if luto_solver.gurobi_model.Status not in [GRB.OPTIMAL, GRB.SUBOPTIMAL]:
+        if analyze_iis and (luto_solver.gurobi_model.Status not in [GRB.OPTIMAL, GRB.SUBOPTIMAL]):
             print('!' * 100)
             print(f"Warning: Gurobi solver did not find an optimal/suboptimal solution for year {target_year}. Status: {luto_solver.gurobi_model.Status}")
             print(f'Warning: The results are still written to disk, but will not be optimal.')

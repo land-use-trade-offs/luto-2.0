@@ -1,4 +1,4 @@
-# LUTO 2.0: The Land-Use Trade-Offs Model Version 2.0
+# LUTO2: The Land-Use Trade-Offs Model Version 2.0
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
@@ -103,7 +103,7 @@ luto/                                    # Main package directory
 input/                                   # Input data directory (requires separate download)
 output/                                  # Simulation outputs with interactive HTML reports
 docs/                                    # Documentation files
-requirements.yml                        # Python package dependencies (conda environment spec)
+requirements.yml                         # Python package dependencies (conda environment spec)
 pyproject.toml                           # Project configuration
 ```
 
@@ -294,7 +294,7 @@ LUTO2 behavior can be customized through the `luto.settings` module. Key paramet
 - `RENEWABLES_OPTIONS`: List of renewable energy types (`['Utility Solar PV', 'Onshore Wind']`)
 - `RENEWABLE_TARGET_SCENARIO`: Target scenario ('CNS25 - Accelerated Transition' or 'CNS25 - Current Targets')
 - `RE_TARGET_LEVEL`: Spatial level for targets ('STATE' or 'NRM')
-- `RENEWABLE_NATURAL_ENERGY_MW_HA_HOUR`: Per-hectare generation capacity (MW/ha) for each renewable type
+- `INSTALL_CAPACITY_MW_HA`: Per-hectare generation capacity (MW/ha) for each renewable type
 - `RENEWABLES_ADOPTION_LIMITS`: Maximum fraction of compatible land available for each renewable type (default: 1.0)
 
 ### Land Use Options

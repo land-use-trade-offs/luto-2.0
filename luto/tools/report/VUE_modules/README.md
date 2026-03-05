@@ -143,7 +143,7 @@ Each analysis view follows a progressive selection pattern for data exploration:
 #### Map View (Decision Variables)
 - Spatial visualization of optimization results
 - Land use allocation and water supply decisions
-- Agricultural management practice distribution
+- Agricultural Management practice distribution
 - Simplified hierarchy: Category → Landuse/AgMgt → Year
 
 ### 3. Interactive Map System
@@ -316,7 +316,7 @@ The model generates comprehensive datasets organized by module:
 
 #### Decision Variables (DVAR) Module
 - Spatial optimization results showing optimal land use allocation
-- Agricultural management practice distribution
+- Agricultural Management practice distribution
 - Water supply and infrastructure decisions
 
 ## Development Notes

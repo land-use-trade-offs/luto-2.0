@@ -25,12 +25,12 @@ Pure functions to calculate economic profit from land use.
 
 import numpy as np
 import pandas as pd
-import xarray as xr
-import luto.settings as settings 
+import luto.settings as settings
 
 from luto.data import Data
 from luto.economics.agricultural.quantity import get_yield_pot, get_quantity, lvs_veg_types, get_quantity_renewable
 from luto.economics.agricultural.ghg import get_savanna_burning_effect_g_mrj
+from functools import lru_cache
 
 def get_rev_crop( data:Data         # Data object.
                 , lu           # Land use.
@@ -201,6 +201,7 @@ def get_rev_matrix(data:Data, lm, yr_idx):
     return r_rjs
 
 
+@lru_cache(maxsize=1)
 def get_rev_matrices(data:Data, yr_idx, aggregate:bool = True):
     """Return r_mrj matrix of revenue per cell as 3D Numpy array."""
 

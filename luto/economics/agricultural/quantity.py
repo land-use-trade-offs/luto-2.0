@@ -136,8 +136,6 @@ def get_yield_pot(data, lvstype, vegtype, lm, yr_idx):
     lu = f'{lvstype.capitalize()} - {vegtype}'
     yield_pot *= get_ccimpact(data, lu, lm, yr_idx)
 
-    # Here we can add a productivity multiplier for sustainable intensification to increase pasture growth and yield potential (i.e., head/ha)
-    yield_pot *= settings.AG_YIELD_MULT  # ***Still to do***, now [20251027] only use a constant multiplier from settings
 
     return yield_pot
 
@@ -164,7 +162,7 @@ def get_quantity_lvstk(data, pr, lm, yr_idx):
     lvstype, vegtype = lvs_veg_types(pr)
 
     # Get the yield potential. Since [20251027], here uses a constant multiplier from settings for production intensification
-    yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx) * settings.AG_YIELD_MULT
+    yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
 
     # Determine base quantity case-by-case.
 
@@ -266,7 +264,7 @@ def get_quantity(data, pr, lm, yr_idx):
         raise KeyError(f"Land use '{pr}' not found in data.")
 
     # Apply productivity increase multiplier by product. 
-    q *= data.BAU_PROD_INCR[lm, pr][yr_idx]
+    q *= data.PRODUCTIVITY_MUL_xr.sel(lm=lm, product=pr, year=data.YR_CAL_BASE + yr_idx).item()
 
     return q
 
@@ -629,7 +627,13 @@ For agricultural products, the quantity is calculated as:
     quantity_am = quantity_ag * (re_productivity_multiplier - 1)    # If ag-man applied, an additional quantity is introduced (positive or negative) depending on the multiplier.
 
 For renewable products, the quantity is calculated as:
-    quantity = Natural_energy * re_nature_energy_capture_percent * (1 - re_remain_percent_after_distribution) * 365 * 24 * real_area
+    quantity = (
+        INSTALL_CAPACITY_MW_HA 
+        * capacity_factor_multiplier 
+        * (1 - re_remain_percent_after_distribution) 
+        * 365 * 24 
+        * real_area
+    )
 '''
 
 
@@ -650,12 +654,12 @@ def get_quantity_renewable(data, re_type: str, yr_idx: int):
     
     re_lyr = data.RENEWABLE_LAYERS.sel(Type=re_type, year=yr_cal)
     
-    re_nature_energy_capture_percent = re_lyr['Capacity_percent_of_natural_energy']
-    re_percent_remain_after_distribution = re_lyr['Energy_percent_remain_after_distribution']
+    capacity_factor_multiplier = re_lyr['capacity_factor_multiplier']
+    distribution_loss_factor_multiplier = re_lyr['distribution_loss_factor_multiplier']
     yield_per_ha = (
-        settings.RENEWABLE_NATURAL_ENERGY_MW_HA_HOUR[re_type]  
-        * re_nature_energy_capture_percent 
-        * re_percent_remain_after_distribution 
+        settings.INSTALL_CAPACITY_MW_HA[re_type] 
+        * capacity_factor_multiplier            # Range 0-1, indicates how much installed capacity is converted to electricity on average over the year.
+        * distribution_loss_factor_multiplier   # Range 0-1, indicates how much electricity was sent to customers.
         * 365 * 24
     )
 

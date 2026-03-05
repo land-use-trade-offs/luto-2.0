@@ -1,4 +1,8 @@
 
+// Expose view state to window._debug for console debugging
+// Usage: window._debug.Home.ChartData.value
+window._debug = {};
+
 window.loadScript = (src, name) => {
     return new Promise((resolve, reject) => {
         const existingScript = document.querySelector(`script[src="${src}"]`);

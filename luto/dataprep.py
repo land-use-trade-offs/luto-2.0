@@ -33,7 +33,7 @@ from luto.settings import INPUT_DIR, RAW_DATA
 
 
 
-def create_new_dataset():
+def create_new_dataset(refresh=False):
     """Creates a new LUTO input dataset from source data"""
 
     # Set up a timer and print the time
@@ -65,17 +65,16 @@ def create_new_dataset():
     bio_GBF8_inpath = 'N:/Data-Master/Biodiversity/Environmental-suitability/Annual-species-suitability_20-year_snapshots_5km_to_NetCDF/'
     bio_NES_Zonation_inpath = bio_GBF4_inpath
     renewable_energy_inpath = 'N:/Data-Master/Renewable Energy/processed'
+    ag_yield_trend = 'N:/Data-Master/AG 2050/'
     
 
     # Set data output paths
-    raw_data = RAW_DATA + '/' # '../raw_data/'
+    raw_data = RAW_DATA + '/'
     outpath = INPUT_DIR + '/'
 
 
-    # Delete the data folders' contents
-    for file in os.scandir(outpath):
-        if file.name != '.gitignore':
-            os.remove(file.path)
+    # Remove existing files in the output folder, except for .gitignore, if refresh is True
+    if refresh: [os.remove(f.path) for f in os.scandir(outpath) if f.name != '.gitignore']
 
 
     # Copy raw data files from their source into raw_data folder for further processing
@@ -93,23 +92,26 @@ def create_new_dataset():
     shutil.copyfile(luto_2D_inpath + 'SA2_crop_GHG_data.h5', raw_data + 'SA2_crop_GHG_data.h5')
     shutil.copyfile(luto_2D_inpath + 'cell_biophysical_df.h5', raw_data + 'cell_biophysical_df.h5')
     shutil.copyfile(luto_2D_inpath + 'SA2_climate_damage_mult.h5', raw_data + 'SA2_climate_damage_mult.h5')
+    
+    # Yiled trend data
+    shutil.copyfile(fdh_inpath + 'yieldincreases-bau2022.csv', outpath + 'yieldincreases_bau2022.csv')
+    shutil.copyfile(ag_yield_trend + 'yieldncreases_ABARES.xlsx', outpath + 'yieldincreases_ag_2050.xlsx')
 
     
     # Demand and elasticity data
     shutil.copyfile(f'{demand_scenarios_inpath}/All_LUTO_demand_scenarios_with_convergences.csv',  raw_data + 'All_LUTO_demand_scenarios_with_convergences.csv')
-    shutil.copyfile(f'{demand_elasticity_inpath}/Elasticities_Table.csv', outpath + 'demand_elasticity.csv')
-    shutil.copyfile(f'{luto_1D_inpath}/20251023_CNS25 Pathways AusTIMES data.xlsx', outpath + 'AusTIMES_demand_multiplier.xlsx')
+    shutil.copyfile(f'{demand_elasticity_inpath}/Elasticities_Table_20260224.csv', outpath + 'demand_elasticity.csv')
+    shutil.copyfile(f'{luto_1D_inpath}/20260220_CNS25 Pathways AusTIMES data.xlsx', outpath + 'AusTIMES_demand_multiplier.xlsx')
     
     # Read raw BECCS data from CSIRO and save as HDF5
     BECCS_raw = pd.read_pickle(BECCS_inpath + 'df_info_best_grid_20211116.pkl')
 
 
     # Copy data straight to LUTO input folder, no processing required
-    shutil.copyfile(fdh_inpath + 'yieldincreases-bau2022.csv', outpath + 'yieldincreases_bau2022.csv')
     shutil.copyfile(nlum_inpath + 'NLUM_2010-11_mask.tif', outpath + 'NLUM_2010-11_mask.tif')
     shutil.copyfile(nlum_inpath + 'ag_landuses.csv', outpath + 'ag_landuses.csv')
 
-    shutil.copyfile(luto_1D_inpath + 'GHG_targets_20251023.xlsx', outpath + 'GHG_targets.xlsx')
+    shutil.copyfile(luto_1D_inpath + 'GHG_targets_20260223.xlsx', outpath + 'GHG_targets.xlsx')
     shutil.copyfile(luto_1D_inpath + 'carbon_prices_20240612.xlsx', outpath + 'carbon_prices.xlsx')
     shutil.copyfile(luto_1D_inpath + 'ag_price_multipliers_20240612.xlsx', outpath + 'ag_price_multipliers.xlsx')
     shutil.copyfile(luto_1D_inpath + 'cost_multipliers_20240612.xlsx', outpath + 'cost_multipliers.xlsx')
@@ -207,9 +209,10 @@ def create_new_dataset():
     
     # Copy renewable energy data files
     shutil.copyfile(f'{renewable_energy_inpath}/renewable_targets.csv', outpath + 'renewable_targets.csv')
-    shutil.copyfile(f'{renewable_energy_inpath}/renewable_elec_price_AUD_MWh.csv', outpath + 'renewable_elec_price_AUD_MWh.csv')
     shutil.copyfile(f'{renewable_energy_inpath}/renewable_energy_layers_1D.nc', outpath + 'renewable_energy_layers_1D.nc')
     shutil.copyfile(f'{renewable_energy_inpath}/renewable_energy_bundle.csv', outpath + 'renewable_energy_bundle.csv')
+    shutil.copyfile(f'{renewable_energy_inpath}/renewable_price_AUD_MWh_solar.csv', outpath + 'renewable_price_AUD_MWh_solar.csv')
+    shutil.copyfile(f'{renewable_energy_inpath}/renewable_price_AUD_MWh_wind.csv', outpath + 'renewable_price_AUD_MWh_wind.csv')
 
 
 

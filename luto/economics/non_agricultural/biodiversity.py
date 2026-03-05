@@ -22,8 +22,9 @@ import numpy as np
 from luto import settings
 from luto.data import Data
 from luto import tools
+from functools import lru_cache
 from luto.settings import (
-    BIO_CONTRIBUTION_ENV_PLANTING, 
+    BIO_CONTRIBUTION_ENV_PLANTING,
     BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK, 
     BIO_CONTRIBUTION_CARBON_PLANTING_BELT, 
     BIO_CONTRIBUTION_RIPARIAN_PLANTING,
@@ -239,6 +240,7 @@ def get_breq_matrix(data: Data, ag_b_mrj: np.ndarray, lumap: np.ndarray):
 
 
 
+@lru_cache(maxsize=1)
 def get_non_ag_lu_biodiv_contribution(data: Data) -> dict[int, float]:
     return {
         # Environmental plantings

@@ -81,14 +81,14 @@ def get_to_ag_exclude_matrices(data: Data, lumap: np.ndarray):
 
     return (x_mrj * t_rj * no_go_x_mrj).astype(np.int8)
 
-def get_transition_matrices_ag2ag(data: Data, yr_idx: int, lumap: np.ndarray, lmmap: np.ndarray, separate=False):
+def get_transition_matrices_ag2ag(data: Data, yr_idx: int, base_lumap: np.ndarray, base_lmmap: np.ndarray, separate=False):
     """
     Calculate the transition matrices for land-use and land management transitions.
     Args:
         data (Data object): The data object containing the necessary input data.
         yr_idx (int): The index of the current year.
-        lumap (np.ndarray): Land use map of the base year for the transitions.
-        lmmap (np.ndarray): Land management map of the base year for the transitions.
+        base_lumap (np.ndarray): Land use map of the base year for the transitions.
+        base_lmmap (np.ndarray): Land management map of the base year for the transitions.
         separate (bool, optional): Whether to return separate cost matrices for each cost component.
                                    Defaults to False.
     Returns:
@@ -100,13 +100,13 @@ def get_transition_matrices_ag2ag(data: Data, yr_idx: int, lumap: np.ndarray, lm
     yr_cal = data.YR_CAL_BASE + yr_idx
 
     # Return l_mrj (Boolean) for current land-use and land management
-    l_mrj = tools.lumap2ag_l_mrj(lumap, lmmap)
+    l_mrj = tools.lumap2ag_l_mrj(base_lumap, base_lmmap)
     l_mrj_not = np.logical_not(l_mrj)
 
     # Get the exclusion matrix
-    x_mrj = get_to_ag_exclude_matrices(data, lumap)
+    x_mrj = get_to_ag_exclude_matrices(data, base_lumap)
 
-    ag_cells, _ = tools.get_ag_and_non_ag_cells(lumap)
+    ag_cells, _ = tools.get_ag_and_non_ag_cells(base_lumap)
 
     n_ag_lms, ncells, n_ag_lus = data.AG_L_MRJ.shape
 
@@ -120,7 +120,7 @@ def get_transition_matrices_ag2ag(data: Data, yr_idx: int, lumap: np.ndarray, lm
     # Non-irrigation related transition costs for cell r to change to land-use j calculated based on lumap (in $/ha).
     # Only consider for cells currently being used for agriculture.
     e_rj = np.zeros((ncells, n_ag_lus)).astype(np.float32)
-    e_rj[ag_cells, :] = t_ij[lumap[ag_cells]]
+    e_rj[ag_cells, :] = t_ij[base_lumap[ag_cells]]
 
     # Amortise upfront costs to annualised costs and converted to $ per cell via REAL_AREA
     e_rj = tools.amortise(e_rj) * data.REAL_AREA[:, np.newaxis]
@@ -136,7 +136,7 @@ def get_transition_matrices_ag2ag(data: Data, yr_idx: int, lumap: np.ndarray, lm
     # Water license cost (upfront, amortised to annual, per cell).   #
     # -------------------------------------------------------------- #
 
-    w_mrj = get_wreq_matrices(data, yr_idx)                                     # <unit: ML/cell>
+    w_mrj = get_wreq_matrices(data, yr_idx)                                                     # <unit: ML/cell>
     w_delta_mrj = tools.get_ag_to_ag_water_delta_matrix(w_mrj, l_mrj, data, yr_idx)
     w_delta_mrj = np.einsum('mrj,mrj,mrj->mrj', w_delta_mrj, x_mrj, l_mrj_not).astype(np.float32)
 
@@ -145,22 +145,25 @@ def get_transition_matrices_ag2ag(data: Data, yr_idx: int, lumap: np.ndarray, lm
     # -------------------------------------------------------------- #
 
     # Apply the cost of carbon released by transitioning natural land to modified land
-    ghg_transition = ag_ghg.get_ghg_transition_emissions(data, lumap, separate=True)        # <unit: t/ha>
+    ghg_transition = ag_ghg.get_ghg_transition_emissions(data, base_lumap, separate=True)       # <unit: t/ha>
         
     ghg_transition = {
-        k:np.einsum('mrj,mrj,mrj->mrj', v, x_mrj, l_mrj_not).astype(np.float32)             # No GHG penalty for cells that remain the same, or are prohibited from transitioning
+        k:np.einsum('mrj,mrj,mrj->mrj', v, x_mrj, l_mrj_not).astype(np.float32)                 # No GHG penalty for cells that remain the same, or are prohibited from transitioning
         for k, v in ghg_transition.items()
     }
     
     ghg_transition = {
-        k:tools.amortise(v * data.get_carbon_price_by_yr_idx(yr_idx))                       # Amortise the GHG penalties
+        k:tools.amortise(v * data.get_carbon_price_by_yr_idx(yr_idx))                           # Amortise the GHG penalties
         for k,v in ghg_transition.items()
     }
     
     ghg_t_types = ghg_transition.keys()
-    ghg_t_smrj = np.stack([ghg_transition[t] for t in ghg_t_types], axis=0)                 # s: ghg_t_types, m: land management, r: cell, j: land use
+    ghg_t_smrj = np.stack([ghg_transition[t] for t in ghg_t_types], axis=0)                     # s: ghg_t_types, m: land management, r: cell, j: land use
     ghg_t_mrj = np.einsum('smrj->mrj', ghg_t_smrj)
 
+    
+    # TODO: add cost of biodiversity loss/gain from land-use transitions.
+    
     # -------------------------------------------------------------- #
     # Total costs.                                                   #
     # -------------------------------------------------------------- #
@@ -269,7 +272,13 @@ def get_utility_solar_pv_effect_t_mrj(data, yr_idx):
         return np.zeros((data.NLMS, data.NCELLS, len(solar_lus)), dtype=np.float32)
 
     # Get upfront installation cost map (AUD/Cell)
-    capex_map = data.RENEWABLE_LAYERS.sel(year=yr_cal, Type='Utility Solar PV')['Cost_of_install_AUD_ha'] * data.REAL_AREA
+    capex_map = (
+        data.RENEWABLE_LAYERS.sel(year=yr_cal, Type='Utility Solar PV')['Cost_of_install_AUD_kw'] 
+        * 1000                                                  # Convert from AUD/kW to AUD/MW
+        * 0.6944                                                # Adjust AUD from 2024 to 2010
+        * settings.INSTALL_CAPACITY_MW_HA['Utility Solar PV']   # Convert from AUD/MW to AUD/ha
+        * data.REAL_AREA                                        # Convert from AUD/ha to AUD/cell
+    )
     
     # Assign to mrj matrix
     effect_array = np.zeros((data.NLMS, data.NCELLS, len(solar_lus)), dtype=np.float32)
@@ -294,10 +303,16 @@ def get_onshore_wind_effect_t_mrj(data, yr_idx):
     wind_lus = settings.AG_MANAGEMENTS_TO_LAND_USES['Onshore Wind']
     
     if not settings.AG_MANAGEMENTS.get('Onshore Wind', False):
-        return np.zeros((data.NLMS, data.NCELLS, data.NPRS), dtype=np.float32)
+        return np.zeros((data.NLMS, data.NCELLS, len(wind_lus)), dtype=np.float32)
 
     # Get upfront installation cost map (AUD/Cell)
-    capex_map = data.RENEWABLE_LAYERS.sel(year=yr_cal, Type='Onshore Wind')['Cost_of_install_AUD_ha'] * data.REAL_AREA
+    capex_map = (
+        data.RENEWABLE_LAYERS.sel(year=yr_cal, Type='Onshore Wind')['Cost_of_install_AUD_kw'] 
+        * 1000                                              # Convert from AUD/kW to AUD/MW
+        * 0.6944                                            # Adjust AUD from 2024 to 2010
+        * settings.INSTALL_CAPACITY_MW_HA['Onshore Wind']   # Convert from AUD/MW to AUD/ha
+        * data.REAL_AREA                                    # Convert from AUD/ha to AUD/cell
+    )
     
     # Assign to mrj matrix
     effect_array = np.zeros((data.NLMS, data.NCELLS, len(wind_lus)), dtype=np.float32)

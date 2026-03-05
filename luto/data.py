@@ -32,7 +32,6 @@ import luto.economics.agricultural.quantity as ag_quantity
 import luto.economics.non_agricultural.quantity as non_ag_quantity
 import luto.economics.agricultural.water as ag_water
 from luto.tools.Manual_jupyter_books.helpers import arr_to_xr
-from luto.tools.spatializers import upsample_array
 
 from collections import defaultdict
 from typing import Any, Literal, Optional
@@ -93,6 +92,9 @@ class Data:
     """
     Contains all data required for the LUTO model to run. Loads all data upon initialisation.
     """
+
+    # Restore identity-based hashing (dataclass __eq__ silently sets __hash__ = None)
+    __hash__ = object.__hash__
 
     def __init__(self) -> None:
         """
@@ -183,6 +185,8 @@ class Data:
             self.MASK = self.LUMASK
             self.GEO_META = self.GEO_META_FULLRES
             self.LUMAP_2D_RESFACTORED = self.LUMAP_2D_FULLRES
+            self.COORD_ROW_COL_FULLRES = np.argwhere(self.NLUM_MASK == 1).T
+            self.COORD_ROW_COL_RESFACTORED = self.COORD_ROW_COL_FULLRES
         else:
             raise KeyError("Resfactor setting invalid")
         
@@ -428,8 +432,15 @@ class Data:
         
         # Initial (2010) ag decision variable (X_mrj).
         self.LMMAP_NO_RESFACTOR = pd.read_hdf(os.path.join(settings.INPUT_DIR, "lmmap.h5")).to_numpy()
-        self.AG_L_MRJ = self.get_exact_resfactored_lumap_mrj() 
+        self.AG_L_MRJ = self.get_exact_resfactored_lumap_mrj()
         self.add_ag_dvars(self.YR_CAL_BASE, self.AG_L_MRJ)
+        
+        # Initial (2010) maximum ag dvar proportion
+        #   For example, if a cell has 0.2 of ag land-use at beginning,
+        #   then, the sum(ag + non_ag) in the following years should be <= 0.2.
+        #   This is used as a constraint in the solver to prevent the model 
+        #   from allocating more agricultural land than the initial proportion.
+        self.AG_MASK_PROPORTION_R =  self.AG_L_MRJ.sum(0).sum(1)
 
         # Initial (2010) land-use map, mapped as lexicographic land-use class indices.
         self.LU_RESFACTOR_CELLS = pd.DataFrame({
@@ -508,8 +519,9 @@ class Data:
         
         self.REGION_STATE_NAME2CODE = REGION_STATE_r.groupby('STE_NAME11', observed=True)['STE_CODE11'].first().to_dict()
         self.REGION_STATE_NAME2CODE = dict(sorted(self.REGION_STATE_NAME2CODE.items()))     # Make sure the dict is sorted by state name, makes it consistent with renewable target.
+        
         if 'Other Territories' in self.REGION_STATE_NAME2CODE:
-            self.REGION_STATE_NAME2CODE.pop('Other Territories')                                # Remove 'Other Territories' from the dict.
+            self.REGION_STATE_NAME2CODE.pop('Other Territories')                            # Remove 'Other Territories' from the dict.
         
         self.REGION_STATE_CODE = REGION_STATE_r['STE_CODE11'].values
 
@@ -760,110 +772,22 @@ class Data:
         self.SOLAR_PRICES = pd.read_csv(f'{settings.INPUT_DIR}/renewable_price_AUD_MWh_solar.csv')
         self.WIND_PRICES = pd.read_csv(f'{settings.INPUT_DIR}/renewable_price_AUD_MWh_wind.csv')
         
-        # Renewable energy related raster layers
-        self.RENEWABLE_LAYERS = self._construct_renewable_layers()
+        # Renewable energy ralated raster layers
+        self.RENEWABLE_LAYERS = xr.load_dataset(f'{settings.INPUT_DIR}/renewable_energy_layers_1D.nc').isel(cell=self.MASK)
+        
+        # TODO: remove when all years of renewable layers are available. 
+        #   Now is a temporary fix to expand the 2010 layers across all years.
+        self.RENEWABLE_LAYERS = (
+            self.RENEWABLE_LAYERS
+            .squeeze('year', drop=True)
+            .expand_dims({'year': range(2010, 2051)})
+        )
         
         # Renewable bundle data (productivity impacts, cost multipliers, etc)
         renewable_bundle = pd.read_csv(f'{settings.INPUT_DIR}/renewable_energy_bundle.csv')
         self.RENEWABLE_BUNDLE_WIND = renewable_bundle.query('Lever == "Onshore Wind"')
         self.RENEWABLE_BUNDLE_SOLAR = renewable_bundle.query('Lever == "Utility Solar PV"')
         
-
-    def _construct_renewable_layers(self) -> xr.Dataset:
-        """
-        Dynamically constructs the xarray dataset for renewable energy raster layers 
-        (TIFs) based on the current scenario, mimicking the structure of the old 
-        renewable_energy_layers_1D.nc file. Missing layers or mismatched dimensions 
-        are reprojected via WarpedVRT to match the baseline NLUM map.
-        """
-        import glob
-        from rasterio.vrt import WarpedVRT
-        from rasterio.enums import Resampling
-
-        re_data_vars = {}
-        years = list(range(2010, 2051))
-        re_types = ['Utility Solar PV', 'Onshore Wind']
-        
-        # Load the base mask to get the expected spatial properties
-        mask_path = os.path.join(settings.INPUT_DIR, 'NLUM_2010-11_mask.tif')
-        with rasterio.open(mask_path) as mask_src:
-            vrt_options = {
-                'resampling': Resampling.nearest,
-                'crs': mask_src.crs,
-                'transform': mask_src.transform,
-                'height': mask_src.height,
-                'width': mask_src.width
-            }
-
-        def _load_re_variable(layer_type_map, is_static=False):
-            # Pre-allocate array with NaNs
-            var_data = np.full((len(re_types), len(years), self.MASK.sum()), np.nan, dtype=np.float32)
-            for i, re_type in enumerate(re_types):
-                layer_type = layer_type_map.get(re_type)
-                if not layer_type: continue
-                
-                base_dir = os.path.join(settings.INPUT_DIR, 'RE Module', settings.RENEWABLE_SCENARIO, layer_type)
-                
-                if is_static:
-                    if 'solar' in re_type.lower(): pattern = os.path.join(base_dir, '*solar*.tif')
-                    elif 'wind' in re_type.lower(): pattern = os.path.join(base_dir, '*wind*.tif')
-                    else: pattern = os.path.join(base_dir, '*.tif')
-                        
-                    matches = glob.glob(pattern)
-                    if not matches:
-                        matches = glob.glob(os.path.join(base_dir, '*.tif'))
-                        
-                    if matches:
-                        with rasterio.open(matches[0]) as src:
-                            with WarpedVRT(src, **vrt_options) as vrt:
-                                arr_1d = vrt.read(1).flatten()[self.MASK].astype(np.float32)
-                                var_data[i, :, :] = arr_1d
-                else:
-                    for j, y in enumerate(years):
-                        pattern = os.path.join(base_dir, f'*_{y}.tif')
-                        matches = glob.glob(pattern)
-                        if matches:
-                            with rasterio.open(matches[0]) as src:
-                                with WarpedVRT(src, **vrt_options) as vrt:
-                                    arr_1d = vrt.read(1).flatten()[self.MASK].astype(np.float32)
-                                    var_data[i, j, :] = arr_1d
-            
-            # Propagate values across years (ffill then bfill) using numpy directly
-            for j in range(1, len(years)):
-                mask = np.isnan(var_data[:, j, :])
-                var_data[:, j, :][mask] = var_data[:, j-1, :][mask]
-            
-            for j in range(len(years)-2, -1, -1):
-                mask = np.isnan(var_data[:, j, :])
-                var_data[:, j, :][mask] = var_data[:, j+1, :][mask]
-
-            # Create DataArray
-            da = xr.DataArray(
-                var_data, 
-                coords=[re_types, years, np.arange(self.MASK.sum())], 
-                dims=['Type', 'year', 'cell']
-            )
-            # If still NaN (layer doesn't exist at all), fill with 0
-            return da.fillna(0)
-            
-        re_data_vars['Cost_of_operation'] = _load_re_variable({
-            'Utility Solar PV': 'solar_opex',
-            'Onshore Wind': 'wind_opex'
-        })
-        re_data_vars['Cost_of_install_AUD_ha'] = _load_re_variable({
-            'Utility Solar PV': 'solar_capex',
-            'Onshore Wind': 'wind_capex'
-        })
-        re_data_vars['Capacity_percent_of_natural_energy'] = _load_re_variable({
-            'Utility Solar PV': 'capacity_factor',
-            'Onshore Wind': 'capacity_factor'
-        }, is_static=True)
-        re_data_vars['Energy_percent_remain_after_distribution'] = _load_re_variable({
-            'Utility Solar PV': 'transmission_loss',
-            'Onshore Wind': 'transmission_loss'
-        }, is_static=False)
-        
-        return xr.Dataset(re_data_vars)        
 
     
 
@@ -873,14 +797,34 @@ class Data:
         print("├── Loading productivity data", flush=True)
 
         # Yield increases.
-        fpath = os.path.join(settings.INPUT_DIR, "yieldincreases_bau2022.csv")
-        self.BAU_PROD_INCR = pd.read_csv(fpath, header=[0, 1]).astype(np.float32)
-        self.BAU_PROD_INCR_xr = (
-            xr.DataArray(self.BAU_PROD_INCR)
-            .unstack('dim_1')
-            .rename({'dim_1_level_0':'lm', 'dim_1_level_1':'product', 'dim_0':'year'})
-            .assign_coords(year=lambda x: x.year + self.YR_CAL_BASE)  # Adjust year to absolute year
-        )
+        if settings.PRODUCTIVITY_TREND == 'BAU':
+            fpath = os.path.join(settings.INPUT_DIR, "yieldincreases_bau2022.csv")
+            productivity_trend = pd.read_csv(fpath, header=[0, 1]).astype(np.float32)
+            productivity_trend.index = productivity_trend.index + self.YR_CAL_BASE  # Adjust year to absolute year
+            productivity_trend.index.name = 'Year'
+            
+            # Convert to xarray for easier accessing.
+            self.PRODUCTIVITY_MUL_xr = (
+                xr.DataArray(productivity_trend)
+                .unstack('dim_1')
+                .rename({'Year':'year', 'dim_1_level_0':'lm', 'dim_1_level_1':'product'})
+            )
+        else: 
+            fpath = os.path.join(settings.INPUT_DIR, "yieldincreases_ag_2050.xlsx")
+            productivity_trend = pd.read_excel(
+                fpath, 
+                sheet_name=f'{settings.PRODUCTIVITY_TREND.lower()}', 
+                header=[0, 1],
+                index_col=0
+            ).astype(np.float32)
+            
+            # Convert to xarray for easier accessing.
+            self.PRODUCTIVITY_MUL_xr = (
+                xr.DataArray(productivity_trend)
+                .unstack('dim_1')
+                .rename({'Year':'lm', 'dim_1_level_1':'product', 'dim_0':'year'})
+            )
+
 
 
 
@@ -947,7 +891,9 @@ class Data:
         fire_risk = fr_df[fr_dict[settings.FIRE_RISK]]
 
         # Load environmental plantings (block) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
-        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_block.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
+        #   NOTE: Use .sel(age=...).load().isel(cell=self.MASK) instead of .sel(cell=self.MASK) 
+        #   to avoid slow xarray label-based indexing on large cell dimensions
+        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_block.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW).load().isel(cell=self.MASK)
         self.EP_BLOCK_AVG_T_CO2_HA_PER_YR = (
             (ds['EP_BLOCK_TREES_T_CO2_HA'] + ds['EP_BLOCK_DEBRIS_T_CO2_HA'])
             * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
@@ -955,7 +901,7 @@ class Data:
         ).values / settings.CARBON_EFFECTS_WINDOW
 
         # Load environmental plantings (belt) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
-        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_belt.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
+        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_belt.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW).load().isel(cell=self.MASK)
         self.EP_BELT_AVG_T_CO2_HA_PER_YR = (
             (ds['EP_BELT_TREES_T_CO2_HA'] + ds['EP_BELT_DEBRIS_T_CO2_HA'])
             * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
@@ -963,7 +909,7 @@ class Data:
         ).values / settings.CARBON_EFFECTS_WINDOW
 
         # Load environmental plantings (riparian) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
-        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_rip.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
+        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_rip.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW).load().isel(cell=self.MASK)
         self.EP_RIP_AVG_T_CO2_HA_PER_YR = (
             (ds['EP_RIP_TREES_T_CO2_HA'] + ds['EP_RIP_DEBRIS_T_CO2_HA'])
             * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
@@ -971,7 +917,7 @@ class Data:
         ).values / settings.CARBON_EFFECTS_WINDOW
 
         # Load carbon plantings (block) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
-        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_cp_block.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
+        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_cp_block.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW).load().isel(cell=self.MASK)
         self.CP_BLOCK_AVG_T_CO2_HA_PER_YR = (
             (ds['CP_BLOCK_TREES_T_CO2_HA'] + ds['CP_BLOCK_DEBRIS_T_CO2_HA'])
             * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
@@ -979,7 +925,7 @@ class Data:
         ).values / settings.CARBON_EFFECTS_WINDOW
 
         # Load farm forestry [i.e. carbon plantings (belt)] GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
-        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_cp_belt.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
+        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_cp_belt.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW).load().isel(cell=self.MASK)
         self.CP_BELT_AVG_T_CO2_HA_PER_YR = (
             (ds['CP_BELT_TREES_T_CO2_HA'] + ds['CP_BELT_DEBRIS_T_CO2_HA'])
             * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
@@ -1188,21 +1134,21 @@ class Data:
         print("├── Calculating base year productivity", flush=True)
         
         (
-            self.prod_base_yr_potential_ag_mrp, 
-            self.prod_base_yr_potential_non_ag_rp, 
+            self.prod_base_yr_potential_ag_mrp,
+            self.prod_base_yr_potential_non_ag_rp,
             self.prod_base_yr_potential_am_amrp
         ) = self.get_potential_production_lyr(self.YR_CAL_BASE)
-        
+
         (
-            self.prod_base_yr_actual_ag_mrc, 
-            self.prod_base_yr_actual_non_ag_rc, 
+            self.prod_base_yr_actual_ag_mrc,
+            self.prod_base_yr_actual_non_ag_rc,
             self.prod_base_yr_actual_am_amrc
         ) = self.get_actual_production_lyr(self.YR_CAL_BASE)
-        
+
         yr_cal_base_prod_data = (
             self.prod_base_yr_actual_ag_mrc.sum(['cell','lm'])
-            + self.prod_base_yr_actual_non_ag_rc.sum(['cell']) 
-            + self.prod_base_yr_actual_am_amrc.sum(['cell', 'am', 'lm'])  
+            + self.prod_base_yr_actual_non_ag_rc.sum(['cell'])
+            + self.prod_base_yr_actual_am_amrc.sum(['cell', 'am', 'lm'])
         ).compute().values
         
         self.add_production_data(self.YR_CAL_BASE, "Production", yr_cal_base_prod_data)
@@ -1470,13 +1416,21 @@ class Data:
                 self.BIO_GBF2_MASK
             )
             
-            self.BIO_GBF2_BASE_YR = np.einsum(
-                'j,mrj,r,r->r',
-                np.array(list(self.BIO_HABITAT_CONTRIBUTION_LOOK_UP.values())),
-                self.AG_L_MRJ,      # lumap in proportion representation if resfactored
-                self.BIO_GBF2_MASK,
-                self.REAL_AREA
-            ) - (self.SAVBURN_ELIGIBLE * self.BIO_GBF2_MASK * (1 - settings.BIO_CONTRIBUTION_LDS) * self.REAL_AREA)
+            self.BIO_GBF2_BASE_YR = (
+                np.einsum(
+                    'j,mrj,r,r->r',
+                    np.array(list(self.BIO_HABITAT_CONTRIBUTION_LOOK_UP.values())),
+                    self.AG_L_MRJ,      # lumap in proportion representation if resfactored
+                    self.BIO_GBF2_MASK,
+                    self.REAL_AREA
+                ) - (
+                    self.SAVBURN_ELIGIBLE 
+                    * self.BIO_GBF2_MASK 
+                    * (1 - settings.BIO_CONTRIBUTION_LDS) 
+                    * self.REAL_AREA
+                    * self.AG_MASK_PROPORTION_R
+                )
+            ) 
               
         
         ###############################################################
@@ -1651,7 +1605,7 @@ class Data:
             self.BIO_GBF4_SPECIES_LAYERS = np.array([self.get_average_fraction_from_int_map(arr) for arr in snes_arr]) 
         
         
-        if settings.BIODIVERSITY_TARGET_GBF_4_SNES != 'off':
+        if settings.BIODIVERSITY_TARGET_GBF_4_ECNES != 'off':
             print("│   ├── Loading environmental significance data (ECNES)", flush=True)
         
         
@@ -1949,7 +1903,7 @@ class Data:
         ).assign_coords(
             region=('cell', self.REGION_NRM_NAME),
         )
-        
+
         return (ag_q_mrp_xr.compute(), non_ag_crk_xr.compute(), ag_man_q_amrp_xr.compute())
     
     
@@ -1989,7 +1943,7 @@ class Data:
         ag_q_mrc = xr.dot((xr.dot(ag_X_mrj_xr, self.lu2pr_xr, dims=['lu']) * ag_q_mrp_xr), self.pr2cm_xr, dims=['product'])
         non_ag_p_rc = xr.dot(non_ag_X_rk_xr, non_ag_crk_xr, dims=['lu'])
         am_p_amrc = xr.dot((xr.dot(ag_man_X_amrj_xr, self.lu2pr_xr, dims=['lu']) * ag_man_q_amrp_xr), self.pr2cm_xr, dims=['product'])
-        
+
         return ag_q_mrc, non_ag_p_rc, am_p_amrc
     
     
@@ -2010,18 +1964,18 @@ class Data:
 
         # Get potential production layers
         ag_q_mrp_xr_target_yr, non_ag_crk_xr_target_yr, ag_man_q_amrp_xr_target_yr = self.get_potential_production_lyr(yr_cal)
-        
-        # Calculate total impact 
+
+        # Calculate total impact
         ag_production_c = xr.dot(
-            xr.dot(ag_X_mrj_xr, self.lu2pr_xr, dims=['lu']) * ag_q_mrp_xr_target_yr, self.pr2cm_xr, 
+            xr.dot(ag_X_mrj_xr, self.lu2pr_xr, dims=['lu']) * ag_q_mrp_xr_target_yr, self.pr2cm_xr,
             dim=['cell', 'lm','product']
         ).compute()
         non_ag_production_c = xr.dot(non_ag_X_rk_xr, non_ag_crk_xr_target_yr, dims=['cell', 'lu'])
         am_p_amrc = xr.dot(
-            (xr.dot(ag_man_X_amrj_xr, self.lu2pr_xr, dims=['lu']) * ag_man_q_amrp_xr_target_yr), self.pr2cm_xr, 
+            (xr.dot(ag_man_X_amrj_xr, self.lu2pr_xr, dims=['lu']) * ag_man_q_amrp_xr_target_yr), self.pr2cm_xr,
             dims=['am', 'cell', 'lm','product']
         )
-        
+
         return (ag_production_c.compute() + non_ag_production_c.compute() + am_p_amrc.compute())
     
     
@@ -2039,9 +1993,9 @@ class Data:
             return self.DEMAND_ELASTICITY_MUL[yr_cal]
 
         # Get supply delta (0-based ratio)
-        supply_base_dvar_base_productivity = self.BASE_YR_production_t
-        supply_base_dvar_target_productivity = self.get_production_from_base_dvar_under_target_CCI_and_yield_change(yr_cal)
-        delta_supply = (supply_base_dvar_target_productivity - supply_base_dvar_base_productivity) / supply_base_dvar_base_productivity
+        supply_base_dvar_base_production = self.BASE_YR_production_t
+        supply_base_dvar_target_production = self.get_production_from_base_dvar_under_target_CCI_and_yield_change(yr_cal)
+        delta_supply = (supply_base_dvar_target_production - supply_base_dvar_base_production) / supply_base_dvar_base_production
 
         # Get demand delta (0-based ratio)
         demand_base_year = self.D_CY_xr.sel(year=self.YR_CAL_BASE)
@@ -2142,7 +2096,7 @@ class Data:
             The priority degrade areas conservation target for the given year.
         """
         
-        bio_habitat_score_baseline_sum = (self.BIO_GBF2_MASK * self.REAL_AREA).sum()
+        bio_habitat_score_baseline_sum = (self.BIO_GBF2_MASK * self.REAL_AREA * self.AG_MASK_PROPORTION_R).sum()
         bio_habitat_score_base_yr_sum = self.BIO_GBF2_BASE_YR.sum()
         bio_habitat_score_base_yr_proportion = bio_habitat_score_base_yr_sum / bio_habitat_score_baseline_sum
 

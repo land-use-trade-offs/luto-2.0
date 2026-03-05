@@ -1,4 +1,5 @@
 window.Sidebar = {
+  name: 'Sidebar',
   emits: ['update:isCollapsed'],
   setup(props, { emit }) {
     const { ref, computed } = Vue;

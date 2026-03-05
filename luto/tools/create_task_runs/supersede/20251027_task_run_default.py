@@ -60,7 +60,6 @@ grid_search = {
     'SSP': ['245'],                                                         # '126', '245', '370', '585'
     'CARBON_EFFECTS_WINDOW': [60],
     'CO2_FERT': ['off'],                                                    # 'on' or 'off'
-    'AG_YIELD_MULT': [1.0],                                                 # Agricultural yield multiplier for productivity intensification. E.g., 1.1 means 10% increase in yields.
     'APPLY_DEMAND_MULTIPLIERS': [True],                                     # True or False. Whether to apply demand multipliers from AusTIME model.
     'NON_AG_LAND_USES' : [{
         'Environmental Plantings': True,

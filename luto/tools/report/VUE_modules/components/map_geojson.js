@@ -1,4 +1,5 @@
 window.map_geojson = {
+    name: 'MapGeojson',
     props: {
         height: {
             type: String,

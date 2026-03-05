@@ -1,8 +1,9 @@
 window.RegionsMap = {
+  name: 'RegionsMap',
 
   props: {
     mapData: {
-      type: String,
+      type: Object,
       required: true
     },
   },

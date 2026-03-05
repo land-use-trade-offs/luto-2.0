@@ -1,4 +1,5 @@
 window.FilterableDropdown = {
+  name: 'FilterableDropdown',
   props: {
     useSearch: {
       type: Boolean,
@@ -131,11 +132,10 @@ window.FilterableDropdown = {
               <path d="m21 21-4.3-4.3"/>
             </svg>
             <input
-              class="text-[0.75rem]"
               type="text"
               :placeholder="searchPlaceholder"
               v-model="searchTerm"
-              class="pl-10 pr-1 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              class="text-[0.75rem] pl-10 pr-1 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
         </div>

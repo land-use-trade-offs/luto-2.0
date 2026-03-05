@@ -1,4 +1,5 @@
 window.AreaView = {
+  name: 'AreaView',
   setup() {
     const { ref, onMounted, onUnmounted, inject, computed, watch, nextTick } = Vue;
 
@@ -102,7 +103,6 @@ window.AreaView = {
           },
         },
         series: seriesData || [],
-        colors: window["Supporting_info"].colors,
       }
     });
 
@@ -232,7 +232,7 @@ window.AreaView = {
       window.MemoryService.cleanupViewData(VIEW_NAME);
     });
 
-    return {
+    const _state = {
       yearIndex,
       selectYear,
       selectRegion,
@@ -255,8 +255,10 @@ window.AreaView = {
       isDrawerOpen,
       toggleDrawer,
     };
+    window._debug[VIEW_NAME] = _state;
+    return _state;
   },
-  template: `
+  template: /*html*/`
     <div class="relative w-full h-screen">
 
 
@@ -272,12 +274,11 @@ window.AreaView = {
           v-if="availableYears && availableYears.length > 0"
           v-model="yearIndex"
           size="small"
-          :show-tooltip="false"
           :min="0"
           :max="availableYears.length - 1"
           :step="1"
           :format-tooltip="index => availableYears[index]"
-          :marks="availableYears.reduce((acc, year, index) => ({ ...acc, [index]: year }), {})"
+          :show-stops="true"
           @input="(index) => { yearIndex = index; selectYear = availableYears[index]; }"
         />
       </div>

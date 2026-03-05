@@ -27,7 +27,7 @@ from io import BytesIO
 from PIL import Image
 
 from luto import settings
-from luto.tools.report.data_tools.parameters import RENAME_AM_NON_AG, YR_BASE
+from luto.tools.report.data_tools.parameters import RENAME_AM_NON_AG
 
 
 def extract_dtype_from_path(path):
@@ -42,10 +42,6 @@ def extract_dtype_from_path(path):
     """
     # Define the output categories and its corresponding file patterns
     f_cat = {
-            # decision variables (npy files)
-            'ag_X_mrj':['ag_X_mrj'],
-            'ag_man_X_mrj':['ag_man_X_mrj'],
-            'non_ag_X_rk':['non_ag_X_rk'],
             # CSVs
             'GHG':['GHG'],
             'water':['water'],
@@ -53,19 +49,11 @@ def extract_dtype_from_path(path):
             'area':['area'],
             'transition_matrix':['transition_matrix'],
             'quantity':['quantity'],
-            'revenue':['revenue'],
-            'cost':['cost'],
-            'profit':['profit'],
+            'economics_ag':['economics_ag_'],
+            'economics_am':['economics_am_'],
+            'economics_non_ag':['economics_non_ag_'],
+            'transition':['transition_ag2ag_', 'transition_ag2nonag_', 'transition_nonag2ag_'],
             'biodiversity':['biodiversity'],
-            # Maps (GeoTIFFs)
-            'ammap':['ammap'],
-            'lumap':['lumap'],
-            'lmmap':['lmmap'],
-            'non_ag':['non_ag'],
-            'Ag_LU':['Ag_LU'], 
-            'Ag_Mgt':['Ag_Mgt'],
-            'Land_Mgt':['Land_Mgt'],
-            'Non-Ag':['Non-Ag'],
             # Metrics xarrays
             'xarray_layer':['xr_'],
     }
@@ -190,6 +178,7 @@ def rename_reorder_hierarchy(sel: dict) -> dict:
     # 1: 'am'
     if 'am' in sel:
         sel_rename['am'] = RENAME_AM_NON_AG.get(sel['am'], sel['am'])
+        
     # 2: 'lm'
     if 'lm' in sel:
         sel_rename['lm'] =  {'irr': 'Irrigated', 'dry': 'Dryland'}.get(sel['lm'], sel['lm'])
@@ -202,9 +191,9 @@ def rename_reorder_hierarchy(sel: dict) -> dict:
             'Sheep lexp': 'Sheep live export',
             'Beef lexp': 'Beef live export'
         }.get(commodity, commodity)
-
-    # 3-2: Profit/Revenue/Cost
-    leftover_keys = set(sel.keys()) - set(sel_rename.keys()) - {'lu'}
+        
+    # 3-2: Profit/Revenue/Cost/Source
+    leftover_keys = set(sel.keys()) - set(sel_rename.keys()) - {'lu', 'from_lu'}
     for key in leftover_keys:
         sel_rename[key] = {
             'Operation-cost': 'Cost (operation)',
@@ -213,66 +202,40 @@ def rename_reorder_hierarchy(sel: dict) -> dict:
             'Transition-cost-nonag2ag': 'Cost (trans NonAg2Ag)',
             'Transition-cost-agMgt': 'Cost (trans AgMgt)',
         }.get(sel[key], sel[key])
-        
-    # 4 last: 'lu'
+
+    # 4 last: 'lu' or 'from_lu' (treated identically as the land-use selection level)
     if 'lu' in sel:
         sel_rename['lu'] = RENAME_AM_NON_AG.get(sel['lu'], sel['lu'])
-        
-        
+    elif 'from_lu' in sel:
+        sel_rename['from_lu'] = RENAME_AM_NON_AG.get(sel['from_lu'], sel['from_lu'])
+
     return sel_rename
 
 
-def get_map_legend() -> dict:
+def build_map_legend(code_dict) -> dict:
+    """Build map legend dicts from the Python color sub-dicts in parameters.py.
 
-    color_csvs = {
-        'lumap': 'luto/tools/report/VUE_modules/assets/lumap_colors_grouped.csv',
-        'lm': 'luto/tools/report/VUE_modules/assets/lm_colors.csv',
-        'ag': 'luto/tools/report/VUE_modules/assets/lumap_colors.csv',
-        'non_ag': 'luto/tools/report/VUE_modules/assets/non_ag_colors.csv',
-        'am': 'luto/tools/report/VUE_modules/assets/ammap_colors.csv',
-        'float': 'luto/tools/report/VUE_modules/assets/float_img_colors.csv'
-    }
-    
-    # Remove land-uses and ag managements that are not used, this excludes them from showing in the map legend
-    rm_lus = [i for i in settings.NON_AG_LAND_USES if not settings.NON_AG_LAND_USES[i]]
-    rm_ams = [i for i in settings.AG_MANAGEMENTS if not settings.AG_MANAGEMENTS[i]]
-    rm_items = rm_lus + rm_ams
-    
-    return {
-        'lumap': {
-            'color_csv': color_csvs['lumap'], 
-            'legend': {
-                RENAME_AM_NON_AG.get(k,k):v for k,v in pd.read_csv(color_csvs['lumap']).set_index('lu_desc')['lu_color_HEX'].to_dict().items() 
-                if k not in rm_items
-            }
-        },
-        'lm': {
-            'color_csv': color_csvs['lm'],
-            'legend': pd.read_csv(color_csvs['lm']).set_index('lu_desc')['lu_color_HEX'].to_dict()
-        },
-        'ag': {
-            'color_csv': color_csvs['ag'],
-            'legend': pd.read_csv(color_csvs['ag']).set_index('lu_desc')['lu_color_HEX'].to_dict()
-        },
-        'non_ag': {
-            'color_csv': color_csvs['non_ag'],
-            'legend': {
-                RENAME_AM_NON_AG.get(k,k):v for k,v in pd.read_csv(color_csvs['non_ag']).set_index('lu_desc')['lu_color_HEX'].to_dict().items() 
-                if k not in rm_items
-            }
-        },
-        'am': {
-            'color_csv': color_csvs['am'],
-            'legend': {
-                RENAME_AM_NON_AG.get(k,k):v for k,v in pd.read_csv(color_csvs['am']).set_index('lu_desc')['lu_color_HEX'].to_dict().items() 
-                if k not in rm_items
-            }
-        },
-        'float': {
-            'color_csv': color_csvs['float'],
-            'legend': pd.read_csv(color_csvs['float']).set_index('lu_code')['lu_color_HEX'].to_dict()
-        }
-    }
-    
+    Input: code_dict is a dict of the form {code: (description, hex_color)}, e.g. COLOR_AG.
+    Output: dict with two sub-dicts:
+     - 'legend': {description: hex_color} for legend rendering
+     - 'code_colors': {code: (R, G, B, A)} for pixel rendering, with nodata (-1) as transparent (0, 0, 0, 0).
+    """
+    # Items disabled in settings are excluded from legend and pixel rendering
+    rm_items = set(
+        [lu for lu, enabled in settings.NON_AG_LAND_USES.items() if not enabled] +
+        [am for am, enabled in settings.AG_MANAGEMENTS.items()    if not enabled]
+    )
+
+    legend = {}
+    code_colors = {}
+    for code, (desc, hex_c) in code_dict.items():
+        if desc in rm_items:
+            continue
+        legend[desc] = hex_c
+        code_colors[code] = hex_color_to_numeric(hex_c)
+    code_colors[-1] = (0, 0, 0, 0)  # nodata / outside study area → transparent
+    return {'legend': legend, 'code_colors': code_colors}
+
+
     
 
