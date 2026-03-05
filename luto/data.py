@@ -1450,9 +1450,9 @@ class Data:
                 nvis_selected_groups = [
                     row['group'] for _, row in nvis_targets_df.iterrows()
                     if all([
-                        row['USER_DEFINED_TARGET_PERCENT_2030'] > 0,
-                        row['USER_DEFINED_TARGET_PERCENT_2050'] > 0,
-                        row['USER_DEFINED_TARGET_PERCENT_2100'] > 0
+                        row.get('USER_DEFINED_TARGET_PERCENT_2030', 0) > 0,
+                        row.get('USER_DEFINED_TARGET_PERCENT_2050', 0) > 0,
+                        row.get('USER_DEFINED_TARGET_PERCENT_2100', 0) > 0
                     ])
                 ]
                 nvis_baseline_and_targets = nvis_targets_df.query("group.isin(@nvis_selected_groups)")
@@ -1513,9 +1513,9 @@ class Data:
                 ibra_selected_groups = [
                     row['Region'] for _, row in ibra_targets_df.iterrows()
                     if all([
-                        row['USER_DEFINED_TARGET_PERCENT_2030'] > 0,
-                        row['USER_DEFINED_TARGET_PERCENT_2050'] > 0,
-                        row['USER_DEFINED_TARGET_PERCENT_2100'] > 0
+                        row.get('USER_DEFINED_TARGET_PERCENT_2030', 0) > 0,
+                        row.get('USER_DEFINED_TARGET_PERCENT_2050', 0) > 0,
+                        row.get('USER_DEFINED_TARGET_PERCENT_2100', 0) > 0
                     ])
                 ]
                 ibra_baseline_and_targets = ibra_targets_df.query("Region.isin(@ibra_selected_groups)")
@@ -1574,17 +1574,17 @@ class Data:
             BIO_GBF4_SNES_score = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF4_TARGET_SNES.csv').sort_values(by='SCIENTIFIC_NAME', ascending=True)
             
             self.BIO_GBF4_SNES_LIKELY_SEL = [row['SCIENTIFIC_NAME'] for _,row in BIO_GBF4_SNES_score.iterrows()
-                                                    if all([row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY']>0,
-                                                            row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY']>0,
-                                                            row['USER_DEFINED_TARGET_PERCENT_2100_LIKELY']>0])]
-            
+                                                    if all([row.get('USER_DEFINED_TARGET_PERCENT_2030_LIKELY', 0)>0,
+                                                            row.get('USER_DEFINED_TARGET_PERCENT_2050_LIKELY', 0)>0,
+                                                            row.get('USER_DEFINED_TARGET_PERCENT_2100_LIKELY', 0)>0])]
+
             self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL = [row['SCIENTIFIC_NAME'] for _,row in BIO_GBF4_SNES_score.iterrows()
-                                                    if all([row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY_MAYBE']>0,
-                                                            row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY_MAYBE']>0,
-                                                            row['USER_DEFINED_TARGET_PERCENT_2100_LIKELY_MAYBE']>0])]
+                                                    if all([row.get('USER_DEFINED_TARGET_PERCENT_2030_LIKELY_MAYBE', 0)>0,
+                                                            row.get('USER_DEFINED_TARGET_PERCENT_2050_LIKELY_MAYBE', 0)>0,
+                                                            row.get('USER_DEFINED_TARGET_PERCENT_2100_LIKELY_MAYBE', 0)>0])]
             
             if len(self.BIO_GBF4_SNES_LIKELY_SEL) == 0:
-                raise ValueError("At least one of 'LIKELY' layers should be selected!")
+                print("│   │   ⚠ WARNING: No 'LIKELY' SNES layers selected, proceeding with empty selection.", flush=True)
 
             likely_maybe_union = set(self.BIO_GBF4_SNES_LIKELY_SEL).intersection(self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL)
             if likely_maybe_union:
@@ -1592,54 +1592,62 @@ class Data:
                 for idx, name in enumerate(likely_maybe_union):
                     print(f"│   │       ├── {idx+1}) {name}", flush=True)
                 self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL = list(set(self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL) - likely_maybe_union)
-                
+
             self.BIO_GBF4_SNES_SEL_ALL = self.BIO_GBF4_SNES_LIKELY_SEL + self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL
-            self.BIO_GBF4_PRESENCE_SNES_SEL = ['LIKELY'] * len(self.BIO_GBF4_SNES_LIKELY_SEL) + ['LIKELY_MAYBE'] * len(self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL)  
+            self.BIO_GBF4_PRESENCE_SNES_SEL = ['LIKELY'] * len(self.BIO_GBF4_SNES_LIKELY_SEL) + ['LIKELY_MAYBE'] * len(self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL)
             self.BIO_GBF4_SNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY = BIO_GBF4_SNES_score.query(f'SCIENTIFIC_NAME in {self.BIO_GBF4_SNES_LIKELY_SEL}')
-            self.BIO_GBF4_SNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY_AND_MAYBE = BIO_GBF4_SNES_score.query(f'SCIENTIFIC_NAME in {self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL}') 
-            
+            self.BIO_GBF4_SNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY_AND_MAYBE = BIO_GBF4_SNES_score.query(f'SCIENTIFIC_NAME in {self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL}')
+
             BIO_GBF4_SPECIES_raw = xr.open_dataarray(f'{settings.INPUT_DIR}/bio_GBF4_SNES.nc', chunks={'species':1})
-            snes_arr_likely = BIO_GBF4_SPECIES_raw.sel(species=self.BIO_GBF4_SNES_LIKELY_SEL, presence='LIKELY')
-            snes_arr_likely_maybe = BIO_GBF4_SPECIES_raw.sel(species=self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL, presence='LIKELY_AND_MAYBE')
-            snes_arr = xr.concat([snes_arr_likely, snes_arr_likely_maybe], dim='species')
+            snes_parts = []
+            if self.BIO_GBF4_SNES_LIKELY_SEL:
+                snes_parts.append(BIO_GBF4_SPECIES_raw.sel(species=self.BIO_GBF4_SNES_LIKELY_SEL, presence='LIKELY'))
+            if self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL:
+                snes_parts.append(BIO_GBF4_SPECIES_raw.sel(species=self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL, presence='LIKELY_AND_MAYBE'))
+            snes_arr = xr.concat(snes_parts, dim='species') if snes_parts else BIO_GBF4_SPECIES_raw.isel(species=[], cell=slice(None))
             self.BIO_GBF4_SPECIES_LAYERS = np.array([self.get_average_fraction_from_int_map(arr) for arr in snes_arr]) 
         
         
         if settings.BIODIVERSITY_TARGET_GBF_4_ECNES != 'off':
             print("│   ├── Loading environmental significance data (ECNES)", flush=True)
-        
+
         
             BIO_GBF4_ECNES_score = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF4_TARGET_ECNES.csv').sort_values(by='COMMUNITY', ascending=True)
        
+            BIO_GBF4_ECNES_score.columns = BIO_GBF4_ECNES_score.columns.str.strip()  # Remove leading/trailing whitespace from column names
+       
             self.BIO_GBF4_ECNES_LIKELY_SEL = [row['COMMUNITY'] for _,row in BIO_GBF4_ECNES_score.iterrows()
-                                                    if all([row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY']>0,
-                                                            row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY']>0,
-                                                            row['USER_DEFINED_TARGET_PERCENT_2100_LIKELY']>0])]
-            
+                                                    if all([row.get('USER_DEFINED_TARGET_PERCENT_2030_LIKELY', 0)>0,
+                                                            row.get('USER_DEFINED_TARGET_PERCENT_2050_LIKELY', 0)>0,
+                                                            row.get('USER_DEFINED_TARGET_PERCENT_2100_LIKELY', 0)>0])]
+
             self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL = [row['COMMUNITY'] for _,row in BIO_GBF4_ECNES_score.iterrows()
-                                                    if all([row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY_MAYBE']>0,
-                                                            row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY_MAYBE']>0,
-                                                            row['USER_DEFINED_TARGET_PERCENT_2100_LIKELY_MAYBE']>0])]
+                                                    if all([row.get('USER_DEFINED_TARGET_PERCENT_2030_LIKELY_MAYBE', 0)>0,
+                                                            row.get('USER_DEFINED_TARGET_PERCENT_2050_LIKELY_MAYBE', 0)>0,
+                                                            row.get('USER_DEFINED_TARGET_PERCENT_2100_LIKELY_MAYBE', 0)>0])]
             
-            if len(self.BIO_GBF4_ECNES_LIKELY_SEL) + len(self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL)  == 0:
-                raise ValueError("At least one of 'LIKELY' or 'LIKELY_MAYBE' layers should be selected!")
-  
+            if len(self.BIO_GBF4_ECNES_LIKELY_SEL) + len(self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL) == 0:
+                print("│   │   ⚠ WARNING: No 'LIKELY' or 'LIKELY_MAYBE' ECNES layers selected, proceeding with empty selection.", flush=True)
+
             likely_maybe_union = set(self.BIO_GBF4_ECNES_LIKELY_SEL).intersection(self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL)
             if likely_maybe_union:
                 print(f"│   │   ⚠ WARNING: {len(likely_maybe_union)} duplicate ECNES species targets found, using 'LIKELY' targets only:", flush=True)
                 for idx, name in enumerate(likely_maybe_union):
                     print(f"│   │       ├── {idx+1}) {name}", flush=True)
                 self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL = list(set(self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL) - likely_maybe_union)
-                 
+
             self.BIO_GBF4_ECNES_SEL_ALL = self.BIO_GBF4_ECNES_LIKELY_SEL + self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL
             self.BIO_GBF4_PRESENCE_ECNES_SEL = ['LIKELY'] * len(self.BIO_GBF4_ECNES_LIKELY_SEL) + ['LIKELY_MAYBE'] * len(self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL)
             self.BIO_GBF4_ECNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY = BIO_GBF4_ECNES_score.query(f'COMMUNITY in {self.BIO_GBF4_ECNES_LIKELY_SEL}')
             self.BIO_GBF4_ECNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY_AND_MAYBE = BIO_GBF4_ECNES_score.query(f'COMMUNITY in {self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL}')
-    
+
             BIO_GBF4_COMUNITY_raw = xr.open_dataarray(f'{settings.INPUT_DIR}/bio_GBF4_ECNES.nc', chunks={'species':1})
-            ecnes_arr_likely = BIO_GBF4_COMUNITY_raw.sel(species=self.BIO_GBF4_ECNES_LIKELY_SEL, presence='LIKELY').compute()
-            ecnes_arr_likely_maybe = BIO_GBF4_COMUNITY_raw.sel(species=self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL, presence='LIKELY_AND_MAYBE').compute()
-            ecnes_arr = xr.concat([ecnes_arr_likely, ecnes_arr_likely_maybe], dim='species')
+            ecnes_parts = []
+            if self.BIO_GBF4_ECNES_LIKELY_SEL:
+                ecnes_parts.append(BIO_GBF4_COMUNITY_raw.sel(species=self.BIO_GBF4_ECNES_LIKELY_SEL, presence='LIKELY').compute())
+            if self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL:
+                ecnes_parts.append(BIO_GBF4_COMUNITY_raw.sel(species=self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL, presence='LIKELY_AND_MAYBE').compute())
+            ecnes_arr = xr.concat(ecnes_parts, dim='species') if ecnes_parts else BIO_GBF4_COMUNITY_raw.isel(species=[], cell=slice(None))
             self.BIO_GBF4_COMUNITY_LAYERS = np.array([self.get_average_fraction_from_int_map(arr) for arr in ecnes_arr])
         
   
@@ -1657,10 +1665,10 @@ class Data:
             bio_GBF8_baseline_score = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF8_SCORES.csv').sort_values(by='species', ascending=True)
             bio_GBF8_target_percent = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF8_TARGET.csv').sort_values(by='species', ascending=True)
             
-            self.BIO_GBF8_SEL_SPECIES = [row['species'] for _,row in bio_GBF8_target_percent.iterrows() 
-                                        if all([row['USER_DEFINED_TARGET_PERCENT_2030']>0,
-                                                row['USER_DEFINED_TARGET_PERCENT_2050']>0,
-                                                row['USER_DEFINED_TARGET_PERCENT_2100']>0])]
+            self.BIO_GBF8_SEL_SPECIES = [row['species'] for _,row in bio_GBF8_target_percent.iterrows()
+                                        if all([row.get('USER_DEFINED_TARGET_PERCENT_2030', 0)>0,
+                                                row.get('USER_DEFINED_TARGET_PERCENT_2050', 0)>0,
+                                                row.get('USER_DEFINED_TARGET_PERCENT_2100', 0)>0])]
             
             self.BIO_GBF8_OUTSDIE_LUTO_SCORE_SPECIES = bio_GBF8_baseline_score.query(f'species in {self.BIO_GBF8_SEL_SPECIES}')[['species', 'year', f'OUTSIDE_LUTO_NATURAL_SUITABILITY_AREA_WEIGHTED_HA_SSP{settings.SSP}']]
             self.BIO_GBF8_OUTSDIE_LUTO_SCORE_GROUPS = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF8_SCORES_group.csv')[['group', 'year', f'OUTSIDE_LUTO_NATURAL_SUITABILITY_AREA_WEIGHTED_HA_SSP{settings.SSP}']]
@@ -1668,8 +1676,12 @@ class Data:
             self.BIO_GBF8_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES = bio_GBF8_target_percent.query(f'species in {self.BIO_GBF8_SEL_SPECIES}')
             self.BIO_GBF8_BASELINE_SCORE_GROUPS = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF8_TARGET_group.csv')
             
-            self.BIO_GBF8_SPECIES_LAYER = BIO_GBF8_SPECIES_raw.sel(species=self.BIO_GBF8_SEL_SPECIES).compute()
             self.N_GBF8_SPECIES = len(self.BIO_GBF8_SEL_SPECIES)
+            if self.BIO_GBF8_SEL_SPECIES:
+                self.BIO_GBF8_SPECIES_LAYER = BIO_GBF8_SPECIES_raw.sel(species=self.BIO_GBF8_SEL_SPECIES).compute()
+            else:
+                print("│   │   ⚠ WARNING: No GBF8 species selected, proceeding with empty selection.", flush=True)
+                self.BIO_GBF8_SPECIES_LAYER = BIO_GBF8_SPECIES_raw.isel(species=[])
             
             self.BIO_GBF8_GROUPS_LAYER = xr.load_dataset(f'{settings.INPUT_DIR}/bio_GBF8_ssp{settings.SSP}_EnviroSuit_group.nc')['data']
             self.BIO_GBF8_GROUPS_NAMES = [i.capitalize() for i in self.BIO_GBF8_GROUPS_LAYER['group'].values]

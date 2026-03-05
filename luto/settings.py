@@ -846,7 +846,7 @@ GBF3_TARGETS_DICT = {
 
 # ------------------------------- Species parameters -------------------------------
 BIODIVERSITY_TARGET_GBF_4_SNES =  'off'           # 'on' or 'off'.
-BIODIVERSITY_TARGET_GBF_4_ECNES = 'off'           # 'on' or 'off'.
+BIODIVERSITY_TARGET_GBF_4_ECNES = 'on'           # 'on' or 'off'.
 
 '''
 Target 4 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 
