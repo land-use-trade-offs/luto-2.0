@@ -1621,8 +1621,8 @@ class Data:
                                                             row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY_MAYBE']>0,
                                                             row['USER_DEFINED_TARGET_PERCENT_2100_LIKELY_MAYBE']>0])]
             
-            if len(self.BIO_GBF4_ECNES_LIKELY_SEL) == 0:
-                raise ValueError("At least one of 'LIKELY' layers should be selected!")
+            if len(self.BIO_GBF4_ECNES_LIKELY_SEL) + len(self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL)  == 0:
+                raise ValueError("At least one of 'LIKELY' or 'LIKELY_MAYBE' layers should be selected!")
   
             likely_maybe_union = set(self.BIO_GBF4_ECNES_LIKELY_SEL).intersection(self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL)
             if likely_maybe_union:

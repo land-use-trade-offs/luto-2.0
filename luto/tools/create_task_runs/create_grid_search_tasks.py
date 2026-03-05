@@ -67,9 +67,9 @@ grid_search = {
         'Riparian Plantings': True,
         'Sheep Agroforestry': True,
         'Beef Agroforestry': True,
-        'Carbon Plantings (Block)': True,           # ON per LUF Report 2026
-        'Sheep Carbon Plantings (Belt)': True,      # ON per LUF Report 2026
-        'Beef Carbon Plantings (Belt)': True,       # ON per LUF Report 2026
+        'Carbon Plantings (Block)': True,       
+        'Sheep Carbon Plantings (Belt)': True,  
+        'Beef Carbon Plantings (Belt)': True,   
         'BECCS': False,
         'Destocked - natural land': True,
     }],
@@ -106,6 +106,7 @@ grid_search = {
     'INCLUDE_WATER_LICENSE_COSTS': [1],
     
     # --------------- Biodiversity overall ---------------
+    'BIO_QUALITY_LAYER': ['MNES_likely_may'],                               
     'CONTRIBUTION_PERCENTILE': ['USER_DEFINED'],                            # 50th percentile of HCAS per LUF Report 2026 (was 'USER_DEFINED')
     'CONNECTIVITY_SOURCE': ['NCI'],
     
