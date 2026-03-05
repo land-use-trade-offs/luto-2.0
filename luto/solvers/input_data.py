@@ -459,13 +459,13 @@ def get_ag_man_lb_mrj(data: Data, base_year):
     return output
 
 def get_renewable_solar_r(data: Data, target_idx):
-    print('Getting renewable energy - solar yield matrix...', flush = True)
-    output = ag_quantity.get_quantity_renewable(data, 'Utility Solar PV', target_idx)
+    print('Getting renewable energy - solar footprint matrix...', flush = True)
+    output = data.REAL_AREA.astype(np.float32)
     return output
 
 def get_renewable_wind_r(data: Data, target_idx):
-    print('Getting renewable energy - wind yield matrix...', flush = True)
-    output = ag_quantity.get_quantity_renewable(data, 'Onshore Wind', target_idx)
+    print('Getting renewable energy - wind footprint matrix...', flush = True)
+    output = data.REAL_AREA.astype(np.float32)
     return output
 
 def get_region_state_r(data: Data):
@@ -748,13 +748,13 @@ def get_limits(data: Data, base_year:int, target_year: int, resale_factors) -> d
         renewable_limit_tagt = data.RENEWABLE_TARGETS.query('Year == @target_year and SCENARIO == @settings.RENEWABLE_TARGET_SCENARIO')
         renewbale_limit_base = data.RENEWABLE_TARGETS.query('Year == @base_year and SCENARIO == @settings.RENEWABLE_TARGET_SCENARIO')
         limits['renewable_solar'] = np.max([
-            renewable_limit_tagt.query('PRODUCT == "Electricity - Solar"')['Renewable_Target_MWh'].values,
-            renewbale_limit_base.query('PRODUCT == "Electricity - Solar"')['Renewable_Target_MWh'].values
-        ], axis=0)
+            renewable_limit_tagt.query('PRODUCT == "Electricity - Solar"')['Renewable_Target_MW'].values,
+            renewbale_limit_base.query('PRODUCT == "Electricity - Solar"')['Renewable_Target_MW'].values
+        ], axis=0) / settings.INSTALL_CAPACITY_MW_HA['Utility Solar PV']
         limits['renewable_wind'] = np.max([
-            renewbale_limit_base.query('PRODUCT == "Electricity - Wind"')['Renewable_Target_MWh'].values,
-            renewable_limit_tagt.query('PRODUCT == "Electricity - Wind"')['Renewable_Target_MWh'].values
-        ], axis=0)
+            renewbale_limit_base.query('PRODUCT == "Electricity - Wind"')['Renewable_Target_MW'].values,
+            renewable_limit_tagt.query('PRODUCT == "Electricity - Wind"')['Renewable_Target_MW'].values
+        ], axis=0) / settings.INSTALL_CAPACITY_MW_HA['Onshore Wind']
         limits['renewable_solar_rescale'] = limits['renewable_solar'] / resale_factors['Renewable_Solar']
         limits['renewable_wind_rescale'] = limits['renewable_wind'] / resale_factors['Renewable_Wind']
 

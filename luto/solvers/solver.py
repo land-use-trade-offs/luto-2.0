@@ -751,7 +751,7 @@ class LutoSolver:
                 
                 target_raw = self._input_data.limits[limit_key][target_idx]
                 target_rescal = self._input_data.limits[f"{limit_key}_rescale"][target_idx]
-                print(f"│   │   │   ├── target for {re_label} is {target_raw:5,.0f} Mwh")
+                print(f"│   │   │   ├── target for {re_label} is {target_raw:5,.0f} ha")
 
                 am_exprs = []
                 for j_idx, j in enumerate(self._input_data.am2j[am]):

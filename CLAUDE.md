@@ -307,7 +307,8 @@ Renewable energy types (Utility Solar PV, Onshore Wind) are implemented as agric
 
 ### Data Loading (`data.py`)
 
-- `RENEWABLE_TARGETS`: State-level generation targets (TWh → MWh) by year, scenario, and product
+- `RENEWABLE_TARGETS`: State-level capacity targets (GW → MW) by year, scenario, and product
+  - Spatial allocation constraint uses solver-based ha formulation mapping MW capacity limit.
 - `SOLAR_PRICES`: State-level solar electricity prices (AUD/MWh) by year
 - `WIND_PRICES`: State-level wind electricity prices (AUD/MWh) by year
 - `RENEWABLE_LAYERS`: NetCDF spatial layers with installation cost, operation cost, capacity %, and distribution loss %

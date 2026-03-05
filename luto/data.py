@@ -766,7 +766,7 @@ class Data:
 
         # Renewable targets and prices
         self.RENEWABLE_TARGETS = pd.read_csv(f'{settings.INPUT_DIR}/renewable_targets.csv').sort_values('STATE')    # Ensure targets are sorted by state for consistent mapping to region codes.
-        self.RENEWABLE_TARGETS['Renewable_Target_MWh'] = self.RENEWABLE_TARGETS['Renewable_Target_TWh'] * 1e6       # Convert TWh to MWh
+        self.RENEWABLE_TARGETS['Renewable_Target_MW'] = self.RENEWABLE_TARGETS['Renewable_Target_GW'] * 1e3         # Convert GW to MW
         
         #self.RENEWABLE_PRICES = pd.read_csv(f'{settings.INPUT_DIR}/renewable_elec_price_AUD_MWh.csv')
         self.SOLAR_PRICES = pd.read_csv(f'{settings.INPUT_DIR}/renewable_price_AUD_MWh_solar.csv')

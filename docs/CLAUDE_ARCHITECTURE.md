@@ -196,7 +196,7 @@ Renewable energy types (Utility Solar PV, Onshore Wind) are implemented as non-r
 
 ### Data Loading (`data.py`)
 
-- `RENEWABLE_TARGETS`: State-level generation targets (TWh → MWh) by year, scenario, product
+- `RENEWABLE_TARGETS`: State-level capacity targets (GW → MW) by year, scenario, product
 - `SOLAR_PRICES` / `WIND_PRICES`: Separate state-level electricity prices (AUD/MWh)
 - `RENEWABLE_LAYERS`: NetCDF spatial layers (install cost, operation cost, capacity %, distribution loss %)
 - `RENEWABLE_BUNDLE_SOLAR` / `RENEWABLE_BUNDLE_WIND`: Parameters per land use
