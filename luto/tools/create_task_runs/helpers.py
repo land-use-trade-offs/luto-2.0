@@ -115,7 +115,7 @@ def get_grid_search_settings_df(task_root_dir:str, settings_df:pd.DataFrame, gri
     for _, row in grid_search_param_df.iterrows():
         settings_dict = template_grid_search.set_index('Name')['Default_run'].to_dict()
         settings_dict.update(row.to_dict())
-        settings_dict = update_settings(settings_dict, f'{task_dir}_Run_{row['run_idx']:04}')
+        settings_dict = update_settings(settings_dict, f'run_{row["run_idx"]:04}')
         run_settings_dfs.append(pd.Series(settings_dict, name=f'Run_{row['run_idx']:04}'))
     
     template_grid_search = pd.concat(run_settings_dfs, axis=1).reset_index(names='Name')
@@ -178,9 +178,21 @@ def submit_task(task_root_dir:str, col:str, mode:Literal['single','cluster'], ma
 
     
 def write_settings(task_dir:str, settings_dict:dict):
+    # Read the raw AG_MANAGEMENTS block from source settings.py to preserve inline expressions
+    with open('luto/settings.py', 'r') as src:
+        src_text = src.read()
+        
+    ag_managements_raw = re.search(
+        r'^AG_MANAGEMENTS\s*=\s*\{.*?\}', 
+        src_text, 
+        re.MULTILINE | re.DOTALL
+        ).group(0) + '\n'
+
     with open(f'{task_dir}/luto/settings.py', 'w') as file:
         for k, v in settings_dict.items():
-            if isinstance(v, str):
+            if k == 'AG_MANAGEMENTS':
+                file.write(ag_managements_raw)
+            elif isinstance(v, str):
                 file.write(f'{k}="{v}"\n')
             else:
                 file.write(f'{k}={v}\n')

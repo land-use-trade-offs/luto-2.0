@@ -262,7 +262,7 @@ def get_utility_solar_pv_effect_b_mrj(data:Data, ag_b_mrj: np.ndarray, yr_idx: i
     yr_cal = data.YR_CAL_BASE + yr_idx
     # Set up the effects matrix
     b_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)   
-    if not settings.AG_MANAGEMENTS['Utility Solar PV']:
+    if settings.RENEWABLE_ENERGY_CONSTRAINTS != 'on':
         return b_mrj_effect
     for lu_idx, lu in enumerate(land_uses):
         biodiv_impact = data.RENEWABLE_BUNDLE_SOLAR.query('Year == @yr_cal and Commodity == @lu')['Biodiversity_compatability'].item()
@@ -286,7 +286,7 @@ def get_onshore_wind_effect_b_mrj(data:Data, ag_b_mrj: np.ndarray, yr_idx: int):
     yr_cal = data.YR_CAL_BASE + yr_idx
     # Set up the effects matrix
     b_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)   
-    if not settings.AG_MANAGEMENTS['Onshore Wind']:
+    if settings.RENEWABLE_ENERGY_CONSTRAINTS != 'on':
         return b_mrj_effect
     for lu_idx, lu in enumerate(land_uses):
         biodiv_impact = data.RENEWABLE_BUNDLE_WIND.query('Year == @yr_cal and Commodity == @lu')['Biodiversity_compatability'].item()
@@ -511,12 +511,11 @@ def get_ag_management_biodiversity_contribution(
             )
             for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep'])
         }
-    if settings.AG_MANAGEMENTS['Utility Solar PV']:
+    if settings.RENEWABLE_ENERGY_CONSTRAINTS == 'on':
         am_contr_dict['Utility Solar PV'] = {
             j_idx: (data.RENEWABLE_BUNDLE_SOLAR.query('Year == @yr_cal and Commodity == @lu')['Biodiversity_compatability'].item() - 1) * np.ones(data.NCELLS).astype(np.float32)
             for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Utility Solar PV'])
         }
-    if settings.AG_MANAGEMENTS['Onshore Wind']:
         am_contr_dict['Onshore Wind'] = {
             j_idx: (data.RENEWABLE_BUNDLE_WIND.query('Year == @yr_cal and Commodity == @lu')['Biodiversity_compatability'].item() - 1) * np.ones(data.NCELLS).astype(np.float32)
             for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Onshore Wind'])

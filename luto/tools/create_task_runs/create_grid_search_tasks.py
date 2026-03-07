@@ -28,7 +28,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/LUF_20260305_RE5_GBF4_LIKELY"
+TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/LUF_20260307_RE5_GBF4_LIKELY"
 
 
 # Set the grid search parameters
@@ -106,7 +106,7 @@ grid_search = {
     'INCLUDE_WATER_LICENSE_COSTS': [1],
     
     # --------------- Biodiversity overall ---------------
-    'BIO_QUALITY_LAYER': ['MNES_likely_may'],                               
+    'BIO_QUALITY_LAYER': ['Suitability'],                               
     'CONTRIBUTION_PERCENTILE': ['USER_DEFINED'],                            # 50th percentile of HCAS per LUF Report 2026 (was 'USER_DEFINED')
     'CONNECTIVITY_SOURCE': ['NCI'],
     
@@ -127,7 +127,7 @@ grid_search = {
     'BIODIVERSITY_TARGET_GBF_8': ['off'],                                   # 'on' or 'off'
 
     # --------------- Renewable energy ---------------
-    'RENEWABLE_ENERGY_CONSTRAINTS': ['off'],                                # 'off' per LUF Report 2026 (Solar and Wind both OFF)
+    'RENEWABLE_ENERGY_CONSTRAINTS': ['off', 'on'],                                # 'off' per LUF Report 2026 (Solar and Wind both OFF)
     'RENEWABLE_TARGET_SCENARIO_TARGETS': ['CNS25 - Accelerated Transition'],        # 'CNS25 - Accelerated Transition', 'CNS25 - Current Targets'
 
     ###############################################################

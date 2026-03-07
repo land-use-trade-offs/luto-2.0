@@ -347,6 +347,64 @@ AF_FENCING_LENGTH_HA = 100 * no_belts_per_ha * 2 # Length of fencing required pe
 
 
 # ---------------------------------------------------------------------------- #
+# Renewable energy parameters
+# ---------------------------------------------------------------------------- #
+RENEWABLE_ENERGY_CONSTRAINTS = 'on'         # 'on' or 'off'
+
+RENEWABLES_OPTIONS = [
+    'Utility Solar PV',
+    'Onshore Wind'
+]
+
+
+RENEWABLE_TARGET_SCENARIO_TARGETS = 'CNS - Accelerated Transition'
+'''
+The renewable energy target scenario to use when `RENEWABLE_ENERGY_CONSTRAINTS` is set to 'on'. One of
+ - CNS - Accelerated Transition
+ - CNS - Current Targets
+ - Gladstone - Current Targets
+'''
+
+
+RENEWABLE_TARGET_SCENARIO_INPUT_LAYERS = 'step_change'
+'''
+The renewable energy target scenario for input spatial layersto use when `RENEWABLE_ENERGY_CONSTRAINTS`
+is set to 'on'. One of
+ - 'step_change',
+ - 'accelerated_transition',
+ - 'ANU_transmission_T3',
+ - 'ANU_transmission_T5',
+ - 'ANU_transmission_T10'.
+'''
+
+RE_TARGET_LEVEL = "STATE"  # options: "STATE", "NRM"; TODO: currently (20260205) only support STATE, will add NRM in the future.
+'''
+The spatial level at which to apply the renewable energy targets when `RENEWABLE_ENERGY_CONSTRAINTS` is set to 'on'.
+Options include "STATE" or "NRM". Currently (20260205) only support STATE.
+'''
+
+INSTALL_CAPACITY_MW_HA = {
+    "Utility Solar PV": 0.45,
+    "Onshore Wind": 0.04,
+}
+'''
+The per/ha capacity (Mw/ha) for each renewable energy management type.
+'''
+
+
+RENEWABLES_ADOPTION_LIMITS = {
+    'Utility Solar PV': 1.0,        # Maximum proportion of land that can be used for Utility Solar PV
+    'Onshore Wind': 1.0,            # Maximum proportion of land that can be used for Onshore Wind
+}
+'''
+The maximum proportion of land that can be used for each renewable energy management type.
+For example, if RENEWABLES_ADOPTION_LIMITS['Utility Solar PV'] = 0.5, then at most 50% of
+the land can be used for Utility Solar PV.
+'''
+
+
+
+# ---------------------------------------------------------------------------- #
 # Agricultural Management parameters
 # ---------------------------------------------------------------------------- #
 
@@ -405,8 +463,8 @@ AG_MANAGEMENTS = {
     'Biochar': True,
     'HIR - Beef': True,
     'HIR - Sheep': True,
-    'Utility Solar PV': None,   # Set later based on RENEWABLE_ENERGY_CONSTRAINTS
-    'Onshore Wind': None,       # Set later based on RENEWABLE_ENERGY_CONSTRAINTS
+    'Utility Solar PV': RENEWABLE_ENERGY_CONSTRAINTS == 'on',
+    'Onshore Wind': RENEWABLE_ENERGY_CONSTRAINTS == 'on',
 }
 """
 The dictionary below contains a master list of all agricultural management options and
@@ -460,70 +518,6 @@ SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
 
 
 
-# ---------------------------------------------------------------------------- #
-# Renewable energy parameters
-# ---------------------------------------------------------------------------- #
-RENEWABLE_ENERGY_CONSTRAINTS = 'on'         # 'on' or 'off'
-
-if RENEWABLE_ENERGY_CONSTRAINTS == 'on':
-    AG_MANAGEMENTS['Utility Solar PV'] = True
-    AG_MANAGEMENTS['Onshore Wind'] = True
-elif RENEWABLE_ENERGY_CONSTRAINTS == 'off':
-    AG_MANAGEMENTS['Utility Solar PV'] = False
-    AG_MANAGEMENTS['Onshore Wind'] = False
-else:    
-    raise ValueError("Invalid value for RENEWABLE_ENERGY_CONSTRAINTS. Must be 'on' or 'off'.")
-
-RENEWABLES_OPTIONS = [
-    'Utility Solar PV',
-    'Onshore Wind'
-]
-
-
-RENEWABLE_TARGET_SCENARIO_TARGETS = 'CNS - Accelerated Transition'  
-''' 
-The renewable energy target scenario to use when `RENEWABLE_ENERGY_CONSTRAINTS` is set to 'on'. One of 
- - CNS - Accelerated Transition
- - CNS - Current Targets
- - Gladstone - Current Targets
-'''
-
-
-RENEWABLE_TARGET_SCENARIO_INPUT_LAYERS = 'step_change'
-'''
-The renewable energy target scenario for input spatial layersto use when `RENEWABLE_ENERGY_CONSTRAINTS` 
-is set to 'on'. One of 
- - 'step_change', 
- - 'accelerated_transition', 
- - 'ANU_transmission_T3', 
- - 'ANU_transmission_T5', 
- - 'ANU_transmission_T10'.
-'''
-
-RE_TARGET_LEVEL = "STATE"  # options: "STATE", "NRM"; TODO: currently (20260205) only support STATE, will add NRM in the future.
-'''
-The spatial level at which to apply the renewable energy targets when `RENEWABLE_ENERGY_CONSTRAINTS` is set to 'on'.
-Options include "STATE" or "NRM". Currently (20260205) only support STATE.
-'''
-
-INSTALL_CAPACITY_MW_HA = {
-    "Utility Solar PV": 0.45,
-    "Onshore Wind": 0.04,  
-}
-'''
-The per/ha capacity (Mw/ha) for each renewable energy management type.
-'''
-
-
-RENEWABLES_ADOPTION_LIMITS = {
-    'Utility Solar PV': 1.0,        # Maximum proportion of land that can be used for Utility Solar PV
-    'Onshore Wind': 1.0,            # Maximum proportion of land that can be used for Onshore Wind
-}
-'''
-The maximum proportion of land that can be used for each renewable energy management type.
-For example, if RENEWABLES_ADOPTION_LIMITS['Utility Solar PV'] = 0.5, then at most 50% of 
-the land can be used for Utility Solar PV.
-'''
 
 
 
