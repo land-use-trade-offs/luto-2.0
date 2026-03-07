@@ -273,7 +273,7 @@ def get_utility_solar_pv_effect_t_mrj(data, yr_idx):
 
     # Get upfront installation cost map (AUD/Cell)
     capex_map = (
-        data.RENEWABLE_LAYERS.sel(year=yr_cal, Type='Utility Solar PV')['Cost_of_install_AUD_kw'] 
+        data.RENEWABLE_LAYERS.sel(year=yr_cal, tech_name='Utility Solar PV')['Cost_of_install_AUD_kw'] 
         * 1000                                                  # Convert from AUD/kW to AUD/MW
         * 0.6944                                                # Adjust AUD from 2024 to 2010
         * settings.INSTALL_CAPACITY_MW_HA['Utility Solar PV']   # Convert from AUD/MW to AUD/ha
@@ -307,7 +307,7 @@ def get_onshore_wind_effect_t_mrj(data, yr_idx):
 
     # Get upfront installation cost map (AUD/Cell)
     capex_map = (
-        data.RENEWABLE_LAYERS.sel(year=yr_cal, Type='Onshore Wind')['Cost_of_install_AUD_kw'] 
+        data.RENEWABLE_LAYERS.sel(year=yr_cal, tech_name='Onshore Wind')['Cost_of_install_AUD_kw'] 
         * 1000                                              # Convert from AUD/kW to AUD/MW
         * 0.6944                                            # Adjust AUD from 2024 to 2010
         * settings.INSTALL_CAPACITY_MW_HA['Onshore Wind']   # Convert from AUD/MW to AUD/ha

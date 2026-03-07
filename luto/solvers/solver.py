@@ -735,7 +735,7 @@ class LutoSolver:
         #   as its renewable energy target is being merged to NSW
         self._input_data.region_state_name2idx.pop('Australian Capital Territory', None)
 
-        for target_idx, (reg_name, reg_id) in enumerate(self._input_data.region_state_name2idx.items()):
+        for reg_name, reg_id in self._input_data.region_state_name2idx.items():
 
             if reg_name == 'Australian Capital Territory':
                 print(f"│   │   │    Skipping {reg_name} as its target being merged to NSW ...")
@@ -747,10 +747,15 @@ class LutoSolver:
 
             for am, energy_r, limit_key, re_label in re_types:
                 
-                if not settings.AG_MANAGEMENTS[am]: continue
+                if not settings.AG_MANAGEMENTS[am]: 
+                    continue
                 
-                target_raw = self._input_data.limits[limit_key][target_idx]
-                target_rescal = self._input_data.limits[f"{limit_key}_rescale"][target_idx]
+                target_raw = self._input_data.limits[limit_key].get(reg_name)
+                target_rescal = self._input_data.limits[f"{limit_key}_rescale"].get(reg_name)
+                if target_raw is None or target_rescal is None:
+                    print(f"│   │   │   ├── No target found for {re_label} in {reg_name}, skipping constraint ...")
+                    continue
+                
                 print(f"│   │   │   ├── target for {re_label} is {target_raw:5,.0f} Mwh")
 
                 am_exprs = []

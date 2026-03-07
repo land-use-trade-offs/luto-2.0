@@ -707,7 +707,7 @@ def rescale_solver_input_data(arries: list) -> tuple[list, float]:
 
     return scaled, scale
 
-def get_limits(data: Data, base_year:int, target_year: int, resale_factors) -> dict[str, Any]:
+def get_limits(data: Data, yr_cal: int, resale_factors) -> dict[str, Any]:
     """
     Gets the following limits for the solve:
     - Water net yield limits
@@ -733,7 +733,7 @@ def get_limits(data: Data, base_year:int, target_year: int, resale_factors) -> d
     }
     
     if True:    # Always set demand limits
-        limits['demand'] = data.D_CY[target_year - data.YR_CAL_BASE]
+        limits['demand'] = data.D_CY[yr_cal - data.YR_CAL_BASE]
         limits['demand_rescale'] = limits['demand'] / resale_factors['Demand']
     
     if settings.WATER_LIMITS == 'on':
@@ -741,53 +741,47 @@ def get_limits(data: Data, base_year:int, target_year: int, resale_factors) -> d
         limits['water_rescale'] = {k: v / resale_factors['Water'] for k, v in limits['water'].items()}
         
     if settings.GHG_EMISSIONS_LIMITS != 'off':
-        limits['ghg'] = data.GHG_TARGETS[target_year]
+        limits['ghg'] = data.GHG_TARGETS[yr_cal]
         limits['ghg_rescale'] = limits['ghg'] / resale_factors['GHG']
         
     if settings.RENEWABLE_ENERGY_CONSTRAINTS == 'on':
-        renewable_limit_tagt = data.RENEWABLE_TARGETS.query('Year == @target_year and SCENARIO == @settings.RENEWABLE_TARGET_SCENARIO')
-        renewbale_limit_base = data.RENEWABLE_TARGETS.query('Year == @base_year and SCENARIO == @settings.RENEWABLE_TARGET_SCENARIO')
-        limits['renewable_solar'] = np.max([
-            renewable_limit_tagt.query('PRODUCT == "Electricity - Solar"')['Renewable_Target_MWh'].values,
-            renewbale_limit_base.query('PRODUCT == "Electricity - Solar"')['Renewable_Target_MWh'].values
-        ], axis=0)
-        limits['renewable_wind'] = np.max([
-            renewbale_limit_base.query('PRODUCT == "Electricity - Wind"')['Renewable_Target_MWh'].values,
-            renewable_limit_tagt.query('PRODUCT == "Electricity - Wind"')['Renewable_Target_MWh'].values
-        ], axis=0)
-        limits['renewable_solar_rescale'] = limits['renewable_solar'] / resale_factors['Renewable_Solar']
-        limits['renewable_wind_rescale'] = limits['renewable_wind'] / resale_factors['Renewable_Wind']
+        renewable_targets = data.RENEWABLE_TARGETS.query('Year == @yr_cal and scen == @settings.RENEWABLE_TARGET_SCENARIO_TARGETS').set_index('state')
+        limits['renewable_solar'] = renewable_targets.query('tech == "Utility Solar"')['Renewable_Target_MWh'].to_dict()
+        limits['renewable_wind'] = renewable_targets.query('tech == "Wind"')['Renewable_Target_MWh'].to_dict()
+        limits['renewable_solar_rescale'] = {k: v / resale_factors['Renewable_Solar'] for k, v in limits['renewable_solar'].items()}
+        limits['renewable_wind_rescale'] = {k: v / resale_factors['Renewable_Wind'] for k, v in limits['renewable_wind'].items()}
 
     if settings.BIODIVERSITY_TARGET_GBF_2 != 'off':
-        limits["GBF2"] = data.get_GBF2_target_for_yr_cal(target_year)
+        limits["GBF2"] = data.get_GBF2_target_for_yr_cal(yr_cal)
         limits["GBF2_rescale"] = limits["GBF2"] / resale_factors['GBF2']
 
     if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off':
-        limits["GBF3_NVIS"] = data.get_GBF3_NVIS_limit_score_inside_LUTO_by_yr(target_year)
+        limits["GBF3_NVIS"] = data.get_GBF3_NVIS_limit_score_inside_LUTO_by_yr(yr_cal)
         limits["GBF3_NVIS_rescale"] = limits["GBF3_NVIS"] / resale_factors['GBF3_NVIS']
 
     if settings.BIODIVERSITY_TARGET_GBF_3_IBRA != 'off':
-        limits["GBF3_IBRA"] = data.get_GBF3_IBRA_limit_score_inside_LUTO_by_yr(target_year)
+        limits["GBF3_IBRA"] = data.get_GBF3_IBRA_limit_score_inside_LUTO_by_yr(yr_cal)
         limits["GBF3_IBRA_rescale"] = limits["GBF3_IBRA"] / resale_factors['GBF3_IBRA']
 
     if settings.BIODIVERSITY_TARGET_GBF_4_SNES == "on":
-        limits["GBF4_SNES"] = data.get_GBF4_SNES_target_inside_LUTO_by_year(target_year)
+        limits["GBF4_SNES"] = data.get_GBF4_SNES_target_inside_LUTO_by_year(yr_cal)
         limits["GBF4_SNES_rescale"] = limits["GBF4_SNES"] / resale_factors['GBF4_SNES']
         
     if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == "on":
-        limits["GBF4_ECNES"] = data.get_GBF4_ECNES_target_inside_LUTO_by_year(target_year)
+        limits["GBF4_ECNES"] = data.get_GBF4_ECNES_target_inside_LUTO_by_year(yr_cal)
         limits["GBF4_ECNES_rescale"] = limits["GBF4_ECNES"] / resale_factors['GBF4_ECNES']
 
     if settings.BIODIVERSITY_TARGET_GBF_8 == "on":
-        limits["GBF8"] = data.get_GBF8_target_inside_LUTO_by_yr(target_year)
+        limits["GBF8"] = data.get_GBF8_target_inside_LUTO_by_yr(yr_cal)
         limits["GBF8_rescale"] = limits["GBF8"] / resale_factors['GBF8']
 
     if settings.REGIONAL_ADOPTION_CONSTRAINTS != 'off':
-        ag_reg_adoption, non_ag_reg_adoption = ag_transition.get_regional_adoption_limits(data, target_year)
+        ag_reg_adoption, non_ag_reg_adoption = ag_transition.get_regional_adoption_limits(data, yr_cal)
         limits["ag_regional_adoption"] = ag_reg_adoption
         limits["non_ag_regional_adoption"] = non_ag_reg_adoption
 
     return limits
+
 
 
 def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputData:
@@ -888,6 +882,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     [ag_q_mrp, non_ag_q_crk, ag_man_q_mrp],   demand_scale  = rescale_solver_input_data([ag_q_mrp, non_ag_q_crk, ag_man_q_mrp])
     [ag_b_mrj, non_ag_b_rk, ag_man_b_mrj],    biodiv_scale  = rescale_solver_input_data([ag_b_mrj, non_ag_b_rk, ag_man_b_mrj])
 
+    # Get the scale factors
     if settings.GHG_EMISSIONS_LIMITS != 'off':
         [ag_g_mrj, non_ag_g_rk, ag_man_g_mrj, ag_ghg_t_mrj], ghg_scale = rescale_solver_input_data([ag_g_mrj, non_ag_g_rk, ag_man_g_mrj, ag_ghg_t_mrj])
     else:
@@ -971,7 +966,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
 
     lu2pr_pj=data.LU2PR
     pr2cm_cp=data.PR2CM
-    limits=get_limits(data, base_year, target_year, scale_factors)
+    limits=get_limits(data, target_year, scale_factors)
     desc2aglu=data.DESC2AGLU
     real_area=data.REAL_AREA
     ag_mask_proportion_r=data.AG_MASK_PROPORTION_R

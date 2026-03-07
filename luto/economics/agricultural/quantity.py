@@ -652,7 +652,7 @@ def get_quantity_renewable(data, re_type: str, yr_idx: int):
     if not re_type in settings.RENEWABLES_OPTIONS:
         raise KeyError(f"Renewable re_typeoduct '{re_type}' not found in settings.RENEWABLES_OPTIONS.")
     
-    re_lyr = data.RENEWABLE_LAYERS.sel(Type=re_type, year=yr_cal)
+    re_lyr = data.RENEWABLE_LAYERS.sel(tech_name=re_type, year=yr_cal)
     
     capacity_factor_multiplier = re_lyr['capacity_factor_multiplier']
     distribution_loss_factor_multiplier = re_lyr['distribution_loss_factor_multiplier']
