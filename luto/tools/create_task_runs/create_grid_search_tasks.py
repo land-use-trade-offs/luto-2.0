@@ -28,7 +28,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/LUF_20260305_RE5"
+TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/LUF_20260305_RE5_GBF4_LIKELY"
 
 
 # Set the grid search parameters
@@ -39,7 +39,7 @@ grid_search = {
     'MEM': ['64GB'],
     'WRITE_REPORT_MAX_MEM_GB': [64],                                       # Max memory for writing report (in GB)
     'NCPUS':[16],
-    'TIME': ['10:00:00'],
+    'TIME': ['12:00:00'],
     'QUEUE': ['normalsr'],                                                  # normalsr for CPU, hugemembw for memory intensive jobs
     
  
