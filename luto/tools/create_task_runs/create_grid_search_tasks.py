@@ -128,7 +128,7 @@ grid_search = {
 
     # --------------- Renewable energy ---------------
     'RENEWABLE_ENERGY_CONSTRAINTS': ['off'],                                # 'off' per LUF Report 2026 (Solar and Wind both OFF)
-    'RENEWABLE_TARGET_SCENARIO': ['CNS25 - Accelerated Transition'],        # 'CNS25 - Accelerated Transition', 'CNS25 - Current Targets'
+    'RENEWABLE_TARGET_SCENARIO_TARGETS': ['CNS25 - Accelerated Transition'],        # 'CNS25 - Accelerated Transition', 'CNS25 - Current Targets'
 
     ###############################################################
     # Scenario settings for the model run

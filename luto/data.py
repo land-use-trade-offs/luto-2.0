@@ -762,32 +762,41 @@ class Data:
         # #########################################################
         # RENEWABLE ENERGY DATA LOADING                           #
         # #########################################################
-        print("├── Loading renewable energy data...", flush=True)
+        if settings.RENEWABLE_ENERGY_CONSTRAINTS != "off":
+            
+            print("├── Loading renewable energy data...", flush=True)
 
-        # Renewable targets and prices
-        self.RENEWABLE_TARGETS = pd.read_csv(f'{settings.INPUT_DIR}/renewable_targets.csv').sort_values('STATE')    # Ensure targets are sorted by state for consistent mapping to region codes.
-        self.RENEWABLE_TARGETS['Renewable_Target_MWh'] = self.RENEWABLE_TARGETS['Renewable_Target_TWh'] * 1e6       # Convert TWh to MWh
-        
-        #self.RENEWABLE_PRICES = pd.read_csv(f'{settings.INPUT_DIR}/renewable_elec_price_AUD_MWh.csv')
-        self.SOLAR_PRICES = pd.read_csv(f'{settings.INPUT_DIR}/renewable_price_AUD_MWh_solar.csv')
-        self.WIND_PRICES = pd.read_csv(f'{settings.INPUT_DIR}/renewable_price_AUD_MWh_wind.csv')
-        
-        # Renewable energy ralated raster layers
-        self.RENEWABLE_LAYERS = xr.load_dataset(f'{settings.INPUT_DIR}/renewable_energy_layers_1D.nc').isel(cell=self.MASK)
-        
-        # TODO: remove when all years of renewable layers are available. 
-        #   Now is a temporary fix to expand the 2010 layers across all years.
-        self.RENEWABLE_LAYERS = (
-            self.RENEWABLE_LAYERS
-            .squeeze('year', drop=True)
-            .expand_dims({'year': range(2010, 2051)})
-        )
-        
-        # Renewable bundle data (productivity impacts, cost multipliers, etc)
-        renewable_bundle = pd.read_csv(f'{settings.INPUT_DIR}/renewable_energy_bundle.csv')
-        self.RENEWABLE_BUNDLE_WIND = renewable_bundle.query('Lever == "Onshore Wind"')
-        self.RENEWABLE_BUNDLE_SOLAR = renewable_bundle.query('Lever == "Utility Solar PV"')
-        
+            # Renewable targets and prices
+            self.RENEWABLE_TARGETS = pd.read_csv(f'{settings.INPUT_DIR}/renewable_targets.csv').sort_values('state')    # Ensure targets are sorted by state for consistent mapping to region codes.
+            self.RENEWABLE_TARGETS['Renewable_Target_MWh'] = self.RENEWABLE_TARGETS['Renewable_Target_TWh'] * 1e6       # Convert TWh to MWh
+            
+            #self.RENEWABLE_PRICES = pd.read_csv(f'{settings.INPUT_DIR}/renewable_elec_price_AUD_MWh.csv')
+            self.SOLAR_PRICES = pd.read_csv(f'{settings.INPUT_DIR}/renewable_price_AUD_MWh_solar.csv')
+            self.WIND_PRICES = pd.read_csv(f'{settings.INPUT_DIR}/renewable_price_AUD_MWh_wind.csv')
+            
+            # Renewable energy ralated raster layers
+            #   Compute before isel to avoid isel working on dask chunks
+            #   which slows down the reading.
+            self.RENEWABLE_LAYERS = (
+                xr.open_dataset(f'{settings.INPUT_DIR}/renewable_energy_layers_1D.nc')
+                .sel(scenario=settings.RENEWABLE_TARGET_SCENARIO_INPUT_LAYERS)
+                .compute()
+                .isel(cell=self.MASK)
+            )
+            
+            # TODO: remove when all years of renewable layers are available. 
+            #   Now is a temporary fix to duplicate 2030 to 2010-2029.
+            self.RENEWABLE_LAYERS = xr.concat(
+                [self.RENEWABLE_LAYERS.sel(year=2030, drop=True).expand_dims(year=range(self.YR_CAL_BASE, 2030))
+                , self.RENEWABLE_LAYERS],
+                dim='year'
+            )
+            
+            # Renewable bundle data (productivity impacts, cost multipliers, etc)
+            renewable_bundle = pd.read_csv(f'{settings.INPUT_DIR}/renewable_energy_bundle.csv')
+            self.RENEWABLE_BUNDLE_WIND = renewable_bundle.query('Lever == "Onshore Wind"')
+            self.RENEWABLE_BUNDLE_SOLAR = renewable_bundle.query('Lever == "Utility Solar PV"')
+            
 
     
 

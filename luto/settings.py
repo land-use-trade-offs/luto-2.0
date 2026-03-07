@@ -463,7 +463,7 @@ SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
 # ---------------------------------------------------------------------------- #
 # Renewable energy parameters
 # ---------------------------------------------------------------------------- #
-RENEWABLE_ENERGY_CONSTRAINTS = 'off'         # 'on' or 'off'
+RENEWABLE_ENERGY_CONSTRAINTS = 'on'         # 'on' or 'off'
 
 if RENEWABLE_ENERGY_CONSTRAINTS == 'on':
     AG_MANAGEMENTS['Utility Solar PV'] = True
@@ -479,10 +479,25 @@ RENEWABLES_OPTIONS = [
     'Onshore Wind'
 ]
 
-RENEWABLE_TARGET_SCENARIO =  'CNS25 - Accelerated Transition' # one of 'CNS25 - Accelerated Transition', 'CNS25 - Current Targets'
+
+RENEWABLE_TARGET_SCENARIO_TARGETS = 'CNS - Accelerated Transition'  
+''' 
+The renewable energy target scenario to use when `RENEWABLE_ENERGY_CONSTRAINTS` is set to 'on'. One of 
+ - CNS - Accelerated Transition
+ - CNS - Current Targets
+ - Gladstone - Current Targets
 '''
-The renewable energy target scenario to use when `RENEWABLE_ENERGY_CONSTRAINTS` is set to 'on'.
-One of 'CNS25 - Accelerated Transition' or 'CNS25 - Current Targets', 
+
+
+RENEWABLE_TARGET_SCENARIO_INPUT_LAYERS = 'step_change'
+'''
+The renewable energy target scenario for input spatial layersto use when `RENEWABLE_ENERGY_CONSTRAINTS` 
+is set to 'on'. One of 
+ - 'step_change', 
+ - 'accelerated_transition', 
+ - 'ANU_transmission_T3', 
+ - 'ANU_transmission_T5', 
+ - 'ANU_transmission_T10'.
 '''
 
 RE_TARGET_LEVEL = "STATE"  # options: "STATE", "NRM"; TODO: currently (20260205) only support STATE, will add NRM in the future.
