@@ -128,18 +128,19 @@ def get_map2json(
     workers = max(4, int(workers))      # At least 4 workers
     workers = min(workers, 32)          # At most 32 workers
     
-    # Loop through each year
-    tasks = []
+    # Process one file at a time so only one file's arrays are in memory at once
+    output = {}
     for _,row in files_df.iterrows():
-        
-        xr_arr = cfxr.decode_compress_to_multi_index(xr.load_dataset(row['path'], chunks={}), 'layer')['data']
+
+        xr_arr = cfxr.decode_compress_to_multi_index(xr.open_dataset(row['path'], chunks={}), 'layer')['data']
         ds_template = f'{os.path.dirname(row['path'])}/xr_map_template_{row['Year']}.nc'
         valid_layers = xr_arr['layer'].to_index().to_frame().to_dict(orient='records')
-        
+
+        tasks = []
         for sel in valid_layers:
-            
+
             # Select the array for this layer
-            arr_sel = xr_arr.sel(**sel)
+            arr_sel = xr_arr.sel(**sel).load()   # load only this slice
             sel_rename = rename_reorder_hierarchy(sel)
             hierarchy_tp = tuple(list(sel_rename.values()) + [row['Year']])
 
@@ -163,16 +164,17 @@ def get_map2json(
             elif isinstance(float_magnitude, tuple):
                 legend = legend_float
                 layer_magnitude = float_magnitude
-            
+
             tasks.append(
                 delayed(map2base64)(ds_template, arr_sel, isInt, legend, hierarchy_tp, layer_magnitude)
-            )    
-            
-    # Gather results and save to JSON
-    output = {}
-    for res in Parallel(n_jobs=workers, return_as='generator')(tasks):
-        hierarchy_tp, val_dict = res
-        output[hierarchy_tp] = val_dict
+            )
+
+        # Run workers for this file, then release its memory before the next file
+        for res in Parallel(n_jobs=workers, return_as='generator', max_nbytes=None)(tasks):
+            hierarchy_tp, val_dict = res
+            output[hierarchy_tp] = val_dict
+
+        xr_arr.close()
         
     # To nested dict
     output = tuple_dict_to_nested(output)
