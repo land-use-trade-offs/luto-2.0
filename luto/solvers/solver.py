@@ -727,8 +727,8 @@ class LutoSolver:
 
         # Group the renewable energy types, input data, 
         re_types = [
-            ('Utility Solar PV', self._input_data.renewable_solar_r, 'renewable_solar', 'solar'),
-            ('Onshore Wind',     self._input_data.renewable_wind_r,  'renewable_wind',  'wind'),
+            ('Utility Solar PV', self._input_data.renewable_solar_r, 'renewable_solar'),
+            ('Onshore Wind',     self._input_data.renewable_wind_r,  'renewable_wind'),
         ]
         
         # Pop Australian Capital Territory out of the region_state_name2idx
@@ -737,43 +737,41 @@ class LutoSolver:
 
         for reg_name, reg_id in self._input_data.region_state_name2idx.items():
 
-            if reg_name == 'Australian Capital Territory':
-                print(f"│   │   │    Skipping {reg_name} as its target being merged to NSW ...")
-                continue
-            
             reg_idx = np.where(self._input_data.region_state_r == reg_id)[0]
             print(f"│   │   ├── Adding renewable energy constraints for {reg_name} ...")
 
 
-            for am, energy_r, limit_key, re_label in re_types:
+            for am, energy_r, limit_key in re_types:
                 
                 if not settings.AG_MANAGEMENTS[am]: 
                     continue
                 
                 target_raw = self._input_data.limits[limit_key].get(reg_name)
                 target_rescal = self._input_data.limits[f"{limit_key}_rescale"].get(reg_name)
+                
                 if target_raw is None or target_rescal is None:
-                    print(f"│   │   │   ├── No target found for {re_label} in {reg_name}, skipping constraint ...")
+                    print(f"│   │   │   ├── target for {limit_key} is not found, skipping constraint ...")
                     continue
                 
-                print(f"│   │   │   ├── target for {re_label} is {target_raw:5,.0f} Mwh")
+                print(f"│   │   │   ├── target for {limit_key} is {target_raw:5,.0f} Mwh")
 
                 am_exprs = []
                 for j_idx, j in enumerate(self._input_data.am2j[am]):
                     j_cells = np.union1d(self._input_data.ag_lu2cells[0, j], self._input_data.ag_lu2cells[1, j])
                     reg_AND_j_cells = np.intersect1d(j_cells, reg_idx)
+                    
                     if not reg_AND_j_cells.size:continue
-                    energy_lyr = energy_r[reg_AND_j_cells]
+                    
                     am_exprs.append(
-                        gp.quicksum(self.X_ag_man_dry_vars_jr[am][j_idx, reg_AND_j_cells] * energy_lyr)
-                        + gp.quicksum(self.X_ag_man_irr_vars_jr[am][j_idx, reg_AND_j_cells] * energy_lyr)
+                        gp.quicksum(self.X_ag_man_dry_vars_jr[am][j_idx, reg_AND_j_cells] * energy_r[reg_AND_j_cells])
+                        + gp.quicksum(self.X_ag_man_irr_vars_jr[am][j_idx, reg_AND_j_cells] * energy_r[reg_AND_j_cells])
                     )
 
                 if am_exprs:
-                    self.renewable_constraints[f'{re_label}_{reg_name}'] = (
+                    self.renewable_constraints[f'{limit_key}_{reg_name}'] = (
                         self.gurobi_model.addConstr(
-                            gp.quicksum(am_exprs) == target_rescal,
-                            name=f"renewable_{re_label}_target_{reg_name}".replace(" ", "_")
+                            gp.quicksum(am_exprs) >= target_rescal,
+                            name=f"renewable_{limit_key}_target_{reg_name}".replace(" ", "_")
                         )
                     )
                 
