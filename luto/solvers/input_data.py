@@ -689,10 +689,10 @@ def rescale_solver_input_data(arries: list) -> tuple[list, float]:
     max_vals = []
     for arr in arries:
         if isinstance(arr, np.ndarray):
-            max_vals.append(max(arr.max(), abs(arr.min())))
+            max_vals.append(np.max(np.abs(arr)))
         elif isinstance(arr, dict):
             # Assume all dictionaries are {str: np.ndarray}
-            max_vals.extend([max(v.max(), abs(v.min())) for v in arr.values()])
+            max_vals.extend([np.max(np.abs(v)) for v in arr.values()])
 
     scale = (np.max(max_vals) / settings.RESCALE_FACTOR).astype(np.float32)
 

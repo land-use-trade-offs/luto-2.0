@@ -1249,7 +1249,7 @@ class Data:
         ) 
 
         # Price elasticity data
-        demand_supply_elasticity = pd.read_csv(f'{settings.INPUT_DIR}/demand_elasticity.csv').drop(columns=['Unnamed: 0'])
+        demand_supply_elasticity = pd.read_csv(f'{settings.INPUT_DIR}/demand_elasticity.csv')
         demand_supply_elasticity = demand_supply_elasticity.sort_values('Commodity')    # Sort by commodity to ensure the order is correct
         demand_supply_elasticity['Demand Elasticity(ED)'] = demand_supply_elasticity['Demand Elasticity(ED)'] * -1 # ED is subtracted from supply becase demand curve are given as negative numbers
         
@@ -1583,14 +1583,14 @@ class Data:
             BIO_GBF4_SNES_score = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF4_TARGET_SNES.csv').sort_values(by='SCIENTIFIC_NAME', ascending=True)
             
             self.BIO_GBF4_SNES_LIKELY_SEL = [row['SCIENTIFIC_NAME'] for _,row in BIO_GBF4_SNES_score.iterrows()
-                                                    if all([row.get('USER_DEFINED_TARGET_PERCENT_2030_LIKELY', 0)>0,
-                                                            row.get('USER_DEFINED_TARGET_PERCENT_2050_LIKELY', 0)>0,
-                                                            row.get('USER_DEFINED_TARGET_PERCENT_2100_LIKELY', 0)>0])]
+                                                    if all([row.get('TARGET_LEVEL_2030_LIKELY', 0)>0,
+                                                            row.get('TARGET_LEVEL_2050_LIKELY', 0)>0,
+                                                            row.get('TARGET_LEVEL_2100_LIKELY', 0)>0])]
 
             self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL = [row['SCIENTIFIC_NAME'] for _,row in BIO_GBF4_SNES_score.iterrows()
-                                                    if all([row.get('USER_DEFINED_TARGET_PERCENT_2030_LIKELY_MAYBE', 0)>0,
-                                                            row.get('USER_DEFINED_TARGET_PERCENT_2050_LIKELY_MAYBE', 0)>0,
-                                                            row.get('USER_DEFINED_TARGET_PERCENT_2100_LIKELY_MAYBE', 0)>0])]
+                                                    if all([row.get('TARGET_LEVEL_2030_LIKELY_MAYBE', 0)>0,
+                                                            row.get('TARGET_LEVEL_2050_LIKELY_MAYBE', 0)>0,
+                                                            row.get('TARGET_LEVEL_2100_LIKELY_MAYBE', 0)>0])]
             
             if len(self.BIO_GBF4_SNES_LIKELY_SEL) == 0:
                 print("│   │   ⚠ WARNING: No 'LIKELY' SNES layers selected, proceeding with empty selection.", flush=True)
@@ -1626,14 +1626,14 @@ class Data:
             BIO_GBF4_ECNES_score.columns = BIO_GBF4_ECNES_score.columns.str.strip()  # Remove leading/trailing whitespace from column names
        
             self.BIO_GBF4_ECNES_LIKELY_SEL = [row['COMMUNITY'] for _,row in BIO_GBF4_ECNES_score.iterrows()
-                                                    if all([row.get('USER_DEFINED_TARGET_PERCENT_2030_LIKELY', 0)>0,
-                                                            row.get('USER_DEFINED_TARGET_PERCENT_2050_LIKELY', 0)>0,
-                                                            row.get('USER_DEFINED_TARGET_PERCENT_2100_LIKELY', 0)>0])]
+                                                    if all([row.get('TARGET_LEVEL_2030_LIKELY', 0)>0,
+                                                            row.get('TARGET_LEVEL_2050_LIKELY', 0)>0,
+                                                            row.get('TARGET_LEVEL_2100_LIKELY', 0)>0])]
 
             self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL = [row['COMMUNITY'] for _,row in BIO_GBF4_ECNES_score.iterrows()
-                                                    if all([row.get('USER_DEFINED_TARGET_PERCENT_2030_LIKELY_MAYBE', 0)>0,
-                                                            row.get('USER_DEFINED_TARGET_PERCENT_2050_LIKELY_MAYBE', 0)>0,
-                                                            row.get('USER_DEFINED_TARGET_PERCENT_2100_LIKELY_MAYBE', 0)>0])]
+                                                    if all([row.get('TARGET_LEVEL_2030_LIKELY_MAYBE', 0)>0,
+                                                            row.get('TARGET_LEVEL_2050_LIKELY_MAYBE', 0)>0,
+                                                            row.get('TARGET_LEVEL_2100_LIKELY_MAYBE', 0)>0])]
             
             if len(self.BIO_GBF4_ECNES_LIKELY_SEL) + len(self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL) == 0:
                 print("│   │   ⚠ WARNING: No 'LIKELY' or 'LIKELY_MAYBE' ECNES layers selected, proceeding with empty selection.", flush=True)
@@ -2216,18 +2216,25 @@ class Data:
             layer = self.BIO_GBF4_PRESENCE_SNES_SEL[idx]
             f = interp1d(
                 [2010, 2030, 2050, 2100],
-                [row[f'HABITAT_SIGNIFICANCE_BASELINE_PERCENT_{layer}'], row[f'USER_DEFINED_TARGET_PERCENT_2030_{layer}'], row[f'USER_DEFINED_TARGET_PERCENT_2050_{layer}'], row[f'USER_DEFINED_TARGET_PERCENT_2100_{layer}']],
+                [row[f'BASEYEAR_LEVEL_{layer}'], row[f'TARGET_LEVEL_2030_{layer}'], row[f'TARGET_LEVEL_2050_{layer}'], row[f'TARGET_LEVEL_2100_{layer}']],
                 kind = "linear",
                 fill_value = "extrapolate",
             )
+
+            interp_pct = float(f(yr))
+            attainable_pct = row[f'ATTAINABLE_LEVEL_{layer}']
             
-            score_all_aus = row[f'HABITAT_SIGNIFICANCE_BASELINE_ALL_AUSTRALIA_{layer}'] * f(yr) / 100  # Convert the percentage to proportion
-            score_out_LUTO = row[f'HABITAT_SIGNIFICANCE_BASELINE_OUT_LUTO_NATURAL_{layer}'] 
+            target_pct = min(interp_pct, attainable_pct)                                    # Cap target at attainable level
+            if interp_pct > attainable_pct:
+                print(f"│   ├── SNES target capped for '{row['SCIENTIFIC_NAME']}' ({layer}): {interp_pct:.2f}% -> {attainable_pct:.2f}% (attainable limit)", flush=True)
+            
+            score_all_aus = row[f'BASELINE_LEVEL_ALL_AUSTRALIA_{layer}'] * target_pct / 100  # Convert the percentage to proportion
+            score_out_LUTO = row[f'BASEYEAR_LEVEL_OUT_LUTO_NATURAL_{layer}']
             targets.append(score_all_aus - score_out_LUTO)
 
         return np.array(targets).astype(np.float32)
 
-        
+
     def get_GBF4_ECNES_target_inside_LUTO_by_year(self, yr:int) -> np.ndarray:
         # Check the layer name
         ecnes_df_likely = self.BIO_GBF4_ECNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY
@@ -2239,18 +2246,25 @@ class Data:
             layer = self.BIO_GBF4_PRESENCE_ECNES_SEL[idx]
             f = interp1d(
                 [2010, 2030, 2050, 2100],
-                [row[f'HABITAT_SIGNIFICANCE_BASELINE_PERCENT_{layer}'], row[f'USER_DEFINED_TARGET_PERCENT_2030_{layer}'], row[f'USER_DEFINED_TARGET_PERCENT_2050_{layer}'], row[f'USER_DEFINED_TARGET_PERCENT_2100_{layer}']],
+                [row[f'BASEYEAR_LEVEL_{layer}'], row[f'TARGET_LEVEL_2030_{layer}'], row[f'TARGET_LEVEL_2050_{layer}'], row[f'TARGET_LEVEL_2100_{layer}']],
                 kind = "linear",
                 fill_value = "extrapolate",
             )
+
+            interp_pct = float(f(yr))
+            attainable_pct = row[f'ATTAINABLE_LEVEL_{layer}']
             
-            score_all_aus = row[f'HABITAT_SIGNIFICANCE_BASELINE_ALL_AUSTRALIA_{layer}'] * f(yr) / 100  # Convert the percentage to proportion
-            score_out_LUTO = row[f'HABITAT_SIGNIFICANCE_BASELINE_OUT_LUTO_NATURAL_{layer}']
-            targets.append(score_all_aus - score_out_LUTO)  
-                      
+            target_pct = min(interp_pct, attainable_pct)                                    # Cap target at attainable level
+            if interp_pct > attainable_pct:
+                print(f"│   ├── ECNES target capped for '{row['COMMUNITY']}' ({layer}): {interp_pct:.2f}% -> {attainable_pct:.2f}% (attainable limit)", flush=True)
+            
+            score_all_aus = row[f'BASELINE_LEVEL_ALL_AUSTRALIA_{layer}'] * target_pct / 100  # Convert the percentage to proportion
+            score_out_LUTO = row[f'BASEYEAR_LEVEL_OUT_LUTO_NATURAL_{layer}']
+            targets.append(score_all_aus - score_out_LUTO)
+
         return np.array(targets).astype(np.float32)
-    
-    
+
+
     def get_GBF8_bio_layers_by_yr(self, yr: int, level:Literal['species', 'group']='species'):
         '''
         Get the biodiversity suitability score [hectare weighted] for each species at the given year.
