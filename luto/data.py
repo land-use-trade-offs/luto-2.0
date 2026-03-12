@@ -1414,7 +1414,7 @@ class Data:
 
             # Get the mask of 'priority degraded areas' for habitat conservation
             conservation_performance_curve = pd.read_excel(
-                os.path.join(settings.INPUT_DIR, 'BIODIVERSITY_GBF2_conservation_performance.xlsx'), 
+                os.path.join(settings.INPUT_DIR, 'Biodiversity_conserve_performance.xlsx'), 
                 sheet_name=performance_sheet
             ).set_index('AREA_COVERAGE_PERCENT')['PRIORITY_RANK'].to_dict()
             

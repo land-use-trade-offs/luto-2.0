@@ -123,24 +123,26 @@ def get_map2json(
     ) -> None:
     
     # Determine number of workers based on max memory setting
-    #    The MEM for RESFACTOR=13 is ~0.5 GB, so scale accordingly
-    workers = (settings.WRITE_REPORT_MAX_MEM_GB) // (0.5 * (13/settings.RESFACTOR)**2)
-    workers = max(4, int(workers))      # At least 4 workers
-    workers = min(workers, 32)          # At most 32 workers
+    #    Each worker loads the 2D template + reprojects + creates RGBA,
+    #    memory per worker scales as ~0.5 GB * (13/RESFACTOR)^2
+    mem_per_worker = 0.5 * (13 / settings.RESFACTOR) ** 2
+    workers = int(settings.WRITE_REPORT_MAX_MEM_GB // mem_per_worker)
+    workers = max(4, min(workers, 16))
     
     # Process one file at a time so only one file's arrays are in memory at once
     output = {}
     for _,row in files_df.iterrows():
 
-        xr_arr = cfxr.decode_compress_to_multi_index(xr.open_dataset(row['path'], chunks={}), 'layer')['data']
+        xr_arr = cfxr.decode_compress_to_multi_index(xr.open_dataset(row['path']), 'layer')['data']
         ds_template = f'{os.path.dirname(row['path'])}/xr_map_template_{row['Year']}.nc'
         valid_layers = xr_arr['layer'].to_index().to_frame().to_dict(orient='records')
 
         tasks = []
         for sel in valid_layers:
 
-            # Select the array for this layer
-            arr_sel = xr_arr.sel(**sel).load()   # load only this slice
+            # Select the array for this layer; .copy() detaches from the parent
+            # so joblib only serializes the small slice, not the full dataset
+            arr_sel = xr_arr.sel(**sel).copy()
             sel_rename = rename_reorder_hierarchy(sel)
             hierarchy_tp = tuple(list(sel_rename.values()) + [row['Year']])
 

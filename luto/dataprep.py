@@ -174,7 +174,7 @@ def create_new_dataset(refresh=False):
     shutil.copyfile(bio_HACS_inpath + 'HABITAT_CONDITION.csv', outpath + 'bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv')
     
     # Copy biodiversity GBF-2 files
-    shutil.copyfile(bio_GBF2_inpath + 'GBF2_conserve_performance.xlsx', outpath + 'BIODIVERSITY_GBF2_conservation_performance.xlsx')
+    shutil.copyfile(bio_GBF2_inpath + 'Biodiversity_conserve_performance.xlsx', outpath + 'Biodiversity_conserve_performance.xlsx')
 
     # Copy biodiversity GBF-3 data
     shutil.copyfile(bio_GBF3_NVIS_inpath + '/NVIS7_0_AUST_PRE_MVS.nc', outpath + 'bio_GBF3_NVIS_MVS.nc')
