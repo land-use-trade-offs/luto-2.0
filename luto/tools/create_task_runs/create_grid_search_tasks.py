@@ -28,7 +28,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/LUF_20260307_RE5_GBF4_LIKELY"
+TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/LUF_20260310_RE5_GBF4_LIKELY"
 
 
 # Set the grid search parameters
@@ -127,9 +127,9 @@ grid_search = {
     'BIODIVERSITY_TARGET_GBF_8': ['off'],                                   # 'on' or 'off'
 
     # --------------- Renewable energy ---------------
-    'RENEWABLE_ENERGY_CONSTRAINTS': ['off', 'on'],                                # 'off' per LUF Report 2026 (Solar and Wind both OFF)
-    'RENEWABLE_TARGET_SCENARIO_TARGETS': ['CNS25 - Accelerated Transition'],        # 'CNS25 - Accelerated Transition', 'CNS25 - Current Targets'
-
+    'RENEWABLE_ENERGY_CONSTRAINTS': ['on'],                                # 'off' per LUF Report 2026 (Solar and Wind both OFF)
+    'RENEWABLE_TARGET_SCENARIO_TARGETS': ['Gladstone - Current Targets'],  # 'CNS - Accelerated Transition', 'CNS - Current Targets', 'Gladstone - Current Targets'
+    
     ###############################################################
     # Scenario settings for the model run
     ###############################################################
