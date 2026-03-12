@@ -694,6 +694,65 @@ def process_economics_data(files, SAVE_DIR):
     # This is the same as the "Economics_overview_Non_Ag"
 
 
+    # -------------------- Economics Sum (Ag + Am + NonAg profit) --------------------
+    # Load profit CSVs
+    profit_ag_files = files.query('base_name == "economics_ag_profit"').reset_index(drop=True)
+    profit_ag_sum_df = pd.concat([pd.read_csv(p) for p in profit_ag_files['path']], ignore_index=True)
+    profit_ag_sum_df = profit_ag_sum_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False)
+    profit_ag_sum_df = profit_ag_sum_df.query('`Land-use` != "ALL" and Water_supply != "ALL"')
+
+    profit_am_files = files.query('base_name == "economics_am_profit"').reset_index(drop=True)
+    profit_am_sum_df = pd.concat([df for p in profit_am_files['path'] if not (df := pd.read_csv(p)).empty], ignore_index=True)
+    profit_am_sum_df = profit_am_sum_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False)
+    profit_am_sum_df = profit_am_sum_df.query('`Land-use` != "ALL" and Water_supply != "ALL" and `Management Type` != "ALL"')
+    # Sum over management types to get (region, Water_supply, Land-use, Year) level
+    profit_am_sum_df = profit_am_sum_df.groupby(['region', 'Water_supply', 'Land-use', 'Year'])[['Value ($)']].sum().reset_index()
+
+    profit_na_files = files.query('base_name == "economics_non_ag_profit"').reset_index(drop=True)
+    profit_na_sum_df = pd.concat([df for p in profit_na_files['path'] if not (df := pd.read_csv(p)).empty], ignore_index=True)
+    profit_na_sum_df = profit_na_sum_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False)
+    profit_na_sum_df = profit_na_sum_df.query('`Land-use` != "ALL"')
+    # Assign nonag to Dryland to avoid double counting
+    profit_na_sum_df['Water_supply'] = 'Dryland'
+
+    # Combine all three
+    econ_sum = pd.concat([
+        profit_ag_sum_df[['region', 'Water_supply', 'Land-use', 'Year', 'Value ($)']],
+        profit_am_sum_df[['region', 'Water_supply', 'Land-use', 'Year', 'Value ($)']],
+        profit_na_sum_df[['region', 'Water_supply', 'Land-use', 'Year', 'Value ($)']],
+    ], ignore_index=True)
+
+    # Group to sum ag+am for same land uses, then add ALL water aggregate
+    econ_sum = econ_sum.groupby(['region', 'Water_supply', 'Land-use', 'Year'])[['Value ($)']].sum().reset_index()
+
+    econ_sum_all_water = econ_sum.groupby(['region', 'Land-use', 'Year'])[['Value ($)']].sum().reset_index().assign(Water_supply='ALL')
+    econ_sum = pd.concat([econ_sum_all_water, econ_sum], ignore_index=True)
+
+    df_wide = econ_sum\
+        .groupby(['region', 'Water_supply', 'Land-use'])[['Year', 'Value ($)']]\
+        .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
+        .reset_index()
+
+    df_wide.columns = ['region', 'water', 'name', 'data']
+    df_wide['type'] = 'column'
+    df_wide['color'] = df_wide['name'].apply(lambda x: COLORS[x])
+    df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x) if x in LANDUSE_ALL_RENAMED else 999)
+    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+
+    out_dict = {}
+    for (region, water), df in df_wide.groupby(['region', 'water']):
+        df = df.drop(['region', 'water'], axis=1)
+        if region not in out_dict:
+            out_dict[region] = {}
+        out_dict[region][water] = df.to_dict(orient='records')
+
+    filename = 'Economics_Sum'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
+
+
 
 
     # # -------------------- Transition cost for Ag2Ag --------------------

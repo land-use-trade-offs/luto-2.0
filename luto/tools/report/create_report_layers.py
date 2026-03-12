@@ -465,6 +465,13 @@ def save_report_layer(raw_data_dir:str):
     get_map2json(profit_nonag, None, None, legend_float, economic_min_max_nonag, f'{SAVE_DIR}/map_layers/map_economics_NonAg_profit.js')
     print('│   ├── Economics NonAg profit layer saved.')
 
+    # Sum profit (Ag + Am + NonAg)
+    economic_magnitudes_sum = cell_magnitudes.get('Economics_sum', {}).get('sum_profit', [0.0, 0.0])
+    economic_min_max_sum = (min(economic_magnitudes_sum), max(economic_magnitudes_sum))
+    profit_sum = files.query('base_name == "xr_economics_sum_profit"')
+    get_map2json(profit_sum, None, None, legend_float, economic_min_max_sum, f'{SAVE_DIR}/map_layers/map_economics_Sum_profit.js')
+    print('│   ├── Economics Sum profit layer saved.')
+
 
     # ---------------- Revenue ----------------
     revenue_ag = files.query('base_name == "xr_economics_ag_revenue"')

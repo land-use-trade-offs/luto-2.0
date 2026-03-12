@@ -303,6 +303,10 @@ window.ChartService = {
       },
     },
     "Economics": {
+      "Sum": {
+        "path": "data/Economics_Sum.js",
+        "name": "Economics_Sum",
+      },
       "Ag": {
         "path": "data/Economics_Ag.js",
         "name": "Economics_Ag",
