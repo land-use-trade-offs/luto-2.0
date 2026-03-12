@@ -1249,6 +1249,52 @@ def process_production_data(files, SAVE_DIR, years):
         f.write(';\n')
 
 
+    # -------------------- Sum production (Ag + Am + NonAg) --------------------
+    # Assign non_ag Water_supply='Dryland' to avoid double counting, then sum all types
+    quantity_non_ag_with_water = quantity_non_ag.copy()
+    quantity_non_ag_with_water['Water_supply'] = 'Dryland'
+
+    quantity_sum = pd.concat([
+        quantity_ag_non_all[['region', 'Water_supply', 'Commodity', 'Year', 'Production (t/KL)']],
+        quantity_am_non_all[['region', 'Water_supply', 'Commodity', 'Year', 'Production (t/KL)']],
+        quantity_non_ag_with_water[['region', 'Water_supply', 'Commodity', 'Year', 'Production (t/KL)']],
+    ], ignore_index=True)
+
+    # Add ALL water level
+    quantity_sum_all_water = quantity_sum\
+        .groupby(['region', 'Commodity', 'Year'])[['Production (t/KL)']]\
+        .sum(numeric_only=True)\
+        .reset_index()\
+        .assign(Water_supply='ALL')
+    quantity_sum = pd.concat([quantity_sum_all_water, quantity_sum], ignore_index=True)
+
+    # Group by region, water, commodity → time series
+    df_wide = quantity_sum\
+        .groupby(['region', 'Water_supply', 'Commodity', 'Year'])[['Production (t/KL)']]\
+        .sum(numeric_only=True)\
+        .reset_index()\
+        .groupby(['region', 'Water_supply', 'Commodity'])[['Year', 'Production (t/KL)']]\
+        .apply(lambda x: x[['Year', 'Production (t/KL)']].values.tolist())\
+        .reset_index()
+
+    df_wide.columns = ['region', 'water', 'name', 'data']
+    df_wide['type'] = 'column'
+    df_wide['color'] = df_wide['name'].apply(lambda x: COLORS[x])
+    df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x) if x in COMMODITIES_ALL else 999)
+    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+
+    out_dict = {}
+    for (region, water), df in df_wide.groupby(['region', 'water']):
+        df = df.drop(['region', 'water'], axis=1)
+        if region not in out_dict:
+            out_dict[region] = {}
+        out_dict[region][water] = df.to_dict(orient='records')
+
+    filename = f'Production_Sum'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
 
 
     return "Production data processing completed"

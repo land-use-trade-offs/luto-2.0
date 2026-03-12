@@ -131,7 +131,7 @@ window.EconomicsView = {
       const waterData = mapData?.[water] || {};
       if (isSource) {
         availableSource.value = Object.keys(waterData);
-        const prev = previousSelections.value["Ag"].source;
+        const prev = previousSelections.value["Ag"].source || selectSource.value;
         selectSource.value = (prev && availableSource.value.includes(prev)) ? prev : (availableSource.value[0] || '');
         availableLanduse.value = Object.keys(waterData[selectSource.value] || {});
       } else {
@@ -139,7 +139,7 @@ window.EconomicsView = {
         selectSource.value = '';
         availableLanduse.value = Object.keys(waterData);
       }
-      const prev = previousSelections.value["Ag"].landuse;
+      const prev = previousSelections.value["Ag"].landuse || selectLanduse.value;
       selectLanduse.value = (prev && availableLanduse.value.includes(prev)) ? prev : (availableLanduse.value[0] || '');
     }
 
@@ -148,6 +148,12 @@ window.EconomicsView = {
       const mapData = window[mapRegister[cat]?.[mapType]?.name];
       if (!mapData) return;
 
+      // Remember current selections for cross-category restore
+      const curWater = selectWater.value;
+      const curLanduse = selectLanduse.value;
+      const curAgMgt = selectAgMgt.value;
+      const curSource = selectSource.value;
+
       if (cat === "Ag") {
         if (mapType === "Transition (Ag2Ag)" || mapType === "Transition (Ag2NonAg)") {
           availableWater.value = [];
@@ -155,28 +161,28 @@ window.EconomicsView = {
           cascadeAgFromWater(mapData, 'ALL', true);
         } else {
           availableWater.value = Object.keys(mapData);
-          const prev = previousSelections.value["Ag"].water;
+          const prev = previousSelections.value["Ag"].water || curWater;
           selectWater.value = (prev && availableWater.value.includes(prev)) ? prev : (availableWater.value[0] || '');
           cascadeAgFromWater(mapData, selectWater.value, mapType !== "Profit");
         }
 
       } else if (cat === "Ag Mgt") {
         availableAgMgt.value = Object.keys(mapData);
-        const prevAm = previousSelections.value["Ag Mgt"].agMgt;
+        const prevAm = previousSelections.value["Ag Mgt"].agMgt || curAgMgt;
         selectAgMgt.value = (prevAm && availableAgMgt.value.includes(prevAm)) ? prevAm : (availableAgMgt.value[0] || '');
 
         const agMgtData = mapData[selectAgMgt.value] || {};
         availableWater.value = Object.keys(agMgtData);
-        const prevW = previousSelections.value["Ag Mgt"].water;
+        const prevW = previousSelections.value["Ag Mgt"].water || curWater;
         selectWater.value = (prevW && availableWater.value.includes(prevW)) ? prevW : (availableWater.value[0] || '');
 
         availableLanduse.value = Object.keys(agMgtData[selectWater.value] || {});
-        const prevL = previousSelections.value["Ag Mgt"].landuse;
+        const prevL = previousSelections.value["Ag Mgt"].landuse || curLanduse;
         selectLanduse.value = (prevL && availableLanduse.value.includes(prevL)) ? prevL : (availableLanduse.value[0] || '');
 
       } else if (cat === "Non-Ag") {
         availableLanduse.value = Object.keys(mapData);
-        const prev = previousSelections.value["Non-Ag"].landuse;
+        const prev = previousSelections.value["Non-Ag"].landuse || curLanduse;
         selectLanduse.value = (prev && availableLanduse.value.includes(prev)) ? prev : (availableLanduse.value[0] || '');
       }
     }

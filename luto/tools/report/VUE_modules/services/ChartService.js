@@ -375,6 +375,10 @@ window.ChartService = {
       },
     },
     "Production": {
+      "Sum": {
+        "path": "data/Production_Sum.js",
+        "name": "Production_Sum",
+      },
       "Ag": {
         "path": "data/Production_Ag.js",
         "name": "Production_Ag",

@@ -92,38 +92,43 @@ window.BiodiversityView = {
       const amData = window[mr?.["Ag Mgt"]?.["name"]];
       const nonAgData = window[mr?.["Non-Ag"]?.["name"]];
 
+      // Remember current selections for cross-category restore
+      const curWater = selectWater.value;
+      const curLanduse = selectLanduse.value;
+      const curAgMgt = selectAgMgt.value;
+
       if (category === "Sum") {
         availableAgMgt.value = [];
         availableWater.value = [];
         availableLanduse.value = Object.keys(sumData || {});
-        const prevLU = previousSelections.value["Sum"].landuse;
+        const prevLU = previousSelections.value["Sum"].landuse || curLanduse;
         selectLanduse.value = (prevLU && availableLanduse.value.includes(prevLU)) ? prevLU : (availableLanduse.value[0] || '');
 
       } else if (category === "Ag") {
         availableWater.value = Object.keys(agData || {});
-        const prevWater = previousSelections.value["Ag"].water;
+        const prevWater = previousSelections.value["Ag"].water || curWater;
         selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
 
         availableLanduse.value = Object.keys(agData?.[selectWater.value] || {});
-        const prevLU = previousSelections.value["Ag"].landuse;
+        const prevLU = previousSelections.value["Ag"].landuse || curLanduse;
         selectLanduse.value = (prevLU && availableLanduse.value.includes(prevLU)) ? prevLU : (availableLanduse.value[0] || '');
 
       } else if (category === "Ag Mgt") {
         availableAgMgt.value = Object.keys(amData || {});
-        const prevAgMgt = previousSelections.value["Ag Mgt"].agMgt;
+        const prevAgMgt = previousSelections.value["Ag Mgt"].agMgt || curAgMgt;
         selectAgMgt.value = (prevAgMgt && availableAgMgt.value.includes(prevAgMgt)) ? prevAgMgt : (availableAgMgt.value[0] || '');
 
         availableWater.value = Object.keys(amData?.[selectAgMgt.value] || {});
-        const prevWater = previousSelections.value["Ag Mgt"].water;
+        const prevWater = previousSelections.value["Ag Mgt"].water || curWater;
         selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
 
         availableLanduse.value = Object.keys(amData?.[selectAgMgt.value]?.[selectWater.value] || {});
-        const prevLU = previousSelections.value["Ag Mgt"].landuse;
+        const prevLU = previousSelections.value["Ag Mgt"].landuse || curLanduse;
         selectLanduse.value = (prevLU && availableLanduse.value.includes(prevLU)) ? prevLU : (availableLanduse.value[0] || '');
 
       } else if (category === "Non-Ag") {
         availableLanduse.value = Object.keys(nonAgData || {});
-        const prevLU = previousSelections.value["Non-Ag"].landuse;
+        const prevLU = previousSelections.value["Non-Ag"].landuse || curLanduse;
         selectLanduse.value = (prevLU && availableLanduse.value.includes(prevLU)) ? prevLU : (availableLanduse.value[0] || '');
       }
     }

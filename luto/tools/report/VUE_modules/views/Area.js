@@ -150,31 +150,36 @@ window.AreaView = {
         }
       }
 
+      // Remember current selections for cross-category restore
+      const curWater = selectWater.value;
+      const curLanduse = selectLanduse.value;
+      const curAgMgt = selectAgMgt.value;
+
       // Handle ALL downstream variables with cascading pattern
       if (newCategory === "Ag Mgt") {
         availableAgMgt.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]]);
-        const prevAgMgt = previousSelections.value["Ag Mgt"].agMgt;
+        const prevAgMgt = previousSelections.value["Ag Mgt"].agMgt || curAgMgt;
         selectAgMgt.value = (prevAgMgt && availableAgMgt.value.includes(prevAgMgt)) ? prevAgMgt : (availableAgMgt.value[0] || '');
 
         availableWater.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value]);
-        const prevWater = previousSelections.value["Ag Mgt"].water;
+        const prevWater = previousSelections.value["Ag Mgt"].water || curWater;
         selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
 
         availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value][selectWater.value]);
-        const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
-        selectLanduse.value = availableLanduse.value[0];
+        const prevLanduse = previousSelections.value["Ag Mgt"].landuse || curLanduse;
+        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
       } else if (newCategory === "Ag") {
         availableWater.value = Object.keys(window[mapRegister["Ag"]["name"]]);
-        const prevWater = previousSelections.value["Ag"].water;
+        const prevWater = previousSelections.value["Ag"].water || curWater;
         selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
 
         availableLanduse.value = Object.keys(window[mapRegister["Ag"]["name"]][selectWater.value]);
-        const prevLanduse = previousSelections.value["Ag"].landuse;
-        selectLanduse.value = availableLanduse.value[0];
+        const prevLanduse = previousSelections.value["Ag"].landuse || curLanduse;
+        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
       } else if (newCategory === "Non-Ag") {
         availableLanduse.value = Object.keys(window[mapRegister["Non-Ag"]["name"]]);
-        const prevLanduse = previousSelections.value["Non-Ag"].landuse;
-        selectLanduse.value = availableLanduse.value[0];
+        const prevLanduse = previousSelections.value["Non-Ag"].landuse || curLanduse;
+        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
       }
 
     });
@@ -191,12 +196,12 @@ window.AreaView = {
       // Handle ALL downstream variables
       if (selectCategory.value === "Ag") {
         availableLanduse.value = Object.keys(window[mapRegister["Ag"]["name"]][newWater]);
-        const prevLanduse = previousSelections.value["Ag"].landuse;
-        selectLanduse.value = availableLanduse.value[0];
+        const prevLanduse = previousSelections.value["Ag"].landuse || selectLanduse.value;
+        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
       } else if (selectCategory.value === "Ag Mgt") {
         availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value][newWater]);
-        const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
-        selectLanduse.value = availableLanduse.value[0];
+        const prevLanduse = previousSelections.value["Ag Mgt"].landuse || selectLanduse.value;
+        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
       }
     });
 
@@ -211,8 +216,8 @@ window.AreaView = {
         selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
 
         availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][newAgMgt][selectWater.value]);
-        const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
-        selectLanduse.value = availableLanduse.value[0];
+        const prevLanduse = previousSelections.value["Ag Mgt"].landuse || selectLanduse.value;
+        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
       }
     });
 

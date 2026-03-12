@@ -562,6 +562,10 @@ def save_report_layer(raw_data_dir:str):
     get_map2json(quantities_nonag, legend_non_ag, {'Commodity':'ALL'}, legend_float, prod_min_max, f'{SAVE_DIR}/map_layers/map_quantities_NonAg.js')
     print('│   ├── Quantities Non-Ag layer saved.')
 
+    quantities_sum = files_quantities.query('base_name == "xr_quantities_sum"')
+    get_map2json(quantities_sum, legend_ag, {'Commodity':'ALL'}, legend_float, prod_min_max, f'{SAVE_DIR}/map_layers/map_quantities_Sum.js')
+    print('│   ├── Quantities Sum layer saved.')
+
 
 
     ####################################################

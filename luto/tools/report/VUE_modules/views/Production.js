@@ -28,7 +28,7 @@ window.ProductionView = {
     };
 
     // Available selections - Production now has Area-like structure
-    const availableCategories = ["Ag", "Ag Mgt", "Non-Ag"];
+    const availableCategories = ["Sum", "Ag", "Ag Mgt", "Non-Ag"];
     const availableAgMgt = ref([]);
     const availableWater = ref([]);
     const availableLanduse = ref([]);
@@ -41,6 +41,7 @@ window.ProductionView = {
 
     // Previous selections memory
     const previousSelections = ref({
+      "Sum": { water: "", landuse: "" },
       "Ag": { water: "", landuse: "" },
       "Ag Mgt": { agMgt: "", water: "", landuse: "" },
       "Non-Ag": { landuse: "" }
@@ -58,7 +59,10 @@ window.ProductionView = {
 
       let mapData = JSON.parse(JSON.stringify(window[mapRegister[selectCategory.value]["name"]]));
 
-      if (selectCategory.value === "Ag") {
+      if (selectCategory.value === "Sum") {
+        return mapData[selectWater.value][selectCommodity.value][selectYear.value];
+      }
+      else if (selectCategory.value === "Ag") {
         return mapData[selectWater.value][selectCommodity.value][selectYear.value];
       }
       else if (selectCategory.value === "Ag Mgt") {
@@ -77,13 +81,16 @@ window.ProductionView = {
       let chartData = window[chartRegister[selectCategory.value]["name"]][selectRegion.value]
       let seriesData;
 
-      if (selectCategory.value === "Ag") {
+      if (selectCategory.value === "Sum") {
+        seriesData = chartData[selectWater.value];
+        seriesData = seriesData.filter(serie => (selectCommodity.value === "ALL" || serie.name === selectCommodity.value));
+      }
+      else if (selectCategory.value === "Ag") {
         seriesData = chartData[selectWater.value];
         seriesData = seriesData.filter(serie => (selectCommodity.value === "ALL" || serie.name === selectCommodity.value));
       }
       else if (selectCategory.value === "Ag Mgt") {
         seriesData = chartData[selectWater.value][selectCommodity.value];
-        console.log(chartData);
         seriesData = seriesData.filter(serie => (selectAgMgt.value === "ALL" || serie.name === selectAgMgt.value));
       } else if (selectCategory.value === "Non-Ag") {
         seriesData = chartData.filter(serie => (selectCommodity.value === "ALL" || serie.name === selectCommodity.value));
@@ -109,9 +116,11 @@ window.ProductionView = {
       await loadScript("./data/chart_option/Chart_default_options.js", "Chart_default_options", VIEW_NAME);
 
       // Load data
+      await loadScript(mapRegister["Sum"]["path"], mapRegister["Sum"]["name"], VIEW_NAME);
       await loadScript(mapRegister["Ag"]["path"], mapRegister["Ag"]["name"], VIEW_NAME);
       await loadScript(mapRegister["Ag Mgt"]["path"], mapRegister["Ag Mgt"]["name"], VIEW_NAME);
       await loadScript(mapRegister["Non-Ag"]["path"], mapRegister["Non-Ag"]["name"], VIEW_NAME);
+      await loadScript(chartRegister["Sum"]["path"], chartRegister["Sum"]["name"], VIEW_NAME);
       await loadScript(chartRegister["Ag"]["path"], chartRegister["Ag"]["name"], VIEW_NAME);
       await loadScript(chartRegister["Ag Mgt"]["path"], chartRegister["Ag Mgt"]["name"], VIEW_NAME);
       await loadScript(chartRegister["Non-Ag"]["path"], chartRegister["Non-Ag"]["name"], VIEW_NAME);
@@ -138,7 +147,9 @@ window.ProductionView = {
     watch(selectCategory, (newCategory, oldCategory) => {
       // Save previous selections before switching
       if (oldCategory) {
-        if (oldCategory === "Ag") {
+        if (oldCategory === "Sum") {
+          previousSelections.value["Sum"] = { water: selectWater.value, landuse: selectCommodity.value };
+        } else if (oldCategory === "Ag") {
           previousSelections.value["Ag"] = { water: selectWater.value, landuse: selectCommodity.value };
         } else if (oldCategory === "Ag Mgt") {
           previousSelections.value["Ag Mgt"] = { agMgt: selectAgMgt.value, water: selectWater.value, landuse: selectCommodity.value };
@@ -147,31 +158,45 @@ window.ProductionView = {
         }
       }
 
+      // Remember current selections for cross-category restore
+      const curWater = selectWater.value;
+      const curLanduse = selectCommodity.value;
+      const curAgMgt = selectAgMgt.value;
+
       // Handle ALL downstream variables with cascading pattern
-      if (newCategory === "Ag Mgt") {
+      if (newCategory === "Sum") {
+        availableAgMgt.value = [];
+        availableWater.value = Object.keys(window[mapRegister["Sum"]["name"]] || {});
+        const prevWater = previousSelections.value["Sum"].water || curWater;
+        selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
+
+        availableLanduse.value = Object.keys(window[mapRegister["Sum"]["name"]][selectWater.value] || {});
+        const prevLanduse = previousSelections.value["Sum"].landuse || curLanduse;
+        selectCommodity.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
+      } else if (newCategory === "Ag Mgt") {
         availableAgMgt.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]] || {});
-        const prevAgMgt = previousSelections.value["Ag Mgt"].agMgt;
+        const prevAgMgt = previousSelections.value["Ag Mgt"].agMgt || curAgMgt;
         selectAgMgt.value = (prevAgMgt && availableAgMgt.value.includes(prevAgMgt)) ? prevAgMgt : (availableAgMgt.value[0] || '');
 
         availableWater.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value] || {});
-        const prevWater = previousSelections.value["Ag Mgt"].water;
+        const prevWater = previousSelections.value["Ag Mgt"].water || curWater;
         selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
 
         availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value][selectWater.value]);
-        const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
-        selectCommodity.value = availableLanduse.value[0];
+        const prevLanduse = previousSelections.value["Ag Mgt"].landuse || curLanduse;
+        selectCommodity.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
       } else if (newCategory === "Ag") {
         availableWater.value = Object.keys(window[mapRegister["Ag"]["name"]] || {});
-        const prevWater = previousSelections.value["Ag"].water;
+        const prevWater = previousSelections.value["Ag"].water || curWater;
         selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
 
         availableLanduse.value = Object.keys(window[mapRegister["Ag"]["name"]][selectWater.value]);
-        const prevLanduse = previousSelections.value["Ag"].landuse;
-        selectCommodity.value = availableLanduse.value[0];
+        const prevLanduse = previousSelections.value["Ag"].landuse || curLanduse;
+        selectCommodity.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
       } else if (newCategory === "Non-Ag") {
         availableLanduse.value = Object.keys(window[mapRegister["Non-Ag"]["name"]]);
-        const prevLanduse = previousSelections.value["Non-Ag"].landuse;
-        selectCommodity.value = availableLanduse.value[0];
+        const prevLanduse = previousSelections.value["Non-Ag"].landuse || curLanduse;
+        selectCommodity.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
       }
     });
 
@@ -186,34 +211,42 @@ window.ProductionView = {
         selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
 
         availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][newAgMgt][selectWater.value]);
-        const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
-        selectCommodity.value = availableLanduse.value[0];
+        const prevLanduse = previousSelections.value["Ag Mgt"].landuse || selectCommodity.value;
+        selectCommodity.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
       }
     });
 
     watch(selectWater, (newWater) => {
       // Save current water selection
-      if (selectCategory.value === "Ag") {
+      if (selectCategory.value === "Sum") {
+        previousSelections.value["Sum"].water = newWater;
+      } else if (selectCategory.value === "Ag") {
         previousSelections.value["Ag"].water = newWater;
       } else if (selectCategory.value === "Ag Mgt") {
         previousSelections.value["Ag Mgt"].water = newWater;
       }
 
       // Handle downstream variables
-      if (selectCategory.value === "Ag") {
+      if (selectCategory.value === "Sum") {
+        availableLanduse.value = Object.keys(window[mapRegister["Sum"]["name"]][newWater] || {});
+        const prevLanduse = previousSelections.value["Sum"].landuse || selectCommodity.value;
+        selectCommodity.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
+      } else if (selectCategory.value === "Ag") {
         availableLanduse.value = Object.keys(window[mapRegister["Ag"]["name"]][newWater]);
-        const prevLanduse = previousSelections.value["Ag"].landuse;
-        selectCommodity.value = availableLanduse.value[0];
+        const prevLanduse = previousSelections.value["Ag"].landuse || selectCommodity.value;
+        selectCommodity.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
       } else if (selectCategory.value === "Ag Mgt") {
         availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value][newWater]);
-        const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
-        selectCommodity.value = availableLanduse.value[0];
+        const prevLanduse = previousSelections.value["Ag Mgt"].landuse || selectCommodity.value;
+        selectCommodity.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
       }
     });
 
     watch(selectCommodity, (newLanduse) => {
       // Save current landuse selection
-      if (selectCategory.value === "Ag") {
+      if (selectCategory.value === "Sum") {
+        previousSelections.value["Sum"].landuse = newLanduse;
+      } else if (selectCategory.value === "Ag") {
         previousSelections.value["Ag"].landuse = newLanduse;
       } else if (selectCategory.value === "Ag Mgt") {
         previousSelections.value["Ag Mgt"].landuse = newLanduse;
@@ -302,8 +335,8 @@ window.ProductionView = {
           </button>
         </div>
 
-        <!-- Water options (for Ag and Ag Mgt) -->
-        <div v-if="dataLoaded && (selectCategory === 'Ag' || selectCategory === 'Ag Mgt') && availableWater.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
+        <!-- Water options (for Sum, Ag and Ag Mgt) -->
+        <div v-if="dataLoaded && (selectCategory === 'Sum' || selectCategory === 'Ag' || selectCategory === 'Ag Mgt') && availableWater.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
           <span class="text-[0.8rem] mr-1 font-medium">Water:</span>
           <button v-for="(val, key) in availableWater" :key="key"
             @click="selectWater = val"
@@ -329,7 +362,7 @@ window.ProductionView = {
       <div style="position: relative; width: 100%; height: 100%; overflow: hidden;">
 
         <!-- Map component takes full space -->
-        <regions-map 
+        <regions-map
           :mapData="selectMapData"
           style="width: 100%; height: 100%;">
         </regions-map>
@@ -341,9 +374,9 @@ window.ProductionView = {
           :class="isDrawerOpen ? 'right-[420px]' : 'right-5'">
           {{ isDrawerOpen ? '→' : '←' }}
         </button>
-        
+
         <!-- Chart drawer positioned relative to map -->
-        <div 
+        <div
           :style="{
             position: 'absolute',
             height: '50px',
@@ -357,8 +390,8 @@ window.ProductionView = {
             padding: '60px 20px 20px 20px',
             boxSizing: 'border-box'
           }">
-          <chart-container 
-            :chartData="selectChartData" 
+          <chart-container
+            :chartData="selectChartData"
             :draggable="true"
             :zoomable="true"
             style="width: 100%; height: 200px;">

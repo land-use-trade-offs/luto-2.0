@@ -699,16 +699,42 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
     _save2nc(am_p_amrc_cat_stack, os.path.join(path, f'xr_quantities_agricultural_management_{yr_cal}.nc'))
 
 
+    # ------------------------- Sum (Ag + Am + NonAg): stack and save -------------------------
+    # Sum ag + am (summed over 'am'); non_ag assigned to lm='dry' to avoid double counting
+    am_sum_mrc = am_p_amrc.sel(lm=['dry', 'irr'], Commodity=[c for c in am_p_amrc.coords['Commodity'].values if c != 'ALL']).sum('am')
+    non_ag_as_dry = non_ag_p_rc.expand_dims('lm').assign_coords(lm=['dry']).reindex(lm=['dry', 'irr'], fill_value=0)
+
+    sum_dry_irr = (ag_q_mrc.sel(lm=['dry', 'irr'])
+                   + am_sum_mrc.reindex_like(ag_q_mrc.sel(lm=['dry', 'irr']), fill_value=0)
+                   + non_ag_as_dry.reindex_like(ag_q_mrc.sel(lm=['dry', 'irr']), fill_value=0))
+
+    sum_all = sum_dry_irr.sum('lm', keepdims=True).assign_coords(lm=['ALL'])
+    sum_mrc = xr.concat([sum_all, sum_dry_irr], dim='lm')
+
+    # Float layers: per-commodity production sums
+    sum_mrc_stack = sum_mrc.stack(layer=['lm', 'Commodity'])
+
+    # Mosaic layers: use xr_map_lumap for Commodity='ALL' (categorical land-use map with lm splits)
+    lumap_mosaic = cfxr.decode_compress_to_multi_index(
+        xr.load_dataset(os.path.join(path, f'xr_map_lumap_{yr_cal}.nc')), 'layer')['data'].unstack('layer')
+    sum_mosaic = lumap_mosaic.expand_dims('Commodity').assign_coords(Commodity=['ALL'])
+    sum_mosaic_stack = sum_mosaic.stack(layer=['lm', 'Commodity'])
+
+    sum_cat_stack = xr.concat([sum_mosaic_stack, sum_mrc_stack], dim='layer').drop_vars('region').compute()
+    _save2nc(sum_cat_stack, os.path.join(path, f'xr_quantities_sum_{yr_cal}.nc'))
+
+
     # Record max cell value for report generation later (e.g., for setting colorbar limits)
     prod_magnitudes = {
         'ag':     {cm: _get_mag(ag_q_mrc.sel(Commodity=cm)) for cm in data.COMMODITIES},
         'non_ag': {cm: _get_mag(non_ag_p_rc.sel(Commodity=cm)) for cm in data.COMMODITIES},
         'am':     {cm: _get_mag(am_p_amrc.sel(Commodity=cm)) for cm in data.COMMODITIES},
+        'sum':    {cm: _get_mag(sum_mrc.sel(Commodity=cm)) for cm in data.COMMODITIES},
     }
     
     commodity_magnitudes = {'production': {}}
     for cm in data.COMMODITIES:
-        vals = [*prod_magnitudes['ag'][cm], *prod_magnitudes['non_ag'][cm], *prod_magnitudes['am'][cm]]
+        vals = [*prod_magnitudes['ag'][cm], *prod_magnitudes['non_ag'][cm], *prod_magnitudes['am'][cm], *prod_magnitudes['sum'][cm]]
         commodity_magnitudes['production'][cm] = [i for i in vals if not np.isnan(i)]  # Filter out None values (in case some categories don't produce certain commodities)
     
     return (
