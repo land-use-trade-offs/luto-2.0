@@ -1,6 +1,6 @@
-# Copyright 2025 Bryan, B.A., Williams, N., Archibald, C.L., de Haan, F., Wang, J., 
-# van Schoten, N., Hadjikakou, M., Sanson, J.,  Zyngier, R., Marcos-Martinez, R.,  
-# Navarro, J.,  Gao, L., Aghighi, H., Armstrong, T., Bohl, H., Jaffe, P., Khan, M.S., 
+# Copyright 2025 Bryan, B.A., Williams, N., Archibald, C.L., de Haan, F., Wang, J.,
+# van Schoten, N., Hadjikakou, M., Sanson, J.,  Zyngier, R., Marcos-Martinez, R.,
+# Navarro, J.,  Gao, L., Aghighi, H., Armstrong, T., Bohl, H., Jaffe, P., Khan, M.S.,
 # Moallemi, E.A., Nazari, A., Pan, X., Steyl, D., and Thiruvady, D.R.
 #
 # This file is part of LUTO2 - Version 2 of the Australian Land-Use Trade-Offs model
@@ -20,41 +20,73 @@
 """
 Find all GBF4 ECNES constraints that are infeasible in the saved MPS model.
 
-Removes ALL ECNES constraints to create a base model, then for each ECNES
-constraint, maximizes its LHS to check if the target is achievable.
+Removes ALL ECNES constraints to create a base model, then submits each ECNES
+constraint check as a separate PBS job on NCI Gadi.
 
-Usage (Jupyter):
-    base_model, results = find_infeasible_ecnes()
-    base_model, results = find_infeasible_ecnes("path/to/model.mps")
+Usage:
+    # Step 1: Prepare and submit PBS jobs
+    from luto.tests.find_infeasible_ecnes import submit_ecnes_checks
+    submit_ecnes_checks("path/to/model.mps")
+
+    # Step 2: After all jobs finish, collect results
+    from luto.tests.find_infeasible_ecnes import collect_results
+    results = collect_results("path/to/ecnes_workdir")
 """
 
+import json
 import os
-import tempfile
+import pickle
+import subprocess
+import time
+
+from tqdm.auto import tqdm
 
 import gurobipy as gp
 from gurobipy import GRB
-from joblib import Parallel, delayed
-from tqdm.auto import tqdm
 
+# Worker script called by each PBS job
+WORKER_SCRIPT = 'luto/tests/check_one_constraint.py'
 
 DEFAULT_MPS = (
-    "F:/Users/jinzhu/Documents/luto-2.0/output"
-    "/2026_03_12__10_32_41_RF10_2010-2050/debug_model_2040_2050.mps"
+    "/g/data/jk53/jinzhu/LUTO/luto-2.0/output/"
+    "2026_03_12__22_50_37_RF5_2010-2050/debug_model_2010_2015.mps"
 )
 
 
-def find_infeasible_ecnes(mps_path: str = DEFAULT_MPS, workers: int = 16):
+def submit_ecnes_checks(
+    mps_path: str = DEFAULT_MPS,
+    work_dir: str | None = None,
+    queue: str = "normalsr",
+    ncpus: int = 16,
+    mem: str = "64GB",
+    walltime: str = "02:00:00",
+    project: str = "jk53",
+    max_concurrent: int = 200,
+):
     """
+    Extract ECNES constraints, create a base model, and submit one PBS job
+    per constraint.
+
+    Args:
+        mps_path: Path to the saved MPS model file.
+        work_dir: Directory for intermediate files and results. Defaults to
+                  a subdirectory next to the MPS file.
+        queue: PBS queue name.
+        ncpus: CPUs per PBS job.
+        mem: Memory per PBS job.
+        walltime: Wall time per PBS job.
+        project: NCI project code for storage and accounting.
+        max_concurrent: Maximum number of concurrent PBS jobs.
+
     Returns:
-        base_model: Gurobi model with all ECNES constraints removed
-        results: list of dicts with keys: name, target, max_lhs, gap, ratio, feasible, n_vars
+        work_dir: Path to the working directory (needed for collect_results).
     """
     # ── Load model ──
     print(f"Loading model from: {mps_path}")
     model = gp.read(mps_path)
     print(f"Model: {model.NumVars} variables, {model.NumConstrs} constraints\n")
 
-    # ── Extract all ECNES constraint info before removing them ──
+    # ── Extract all ECNES constraint info ──
     ecnes_info = []
     for c in model.getConstrs():
         if "GBF4_ECNES" not in c.ConstrName:
@@ -70,7 +102,7 @@ def find_infeasible_ecnes(mps_path: str = DEFAULT_MPS, workers: int = 16):
     print(f"Found {len(ecnes_info)} ECNES constraints\n")
     if not ecnes_info:
         print("No ECNES constraints found.")
-        return model, []
+        return None
 
     # ── Create base model: remove ALL ECNES constraints ──
     print("Removing all ECNES constraints to create base model...")
@@ -80,81 +112,157 @@ def find_infeasible_ecnes(mps_path: str = DEFAULT_MPS, workers: int = 16):
         base_model.remove(c)
     base_model.update()
 
-    # Verify base model feasibility
-    print("Checking base model feasibility...")
-    base_model.setParam("OutputFlag", 0)
-    base_model.optimize()
+    # # Verify base model feasibility
+    # print("Checking base model feasibility...")
+    # base_model.setParam("OutputFlag", 0)
+    # base_model.optimize()
 
-    if base_model.Status == GRB.INFEASIBLE:
-        print("ERROR: Base model (without ANY ECNES) is INFEASIBLE!")
-        print("The infeasibility comes from other constraints (demand, GHG, water, etc.)")
-        return base_model, []
+    # if base_model.Status == GRB.INFEASIBLE:
+    #     print("ERROR: Base model (without ANY ECNES) is INFEASIBLE!")
+    #     print("The infeasibility comes from other constraints (demand, GHG, water, etc.)")
+    #     return None
 
-    print(f"Base model feasible (status={base_model.Status})\n")
+    # print(f"Base model feasible (status={base_model.Status})\n")
 
-    # ── Save base model to temp file for parallel workers ──
-    fd, model_file = tempfile.mkstemp(suffix=".mps")
-    os.close(fd)
-    base_model.write(model_file)
+    # ── Set up working directory ──
+    if work_dir is None:
+        work_dir = os.path.join(os.path.dirname(mps_path), "ecnes_checks")
+    os.makedirs(work_dir, exist_ok=True)
+    results_dir = os.path.join(work_dir, "results")
+    os.makedirs(results_dir, exist_ok=True)
+    logs_dir = os.path.join(work_dir, "logs")
+    os.makedirs(logs_dir, exist_ok=True)
 
-    def _check_one(info):
-        """Check one ECNES constraint in a separate process."""
-        import gurobipy as _gp
-        from gurobipy import GRB as _GRB
+    # Save base model
+    base_model_path = os.path.join(work_dir, "base_model.mps")
+    print(f"Saving base model to: {base_model_path}")
+    base_model.write(base_model_path)
 
-        rhs = info['rhs']
-        if rhs <= 0:
-            return dict(
-                constr_name=info['constr_name'], target=rhs, max_lhs=0,
-                gap=-rhs, ratio=float('inf'), feasible=True,
-                n_vars=len(info['terms']), marker="SKIP_RHS<=0",
-            )
+    # Save constraint info
+    constraints_path = os.path.join(work_dir, "ecnes_constraints.pkl")
+    with open(constraints_path, "wb") as f:
+        pickle.dump(ecnes_info, f)
 
-        test_model = _gp.read(model_file)
-        test_model.setParam("OutputFlag", 0)
+    # ── Submit one PBS job per constraint ──
+    print(f"Submitting {len(ecnes_info)} PBS jobs (queue={queue}, ncpus={ncpus}, mem={mem})...")
+    job_ids = []
 
-        obj = _gp.quicksum(
-            coeff * test_model.getVarByName(var_name)
-            for var_name, coeff in info['terms']
-            if test_model.getVarByName(var_name) is not None
+    for idx, info in tqdm(enumerate(ecnes_info), total=len(ecnes_info), desc="Submitting PBS jobs"):
+        # Save individual constraint info
+        task_path = os.path.join(work_dir, f"task_{idx:04d}.pkl")
+        with open(task_path, "wb") as f:
+            pickle.dump(info, f)
+
+        result_path = os.path.join(results_dir, f"result_{idx:04d}.json")
+
+        # Generate the PBS script
+        pbs_script = (
+            f"#!/bin/bash\n"
+            f"#PBS -N ecnes_{idx:04d}\n"
+            f"#PBS -q {queue}\n"
+            f"#PBS -l storage=scratch/{project}+gdata/{project}\n"
+            f"#PBS -l ncpus={ncpus}\n"
+            f"#PBS -l mem={mem}\n"
+            f"#PBS -l jobfs=10GB\n"
+            f"#PBS -l walltime={walltime}\n"
+            f"#PBS -o {logs_dir}/ecnes_{idx:04d}.out\n"
+            f"#PBS -e {logs_dir}/ecnes_{idx:04d}.err\n"
+            f"\n"
+            f"source ~/.bashrc\n"
+            f"conda activate luto\n"
+            f"\n"
+            f"python {WORKER_SCRIPT} \\\n"
+            f"    {task_path} \\\n"
+            f"    {base_model_path} \\\n"
+            f"    {result_path}\n"
         )
-        test_model.setObjective(obj, _GRB.MAXIMIZE)
-        test_model.optimize()
 
-        status = test_model.Status
-        if status in (_GRB.OPTIMAL, _GRB.SUBOPTIMAL):
-            max_lhs = test_model.ObjVal
-            gap = rhs - max_lhs
-            ratio = max_lhs / rhs if rhs != 0 else float('inf')
-            is_feasible = max_lhs >= rhs - 1e-6
-            marker = "OK" if is_feasible else "INFEASIBLE"
-        elif status == _GRB.INFEASIBLE:
-            max_lhs, gap, ratio, is_feasible = float('-inf'), float('inf'), 0, False
-            marker = "MODEL_INFEAS"
+        pbs_path = os.path.join(work_dir, f"job_{idx:04d}.sh")
+        with open(pbs_path, "w") as f:
+            f.write(pbs_script)
+
+        # Throttle concurrent jobs
+        while True:
+            try:
+                running = subprocess.run(
+                    "qselect | wc -l", shell=True,
+                    capture_output=True, text=True, timeout=30,
+                )
+                n_running = int(running.stdout.strip())
+                if n_running < max_concurrent:
+                    break
+                print(f"  Waiting: {n_running}/{max_concurrent} jobs running...")
+                time.sleep(10)
+            except Exception:
+                break
+
+        # Submit the job
+        result = subprocess.run(
+            ["qsub", pbs_path],
+            capture_output=True, text=True,
+        )
+        job_id = result.stdout.strip()
+        job_ids.append(job_id)
+
+    # Save job IDs for tracking
+    with open(os.path.join(work_dir, "job_ids.txt"), "w") as f:
+        f.write("\n".join(job_ids))
+
+    print(f"\nAll {len(ecnes_info)} jobs submitted.")
+    print(f"Working directory: {work_dir}")
+    print(f"\nMonitor with:  qstat -u $USER")
+    print(f"Collect with:  from luto.tests.find_infeasible_ecnes import collect_results")
+    print(f"               collect_results('{work_dir}')")
+
+    return work_dir
+
+
+def collect_results(work_dir: str):
+    """
+    Collect results from completed PBS jobs and print summary.
+
+    Args:
+        work_dir: Path returned by submit_ecnes_checks().
+
+    Returns:
+        results: list of dicts with keys: constr_name, target, max_lhs, gap, ratio, feasible, n_vars, marker
+    """
+    results_dir = os.path.join(work_dir, "results")
+
+    # Load original constraint info for the total count
+    with open(os.path.join(work_dir, "ecnes_constraints.pkl"), "rb") as f:
+        ecnes_info = pickle.load(f)
+    n_total = len(ecnes_info)
+
+    # Collect available results
+    results = []
+    missing = []
+    for idx in range(n_total):
+        result_path = os.path.join(results_dir, f"result_{idx:04d}.json")
+        if os.path.exists(result_path):
+            with open(result_path) as f:
+                results.append(json.load(f))
         else:
-            max_lhs, gap, ratio, is_feasible = None, None, None, None
-            marker = f"STATUS={status}"
+            missing.append(idx)
 
-        del test_model
-        return dict(
-            constr_name=info['constr_name'], target=rhs, max_lhs=max_lhs,
-            gap=gap, ratio=ratio, feasible=is_feasible,
-            n_vars=len(info['terms']), marker=marker,
-        )
+    print(f"Collected {len(results)}/{n_total} results")
+    if missing:
+        print(f"Missing results for {len(missing)} constraints (indices: {missing[:20]}{'...' if len(missing) > 20 else ''})")
+        print("Check logs in:", os.path.join(work_dir, "logs"))
+        print()
 
-    # ── Test each ECNES constraint in parallel ──
-    print(f"Testing {len(ecnes_info)} constraints in parallel (n_jobs={workers})...")
-    gen = Parallel(n_jobs=workers, return_as='generator')(
-        delayed(_check_one)(info) for info in ecnes_info
-    )
-    results = list(tqdm(gen, total=len(ecnes_info), desc="Checking ECNES"))
+    if not results:
+        return results
 
-    os.remove(model_file)
-
+    # Print individual results
     for i, r in enumerate(results):
-        print(f"[{i+1}/{len(ecnes_info)}] {r['marker']:12s} | "
-              f"max={r['max_lhs']:12.4f} target={r['target']:12.4f} gap={r['gap']:12.4f} "
-              f"({r['ratio']:.1%}) | {r['constr_name']}")
+        max_lhs = r['max_lhs'] if r['max_lhs'] is not None else float('nan')
+        target = r['target'] if r['target'] is not None else float('nan')
+        gap = r['gap'] if r['gap'] is not None else float('nan')
+        ratio = r['ratio'] if r['ratio'] is not None else float('nan')
+        print(f"[{i+1}/{len(results)}] {r['marker']:12s} | "
+              f"max={max_lhs:12.4f} target={target:12.4f} gap={gap:12.4f} "
+              f"({ratio:.1%}) | {r['constr_name']}")
 
     # ── Summary ──
     infeasible = [r for r in results if r['feasible'] is False]
@@ -162,7 +270,7 @@ def find_infeasible_ecnes(mps_path: str = DEFAULT_MPS, workers: int = 16):
 
     print(f"\n{'='*80}")
     print(f"SUMMARY: {len(infeasible)} infeasible, {len(feasible)} feasible "
-          f"out of {len(ecnes_info)} ECNES constraints")
+          f"out of {len(results)} completed checks ({n_total} total)")
     print(f"{'='*80}")
 
     if infeasible:
@@ -184,4 +292,4 @@ def find_infeasible_ecnes(mps_path: str = DEFAULT_MPS, workers: int = 16):
         if len(feasible) > 10:
             print(f"  ... and {len(feasible) - 10} more feasible constraints")
 
-    return base_model, results
+    return results
