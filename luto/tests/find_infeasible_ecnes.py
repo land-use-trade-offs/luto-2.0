@@ -44,8 +44,8 @@ from tqdm.auto import tqdm
 import gurobipy as gp
 from gurobipy import GRB
 
-# Worker script called by each PBS job
-WORKER_SCRIPT = 'luto/tests/check_one_constraint.py'
+# Worker script called by each PBS job (absolute path)
+WORKER_SCRIPT = os.path.join(os.path.dirname(__file__), 'check_one_constraint.py')
 
 DEFAULT_MPS = (
     "/g/data/jk53/jinzhu/LUTO/luto-2.0/output/"
