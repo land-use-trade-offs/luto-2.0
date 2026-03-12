@@ -122,12 +122,10 @@ def get_map2json(
     save_path:str, 
     ) -> None:
     
-    # Determine number of workers based on max memory setting
-    #    Each worker loads the 2D template + reprojects + creates RGBA,
-    #    memory per worker scales as ~0.5 GB * (13/RESFACTOR)^2
-    mem_per_worker = 0.5 * (13 / settings.RESFACTOR) ** 2
-    workers = int(settings.WRITE_REPORT_MAX_MEM_GB // mem_per_worker)
-    workers = max(4, min(workers, 16))
+    # Determine number of workers from memory budget.
+    ncells = 5_000_000 // (settings.RESFACTOR ** 2)    # Number of cells in the original 100m grid, which determines the size of each layer array
+    mem_per_worker = 1000 * ncells * 4 / 1e9           # ~100 layers × ncells × float32, in GB
+    workers = min(60, max(1, int(settings.WRITE_REPORT_MAX_MEM_GB // mem_per_worker)))
     
     # Process one file at a time so only one file's arrays are in memory at once
     output = {}
@@ -137,44 +135,50 @@ def get_map2json(
         ds_template = f'{os.path.dirname(row['path'])}/xr_map_template_{row['Year']}.nc'
         valid_layers = xr_arr['layer'].to_index().to_frame().to_dict(orient='records')
 
-        tasks = []
-        for sel in valid_layers:
+        # Build tasks in batches to avoid OOM when there are many layers
+        # (e.g. GBF4 ECNES: 92 communities × 30 land-use combos = ~2700 layers).
+        # Each batch creates only `workers` cell-array copies at a time.
+        for batch_start in range(0, len(valid_layers), workers):
+            batch_layers = valid_layers[batch_start : batch_start + workers]
+            tasks = []
 
-            # Select the array for this layer; .copy() detaches from the parent
-            # so joblib only serializes the small slice, not the full dataset
-            arr_sel = xr_arr.sel(**sel).copy()
-            sel_rename = rename_reorder_hierarchy(sel)
-            hierarchy_tp = tuple(list(sel_rename.values()) + [row['Year']])
+            for sel in batch_layers:
 
-            # Determine if this layer should use integer legend
-            if legend_int_level is None:
-                isInt = False
-            elif isinstance(legend_int_level, dict):
-                isInt = legend_int_level.items() <= sel.items()
-            elif isinstance(legend_int_level, str):
-                isInt = legend_int_level in sel.keys()
-            else:
-                raise ValueError('legend_int_level must be None, a dict, or a str')
+                # Select the array for this layer; .copy() detaches from the parent
+                # so joblib only serializes the small slice, not the full dataset
+                arr_sel = xr_arr.sel(**sel).copy()
+                sel_rename = rename_reorder_hierarchy(sel)
+                hierarchy_tp = tuple(list(sel_rename.values()) + [row['Year']])
 
-            # Set legend and metadata based on type
-            if isInt:
-                legend = legend_int
-                layer_magnitude = None
-            elif isinstance(float_magnitude, dict):
-                legend = legend_float
-                layer_magnitude = float_magnitude[sel['Commodity']]
-            elif isinstance(float_magnitude, tuple):
-                legend = legend_float
-                layer_magnitude = float_magnitude
+                # Determine if this layer should use integer legend
+                if legend_int_level is None:
+                    isInt = False
+                elif isinstance(legend_int_level, dict):
+                    isInt = legend_int_level.items() <= sel.items()
+                elif isinstance(legend_int_level, str):
+                    isInt = legend_int_level in sel.keys()
+                else:
+                    raise ValueError('legend_int_level must be None, a dict, or a str')
 
-            tasks.append(
-                delayed(map2base64)(ds_template, arr_sel, isInt, legend, hierarchy_tp, layer_magnitude)
-            )
+                # Set legend and metadata based on type
+                if isInt:
+                    legend = legend_int
+                    layer_magnitude = None
+                elif isinstance(float_magnitude, dict):
+                    legend = legend_float
+                    layer_magnitude = float_magnitude[sel['Commodity']]
+                elif isinstance(float_magnitude, tuple):
+                    legend = legend_float
+                    layer_magnitude = float_magnitude
 
-        # Run workers for this file, then release its memory before the next file
-        for res in Parallel(n_jobs=workers, return_as='generator', max_nbytes=None)(tasks):
-            hierarchy_tp, val_dict = res
-            output[hierarchy_tp] = val_dict
+                tasks.append(
+                    delayed(map2base64)(ds_template, arr_sel, isInt, legend, hierarchy_tp, layer_magnitude)
+                )
+
+            # Run this batch, then release its arrays before building the next batch
+            for res in Parallel(n_jobs=workers, return_as='generator', max_nbytes=None)(tasks):
+                hierarchy_tp, val_dict = res
+                output[hierarchy_tp] = val_dict
 
         xr_arr.close()
         
@@ -601,3 +605,6 @@ def save_report_layer(raw_data_dir:str):
     water_nonag = files_water.query('base_name == "xr_water_yield_non_ag"')
     get_map2json(water_nonag, None, None, legend_float, water_min_max, f'{SAVE_DIR}/map_layers/map_water_yield_NonAg.js')
     print('│   └── Water Yield Non-Ag layer saved.')
+    
+    
+    
