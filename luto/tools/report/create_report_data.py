@@ -545,9 +545,6 @@ def process_economics_data(files, SAVE_DIR):
     df_wide.columns = ['region', 'name', 'Rev_Cost', 'data']
     df_wide['type'] = 'column'
     df_wide['color'] = df_wide.apply(lambda x: COLORS[x['name']], axis=1)
-    df_wide['id'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Revenue' else None, axis=1)
-    df_wide['linkedTo'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Cost' else None, axis=1)
-    df_wide.loc[df_wide['name'] == 'Early dry-season savanna burning', 'linkedTo'] = None
 
     out_dict = {}
     for region, df in df_wide.groupby('region'):
@@ -580,20 +577,35 @@ def process_economics_data(files, SAVE_DIR):
     df_wide['color'] = df_wide.apply(lambda x: COLORS[x['name']], axis=1)
     df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
     df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
-    df_wide['id'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Revenue' else None, axis=1)
-    df_wide['linkedTo'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Cost' else None, axis=1)
-    df_wide.loc[df_wide['name'].isin([
-        'Environmental plantings (mixed species)',
-        'Riparian buffer restoration (mixed species)',
-        'Carbon plantings (monoculture)',
-        'Destocked - natural land'
-        ]), 'linkedTo'] = None
-
 
     out_dict = {}
-    for region, df in df_wide.groupby('region'):
-        df = df.drop(['region','Rev_Cost'], axis=1)
-        out_dict[region] = df.to_dict(orient='records')
+    for (region, rev_cost), df in df_wide.groupby(['region', 'Rev_Cost']):
+        df = df.drop(['region', 'Rev_Cost'], axis=1)
+        if region not in out_dict:
+            out_dict[region] = {}
+        out_dict[region][rev_cost] = df.to_dict(orient='records')
+
+    # Add Profit from pre-computed profit CSVs
+    profit_na_files = files.query('base_name == "economics_non_ag_profit"').reset_index(drop=True)
+    profit_na_df = pd.concat([df for p in profit_na_files['path'] if not (df := pd.read_csv(p)).empty], ignore_index=True)
+    profit_na_df = profit_na_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False)
+    profit_na_df = profit_na_df.query('`Land-use` != "ALL"').round({'Value ($)': 2})
+
+    df_profit = profit_na_df\
+        .groupby(['region', 'Land-use'])[['Year', 'Value ($)']]\
+        .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
+        .reset_index()
+    df_profit.columns = ['region', 'name', 'data']
+    df_profit['type'] = 'column'
+    df_profit['color'] = df_profit['name'].apply(lambda x: COLORS[x])
+    df_profit['name_order'] = df_profit['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+    df_profit = df_profit.sort_values('name_order').drop(columns=['name_order'])
+
+    for region, df in df_profit.groupby('region'):
+        df = df.drop(['region'], axis=1)
+        if region not in out_dict:
+            out_dict[region] = {}
+        out_dict[region]['Profit'] = df.to_dict(orient='records')
 
     filename = f'Economics_overview_Non_Ag'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
@@ -604,94 +616,188 @@ def process_economics_data(files, SAVE_DIR):
 
 
 
-    # -------------------- Economics for ag --------------------
-    revenue_ag_df = revenue_ag_df.assign(Rev_Cost='Revenue')
-    cost_ag_df = cost_ag_df.assign(Rev_Cost='Cost')
+    # -------------------- Economics for ag (separate files per MapType) --------------------
 
-    economics_ag = pd.concat([revenue_ag_df, cost_ag_df]
-        ).query('`Land-use` != "ALL"'
-        ).round({'Value ($)': 2}
-        ).query('abs(`Value ($)`) > 1'
-        ).reset_index(drop=True)
+    def write_chart_js(out_dict, filename):
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
 
-    df_wide = economics_ag\
-        .groupby(['region', 'Type', 'Water_supply', 'Rev_Cost', 'Land-use'])[['Year','Value ($)']]\
+    # Ag Revenue: region → Type(source) → Water → [series by LU]
+    ag_rev = revenue_ag_df.query('`Land-use` != "ALL"').round({'Value ($)': 2}).query('abs(`Value ($)`) > 1')
+    df_wide = ag_rev\
+        .groupby(['region', 'Type', 'Water_supply', 'Land-use'])[['Year','Value ($)']]\
         .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
-        .reset_index()\
-        .round({'Value ($)': 2})
-
-    df_wide.columns = ['region', '_type', 'water', 'Rev_Cost', 'name', 'data']
+        .reset_index()
+    df_wide.columns = ['region', '_type', 'water', 'name', 'data']
     df_wide['type'] = 'column'
-    df_wide['color'] = df_wide.apply(lambda x: COLORS[x['name']], axis=1)
+    df_wide['color'] = df_wide['name'].apply(lambda x: COLORS[x])
     df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
     df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
-    df_wide['id'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Revenue' else None, axis=1)
-    df_wide['linkedTo'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Cost' else None, axis=1)
-
 
     out_dict = {}
     for (region, _type, water), df in df_wide.groupby(['region', '_type', 'water']):
-        df = df.drop(['region', '_type', 'water', 'Rev_Cost'], axis=1)
-        if region not in out_dict:
-            out_dict[region] = {}
-        if _type not in out_dict[region]:
-            out_dict[region][_type] = {}
-        if water not in out_dict[region][_type]:
-            out_dict[region][_type][water] = {}
-        out_dict[region][_type][water] = df.to_dict(orient='records')
+        df = df.drop(['region', '_type', 'water'], axis=1)
+        out_dict.setdefault(region, {}).setdefault(_type, {})[water] = df.to_dict(orient='records')
+    write_chart_js(out_dict, 'Economics_Ag_revenue')
 
-    filename = 'Economics_Ag'
-    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-        f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
-        f.write(';\n')
-
-
-
-    # -------------------- Economics for ag-management --------------------
-    revenue_am_df = revenue_am_df.assign(Rev_Cost='Revenue')
-    cost_am_df = cost_am_df.assign(Rev_Cost='Cost')
-
-    economics_am = pd.concat([revenue_am_df, cost_am_df]
-        ).query('`Land-use` != "ALL"'
-        ).round({'Value ($)': 2}
-        ).query('abs(`Value ($)`) > 1'
-        ).reset_index(drop=True)
-
-    df_wide = economics_am\
-        .groupby(['region', 'Water_supply', 'Land-use', 'Rev_Cost', 'Management Type'])[['Year', 'Value ($)']]\
+    # Ag Cost: region → Type(source) → Water → [series by LU]
+    ag_cost = cost_ag_df.query('`Land-use` != "ALL"').round({'Value ($)': 2}).query('abs(`Value ($)`) > 1')
+    df_wide = ag_cost\
+        .groupby(['region', 'Type', 'Water_supply', 'Land-use'])[['Year','Value ($)']]\
         .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
-        .reset_index()\
-        .round({'Value ($)': 2})
-
-    df_wide.columns = ['region', 'water', 'landuse', 'Rev_Cost', 'name', 'data']
+        .reset_index()
+    df_wide.columns = ['region', '_type', 'water', 'name', 'data']
     df_wide['type'] = 'column'
     df_wide['color'] = df_wide['name'].apply(lambda x: COLORS[x])
-    df_wide['id'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Revenue' else None, axis=1)
-    df_wide['linkedTo'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Cost' else None, axis=1)
-    df_wide.loc[df_wide['name'] == 'Early dry-season savanna burning', 'linkedTo'] = None
+    df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
 
     out_dict = {}
-    for (region, water, landuse, Rev_Cost), df in df_wide.groupby(['region', 'water', 'landuse', 'Rev_Cost']):
-        df = df.drop(['region', 'water', 'landuse', 'Rev_Cost'], axis=1)
-        if region not in out_dict:
-            out_dict[region] = {}
-        if water not in out_dict[region]:
-            out_dict[region][water] = {}
-        if landuse not in out_dict[region][water]:
-            out_dict[region][water][landuse] = {}
-        out_dict[region][water][landuse][Rev_Cost] = df.to_dict(orient='records')
+    for (region, _type, water), df in df_wide.groupby(['region', '_type', 'water']):
+        df = df.drop(['region', '_type', 'water'], axis=1)
+        out_dict.setdefault(region, {}).setdefault(_type, {})[water] = df.to_dict(orient='records')
+    write_chart_js(out_dict, 'Economics_Ag_cost')
 
-    filename = f'Economics_Am'
-    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-        f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
-        f.write(';\n')
+    # Ag Profit: region → Water → [series by LU]
+    profit_ag_files = files.query('base_name == "economics_ag_profit"').reset_index(drop=True)
+    profit_ag_df = pd.concat([pd.read_csv(p) for p in profit_ag_files['path']], ignore_index=True)
+    profit_ag_df = profit_ag_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False)
+    profit_ag_df = profit_ag_df.query('`Land-use` != "ALL"').round({'Value ($)': 2})
+
+    df_profit = profit_ag_df\
+        .groupby(['region', 'Water_supply', 'Land-use'])[['Year', 'Value ($)']]\
+        .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
+        .reset_index()
+    df_profit.columns = ['region', 'water', 'name', 'data']
+    df_profit['type'] = 'column'
+    df_profit['color'] = df_profit['name'].apply(lambda x: COLORS[x])
+    df_profit['name_order'] = df_profit['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+    df_profit = df_profit.sort_values('name_order').drop(columns=['name_order'])
+
+    out_dict = {}
+    for (region, water), df in df_profit.groupby(['region', 'water']):
+        df = df.drop(['region', 'water'], axis=1)
+        out_dict.setdefault(region, {})[water] = df.to_dict(orient='records')
+    write_chart_js(out_dict, 'Economics_Ag_profit')
 
 
-    # -------------------- Economics for non-agriculture --------------------
 
-    # This is the same as the "Economics_overview_Non_Ag"
+    # -------------------- Economics for ag-management (separate files per MapType) --------------------
+
+    # Am Revenue: region → Water → LU → [series by mgmt]
+    am_rev = revenue_am_df.query('`Land-use` != "ALL"').round({'Value ($)': 2}).query('abs(`Value ($)`) > 1')
+    df_wide = am_rev\
+        .groupby(['region', 'Water_supply', 'Land-use', 'Management Type'])[['Year', 'Value ($)']]\
+        .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
+        .reset_index()
+    df_wide.columns = ['region', 'water', 'landuse', 'name', 'data']
+    df_wide['type'] = 'column'
+    df_wide['color'] = df_wide['name'].apply(lambda x: COLORS[x])
+
+    out_dict = {}
+    for (region, water, landuse), df in df_wide.groupby(['region', 'water', 'landuse']):
+        df = df.drop(['region', 'water', 'landuse'], axis=1)
+        out_dict.setdefault(region, {}).setdefault(water, {})[landuse] = df.to_dict(orient='records')
+    write_chart_js(out_dict, 'Economics_Am_revenue')
+
+    # Am Cost: region → Water → LU → [series by mgmt]
+    am_cost = cost_am_df.query('`Land-use` != "ALL"').round({'Value ($)': 2}).query('abs(`Value ($)`) > 1')
+    df_wide = am_cost\
+        .groupby(['region', 'Water_supply', 'Land-use', 'Management Type'])[['Year', 'Value ($)']]\
+        .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
+        .reset_index()
+    df_wide.columns = ['region', 'water', 'landuse', 'name', 'data']
+    df_wide['type'] = 'column'
+    df_wide['color'] = df_wide['name'].apply(lambda x: COLORS[x])
+
+    out_dict = {}
+    for (region, water, landuse), df in df_wide.groupby(['region', 'water', 'landuse']):
+        df = df.drop(['region', 'water', 'landuse'], axis=1)
+        out_dict.setdefault(region, {}).setdefault(water, {})[landuse] = df.to_dict(orient='records')
+    write_chart_js(out_dict, 'Economics_Am_cost')
+
+    # Am Profit: region → Water → LU → [series by mgmt]
+    profit_am_files = files.query('base_name == "economics_am_profit"').reset_index(drop=True)
+    profit_am_df = pd.concat([df for p in profit_am_files['path'] if not (df := pd.read_csv(p)).empty], ignore_index=True)
+    profit_am_df = profit_am_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False)
+    profit_am_df = profit_am_df.query('`Land-use` != "ALL" and `Management Type` != "ALL"').round({'Value ($)': 2})
+
+    df_profit = profit_am_df\
+        .groupby(['region', 'Water_supply', 'Land-use', 'Management Type'])[['Year', 'Value ($)']]\
+        .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
+        .reset_index()
+    df_profit.columns = ['region', 'water', 'landuse', 'name', 'data']
+    df_profit['type'] = 'column'
+    df_profit['color'] = df_profit['name'].apply(lambda x: COLORS[x])
+
+    out_dict = {}
+    for (region, water, landuse), df in df_profit.groupby(['region', 'water', 'landuse']):
+        df = df.drop(['region', 'water', 'landuse'], axis=1)
+        out_dict.setdefault(region, {}).setdefault(water, {})[landuse] = df.to_dict(orient='records')
+    write_chart_js(out_dict, 'Economics_Am_profit')
+
+
+    # -------------------- Economics for non-ag (separate files per MapType) --------------------
+
+    # NonAg Revenue: region → [series by LU]
+    na_rev = revenue_non_ag_df.query('`Land-use` != "ALL" and abs(`Value ($)`) > 1').round({'Value ($)': 2})
+    df_wide = na_rev\
+        .groupby(['region', 'Land-use'])[['Year', 'Value ($)']]\
+        .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
+        .reset_index()
+    df_wide.columns = ['region', 'name', 'data']
+    df_wide['type'] = 'column'
+    df_wide['color'] = df_wide['name'].apply(lambda x: COLORS[x])
+    df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+
+    out_dict = {}
+    for region, df in df_wide.groupby('region'):
+        df = df.drop('region', axis=1)
+        out_dict[region] = df.to_dict(orient='records')
+    write_chart_js(out_dict, 'Economics_NonAg_revenue')
+
+    # NonAg Cost: region → [series by LU]
+    na_cost = cost_non_ag_df.query('`Land-use` != "ALL" and abs(`Value ($)`) > 1').round({'Value ($)': 2})
+    df_wide = na_cost\
+        .groupby(['region', 'Land-use'])[['Year', 'Value ($)']]\
+        .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
+        .reset_index()
+    df_wide.columns = ['region', 'name', 'data']
+    df_wide['type'] = 'column'
+    df_wide['color'] = df_wide['name'].apply(lambda x: COLORS[x])
+    df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+
+    out_dict = {}
+    for region, df in df_wide.groupby('region'):
+        df = df.drop('region', axis=1)
+        out_dict[region] = df.to_dict(orient='records')
+    write_chart_js(out_dict, 'Economics_NonAg_cost')
+
+    # NonAg Profit: region → [series by LU]
+    profit_na_files = files.query('base_name == "economics_non_ag_profit"').reset_index(drop=True)
+    profit_na_df = pd.concat([df for p in profit_na_files['path'] if not (df := pd.read_csv(p)).empty], ignore_index=True)
+    profit_na_df = profit_na_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False)
+    profit_na_df = profit_na_df.query('`Land-use` != "ALL"').round({'Value ($)': 2})
+
+    df_profit = profit_na_df\
+        .groupby(['region', 'Land-use'])[['Year', 'Value ($)']]\
+        .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
+        .reset_index()
+    df_profit.columns = ['region', 'name', 'data']
+    df_profit['type'] = 'column'
+    df_profit['color'] = df_profit['name'].apply(lambda x: COLORS[x])
+    df_profit['name_order'] = df_profit['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+    df_profit = df_profit.sort_values('name_order').drop(columns=['name_order'])
+
+    out_dict = {}
+    for region, df in df_profit.groupby('region'):
+        df = df.drop('region', axis=1)
+        out_dict[region] = df.to_dict(orient='records')
+    write_chart_js(out_dict, 'Economics_NonAg_profit')
 
 
     # -------------------- Economics Sum (Ag + Am + NonAg profit) --------------------
