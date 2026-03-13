@@ -87,22 +87,47 @@ window.EconomicsView = {
     const selectChartData = computed(() => {
       if (!dataLoaded.value) return {};
       const cat = selectCategory.value;
-      const chartData = window[chartRegister[cat]?.name]?.[selectRegion.value];
+      const mt = selectMapType.value;
+      // For Sum, mapType is always "Profit"; for transitions, use Profit data
+      const effectiveMt = cat === "Sum" ? "Profit"
+        : (mt === "Transition (Ag2Ag)" || mt === "Transition (Ag2NonAg)") ? "Profit"
+        : mt;
+      const chartEntry = chartRegister[cat]?.[effectiveMt];
+      if (!chartEntry) return {};
+      const chartData = window[chartEntry.name]?.[selectRegion.value];
+      if (!chartData) return {};
+
       let seriesData;
       if (cat === "Sum") {
-        // Sum chart: region → water → [series by landuse]
-        const waterData = chartData?.[selectWater.value];
-        if (waterData) {
-          if (selectLanduse.value === "ALL" || !selectLanduse.value) {
-            seriesData = waterData;
-          } else {
-            seriesData = waterData.filter(s => s.name === selectLanduse.value);
-          }
+        // Sum: region → water → [series by landuse]
+        const items = chartData?.[selectWater.value];
+        if (items) {
+          seriesData = (selectLanduse.value === "ALL" || !selectLanduse.value)
+            ? items : items.filter(s => s.name === selectLanduse.value);
         }
-      } else if (cat === "Ag" || cat === "Ag Mgt") {
-        seriesData = chartData?.["ALL"]?.["ALL"];
+      } else if (cat === "Ag") {
+        // Revenue/Cost: region → source → water → [series by LU]
+        // Profit: region → water → [series by LU]
+        let items;
+        if (hasSourceLevel.value) {
+          items = chartData?.[selectSource.value || "ALL"]?.[selectWater.value];
+        } else {
+          items = chartData?.[selectWater.value];
+        }
+        if (items && items.length) {
+          seriesData = (selectLanduse.value === "ALL" || !selectLanduse.value)
+            ? items : items.filter(s => s.name === selectLanduse.value);
+        }
+      } else if (cat === "Ag Mgt") {
+        // All: region → water → landuse → [series by mgmt]
+        seriesData = chartData?.[selectWater.value]?.[selectLanduse.value];
       } else if (cat === "Non-Ag") {
-        seriesData = chartData;
+        // All: region → [series by landuse]
+        if (selectLanduse.value && selectLanduse.value !== "ALL") {
+          seriesData = chartData?.filter(s => s.name === selectLanduse.value);
+        } else {
+          seriesData = chartData;
+        }
       }
       return {
         ...window["Chart_default_options"],
@@ -228,11 +253,13 @@ window.EconomicsView = {
           await loadScript(entry.path, entry.name, VIEW_NAME);
         }
       }
-      // Load chart data
-      await loadScript(chartRegister["Sum"]["path"],    chartRegister["Sum"]["name"],    VIEW_NAME);
-      await loadScript(chartRegister["Ag"]["path"],     chartRegister["Ag"]["name"],     VIEW_NAME);
-      await loadScript(chartRegister["Ag Mgt"]["path"], chartRegister["Ag Mgt"]["name"], VIEW_NAME);
-      await loadScript(chartRegister["Non-Ag"]["path"], chartRegister["Non-Ag"]["name"], VIEW_NAME);
+      // Load chart data (per-MapType files)
+      for (const [cat, mapTypes] of Object.entries(chartRegister)) {
+        if (cat === "overview" || cat === "ranking") continue;
+        for (const entry of Object.values(mapTypes)) {
+          await loadScript(entry.path, entry.name, VIEW_NAME);
+        }
+      }
 
       availableYears.value = window.Supporting_info.years;
       selectYear.value = availableYears.value[0] || 2020;

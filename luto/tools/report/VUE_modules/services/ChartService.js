@@ -304,20 +304,22 @@ window.ChartService = {
     },
     "Economics": {
       "Sum": {
-        "path": "data/Economics_Sum.js",
-        "name": "Economics_Sum",
+        "Profit": { "path": "data/Economics_Sum.js", "name": "Economics_Sum" },
       },
       "Ag": {
-        "path": "data/Economics_Ag.js",
-        "name": "Economics_Ag",
+        "Profit":  { "path": "data/Economics_Ag_profit.js",  "name": "Economics_Ag_profit" },
+        "Revenue": { "path": "data/Economics_Ag_revenue.js", "name": "Economics_Ag_revenue" },
+        "Cost":    { "path": "data/Economics_Ag_cost.js",    "name": "Economics_Ag_cost" },
       },
       "Ag Mgt": {
-        "path": "data/Economics_Am.js",
-        "name": "Economics_Am",
+        "Profit":  { "path": "data/Economics_Am_profit.js",  "name": "Economics_Am_profit" },
+        "Revenue": { "path": "data/Economics_Am_revenue.js", "name": "Economics_Am_revenue" },
+        "Cost":    { "path": "data/Economics_Am_cost.js",    "name": "Economics_Am_cost" },
       },
       "Non-Ag": {
-        "path": "data/Economics_overview_Non_Ag.js",
-        "name": "Economics_overview_Non_Ag",
+        "Profit":  { "path": "data/Economics_NonAg_profit.js",  "name": "Economics_NonAg_profit" },
+        "Revenue": { "path": "data/Economics_NonAg_revenue.js", "name": "Economics_NonAg_revenue" },
+        "Cost":    { "path": "data/Economics_NonAg_cost.js",    "name": "Economics_NonAg_cost" },
       },
       "overview": {
         "Ag": {
