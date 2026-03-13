@@ -757,8 +757,12 @@ class LutoSolver:
 
                 am_exprs = []
                 for j_idx, j in enumerate(self._input_data.am2j[am]):
+                    
                     j_cells = np.union1d(self._input_data.ag_lu2cells[0, j], self._input_data.ag_lu2cells[1, j])
-                    reg_AND_j_cells = np.intersect1d(j_cells, reg_idx)
+                    reg_AND_j_cells = np.intersect1d(j_cells, reg_idx)                                  # Get cells that are both in the region and in the agricultural land use
+                    
+                    if settings.ALLOW_RENEWABLES_IN_GBF2_MASKED_CELLS == False:
+                        reg_AND_j_cells = np.setdiff1d(reg_AND_j_cells, self._input_data.GBF2_mask_idx) # Remove GBF2-masked cells we do not want to apply the renewable energy to high biodiversity areas (as per stakeholder feedback)
                     
                     if not reg_AND_j_cells.size:continue
                     

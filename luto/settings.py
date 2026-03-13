@@ -356,6 +356,14 @@ RENEWABLES_OPTIONS = [
     'Onshore Wind'
 ]
 
+ALLOW_RENEWABLES_IN_GBF2_MASKED_CELLS = False
+'''
+Whether installing renewable energy on cells that are masked out in the GBF2 layer (i.e., cells with very high biodiversity value) is allowed or not.
+ - True: allowed. The model can choose to install renewable energy on cells that are masked out in the GBF2 layer, which may lead to higher profits but also higher biodiversity loss.
+ - False: not allowed. The model can not choose to install renewable energy on cells that are masked out in the GBF2 layer, which may lead to lower profits but also lower biodiversity loss.
+'''
+
+
 
 RENEWABLE_TARGET_SCENARIO_TARGETS = 'CNS - Accelerated Transition'
 '''
