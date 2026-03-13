@@ -292,4 +292,18 @@ def collect_results(work_dir: str):
         if len(feasible) > 10:
             print(f"  ... and {len(feasible) - 10} more feasible constraints")
 
-    return results
+    # ── Save summary to work_dir ──
+    summary_path = os.path.join(work_dir, "summary.json")
+    summary = {
+        "n_total": n_total,
+        "n_completed": len(results),
+        "n_missing": len(missing),
+        "n_infeasible": len(infeasible),
+        "n_feasible": len(feasible),
+        "infeasible": sorted(infeasible, key=lambda x: -(x['gap'] if x['gap'] != float('inf') else 1e30)),
+        "feasible": sorted(feasible, key=lambda x: x['ratio']),
+    }
+    with open(summary_path, "w") as f:
+        json.dump(summary, f, indent=2, default=str)
+    print(f"\nSummary saved to: {summary_path}")
+
