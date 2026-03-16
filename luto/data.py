@@ -758,23 +758,21 @@ class Data:
             self.BIOCHAR_DATA[lu] = horticulture_data
 
 
-
         # #########################################################
         # RENEWABLE ENERGY DATA LOADING                           #
         # #########################################################
         if settings.RENEWABLE_ENERGY_CONSTRAINTS != "off":
-            
+
             print("├── Loading renewable energy data...", flush=True)
 
             # Renewable targets and prices
             self.RENEWABLE_TARGETS = pd.read_csv(f'{settings.INPUT_DIR}/renewable_targets.csv').sort_values('state')    # Ensure targets are sorted by state for consistent mapping to region codes.
             self.RENEWABLE_TARGETS['Renewable_Target_MWh'] = self.RENEWABLE_TARGETS['Renewable_Target_TWh'] * 1e6       # Convert TWh to MWh
-            
-            #self.RENEWABLE_PRICES = pd.read_csv(f'{settings.INPUT_DIR}/renewable_elec_price_AUD_MWh.csv')
+
             self.SOLAR_PRICES = pd.read_csv(f'{settings.INPUT_DIR}/renewable_price_AUD_MWh_solar.csv')
             self.WIND_PRICES = pd.read_csv(f'{settings.INPUT_DIR}/renewable_price_AUD_MWh_wind.csv')
-            
-            # Renewable energy ralated raster layers
+
+            # Renewable energy related raster layers
             #   Compute before isel to avoid isel working on dask chunks
             #   which slows down the reading.
             self.RENEWABLE_LAYERS = (
@@ -783,22 +781,22 @@ class Data:
                 .compute()
                 .isel(cell=self.MASK)
             )
-            
-            # TODO: remove when all years of renewable layers are available. 
+
+            # TODO: remove when all years of renewable layers are available.
             #   Now is a temporary fix to duplicate 2030 to 2010-2029.
             self.RENEWABLE_LAYERS = xr.concat(
                 [self.RENEWABLE_LAYERS.sel(year=2030, drop=True).expand_dims(year=range(self.YR_CAL_BASE, 2030))
                 , self.RENEWABLE_LAYERS],
                 dim='year'
             )
-            
+
             # Renewable bundle data (productivity impacts, cost multipliers, etc)
             renewable_bundle = pd.read_csv(f'{settings.INPUT_DIR}/renewable_energy_bundle.csv')
             self.RENEWABLE_BUNDLE_WIND = renewable_bundle.query('Lever == "Onshore Wind"')
             self.RENEWABLE_BUNDLE_SOLAR = renewable_bundle.query('Lever == "Utility Solar PV"')
-            
 
-    
+
+
 
         ###############################################################
         # Productivity data.
@@ -1409,22 +1407,24 @@ class Data:
         )
         
   
+        # Conservation performance curve 
+        conservation_performance_curve = pd.read_excel(
+            os.path.join(settings.INPUT_DIR, 'Biodiversity_conserve_performance.xlsx'),
+            sheet_name=performance_sheet
+        ).set_index('AREA_COVERAGE_PERCENT')['PRIORITY_RANK'].to_dict()
+
+
         # ------------------ Habitat condition impacts for habitat conservation (GBF2) in 'priority degraded areas' regions ---------------
         if settings.BIODIVERSITY_TARGET_GBF_2 != 'off':
 
             # Get the mask of 'priority degraded areas' for habitat conservation
-            conservation_performance_curve = pd.read_excel(
-                os.path.join(settings.INPUT_DIR, 'Biodiversity_conserve_performance.xlsx'), 
-                sheet_name=performance_sheet
-            ).set_index('AREA_COVERAGE_PERCENT')['PRIORITY_RANK'].to_dict()
-            
             self.BIO_GBF2_MASK = bio_quality_raw >= conservation_performance_curve[settings.GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT]
             self.BIO_GBF2_MASK_LDS = np.where(
                 self.SAVBURN_ELIGIBLE,
                 self.BIO_GBF2_MASK  - (self.BIO_GBF2_MASK * (1 - settings.BIO_CONTRIBUTION_LDS)),
                 self.BIO_GBF2_MASK
             )
-            
+
             self.BIO_GBF2_BASE_YR = (
                 np.einsum(
                     'j,mrj,r,r->r',
@@ -1433,15 +1433,21 @@ class Data:
                     self.BIO_GBF2_MASK,
                     self.REAL_AREA
                 ) - (
-                    self.SAVBURN_ELIGIBLE 
-                    * self.BIO_GBF2_MASK 
-                    * (1 - settings.BIO_CONTRIBUTION_LDS) 
+                    self.SAVBURN_ELIGIBLE
+                    * self.BIO_GBF2_MASK
+                    * (1 - settings.BIO_CONTRIBUTION_LDS)
                     * self.REAL_AREA
                     * self.AG_MASK_PROPORTION_R
                 )
-            ) 
-              
-        
+            )
+
+
+        # Renewable energy exclusion masks using biodiversity quality and independent cut values
+        if settings.RENEWABLE_ENERGY_CONSTRAINTS != "off" and settings.EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS:
+            self.RENEWABLE_GBF2_MASK_SOLAR = bio_quality_raw >= conservation_performance_curve[settings.RENEWABLE_GBF2_CUT_SOLAR]
+            self.RENEWABLE_GBF2_MASK_WIND = bio_quality_raw >= conservation_performance_curve[settings.RENEWABLE_GBF2_CUT_WIND]
+
+
         ###############################################################
         # GBF3 biodiversity data. (NVIS and IBRA)
         ###############################################################

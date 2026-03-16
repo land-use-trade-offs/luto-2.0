@@ -727,8 +727,8 @@ class LutoSolver:
 
         # Group the renewable energy types, input data, 
         re_types = [
-            ('Utility Solar PV', self._input_data.renewable_solar_r, 'renewable_solar'),
-            ('Onshore Wind',     self._input_data.renewable_wind_r,  'renewable_wind'),
+            ('Utility Solar PV', self._input_data.renewable_solar_r, 'renewable_solar', self._input_data.renewable_GBF2_mask_solar_idx),
+            ('Onshore Wind',     self._input_data.renewable_wind_r,  'renewable_wind',  self._input_data.renewable_GBF2_mask_wind_idx),
         ]
         
         # Pop Australian Capital Territory out of the region_state_name2idx
@@ -741,7 +741,7 @@ class LutoSolver:
             print(f"│   │   ├── Adding renewable energy constraints for {reg_name} ...")
 
 
-            for am, energy_r, limit_key in re_types:
+            for am, energy_r, limit_key, gbf2_mask_idx in re_types:
                 
                 if not settings.AG_MANAGEMENTS[am]: 
                     continue
@@ -759,10 +759,10 @@ class LutoSolver:
                 for j_idx, j in enumerate(self._input_data.am2j[am]):
                     
                     j_cells = np.union1d(self._input_data.ag_lu2cells[0, j], self._input_data.ag_lu2cells[1, j])
-                    reg_AND_j_cells = np.intersect1d(j_cells, reg_idx)                                  # Get cells that are both in the region and in the agricultural land use
+                    reg_AND_j_cells = np.intersect1d(j_cells, reg_idx)                      # Get cells that are both in the region and in the agricultural land use
                     
-                    if settings.ALLOW_RENEWABLES_IN_GBF2_MASKED_CELLS == False:
-                        reg_AND_j_cells = np.setdiff1d(reg_AND_j_cells, self._input_data.GBF2_mask_idx) # Remove GBF2-masked cells we do not want to apply the renewable energy to high biodiversity areas (as per stakeholder feedback)
+                    if settings.EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS == True:
+                        reg_AND_j_cells = np.setdiff1d(reg_AND_j_cells, gbf2_mask_idx)      # Disallowing renewable energy production in GBF2-masked cells, using type-specific cut values
                     
                     if not reg_AND_j_cells.size:continue
                     

@@ -126,10 +126,10 @@ DYNAMIC_PRICE = False
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 10        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 5        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-SIM_YEARS =  list(range(2010, 2051, 10))
+SIM_YEARS =  list(range(2010, 2051, 5))
 
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
@@ -356,13 +356,21 @@ RENEWABLES_OPTIONS = [
     'Onshore Wind'
 ]
 
-ALLOW_RENEWABLES_IN_GBF2_MASKED_CELLS = False
+EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS = True
 '''
-Whether installing renewable energy on cells that are masked out in the GBF2 layer (i.e., cells with very high biodiversity value) is allowed or not.
- - True: allowed. The model can choose to install renewable energy on cells that are masked out in the GBF2 layer, which may lead to higher profits but also higher biodiversity loss.
- - False: not allowed. The model can not choose to install renewable energy on cells that are masked out in the GBF2 layer, which may lead to lower profits but also lower biodiversity loss.
+Whether to exclude renewable energy installation on cells inside the GBF2 masked layer (i.e., cells with very high biodiversity value).
+ - True: The model cannot install renewable energy on GBF2-masked cells.
+ - False: The model can install renewable energy on GBF2-masked cells.
 '''
 
+RENEWABLE_GBF2_CUT_WIND = 20
+RENEWABLE_GBF2_CUT_SOLAR = 20
+'''
+Independent biodiversity area coverage percentage thresholds (same scale as GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT)
+for determining which cells to exclude from renewable energy installation.
+Cells with biodiversity quality >= the conservation performance curve value at this cut are excluded.
+Lower values = fewer cells excluded, higher values = more cells excluded.
+'''
 
 
 RENEWABLE_TARGET_SCENARIO_TARGETS = 'CNS - Accelerated Transition'
@@ -863,7 +871,7 @@ GBF3_TARGETS_DICT = {
 
 # ------------------------------- Species parameters -------------------------------
 BIODIVERSITY_TARGET_GBF_4_SNES =  'off'           # 'on' or 'off'.
-BIODIVERSITY_TARGET_GBF_4_ECNES = 'on'           # 'on' or 'off'.
+BIODIVERSITY_TARGET_GBF_4_ECNES = 'off'           # 'on' or 'off'.
 
 '''
 Target 4 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 
