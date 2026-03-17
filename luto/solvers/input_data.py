@@ -691,6 +691,27 @@ def get_renewable_GBF2_mask_wind_idx(data: Data) -> np.ndarray:
     return np.where(data.RENEWABLE_GBF2_MASK_WIND)[0]
 
 
+def rescale_per_species_data(arr: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Rescale a 2D species×cell matrix per-species (per-row) independently.
+
+    Each row is scaled so its max absolute value equals `settings.RESCALE_FACTOR` (default 1e3).
+    This avoids numerical issues when different species have vastly different area magnitudes
+    but each gets its own solver constraint.
+
+    Returns:
+        scaled_arr: The rescaled 2D array (float32).
+        scale_factors: 1D array of per-species scale factors. Multiply rescaled values
+                       by scale_factors[s] to recover original values for species s.
+    """
+    row_maxes = np.max(np.abs(arr), axis=1)  # max per species
+    # Avoid division by zero for empty species rows
+    row_maxes[row_maxes == 0] = settings.RESCALE_FACTOR
+    scale_factors = (row_maxes / settings.RESCALE_FACTOR).astype(np.float32)
+    scaled_arr = (arr / scale_factors[:, np.newaxis]).astype(np.float32)
+    return scaled_arr, scale_factors
+
+
 def rescale_solver_input_data(arries: list) -> tuple[list, float]:
     """
     Rescale the solver input data based on `settings.RESCALE_FACTOR`.
@@ -779,15 +800,15 @@ def get_limits(data: Data, yr_cal: int, resale_factors) -> dict[str, Any]:
 
     if settings.BIODIVERSITY_TARGET_GBF_4_SNES == "on":
         limits["GBF4_SNES"] = data.get_GBF4_SNES_target_inside_LUTO_by_year(yr_cal)
-        limits["GBF4_SNES_rescale"] = limits["GBF4_SNES"] / resale_factors['GBF4_SNES']
-        
+        limits["GBF4_SNES_rescale"] = limits["GBF4_SNES"] / resale_factors['GBF4_SNES']  # element-wise per-species
+
     if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == "on":
         limits["GBF4_ECNES"] = data.get_GBF4_ECNES_target_inside_LUTO_by_year(yr_cal)
-        limits["GBF4_ECNES_rescale"] = limits["GBF4_ECNES"] / resale_factors['GBF4_ECNES']
+        limits["GBF4_ECNES_rescale"] = limits["GBF4_ECNES"] / resale_factors['GBF4_ECNES']  # element-wise per-species
 
     if settings.BIODIVERSITY_TARGET_GBF_8 == "on":
         limits["GBF8"] = data.get_GBF8_target_inside_LUTO_by_yr(yr_cal)
-        limits["GBF8_rescale"] = limits["GBF8"] / resale_factors['GBF8']
+        limits["GBF8_rescale"] = limits["GBF8"] / resale_factors['GBF8']  # element-wise per-species
 
     if settings.REGIONAL_ADOPTION_CONSTRAINTS != 'off':
         ag_reg_adoption, non_ag_reg_adoption = ag_transition.get_regional_adoption_limits(data, yr_cal)
@@ -931,17 +952,17 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         gbf3_ibra_scale = 1.0
 
     if settings.BIODIVERSITY_TARGET_GBF_4_SNES == "on":
-        [GBF4_SNES_pre_1750_area_sr], gbf4_snes_scale = rescale_solver_input_data([GBF4_SNES_pre_1750_area_sr])
+        GBF4_SNES_pre_1750_area_sr, gbf4_snes_scale = rescale_per_species_data(GBF4_SNES_pre_1750_area_sr)
     else:
         gbf4_snes_scale = 1.0
 
     if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == "on":
-        [GBF4_ECNES_pre_1750_area_sr], gbf4_ecnes_scale = rescale_solver_input_data([GBF4_ECNES_pre_1750_area_sr])
+        GBF4_ECNES_pre_1750_area_sr, gbf4_ecnes_scale = rescale_per_species_data(GBF4_ECNES_pre_1750_area_sr)
     else:
         gbf4_ecnes_scale = 1.0
 
     if settings.BIODIVERSITY_TARGET_GBF_8 == "on":
-        [GBF8_pre_1750_area_sr], gbf8_scale = rescale_solver_input_data([GBF8_pre_1750_area_sr])
+        GBF8_pre_1750_area_sr, gbf8_scale = rescale_per_species_data(GBF8_pre_1750_area_sr)
     else:
         gbf8_scale = 1.0
 

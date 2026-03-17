@@ -1100,14 +1100,20 @@ class LutoSolver:
         print(f"│   │   ├── Adding constraints for biodiversity GBF 4 SNES...")
         
         for x, x_area_lb_rescale in enumerate(x_limits):
-            x_area_lb_raw = x_area_lb_rescale * self._input_data.scale_factors['GBF4_SNES']
+            x_area_lb_raw = x_area_lb_rescale * self._input_data.scale_factors['GBF4_SNES'][x]
+
+            if x_area_lb_raw <= 0:
+                print(
+                    f"│   │   │   ├── SKIPPED: SNES target is {x_area_lb_raw:15,.0f} (non-positive) for {x_names[x]}")
+                continue
+
             ind = np.where(self._input_data.GBF4_SNES_pre_1750_area_sr[x] > 0)[0]
 
             if ind.size == 0:
                 print(
                     f"│   │   │   ├── WARNING: SNES species NOT added because of empty layer for {x_names[x]}")
                 continue
-            
+
             ag_contr = gp.quicksum(
                 gp.quicksum(
                     self._input_data.GBF4_SNES_pre_1750_area_sr[x, ind]
@@ -1165,14 +1171,20 @@ class LutoSolver:
         print(f"│   │   ├── Adding constraints for biodiversity GBF 4 ECNES...")
         
         for x, x_area_lb_rescale in enumerate(x_limits):
-            x_area_lb_raw = x_area_lb_rescale * self._input_data.scale_factors['GBF4_ECNES']
+            x_area_lb_raw = x_area_lb_rescale * self._input_data.scale_factors['GBF4_ECNES'][x]
+
+            if x_area_lb_raw <= 0:
+                print(
+                    f"│   │   │   ├── SKIPPED: ECNES target is {x_area_lb_raw:15,.0f} (non-positive) for {x_names[x]}")
+                continue
+
             ind = np.where(self._input_data.GBF4_ECNES_pre_1750_area_sr[x] > 0)[0]
 
             if ind.size == 0:
                 print(
                     f"│   │   │   ├── WARNING: ECNES species was NOT added because of empty layer for {x_names[x]}")
                 continue
-            
+
             ag_contr = gp.quicksum(
                 gp.quicksum(
                     self._input_data.GBF4_ECNES_pre_1750_area_sr[x, ind]
@@ -1234,11 +1246,17 @@ class LutoSolver:
         print(f"│   │   ├── Adding constraints for biodiversity GBF 8...")
         
         for s, s_area_lb_rescale in enumerate(s_limits):
-            
+
             ind = s_ind[s]
-            s_area_lb_raw = s_area_lb_rescale * self._input_data.scale_factors['GBF8']
+            s_area_lb_raw = s_area_lb_rescale * self._input_data.scale_factors['GBF8'][s]
+
+            if s_area_lb_raw <= 0:
+                print(
+                    f"│   │   │   ├── SKIPPED: GBF8 target is {s_area_lb_raw:15,.0f} (non-positive) for {s_names[s]}")
+                continue
+
             GBF8_raw_area_r = self._input_data.GBF8_pre_1750_area_sr[s, ind]
-            
+
             ag_contr = gp.quicksum(
                 gp.quicksum(
                     GBF8_raw_area_r
@@ -1788,18 +1806,18 @@ class LutoSolver:
             }
         )
         prod_data["BIO (GBF4) SNES value (ha)"] = (
-            {k: v.getValue() * self._input_data.scale_factors['GBF4_SNES'] for k,v in self.bio_GBF4_SNES_exprs.items()}                   
-            if settings.BIODIVERSITY_TARGET_GBF_4_SNES == "on"     
+            {k: v.getValue() * self._input_data.scale_factors['GBF4_SNES'][k] for k,v in self.bio_GBF4_SNES_exprs.items()}
+            if settings.BIODIVERSITY_TARGET_GBF_4_SNES == "on"
             else 0
         )
         prod_data["BIO (GBF4) ECNES value (ha)"] = (
-            {k: v.getValue() * self._input_data.scale_factors['GBF4_ECNES'] for k,v in self.bio_GBF4_ECNES_exprs.items()}                  
-            if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == "on"    
+            {k: v.getValue() * self._input_data.scale_factors['GBF4_ECNES'][k] for k,v in self.bio_GBF4_ECNES_exprs.items()}
+            if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == "on"
             else 0
         )
         prod_data["BIO (GBF8) value (ha)"] = (
-            {k: v.getValue() * self._input_data.scale_factors['GBF8'] for k,v in self.bio_GBF8_exprs.items()}   
-            if settings.BIODIVERSITY_TARGET_GBF_8 == "on"          
+            {k: v.getValue() * self._input_data.scale_factors['GBF8'][k] for k,v in self.bio_GBF8_exprs.items()}
+            if settings.BIODIVERSITY_TARGET_GBF_8 == "on"
             else 0
         )
                 

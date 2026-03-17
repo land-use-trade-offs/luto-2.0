@@ -2235,7 +2235,7 @@ class Data:
                 print(f"│   ├── SNES target capped for '{row['SCIENTIFIC_NAME']}' ({layer}): {interp_pct:.2f}% -> {attainable_pct:.2f}% (attainable limit)", flush=True)
             
             score_all_aus = row[f'BASELINE_LEVEL_ALL_AUSTRALIA_{layer}'] * target_pct / 100  # Convert the percentage to proportion
-            score_out_LUTO = row[f'BASEYEAR_LEVEL_OUT_LUTO_NATURAL_{layer}']
+            score_out_LUTO = row[f'BASEYEAR_SCORE_OUT_LUTO_NATURAL_{layer}']
             targets.append(score_all_aus - score_out_LUTO)
 
         return np.array(targets).astype(np.float32)
@@ -2265,7 +2265,7 @@ class Data:
                 print(f"│   ├── ECNES target capped for '{row['COMMUNITY']}' ({layer}): {interp_pct:.2f}% -> {attainable_pct:.2f}% (attainable limit)", flush=True)
             
             score_all_aus = row[f'BASELINE_LEVEL_ALL_AUSTRALIA_{layer}'] * target_pct / 100  # Convert the percentage to proportion
-            score_out_LUTO = row[f'BASEYEAR_LEVEL_OUT_LUTO_NATURAL_{layer}']
+            score_out_LUTO = row[f'BASEYEAR_SCORE_OUT_LUTO_NATURAL_{layer}']
             targets.append(score_all_aus - score_out_LUTO)
 
         return np.array(targets).astype(np.float32)

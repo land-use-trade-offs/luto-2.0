@@ -129,7 +129,7 @@ DYNAMIC_PRICE = False
 RESFACTOR = 5        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-SIM_YEARS =  list(range(2010, 2051, 5))
+SIM_YEARS =  [2010,2050] #list(range(2010, 2051, 5))
 
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
@@ -871,7 +871,7 @@ GBF3_TARGETS_DICT = {
 
 # ------------------------------- Species parameters -------------------------------
 BIODIVERSITY_TARGET_GBF_4_SNES =  'off'           # 'on' or 'off'.
-BIODIVERSITY_TARGET_GBF_4_ECNES = 'off'           # 'on' or 'off'.
+BIODIVERSITY_TARGET_GBF_4_ECNES = 'on'           # 'on' or 'off'.
 
 '''
 Target 4 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 

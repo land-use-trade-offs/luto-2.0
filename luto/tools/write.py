@@ -3584,7 +3584,7 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
     bio_snes_scores = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF4_TARGET_SNES.csv')
     idx_row = [bio_snes_scores.query('SCIENTIFIC_NAME == @i').index[0] for i in data.BIO_GBF4_SNES_SEL_ALL]
     idx_all_score = [bio_snes_scores.columns.get_loc(f'BASELINE_LEVEL_ALL_AUSTRALIA_{col}') for col in data.BIO_GBF4_PRESENCE_SNES_SEL]
-    idx_outside_score =  [bio_snes_scores.columns.get_loc(f'BASEYEAR_LEVEL_OUT_LUTO_NATURAL_{col}') for col in data.BIO_GBF4_PRESENCE_SNES_SEL]
+    idx_outside_score =  [bio_snes_scores.columns.get_loc(f'BASEYEAR_SCORE_OUT_LUTO_NATURAL_{col}') for col in data.BIO_GBF4_PRESENCE_SNES_SEL]
 
     base_yr_score = pd.DataFrame({
             'species': data.BIO_GBF4_SNES_SEL_ALL,
@@ -3774,7 +3774,7 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
     bio_ecnes_scores = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF4_TARGET_ECNES.csv')
     idx_row = [bio_ecnes_scores.query('COMMUNITY == @i').index[0] for i in data.BIO_GBF4_ECNES_SEL_ALL]
     idx_all_score = [bio_ecnes_scores.columns.get_loc(f'BASELINE_LEVEL_ALL_AUSTRALIA_{col}') for col in data.BIO_GBF4_PRESENCE_ECNES_SEL]
-    idx_outside_score = [bio_ecnes_scores.columns.get_loc(f'BASEYEAR_LEVEL_OUT_LUTO_NATURAL_{col}') for col in data.BIO_GBF4_PRESENCE_ECNES_SEL]
+    idx_outside_score = [bio_ecnes_scores.columns.get_loc(f'BASEYEAR_SCORE_OUT_LUTO_NATURAL_{col}') for col in data.BIO_GBF4_PRESENCE_ECNES_SEL]
 
     base_yr_score = pd.DataFrame({
         'species': data.BIO_GBF4_ECNES_SEL_ALL,
