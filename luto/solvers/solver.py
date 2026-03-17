@@ -1104,7 +1104,7 @@ class LutoSolver:
 
             if x_area_lb_raw <= 0:
                 print(
-                    f"│   │   │   ├── SKIPPED: SNES target is {x_area_lb_raw:15,.0f} (non-positive) for {x_names[x]}")
+                    f"│   │   │   ├── target is {x_area_lb_raw:15,.0f}  (skipped because of negative target) for {x_names[x]}")
                 continue
 
             ind = np.where(self._input_data.GBF4_SNES_pre_1750_area_sr[x] > 0)[0]
@@ -1175,7 +1175,7 @@ class LutoSolver:
 
             if x_area_lb_raw <= 0:
                 print(
-                    f"│   │   │   ├── SKIPPED: ECNES target is {x_area_lb_raw:15,.0f} (non-positive) for {x_names[x]}")
+                    f"│   │   │   ├── target is {x_area_lb_raw:15,.0f}  (skipped because of negative target) for {x_names[x]}")
                 continue
 
             ind = np.where(self._input_data.GBF4_ECNES_pre_1750_area_sr[x] > 0)[0]
@@ -1252,7 +1252,7 @@ class LutoSolver:
 
             if s_area_lb_raw <= 0:
                 print(
-                    f"│   │   │   ├── SKIPPED: GBF8 target is {s_area_lb_raw:15,.0f} (non-positive) for {s_names[s]}")
+                    f"│   │   │   ├── target is {s_area_lb_raw:15,.0f}  (skipped because of negative target) for {s_names[s]}")
                 continue
 
             GBF8_raw_area_r = self._input_data.GBF8_pre_1750_area_sr[s, ind]
