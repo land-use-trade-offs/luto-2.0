@@ -594,9 +594,9 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
         .groupby('region')
         .sum('cell')
         .to_dataframe('Production (t/KL)')
-        .reset_index().assign(Year=yr_cal, Type='Agricultural')
+        .reset_index().assign(Year=yr_cal, Type='Agricultural_Management')
         .query('abs(`Production (t/KL)`) > 1'))
-    
+
     # Australia level aggregation
     ag_q_mrc_df_AUS = ag_q_mrc_df_region.groupby(['lm', 'Commodity', 'Year']
         ).sum(

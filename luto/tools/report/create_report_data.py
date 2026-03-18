@@ -314,24 +314,24 @@ def process_economics_data(files, SAVE_DIR):
     revenue_ag_df = files.query('base_name == "economics_ag_revenue"').reset_index(drop=True)
     revenue_ag_df = pd.concat([pd.read_csv(path) for path in revenue_ag_df['path']], ignore_index=True)
     revenue_ag_df = revenue_ag_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False).assign(Source='Agricultural Land-use (revenue)')
-    revenue_ag_df_non_all = revenue_ag_df.query('Water_supply != "ALL" and Type != "ALL"')
+    revenue_ag_df_non_all = revenue_ag_df.query('Water_supply != "ALL" and Type != "ALL" and `Land-use` != "ALL"')
 
     cost_ag_df = files.query('base_name == "economics_ag_cost"').reset_index(drop=True)
     cost_ag_df = pd.concat([pd.read_csv(path) for path in cost_ag_df['path']], ignore_index=True)
     cost_ag_df = cost_ag_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False).assign(Source='Agricultural Land-use (cost)')
     cost_ag_df['Value ($)'] = cost_ag_df['Value ($)'] * -1          # Convert cost to negative value
-    cost_ag_df_non_all = cost_ag_df.query('Water_supply != "ALL" and Type != "ALL"')
+    cost_ag_df_non_all = cost_ag_df.query('Water_supply != "ALL" and Type != "ALL" and `Land-use` != "ALL"')
 
     revenue_am_df = files.query('base_name == "economics_am_revenue"').reset_index(drop=True)
     revenue_am_df = pd.concat([df for path in revenue_am_df['path'] if not (df := pd.read_csv(path)).empty], ignore_index=True)
     revenue_am_df = revenue_am_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False).assign(Source='Agricultural Management (revenue)')
-    revenue_am_df_non_all = revenue_am_df.query('Water_supply != "ALL" and `Land-use` != "ALL"')
+    revenue_am_df_non_all = revenue_am_df.query('Water_supply != "ALL" and `Land-use` != "ALL" and `Management Type` != "ALL"')
 
     cost_am_df = files.query('base_name == "economics_am_cost"').reset_index(drop=True)
     cost_am_df = pd.concat([df for path in cost_am_df['path'] if not (df := pd.read_csv(path)).empty], ignore_index=True)
     cost_am_df = cost_am_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False).assign(Source='Agricultural Management (cost)')
     cost_am_df['Value ($)'] = cost_am_df['Value ($)'] * -1          # Convert cost to negative value
-    cost_am_df_non_all = cost_am_df.query('Water_supply != "ALL" and `Land-use` != "ALL"')
+    cost_am_df_non_all = cost_am_df.query('Water_supply != "ALL" and `Land-use` != "ALL" and `Management Type` != "ALL"')
 
     revenue_non_ag_df = files.query('base_name == "economics_non_ag_revenue"').reset_index(drop=True)
     revenue_non_ag_df = pd.concat([df for path in revenue_non_ag_df['path'] if not (df := pd.read_csv(path)).empty], ignore_index=True)
@@ -363,7 +363,7 @@ def process_economics_data(files, SAVE_DIR):
     cost_transition_non_ag2ag_df = cost_transition_non_ag2ag_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False).assign(Source='Transition cost (Non-Ag2Ag)').dropna(subset=['Cost ($)'])
     cost_transition_non_ag2ag_df['Value ($)'] = cost_transition_non_ag2ag_df['Cost ($)'] * -1   # Convert cost to negative value
     cost_transition_non_ag2ag_df_non_all = cost_transition_non_ag2ag_df.query(
-        '`From-land-use` != "ALL" and `To-land-use` != "ALL"'
+        '`From-land-use` != "ALL" and `To-land-use` != "ALL" and `Cost-type` != "ALL"'
         ).copy()
 
     economics_df_non_all = pd.concat(
@@ -1176,7 +1176,7 @@ def process_production_data(files, SAVE_DIR, years):
     quantity_non_ag = quantity_df.query('Type == "Non_Agricultural"').copy()
 
     quantity_ag_non_all = quantity_ag.query('Water_supply != "ALL"').copy()
-    quantity_am_non_all = quantity_am.query('Water_supply != "ALL"').copy()
+    quantity_am_non_all = quantity_am.query('Water_supply != "ALL" and Commodity != "ALL"').copy()
     
     
     # Fill 0 for empty non-agr dataframe
@@ -1479,7 +1479,7 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
     GHG_ag = GHG_files.query('base_name.str.contains("agricultural_landuse")').reset_index(drop=True)
     GHG_ag = pd.concat([pd.read_csv(path) for path in GHG_ag['path']], ignore_index=True)
     GHG_ag = GHG_ag.replace(GHG_NAMES).infer_objects(copy=False).round({'Value (t CO2e)': 2})
-    GHG_ag_non_all = GHG_ag.query('Water_supply != "ALL" and Source != "ALL"').reset_index(drop=True)
+    GHG_ag_non_all = GHG_ag.query('Water_supply != "ALL" and Source != "ALL" and `Land-use` != "ALL"').reset_index(drop=True)
     
     GHG_non_ag = GHG_files.query('base_name.str.contains("no_ag_reduction")').reset_index(drop=True)
     GHG_non_ag = pd.concat([df for path in GHG_non_ag['path'] if not (df := pd.read_csv(path)).empty], ignore_index=True)
@@ -1488,7 +1488,7 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
     GHG_ag_man = GHG_files.query('base_name.str.contains("agricultural_management")').reset_index(drop=True)
     GHG_ag_man = pd.concat([df for path in GHG_ag_man['path'] if not (df := pd.read_csv(path)).empty], ignore_index=True)
     GHG_ag_man = GHG_ag_man.replace(RENAME_AM_NON_AG).infer_objects(copy=False).round({'Value (t CO2e)': 2})
-    GHG_ag_man_non_all = GHG_ag_man.query('Water_supply != "ALL" and `Land-use` != "ALL"').reset_index(drop=True)
+    GHG_ag_man_non_all = GHG_ag_man.query('Water_supply != "ALL" and `Land-use` != "ALL" and `Agricultural Management Type` != "ALL"').reset_index(drop=True)
     
     GHG_transition = GHG_files.query('base_name.str.contains("transition_penalty")').reset_index(drop=True)
     GHG_transition = pd.concat([df for path in GHG_transition['path'] if not (df := pd.read_csv(path)).empty], ignore_index=True)
@@ -1865,7 +1865,7 @@ def process_water_data(files, SAVE_DIR):
         .query('abs(`Water Net Yield (ML)`) > 1e-4')\
         .rename(columns={'Water Net Yield (ML)': 'Value (ML)'})
     water_net_yield_watershed_non_all = water_net_yield_watershed\
-        .query('`Water Supply` != "ALL" and Landuse	 != "ALL"')\
+        .query('`Water Supply` != "ALL" and Landuse	 != "ALL" and `Agricultural Management` != "ALL"')\
         .reset_index(drop=True)
 
 
@@ -1995,7 +1995,7 @@ def process_water_data(files, SAVE_DIR):
         .query('abs(`Water Net Yield (ML)`) > 1e-4')\
         .rename(columns={'Water Net Yield (ML)': 'Value (ML)'})
     water_net_yield_NRM_region_non_all = water_net_yield_NRM_region\
-        .query('`Water Supply` != "ALL" and Landuse != "ALL"')\
+        .query('`Water Supply` != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
         .reset_index(drop=True)
 
 
@@ -2297,7 +2297,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         .rename(columns={'Contribution Relative to Base Year Level (%)': 'Value (%)'})\
         .round({'Value (%)': 6})
         
-    bio_df_non_all = bio_df.query('Water_supply != "ALL" and Landuse != "ALL"')
+    bio_df_non_all = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')
     bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural Land-use"').copy()
     bio_df_am_non_all = bio_df_non_all.query('Type == "Agricultural Management"').copy()
     bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"').copy()
@@ -2562,7 +2562,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
             .round({'Value (%)': 2})
 
-        bio_df_non_all = bio_df.query('Water_supply != "ALL" and Landuse != "ALL"')
+        bio_df_non_all = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')
         bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural Land-use"')
         bio_df_am_non_all = bio_df_non_all.query('Type == "Agricultural Management"')
         bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"')
@@ -2816,7 +2816,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)', 'Vegetation Group': 'species'})\
             .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
             .round(6)
-        bio_df_non_all = bio_df.query('Water_supply != "ALL" and Landuse != "ALL"')
+        bio_df_non_all = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')
         bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural Land-use"')
         bio_df_am_non_all = bio_df_non_all.query('Type == "Agricultural Management"')
         bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"')
@@ -3070,7 +3070,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)', 'IBRA Bioregion': 'species'})\
             .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
             .round(6)
-        bio_df_non_all = bio_df.query('Water_supply != "ALL" and Landuse != "ALL"')
+        bio_df_non_all = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')
         bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural Land-use"')
         bio_df_am_non_all = bio_df_non_all.query('Type == "Agricultural Management"')
         bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"')
@@ -3326,7 +3326,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)'})\
             .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
             .round(6)
-        bio_df_non_all = bio_df.query('Water_supply != "ALL" and Landuse != "ALL"')
+        bio_df_non_all = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')
         bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural Land-use"')
         bio_df_am_non_all = bio_df_non_all.query('Type == "Agricultural Management"')
         bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"')
@@ -3572,7 +3572,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
             .round(6)
 
-        bio_df_non_all = bio_df.query('Water_supply != "ALL" and Landuse != "ALL"')
+        bio_df_non_all = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')
         bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural Land-use"')
         bio_df_am_non_all = bio_df_non_all.query('Type == "Agricultural Management"')
         bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"')
@@ -3824,7 +3824,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
             .round(6)
 
-        bio_df_non_all = bio_df.query('Water_supply != "ALL" and Landuse != "ALL"')
+        bio_df_non_all = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')
         bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural Land-use"')
         bio_df_am_non_all = bio_df_non_all.query('Type == "Agricultural Management"')
         bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"')
@@ -4065,7 +4065,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
             .round(6)
 
-        bio_df_non_all = bio_df.query('Water_supply != "ALL" and Landuse != "ALL"')
+        bio_df_non_all = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')
         bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural Land-use"')
         bio_df_am_non_all = bio_df_non_all.query('Type == "Agricultural Management"')
         bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"')
