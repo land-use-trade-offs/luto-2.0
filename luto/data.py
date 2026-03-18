@@ -917,9 +917,16 @@ class Data:
         self.CP_EST_COST_HA = pd.read_hdf(os.path.join(settings.INPUT_DIR, "cp_est_cost_ha.h5"), where=self.MASK).to_numpy(dtype=np.float32)
 
         # Load fire risk data (reduced carbon sequestration by this amount)
-        fr_df = pd.read_hdf(os.path.join(settings.INPUT_DIR, "fire_risk.h5"), where=self.MASK)
-        fr_dict = {"low": "FD_RISK_PERC_5TH", "med": "FD_RISK_MEDIAN", "high": "FD_RISK_PERC_95TH"}
-        fire_risk = fr_df[fr_dict[settings.FIRE_RISK]]
+        # fr_df = pd.read_hdf(os.path.join(settings.INPUT_DIR, "fire_risk.h5"), where=self.MASK)
+        # fr_dict = {"low": "FD_RISK_PERC_5TH", "med": "FD_RISK_MEDIAN", "high": "FD_RISK_PERC_95TH"}
+        # fire_risk = fr_df[fr_dict[settings.FIRE_RISK]]
+        fire_risk = 100 
+        '''
+        Per LUF 2026 scenario runs: https://docs.google.com/document/d/1kDZtJiTMqLREyoLXE6HGUUF0dfKWL1VXsvDLV0t_TcY/edit?disco=AAAB2I4WvU8
+        Copying across Brett's comment: "I suggested that we drop the fire risk and just use the 5% ERF risk of reversal. 
+        Doubling up is very conservative and leads to more area reqd to meet targets. You still want both on?"
+        '''
+        
 
         # Load environmental plantings (block) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
         #   NOTE: Use .sel(age=...).load().isel(cell=self.MASK) instead of .sel(cell=self.MASK) 
