@@ -1842,33 +1842,46 @@ class Data:
             for idx_w, _ in enumerate(self.LANDMANS):
                 # Get the cells with the same ID and water supply
                 lu_arr = (self.LUMAP_NO_RESFACTOR == idx_lu) * (self.LMMAP_NO_RESFACTOR == idx_w)
-                lumap_mrj[idx_w, :, idx_lu] = self.get_average_fraction_from_int_map(lu_arr)        
+                lumap_mrj[idx_w, :, idx_lu] = self.get_average_fraction_from_int_map(lu_arr, use_valid_cell_count=False)
                     
         return lumap_mrj
     
     
-    def get_average_fraction_from_int_map(self, arr: np.ndarray) -> np.ndarray:
+    def get_average_fraction_from_int_map(self, arr: np.ndarray, use_valid_cell_count: bool = True) -> np.ndarray:
         '''
         Calculate the average value for each resfactored cell, given the input arr is masked by the land-use mask
         (has a length of the number of cells in the full-resolution 1D array, i.e., 6956407).
-        
-        For example, with a 5x5 resfactor, if there are only 7 cells exist, the average value for this 
-        resfactored cell will be the (sum of 7 cells) / 25.
-        
+
         Args:
-            arr (np.ndarray): A 1D array containing the values for the full-resolution array, should be the length of the number of cells in the full-resolution array (i.e., 6956407)
-            
+            arr (np.ndarray): A 1D array containing the values for the full-resolution array, should be the length
+                of the number of cells in the full-resolution array (i.e., 6956407).
+            use_valid_cell_count (bool): If True (default), divide by the number of valid NLUM cells in each
+                coarsened block. This preserves the per-valid-cell average (e.g. habitat fraction) and prevents
+                edge/coastal blocks with fewer valid cells from being artificially dwarfed vs RES1.
+                If False, divide by RESFACTOR² (all cells in block), which gives the fraction relative to the
+                full coarse cell area — required for lumap dvars where REAL_AREA is the full coarse cell.
+
         Returns:
-            np.ndarray: A 1D array containing the average values for each cell in the 
-            resfactored array, with the same length as the number of cells in the resfactored array (i.e., 6956407)
+            np.ndarray: A 1D array containing the average values for each cell in the
+            resfactored array, with the same length as the number of cells in the resfactored array.
         '''
-        
-        arr_2d = np.zeros_like(self.LUMAP_2D_FULLRES, dtype=np.float32)         # Create a 2D array of zeros with the same shape as the LUMAP_2D_FULLRES
-        np.place(arr_2d, self.NLUM_MASK, arr)                                   # Place the values of arr in the 2D array where the LUMAP_2D_RESFACTORED is equal to idx_lu
+
+        arr_2d = np.zeros_like(self.LUMAP_2D_FULLRES, dtype=np.float32)
+        np.place(arr_2d, self.NLUM_MASK, arr)
 
         arr_2d_xr = xr.DataArray(arr_2d, dims=['y', 'x'])
-        arr_2d_xr_resfactored = arr_2d_xr.coarsen(x=settings.RESFACTOR, y=settings.RESFACTOR, boundary='pad').mean()
-        arr_2d_xr_resfactored = arr_2d_xr_resfactored.values[0:self.LUMAP_2D_RESFACTORED.shape[0], 0:self.LUMAP_2D_RESFACTORED.shape[1]] 
+        arr_sum = arr_2d_xr.coarsen(x=settings.RESFACTOR, y=settings.RESFACTOR, boundary='pad').sum()
+
+        if use_valid_cell_count:
+            # Divide by valid NLUM cells per block — preserves per-valid-cell average (e.g. habitat layers)
+            nlum_2d_xr = xr.DataArray(self.NLUM_MASK.astype(np.float32), dims=['y', 'x'])
+            denom = nlum_2d_xr.coarsen(x=settings.RESFACTOR, y=settings.RESFACTOR, boundary='pad').sum()
+            denom = denom.where(denom > 0, other=1)  # avoid division by zero
+        else:
+            # Divide by RESFACTOR² — fraction relative to full coarse cell (required for lumap dvars)
+            denom = settings.RESFACTOR ** 2
+
+        arr_2d_xr_resfactored = (arr_sum / denom).values[0:self.LUMAP_2D_RESFACTORED.shape[0], 0:self.LUMAP_2D_RESFACTORED.shape[1]]
 
         return arr_2d_xr_resfactored[self.COORD_ROW_COL_RESFACTORED[0], self.COORD_ROW_COL_RESFACTORED[1]]
 
