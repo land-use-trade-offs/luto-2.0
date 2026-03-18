@@ -94,12 +94,17 @@ for the first 50 years after planting and then use the average as the annual seq
 
 # Fire impacts on carbon sequestration
 RISK_OF_REVERSAL = 0.05  # Risk of reversal buffer under ERF (reasonable values range from 0.05 [100 years] to 0.25 [25 years]) https://www.cleanenergyregulator.gov.au/ERF/Choosing-a-project-type/Opportunities-for-the-land-sector/Risk-of-reversal-buffer
+
 FIRE_RISK = 'med'   # Options are 'low', 'med', 'high'. Determines whether to take the 5th, 50th, or 95th percentile of modelled fire impacts.
 """ 
 Mean FIRE_RISK cell values (%)
 - FD_RISK_PERC_5TH    80.3967
 - FD_RISK_MEDIAN      89.2485
 - FD_RISK_PERC_95TH   93.2735 
+
+As of 20260318, fire_risk is hardcoded as 100% in data.py following the decision to drop fire risk and just use the 5% ERF risk 
+of reversal, as per Brett's comment in the LUF 2026 scenario runs document: "I suggested that we drop the fire risk and just use 
+the 5% ERF risk of reversal. Doubling up is very conservative and leads to more area reqd to meet targets. You still want both on?"
 """
 
 
@@ -826,7 +831,8 @@ BIO_CONTRIBUTION_CARBON_PLANTING_BELT = 0.1
 BIO_CONTRIBUTION_RIPARIAN_PLANTING = 1.2
 BIO_CONTRIBUTION_AGROFORESTRY = 0.75       
 BIO_CONTRIBUTION_BECCS = 0
-''' 
+BIO_CONTRIBUTION_DESTOCKING = None  # If None, uses BIO_HABITAT_CONTRIBUTION_LOOK_UP difference; if set (e.g. 0.75), overrides with a fixed scalar
+'''
 The benefit of each non-agricultural land use to biodiversity is set as a proportion to the raw biodiversity priority value.
 For example, if the raw biodiversity priority value is 0.6 and the benefit is 0.8, then the biodiversity value
 will be 0.6 * 0.8 = 0.48.
