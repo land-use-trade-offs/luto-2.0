@@ -682,25 +682,25 @@ def get_GBF2_mask_idx(data: Data) -> np.ndarray:
 
 
 def get_renewable_GBF2_mask_solar_idx(data: Data) -> np.ndarray:
-    if not settings.EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS:
+    if settings.RENEWABLE_ENERGY_CONSTRAINTS == 'off' or not settings.EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS:
         return np.empty(0, dtype=int)
     return np.where(data.RENEWABLE_GBF2_MASK_SOLAR)[0]
 
 
 def get_renewable_GBF2_mask_wind_idx(data: Data) -> np.ndarray:
-    if not settings.EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS:
+    if settings.RENEWABLE_ENERGY_CONSTRAINTS == 'off' or not settings.EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS:
         return np.empty(0, dtype=int)
     return np.where(data.RENEWABLE_GBF2_MASK_WIND)[0]
 
 
 def get_renewable_MNES_mask_solar_idx(data: Data) -> np.ndarray:
-    if not settings.EXCLUDE_RENEWABLES_IN_EPBC_MNES_MASK:
+    if settings.RENEWABLE_ENERGY_CONSTRAINTS == 'off' or not settings.EXCLUDE_RENEWABLES_IN_EPBC_MNES_MASK:
         return np.empty(0, dtype=int)
     return np.where(data.RENEWABLE_MNES_MASK_SOLAR)[0]
 
 
 def get_renewable_MNES_mask_wind_idx(data: Data) -> np.ndarray:
-    if not settings.EXCLUDE_RENEWABLES_IN_EPBC_MNES_MASK:
+    if settings.RENEWABLE_ENERGY_CONSTRAINTS == 'off' or not settings.EXCLUDE_RENEWABLES_IN_EPBC_MNES_MASK:
         return np.empty(0, dtype=int)
     return np.where(data.RENEWABLE_MNES_MASK_WIND)[0]
 
