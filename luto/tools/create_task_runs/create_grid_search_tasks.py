@@ -28,7 +28,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/LUF_20260310_RE5_GBF4_LIKELY"
+TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/LUF_20260318_RE5_CORE"
 
 
 # Set the grid search parameters
@@ -48,7 +48,7 @@ grid_search = {
     ###############################################################
     'OBJECTIVE': ['maxprofit'],                                             # 'maxprofit' or 'mincost'
     'RESFACTOR': [5],
-    'SIM_YEARS': [range(2020,2051,5)],                                      # Years to run the model (2020-2060 per LUF Report 2026)
+    'SIM_YEARS': [range(2020,2051,5)],                                      # Years to run the model (2020-2060 per LUF Report 2026, but LUTO now only supports 2010-2050)
     'WRITE_THREADS': [4],
     
  
@@ -76,8 +76,8 @@ grid_search = {
 
     # --------------- Economics ---------------
     'DYNAMIC_PRICE' : [True],                                               # True or False (ON per LUF Report 2026)
-    'BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR': [100],                     # AUD/ha/year       
-    'SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR':[100],                     # AUD/ha/year  
+    'BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR': [100, 50],                 # AUD/ha/year; 100=core, 50=Cheaper HIR sensitivity (LUF Report 2026)
+    'SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR':[100, 50],                 # AUD/ha/year; 100=core, 50=Cheaper HIR sensitivity (LUF Report 2026)
 
     # --------------- Target deviation weight ---------------
     'SOLVER_WEIGHT_DEMAND': [1], 
@@ -87,13 +87,13 @@ grid_search = {
 
     # --------------- Social license ---------------
     'EXCLUDE_NO_GO_LU': [False],                                            # True or False
-    'REGIONAL_ADOPTION_CONSTRAINTS': ['off', 'NON_AG_UNIFORM'],             # 'off' = core; 'NON_AG_UNIFORM' = sensitivity (LUF Report 2026)
-    'REGIONAL_ADOPTION_NON_AG_UNIFORM': [5, 10, 15],                        # Sensitivity: 5% target, test 10% and 15% (LUF Report 2026)
+    'REGIONAL_ADOPTION_CONSTRAINTS': ['off'],                               # 'off' = core (LUF Report 2026); 'NON_AG_UNIFORM' = lower-priority sensitivity
+    'REGIONAL_ADOPTION_NON_AG_UNIFORM': [5],                                # Default value (not active when REGIONAL_ADOPTION_CONSTRAINTS='off')
     'REGIONAL_ADOPTION_ZONE': ['NRM_CODE'],                                 # One of 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
 
 
     # --------------- GHG settings ---------------
-    'GHG_EMISSIONS_LIMITS': ['low', 'high'],                                # 'low'=core 1.8C 67%; 'high'=higher ambition 1.5C 50% (LUF Report 2026)
+    'GHG_EMISSIONS_LIMITS': ['low'],                                        # 'low'=core 1.8C 67% (LUF Report 2026); 'high'=higher ambition 1.5C 50% (lower priority sensitivity)
     'CARBON_PRICES_FIELD': ['CONSTANT'],
     'GHG_CONSTRAINT_TYPE': ['hard'],                                        # 'hard' or 'soft'
     'USE_GHG_SCOPE_1': [True],                                              # True or False
@@ -112,7 +112,7 @@ grid_search = {
     
     # --------------- Biodiversity settings - GBF 2 ---------------
     'BIODIVERSITY_TARGET_GBF_2': ['high'],                                  # 'off', 'low', 'medium', 'high'
-    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [15, 20, 25, 30, 40, 50], # Core: [15,20,25,30] (20%=central); Higher ambition adds [30,40,50] (LUF Report 2026)
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [15, 20, 25, 30],        # Core: 20% central; test [15,25,30] alongside (LUF Report 2026)
     'GBF2_CONSTRAINT_TYPE': ['hard'],                                       # 'hard' or 'soft'
 
     # --------------- Biodiversity settings - GBF 3 ---------------
@@ -121,13 +121,15 @@ grid_search = {
 
     # --------------- Biodiversity settings - GBF 4 ---------------
     'BIODIVERSITY_TARGET_GBF_4_SNES': ['off'],                              # 'on' or 'off'.
-    'BIODIVERSITY_TARGET_GBF_4_ECNES': ['off', 'on'],                       # 'off'=core; 'on'=MNES biodiversity sensitivity (LUF Report 2026)
+    'BIODIVERSITY_TARGET_GBF_4_ECNES': ['off'],                             # 'off'=core (LUF Report 2026); 'on'=MNES biodiversity sensitivity (lower priority)
 
     # --------------- Biodiversity settings - GBF 8 ---------------
     'BIODIVERSITY_TARGET_GBF_8': ['off'],                                   # 'on' or 'off'
 
     # --------------- Renewable energy ---------------
-    'RENEWABLE_ENERGY_CONSTRAINTS': ['on'],                                # 'off' per LUF Report 2026 (Solar and Wind both OFF)
+    # Core: RE OFF. REN1-REN4 are separate renewable energy scenario runs (not part of this grid search).
+    # REN1: No GBF2 + RE ON; REN2: Core + RE ON; REN3: REN2 + GBF2 exclusion mask; REN4: REN3 + QLD EPBC MNES layer
+    'RENEWABLE_ENERGY_CONSTRAINTS': ['off'],                               # 'off'=core (LUF Report 2026); 'on' for REN1-REN4 scenarios
     'RENEWABLE_TARGET_SCENARIO_TARGETS': ['Gladstone - Current Targets'],  # 'CNS - Accelerated Transition', 'CNS - Current Targets', 'Gladstone - Current Targets'
     
     ###############################################################
@@ -168,6 +170,13 @@ if __name__ == '__main__':
             if (row[k] == v[0]) and (str(row[v[1]]) != str(grid_search[v[1]][0])):
                 rm_idx.append(row['run_idx'])
                 
+    # HIR costs must be paired; remove beef_cost != sheep_cost runs
+    hir_mismatch = grid_search_param_df[
+        grid_search_param_df['BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR'] !=
+        grid_search_param_df['SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR']
+    ]['run_idx'].tolist()
+    rm_idx.extend(hir_mismatch)
+
     grid_search_param_df = grid_search_param_df[~grid_search_param_df['run_idx'].isin(rm_idx)]
     grid_search_param_df.to_csv(f'{TASK_ROOT_DIR}/grid_search_parameters.csv', index=False)
     print(f'Removed {len(set(rm_idx))} unnecessary runs!')
