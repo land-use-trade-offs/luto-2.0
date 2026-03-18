@@ -216,6 +216,8 @@ def create_new_dataset(refresh=False):
     shutil.copyfile(f'{renewable_energy_inpath}/renewable_energy_bundle.csv', outpath + 'renewable_energy_bundle.csv')
     shutil.copyfile(f'{renewable_energy_inpath}/renewable_price_AUD_MWh_solar.csv', outpath + 'renewable_price_AUD_MWh_solar.csv')
     shutil.copyfile(f'{renewable_energy_inpath}/renewable_price_AUD_MWh_wind.csv', outpath + 'renewable_price_AUD_MWh_wind.csv')
+    shutil.copyfile(f'{renewable_energy_inpath}/renewable_QLD_EPBC_MNES_prioritization.nc', outpath + 'renewable_QLD_EPBC_MNES_prioritization.nc')
+    shutil.copyfile(f'{renewable_energy_inpath}/renewable_QLD_EPBC_MNES_prioritization_performance.csv', outpath + 'renewable_QLD_EPBC_MNES_prioritization_performance.csv')
 
 
 

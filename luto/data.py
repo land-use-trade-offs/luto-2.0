@@ -1471,6 +1471,13 @@ class Data:
             self.RENEWABLE_GBF2_MASK_SOLAR = bio_quality_raw >= conservation_performance_curve[settings.RENEWABLE_GBF2_CUT_SOLAR]
             self.RENEWABLE_GBF2_MASK_WIND = bio_quality_raw >= conservation_performance_curve[settings.RENEWABLE_GBF2_CUT_WIND]
 
+        # Renewable energy exclusion masks using EPBC MNES prioritization layer
+        if settings.RENEWABLE_ENERGY_CONSTRAINTS != "off" and settings.EXCLUDE_RENEWABLES_IN_EPBC_MNES_MASK:
+            mnes_rank_raw = xr.open_dataset(os.path.join(settings.INPUT_DIR, 'renewable_QLD_EPBC_MNES_prioritization.nc'))['data'].values[self.MASK]
+            mnes_performance = pd.read_csv(os.path.join(settings.INPUT_DIR, 'renewable_QLD_EPBC_MNES_prioritization_performance.csv')).set_index('AREA_COVERAGE_PERCENT')['PRIORITY_RANK'].to_dict()
+            self.RENEWABLE_MNES_MASK_SOLAR = mnes_rank_raw >= mnes_performance[settings.RENEWABLE_EPBC_MNES_CUT_SOLAR]
+            self.RENEWABLE_MNES_MASK_WIND = mnes_rank_raw >= mnes_performance[settings.RENEWABLE_EPBC_MNES_CUT_WIND]
+
 
         ###############################################################
         # GBF3 biodiversity data. (NVIS and IBRA)

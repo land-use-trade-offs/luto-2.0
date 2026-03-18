@@ -129,7 +129,7 @@ DYNAMIC_PRICE = False
 RESFACTOR = 5        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-SIM_YEARS =  [2010,2050] #list(range(2010, 2051, 5))
+SIM_YEARS =  list(range(2010, 2051, 5))
 
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
@@ -168,7 +168,7 @@ the model sensitive to variations in input data.
 # Geographical raster writing parameters
 # ---------------------------------------------------------------------------- #
 WRITE_PARALLEL = True                       # If to use parallel processing to write GeoTiffs: True or False
-WRITE_THREADS = min(12, os.cpu_count())     # The Threads to use for map making, only work with WRITE_PARALLEL = True
+WRITE_THREADS = min(16, os.cpu_count())     # The Threads to use for map making, only work with WRITE_PARALLEL = True
 
 WRITE_REPORT_MAX_MEM_GB = 64                # The maximum memory (in GB) to use for writing report layers.
                                             #   Estimated based on the 0.5 GB MEM usage when RESFACTOR = 13 
@@ -369,6 +369,23 @@ RENEWABLE_GBF2_CUT_SOLAR = 20
 Independent biodiversity area coverage percentage thresholds (same scale as GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT)
 for determining which cells to exclude from renewable energy installation.
 Cells with biodiversity quality >= the conservation performance curve value at this cut are excluded.
+Lower values = fewer cells excluded, higher values = more cells excluded.
+'''
+
+EXCLUDE_RENEWABLES_IN_EPBC_MNES_MASK = True
+'''
+Whether to exclude renewable energy installation on cells inside the EPBC MNES prioritization layer
+(i.e., cells with high MNES priority rank).
+ - True: The model cannot install renewable energy on MNES high-priority cells.
+ - False: The model can install renewable energy on MNES high-priority cells.
+'''
+
+RENEWABLE_EPBC_MNES_CUT_SOLAR = 10
+RENEWABLE_EPBC_MNES_CUT_WIND = 10
+'''
+Independent MNES area coverage percentage thresholds for determining which cells to exclude from
+renewable energy installation. Cells with MNES priority rank >= the performance curve value at this
+cut are excluded.
 Lower values = fewer cells excluded, higher values = more cells excluded.
 '''
 

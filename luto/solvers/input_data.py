@@ -106,6 +106,8 @@ class SolverInputData:
     GBF2_mask_idx: np.ndarray                                           # Index of the mask of priority degraded areas.
     renewable_GBF2_mask_solar_idx: np.ndarray                            # Index of GBF2 mask for solar renewable exclusion.
     renewable_GBF2_mask_wind_idx: np.ndarray                             # Index of GBF2 mask for wind renewable exclusion.
+    renewable_MNES_mask_solar_idx: np.ndarray                           # Index of EPBC MNES mask for solar renewable exclusion.
+    renewable_MNES_mask_wind_idx: np.ndarray                            # Index of EPBC MNES mask for wind renewable exclusion.
 
     base_yr_prod: dict[str, tuple]                                      # Base year production of each commodity.
     scale_factors: dict[float]                                          # Scale factors for each input layer.
@@ -691,6 +693,18 @@ def get_renewable_GBF2_mask_wind_idx(data: Data) -> np.ndarray:
     return np.where(data.RENEWABLE_GBF2_MASK_WIND)[0]
 
 
+def get_renewable_MNES_mask_solar_idx(data: Data) -> np.ndarray:
+    if not settings.EXCLUDE_RENEWABLES_IN_EPBC_MNES_MASK:
+        return np.empty(0, dtype=int)
+    return np.where(data.RENEWABLE_MNES_MASK_SOLAR)[0]
+
+
+def get_renewable_MNES_mask_wind_idx(data: Data) -> np.ndarray:
+    if not settings.EXCLUDE_RENEWABLES_IN_EPBC_MNES_MASK:
+        return np.empty(0, dtype=int)
+    return np.where(data.RENEWABLE_MNES_MASK_WIND)[0]
+
+
 def rescale_per_species_data(arr: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """
     Rescale a 2D species×cell matrix per-species (per-row) independently.
@@ -925,6 +939,8 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     GBF2_mask_idx=get_GBF2_mask_idx(data)
     renewable_GBF2_mask_solar_idx=get_renewable_GBF2_mask_solar_idx(data)
     renewable_GBF2_mask_wind_idx=get_renewable_GBF2_mask_wind_idx(data)
+    renewable_MNES_mask_solar_idx=get_renewable_MNES_mask_solar_idx(data)
+    renewable_MNES_mask_wind_idx=get_renewable_MNES_mask_wind_idx(data)
 
     # Rescale solver input data
     [ag_obj_mrj, non_ag_obj_rk, ag_man_objs], economy_scale = rescale_solver_input_data([ag_obj_mrj, non_ag_obj_rk, ag_man_objs])
@@ -1077,6 +1093,8 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         GBF2_mask_idx,
         renewable_GBF2_mask_solar_idx,
         renewable_GBF2_mask_wind_idx,
+        renewable_MNES_mask_solar_idx,
+        renewable_MNES_mask_wind_idx,
 
         base_yr_prod,
         scale_factors,

@@ -725,10 +725,10 @@ class LutoSolver:
         print("│   └── Adding constraints for renewable energy production targets ...")
 
 
-        # Group the renewable energy types, input data, 
+        # Group the renewable energy types, input data,
         re_types = [
-            ('Utility Solar PV', self._input_data.renewable_solar_r, 'renewable_solar', self._input_data.renewable_GBF2_mask_solar_idx),
-            ('Onshore Wind',     self._input_data.renewable_wind_r,  'renewable_wind',  self._input_data.renewable_GBF2_mask_wind_idx),
+            ('Utility Solar PV', self._input_data.renewable_solar_r, 'renewable_solar', self._input_data.renewable_GBF2_mask_solar_idx, self._input_data.renewable_MNES_mask_solar_idx),
+            ('Onshore Wind',     self._input_data.renewable_wind_r,  'renewable_wind',  self._input_data.renewable_GBF2_mask_wind_idx,  self._input_data.renewable_MNES_mask_wind_idx),
         ]
         
         # Pop Australian Capital Territory out of the region_state_name2idx
@@ -741,28 +741,31 @@ class LutoSolver:
             print(f"│   │   ├── Adding renewable energy constraints for {reg_name} ...")
 
 
-            for am, energy_r, limit_key, gbf2_mask_idx in re_types:
-                
-                if not settings.AG_MANAGEMENTS[am]: 
+            for am, energy_r, limit_key, gbf2_mask_idx, mnes_mask_idx in re_types:
+
+                if not settings.AG_MANAGEMENTS[am]:
                     continue
-                
+
                 target_raw = self._input_data.limits[limit_key].get(reg_name)
                 target_rescal = self._input_data.limits[f"{limit_key}_rescale"].get(reg_name)
-                
+
                 if target_raw is None or target_rescal is None:
                     print(f"│   │   │   ├── target for {limit_key} is not found, skipping constraint ...")
                     continue
-                
+
                 print(f"│   │   │   ├── target for {limit_key} is {target_raw:5,.0f} Mwh")
 
                 am_exprs = []
                 for j_idx, j in enumerate(self._input_data.am2j[am]):
-                    
+
                     j_cells = np.union1d(self._input_data.ag_lu2cells[0, j], self._input_data.ag_lu2cells[1, j])
                     reg_AND_j_cells = np.intersect1d(j_cells, reg_idx)                      # Get cells that are both in the region and in the agricultural land use
-                    
+
                     if settings.EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS == True:
                         reg_AND_j_cells = np.setdiff1d(reg_AND_j_cells, gbf2_mask_idx)      # Disallowing renewable energy production in GBF2-masked cells, using type-specific cut values
+
+                    if settings.EXCLUDE_RENEWABLES_IN_EPBC_MNES_MASK == True:
+                        reg_AND_j_cells = np.setdiff1d(reg_AND_j_cells, mnes_mask_idx)      # Disallowing renewable energy production in EPBC MNES high-priority cells
                     
                     if not reg_AND_j_cells.size:continue
                     
