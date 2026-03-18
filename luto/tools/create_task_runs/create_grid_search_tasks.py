@@ -120,6 +120,14 @@ grid_search = {
     'CONTRIBUTION_PERCENTILE': ['USER_DEFINED'],                            # 50th percentile of HCAS per LUF Report 2026 (was 'USER_DEFINED')
     'CONNECTIVITY_SOURCE': ['NCI'],
     'CONNECTIVITY_LB': [0.7],                                               # Connectivity score importance: 0.7 per LUF Report 2026
+
+    # --------------- Biodiversity contribution parameters ---------------
+    'BIO_CONTRIBUTION_LDS': [0.7],                                          # Late dry season savanna fire regime (doc=0.7, default=0.8)
+    'BIO_CONTRIBUTION_ENV_PLANTING': [0.7],                                 # Environmental plantings (doc=0.7, default=0.8)
+    'BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK': [0.12],                       # Carbon plantings block (doc=0.12, default=0.1)
+    'BIO_CONTRIBUTION_CARBON_PLANTING_BELT': [0.12],                        # Carbon plantings belt (doc=0.12, default=0.1)
+    'BIO_CONTRIBUTION_RIPARIAN_PLANTING': [1.0],                            # Riparian plantings (doc=1.0, default=1.2)
+    'BIO_CONTRIBUTION_AGROFORESTRY': [0.7],                                 # Agroforestry (doc=0.7, default=0.75)
     
     # --------------- Biodiversity settings - GBF 2 ---------------
     'BIODIVERSITY_TARGET_GBF_2': ['high'],                                  # 'off', 'low', 'medium', 'high'
