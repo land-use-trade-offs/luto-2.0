@@ -2273,14 +2273,14 @@ class Data:
             layer = self.BIO_GBF4_PRESENCE_SNES_SEL[idx]
             f = interp1d(
                 [2010, 2030, 2050, 2100],
-                [row[f'BASEYEAR_LEVEL_{layer}'], row[f'TARGET_LEVEL_2030_{layer}'], row[f'TARGET_LEVEL_2050_{layer}'], row[f'TARGET_LEVEL_2100_{layer}']],
+                [min(row[f'BASEYEAR_LEVEL_{layer}'], row[f'TARGET_LEVEL_2030_{layer}']), row[f'TARGET_LEVEL_2030_{layer}'], row[f'TARGET_LEVEL_2050_{layer}'], row[f'TARGET_LEVEL_2100_{layer}']],
                 kind = "linear",
                 fill_value = "extrapolate",
             )
 
             interp_pct = float(f(yr))
             attainable_pct = row[f'ATTAINABLE_LEVEL_{layer}']
-            
+
             target_pct = min(interp_pct, attainable_pct)                                    # Cap target at attainable level
             if interp_pct > attainable_pct:
                 print(f"│   ├── SNES target capped for '{row['SCIENTIFIC_NAME']}' ({layer}): {interp_pct:.2f}% -> {attainable_pct:.2f}% (attainable limit)", flush=True)
@@ -2303,14 +2303,14 @@ class Data:
             layer = self.BIO_GBF4_PRESENCE_ECNES_SEL[idx]
             f = interp1d(
                 [2010, 2030, 2050, 2100],
-                [row[f'BASEYEAR_LEVEL_{layer}'], row[f'TARGET_LEVEL_2030_{layer}'], row[f'TARGET_LEVEL_2050_{layer}'], row[f'TARGET_LEVEL_2100_{layer}']],
+                [min(row[f'BASEYEAR_LEVEL_{layer}'], row[f'TARGET_LEVEL_2030_{layer}']), row[f'TARGET_LEVEL_2030_{layer}'], row[f'TARGET_LEVEL_2050_{layer}'], row[f'TARGET_LEVEL_2100_{layer}']],
                 kind = "linear",
                 fill_value = "extrapolate",
             )
 
             interp_pct = float(f(yr))
             attainable_pct = row[f'ATTAINABLE_LEVEL_{layer}']
-            
+
             target_pct = min(interp_pct, attainable_pct)                                    # Cap target at attainable level
             if interp_pct > attainable_pct:
                 print(f"│   ├── ECNES target capped for '{row['COMMUNITY']}' ({layer}): {interp_pct:.2f}% -> {attainable_pct:.2f}% (attainable limit)", flush=True)
@@ -2389,7 +2389,7 @@ class Data:
         for _,row in self.BIO_GBF8_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES.iterrows():
             f = interp1d(
                 [2010, 2030, 2050, 2100],
-                [row['HABITAT_SUITABILITY_BASELINE_PERCENT'], row[f'USER_DEFINED_TARGET_PERCENT_2030'], row[f'USER_DEFINED_TARGET_PERCENT_2050'], row[f'USER_DEFINED_TARGET_PERCENT_2100']],
+                [min(row['HABITAT_SUITABILITY_BASELINE_PERCENT'], row['USER_DEFINED_TARGET_PERCENT_2030']), row[f'USER_DEFINED_TARGET_PERCENT_2030'], row[f'USER_DEFINED_TARGET_PERCENT_2050'], row[f'USER_DEFINED_TARGET_PERCENT_2100']],
                 kind="linear",
                 fill_value="extrapolate",
             )
