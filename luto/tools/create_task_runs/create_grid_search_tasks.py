@@ -48,7 +48,7 @@ grid_search = {
     ###############################################################
     'OBJECTIVE': ['maxprofit'],                                             # 'maxprofit' or 'mincost'
     'RESFACTOR': [5],
-    'SIM_YEARS': [range(2020,2051,5)],                                      # Years to run the model (2020-2060 per LUF Report 2026, but LUTO now only supports 2010-2050)
+    'SIM_YEARS': [range(2010,2051,5)],                                      # 2010-2050 (2010 is base year; 2060 not yet supported)
     'WRITE_THREADS': [4],
     
  
@@ -60,6 +60,9 @@ grid_search = {
     # --------------- Scenarios ---------------
     'SSP': ['245'],                                                         # Core: SSP2-RCP4.5. Add '585' separately for higher climate impacts sensitivity (lower priority, LUF Report 2026)
     'CARBON_EFFECTS_WINDOW': [60],
+    'RISK_OF_REVERSAL': [0.05],                                             # Risk of reversal buffer under ERF (aligns with ACCU methods)
+    'FIRE_RISK': ['med'],                                                   # 'low', 'med', 'high' → 5th/50th/95th percentile of modelled fire impacts; 'med' = 94% median
+    'CONVERGENCE': [2050],                                                  # Year at which dietary transformation is completed
     'CO2_FERT': ['off'],                                                    # 'on' or 'off'
     'APPLY_DEMAND_MULTIPLIERS': [True],                                     # True or False. Whether to apply demand multipliers from AusTIME model.
     'NON_AG_LAND_USES' : [{
@@ -76,8 +79,12 @@ grid_search = {
 
     # --------------- Economics ---------------
     'DYNAMIC_PRICE' : [True],                                               # True or False (ON per LUF Report 2026)
+    'AMORTISE_UPFRONT_COSTS': [False],                                      # OFF per LUF Report 2026
+    'DISCOUNT_RATE': [0.07],                                                # 7% per LUF Report 2026
+    'CARBON_PRICE_COSTANT': [0],                                            # $0/tonne; LUTO does not consider cost/revenue for pure carbon emission/sequestration
     'BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR': [100, 50],                 # AUD/ha/year; 100=core, 50=Cheaper HIR sensitivity (LUF Report 2026)
     'SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR':[100, 50],                 # AUD/ha/year; 100=core, 50=Cheaper HIR sensitivity (LUF Report 2026)
+    'HIR_CEILING_PERCENTAGE': [0.9],                                        # HIR achieves 90% of bio/GHG benefits of Destocked - natural land
 
     # --------------- Target deviation weight ---------------
     'SOLVER_WEIGHT_DEMAND': [1], 
@@ -103,12 +110,16 @@ grid_search = {
     'WATER_REGION_DEF':['Drainage Division'],                               # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
     'WATER_LIMITS': ['on'],                                                 # 'on' or 'off'
     'WATER_CONSTRAINT_TYPE': ['hard'],                                      # 'hard' or 'soft'
+    'WATER_STRESS': [0.6],                                                  # Water yield must be >= 60% of historical; aligns with 2023 Planetary Boundaries update
+    'WATER_CLIMATE_CHANGE_IMPACT': ['on'],                                  # 'on' or 'off'; climate change impacts on water yields
+    'LIVESTOCK_DRINKING_WATER': [1],                                        # 1=ON; include livestock drinking water in water balance
     'INCLUDE_WATER_LICENSE_COSTS': [1],
     
     # --------------- Biodiversity overall ---------------
-    'BIO_QUALITY_LAYER': ['Suitability'],                               
+    'BIO_QUALITY_LAYER': ['Suitability'],
     'CONTRIBUTION_PERCENTILE': ['USER_DEFINED'],                            # 50th percentile of HCAS per LUF Report 2026 (was 'USER_DEFINED')
     'CONNECTIVITY_SOURCE': ['NCI'],
+    'CONNECTIVITY_LB': [0.7],                                               # Connectivity score importance: 0.7 per LUF Report 2026
     
     # --------------- Biodiversity settings - GBF 2 ---------------
     'BIODIVERSITY_TARGET_GBF_2': ['high'],                                  # 'off', 'low', 'medium', 'high'
@@ -139,6 +150,20 @@ grid_search = {
     'SOLVE_WEIGHT_BETA':  [0.5],         
     
     
+    # --------------- Ag management ---------------
+    'AG_MANAGEMENTS': [{
+        'Asparagopsis taxiformis': True,
+        'Precision Agriculture': True,
+        'Ecological Grazing': False,                                        # OFF per LUF Report 2026 (controversial)
+        'Savanna Burning': True,
+        'AgTech EI': True,
+        'Biochar': True,
+        'HIR - Beef': True,
+        'HIR - Sheep': True,
+        'Utility Solar PV': False,                                          # OFF for core; ON for REN1-REN4
+        'Onshore Wind': False,                                              # OFF for core; ON for REN1-REN4
+    }],
+
     #-------------------- Dietary --------------------
     'DIET_DOM': ['BAU'],                                                    # 'BAU', 'FLX', 'VEG', 'VGN'
     'DIET_GLOB': ['BAU'],                                                   # 'BAU' or 'FLX'
