@@ -47,10 +47,7 @@ from gurobipy import GRB
 # Worker script called by each PBS job (absolute path)
 WORKER_SCRIPT = os.path.join(os.path.dirname(__file__), 'check_one_constraint.py')
 
-DEFAULT_MPS = (
-    "/g/data/jk53/jinzhu/LUTO/luto-2.0/output/"
-    "2026_03_12__22_50_37_RF5_2010-2050/debug_model_2010_2015.mps"
-)
+DEFAULT_MPS = "/g/data/jk53/jinzhu/LUTO/luto-2.0/output/2026_03_18__13_47_54_RF5_2010-2050/debug_model_2010_2015.mps"
 
 
 def submit_ecnes_checks(
@@ -245,24 +242,13 @@ def collect_results(work_dir: str):
         else:
             missing.append(idx)
 
-    print(f"Collected {len(results)}/{n_total} results")
     if missing:
-        print(f"Missing results for {len(missing)} constraints (indices: {missing[:20]}{'...' if len(missing) > 20 else ''})")
+        print(f"Missing results for {len(missing)}/{n_total} constraints (indices: {missing[:20]}{'...' if len(missing) > 20 else ''})")
         print("Check logs in:", os.path.join(work_dir, "logs"))
         print()
 
     if not results:
         return results
-
-    # Print individual results
-    for i, r in enumerate(results):
-        max_lhs = r['max_lhs'] if r['max_lhs'] is not None else float('nan')
-        target = r['target'] if r['target'] is not None else float('nan')
-        gap = r['gap'] if r['gap'] is not None else float('nan')
-        ratio = r['ratio'] if r['ratio'] is not None else float('nan')
-        print(f"[{i+1}/{len(results)}] {r['marker']:12s} | "
-              f"max={max_lhs:12.4f} target={target:12.4f} gap={gap:12.4f} "
-              f"({ratio:.1%}) | {r['constr_name']}")
 
     # ── Summary ──
     infeasible = [r for r in results if r['feasible'] is False]
@@ -276,21 +262,21 @@ def collect_results(work_dir: str):
     if infeasible:
         infeasible.sort(key=lambda x: -(x['gap'] if x['gap'] != float('inf') else 1e30))
         print(f"\nINFEASIBLE ECNES constraints (sorted by gap, worst first):")
-        print(f"{'Community':<65s} {'Target':>12s} {'Max LHS':>12s} {'Gap':>12s} {'Achieved':>10s}")
-        print("-" * 115)
+        print(f"{'Community':<63s} {'Target':>12s} {'Max LHS':>12s} {'Gap':>12s} {'Achieved':>10s}")
+        print("-" * 113)
         for r in infeasible:
+            name = r['constr_name'][:60] + '...' if len(r['constr_name']) > 60 else r['constr_name']
             if r['max_lhs'] == float('-inf'):
-                print(f"{r['constr_name']:<65s} {r['target']:12.4f} {'model infeas':>12s} {'N/A':>12s} {'N/A':>10s}")
+                print(f"{name:<63s} {r['target']:12.4f} {'model infeas':>12s} {'N/A':>12s} {'N/A':>10s}")
             else:
-                print(f"{r['constr_name']:<65s} {r['target']:12.4f} {r['max_lhs']:12.4f} {r['gap']:12.4f} {r['ratio']:9.1%}")
+                print(f"{name:<63s} {r['target']:12.4f} {r['max_lhs']:12.4f} {r['gap']:12.4f} {r['ratio']:9.1%}")
 
     if feasible:
         feasible.sort(key=lambda x: x['ratio'])
         print(f"\nFEASIBLE ECNES constraints (tightest first):")
-        for r in feasible[:10]:
-            print(f"  {r['ratio']:7.1%} achievable | target={r['target']:12.4f} max={r['max_lhs']:12.4f} | {r['constr_name']}")
-        if len(feasible) > 10:
-            print(f"  ... and {len(feasible) - 10} more feasible constraints")
+        for r in feasible:
+            name = r['constr_name'][:60] + '...' if len(r['constr_name']) > 60 else r['constr_name']
+            print(f"  {r['ratio']:7.1%} achievable | target={r['target']:12.4f} max={r['max_lhs']:12.4f} | {name}")
 
     # ── Save summary to work_dir ──
     summary_path = os.path.join(work_dir, "summary.json")
