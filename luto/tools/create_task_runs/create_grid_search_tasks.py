@@ -37,7 +37,7 @@ grid_search = {
     # Task run settings for submitting the job to the cluster
     ###############################################################
     'MEM': ['64GB'],
-    'WRITE_REPORT_MAX_MEM_GB': [64],                                       # Max memory for writing report (in GB)
+    'WRITE_REPORT_MAX_MEM_GB': [64],                                        # Max memory for writing report (in GB)
     'NCPUS':[16],
     'TIME': ['12:00:00'],
     'QUEUE': ['normalsr'],                                                  # normalsr for CPU, hugemembw for memory intensive jobs
@@ -48,7 +48,7 @@ grid_search = {
     ###############################################################
     'OBJECTIVE': ['maxprofit'],                                             # 'maxprofit' or 'mincost'
     'RESFACTOR': [5],
-    'SIM_YEARS': [range(2010,2051,5)],                                      # 2010-2050 (2010 is base year; 2060 not yet supported)
+    'SIM_YEARS': [range(2020,2051,5)],                                      # 2010-2050 (2010 is base year; 2060 not yet supported)
     'WRITE_THREADS': [4],
     
  
@@ -61,26 +61,17 @@ grid_search = {
     'SSP': ['245'],                                                         # Core: SSP2-RCP4.5. Add '585' separately for higher climate impacts sensitivity (lower priority, LUF Report 2026)
     'CARBON_EFFECTS_WINDOW': [60],
     'RISK_OF_REVERSAL': [0.05],                                             # Risk of reversal buffer under ERF (aligns with ACCU methods)
-    'FIRE_RISK': ['med'],                                                   # 'low', 'med', 'high' → 5th/50th/95th percentile of modelled fire impacts; 'med' = 94% median
+    'FIRE_RISK': ['med'],                                                   # Not effect as of 20260318 following decision to drop fire risk and just use the 5% ERF risk of reversal
     'CONVERGENCE': [2050],                                                  # Year at which dietary transformation is completed
     'CO2_FERT': ['off'],                                                    # 'on' or 'off'
     'APPLY_DEMAND_MULTIPLIERS': [True],                                     # True or False. Whether to apply demand multipliers from AusTIME model.
-    'NON_AG_LAND_USES' : [{
-        'Environmental Plantings': True,
-        'Riparian Plantings': True,
-        'Sheep Agroforestry': True,
-        'Beef Agroforestry': True,
-        'Carbon Plantings (Block)': True,       
-        'Sheep Carbon Plantings (Belt)': True,  
-        'Beef Carbon Plantings (Belt)': True,   
-        'BECCS': False,
-        'Destocked - natural land': True,
-    }],
+    
 
     # --------------- Economics ---------------
     'DYNAMIC_PRICE' : [True],                                               # True or False (ON per LUF Report 2026)
     'AMORTISE_UPFRONT_COSTS': [False],                                      # OFF per LUF Report 2026
     'DISCOUNT_RATE': [0.07],                                                # 7% per LUF Report 2026
+    'AMORTISATION_PERIOD': [30],                                            # 30 years per LUF Report 2026
     'CARBON_PRICE_COSTANT': [0],                                            # $0/tonne; LUTO does not consider cost/revenue for pure carbon emission/sequestration
     'BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR': [100, 50],                 # AUD/ha/year; 100=core, 50=Cheaper HIR sensitivity (LUF Report 2026)
     'SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR':[100, 50],                 # AUD/ha/year; 100=core, 50=Cheaper HIR sensitivity (LUF Report 2026)
@@ -128,6 +119,8 @@ grid_search = {
     'BIO_CONTRIBUTION_CARBON_PLANTING_BELT': [0.12],                        # Carbon plantings belt (doc=0.12, default=0.1)
     'BIO_CONTRIBUTION_RIPARIAN_PLANTING': [1.0],                            # Riparian plantings (doc=1.0, default=1.2)
     'BIO_CONTRIBUTION_AGROFORESTRY': [0.7],                                 # Agroforestry (doc=0.7, default=0.75)
+    'BIO_CONTRIBUTION_BECCS': [0],                                          # BECCS (doc=0, default=0)
+    'BIO_CONTRIBUTION_DESTOCKING': [0.75],                                  # Destocking (doc=0.75, default=None=uses HCAS lookup difference)
     
     # --------------- Biodiversity settings - GBF 2 ---------------
     'BIODIVERSITY_TARGET_GBF_2': ['high'],                                  # 'off', 'low', 'medium', 'high'
@@ -151,12 +144,10 @@ grid_search = {
     'RENEWABLE_ENERGY_CONSTRAINTS': ['off'],                               # 'off'=core (LUF Report 2026); 'on' for REN1-REN4 scenarios
     'RENEWABLE_TARGET_SCENARIO_TARGETS': ['Gladstone - Current Targets'],  # 'CNS - Accelerated Transition', 'CNS - Current Targets', 'Gladstone - Current Targets'
     
-    ###############################################################
-    # Scenario settings for the model run
-    ###############################################################
+    
+    # --------------- Objective function weights ---------------
     'SOLVE_WEIGHT_ALPHA': [1],                                              # between 0 and 1, if 1 will turn off biodiversity objective, if 0 will turn off profit objective
     'SOLVE_WEIGHT_BETA':  [0.5],         
-    
     
     # --------------- Ag management ---------------
     'AG_MANAGEMENTS': [{
@@ -170,6 +161,30 @@ grid_search = {
         'HIR - Sheep': True,
         'Utility Solar PV': False,                                          # OFF for core; ON for REN1-REN4
         'Onshore Wind': False,                                              # OFF for core; ON for REN1-REN4
+    }],
+    
+    # --------------- Non-agricultural land uses ---------------
+    'NON_AG_LAND_USES' : [{
+        'Environmental Plantings': True,
+        'Riparian Plantings': True,
+        'Sheep Agroforestry': True,
+        'Beef Agroforestry': True,
+        'Carbon Plantings (Block)': True,
+        'Sheep Carbon Plantings (Belt)': True,
+        'Beef Carbon Plantings (Belt)': True,
+        'BECCS': False,
+        'Destocked - natural land': True,
+    }],
+    'NON_AG_LAND_USES_REVERSIBLE': [{                                       
+        'Environmental Plantings': False,
+        'Riparian Plantings': False,
+        'Sheep Agroforestry': False,
+        'Beef Agroforestry': False,
+        'Carbon Plantings (Block)': False,
+        'Sheep Carbon Plantings (Belt)': False,
+        'Beef Carbon Plantings (Belt)': False,
+        'BECCS': False,
+        'Destocked - natural land': True,                                   # Destocking is reversible in the model (can switch back to grazing), but we consider it a permanent land use change for the purposes of the reversal risk buffer
     }],
 
     #-------------------- Dietary --------------------
