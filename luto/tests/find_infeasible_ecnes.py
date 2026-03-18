@@ -47,7 +47,7 @@ from gurobipy import GRB
 # Worker script called by each PBS job (absolute path)
 WORKER_SCRIPT = os.path.join(os.path.dirname(__file__), 'check_one_constraint.py')
 
-DEFAULT_MPS = "/g/data/jk53/jinzhu/LUTO/luto-2.0/output/2026_03_18__13_47_54_RF5_2010-2050/debug_model_2010_2015.mps"
+DEFAULT_MPS = "/g/data/jk53/jinzhu/LUTO/luto-2.0/output/2026_03_18__15_13_01_RF5_2010-2050/debug_model_2010_2015.mps"
 
 
 def submit_ecnes_checks(
