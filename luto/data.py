@@ -1158,7 +1158,7 @@ class Data:
         
         # Get the carbon stock of unallowcated natural land
         self.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR = np.array(
-            nat_land_CO2['NATURAL_LAND_TREES_DEBRIS_SOIL_TCO2_HA'] - (nat_land_CO2['NATURAL_LAND_AGB_DEBRIS_TCO2_HA'] * (100 - fire_risk).to_numpy() / 100),  # everyting minus the fire DAMAGE
+            nat_land_CO2['NATURAL_LAND_TREES_DEBRIS_SOIL_TCO2_HA'] - (nat_land_CO2['NATURAL_LAND_AGB_DEBRIS_TCO2_HA'] * (100 - fire_risk) / 100),  # everyting minus the fire DAMAGE
         ) / settings.CARBON_EFFECTS_WINDOW
         
         
