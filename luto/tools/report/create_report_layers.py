@@ -530,8 +530,9 @@ def save_report_layer(raw_data_dir:str):
         *cell_magnitudes['ghg_emission']['non_ag'],
         *cell_magnitudes['ghg_emission']['ag_man'],
         # *cell_magnitudes['ghg_emission']['transition'],
+        *cell_magnitudes['ghg_emission'].get('sum', []),
     )
-    
+
     ghg_min_max = (min(ghg_magnitudes), max(ghg_magnitudes))
 
     ghg_ag = files_ghg.query('base_name == "xr_GHG_ag"')
@@ -545,6 +546,10 @@ def save_report_layer(raw_data_dir:str):
     ghg_nonag = files_ghg.query('base_name == "xr_GHG_non_ag"')
     get_map2json(ghg_nonag, None, None, legend_float, ghg_min_max, f'{SAVE_DIR}/map_layers/map_GHG_NonAg.js')
     print('│   ├── GHG Non-Ag layer saved.')
+
+    ghg_sum = files_ghg.query('base_name == "xr_GHG_sum"')
+    get_map2json(ghg_sum, None, None, legend_float, ghg_min_max, f'{SAVE_DIR}/map_layers/map_GHG_Sum.js')
+    print('│   ├── GHG Sum layer saved.')
 
 
 

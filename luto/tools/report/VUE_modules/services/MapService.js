@@ -81,6 +81,7 @@ window.MapService = {
       },
     },
     'GHG': {
+      'Sum': { 'path': 'data/map_layers/map_GHG_Sum.js', 'name': 'map_GHG_Sum' },
       'Ag': { 'path': 'data/map_layers/map_GHG_Ag.js', 'name': 'map_GHG_Ag' },
       'Ag Mgt': { 'path': 'data/map_layers/map_GHG_Am.js', 'name': 'map_GHG_Am' },
       'Non-Ag': { 'path': 'data/map_layers/map_GHG_NonAg.js', 'name': 'map_GHG_NonAg' },

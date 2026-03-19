@@ -1663,6 +1663,57 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
     
 
 
+    # -------------------- GHG Sum (Ag + Am + NonAg) --------------------
+
+    # Ag: sum over source, keep water/lu/year
+    ghg_ag_sum = GHG_ag_non_all\
+        .groupby(['region', 'Water_supply', 'Land-use', 'Year'])[['Value (t CO2e)']]\
+        .sum(numeric_only=True).reset_index()
+
+    # Am: sum over management type, keep water/lu/year
+    ghg_am_sum = GHG_ag_man_non_all\
+        .groupby(['region', 'Water_supply', 'Land-use', 'Year'])[['Value (t CO2e)']]\
+        .sum(numeric_only=True).reset_index()
+
+    # NonAg: assign to Dryland water supply
+    ghg_non_ag_non_all = GHG_non_ag.query('`Land-use` != "ALL"').reset_index(drop=True)
+    ghg_non_ag_sum = ghg_non_ag_non_all[['region', 'Land-use', 'Year', 'Value (t CO2e)']].copy()
+    ghg_non_ag_sum['Water_supply'] = 'Dryland'
+
+    # Combine all three categories
+    ghg_sum = pd.concat([ghg_ag_sum, ghg_am_sum, ghg_non_ag_sum], ignore_index=True)
+    ghg_sum = ghg_sum.query('abs(`Value (t CO2e)`) > 1').reset_index(drop=True)
+
+    # Add ALL water aggregate
+    ghg_sum_all_water = ghg_sum\
+        .groupby(['region', 'Land-use', 'Year'])[['Value (t CO2e)']]\
+        .sum(numeric_only=True).reset_index().assign(Water_supply='ALL')
+    ghg_sum = pd.concat([ghg_sum_all_water, ghg_sum], ignore_index=True)
+
+    df_wide = ghg_sum\
+        .groupby(['region', 'Water_supply', 'Land-use'])[['Year', 'Value (t CO2e)']]\
+        .apply(lambda x: x[['Year', 'Value (t CO2e)']].values.tolist())\
+        .reset_index()
+    df_wide.columns = ['region', 'water', 'name', 'data']
+    df_wide['type'] = 'column'
+    df_wide['color'] = df_wide['name'].apply(lambda x: COLORS[x])
+    df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+
+    out_dict = {}
+    for (region, water), df in df_wide.groupby(['region', 'water']):
+        df = df.drop(['region', 'water'], axis=1)
+        if region not in out_dict:
+            out_dict[region] = {}
+        out_dict[region][water] = df.to_dict(orient='records')
+
+    filename = 'GHG_Sum'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
+
+
     # -------------------- GHG ranking --------------------
     GHG_rank_emission_region = GHG_land_non_all\
         .query('`Value (t CO2e)` > 0')\

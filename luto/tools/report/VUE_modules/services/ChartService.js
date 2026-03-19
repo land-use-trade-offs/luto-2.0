@@ -345,6 +345,10 @@ window.ChartService = {
       },
     },
     "GHG": {
+      "Sum": {
+        "path": "data/GHG_Sum.js",
+        "name": "GHG_Sum",
+      },
       "Ag": {
         "path": "data/GHG_Ag.js",
         "name": "GHG_Ag",

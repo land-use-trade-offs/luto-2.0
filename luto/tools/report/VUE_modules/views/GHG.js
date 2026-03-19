@@ -27,7 +27,7 @@ window.GHGView = {
     };
 
     // Available selections
-    const availableCategories = ["Ag", "Ag Mgt", "Non-Ag"];
+    const availableCategories = ["Sum", "Ag", "Ag Mgt", "Non-Ag"];
     const availableAgMgt = ref([]);
     const availableWater = ref([]);
     const availableSource = ref([]);  // Ag only: Water → Source → LU
@@ -42,6 +42,7 @@ window.GHGView = {
 
     // Previous selections memory
     const previousSelections = ref({
+      "Sum": { water: "", landuse: "" },
       "Ag": { water: "", source: "", landuse: "" },
       "Ag Mgt": { agMgt: "", water: "", landuse: "" },
       "Non-Ag": { landuse: "" }
@@ -52,13 +53,16 @@ window.GHGView = {
     const isDrawerOpen = ref(false);
 
     // Reactive data
+    // map_GHG_Sum:   Water → LU → Year
     // map_GHG_Ag:    Water → Source → LU → Year
     // map_GHG_Am:    AgMgt → Water → LU → Year
     // map_GHG_NonAg: LU → Year
     const selectMapData = computed(() => {
       if (!dataLoaded.value) return {};
       const mapData = window[mapRegister[selectCategory.value]["name"]];
-      if (selectCategory.value === "Ag") {
+      if (selectCategory.value === "Sum") {
+        return mapData?.[selectWater.value]?.[selectLanduse.value]?.[selectYear.value] || {};
+      } else if (selectCategory.value === "Ag") {
         return mapData?.[selectWater.value]?.[selectSource.value]?.[selectLanduse.value]?.[selectYear.value] || {};
       } else if (selectCategory.value === "Ag Mgt") {
         return mapData?.[selectAgMgt.value]?.[selectWater.value]?.[selectLanduse.value]?.[selectYear.value] || {};
@@ -68,6 +72,7 @@ window.GHGView = {
       return {};
     });
 
+    // GHG_Sum chart:   Region → Water → [series(name=LU)]
     // GHG_Ag chart:    Region → Water → Source → [series(name=LU)]
     // GHG_Am chart:    Region → Water → LU → [series(name=AgMgt)]
     // GHG_NonAg chart: Region → [series(name=LU)]
@@ -76,7 +81,9 @@ window.GHGView = {
       const chartData = window[chartRegister[selectCategory.value]["name"]]?.[selectRegion.value];
       let seriesData;
 
-      if (selectCategory.value === "Ag") {
+      if (selectCategory.value === "Sum") {
+        seriesData = (chartData?.[selectWater.value] || []).filter(s => selectLanduse.value === "ALL" || s.name === selectLanduse.value);
+      } else if (selectCategory.value === "Ag") {
         seriesData = chartData?.[selectWater.value]?.[selectSource.value] || [];
         seriesData = seriesData.filter(s => selectLanduse.value === "ALL" || s.name === selectLanduse.value);
       } else if (selectCategory.value === "Ag Mgt") {
@@ -104,9 +111,11 @@ window.GHGView = {
       await loadScript("./data/chart_option/Chart_default_options.js", "Chart_default_options", VIEW_NAME);
 
       // Load data
+      await loadScript(mapRegister["Sum"]["path"], mapRegister["Sum"]["name"], VIEW_NAME);
       await loadScript(mapRegister["Ag"]["path"], mapRegister["Ag"]["name"], VIEW_NAME);
       await loadScript(mapRegister["Ag Mgt"]["path"], mapRegister["Ag Mgt"]["name"], VIEW_NAME);
       await loadScript(mapRegister["Non-Ag"]["path"], mapRegister["Non-Ag"]["name"], VIEW_NAME);
+      await loadScript(chartRegister["Sum"]["path"], chartRegister["Sum"]["name"], VIEW_NAME);
       await loadScript(chartRegister["Ag"]["path"], chartRegister["Ag"]["name"], VIEW_NAME);
       await loadScript(chartRegister["Ag Mgt"]["path"], chartRegister["Ag Mgt"]["name"], VIEW_NAME);
       await loadScript(chartRegister["Non-Ag"]["path"], chartRegister["Non-Ag"]["name"], VIEW_NAME);
@@ -132,7 +141,9 @@ window.GHGView = {
     // Progressive selection chain watchers
     watch(selectCategory, (newCategory, oldCategory) => {
       // Save previous selections before switching
-      if (oldCategory === "Ag") {
+      if (oldCategory === "Sum") {
+        previousSelections.value["Sum"] = { water: selectWater.value, landuse: selectLanduse.value };
+      } else if (oldCategory === "Ag") {
         previousSelections.value["Ag"] = { water: selectWater.value, source: selectSource.value, landuse: selectLanduse.value };
       } else if (oldCategory === "Ag Mgt") {
         previousSelections.value["Ag Mgt"] = { agMgt: selectAgMgt.value, water: selectWater.value, landuse: selectLanduse.value };
@@ -146,11 +157,22 @@ window.GHGView = {
       const curAgMgt = selectAgMgt.value;
       const curSource = selectSource.value;
 
+      const sumData = window[mapRegister["Sum"]["name"]];
       const agData = window[mapRegister["Ag"]["name"]];
       const amData = window[mapRegister["Ag Mgt"]["name"]];
       const nonAgData = window[mapRegister["Non-Ag"]["name"]];
 
-      if (newCategory === "Ag") {
+      if (newCategory === "Sum") {
+        // Cascade: Water → LU
+        availableWater.value = Object.keys(sumData || {});
+        const prevWater = previousSelections.value["Sum"].water || curWater;
+        selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
+
+        availableLanduse.value = Object.keys(sumData?.[selectWater.value] || {});
+        const prevLanduse = previousSelections.value["Sum"].landuse || curLanduse;
+        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
+
+      } else if (newCategory === "Ag") {
         // Cascade: Water → Source → LU
         availableWater.value = Object.keys(agData || {});
         const prevWater = previousSelections.value["Ag"].water || curWater;
@@ -201,7 +223,15 @@ window.GHGView = {
     });
 
     watch(selectWater, (newWater) => {
-      if (selectCategory.value === "Ag") {
+      if (selectCategory.value === "Sum") {
+        previousSelections.value["Sum"].water = newWater;
+        const sumData = window[mapRegister["Sum"]["name"]];
+
+        availableLanduse.value = Object.keys(sumData?.[newWater] || {});
+        const prevLanduse = previousSelections.value["Sum"].landuse;
+        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
+
+      } else if (selectCategory.value === "Ag") {
         previousSelections.value["Ag"].water = newWater;
         const agData = window[mapRegister["Ag"]["name"]];
 
@@ -234,7 +264,9 @@ window.GHGView = {
     });
 
     watch(selectLanduse, (newLanduse) => {
-      if (selectCategory.value === "Ag") {
+      if (selectCategory.value === "Sum") {
+        previousSelections.value["Sum"].landuse = newLanduse;
+      } else if (selectCategory.value === "Ag") {
         previousSelections.value["Ag"].landuse = newLanduse;
       } else if (selectCategory.value === "Ag Mgt") {
         previousSelections.value["Ag Mgt"].landuse = newLanduse;
