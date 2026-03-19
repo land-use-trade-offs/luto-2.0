@@ -89,7 +89,6 @@ window.WaterView = {
         chart: { height: 440 },
         yAxis: { title: { text: availableUnit["Water"] } },
         series: seriesData || [],
-        colors: window["Supporting_info"].colors,
       };
     });
 

@@ -1663,7 +1663,7 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
     
 
 
-    # -------------------- GHG Sum (Ag + Am + NonAg) --------------------
+    # -------------------- GHG Sum (Ag + Am + NonAg + Transition + Off-land) --------------------
 
     # Ag: sum over source, keep water/lu/year
     ghg_ag_sum = GHG_ag_non_all\
@@ -1680,15 +1680,29 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
     ghg_non_ag_sum = ghg_non_ag_non_all[['region', 'Land-use', 'Year', 'Value (t CO2e)']].copy()
     ghg_non_ag_sum['Water_supply'] = 'Dryland'
 
-    # Combine all three categories
-    ghg_sum = pd.concat([ghg_ag_sum, ghg_am_sum, ghg_non_ag_sum], ignore_index=True)
+    # Transition: sum over Land-use per transition type; use Type as the series name
+    ghg_transition_sum = GHG_transition\
+        .groupby(['region', 'Water_supply', 'Type', 'Year'])[['Value (t CO2e)']]\
+        .sum(numeric_only=True).reset_index()\
+        .rename(columns={'Type': 'Land-use'})
+
+    # Combine Ag + Am + NonAg + Transition
+    ghg_sum = pd.concat([ghg_ag_sum, ghg_am_sum, ghg_non_ag_sum, ghg_transition_sum], ignore_index=True)
     ghg_sum = ghg_sum.query('abs(`Value (t CO2e)`) > 1').reset_index(drop=True)
 
-    # Add ALL water aggregate
+    # Add ALL water aggregate (computed before off_land to avoid double-counting)
     ghg_sum_all_water = ghg_sum\
         .groupby(['region', 'Land-use', 'Year'])[['Value (t CO2e)']]\
         .sum(numeric_only=True).reset_index().assign(Water_supply='ALL')
     ghg_sum = pd.concat([ghg_sum_all_water, ghg_sum], ignore_index=True)
+
+    # Off-land: replicate across ALL/Dryland/Irrigated so it appears on every water tab
+    ghg_off_land_by_year = GHG_off_land.groupby('Year')[['Value (t CO2e)']].sum(numeric_only=True).reset_index()
+    ghg_off_land_rows = pd.concat([
+        ghg_off_land_by_year.assign(Water_supply=w, **{'Land-use': 'Off-land emissions', 'region': 'AUSTRALIA'})
+        for w in ['ALL', 'Dryland', 'Irrigated']
+    ], ignore_index=True).query('abs(`Value (t CO2e)`) > 1')
+    ghg_sum = pd.concat([ghg_sum, ghg_off_land_rows], ignore_index=True)
 
     df_wide = ghg_sum\
         .groupby(['region', 'Water_supply', 'Land-use'])[['Year', 'Value (t CO2e)']]\
@@ -1697,7 +1711,13 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
     df_wide.columns = ['region', 'water', 'name', 'data']
     df_wide['type'] = 'column'
     df_wide['color'] = df_wide['name'].apply(lambda x: COLORS[x])
-    df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+    _ghg_sum_order = LANDUSE_ALL_RENAMED + [
+        'Unallocated natural to modified',
+        'Unallocated natural to livestock natural',
+        'Livestock natural to modified',
+        'Off-land emissions',
+    ]
+    df_wide['name_order'] = df_wide['name'].apply(lambda x: _ghg_sum_order.index(x) if x in _ghg_sum_order else 999)
     df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
 
     out_dict = {}
@@ -1706,6 +1726,18 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
         if region not in out_dict:
             out_dict[region] = {}
         out_dict[region][water] = df.to_dict(orient='records')
+
+    # Add Net emissions and GHG emission limit lines for AUSTRALIA across all water tabs
+    if 'AUSTRALIA' in out_dict:
+        net_values = (
+            ghg_sum_all_water.query('region == "AUSTRALIA"')
+            .groupby('Year')['Value (t CO2e)'].sum()
+            + ghg_off_land_by_year.set_index('Year')['Value (t CO2e)']
+        )
+        net_australia_wide = [[y, v] for y, v in zip(net_values.index.tolist(), net_values.values)]
+        for water in out_dict['AUSTRALIA']:
+            out_dict['AUSTRALIA'][water].append({'name': 'Net emissions',    'data': net_australia_wide, 'type': 'line', 'color': COLORS['Net emissions']})
+            out_dict['AUSTRALIA'][water].append({'name': 'GHG emission limit', 'data': GHG_limit_wide,      'type': 'line', 'color': COLORS['GHG emission limit']})
 
     filename = 'GHG_Sum'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
@@ -2214,11 +2246,12 @@ def process_water_data(files, SAVE_DIR):
         
     water_ag = pd.concat([
         water_ag_AUS,
-        water_net_yield_NRM_region.query('Type == "Agricultural Land-use"').rename(columns={'region_NRM': 'region'})
-        ], ignore_index=True)
-    
+        water_net_yield_NRM_region.query('Type == "Agricultural Land-use" and region_NRM != "AUSTRALIA"').rename(columns={'region_NRM': 'region'})
+        ], ignore_index=True)\
+        .query('Landuse != "ALL"')
+
     df_region_wide = water_ag.groupby(['region', 'Water Supply', 'Landuse'])[['Year','Value (ML)']]\
-        .apply(lambda x: x[['Year', 'Value (ML)']].values.tolist())\
+        .apply(lambda x: [[int(r[0]), r[1]] for r in x[['Year', 'Value (ML)']].values.tolist()])\
         .reset_index()
   
     df_region_wide.columns = ['region', 'water', 'name',  'data']
@@ -2257,13 +2290,13 @@ def process_water_data(files, SAVE_DIR):
     water_am = pd.concat(
         [water_am_AUS,
          water_net_yield_NRM_region\
-             .query('Type == "Agricultural Management" and Landuse != "ALL"')\
+             .query('Type == "Agricultural Management" and Landuse != "ALL" and region_NRM != "AUSTRALIA"')\
              .rename(columns={'region_NRM': 'region'})],
         ignore_index=True
-    )
+    ).query('`Agricultural Management` != "ALL"')
 
     df_region_wide = water_am.groupby(['region', 'Water Supply', 'Landuse', 'Agricultural Management'])[['Year','Value (ML)']]\
-        .apply(lambda x: x[['Year', 'Value (ML)']].values.tolist())\
+        .apply(lambda x: [[int(r[0]), r[1]] for r in x[['Year', 'Value (ML)']].values.tolist()])\
         .reset_index()
     df_region_wide.columns = ['region', 'water', 'landuse', 'name',  'data']
     df_region_wide['type'] = 'column'
@@ -2299,11 +2332,11 @@ def process_water_data(files, SAVE_DIR):
         
     water_nonag = pd.concat([
         water_nonag_AUS,
-        water_net_yield_NRM_region.query('Type == "Non-Agricultural Land-use"').rename(columns={'region_NRM': 'region'})
+        water_net_yield_NRM_region.query('Type == "Non-Agricultural Land-use" and region_NRM != "AUSTRALIA"').rename(columns={'region_NRM': 'region'})
         ], ignore_index=True)
 
     df_region_wide = water_nonag.groupby(['region', 'Landuse'])[['Year','Value (ML)']]\
-        .apply(lambda x: x[['Year', 'Value (ML)']].values.tolist())\
+        .apply(lambda x: [[int(r[0]), r[1]] for r in x[['Year', 'Value (ML)']].values.tolist()])\
         .reset_index()
     df_region_wide.columns = ['region', 'name', 'data']
     df_region_wide['type'] = 'column'
@@ -2321,12 +2354,10 @@ def process_water_data(files, SAVE_DIR):
         f.write(f'window["{filename}"] = ')
         json.dump(out_dict, f, separators=(',', ':'), indent=2)
         f.write(';\n')
-        
-
-
-
 
     return "Water data processing completed"
+
+
 
 
 def process_biodiversity_data(files, SAVE_DIR):
