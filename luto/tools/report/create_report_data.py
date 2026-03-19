@@ -2281,7 +2281,7 @@ def process_water_data(files, SAVE_DIR):
             
     # -------------------- Water yield for Am by NRM region --------------------
     water_am_AUS = water_net_yield_NRM_region\
-        .query('Type == "Agricultural Management" and Landuse != "ALL"')\
+        .query('Type == "Agricultural Management"')\
         .groupby(['Agricultural Management', 'Water Supply', 'Landuse', 'Year'])[['Value (ML)']]\
         .sum(numeric_only=True)\
         .reset_index()\
@@ -2290,7 +2290,7 @@ def process_water_data(files, SAVE_DIR):
     water_am = pd.concat(
         [water_am_AUS,
          water_net_yield_NRM_region\
-             .query('Type == "Agricultural Management" and Landuse != "ALL" and region_NRM != "AUSTRALIA"')\
+             .query('Type == "Agricultural Management" and region_NRM != "AUSTRALIA"')\
              .rename(columns={'region_NRM': 'region'})],
         ignore_index=True
     ).query('`Agricultural Management` != "ALL"')
@@ -2320,7 +2320,7 @@ def process_water_data(files, SAVE_DIR):
             
     # -------------------- Water yield for Non-Agricultural Land-use by NRM region --------------------
     water_nonag_AUS = water_net_yield_NRM_region\
-        .query('Type == "Non-Agricultural Land-use"')\
+        .query('Type == "Non-Agricultural Land-use" and Landuse != "ALL"')\
         .groupby(['Landuse', 'Year'])[['Value (ML)']]\
         .sum(numeric_only=True)\
         .reset_index()\
@@ -2329,10 +2329,10 @@ def process_water_data(files, SAVE_DIR):
             name_order=lambda x: x['Landuse'].apply(lambda y: LANDUSE_ALL_RENAMED.index(y)))\
         .sort_values('name_order')\
         .drop(columns=['name_order'])
-        
+
     water_nonag = pd.concat([
         water_nonag_AUS,
-        water_net_yield_NRM_region.query('Type == "Non-Agricultural Land-use" and region_NRM != "AUSTRALIA"').rename(columns={'region_NRM': 'region'})
+        water_net_yield_NRM_region.query('Type == "Non-Agricultural Land-use" and Landuse != "ALL" and region_NRM != "AUSTRALIA"').rename(columns={'region_NRM': 'region'})
         ], ignore_index=True)
 
     df_region_wide = water_nonag.groupby(['region', 'Landuse'])[['Year','Value (ML)']]\
