@@ -357,40 +357,44 @@ class LutoSolver:
         
         ag_exprs = []
         for j in range(self._input_data.n_ag_lus):
+            dry_cells = self._input_data.ag_lu2cells[0, j]
+            irr_cells = self._input_data.ag_lu2cells[1, j]
             ag_exprs.append(
                 gp.quicksum(
-                    self._input_data.ag_b_mrj[0, :, j] * self.X_ag_dry_vars_jr[j, :]
-                )  
-                + gp.quicksum(
-                    self._input_data.ag_b_mrj[1, :, j] * self.X_ag_irr_vars_jr[j, :]
+                    self._input_data.ag_b_mrj[0, dry_cells, j] * self.X_ag_dry_vars_jr[j, dry_cells]
                 )
-                
+                + gp.quicksum(
+                    self._input_data.ag_b_mrj[1, irr_cells, j] * self.X_ag_irr_vars_jr[j, irr_cells]
+                )
             )
- 
+
         ag_mam_exprs = []
         for am, am_j_list in self._input_data.am2j.items():
             if not AG_MANAGEMENTS[am]:
                 continue
-                
-            for j_idx in range(len(am_j_list)):
+
+            for j_idx, j in enumerate(am_j_list):
+                dry_cells = self._input_data.ag_lu2cells[0, j]
+                irr_cells = self._input_data.ag_lu2cells[1, j]
                 ag_mam_exprs.append(
                     gp.quicksum(
-                        self._input_data.ag_man_b_mrj[am][0, :, j_idx]
-                        * self.X_ag_man_dry_vars_jr[am][j_idx, :]
+                        self._input_data.ag_man_b_mrj[am][0, dry_cells, j_idx]
+                        * self.X_ag_man_dry_vars_jr[am][j_idx, dry_cells]
                     )  # Dryland alt. ag. management contributions
                     + gp.quicksum(
-                        self._input_data.ag_man_b_mrj[am][1, :, j_idx]
-                        * self.X_ag_man_irr_vars_jr[am][j_idx, :]
-                    )  # Irrigated alt. ag. management contributions   
+                        self._input_data.ag_man_b_mrj[am][1, irr_cells, j_idx]
+                        * self.X_ag_man_irr_vars_jr[am][j_idx, irr_cells]
+                    )  # Irrigated alt. ag. management contributions
                 )
     
         non_ag_exprs = []
-        for k,k_name in enumerate(NON_AG_LAND_USES):
+        for k, k_name in enumerate(NON_AG_LAND_USES):
             if not NON_AG_LAND_USES[k_name]:
                 continue
+            non_ag_cells = self._input_data.non_ag_lu2cells[k]
             non_ag_exprs.append(
                 gp.quicksum(
-                    self._input_data.non_ag_b_rk[:, k] * self.X_non_ag_vars_kr[k, :]
+                    self._input_data.non_ag_b_rk[non_ag_cells, k] * self.X_non_ag_vars_kr[k, non_ag_cells]
                 )
             )
         
@@ -524,15 +528,18 @@ class LutoSolver:
             for j_idx, j in enumerate(am_j_list):
                 adoption_limit = self._input_data.ag_man_limits[am][j]
 
+                dry_cells = self._input_data.ag_lu2cells[0, j]
+                irr_cells = self._input_data.ag_lu2cells[1, j]
+
                 # Sum of all usage of the AM option must be less than the limit
                 ag_man_vars_sum = (
-                    gp.quicksum(self.X_ag_man_dry_vars_jr[am][j_idx, :]) 
-                    + gp.quicksum(self.X_ag_man_irr_vars_jr[am][j_idx, :])
+                    gp.quicksum(self.X_ag_man_dry_vars_jr[am][j_idx, dry_cells])
+                    + gp.quicksum(self.X_ag_man_irr_vars_jr[am][j_idx, irr_cells])
                 )
 
                 all_vars_sum = (
-                    gp.quicksum(self.X_ag_dry_vars_jr[j, :]) 
-                    + gp.quicksum(self.X_ag_irr_vars_jr[j, :])
+                    gp.quicksum(self.X_ag_dry_vars_jr[j, dry_cells])
+                    + gp.quicksum(self.X_ag_irr_vars_jr[j, irr_cells])
                 )
                 
                 constr = self.gurobi_model.addConstr(
@@ -550,48 +557,52 @@ class LutoSolver:
         
         self.ag_q_c = [gp.LinExpr(0) for _ in range(self._input_data.ncms)]
         for j in range(self._input_data.n_ag_lus):
-            X_ag_dry_r = self.X_ag_dry_vars_jr[j, :]
-            X_ag_irr_r = self.X_ag_irr_vars_jr[j, :]
-            
+            dry_cells = self._input_data.ag_lu2cells[0, j]
+            irr_cells = self._input_data.ag_lu2cells[1, j]
+            X_ag_dry_r = self.X_ag_dry_vars_jr[j, dry_cells]
+            X_ag_irr_r = self.X_ag_irr_vars_jr[j, irr_cells]
+
             for p in range(self._input_data.nprs):
                 if not self._input_data.lu2pr_pj[p, j]:
                     continue
                 ag_q_p = (
                     gp.quicksum(
-                        self._input_data.ag_q_mrp[0, :, p] * X_ag_dry_r
-                    ) 
+                        self._input_data.ag_q_mrp[0, dry_cells, p] * X_ag_dry_r
+                    )
                     + gp.quicksum(
-                        self._input_data.ag_q_mrp[1, :, p] * X_ag_irr_r
-                    ) 
-                )  
-                
+                        self._input_data.ag_q_mrp[1, irr_cells, p] * X_ag_irr_r
+                    )
+                )
+
                 for c in range(self._input_data.ncms):
                     if not self._input_data.pr2cm_cp[c, p]:
                         continue
                     self.ag_q_c[c] += ag_q_p
-                        
-                        
+
+
         self.ag_man_q_c = [gp.LinExpr(0) for _ in range(self._input_data.ncms)]
         for am, am_j_list in self._input_data.am2j.items():
             if not AG_MANAGEMENTS[am]:
                 continue
-            
-            for j_idx,j in enumerate(am_j_list):
-                X_ag_mam_dry_r = self.X_ag_man_dry_vars_jr[am][j_idx, :]
-                X_ag_mam_irr_r = self.X_ag_man_irr_vars_jr[am][j_idx, :]
-                
+
+            for j_idx, j in enumerate(am_j_list):
+                dry_cells = self._input_data.ag_lu2cells[0, j]
+                irr_cells = self._input_data.ag_lu2cells[1, j]
+                X_ag_mam_dry_r = self.X_ag_man_dry_vars_jr[am][j_idx, dry_cells]
+                X_ag_mam_irr_r = self.X_ag_man_irr_vars_jr[am][j_idx, irr_cells]
+
                 for p in range(self._input_data.nprs):
                     if not self._input_data.lu2pr_pj[p, j]:
                         continue
                     ag_mam_q_p = (
                         gp.quicksum(
-                            self._input_data.ag_man_q_mrp[am][0, :, p] * X_ag_mam_dry_r
-                        ) 
+                            self._input_data.ag_man_q_mrp[am][0, dry_cells, p] * X_ag_mam_dry_r
+                        )
                         + gp.quicksum(
-                            self._input_data.ag_man_q_mrp[am][1, :, p] * X_ag_mam_irr_r
-                        ) 
-                    )  
-                    
+                            self._input_data.ag_man_q_mrp[am][1, irr_cells, p] * X_ag_mam_irr_r
+                        )
+                    )
+
                     for c in range(self._input_data.ncms):
                         if not self._input_data.pr2cm_cp[c, p]:
                             continue
@@ -794,41 +805,46 @@ class LutoSolver:
             self._input_data.ag_g_mrj[1, :, :] + self._input_data.ag_ghg_t_mrj[1, :, :]
         )
 
-        ghg_ag_exprs =[]
+        ghg_ag_exprs = []
         for j in range(self._input_data.n_ag_lus):
+            dry_cells = self._input_data.ag_lu2cells[0, j]
+            irr_cells = self._input_data.ag_lu2cells[1, j]
             ghg_ag_exprs.append(
                 gp.quicksum(
-                    g_dry_coeff[:, j] * self.X_ag_dry_vars_jr[j, :]
+                    g_dry_coeff[dry_cells, j] * self.X_ag_dry_vars_jr[j, dry_cells]
                 )
                 + gp.quicksum(
-                    g_irr_coeff[:, j] * self.X_ag_irr_vars_jr[j, :]
+                    g_irr_coeff[irr_cells, j] * self.X_ag_irr_vars_jr[j, irr_cells]
                 )
             )
-            
+
         ghg_ag_man_exprs = []
         for am, am_j_list in self._input_data.am2j.items():
             if not AG_MANAGEMENTS[am]:
                 continue
-            
-            for j_idx in range(len(am_j_list)):
+
+            for j_idx, j in enumerate(am_j_list):
+                dry_cells = self._input_data.ag_lu2cells[0, j]
+                irr_cells = self._input_data.ag_lu2cells[1, j]
                 ghg_ag_man_exprs.append(
                     gp.quicksum(
-                        self._input_data.ag_man_g_mrj[am][0, :, j_idx]
-                        * self.X_ag_man_dry_vars_jr[am][j_idx, :]
-                    )  
+                        self._input_data.ag_man_g_mrj[am][0, dry_cells, j_idx]
+                        * self.X_ag_man_dry_vars_jr[am][j_idx, dry_cells]
+                    )
                     + gp.quicksum(
-                        self._input_data.ag_man_g_mrj[am][1, :, j_idx]
-                        * self.X_ag_man_irr_vars_jr[am][j_idx, :]
-                    )  
+                        self._input_data.ag_man_g_mrj[am][1, irr_cells, j_idx]
+                        * self.X_ag_man_irr_vars_jr[am][j_idx, irr_cells]
+                    )
                 )
-                
+
         ghg_non_ag_exprs = []
-        for k,k_name in enumerate(NON_AG_LAND_USES):
+        for k, k_name in enumerate(NON_AG_LAND_USES):
             if not NON_AG_LAND_USES[k_name]:
                 continue
+            non_ag_cells = self._input_data.non_ag_lu2cells[k]
             ghg_non_ag_exprs.append(
                 gp.quicksum(
-                    self._input_data.non_ag_g_rk[:, k] * self.X_non_ag_vars_kr[k, :]
+                    self._input_data.non_ag_g_rk[non_ag_cells, k] * self.X_non_ag_vars_kr[k, non_ag_cells]
                 )
             )
             
