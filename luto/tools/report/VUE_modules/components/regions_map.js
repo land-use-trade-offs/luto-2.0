@@ -16,9 +16,9 @@ window.RegionsMap = {
     const map = ref(null);
     const boundingBox = ref(null);
     const loadScript = window.loadScript;
-    const selectedBaseMap = ref('OpenStreetMap');
+    const selectedBaseMap = ref('CartoDB');
     const tileLayers = ref({});
-    const baseMapOptions = ref(['OpenStreetMap', 'Satellite', 'None']);
+    const baseMapOptions = ref(['CartoDB', 'Satellite', 'None']);
 
 
 
@@ -36,8 +36,9 @@ window.RegionsMap = {
 
       // Create tile layers but don't add them yet
       tileLayers.value = {
-        OSM: L.tileLayer('https://tiles.stadiamaps.com/tiles/osm_bright/{z}/{x}/{y}{r}.png', {
-          attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>, &copy; <a href="https://openmaptiles.org/">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        OSM: L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+          subdomains: 'abcd',
           maxZoom: 20
         }),
         Satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
@@ -47,7 +48,7 @@ window.RegionsMap = {
       };
 
       // Add initial base map
-      const initialMapType = selectedBaseMap.value === 'OpenStreetMap' ? 'OSM' : selectedBaseMap.value;
+      const initialMapType = selectedBaseMap.value === 'CartoDB' ? 'OSM' : selectedBaseMap.value;
       if (initialMapType !== 'None') {
         tileLayers.value[initialMapType].addTo(map.value);
       }
@@ -251,7 +252,7 @@ window.RegionsMap = {
       selectedBaseMap.value = mapType;
       // Map display names to internal values
       const mapTypeMap = {
-        'OpenStreetMap': 'OSM',
+        'CartoDB': 'OSM',
         'Satellite': 'Satellite',
         'None': 'None'
       };
