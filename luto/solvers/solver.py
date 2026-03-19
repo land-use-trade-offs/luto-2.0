@@ -555,6 +555,9 @@ class LutoSolver:
         """
         print("│   ├── Adding constraints for demand penalties...")
         
+        # Precompute j→c quantity coefficient arrays in numpy (bypasses p loop entirely).
+        # jc_dry_coeff[j][c] = ag_q_mrp[0, dry_cells, :] @ pr2cm_cp[c, :] for active p only
+        # Shape per j: (ncms, len(dry_cells)) — built once, reused in quicksum.
         self.ag_q_c = [gp.LinExpr(0) for _ in range(self._input_data.ncms)]
         for j in range(self._input_data.n_ag_lus):
             dry_cells = self._input_data.ag_lu2cells[0, j]
@@ -562,22 +565,23 @@ class LutoSolver:
             X_ag_dry_r = self.X_ag_dry_vars_jr[j, dry_cells]
             X_ag_irr_r = self.X_ag_irr_vars_jr[j, irr_cells]
 
-            for p in range(self._input_data.nprs):
-                if not self._input_data.lu2pr_pj[p, j]:
-                    continue
-                ag_q_p = (
-                    gp.quicksum(
-                        self._input_data.ag_q_mrp[0, dry_cells, p] * X_ag_dry_r
-                    )
-                    + gp.quicksum(
-                        self._input_data.ag_q_mrp[1, irr_cells, p] * X_ag_irr_r
-                    )
-                )
+            # active products for this land use
+            active_p = np.where(self._input_data.lu2pr_pj[:, j])[0]
+            if not active_p.size:
+                continue
 
-                for c in range(self._input_data.ncms):
-                    if not self._input_data.pr2cm_cp[c, p]:
-                        continue
-                    self.ag_q_c[c] += ag_q_p
+            # sum quantity coefficients over active products, mapped to commodities
+            # pr2cm_cp[c, p] is 1 if product p maps to commodity c
+            # result shape: (ncms, len(dry_cells)) and (ncms, len(irr_cells))
+            jc_dry = self._input_data.pr2cm_cp[:, active_p] @ self._input_data.ag_q_mrp[0, dry_cells, :][:, active_p].T  # (ncms, len(dry_cells))
+            jc_irr = self._input_data.pr2cm_cp[:, active_p] @ self._input_data.ag_q_mrp[1, irr_cells, :][:, active_p].T  # (ncms, len(irr_cells))
+
+            for c in range(self._input_data.ncms):
+                if jc_dry[c].any() or jc_irr[c].any():
+                    self.ag_q_c[c] += (
+                        gp.quicksum(jc_dry[c] * X_ag_dry_r)
+                        + gp.quicksum(jc_irr[c] * X_ag_irr_r)
+                    )
 
 
         self.ag_man_q_c = [gp.LinExpr(0) for _ in range(self._input_data.ncms)]
@@ -591,32 +595,29 @@ class LutoSolver:
                 X_ag_mam_dry_r = self.X_ag_man_dry_vars_jr[am][j_idx, dry_cells]
                 X_ag_mam_irr_r = self.X_ag_man_irr_vars_jr[am][j_idx, irr_cells]
 
-                for p in range(self._input_data.nprs):
-                    if not self._input_data.lu2pr_pj[p, j]:
-                        continue
-                    ag_mam_q_p = (
-                        gp.quicksum(
-                            self._input_data.ag_man_q_mrp[am][0, dry_cells, p] * X_ag_mam_dry_r
-                        )
-                        + gp.quicksum(
-                            self._input_data.ag_man_q_mrp[am][1, irr_cells, p] * X_ag_mam_irr_r
-                        )
-                    )
+                active_p = np.where(self._input_data.lu2pr_pj[:, j])[0]
+                if not active_p.size:
+                    continue
 
-                    for c in range(self._input_data.ncms):
-                        if not self._input_data.pr2cm_cp[c, p]:
-                            continue
-                        self.ag_man_q_c[c] += ag_mam_q_p
+                jc_dry = self._input_data.pr2cm_cp[:, active_p] @ self._input_data.ag_man_q_mrp[am][0, dry_cells, :][:, active_p].T  # (ncms, len(dry_cells))
+                jc_irr = self._input_data.pr2cm_cp[:, active_p] @ self._input_data.ag_man_q_mrp[am][1, irr_cells, :][:, active_p].T  # (ncms, len(irr_cells))
+
+                for c in range(self._input_data.ncms):
+                    if jc_dry[c].any() or jc_irr[c].any():
+                        self.ag_man_q_c[c] += (
+                            gp.quicksum(jc_dry[c] * X_ag_mam_dry_r)
+                            + gp.quicksum(jc_irr[c] * X_ag_mam_irr_r)
+                        )
 
 
         self.non_ag_q_c = [gp.LinExpr(0) for _ in range(self._input_data.ncms)]
-        for k,k_name in enumerate(NON_AG_LAND_USES):
+        for k, k_name in enumerate(NON_AG_LAND_USES):
             if not NON_AG_LAND_USES[k_name]:
                 continue
-            
+            non_ag_cells = self._input_data.non_ag_lu2cells[k]
             for c in range(self._input_data.ncms):
                 self.non_ag_q_c[c] += gp.quicksum(
-                    self._input_data.non_ag_q_crk[c, :, k] * self.X_non_ag_vars_kr[k, :]
+                    self._input_data.non_ag_q_crk[c, non_ag_cells, k] * self.X_non_ag_vars_kr[k, non_ag_cells]
                 )
             
 
