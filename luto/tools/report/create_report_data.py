@@ -2355,6 +2355,65 @@ def process_water_data(files, SAVE_DIR):
         json.dump(out_dict, f, separators=(',', ':'), indent=2)
         f.write(';\n')
 
+
+    # -------------------- Water yield Sum (Ag + Am + NonAg) by NRM region --------------------
+    # Ag part (per NRM, exclude AUSTRALIA to avoid double-counting)
+    water_ag_nrm = water_net_yield_NRM_region_non_all\
+        .query('Type == "Agricultural Land-use" and region_NRM != "AUSTRALIA"')\
+        [['region_NRM', 'Water Supply', 'Landuse', 'Year', 'Value (ML)']]
+
+    # Am part: sum over Agricultural Management to collapse that dimension
+    water_am_nrm = water_net_yield_NRM_region_non_all\
+        .query('Type == "Agricultural Management" and region_NRM != "AUSTRALIA"')\
+        .groupby(['region_NRM', 'Water Supply', 'Landuse', 'Year'])[['Value (ML)']]\
+        .sum(numeric_only=True).reset_index()
+
+    # NonAg part: assign to Dryland (NonAg has no irrigation dimension)
+    water_nonag_nrm = water_net_yield_NRM_region_non_all\
+        .query('Type == "Non-Agricultural Land-use" and region_NRM != "AUSTRALIA"')\
+        .assign(**{'Water Supply': 'Dryland'})\
+        [['region_NRM', 'Water Supply', 'Landuse', 'Year', 'Value (ML)']]
+
+    water_sum_nrm = pd.concat([water_ag_nrm, water_am_nrm, water_nonag_nrm], ignore_index=True)
+
+    # AUS aggregate: sum over all NRM regions
+    water_sum_AUS = water_sum_nrm\
+        .groupby(['Water Supply', 'Landuse', 'Year'])[['Value (ML)']]\
+        .sum(numeric_only=True).reset_index().assign(region='AUSTRALIA')
+
+    water_sum = pd.concat([
+        water_sum_AUS,
+        water_sum_nrm.rename(columns={'region_NRM': 'region'})
+    ], ignore_index=True)
+
+    # Add ALL water aggregate
+    water_sum_all_water = water_sum\
+        .groupby(['region', 'Landuse', 'Year'])[['Value (ML)']]\
+        .sum(numeric_only=True).reset_index().assign(**{'Water Supply': 'ALL'})
+    water_sum = pd.concat([water_sum_all_water, water_sum], ignore_index=True)
+
+    df_region_wide = water_sum.groupby(['region', 'Water Supply', 'Landuse'])[['Year', 'Value (ML)']]\
+        .apply(lambda x: [[int(r[0]), r[1]] for r in x[['Year', 'Value (ML)']].values.tolist()])\
+        .reset_index()
+    df_region_wide.columns = ['region', 'water', 'name', 'data']
+    df_region_wide['type'] = 'column'
+    df_region_wide['color'] = df_region_wide.apply(lambda x: COLORS[x['name']], axis=1)
+    df_region_wide['name_order'] = df_region_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+    df_region_wide = df_region_wide.sort_values('name_order').drop(columns=['name_order'])
+
+    out_dict = {}
+    for (region, water), df in df_region_wide.groupby(['region', 'water']):
+        df = df.drop(['region'], axis=1)
+        if region not in out_dict:
+            out_dict[region] = {}
+        out_dict[region][water] = df.to_dict(orient='records')
+
+    filename = 'Water_Sum_NRM'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
+
     return "Water data processing completed"
 
 

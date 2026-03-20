@@ -2477,6 +2477,31 @@ def write_water(data: Data, yr_cal, path):
     save2nc(xr_non_ag_wny_cat, os.path.join(path, f'xr_water_yield_non_ag_{yr_cal}.nc'))
     save2nc(xr_am_wny_cat, os.path.join(path, f'xr_water_yield_ag_management_{yr_cal}.nc'))
 
+    # --- Sum water yield (Ag + Am + NonAg) ---
+    ag_lus = [lu for lu in xr_ag_wny.coords['lu'].values if lu != 'ALL']
+    nonag_lus = [lu for lu in xr_non_ag_wny.coords['lu'].values if lu != 'ALL']
+    am_non_all = [am for am in xr_am_wny.coords['am'].values if am != 'ALL']
+
+    raw_wny_ag = xr_ag_wny.sel(lm=['dry', 'irr'], lu=ag_lus)
+    am_sum_wny = xr_am_wny.sel(am=am_non_all, lm=['dry', 'irr']).sum('am').sel(lu=ag_lus)
+    nonag_as_dry = (
+        xr_non_ag_wny.sel(lu=nonag_lus)
+        .expand_dims('lm').assign_coords(lm=['dry'])
+        .reindex(lm=['dry', 'irr'], fill_value=0)
+    )
+
+    ag_plus_am_wny = raw_wny_ag + am_sum_wny
+    sum_wny_dry_irr = xr.concat([ag_plus_am_wny, nonag_as_dry], dim='lu')
+
+    sum_wny_all_lm = sum_wny_dry_irr.sum('lm', keepdims=True).assign_coords(lm=['ALL'])
+    sum_wny = xr.concat([sum_wny_all_lm, sum_wny_dry_irr], dim='lm')
+
+    sum_wny_all_lu = sum_wny.sum('lu', keepdims=True).assign_coords(lu=['ALL'])
+    sum_wny = xr.concat([sum_wny_all_lu, sum_wny], dim='lu')
+
+    xr_sum_wny_cat = sum_wny.stack(layer=['lm', 'lu']).drop_vars(['region_water', 'region_NRM']).compute()
+    save2nc(xr_sum_wny_cat, os.path.join(path, f'xr_water_yield_sum_{yr_cal}.nc'))
+
 
     # ==================== Write Original Targets for Relaxed Watershed Regions ====================
     water_relaxed_region_raw_targets = pd.DataFrame(
@@ -2493,6 +2518,7 @@ def write_water(data: Data, yr_cal, path):
                 'ag': (xr_ag_wny_cat.min().item(), xr_ag_wny_cat.max().item()),
                 'non_ag': (xr_non_ag_wny_cat.min().item(), xr_non_ag_wny_cat.max().item()),
                 'am': (xr_am_wny_cat.min().item(), xr_am_wny_cat.max().item()),
+                'sum': (xr_sum_wny_cat.min().item(), xr_sum_wny_cat.max().item()),
             }
         }
     )

@@ -606,9 +606,14 @@ def save_report_layer(raw_data_dir:str):
         *cell_magnitudes['water_yield']['ag'],
         *cell_magnitudes['water_yield']['non_ag'],
         *cell_magnitudes['water_yield']['am'],
+        *cell_magnitudes['water_yield']['sum'],
     )
 
     water_min_max = (min(water_magnitudes), max(water_magnitudes))
+
+    water_sum = files_water.query('base_name == "xr_water_yield_sum"')
+    get_map2json(water_sum, None, None, legend_float, water_min_max, f'{SAVE_DIR}/map_layers/map_water_yield_Sum.js')
+    print('│   ├── Water Yield Sum layer saved.')
 
     water_ag = files_water.query('base_name == "xr_water_yield_ag"')
     get_map2json(water_ag, None, None, legend_float, water_min_max, f'{SAVE_DIR}/map_layers/map_water_yield_Ag.js')

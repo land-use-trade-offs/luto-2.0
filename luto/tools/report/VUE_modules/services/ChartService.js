@@ -434,6 +434,10 @@ window.ChartService = {
     },
     "Water": {
       "NRM": {
+        "Sum": {
+          "path": "data/Water_Sum_NRM.js",
+          "name": "Water_Sum_NRM",
+        },
         "Ag": {
           "path": "data/Water_Ag_NRM.js",
           "name": "Water_Ag_NRM",
