@@ -84,6 +84,11 @@ window.BiodiversityView = {
     const dataLoaded = ref(false);
     const isDrawerOpen = ref(false);
 
+    // GBF2 mask overlay — only active when GBF2 metric is selected
+    const gbf2MaskOverlay = computed(() =>
+      (dataLoaded.value && selectMetric.value === 'GBF2') ? (window.BIO_GBF2_MASK || null) : null
+    );
+
     // Cascade helper — reads from mapRegister[selectMetric]
     function doCascade(category) {
       const mr = mapRegister[selectMetric.value];
@@ -234,6 +239,12 @@ window.BiodiversityView = {
       selectMetric.value = enabledMetrics[0];
       selectCategory.value = availableCategories[0];
 
+      // Load GBF2 mask overlay if GBF2 is enabled
+      if (enabledMetrics.includes('GBF2')) {
+        const mask = mapRegister['GBF2']['mask'];
+        await loadScript(mask.path, mask.name, VIEW_NAME);
+      }
+
       await nextTick(() => {
         dataLoaded.value = true;
       });
@@ -335,6 +346,7 @@ window.BiodiversityView = {
       formatLanduse,
       selectMapData,
       selectChartData,
+      gbf2MaskOverlay,
 
       dataLoaded,
       isDrawerOpen,
@@ -432,6 +444,7 @@ window.BiodiversityView = {
         <!-- Map component takes full space -->
         <regions-map
           :mapData="selectMapData"
+          :overlayGeoJSON="gbf2MaskOverlay"
           style="width: 100%; height: 100%;">
         </regions-map>
 

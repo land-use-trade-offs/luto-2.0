@@ -11,9 +11,11 @@ window.MapService = {
     },
     'Biodiversity': {
       'GBF2': {
+        'Sum': { 'path': 'data/map_layers/map_bio_GBF2_Sum.js', 'name': 'map_bio_GBF2_Sum' },
         'Ag': { 'path': 'data/map_layers/map_bio_GBF2_Ag.js', 'name': 'map_bio_GBF2_Ag' },
         'Ag Mgt': { 'path': 'data/map_layers/map_bio_GBF2_Am.js', 'name': 'map_bio_GBF2_Am' },
         'Non-Ag': { 'path': 'data/map_layers/map_bio_GBF2_NonAg.js', 'name': 'map_bio_GBF2_NonAg' },
+        'mask': { 'path': 'data/geo/biodiversity_GBF2_mask.js', 'name': 'BIO_GBF2_MASK' },
       },
       'GBF3_NVIS': {
         'Ag': { 'path': 'data/map_layers/map_bio_GBF3_NVIS_Ag.js', 'name': 'map_bio_GBF3_NVIS_Ag' },

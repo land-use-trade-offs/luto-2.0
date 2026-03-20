@@ -6,6 +6,10 @@ window.RegionsMap = {
       type: Object,
       required: true
     },
+    overlayGeoJSON: {
+      type: Object,
+      default: null
+    },
   },
 
   setup(props) {
@@ -15,6 +19,7 @@ window.RegionsMap = {
 
     const map = ref(null);
     const boundingBox = ref(null);
+    const gbf2Layer = ref(null);
     const loadScript = window.loadScript;
     const selectedBaseMap = ref('CartoDB');
     const tileLayers = ref({});
@@ -238,6 +243,19 @@ window.RegionsMap = {
 
     Vue.watch(() => props.mapData, (newVal) => {
       loadMapData();
+    });
+
+    Vue.watch(() => props.overlayGeoJSON, (geojson) => {
+      if (!map.value) return;
+      if (gbf2Layer.value) {
+        map.value.removeLayer(gbf2Layer.value);
+        gbf2Layer.value = null;
+      }
+      if (geojson) {
+        gbf2Layer.value = L.geoJSON(geojson, {
+          style: { color: '#555', weight: 1.5, fillColor: '#666', fillOpacity: 0.35, opacity: 0.7 }
+        }).addTo(map.value);
+      }
     });
 
     Vue.watch(selectedRegion, (newValue, oldValue) => {

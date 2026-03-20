@@ -331,7 +331,11 @@ def save_report_layer(raw_data_dir:str):
         bio_GBF2_nonag = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_non_ag"')
         get_map2json(bio_GBF2_nonag, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF2_NonAg.js')
         print('│   ├── Biodiversity GBF2 Non-Ag layer saved.')
-        
+
+        bio_GBF2_sum = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_sum"')
+        get_map2json(bio_GBF2_sum, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Sum.js')
+        print('│   ├── Biodiversity GBF2 Sum layer saved.')
+
     # TODO: need to create cell magnitude and determine colorbar limit for these GBF layers.
     # Now just use the quality magnitude, which could be incorrect for specific GBFs.
 

@@ -27,7 +27,10 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 import cf_xarray as cfxr
+import rasterio.features
+import geopandas as gpd
 
+from shapely.geometry import shape
 from joblib import Parallel, delayed
 from collections import defaultdict
 
@@ -2770,45 +2773,19 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
     xr_gbf2_non_ag = add_all(xr_gbf2_non_ag, ['lu'])
     xr_gbf2_am     = add_all(xr_gbf2_am,     ['lm', 'lu', 'am'])
 
-    GBF2_score_ag_region = xr_gbf2_ag.groupby('region'
-        ).sum(['cell']
-        ).to_dataframe('Area Weighted Score (ha)'
-        ).reset_index(
-        ).assign(Relative_Contribution_Percentage = lambda x:((x['Area Weighted Score (ha)'] / total_priority_degraded_area) * 100)
-        ).assign(Type='Agricultural Land-use', Year=yr_cal)
-    GBF2_score_non_ag_region = xr_gbf2_non_ag.groupby('region'
-        ).sum(['cell']
-        ).to_dataframe('Area Weighted Score (ha)'
-        ).reset_index(
-        ).assign(Relative_Contribution_Percentage = lambda x:(x['Area Weighted Score (ha)'] / total_priority_degraded_area * 100)
-        ).assign(Type='Non-Agricultural Land-use', Year=yr_cal)  
-    GBF2_score_am_region = xr_gbf2_am.groupby('region'
-        ).sum('cell'
-        ).to_dataframe('Area Weighted Score (ha)'
-        ).reset_index(allow_duplicates=True
-        ).assign(Relative_Contribution_Percentage = lambda x:(x['Area Weighted Score (ha)'] / total_priority_degraded_area * 100)
-        ).assign(Type='Agricultural Management', Year=yr_cal)
-        
-    GBF2_score_ag_AUS = xr_gbf2_ag.sum(['cell']
-        ).to_dataframe('Area Weighted Score (ha)'
-        ).reset_index(
-        ).assign(Relative_Contribution_Percentage = lambda x:((x['Area Weighted Score (ha)'] / total_priority_degraded_area) * 100)
-        ).assign(Type='Agricultural Land-use', Year=yr_cal, region='AUSTRALIA')
-    GBF2_score_non_ag_AUS = xr_gbf2_non_ag.sum(['cell']
-        ).to_dataframe('Area Weighted Score (ha)'
-        ).reset_index(
-        ).assign(Relative_Contribution_Percentage = lambda x:(x['Area Weighted Score (ha)'] / total_priority_degraded_area * 100)
-        ).assign(Type='Non-Agricultural Land-use', Year=yr_cal, region='AUSTRALIA')  
-    GBF2_score_am_AUS = xr_gbf2_am.sum('cell'
-        ).to_dataframe('Area Weighted Score (ha)'
-        ).reset_index(allow_duplicates=True
-        ).assign(Relative_Contribution_Percentage = lambda x:(x['Area Weighted Score (ha)'] / total_priority_degraded_area * 100)
-        ).assign(Type='Agricultural Management', Year=yr_cal, region='AUSTRALIA')
-        
-    # Combine regional and Australia level data
-    GBF2_score_ag = pd.concat([GBF2_score_ag_region, GBF2_score_ag_AUS], axis=0)
-    GBF2_score_non_ag = pd.concat([GBF2_score_non_ag_region, GBF2_score_non_ag_AUS], axis=0)
-    GBF2_score_am = pd.concat([GBF2_score_am_region, GBF2_score_am_AUS], axis=0)
+    GBF2_score_ag, GBF2_score_ag_AUS = _bio_to_region_and_aus_df(
+        xr_gbf2_ag, group_dims=['region', 'lm', 'lu'],
+        value_name='Area Weighted Score (ha)', base_score=total_priority_degraded_area, yr_cal=yr_cal)
+    GBF2_score_non_ag, GBF2_score_non_ag_AUS = _bio_to_region_and_aus_df(
+        xr_gbf2_non_ag, group_dims=['region', 'lu'],
+        value_name='Area Weighted Score (ha)', base_score=total_priority_degraded_area, yr_cal=yr_cal)
+    GBF2_score_am, GBF2_score_am_AUS = _bio_to_region_and_aus_df(
+        xr_gbf2_am, group_dims=['region', 'am', 'lm', 'lu'],
+        value_name='Area Weighted Score (ha)', base_score=total_priority_degraded_area, yr_cal=yr_cal)
+
+    GBF2_score_ag = GBF2_score_ag.assign(Type='Agricultural Land-use')
+    GBF2_score_non_ag = GBF2_score_non_ag.assign(Type='Non-Agricultural Land-use')
+    GBF2_score_am = GBF2_score_am.assign(Type='Agricultural Management')
         
     # Fill nan to empty dataframes
     if GBF2_score_ag.empty:
@@ -2845,17 +2822,49 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
     df.to_csv(os.path.join(path, f'biodiversity_GBF2_priority_scores_{yr_cal}.csv'), index=False)
 
 
+    # ------------------------- Vectorize GBF2 mask to GeoJSON -------------------------
+    
+    geojson_js_path = f'{data.path}/DATA_REPORT/data/geo/biodiversity_GBF2_mask.js'
+    if not os.path.exists(geojson_js_path):
+        mask_2d_da = arr_to_xr(data, data.BIO_GBF2_MASK)
+        mask_2d_np = np.where(np.isnan(mask_2d_da.values), 0, mask_2d_da.values).astype(np.uint8)
+
+        # Vectorize using rasterio.features.shapes with the model's CRS and transform
+        transform = data.GEO_META['transform']
+        crs = data.GEO_META['crs']
+        pixel_area = abs(transform.a * transform.e)
+        min_area = 10 * pixel_area  # drop isolated patches smaller than 10 pixels
+        polygons = [
+            shape(geom)
+            for geom, val in rasterio.features.shapes(mask_2d_np, transform=transform)
+            if val == 1 and shape(geom).area >= min_area
+        ]
+
+        # Dissolve, smooth in projected CRS (EPSG:3577 Australian Albers, metres), then simplify
+        # smooth_d in metres: approx 2× the pixel width converted from degrees to metres
+        smooth_d = abs(transform.a) * 111_000 * 2  # 1 degree ≈ 111 km
+        gdf = gpd.GeoDataFrame(geometry=polygons, crs=crs).dissolve().to_crs('EPSG:3577')
+        gdf['geometry'] = gdf.buffer(smooth_d).buffer(-smooth_d)
+        gdf = gdf.to_crs('EPSG:4326')
+        gdf['geometry'] = gdf.simplify(tolerance=0.05, preserve_topology=True)
+
+        # Write as a JS window variable directly to VUE_modules; copytree carries it into DATA_REPORT
+        geojson_dict = json.loads(gdf.to_json())
+        with open(geojson_js_path, 'w', encoding='utf-8') as f:
+            f.write(f'window.BIO_GBF2_MASK = {json.dumps(geojson_dict)};\n')
+
+
 
     # ------------------------- Stack array, get valid layers -------------------------
 
     # ---- Ag valid layers ----
-    valid_ag_layers = pd.MultiIndex.from_frame(GBF2_score_ag_AUS.query('`Area Weighted Score (ha)` > 1')[['lm', 'lu']]).sort_values()
+    valid_ag_layers = pd.MultiIndex.from_frame(GBF2_score_ag_AUS[['lm', 'lu']]).sort_values()
     valid_layers_stack_ag = xr_gbf2_ag.stack(layer=['lm', 'lu']).sel(layer=valid_ag_layers).drop_vars('region').compute()
 
     # ---- Non-ag valid layers ----
-    valid_non_ag_layers = pd.MultiIndex.from_frame(GBF2_score_non_ag_AUS.query('`Area Weighted Score (ha)` > 1')[['lu']]).sort_values()
+    valid_non_ag_layers = pd.MultiIndex.from_frame(GBF2_score_non_ag_AUS[['lu']]).sort_values()
 
-    if GBF2_score_non_ag_AUS['Area Weighted Score (ha)'].abs().sum() < 1e-3:
+    if GBF2_score_non_ag_AUS.empty:
         valid_layers_stack_non_ag = xr.DataArray(
             np.zeros((1, data.NCELLS), dtype=np.float32),
             dims=['lu', 'cell'],
@@ -2866,9 +2875,9 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
         valid_layers_stack_non_ag = xr_gbf2_non_ag.stack(layer=['lu']).sel(layer=valid_non_ag_layers).drop_vars('region').compute()
 
     # ---- Ag management valid layers ----
-    valid_am_layers = pd.MultiIndex.from_frame(GBF2_score_am_AUS.query('`Area Weighted Score (ha)` > 1')[['am', 'lm', 'lu']]).sort_values()
+    valid_am_layers = pd.MultiIndex.from_frame(GBF2_score_am_AUS[['am', 'lm', 'lu']]).sort_values()
 
-    if GBF2_score_am_AUS['Area Weighted Score (ha)'].abs().sum() < 1e-3:
+    if GBF2_score_am_AUS.empty:
         valid_layers_stack_am = xr.DataArray(
             np.zeros((1, 1, 1, data.NCELLS), dtype=np.float32),
             dims=['am', 'lm', 'lu', 'cell'],
@@ -2882,6 +2891,17 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
     save2nc(valid_layers_stack_ag, os.path.join(path, f'xr_biodiversity_GBF2_priority_ag_{yr_cal}.nc'))
     save2nc(valid_layers_stack_non_ag, os.path.join(path, f'xr_biodiversity_GBF2_priority_non_ag_{yr_cal}.nc'))
     save2nc(valid_layers_stack_am, os.path.join(path, f'xr_biodiversity_GBF2_priority_ag_management_{yr_cal}.nc'))
+
+    # --- Sum GBF2 (Ag + Am + NonAg) — Type dimension matches Quality Sum pattern ---
+    xr_gbf2_all = xr.concat(
+        [   xr_gbf2_ag.sum(dim=['lm', 'lu']).expand_dims({'Type': ['ag']}),
+            xr_gbf2_non_ag.sum(dim=['lu']).expand_dims({'Type': ['non-ag']}),
+            xr_gbf2_am.sum(dim=['am', 'lm', 'lu']).expand_dims({'Type': ['ag-man']})
+        ], dim='Type'
+    )
+    xr_gbf2_all = add_all(xr_gbf2_all, dims=['Type'])
+    xr_sum_gbf2_cat = xr_gbf2_all.stack(layer=['Type']).drop_vars('region').compute()
+    save2nc(xr_sum_gbf2_cat, os.path.join(path, f'xr_biodiversity_GBF2_priority_sum_{yr_cal}.nc'))
 
     return f"Biodiversity GBF2 priority scores written for year {yr_cal}"
 
