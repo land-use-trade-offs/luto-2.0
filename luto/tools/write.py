@@ -2825,6 +2825,7 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
     # ------------------------- Vectorize GBF2 mask to GeoJSON -------------------------
     
     geojson_js_path = f'{data.path}/DATA_REPORT/data/geo/biodiversity_GBF2_mask.js'
+    os.makedirs(os.path.dirname(geojson_js_path), exist_ok=True)
     if not os.path.exists(geojson_js_path):
         mask_2d_da = arr_to_xr(data, data.BIO_GBF2_MASK)
         mask_2d_np = np.where(np.isnan(mask_2d_da.values), 0, mask_2d_da.values).astype(np.uint8)
