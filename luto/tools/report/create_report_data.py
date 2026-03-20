@@ -2622,7 +2622,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         f.write(';\n')
         
     # ---------------- Overall quality - Am ----------------
-    bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL"').copy()
+    bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` != "ALL"').copy()
 
     df_wide = bio_df_am.groupby(['region', 'Water_supply', "Agricultural Management", 'Landuse'])[['Year','Value (%)']]\
         .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
@@ -2630,20 +2630,18 @@ def process_biodiversity_data(files, SAVE_DIR):
     df_wide.columns = ['region', 'water', 'am', 'name', 'data']
     df_wide['type'] = 'column'
     df_wide['color'] = df_wide.apply(lambda x: COLORS[x['name']], axis=1)
-    
-    df_wide_all_am = bio_df_am\
-        .groupby(['region', 'Water_supply', 'Landuse', 'Year'])[['Value (%)']]\
-        .sum(numeric_only=True)\
-        .reset_index()\
+
+    df_wide_all_am = bio_df\
+        .query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` == "ALL"')\
         .groupby(['region', 'Water_supply', 'Landuse'])[['Year','Value (%)']]\
         .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
         .reset_index()
-        
+
     df_wide_all_am.columns = ['region', 'water', 'name', 'data']
     df_wide_all_am['am'] = 'ALL'
     df_wide_all_am['type'] = 'column'
     df_wide_all_am['color'] = df_wide_all_am.apply(lambda x: COLORS[x['name']], axis=1)
-    
+
     df_wide = pd.concat([df_wide, df_wide_all_am], ignore_index=True)
 
     out_dict = {}
@@ -2870,7 +2868,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             
         
         # ---------------- (GBF2) Ag-Mgt  ----------------
-        bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL"').copy()
+        bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` != "ALL"').copy()
 
         df_wide = bio_df_am\
             .groupby(['region', 'Water_supply', 'Agricultural Management', 'Landuse'])[['Year', 'Value (%)']]\
@@ -2880,11 +2878,9 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_wide['type'] = 'column'
         df_wide['color'] = df_wide.apply(lambda x: COLORS[x['name']], axis=1)
 
-        df_wide_all_am = bio_df_am\
-            .groupby(['region', 'Water_supply', 'Landuse', 'Year'])[['Value (%)']]\
-            .sum(numeric_only=True)\
-            .reset_index()\
-            .groupby(['region', 'Water_supply', 'Landuse'])[['Year','Value (%)']]\
+        df_wide_all_am = bio_df\
+            .query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` == "ALL"')\
+            .groupby(['region', 'Water_supply', 'Landuse'])[['Year', 'Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
             .reset_index()
 
@@ -3127,7 +3123,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             
             
         # ---------------- (GBF3-NVIS) - Am  ----------------
-        bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL"').copy()
+        bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` != "ALL"').copy()
 
         df_wide = bio_df_am\
             .groupby(['region', 'species', 'Water_supply', 'Agricultural Management', 'Landuse'])[['Year', 'Value (%)']]\
@@ -3137,11 +3133,9 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_wide['type'] = 'column'
         df_wide['color'] = df_wide.apply(lambda x: COLORS[x['name']], axis=1)
 
-        df_wide_all_am = bio_df_am\
-            .groupby(['region', 'species', 'Water_supply', 'Landuse', 'Year'])[['Value (%)']]\
-            .sum(numeric_only=True)\
-            .reset_index()\
-            .groupby(['region', 'species', 'Water_supply', 'Landuse'])[['Year','Value (%)']]\
+        df_wide_all_am = bio_df\
+            .query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` == "ALL"')\
+            .groupby(['region', 'species', 'Water_supply', 'Landuse'])[['Year', 'Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
             .reset_index()
 
@@ -3381,7 +3375,7 @@ def process_biodiversity_data(files, SAVE_DIR):
 
 
         # ---------------- (GBF3-IBRA) - Am  ----------------
-        bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL"').copy()
+        bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` != "ALL"').copy()
 
         df_wide = bio_df_am\
             .groupby(['region', 'species', 'Water_supply', 'Agricultural Management', 'Landuse'])[['Year', 'Value (%)']]\
@@ -3391,11 +3385,9 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_wide['type'] = 'column'
         df_wide['color'] = df_wide.apply(lambda x: COLORS[x['name']], axis=1)
 
-        df_wide_all_am = bio_df_am\
-            .groupby(['region', 'species', 'Water_supply', 'Landuse', 'Year'])[['Value (%)']]\
-            .sum(numeric_only=True)\
-            .reset_index()\
-            .groupby(['region', 'species', 'Water_supply', 'Landuse'])[['Year','Value (%)']]\
+        df_wide_all_am = bio_df\
+            .query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` == "ALL"')\
+            .groupby(['region', 'species', 'Water_supply', 'Landuse'])[['Year', 'Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
             .reset_index()
 
@@ -3629,7 +3621,7 @@ def process_biodiversity_data(files, SAVE_DIR):
 
 
         # ---------------- (GBF4 SNES) Agricultural Management  ----------------
-        bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL"').copy()
+        bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` != "ALL"').copy()
 
         df_wide = bio_df_am\
             .groupby(['region', 'species', 'Water_supply', 'Agricultural Management', 'Landuse'])[['Year', 'Value (%)']]\
@@ -3639,11 +3631,9 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_wide['type'] = 'column'
         df_wide['color'] = df_wide.apply(lambda x: COLORS[x['name']], axis=1)
 
-        df_wide_all_am = bio_df_am\
-            .groupby(['region', 'species', 'Water_supply', 'Landuse', 'Year'])[['Value (%)']]\
-            .sum(numeric_only=True)\
-            .reset_index()\
-            .groupby(['region', 'species', 'Water_supply', 'Landuse'])[['Year','Value (%)']]\
+        df_wide_all_am = bio_df\
+            .query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` == "ALL"')\
+            .groupby(['region', 'species', 'Water_supply', 'Landuse'])[['Year', 'Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
             .reset_index()
 
@@ -3874,7 +3864,7 @@ def process_biodiversity_data(files, SAVE_DIR):
 
 
         # ---------------- (GBF4 ECNES) Agricultural Management  ----------------
-        bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL"').copy()
+        bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` != "ALL"').copy()
 
         df_wide = bio_df_am\
             .groupby(['region', 'species', 'Water_supply', 'Agricultural Management', 'Landuse'])[['Year', 'Value (%)']]\
@@ -3884,11 +3874,9 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_wide['type'] = 'column'
         df_wide['color'] = df_wide.apply(lambda x: COLORS[x['name']], axis=1)
 
-        df_wide_all_am = bio_df_am\
-            .groupby(['region', 'species', 'Water_supply', 'Landuse', 'Year'])[['Value (%)']]\
-            .sum(numeric_only=True)\
-            .reset_index()\
-            .groupby(['region', 'species', 'Water_supply', 'Landuse'])[['Year','Value (%)']]\
+        df_wide_all_am = bio_df\
+            .query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` == "ALL"')\
+            .groupby(['region', 'species', 'Water_supply', 'Landuse'])[['Year', 'Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
             .reset_index()
 
@@ -4123,7 +4111,7 @@ def process_biodiversity_data(files, SAVE_DIR):
 
 
         # ---------------- (GBF8 SPECIES) Agricultural Management  ----------------
-        bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL"').copy()
+        bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` != "ALL"').copy()
 
         df_wide = bio_df_am\
             .groupby(['region', 'species', 'Water_supply', 'Agricultural Management', 'Landuse'])[['Year', 'Value (%)']]\
@@ -4133,11 +4121,9 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_wide['type'] = 'column'
         df_wide['color'] = df_wide.apply(lambda x: COLORS[x['name']], axis=1)
 
-        df_wide_all_am = bio_df_am\
-            .groupby(['region', 'species', 'Water_supply', 'Landuse', 'Year'])[['Value (%)']]\
-            .sum(numeric_only=True)\
-            .reset_index()\
-            .groupby(['region', 'species', 'Water_supply', 'Landuse'])[['Year','Value (%)']]\
+        df_wide_all_am = bio_df\
+            .query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` == "ALL"')\
+            .groupby(['region', 'species', 'Water_supply', 'Landuse'])[['Year', 'Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
             .reset_index()
 
@@ -4364,7 +4350,7 @@ def process_biodiversity_data(files, SAVE_DIR):
 
 
         # ---------------- (GBF8 GROUP) Agricultural Management  ----------------
-        bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL"').copy()
+        bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` != "ALL"').copy()
 
         df_wide = bio_df_am\
             .groupby(['region', 'species', 'Water_supply', 'Agricultural Management', 'Landuse'])[['Year', 'Value (%)']]\
@@ -4374,11 +4360,9 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_wide['type'] = 'column'
         df_wide['color'] = df_wide.apply(lambda x: COLORS[x['name']], axis=1)
 
-        df_wide_all_am = bio_df_am\
-            .groupby(['region', 'species', 'Water_supply', 'Landuse', 'Year'])[['Value (%)']]\
-            .sum(numeric_only=True)\
-            .reset_index()\
-            .groupby(['region', 'species', 'Water_supply', 'Landuse'])[['Year','Value (%)']]\
+        df_wide_all_am = bio_df\
+            .query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` == "ALL"')\
+            .groupby(['region', 'species', 'Water_supply', 'Landuse'])[['Year', 'Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
             .reset_index()
 
