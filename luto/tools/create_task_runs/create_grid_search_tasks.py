@@ -73,8 +73,8 @@ grid_search = {
     'DISCOUNT_RATE': [0.07],                                                # 7% per LUF Report 2026
     'AMORTISATION_PERIOD': [30],                                            # 30 years per LUF Report 2026
     'CARBON_PRICE_COSTANT': [0],                                            # $0/tonne; LUTO does not consider cost/revenue for pure carbon emission/sequestration
-    'BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR': [100, 50],                 # AUD/ha/year; 100=core, 50=Cheaper HIR sensitivity (LUF Report 2026)
-    'SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR':[100, 50],                 # AUD/ha/year; 100=core, 50=Cheaper HIR sensitivity (LUF Report 2026)
+    'BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR': [100],                     # AUD/ha/year; $100/ha/year full maintenance cost
+    'SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR':[100],                     # AUD/ha/year; $100/ha/year full maintenance cost
     'HIR_CEILING_PERCENTAGE': [0.9],                                        # HIR achieves 90% of bio/GHG benefits of Destocked - natural land
 
     # --------------- Target deviation weight ---------------
@@ -161,6 +161,18 @@ grid_search = {
         'HIR - Sheep': True,
         'Utility Solar PV': False,                                          # OFF for core; ON for REN1-REN4
         'Onshore Wind': False,                                              # OFF for core; ON for REN1-REN4
+    }],
+    'AG_MANAGEMENTS_REVERSIBLE': [{
+        'Asparagopsis taxiformis': True,
+        'Precision Agriculture': True,
+        'Ecological Grazing': True,
+        'Savanna Burning': True,
+        'AgTech EI': True,
+        'Biochar': True,
+        'HIR - Beef': False,                                                # Irreversible: permanent land use change once HIR is adopted
+        'HIR - Sheep': False,                                               # Irreversible: permanent land use change once HIR is adopted
+        'Utility Solar PV': False,
+        'Onshore Wind': False,
     }],
     
     # --------------- Non-agricultural land uses ---------------

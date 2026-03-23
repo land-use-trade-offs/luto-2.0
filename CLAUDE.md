@@ -54,6 +54,7 @@ The LUTO2 documentation is split into themed files for better memory efficiency.
 **Step-by-step skill guides for common tasks:**
 - [adding_sum_tab.md](docs/CLAUDE_SKILL/adding_sum_tab.md): Adding a "Sum" tab (Ag + Am + NonAg) — covers write.py, report data/layers, Vue services, and view wiring
 - [debug_ecnes_infeasibility.md](docs/CLAUDE_SKILL/debug_ecnes_infeasibility.md): Debug ECNES infeasibility — run simulation, detect infeasible constraints, submit PBS jobs
+- [fakedata_inspection.md](docs/CLAUDE_SKILL/fakedata_inspection.md): Use `fakedata` as a lightweight `data.py` substitute for inspecting arrays and prototyping spatial helpers without loading full simulation inputs
 
 ## Diagnostic Tools (`luto/tests/`)
 
