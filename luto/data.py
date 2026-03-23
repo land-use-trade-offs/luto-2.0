@@ -642,20 +642,14 @@ class Data:
         print("├── Loading agricultural management options' data", flush=True)
 
         # Asparagopsis taxiformis data
-        asparagopsis_file = os.path.join(settings.INPUT_DIR, "20250415_Bundle_MR.xlsx")
+        asparagopsis_file = os.path.join(settings.INPUT_DIR, "20260317_Bundle_MR.xlsx")
         self.ASPARAGOPSIS_DATA = {}
         self.ASPARAGOPSIS_DATA["Beef - modified land"] = pd.read_excel(
             asparagopsis_file, sheet_name="MR bundle (ext cattle)", index_col="Year"
         )
-        # Sheep bundle updated to 20260317 CSV (replaces old Excel sheet)
-        sheep_data = pd.read_csv(
-            os.path.join(settings.INPUT_DIR, '20260317_Bundle_MR(MR bundle (sheep)).csv'),
-            index_col='Year',
+        self.ASPARAGOPSIS_DATA["Sheep - modified land"] = pd.read_excel(
+            asparagopsis_file, sheet_name="MR bundle (sheep)", index_col="Year"
         )
-        sheep_data['Technical_Adoption'] = (
-            sheep_data['Technical_Adoption'].astype(str).str.replace('%', '', regex=False).astype(float) / 100.0
-        )
-        self.ASPARAGOPSIS_DATA["Sheep - modified land"] = sheep_data
         self.ASPARAGOPSIS_DATA["Dairy - natural land"] = pd.read_excel(
             asparagopsis_file, sheet_name="MR bundle (dairy)", index_col="Year"
         )
@@ -664,7 +658,7 @@ class Data:
         ]
 
         # Precision agriculture data
-        prec_agr_file = os.path.join(settings.INPUT_DIR, "20231101_Bundle_AgTech_NE.xlsx")
+        prec_agr_file = os.path.join(settings.INPUT_DIR, "20260317_Bundle_AgTech_NE.xlsx")
         self.PRECISION_AGRICULTURE_DATA = {}
         int_cropping_data = pd.read_excel(
             prec_agr_file, sheet_name="AgTech NE bundle (int cropping)", index_col="Year"
@@ -672,15 +666,8 @@ class Data:
         cropping_data = pd.read_excel(
             prec_agr_file, sheet_name="AgTech NE bundle (cropping)", index_col="Year"
         )
-        # Horticulture bundle updated to 20260317 CSV (replaces old Excel sheet)
-        horticulture_data = pd.read_csv(
-            os.path.join(settings.INPUT_DIR, '20260317_Bundle_AgTech_NE(AgTech NE bundle (horticulture)).csv'),
-            index_col='Year',
-        )
-        horticulture_data['Technical_Adoption'] = (
-            horticulture_data['Technical_Adoption']
-            .astype(str).str.replace('%', '', regex=False)
-            .astype(float) / 100.0
+        horticulture_data = pd.read_excel(
+            prec_agr_file, sheet_name="AgTech NE bundle (horticulture)", index_col="Year"
         )
         horticulture_data = horticulture_data.rename(columns={'CO2E_KG_HA_SOIL_N_SURP': 'CO2E_KG_HA_SOIL'})
 
@@ -735,21 +722,14 @@ class Data:
 
 
         # Load AgTech EI data
-        prec_agr_file = os.path.join(settings.INPUT_DIR, '20231107_Bundle_AgTech_EI.xlsx')
+        prec_agr_file = os.path.join(settings.INPUT_DIR, '20260317_Bundle_AgTech_EI.xlsx')
         self.AGTECH_EI_DATA = {}
-        int_cropping_data = pd.read_excel( prec_agr_file, sheet_name='AgTech EI bundle (int cropping)', index_col='Year' )
-        cropping_data = pd.read_excel( prec_agr_file, sheet_name='AgTech EI bundle (cropping)', index_col='Year' )
-
-        # Horticulture bundle updated to 20260317 CSV (replaces old Excel sheet)
-        horticulture_data = pd.read_csv(
-            os.path.join(settings.INPUT_DIR, '20260317_Bundle_AgTech_EI(AgTech EI bundle (horticulture)).csv'),
-            index_col='Year',
+        int_cropping_data = pd.read_excel(
+            prec_agr_file, sheet_name='AgTech EI bundle (int cropping)', index_col='Year',
+            usecols=lambda c: not str(c).startswith('Unnamed')
         )
-        horticulture_data['Technical_Adoption'] = (
-            horticulture_data['Technical_Adoption']
-            .astype(str).str.replace('%', '', regex=False)
-            .astype(float) / 100.0
-        )
+        cropping_data = pd.read_excel(prec_agr_file, sheet_name='AgTech EI bundle (cropping)', index_col='Year')
+        horticulture_data = pd.read_excel(prec_agr_file, sheet_name='AgTech EI bundle (horticulture)', index_col='Year')
 
         for lu in ['Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds',
                 'Winter cereals', 'Winter legumes', 'Winter oilseeds']:

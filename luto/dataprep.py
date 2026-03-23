@@ -164,13 +164,10 @@ def create_new_dataset(refresh=False):
   
 
     # Copy agricultural management datafiles
-    shutil.copyfile(luto_1D_inpath + '20250415_Bundle_MR.xlsx', outpath + '20250415_Bundle_MR.xlsx')
-    shutil.copyfile(luto_1D_inpath + '20260317_Bundle_MR(MR bundle (sheep)).csv', outpath + '20260317_Bundle_MR(MR bundle (sheep)).csv')
-    shutil.copyfile(luto_1D_inpath + '20231101_Bundle_AgTech_NE.xlsx', outpath + '20231101_Bundle_AgTech_NE.xlsx')
-    shutil.copyfile(luto_1D_inpath + '20260317_Bundle_AgTech_NE(AgTech NE bundle (horticulture)).csv', outpath + '20260317_Bundle_AgTech_NE(AgTech NE bundle (horticulture)).csv')
+    shutil.copyfile(luto_1D_inpath + '20260317_Bundle_MR.xlsx', outpath + '20260317_Bundle_MR.xlsx')
+    shutil.copyfile(luto_1D_inpath + '20260317_Bundle_AgTech_NE.xlsx', outpath + '20260317_Bundle_AgTech_NE.xlsx')
+    shutil.copyfile(luto_1D_inpath + '20260317_Bundle_AgTech_EI.xlsx', outpath + '20260317_Bundle_AgTech_EI.xlsx')
     shutil.copyfile(luto_1D_inpath + '20231107_ECOGRAZE_Bundle.xlsx', outpath + '20231107_ECOGRAZE_Bundle.xlsx')
-    shutil.copyfile(luto_1D_inpath + '20231107_Bundle_AgTech_EI.xlsx', outpath + '20231107_Bundle_AgTech_EI.xlsx')
-    shutil.copyfile(luto_1D_inpath + '20260317_Bundle_AgTech_EI(AgTech EI bundle (horticulture)).csv', outpath + '20260317_Bundle_AgTech_EI(AgTech EI bundle (horticulture)).csv')
     shutil.copyfile(luto_1D_inpath + '20240918_Bundle_BC.xlsx', outpath + '20240918_Bundle_BC.xlsx')
     
     # Copy biodiversity HACS data from DCCEEW
