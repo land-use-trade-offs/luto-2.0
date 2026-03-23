@@ -93,7 +93,13 @@ for the first 50 years after planting and then use the average as the annual seq
 
 
 # Fire impacts on carbon sequestration
-RISK_OF_REVERSAL = 0.05  # Risk of reversal buffer under ERF (reasonable values range from 0.05 [100 years] to 0.25 [25 years]) https://www.cleanenergyregulator.gov.au/ERF/Choosing-a-project-type/Opportunities-for-the-land-sector/Risk-of-reversal-buffer
+RISK_OF_REVERSAL = 0  # Risk of reversal buffer under ERF (reasonable values range from 0.05 [100 years] to 0.25 [25 years]) https://www.cleanenergyregulator.gov.au/ERF/Choosing-a-project-type/Opportunities-for-the-land-sector/Risk-of-reversal-buffer
+'''
+As of 20260318, RISK_OF_REVERSAL is set to 0 and just use the 5% ERF risk of reversal, as per Brett's comment in 
+the LUF 2026 scenario runs document: "I suggested that we drop the fire risk and just use the 5% ERF risk of reversal. 
+Doubling up is very conservative and leads to more area reqd to meet targets. You still want both on?"
+'''
+
 
 FIRE_RISK = 'med'   # Options are 'low', 'med', 'high'. Determines whether to take the 5th, 50th, or 95th percentile of modelled fire impacts.
 """ 
@@ -102,9 +108,6 @@ Mean FIRE_RISK cell values (%)
 - FD_RISK_MEDIAN      89.2485
 - FD_RISK_PERC_95TH   93.2735 
 
-As of 20260318, fire_risk is hardcoded as 100% in data.py following the decision to drop fire risk and just use the 5% ERF risk 
-of reversal, as per Brett's comment in the LUF 2026 scenario runs document: "I suggested that we drop the fire risk and just use 
-the 5% ERF risk of reversal. Doubling up is very conservative and leads to more area reqd to meet targets. You still want both on?"
 """
 
 
