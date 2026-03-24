@@ -68,7 +68,7 @@ def amortise(cost, rate=settings.DISCOUNT_RATE, horizon=settings.AMORTISATION_PE
     if settings.AMORTISE_UPFRONT_COSTS: 
         return -1 * npf.pmt(rate, horizon, pv=cost, fv=0, when='begin')
     else: 
-        return cost
+        return cost   
 
 
 def lumap2ag_l_mrj(lumap, lmmap):

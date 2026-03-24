@@ -69,7 +69,7 @@ def map2base64(
             'legend': legend['legend'],
         }
     else:
-        # Map values to color codes: positives → red (51–100), negatives → blue (1–50), zeros → grey (0)
+        # Rescale layers using the provided magnitude: positives → red (51–100), negatives → blue (1–50)
         global_min, global_max = layer_magnitude
         vals = arr_sel.values.copy()
         codes = np.full(vals.shape, 0, dtype=np.int8)  # default: no-data grey
@@ -79,8 +79,6 @@ def map2base64(
         if global_min < 0:
             codes[vals < 0] = np.clip(50 + (vals[vals < 0] / abs(global_min)) * 50, 1, 49)
         
-        # Set values in the range [48,52) to 0 (grey) to avoid color confusion around zero 
-        codes[(codes >= 48) & (codes <= 52)] = 0
 
         arr_sel.values = codes
         min_max = (global_min, global_max)
@@ -123,8 +121,8 @@ def get_map2json(
     ) -> None:
     
     # Determine number of workers from memory budget.
-    ncells = 5_000_000 // (settings.RESFACTOR ** 2)    # Number of cells in the original 100m grid, which determines the size of each layer array
-    mem_per_worker = 1000 * ncells * 4 / 1e9           # ~100 layers × ncells × float32, in GB
+    ncells = 5_000_000 // (settings.RESFACTOR ** 2)    # Number of cells in resfactored layer.
+    mem_per_worker = 1000 * ncells * 4 / 1e9           # ~1000 layers × ncells × float32, in GB
     workers = min(60, max(1, int(settings.WRITE_REPORT_MAX_MEM_GB // mem_per_worker)))
     
     # Process one file at a time so only one file's arrays are in memory at once
