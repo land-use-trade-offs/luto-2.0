@@ -56,8 +56,8 @@ window.EconomicsView = {
     // Transition map types have LU as their first dim (from_lu), not lm/Water.
     // Collapse it by always selecting 'ALL' and hiding the Water row.
     const isTransition = computed(() =>
-      selectCategory.value === "Ag" &&
-      (selectMapType.value === "Transition (Ag2Ag)" || selectMapType.value === "Transition (Ag2NonAg)")
+      (selectCategory.value === "Ag" && (selectMapType.value === "Transition (Ag2Ag)" || selectMapType.value === "Transition (NonAg2Ag)")) ||
+      (selectCategory.value === "Non-Ag" && (selectMapType.value === "Transition (Ag2NonAg)" || selectMapType.value === "Transition (NonAg2NonAg)"))
     );
 
     // ── Computed map data ────────────────────────────────────────────────────
@@ -84,18 +84,23 @@ window.EconomicsView = {
       return {};
     });
 
+    const emptyChart = () => ({
+      ...window["Chart_default_options"],
+      chart: { height: 440 },
+      yAxis: { title: { text: availableUnit["Economics"] } },
+      series: [],
+    });
+
     const selectChartData = computed(() => {
-      if (!dataLoaded.value) return {};
+      if (!dataLoaded.value) return emptyChart();
       const cat = selectCategory.value;
       const mt = selectMapType.value;
-      // For Sum, mapType is always "Profit"; for transitions, use Profit data
-      const effectiveMt = cat === "Sum" ? "Profit"
-        : (mt === "Transition (Ag2Ag)" || mt === "Transition (Ag2NonAg)") ? "Profit"
-        : mt;
+      // For Sum, mapType is always "Profit"
+      const effectiveMt = cat === "Sum" ? "Profit" : mt;
       const chartEntry = chartRegister[cat]?.[effectiveMt];
-      if (!chartEntry) return {};
+      if (!chartEntry) return emptyChart();
       const chartData = window[chartEntry.name]?.[selectRegion.value];
-      if (!chartData) return {};
+      if (!chartData) return emptyChart();
 
       let seriesData;
       if (cat === "Sum") {
@@ -109,7 +114,7 @@ window.EconomicsView = {
         // Revenue/Cost: region → source → water → [series by LU]
         // Profit: region → water → [series by LU]
         let items;
-        if (hasSourceLevel.value) {
+        if (hasSourceLevel.value && effectiveMt !== "Profit") {
           items = chartData?.[selectSource.value || "ALL"]?.[selectWater.value];
         } else {
           items = chartData?.[selectWater.value];
@@ -210,7 +215,7 @@ window.EconomicsView = {
         selectLanduse.value = (prevL && availableLanduse.value.includes(prevL)) ? prevL : (availableLanduse.value[0] || '');
 
       } else if (cat === "Ag") {
-        if (mapType === "Transition (Ag2Ag)" || mapType === "Transition (Ag2NonAg)") {
+        if (mapType === "Transition (Ag2Ag)" || mapType === "Transition (NonAg2Ag)") {
           availableWater.value = [];
           selectWater.value = 'ALL';
           cascadeAgFromWater(mapData, 'ALL', true);
@@ -326,7 +331,7 @@ window.EconomicsView = {
         const prev = previousSelections.value["Sum"].landuse;
         selectLanduse.value = (prev && availableLanduse.value.includes(prev)) ? prev : (availableLanduse.value[0] || '');
       } else if (cat === "Ag") {
-        if (selectMapType.value === "Transition (Ag2Ag)" || selectMapType.value === "Transition (Ag2NonAg)") return;
+        if (selectMapType.value === "Transition (Ag2Ag)") return;
         previousSelections.value["Ag"].water = newWater;
         const mapData = window[mapRegister["Ag"][selectMapType.value]?.name];
         cascadeAgFromWater(mapData, newWater, selectMapType.value !== "Profit");

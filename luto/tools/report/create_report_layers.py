@@ -445,8 +445,8 @@ def save_report_layer(raw_data_dir:str):
         *cell_magnitudes['Economics_ag']['ag2ag_cost'],
         *cell_magnitudes['Economics_ag']['non_ag2ag_cost'],
         *cell_magnitudes['Economics_am']['am_transition'],
-        *cell_magnitudes['Economics_non_ag']['non_ag_to_non_ag_cost'],
-        *cell_magnitudes['Economics_non_ag']['non_ag_to_ag_cost']
+        *cell_magnitudes['Economics_non_ag']['nonag2nonag_cost'],
+        *cell_magnitudes['Economics_non_ag']['ag2nonag_cost']
     )
     
     economic_min_max_ag = (min(ecnomic_magnitudes_ag), max(ecnomic_magnitudes_ag))
@@ -504,19 +504,27 @@ def save_report_layer(raw_data_dir:str):
 
 
     # ---------------- Transition Cost ----------------
-    cost_trans_ag2ag = files.query('base_name == "xr_economics_ag_transition_ag2ag"')
+    cost_trans_ag2ag = files.query('base_name == "xr_economics_ag_transition_Ag2Ag"')
     get_map2json(cost_trans_ag2ag, None, None, legend_float, economic_min_max_ag, f'{SAVE_DIR}/map_layers/map_economics_Ag_transition_ag2ag.js')
     print('│   ├── Economics Ag transition ag2ag layer saved.')
 
-    cost_trans_ag2nonag = files.query('base_name == "xr_economics_ag_transition_non_ag2ag"')
-    get_map2json(cost_trans_ag2nonag, None, None, legend_float, economic_min_max_nonag, f'{SAVE_DIR}/map_layers/map_economics_Ag_transition_ag2nonag.js')
-    print('│   ├── Economics Ag transition ag2nonag layer saved.')
+    cost_trans_nonag2ag = files.query('base_name == "xr_economics_ag_transition_NonAg2Ag"')
+    get_map2json(cost_trans_nonag2ag, None, None, legend_float, economic_min_max_ag, f'{SAVE_DIR}/map_layers/map_economics_Ag_transition_nonag2ag.js')
+    print('│   ├── Economics Ag transition nonag2ag layer saved.')
+
+    cost_trans_ag2nonag = files.query('base_name == "xr_economics_non_ag_transition_Ag2NonAg"')
+    get_map2json(cost_trans_ag2nonag, None, None, legend_float, economic_min_max_nonag, f'{SAVE_DIR}/map_layers/map_economics_NonAg_transition_ag2non_ag.js')
+    print('│   ├── Economics NonAg transition ag2nonag layer saved.')
+
+    cost_trans_nonag2nonag = files.query('base_name == "xr_economics_non_ag_transition_NonAg2NonAg"')
+    get_map2json(cost_trans_nonag2nonag, None, None, legend_float, economic_min_max_nonag, f'{SAVE_DIR}/map_layers/map_economics_NonAg_transition_nonag2nonag.js')
+    print('│   ├── Economics NonAg transition nonag2nonag layer saved.')
 
     # AgMgt has 0 transition cost, so skipping
     # cost_ag_man = files.query('base_name == "xr_economics_am_transition"')
 
     # Non-Ag to Ag transition cost is not allowed, so skipping
-    # cost_trans_nonag2ag = files.query('base_name == "xr_economics_non_ag_transition_non_ag2ag"')
+    # cost_trans_nonag2ag = files.query('base_name == "xr_economics_non_ag_transition_NonAg2NonAg"')
     
     
 

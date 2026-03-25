@@ -307,9 +307,11 @@ window.ChartService = {
         "Profit": { "path": "data/Economics_Sum.js", "name": "Economics_Sum" },
       },
       "Ag": {
-        "Profit":  { "path": "data/Economics_Ag_profit.js",  "name": "Economics_Ag_profit" },
-        "Revenue": { "path": "data/Economics_Ag_revenue.js", "name": "Economics_Ag_revenue" },
-        "Cost":    { "path": "data/Economics_Ag_cost.js",    "name": "Economics_Ag_cost" },
+        "Profit":                 { "path": "data/Economics_Ag_profit.js",                "name": "Economics_Ag_profit" },
+        "Revenue":                { "path": "data/Economics_Ag_revenue.js",               "name": "Economics_Ag_revenue" },
+        "Cost":                   { "path": "data/Economics_Ag_cost.js",                  "name": "Economics_Ag_cost" },
+        "Transition (Ag2Ag)":     { "path": "data/Economics_Ag_transition_ag2ag.js",      "name": "Economics_Ag_transition_ag2ag" },
+        "Transition (NonAg2Ag)":  { "path": "data/Economics_Ag_transition_nonag2ag.js",   "name": "Economics_Ag_transition_nonag2ag" },
       },
       "Ag Mgt": {
         "Profit":  { "path": "data/Economics_Am_profit.js",  "name": "Economics_Am_profit" },
@@ -317,9 +319,11 @@ window.ChartService = {
         "Cost":    { "path": "data/Economics_Am_cost.js",    "name": "Economics_Am_cost" },
       },
       "Non-Ag": {
-        "Profit":  { "path": "data/Economics_NonAg_profit.js",  "name": "Economics_NonAg_profit" },
-        "Revenue": { "path": "data/Economics_NonAg_revenue.js", "name": "Economics_NonAg_revenue" },
-        "Cost":    { "path": "data/Economics_NonAg_cost.js",    "name": "Economics_NonAg_cost" },
+        "Profit":                    { "path": "data/Economics_NonAg_profit.js",                   "name": "Economics_NonAg_profit" },
+        "Revenue":                   { "path": "data/Economics_NonAg_revenue.js",                  "name": "Economics_NonAg_revenue" },
+        "Cost":                      { "path": "data/Economics_NonAg_cost.js",                     "name": "Economics_NonAg_cost" },
+        "Transition (Ag2NonAg)":     { "path": "data/Economics_NonAg_transition_ag2nonag.js",      "name": "Economics_NonAg_transition_ag2nonag" },
+        "Transition (NonAg2NonAg)":  { "path": "data/Economics_NonAg_transition_nonag2nonag.js",   "name": "Economics_NonAg_transition_nonag2nonag" },
       },
       "overview": {
         "Ag": {
