@@ -1688,7 +1688,7 @@ class LutoSolver:
         # Process agricultural land usage information
         # Stack dryland and irrigated decision variables
         ag_X_mrj = np.stack((X_dry_sol_rj, X_irr_sol_rj))  # Float32
-        ag_X_mrj = np.round(ag_X_mrj, settings.ROUND_DECMIALS)
+        ag_X_mrj = np.floor(ag_X_mrj * 10 ** settings.ROUND_DECMIALS) / 10 ** settings.ROUND_DECMIALS
         ag_X_mrj[ag_X_mrj < 10 ** -settings.ROUND_DECMIALS] = 0
         ag_X_mrj_processed = ag_X_mrj
 
@@ -1711,7 +1711,9 @@ class LutoSolver:
         # )
         # ag_X_mrj_processed = np.moveaxis(ag_X_mrj_processed, 0, 1)
 
-        non_ag_X_sol_rk = np.round(non_ag_X_sol_rk.astype(np.float32), settings.ROUND_DECMIALS)
+        # Use floor (not round) so the stored dvar never exceeds the solver value.
+        # np.round can round up, making the lb for the next year exceed the ub (fresh float32 computation), causing infeasibility.
+        non_ag_X_sol_rk = np.floor(non_ag_X_sol_rk.astype(np.float32) * 10 ** settings.ROUND_DECMIALS) / 10 ** settings.ROUND_DECMIALS
         non_ag_X_sol_rk[non_ag_X_sol_rk < 10 ** -settings.ROUND_DECMIALS] = 0
 
         # Process non-agricultural land usage information
@@ -1749,7 +1751,7 @@ class LutoSolver:
             #     (ag_man_X_shape[1], ag_man_X_shape[0], ag_man_X_shape[2])
             # )
             # ag_man_processed = np.moveaxis(ag_man_processed, 0, 1)
-            ag_man_processed = np.round(ag_man_processed, settings.ROUND_DECMIALS)
+            ag_man_processed = np.floor(ag_man_processed * 10 ** settings.ROUND_DECMIALS) / 10 ** settings.ROUND_DECMIALS
             ag_man_processed[ag_man_processed < 10 ** -settings.ROUND_DECMIALS] = 0
             ag_man_X_mrj_processed[am] = ag_man_processed
 

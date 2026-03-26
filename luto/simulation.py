@@ -186,24 +186,32 @@ def solve_timeseries(data: Data, years_to_run: list[int], do_analyze_iis: bool) 
 
         print(f'Processing for {target_year} completed in {round(time.time() - start_time)} seconds\n\n' )
         
-        if luto_solver.gurobi_model.Status not in [GRB.OPTIMAL, GRB.SUBOPTIMAL]:
+        status = luto_solver.gurobi_model.Status
+        if status != GRB.OPTIMAL:
             print('!' * 100)
-            print(f"Warning: Gurobi solver did not find an optimal/suboptimal solution for year {target_year}. Status: {luto_solver.gurobi_model.Status}")
+
+            status_msgs = {
+                GRB.INFEASIBLE:  "INFEASIBLE",
+                GRB.INF_OR_UNBD: "INFEASIBLE OR UNBOUNDED — set `BARHOMOGENOUS`=1 to distinguish",
+                GRB.UNBOUNDED:   "UNBOUNDED — check objective coefficients and variable bounds",
+                GRB.NUMERIC:     "NUMERICAL ISSUES — consider adjusting tolerances or `NumericFocus`",
+                GRB.SUBOPTIMAL:  "SUBOPTIMAL — constraints may not be fully satisfied",
+            }
+            print(f"Solver status for year {target_year}: {status_msgs.get(status, f'unexpected status {status}')}")
+
+            if status == GRB.INFEASIBLE:
+                model_path = f"{data.path}/debug_model_{base_year}_{target_year}.mps"
+                luto_solver.gurobi_model.write(model_path)
+                print(f"Saved model to {model_path}")
+                if do_analyze_iis:
+                    print("Computing IIS...")
+                    luto_solver.gurobi_model.computeIIS()
+                    iis_path = f"{data.path}/debug_model_{base_year}_{target_year}.ilp"
+                    luto_solver.gurobi_model.write(iis_path)
+                    print(f"IIS saved to {iis_path}")
+                    analyze_iis(iis_path, data)
+
             print('!' * 100)
-            
-            # Save model and compute IIS for debugging
-            model_path = f"{data.path}/debug_model_{base_year}_{target_year}.mps"
-            luto_solver.gurobi_model.write(model_path)
-            print(f"Saved Gurobi model to {model_path}")
-
-            if do_analyze_iis:
-                print("Computing IIS (Irreducible Inconsistent Subsystem)...")
-                luto_solver.gurobi_model.computeIIS()
-                iis_path = f"{data.path}/debug_model_{base_year}_{target_year}.ilp"
-                luto_solver.gurobi_model.write(iis_path)
-                print(f"Analyzed IIS and saved to {iis_path}")
-                analyze_iis(iis_path, data)
-
             print('\n')
             break
 
