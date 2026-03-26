@@ -175,6 +175,7 @@ def rename_reorder_hierarchy(sel: dict) -> dict:
     4. 'lu' (Land-use) has to be the lowest level in the hierarchy.
     '''
     sel_rename = {}
+    
     # 1: 'am'
     if 'am' in sel:
         sel_rename['am'] = RENAME_AM_NON_AG.get(sel['am'], sel['am'])
@@ -183,7 +184,13 @@ def rename_reorder_hierarchy(sel: dict) -> dict:
     if 'lm' in sel:
         sel_rename['lm'] =  {'irr': 'Irrigated', 'dry': 'Dryland'}.get(sel['lm'], sel['lm'])
         
-    # 3-1: Commodity dimensions
+    # 3: 'species' or 'group' (biodiversity GBF4/GBF8 — top level in hierarchy)
+    if 'species' in sel:
+        sel_rename['species'] = sel['species']
+    if 'group' in sel:
+        sel_rename['group'] = sel['group']
+        
+    # 4-1: Commodity dimensions
     if 'Commodity' in sel:
         commodity = sel['Commodity'].capitalize()
         sel_rename['Commodity'] = {
@@ -192,8 +199,8 @@ def rename_reorder_hierarchy(sel: dict) -> dict:
             'Beef lexp': 'Beef live export'
         }.get(commodity, commodity)
         
-    # 3-2: Profit/Revenue/Cost/Source
-    leftover_keys = set(sel.keys()) - set(sel_rename.keys()) - {'lu', 'from_lu'}
+    # 4-2: Profit/Revenue/Cost/Source
+    leftover_keys = set(sel.keys()) - set(sel_rename.keys()) - {'lu', 'from_lu', 'species', 'group'}
     for key in leftover_keys:
         sel_rename[key] = {
             'Operation-cost': 'Cost (operation)',
@@ -203,7 +210,7 @@ def rename_reorder_hierarchy(sel: dict) -> dict:
             'Transition-cost-agMgt': 'Cost (trans AgMgt)',
         }.get(sel[key], sel[key])
 
-    # 4 last: 'lu' or 'from_lu' (treated identically as the land-use selection level)
+    # 5 last: 'lu' or 'from_lu' (treated identically as the land-use selection level)
     if 'lu' in sel:
         sel_rename['lu'] = RENAME_AM_NON_AG.get(sel['lu'], sel['lu'])
     elif 'from_lu' in sel:

@@ -268,12 +268,12 @@ def get_utility_solar_pv_effect_t_mrj(data, yr_idx):
     yr_cal = data.YR_CAL_BASE + yr_idx
     solar_lus = settings.AG_MANAGEMENTS_TO_LAND_USES['Utility Solar PV']
     
-    if not settings.AG_MANAGEMENTS.get('Utility Solar PV', False):
+    if settings.RENEWABLE_ENERGY_CONSTRAINTS != 'on':
         return np.zeros((data.NLMS, data.NCELLS, len(solar_lus)), dtype=np.float32)
 
     # Get upfront installation cost map (AUD/Cell)
     capex_map = (
-        data.RENEWABLE_LAYERS.sel(year=yr_cal, Type='Utility Solar PV')['Cost_of_install_AUD_kw'] 
+        data.RENEWABLE_LAYERS.sel(year=yr_cal, tech_name='Utility Solar PV')['Cost_of_install_AUD_kw'] 
         * 1000                                                  # Convert from AUD/kW to AUD/MW
         * 0.6944                                                # Adjust AUD from 2024 to 2010
         * settings.INSTALL_CAPACITY_MW_HA['Utility Solar PV']   # Convert from AUD/MW to AUD/ha
@@ -302,12 +302,12 @@ def get_onshore_wind_effect_t_mrj(data, yr_idx):
     yr_cal = data.YR_CAL_BASE + yr_idx
     wind_lus = settings.AG_MANAGEMENTS_TO_LAND_USES['Onshore Wind']
     
-    if not settings.AG_MANAGEMENTS.get('Onshore Wind', False):
+    if settings.RENEWABLE_ENERGY_CONSTRAINTS != 'on':
         return np.zeros((data.NLMS, data.NCELLS, len(wind_lus)), dtype=np.float32)
 
     # Get upfront installation cost map (AUD/Cell)
     capex_map = (
-        data.RENEWABLE_LAYERS.sel(year=yr_cal, Type='Onshore Wind')['Cost_of_install_AUD_kw'] 
+        data.RENEWABLE_LAYERS.sel(year=yr_cal, tech_name='Onshore Wind')['Cost_of_install_AUD_kw'] 
         * 1000                                              # Convert from AUD/kW to AUD/MW
         * 0.6944                                            # Adjust AUD from 2024 to 2010
         * settings.INSTALL_CAPACITY_MW_HA['Onshore Wind']   # Convert from AUD/MW to AUD/ha

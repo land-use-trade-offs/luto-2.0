@@ -93,13 +93,21 @@ for the first 50 years after planting and then use the average as the annual seq
 
 
 # Fire impacts on carbon sequestration
-RISK_OF_REVERSAL = 0.05  # Risk of reversal buffer under ERF (reasonable values range from 0.05 [100 years] to 0.25 [25 years]) https://www.cleanenergyregulator.gov.au/ERF/Choosing-a-project-type/Opportunities-for-the-land-sector/Risk-of-reversal-buffer
+RISK_OF_REVERSAL = 0  # Risk of reversal buffer under ERF (reasonable values range from 0.05 [100 years] to 0.25 [25 years]) https://www.cleanenergyregulator.gov.au/ERF/Choosing-a-project-type/Opportunities-for-the-land-sector/Risk-of-reversal-buffer
+'''
+As of 20260318, RISK_OF_REVERSAL is set to 0 and just use the 5% ERF risk of reversal, as per Brett's comment in 
+the LUF 2026 scenario runs document: "I suggested that we drop the fire risk and just use the 5% ERF risk of reversal. 
+Doubling up is very conservative and leads to more area reqd to meet targets. You still want both on?"
+'''
+
+
 FIRE_RISK = 'med'   # Options are 'low', 'med', 'high'. Determines whether to take the 5th, 50th, or 95th percentile of modelled fire impacts.
 """ 
 Mean FIRE_RISK cell values (%)
 - FD_RISK_PERC_5TH    80.3967
 - FD_RISK_MEDIAN      89.2485
 - FD_RISK_PERC_95TH   93.2735 
+
 """
 
 
@@ -129,7 +137,7 @@ DYNAMIC_PRICE = False
 RESFACTOR = 10        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-SIM_YEARS =  list(range(2010, 2051, 5))
+SIM_YEARS =  list(range(2010, 2051, 10))
 
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
@@ -168,7 +176,7 @@ the model sensitive to variations in input data.
 # Geographical raster writing parameters
 # ---------------------------------------------------------------------------- #
 WRITE_PARALLEL = True                       # If to use parallel processing to write GeoTiffs: True or False
-WRITE_THREADS = min(12, os.cpu_count())     # The Threads to use for map making, only work with WRITE_PARALLEL = True
+WRITE_THREADS = min(16, os.cpu_count())     # The Threads to use for map making, only work with WRITE_PARALLEL = True
 
 WRITE_REPORT_MAX_MEM_GB = 64                # The maximum memory (in GB) to use for writing report layers.
                                             #   Estimated based on the 0.5 GB MEM usage when RESFACTOR = 13 
@@ -347,6 +355,97 @@ AF_FENCING_LENGTH_HA = 100 * no_belts_per_ha * 2 # Length of fencing required pe
 
 
 # ---------------------------------------------------------------------------- #
+# Renewable energy parameters
+# ---------------------------------------------------------------------------- #
+RENEWABLE_ENERGY_CONSTRAINTS = 'on'         # 'on' or 'off'
+
+RENEWABLES_OPTIONS = [
+    'Utility Solar PV',
+    'Onshore Wind'
+]
+
+EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS = True
+'''
+Whether to exclude renewable energy installation on cells inside the GBF2 masked layer (i.e., cells with very high biodiversity value).
+ - True: The model cannot install renewable energy on GBF2-masked cells.
+ - False: The model can install renewable energy on GBF2-masked cells.
+'''
+
+RENEWABLE_GBF2_CUT_WIND = 20
+RENEWABLE_GBF2_CUT_SOLAR = 20
+'''
+Independent biodiversity area coverage percentage thresholds (same scale as GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT)
+for determining which cells to exclude from renewable energy installation.
+Cells with biodiversity quality >= the conservation performance curve value at this cut are excluded.
+Lower values = fewer cells excluded, higher values = more cells excluded.
+'''
+
+EXCLUDE_RENEWABLES_IN_EPBC_MNES_MASK = True
+'''
+Whether to exclude renewable energy installation on cells inside the EPBC MNES prioritization layer
+(i.e., cells with high MNES priority rank).
+ - True: The model cannot install renewable energy on MNES high-priority cells.
+ - False: The model can install renewable energy on MNES high-priority cells.
+'''
+
+RENEWABLE_EPBC_MNES_CUT_SOLAR = 10
+RENEWABLE_EPBC_MNES_CUT_WIND = 10
+'''
+Independent MNES area coverage percentage thresholds for determining which cells to exclude from
+renewable energy installation. Cells with MNES priority rank >= the performance curve value at this
+cut are excluded.
+Lower values = fewer cells excluded, higher values = more cells excluded.
+'''
+
+
+RENEWABLE_TARGET_SCENARIO_TARGETS = 'CNS - Accelerated Transition'
+'''
+The renewable energy target scenario to use when `RENEWABLE_ENERGY_CONSTRAINTS` is set to 'on'. One of
+ - CNS - Accelerated Transition
+ - CNS - Current Targets
+ - Gladstone - Current Targets
+'''
+
+
+RENEWABLE_TARGET_SCENARIO_INPUT_LAYERS = 'step_change'
+'''
+The renewable energy target scenario for input spatial layersto use when `RENEWABLE_ENERGY_CONSTRAINTS`
+is set to 'on'. One of
+ - 'step_change',
+ - 'accelerated_transition',
+ - 'ANU_transmission_T3',
+ - 'ANU_transmission_T5',
+ - 'ANU_transmission_T10'.
+'''
+
+RE_TARGET_LEVEL = "STATE"  # options: "STATE", "NRM"; TODO: currently (20260205) only support STATE, will add NRM in the future.
+'''
+The spatial level at which to apply the renewable energy targets when `RENEWABLE_ENERGY_CONSTRAINTS` is set to 'on'.
+Options include "STATE" or "NRM". Currently (20260205) only support STATE.
+'''
+
+INSTALL_CAPACITY_MW_HA = {
+    "Utility Solar PV": 0.45,
+    "Onshore Wind": 0.04,
+}
+'''
+The per/ha capacity (Mw/ha) for each renewable energy management type.
+'''
+
+
+RENEWABLES_ADOPTION_LIMITS = {
+    'Utility Solar PV': 1.0,        # Maximum proportion of land that can be used for Utility Solar PV
+    'Onshore Wind': 1.0,            # Maximum proportion of land that can be used for Onshore Wind
+}
+'''
+The maximum proportion of land that can be used for each renewable energy management type.
+For example, if RENEWABLES_ADOPTION_LIMITS['Utility Solar PV'] = 0.5, then at most 50% of
+the land can be used for Utility Solar PV.
+'''
+
+
+
+# ---------------------------------------------------------------------------- #
 # Agricultural Management parameters
 # ---------------------------------------------------------------------------- #
 
@@ -405,8 +504,8 @@ AG_MANAGEMENTS = {
     'Biochar': True,
     'HIR - Beef': True,
     'HIR - Sheep': True,
-    'Utility Solar PV': None,   # Set later based on RENEWABLE_ENERGY_CONSTRAINTS
-    'Onshore Wind': None,       # Set later based on RENEWABLE_ENERGY_CONSTRAINTS
+    'Utility Solar PV': RENEWABLE_ENERGY_CONSTRAINTS == 'on',
+    'Onshore Wind': RENEWABLE_ENERGY_CONSTRAINTS == 'on',
 }
 """
 The dictionary below contains a master list of all agricultural management options and
@@ -460,60 +559,6 @@ SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
 
 
 
-# ---------------------------------------------------------------------------- #
-# Renewable energy parameters
-# ---------------------------------------------------------------------------- #
-RENEWABLE_ENERGY_CONSTRAINTS = 'off'         # 'on' or 'off'
-
-if RENEWABLE_ENERGY_CONSTRAINTS == 'on':
-    AG_MANAGEMENTS['Utility Solar PV'] = True
-    AG_MANAGEMENTS['Onshore Wind'] = True
-elif RENEWABLE_ENERGY_CONSTRAINTS == 'off':
-    AG_MANAGEMENTS['Utility Solar PV'] = False
-    AG_MANAGEMENTS['Onshore Wind'] = False
-else:    
-    raise ValueError("Invalid value for RENEWABLE_ENERGY_CONSTRAINTS. Must be 'on' or 'off'.")
-
-RENEWABLES_OPTIONS = [
-    'Utility Solar PV',
-    'Onshore Wind'
-]
-
-RENEWABLE_SCENARIO = 'step_change' # one of 'step_change', 'reimagined_transition', 'accelerated_transition'
-'''
-The renewable energy transmission scenario to use determining which TIF inputs to load.
-'''
-
-RENEWABLE_TARGET_SCENARIO =  'CNS25 - Accelerated Transition' # one of 'CNS25 - Accelerated Transition', 'CNS25 - Current Targets'
-'''
-The renewable energy target scenario to use when `RENEWABLE_ENERGY_CONSTRAINTS` is set to 'on'.
-One of 'CNS25 - Accelerated Transition' or 'CNS25 - Current Targets', 
-'''
-
-RE_TARGET_LEVEL = "STATE"  # options: "STATE", "NRM"; TODO: currently (20260205) only support STATE, will add NRM in the future.
-'''
-The spatial level at which to apply the renewable energy targets when `RENEWABLE_ENERGY_CONSTRAINTS` is set to 'on'.
-Options include "STATE" or "NRM". Currently (20260205) only support STATE.
-'''
-
-INSTALL_CAPACITY_MW_HA = {
-    "Utility Solar PV": 0.45,
-    "Onshore Wind": 0.04,  
-}
-'''
-The per/ha capacity (Mw/ha) for each renewable energy management type.
-'''
-
-
-RENEWABLES_ADOPTION_LIMITS = {
-    'Utility Solar PV': 1.0,        # Maximum proportion of land that can be used for Utility Solar PV
-    'Onshore Wind': 1.0,            # Maximum proportion of land that can be used for Onshore Wind
-}
-'''
-The maximum proportion of land that can be used for each renewable energy management type.
-For example, if RENEWABLES_ADOPTION_LIMITS['Utility Solar PV'] = 0.5, then at most 50% of 
-the land can be used for Utility Solar PV.
-'''
 
 
 
@@ -702,7 +747,7 @@ in order to enhance biodiversity and ecosystem functions and services, ecologica
 '''
 
 
-GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 40
+GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 20
 '''
 Based on Zonation alogrithm, the biodiversity feature coverage (an indicator of overall biodiversity benifits) is 
 more attached to high rank cells (rank is an indicator of importance/priority in biodiversity conservation). 
@@ -789,7 +834,8 @@ BIO_CONTRIBUTION_CARBON_PLANTING_BELT = 0.1
 BIO_CONTRIBUTION_RIPARIAN_PLANTING = 1.2
 BIO_CONTRIBUTION_AGROFORESTRY = 0.75       
 BIO_CONTRIBUTION_BECCS = 0
-''' 
+BIO_CONTRIBUTION_DESTOCKING = None  # If None, uses BIO_HABITAT_CONTRIBUTION_LOOK_UP difference; if set (e.g. 0.75), overrides with a fixed scalar
+'''
 The benefit of each non-agricultural land use to biodiversity is set as a proportion to the raw biodiversity priority value.
 For example, if the raw biodiversity priority value is 0.6 and the benefit is 0.8, then the biodiversity value
 will be 0.6 * 0.8 = 0.48.

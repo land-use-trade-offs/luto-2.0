@@ -78,7 +78,7 @@ window.HomeView = {
 
     const selectRanking = computed(() => {
       return {
-        economicTotal: rankingData.value['Economics']?.[selectRegion.value]?.['Total']?.['value']?.[selectYear.value] || 'N/A',
+        economicTotal: rankingData.value['Economics']?.[selectRegion.value]?.['Profit']?.['value']?.[selectYear.value] || 'N/A',
         economicCost: rankingData.value['Economics']?.[selectRegion.value]?.['Cost']?.['value']?.[selectYear.value] || 'N/A',
         economicRevenue: rankingData.value['Economics']?.[selectRegion.value]?.['Revenue']?.['value']?.[selectYear.value] || 'N/A',
         areaTotal: rankingData.value['Area']?.[selectRegion.value]?.['Total']?.['value']?.[selectYear.value] || 'N/A',

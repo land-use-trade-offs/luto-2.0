@@ -430,7 +430,7 @@ def get_utility_solar_pv_effect_w_mrj(data, yr_idx):
     wreq_mrj = get_wreq_matrices(data, yr_idx)
     w_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32) 
     
-    if not settings.AG_MANAGEMENTS['Utility Solar PV']:
+    if settings.RENEWABLE_ENERGY_CONSTRAINTS != 'on':
         return w_mrj_effect
 
     for lu_idx, lu in enumerate(land_uses):
@@ -458,7 +458,7 @@ def get_onshore_wind_effect_w_mrj(data, yr_idx):
     wreq_mrj = get_wreq_matrices(data, yr_idx)
     w_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)  
      
-    if not settings.AG_MANAGEMENTS['Onshore Wind']:
+    if settings.RENEWABLE_ENERGY_CONSTRAINTS != 'on':
         return w_mrj_effect
     
     for lu_idx, lu in enumerate(land_uses):

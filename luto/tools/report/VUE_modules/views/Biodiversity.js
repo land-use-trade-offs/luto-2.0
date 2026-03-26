@@ -84,6 +84,11 @@ window.BiodiversityView = {
     const dataLoaded = ref(false);
     const isDrawerOpen = ref(false);
 
+    // GBF2 mask overlay — only active when GBF2 metric is selected
+    const gbf2MaskOverlay = computed(() =>
+      (dataLoaded.value && selectMetric.value === 'GBF2') ? (window.BIO_GBF2_MASK || null) : null
+    );
+
     // Cascade helper — reads from mapRegister[selectMetric]
     function doCascade(category) {
       const mr = mapRegister[selectMetric.value];
@@ -92,38 +97,43 @@ window.BiodiversityView = {
       const amData = window[mr?.["Ag Mgt"]?.["name"]];
       const nonAgData = window[mr?.["Non-Ag"]?.["name"]];
 
+      // Remember current selections for cross-category restore
+      const curWater = selectWater.value;
+      const curLanduse = selectLanduse.value;
+      const curAgMgt = selectAgMgt.value;
+
       if (category === "Sum") {
         availableAgMgt.value = [];
         availableWater.value = [];
         availableLanduse.value = Object.keys(sumData || {});
-        const prevLU = previousSelections.value["Sum"].landuse;
+        const prevLU = previousSelections.value["Sum"].landuse || curLanduse;
         selectLanduse.value = (prevLU && availableLanduse.value.includes(prevLU)) ? prevLU : (availableLanduse.value[0] || '');
 
       } else if (category === "Ag") {
         availableWater.value = Object.keys(agData || {});
-        const prevWater = previousSelections.value["Ag"].water;
+        const prevWater = previousSelections.value["Ag"].water || curWater;
         selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
 
         availableLanduse.value = Object.keys(agData?.[selectWater.value] || {});
-        const prevLU = previousSelections.value["Ag"].landuse;
+        const prevLU = previousSelections.value["Ag"].landuse || curLanduse;
         selectLanduse.value = (prevLU && availableLanduse.value.includes(prevLU)) ? prevLU : (availableLanduse.value[0] || '');
 
       } else if (category === "Ag Mgt") {
         availableAgMgt.value = Object.keys(amData || {});
-        const prevAgMgt = previousSelections.value["Ag Mgt"].agMgt;
+        const prevAgMgt = previousSelections.value["Ag Mgt"].agMgt || curAgMgt;
         selectAgMgt.value = (prevAgMgt && availableAgMgt.value.includes(prevAgMgt)) ? prevAgMgt : (availableAgMgt.value[0] || '');
 
         availableWater.value = Object.keys(amData?.[selectAgMgt.value] || {});
-        const prevWater = previousSelections.value["Ag Mgt"].water;
+        const prevWater = previousSelections.value["Ag Mgt"].water || curWater;
         selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
 
         availableLanduse.value = Object.keys(amData?.[selectAgMgt.value]?.[selectWater.value] || {});
-        const prevLU = previousSelections.value["Ag Mgt"].landuse;
+        const prevLU = previousSelections.value["Ag Mgt"].landuse || curLanduse;
         selectLanduse.value = (prevLU && availableLanduse.value.includes(prevLU)) ? prevLU : (availableLanduse.value[0] || '');
 
       } else if (category === "Non-Ag") {
         availableLanduse.value = Object.keys(nonAgData || {});
-        const prevLU = previousSelections.value["Non-Ag"].landuse;
+        const prevLU = previousSelections.value["Non-Ag"].landuse || curLanduse;
         selectLanduse.value = (prevLU && availableLanduse.value.includes(prevLU)) ? prevLU : (availableLanduse.value[0] || '');
       }
     }
@@ -229,6 +239,12 @@ window.BiodiversityView = {
       selectMetric.value = enabledMetrics[0];
       selectCategory.value = availableCategories[0];
 
+      // Load GBF2 mask overlay if GBF2 is enabled
+      if (enabledMetrics.includes('GBF2')) {
+        const mask = mapRegister['GBF2']['mask'];
+        await loadScript(mask.path, mask.name, VIEW_NAME);
+      }
+
       await nextTick(() => {
         dataLoaded.value = true;
       });
@@ -330,6 +346,7 @@ window.BiodiversityView = {
       formatLanduse,
       selectMapData,
       selectChartData,
+      gbf2MaskOverlay,
 
       dataLoaded,
       isDrawerOpen,
@@ -427,6 +444,7 @@ window.BiodiversityView = {
         <!-- Map component takes full space -->
         <regions-map
           :mapData="selectMapData"
+          :overlayGeoJSON="gbf2MaskOverlay"
           style="width: 100%; height: 100%;">
         </regions-map>
 

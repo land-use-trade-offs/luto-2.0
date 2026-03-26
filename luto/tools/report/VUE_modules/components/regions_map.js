@@ -6,6 +6,10 @@ window.RegionsMap = {
       type: Object,
       required: true
     },
+    overlayGeoJSON: {
+      type: Object,
+      default: null
+    },
   },
 
   setup(props) {
@@ -15,10 +19,11 @@ window.RegionsMap = {
 
     const map = ref(null);
     const boundingBox = ref(null);
+    const gbf2Layer = ref(null);
     const loadScript = window.loadScript;
-    const selectedBaseMap = ref('OpenStreetMap');
+    const selectedBaseMap = ref('CartoDB');
     const tileLayers = ref({});
-    const baseMapOptions = ref(['OpenStreetMap', 'Satellite', 'None']);
+    const baseMapOptions = ref(['CartoDB', 'Satellite', 'None']);
 
 
 
@@ -36,9 +41,10 @@ window.RegionsMap = {
 
       // Create tile layers but don't add them yet
       tileLayers.value = {
-        OSM: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '© OpenStreetMap contributors',
-          maxZoom: 18
+        OSM: L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+          subdomains: 'abcd',
+          maxZoom: 20
         }),
         Satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
           attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
@@ -47,7 +53,7 @@ window.RegionsMap = {
       };
 
       // Add initial base map
-      const initialMapType = selectedBaseMap.value === 'OpenStreetMap' ? 'OSM' : selectedBaseMap.value;
+      const initialMapType = selectedBaseMap.value === 'CartoDB' ? 'OSM' : selectedBaseMap.value;
       if (initialMapType !== 'None') {
         tileLayers.value[initialMapType].addTo(map.value);
       }
@@ -239,6 +245,19 @@ window.RegionsMap = {
       loadMapData();
     });
 
+    Vue.watch(() => props.overlayGeoJSON, (geojson) => {
+      if (!map.value) return;
+      if (gbf2Layer.value) {
+        map.value.removeLayer(gbf2Layer.value);
+        gbf2Layer.value = null;
+      }
+      if (geojson) {
+        gbf2Layer.value = L.geoJSON(geojson, {
+          style: { color: '#555', weight: 1.5, fillColor: '#666', fillOpacity: 0.35, opacity: 0.7 }
+        }).addTo(map.value);
+      }
+    });
+
     Vue.watch(selectedRegion, (newValue, oldValue) => {
       if (newValue) {
         // Only trigger animation if this is a real region change (not a page navigation)
@@ -251,7 +270,7 @@ window.RegionsMap = {
       selectedBaseMap.value = mapType;
       // Map display names to internal values
       const mapTypeMap = {
-        'OpenStreetMap': 'OSM',
+        'CartoDB': 'OSM',
         'Satellite': 'Satellite',
         'None': 'None'
       };

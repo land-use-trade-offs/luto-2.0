@@ -18,9 +18,11 @@ cat << EOF > $SCRIPT_PBS
 #PBS -l storage=scratch/${PROJECT}+gdata/${PROJECT}
 #PBS -l ncpus=${NCPUS}
 #PBS -l mem=${MEM}
-#PBS -l jobfs=10GB
+#PBS -l jobfs=100GB
 #PBS -l walltime=${TIME}
 #PBS -l wd="$(dirname "$0")"
+
+export JOBLIB_TEMP_FOLDER=\$PBS_JOBFS
 
 ${PYTHON} python_script.py
 EOF

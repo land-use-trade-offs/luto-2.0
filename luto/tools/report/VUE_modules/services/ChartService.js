@@ -303,17 +303,27 @@ window.ChartService = {
       },
     },
     "Economics": {
+      "Sum": {
+        "Profit": { "path": "data/Economics_Sum.js", "name": "Economics_Sum" },
+      },
       "Ag": {
-        "path": "data/Economics_Ag.js",
-        "name": "Economics_Ag",
+        "Profit":                 { "path": "data/Economics_Ag_profit.js",                "name": "Economics_Ag_profit" },
+        "Revenue":                { "path": "data/Economics_Ag_revenue.js",               "name": "Economics_Ag_revenue" },
+        "Cost":                   { "path": "data/Economics_Ag_cost.js",                  "name": "Economics_Ag_cost" },
+        "Transition (Ag2Ag)":     { "path": "data/Economics_Ag_transition_ag2ag.js",      "name": "Economics_Ag_transition_ag2ag" },
+        "Transition (NonAg2Ag)":  { "path": "data/Economics_Ag_transition_nonag2ag.js",   "name": "Economics_Ag_transition_nonag2ag" },
       },
       "Ag Mgt": {
-        "path": "data/Economics_Am.js",
-        "name": "Economics_Am",
+        "Profit":  { "path": "data/Economics_Am_profit.js",  "name": "Economics_Am_profit" },
+        "Revenue": { "path": "data/Economics_Am_revenue.js", "name": "Economics_Am_revenue" },
+        "Cost":    { "path": "data/Economics_Am_cost.js",    "name": "Economics_Am_cost" },
       },
       "Non-Ag": {
-        "path": "data/Economics_overview_Non_Ag.js",
-        "name": "Economics_overview_Non_Ag",
+        "Profit":                    { "path": "data/Economics_NonAg_profit.js",                   "name": "Economics_NonAg_profit" },
+        "Revenue":                   { "path": "data/Economics_NonAg_revenue.js",                  "name": "Economics_NonAg_revenue" },
+        "Cost":                      { "path": "data/Economics_NonAg_cost.js",                     "name": "Economics_NonAg_cost" },
+        "Transition (Ag2NonAg)":     { "path": "data/Economics_NonAg_transition_ag2nonag.js",      "name": "Economics_NonAg_transition_ag2nonag" },
+        "Transition (NonAg2NonAg)":  { "path": "data/Economics_NonAg_transition_nonag2nonag.js",   "name": "Economics_NonAg_transition_nonag2nonag" },
       },
       "overview": {
         "Ag": {
@@ -339,6 +349,10 @@ window.ChartService = {
       },
     },
     "GHG": {
+      "Sum": {
+        "path": "data/GHG_Sum.js",
+        "name": "GHG_Sum",
+      },
       "Ag": {
         "path": "data/GHG_Ag.js",
         "name": "GHG_Ag",
@@ -375,6 +389,10 @@ window.ChartService = {
       },
     },
     "Production": {
+      "Sum": {
+        "path": "data/Production_Sum.js",
+        "name": "Production_Sum",
+      },
       "Ag": {
         "path": "data/Production_Ag.js",
         "name": "Production_Ag",
@@ -420,6 +438,10 @@ window.ChartService = {
     },
     "Water": {
       "NRM": {
+        "Sum": {
+          "path": "data/Water_Sum_NRM.js",
+          "name": "Water_Sum_NRM",
+        },
         "Ag": {
           "path": "data/Water_Ag_NRM.js",
           "name": "Water_Ag_NRM",

@@ -100,7 +100,7 @@ def create_new_dataset(refresh=False):
     
     # Demand and elasticity data
     shutil.copyfile(f'{demand_scenarios_inpath}/All_LUTO_demand_scenarios_with_convergences.csv',  raw_data + 'All_LUTO_demand_scenarios_with_convergences.csv')
-    shutil.copyfile(f'{demand_elasticity_inpath}/Elasticities_Table_20260224.csv', outpath + 'demand_elasticity.csv')
+    shutil.copyfile(f'{demand_elasticity_inpath}/20260311_values for runs.csv', outpath + 'demand_elasticity.csv')
     shutil.copyfile(f'{luto_1D_inpath}/20260220_CNS25 Pathways AusTIMES data.xlsx', outpath + 'AusTIMES_demand_multiplier.xlsx')
     
     # Read raw BECCS data from CSIRO and save as HDF5
@@ -164,17 +164,17 @@ def create_new_dataset(refresh=False):
   
 
     # Copy agricultural management datafiles
-    shutil.copyfile(luto_1D_inpath + '20250415_Bundle_MR.xlsx', outpath + '20250415_Bundle_MR.xlsx')
-    shutil.copyfile(luto_1D_inpath + '20231101_Bundle_AgTech_NE.xlsx', outpath + '20231101_Bundle_AgTech_NE.xlsx')
+    shutil.copyfile(luto_1D_inpath + '20260317_Bundle_MR.xlsx', outpath + '20260317_Bundle_MR.xlsx')
+    shutil.copyfile(luto_1D_inpath + '20260317_Bundle_AgTech_NE.xlsx', outpath + '20260317_Bundle_AgTech_NE.xlsx')
+    shutil.copyfile(luto_1D_inpath + '20260317_Bundle_AgTech_EI.xlsx', outpath + '20260317_Bundle_AgTech_EI.xlsx')
     shutil.copyfile(luto_1D_inpath + '20231107_ECOGRAZE_Bundle.xlsx', outpath + '20231107_ECOGRAZE_Bundle.xlsx')
-    shutil.copyfile(luto_1D_inpath + '20231107_Bundle_AgTech_EI.xlsx', outpath + '20231107_Bundle_AgTech_EI.xlsx')
     shutil.copyfile(luto_1D_inpath + '20240918_Bundle_BC.xlsx', outpath + '20240918_Bundle_BC.xlsx')
     
     # Copy biodiversity HACS data from DCCEEW
     shutil.copyfile(bio_HACS_inpath + 'HABITAT_CONDITION.csv', outpath + 'bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv')
     
     # Copy biodiversity GBF-2 files
-    shutil.copyfile(bio_GBF2_inpath + 'GBF2_conserve_performance.xlsx', outpath + 'BIODIVERSITY_GBF2_conservation_performance.xlsx')
+    shutil.copyfile(bio_GBF2_inpath + 'Biodiversity_conserve_performance.xlsx', outpath + 'Biodiversity_conserve_performance.xlsx')
 
     # Copy biodiversity GBF-3 data
     shutil.copyfile(bio_GBF3_NVIS_inpath + '/NVIS7_0_AUST_PRE_MVS.nc', outpath + 'bio_GBF3_NVIS_MVS.nc')
@@ -213,6 +213,8 @@ def create_new_dataset(refresh=False):
     shutil.copyfile(f'{renewable_energy_inpath}/renewable_energy_bundle.csv', outpath + 'renewable_energy_bundle.csv')
     shutil.copyfile(f'{renewable_energy_inpath}/renewable_price_AUD_MWh_solar.csv', outpath + 'renewable_price_AUD_MWh_solar.csv')
     shutil.copyfile(f'{renewable_energy_inpath}/renewable_price_AUD_MWh_wind.csv', outpath + 'renewable_price_AUD_MWh_wind.csv')
+    shutil.copyfile(f'{renewable_energy_inpath}/renewable_QLD_EPBC_MNES_prioritization.nc', outpath + 'renewable_QLD_EPBC_MNES_prioritization.nc')
+    shutil.copyfile(f'{renewable_energy_inpath}/renewable_QLD_EPBC_MNES_prioritization_performance.csv', outpath + 'renewable_QLD_EPBC_MNES_prioritization_performance.csv')
 
 
 

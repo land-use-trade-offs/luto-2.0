@@ -530,7 +530,7 @@ def get_utility_solar_pv_effect_c_mrj(data: Data, c_mrj, yr_idx):
     new_c_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
 
     # Return zeros if management is disabled globally
-    if not settings.AG_MANAGEMENTS['Utility Solar PV']:
+    if settings.RENEWABLE_ENERGY_CONSTRAINTS != 'on':
         return new_c_mrj
 
     for lu_idx, lu in enumerate(land_uses):
@@ -543,7 +543,7 @@ def get_utility_solar_pv_effect_c_mrj(data: Data, c_mrj, yr_idx):
         ag_cost_delta = c_mrj[:, :, j] * (om_mult - 1)
 
         # Cost of renewable energy operation/maintenance
-        re_lyr = data.RENEWABLE_LAYERS.sel(Type='Utility Solar PV', year=yr_cal)
+        re_lyr = data.RENEWABLE_LAYERS.sel(tech_name='Utility Solar PV', year=yr_cal)
         re_cost_operation_AUD_ha = (
             re_lyr['Cost_of_operation_AUD_kw'] 
             * 1000                                                  # Convert from AUD/kW to AUD/MW
@@ -574,7 +574,7 @@ def get_onshore_wind_effect_c_mrj(data: Data, c_mrj, yr_idx):
     new_c_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
 
     # Return zeros if management is disabled globally
-    if not settings.AG_MANAGEMENTS['Onshore Wind']:
+    if settings.RENEWABLE_ENERGY_CONSTRAINTS != 'on':
         return new_c_mrj
 
 
@@ -593,7 +593,7 @@ def get_onshore_wind_effect_c_mrj(data: Data, c_mrj, yr_idx):
         ag_cost_delta = c_mrj[:, :, j] * (om_mult - 1)
 
         # Cost of renewable energy operation/maintenance
-        re_lyr = data.RENEWABLE_LAYERS.sel(Type='Onshore Wind', year=yr_cal) 
+        re_lyr = data.RENEWABLE_LAYERS.sel(tech_name='Onshore Wind', year=yr_cal) 
         re_cost_operation_AUD_ha = (
             re_lyr['Cost_of_operation_AUD_kw'] 
             * 1000                                                  # Convert from AUD/kW to AUD/MW

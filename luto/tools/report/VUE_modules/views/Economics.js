@@ -21,7 +21,7 @@ window.EconomicsView = {
     const availableUnit = { Economics: "AUD" };
 
     // Selection options (static & dynamic)
-    const availableCategories = ["Ag", "Ag Mgt", "Non-Ag"];
+    const availableCategories = ["Sum", "Ag", "Ag Mgt", "Non-Ag"];
     const availableMapTypes = ref([]);   // populated from mapRegister[category] keys
     const availableAgMgt = ref([]);
     const availableWater = ref([]);
@@ -38,6 +38,7 @@ window.EconomicsView = {
 
     // Previous selection memory per category
     const previousSelections = ref({
+      "Sum":    { mapType: "", water: "", landuse: "" },
       "Ag":     { mapType: "", water: "", source: "", landuse: "" },
       "Ag Mgt": { mapType: "", agMgt: "", water: "", landuse: "" },
       "Non-Ag": { mapType: "", landuse: "" },
@@ -55,19 +56,21 @@ window.EconomicsView = {
     // Transition map types have LU as their first dim (from_lu), not lm/Water.
     // Collapse it by always selecting 'ALL' and hiding the Water row.
     const isTransition = computed(() =>
-      selectCategory.value === "Ag" &&
-      (selectMapType.value === "Transition (Ag2Ag)" || selectMapType.value === "Transition (Ag2NonAg)")
+      (selectCategory.value === "Ag" && (selectMapType.value === "Transition (Ag2Ag)" || selectMapType.value === "Transition (NonAg2Ag)")) ||
+      (selectCategory.value === "Non-Ag" && (selectMapType.value === "Transition (Ag2NonAg)" || selectMapType.value === "Transition (NonAg2NonAg)"))
     );
 
     // ── Computed map data ────────────────────────────────────────────────────
     const selectMapData = computed(() => {
       if (!dataLoaded.value) return {};
-      const mapData = window[mapRegister[selectCategory.value]?.[selectMapType.value]?.name];
+      const cat = selectCategory.value;
+      const mapData = window[mapRegister[cat]?.[selectMapType.value]?.name];
       if (!mapData) return {};
       const yr = String(selectYear.value);
-      const cat = selectCategory.value;
 
-      if (cat === "Ag") {
+      if (cat === "Sum") {
+        return mapData?.[selectWater.value]?.[selectLanduse.value]?.[yr] || {};
+      } else if (cat === "Ag") {
         if (hasSourceLevel.value) {
           return mapData?.[selectWater.value]?.[selectSource.value]?.[selectLanduse.value]?.[yr] || {};
         } else {
@@ -81,15 +84,55 @@ window.EconomicsView = {
       return {};
     });
 
+    const emptyChart = () => ({
+      ...window["Chart_default_options"],
+      chart: { height: 440 },
+      yAxis: { title: { text: availableUnit["Economics"] } },
+      series: [],
+    });
+
     const selectChartData = computed(() => {
-      if (!dataLoaded.value) return {};
+      if (!dataLoaded.value) return emptyChart();
       const cat = selectCategory.value;
-      const chartData = window[chartRegister[cat]?.name]?.[selectRegion.value];
+      const mt = selectMapType.value;
+      // For Sum, mapType is always "Profit"
+      const effectiveMt = cat === "Sum" ? "Profit" : mt;
+      const chartEntry = chartRegister[cat]?.[effectiveMt];
+      if (!chartEntry) return emptyChart();
+      const chartData = window[chartEntry.name]?.[selectRegion.value];
+      if (!chartData) return emptyChart();
+
       let seriesData;
-      if (cat === "Ag" || cat === "Ag Mgt") {
-        seriesData = chartData?.["ALL"]?.["ALL"];
+      if (cat === "Sum") {
+        // Sum: region → water → [series by landuse]
+        const items = chartData?.[selectWater.value];
+        if (items) {
+          seriesData = (selectLanduse.value === "ALL" || !selectLanduse.value)
+            ? items : items.filter(s => s.name === selectLanduse.value);
+        }
+      } else if (cat === "Ag") {
+        // Revenue/Cost: region → source → water → [series by LU]
+        // Profit: region → water → [series by LU]
+        let items;
+        if (hasSourceLevel.value && effectiveMt !== "Profit") {
+          items = chartData?.[selectSource.value || "ALL"]?.[selectWater.value];
+        } else {
+          items = chartData?.[selectWater.value];
+        }
+        if (items && items.length) {
+          seriesData = (selectLanduse.value === "ALL" || !selectLanduse.value)
+            ? items : items.filter(s => s.name === selectLanduse.value);
+        }
+      } else if (cat === "Ag Mgt") {
+        // All: region → water → landuse → [series by mgmt]
+        seriesData = chartData?.[selectWater.value]?.[selectLanduse.value];
       } else if (cat === "Non-Ag") {
-        seriesData = chartData;
+        // All: region → [series by landuse]
+        if (selectLanduse.value && selectLanduse.value !== "ALL") {
+          seriesData = chartData?.filter(s => s.name === selectLanduse.value);
+        } else {
+          seriesData = chartData;
+        }
       }
       return {
         ...window["Chart_default_options"],
@@ -104,7 +147,13 @@ window.EconomicsView = {
     // Save current selections for a category before switching away
     function saveSelections(cat) {
       if (!cat) return;
-      if (cat === "Ag") {
+      if (cat === "Sum") {
+        previousSelections.value["Sum"] = {
+          mapType: selectMapType.value,
+          water: selectWater.value,
+          landuse: selectLanduse.value,
+        };
+      } else if (cat === "Ag") {
         previousSelections.value["Ag"] = {
           mapType: selectMapType.value,
           water: selectWater.value,
@@ -131,7 +180,7 @@ window.EconomicsView = {
       const waterData = mapData?.[water] || {};
       if (isSource) {
         availableSource.value = Object.keys(waterData);
-        const prev = previousSelections.value["Ag"].source;
+        const prev = previousSelections.value["Ag"].source || selectSource.value;
         selectSource.value = (prev && availableSource.value.includes(prev)) ? prev : (availableSource.value[0] || '');
         availableLanduse.value = Object.keys(waterData[selectSource.value] || {});
       } else {
@@ -139,7 +188,7 @@ window.EconomicsView = {
         selectSource.value = '';
         availableLanduse.value = Object.keys(waterData);
       }
-      const prev = previousSelections.value["Ag"].landuse;
+      const prev = previousSelections.value["Ag"].landuse || selectLanduse.value;
       selectLanduse.value = (prev && availableLanduse.value.includes(prev)) ? prev : (availableLanduse.value[0] || '');
     }
 
@@ -148,35 +197,52 @@ window.EconomicsView = {
       const mapData = window[mapRegister[cat]?.[mapType]?.name];
       if (!mapData) return;
 
-      if (cat === "Ag") {
-        if (mapType === "Transition (Ag2Ag)" || mapType === "Transition (Ag2NonAg)") {
+      // Remember current selections for cross-category restore
+      const curWater = selectWater.value;
+      const curLanduse = selectLanduse.value;
+      const curAgMgt = selectAgMgt.value;
+      const curSource = selectSource.value;
+
+      if (cat === "Sum") {
+        // Sum: Water → Landuse (same structure as Ag Profit)
+        availableWater.value = Object.keys(mapData);
+        const prevW = previousSelections.value["Sum"].water || curWater;
+        selectWater.value = (prevW && availableWater.value.includes(prevW)) ? prevW : (availableWater.value[0] || '');
+        availableSource.value = [];
+        selectSource.value = '';
+        availableLanduse.value = Object.keys(mapData[selectWater.value] || {});
+        const prevL = previousSelections.value["Sum"].landuse || curLanduse;
+        selectLanduse.value = (prevL && availableLanduse.value.includes(prevL)) ? prevL : (availableLanduse.value[0] || '');
+
+      } else if (cat === "Ag") {
+        if (mapType === "Transition (Ag2Ag)" || mapType === "Transition (NonAg2Ag)") {
           availableWater.value = [];
           selectWater.value = 'ALL';
           cascadeAgFromWater(mapData, 'ALL', true);
         } else {
           availableWater.value = Object.keys(mapData);
-          const prev = previousSelections.value["Ag"].water;
+          const prev = previousSelections.value["Ag"].water || curWater;
           selectWater.value = (prev && availableWater.value.includes(prev)) ? prev : (availableWater.value[0] || '');
           cascadeAgFromWater(mapData, selectWater.value, mapType !== "Profit");
         }
 
       } else if (cat === "Ag Mgt") {
         availableAgMgt.value = Object.keys(mapData);
-        const prevAm = previousSelections.value["Ag Mgt"].agMgt;
+        const prevAm = previousSelections.value["Ag Mgt"].agMgt || curAgMgt;
         selectAgMgt.value = (prevAm && availableAgMgt.value.includes(prevAm)) ? prevAm : (availableAgMgt.value[0] || '');
 
         const agMgtData = mapData[selectAgMgt.value] || {};
         availableWater.value = Object.keys(agMgtData);
-        const prevW = previousSelections.value["Ag Mgt"].water;
+        const prevW = previousSelections.value["Ag Mgt"].water || curWater;
         selectWater.value = (prevW && availableWater.value.includes(prevW)) ? prevW : (availableWater.value[0] || '');
 
         availableLanduse.value = Object.keys(agMgtData[selectWater.value] || {});
-        const prevL = previousSelections.value["Ag Mgt"].landuse;
+        const prevL = previousSelections.value["Ag Mgt"].landuse || curLanduse;
         selectLanduse.value = (prevL && availableLanduse.value.includes(prevL)) ? prevL : (availableLanduse.value[0] || '');
 
       } else if (cat === "Non-Ag") {
         availableLanduse.value = Object.keys(mapData);
-        const prev = previousSelections.value["Non-Ag"].landuse;
+        const prev = previousSelections.value["Non-Ag"].landuse || curLanduse;
         selectLanduse.value = (prev && availableLanduse.value.includes(prev)) ? prev : (availableLanduse.value[0] || '');
       }
     }
@@ -192,10 +258,13 @@ window.EconomicsView = {
           await loadScript(entry.path, entry.name, VIEW_NAME);
         }
       }
-      // Load chart data
-      await loadScript(chartRegister["Ag"]["path"],     chartRegister["Ag"]["name"],     VIEW_NAME);
-      await loadScript(chartRegister["Ag Mgt"]["path"], chartRegister["Ag Mgt"]["name"], VIEW_NAME);
-      await loadScript(chartRegister["Non-Ag"]["path"], chartRegister["Non-Ag"]["name"], VIEW_NAME);
+      // Load chart data (per-MapType files)
+      for (const [cat, mapTypes] of Object.entries(chartRegister)) {
+        if (cat === "overview" || cat === "ranking") continue;
+        for (const entry of Object.values(mapTypes)) {
+          await loadScript(entry.path, entry.name, VIEW_NAME);
+        }
+      }
 
       availableYears.value = window.Supporting_info.years;
       selectYear.value = availableYears.value[0] || 2020;
@@ -255,8 +324,14 @@ window.EconomicsView = {
     // Water → Source → Landuse
     watch(selectWater, (newWater) => {
       const cat = selectCategory.value;
-      if (cat === "Ag") {
-        if (selectMapType.value === "Transition (Ag2Ag)" || selectMapType.value === "Transition (Ag2NonAg)") return;
+      if (cat === "Sum") {
+        previousSelections.value["Sum"].water = newWater;
+        const mapData = window[mapRegister["Sum"][selectMapType.value]?.name];
+        availableLanduse.value = Object.keys(mapData?.[newWater] || {});
+        const prev = previousSelections.value["Sum"].landuse;
+        selectLanduse.value = (prev && availableLanduse.value.includes(prev)) ? prev : (availableLanduse.value[0] || '');
+      } else if (cat === "Ag") {
+        if (selectMapType.value === "Transition (Ag2Ag)") return;
         previousSelections.value["Ag"].water = newWater;
         const mapData = window[mapRegister["Ag"][selectMapType.value]?.name];
         cascadeAgFromWater(mapData, newWater, selectMapType.value !== "Profit");
@@ -282,7 +357,8 @@ window.EconomicsView = {
     // Landuse → just save
     watch(selectLanduse, (newLanduse) => {
       const cat = selectCategory.value;
-      if (cat === "Ag")     previousSelections.value["Ag"].landuse = newLanduse;
+      if (cat === "Sum")     previousSelections.value["Sum"].landuse = newLanduse;
+      else if (cat === "Ag")     previousSelections.value["Ag"].landuse = newLanduse;
       else if (cat === "Ag Mgt") previousSelections.value["Ag Mgt"].landuse = newLanduse;
       else if (cat === "Non-Ag") previousSelections.value["Non-Ag"].landuse = newLanduse;
     });
@@ -338,8 +414,8 @@ window.EconomicsView = {
           </button>
         </div>
 
-        <!-- 2. Map Type (dynamic per category) -->
-        <div v-if="dataLoaded && availableMapTypes.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
+        <!-- 2. Map Type (dynamic per category, hidden for Sum since it only has Profit) -->
+        <div v-if="selectCategory !== 'Sum' && dataLoaded && availableMapTypes.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
           <span class="text-[0.8rem] mr-1 font-medium">Map Type:</span>
           <button v-for="(val, key) in availableMapTypes" :key="key"
             @click="selectMapType = val"
@@ -360,7 +436,7 @@ window.EconomicsView = {
           </button>
         </div>
 
-        <!-- 4. Water (Ag and Ag Mgt only, not Transition) -->
+        <!-- 4. Water (Sum, Ag, and Ag Mgt, not Transition or Non-Ag) -->
         <div v-if="!isTransition && selectCategory !== 'Non-Ag' && dataLoaded && availableWater.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
           <span class="text-[0.8rem] mr-1 font-medium">Water:</span>
           <button v-for="(val, key) in availableWater" :key="key"

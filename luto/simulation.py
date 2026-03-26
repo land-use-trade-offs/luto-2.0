@@ -85,6 +85,7 @@ def load_data() -> Data:
 
 def run(
     data: Data, 
+    do_analyze_iis:bool=False
 ) -> None:
     """
     Run the simulation.
@@ -113,7 +114,7 @@ def run(
             if data.YR_CAL_BASE not in years: 
                 years.insert(0, data.YR_CAL_BASE)
             # Solve and write outputs
-            solve_timeseries(data, years)
+            solve_timeseries(data, years, do_analyze_iis)
             save_data_to_disk(data, f"{save_dir}/Data_RES{settings.RESFACTOR}.lz4")
             write_outputs(data)
         except Exception as e:
@@ -127,7 +128,7 @@ def run(
     return _run()
 
 
-def solve_timeseries(data: Data, years_to_run: list[int], analyze_iis:bool=False) -> None:
+def solve_timeseries(data: Data, years_to_run: list[int], do_analyze_iis: bool) -> None:
 
     for step in range(len(years_to_run) - 1):
         base_year = years_to_run[step]
@@ -185,18 +186,17 @@ def solve_timeseries(data: Data, years_to_run: list[int], analyze_iis:bool=False
 
         print(f'Processing for {target_year} completed in {round(time.time() - start_time)} seconds\n\n' )
         
-        if analyze_iis and (luto_solver.gurobi_model.Status not in [GRB.OPTIMAL, GRB.SUBOPTIMAL]):
+        if luto_solver.gurobi_model.Status not in [GRB.OPTIMAL, GRB.SUBOPTIMAL]:
             print('!' * 100)
             print(f"Warning: Gurobi solver did not find an optimal/suboptimal solution for year {target_year}. Status: {luto_solver.gurobi_model.Status}")
-            print(f'Warning: The results are still written to disk, but will not be optimal.')
             print('!' * 100)
-
+            
             # Save model and compute IIS for debugging
             model_path = f"{data.path}/debug_model_{base_year}_{target_year}.mps"
             luto_solver.gurobi_model.write(model_path)
             print(f"Saved Gurobi model to {model_path}")
 
-            if luto_solver.gurobi_model.Status == GRB.INFEASIBLE:
+            if do_analyze_iis:
                 print("Computing IIS (Irreducible Inconsistent Subsystem)...")
                 luto_solver.gurobi_model.computeIIS()
                 iis_path = f"{data.path}/debug_model_{base_year}_{target_year}.ilp"

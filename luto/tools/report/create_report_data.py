@@ -122,7 +122,6 @@ def process_area_data(files, SAVE_DIR, lu_group_map):
     ag_dvar_area['Source'] = 'Agricultural Land-use'
     ag_dvar_area['Category'] = ag_dvar_area['Land-use'].map(lu_group_map)
     ag_dvar_area['Area (ha)'] = ag_dvar_area['Area (ha)'].round(2)
-    ag_dvar_area_non_all = ag_dvar_area.query('Water_supply != "ALL"').copy()
 
     non_ag_dvar_dfs = area_dvar_paths.query('base_name == "area_non_agricultural_landuse"').reset_index(drop=True)
     non_ag_dvar_area = pd.concat([df for path in non_ag_dvar_dfs['path'] if not (df := pd.read_csv(path)).empty], ignore_index=True)
@@ -136,11 +135,14 @@ def process_area_data(files, SAVE_DIR, lu_group_map):
     am_dvar_area = am_dvar_area.replace(RENAME_AM_NON_AG).infer_objects(copy=False)
     am_dvar_area['Source'] = 'Agricultural Management'
     am_dvar_area['Area (ha)'] = am_dvar_area['Area (ha)'].round(2)
-    am_dvar_area_non_all = am_dvar_area.query('Water_supply != "ALL" and `Land-use` != "ALL"').copy()
 
 
     # -------------------- Area ranking --------------------
-    area_ranking_raw = pd.concat([ag_dvar_area_non_all, non_ag_dvar_area, am_dvar_area_non_all])
+    area_ranking_raw = pd.concat([
+        ag_dvar_area.query('Water_supply != "ALL"'),
+        non_ag_dvar_area,
+        am_dvar_area.query('Water_supply != "ALL" and `Land-use` != "ALL"'),
+    ])
 
     area_ranking_type = area_ranking_raw\
         .groupby(['Year', 'region', 'Source'])[['Area (ha)']]\
@@ -185,9 +187,9 @@ def process_area_data(files, SAVE_DIR, lu_group_map):
     # -------------------- Area overview --------------------
 
     area_df = pd.concat([
-        ag_dvar_area_non_all,
+        ag_dvar_area.query('Water_supply != "ALL"'),
         non_ag_dvar_area,
-        am_dvar_area_non_all.assign(**{'Land-use':'Agricultural Management', 'Category':'Agricultural Management'})
+        am_dvar_area.query('Water_supply != "ALL" and `Land-use` != "ALL"').assign(**{'Land-use':'Agricultural Management', 'Category':'Agricultural Management'}),
         ], ignore_index=True)
 
     group_cols = ['Land-use', 'Category', 'Source']
@@ -256,6 +258,7 @@ def process_area_data(files, SAVE_DIR, lu_group_map):
 
     # -------------------- Area by Agricultural Management Area (ha) Land use --------------------
     df_wide = am_dvar_area\
+        .query('Type != "ALL"')\
         .groupby(['region', 'Water_supply', 'Land-use', 'Type'])[['Year','Area (ha)']]\
         .apply(lambda x: x[['Year','Area (ha)']].values.tolist())\
         .reset_index()
@@ -314,24 +317,20 @@ def process_economics_data(files, SAVE_DIR):
     revenue_ag_df = files.query('base_name == "economics_ag_revenue"').reset_index(drop=True)
     revenue_ag_df = pd.concat([pd.read_csv(path) for path in revenue_ag_df['path']], ignore_index=True)
     revenue_ag_df = revenue_ag_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False).assign(Source='Agricultural Land-use (revenue)')
-    revenue_ag_df_non_all = revenue_ag_df.query('Water_supply != "ALL" and Type != "ALL"')
 
     cost_ag_df = files.query('base_name == "economics_ag_cost"').reset_index(drop=True)
     cost_ag_df = pd.concat([pd.read_csv(path) for path in cost_ag_df['path']], ignore_index=True)
     cost_ag_df = cost_ag_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False).assign(Source='Agricultural Land-use (cost)')
     cost_ag_df['Value ($)'] = cost_ag_df['Value ($)'] * -1          # Convert cost to negative value
-    cost_ag_df_non_all = cost_ag_df.query('Water_supply != "ALL" and Type != "ALL"')
 
     revenue_am_df = files.query('base_name == "economics_am_revenue"').reset_index(drop=True)
     revenue_am_df = pd.concat([df for path in revenue_am_df['path'] if not (df := pd.read_csv(path)).empty], ignore_index=True)
     revenue_am_df = revenue_am_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False).assign(Source='Agricultural Management (revenue)')
-    revenue_am_df_non_all = revenue_am_df.query('Water_supply != "ALL" and `Land-use` != "ALL"')
 
     cost_am_df = files.query('base_name == "economics_am_cost"').reset_index(drop=True)
     cost_am_df = pd.concat([df for path in cost_am_df['path'] if not (df := pd.read_csv(path)).empty], ignore_index=True)
     cost_am_df = cost_am_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False).assign(Source='Agricultural Management (cost)')
     cost_am_df['Value ($)'] = cost_am_df['Value ($)'] * -1          # Convert cost to negative value
-    cost_am_df_non_all = cost_am_df.query('Water_supply != "ALL" and `Land-use` != "ALL"')
 
     revenue_non_ag_df = files.query('base_name == "economics_non_ag_revenue"').reset_index(drop=True)
     revenue_non_ag_df = pd.concat([df for path in revenue_non_ag_df['path'] if not (df := pd.read_csv(path)).empty], ignore_index=True)
@@ -346,41 +345,16 @@ def process_economics_data(files, SAVE_DIR):
     cost_transition_ag2ag_df = pd.concat([df for path in cost_transition_ag2ag_df['path'] if not (df := pd.read_csv(path)).empty], ignore_index=True)
     cost_transition_ag2ag_df = cost_transition_ag2ag_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False).assign(Source='Transition cost (Ag2Ag)')
     cost_transition_ag2ag_df['Value ($)'] = cost_transition_ag2ag_df['Cost ($)']  * -1          # Convert cost to negative value
-    cost_transition_ag2ag_df_non_all = cost_transition_ag2ag_df.query(
-        '`From-land-use` != "ALL" and `To-land-use` != "ALL" and Type != "ALL" '
-        ).copy()
 
     cost_transition_ag2non_ag_df = files.query('base_name == "transition_ag2nonag_cost"').reset_index(drop=True)
     cost_transition_ag2non_ag_df = pd.concat([df for path in cost_transition_ag2non_ag_df['path'] if not (df := pd.read_csv(path)).empty], ignore_index=True)
     cost_transition_ag2non_ag_df = cost_transition_ag2non_ag_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False).assign(Source='Transition cost (Ag2Non-Ag)')
     cost_transition_ag2non_ag_df['Value ($)'] = cost_transition_ag2non_ag_df['Cost ($)'] * -1   # Convert cost to negative value
-    cost_transition_ag2non_ag_df_non_all = cost_transition_ag2non_ag_df.query(
-        '`From-land-use` != "ALL" and `To-land-use` != "ALL" and `Cost-type` != "ALL" '
-        ).copy()
 
     cost_transition_non_ag2ag_df = files.query('base_name == "transition_nonag2ag_cost"').reset_index(drop=True)
     cost_transition_non_ag2ag_df = pd.concat([df for path in cost_transition_non_ag2ag_df['path'] if not (df := pd.read_csv(path)).empty], ignore_index=True)
     cost_transition_non_ag2ag_df = cost_transition_non_ag2ag_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False).assign(Source='Transition cost (Non-Ag2Ag)').dropna(subset=['Cost ($)'])
     cost_transition_non_ag2ag_df['Value ($)'] = cost_transition_non_ag2ag_df['Cost ($)'] * -1   # Convert cost to negative value
-    cost_transition_non_ag2ag_df_non_all = cost_transition_non_ag2ag_df.query(
-        '`From-land-use` != "ALL" and `To-land-use` != "ALL"'
-        ).copy()
-
-    economics_df_non_all = pd.concat(
-            [
-                revenue_ag_df_non_all,
-                revenue_am_df_non_all,
-                revenue_non_ag_df,
-                cost_ag_df_non_all,
-                cost_am_df_non_all,
-                cost_non_ag_df,
-                cost_transition_ag2ag_df_non_all,
-                cost_transition_ag2non_ag_df_non_all,
-                cost_transition_non_ag2ag_df_non_all
-            ]
-        ).round({'Value ($)': 2}
-        ).query('abs(`Value ($)`) > 1e-4'
-        ).reset_index(drop=True)
 
     order = [
         'Agricultural Land-use (revenue)',
@@ -397,22 +371,22 @@ def process_economics_data(files, SAVE_DIR):
 
 
     # -------------------- Economic ranking --------------------
-    revenue_df = pd.concat([revenue_ag_df_non_all, revenue_am_df_non_all, revenue_non_ag_df]
+    revenue_df = pd.concat([revenue_ag_df.query('Water_supply != "ALL" and Type != "ALL" and `Land-use` != "ALL"'), revenue_am_df.query('Water_supply != "ALL" and `Land-use` != "ALL" and `Management Type` != "ALL"'), revenue_non_ag_df]
         ).groupby(['Year', 'region']
         )[['Value ($)']].sum(numeric_only=True
         ).reset_index(
         ).sort_values(['Year', 'Value ($)'], ascending=[True, False]
         ).assign(Rank=lambda x: x.groupby(['Year']).cumcount()
         ).assign(Source='Revenue')
-        
+
     cost_df = pd.concat(
         [
-            cost_ag_df_non_all,
-            cost_am_df_non_all,
+            cost_ag_df.query('Water_supply != "ALL" and Type != "ALL" and `Land-use` != "ALL"'),
+            cost_am_df.query('Water_supply != "ALL" and `Land-use` != "ALL" and `Management Type` != "ALL"'),
             cost_non_ag_df,
-            cost_transition_ag2ag_df_non_all,
-            cost_transition_ag2non_ag_df_non_all,
-            cost_transition_non_ag2ag_df_non_all
+            cost_transition_ag2ag_df.query('`From-land-use` != "ALL" and `To-land-use` != "ALL" and Type != "ALL"'),
+            cost_transition_ag2non_ag_df.query('`From-land-use` != "ALL" and `To-land-use` != "ALL" and `Cost-type` != "ALL"'),
+            cost_transition_non_ag2ag_df.query('`From-land-use` != "ALL" and `To-land-use` != "ALL" and `Cost-type` != "ALL"')
         ]
         ).groupby(['Year', 'region']
         )[['Value ($)']].sum(numeric_only=True
@@ -455,7 +429,22 @@ def process_economics_data(files, SAVE_DIR):
     # -------------------- Economy overview --------------------
 
     # Overview: sum of revenue, cost, and profit by region
-    rev_cost_net_region = economics_df_non_all.groupby(['region', 'Source', 'Year']
+    rev_cost_net_region = pd.concat(
+            [
+                revenue_ag_df.query('Water_supply != "ALL" and Type != "ALL" and `Land-use` != "ALL"'),
+                revenue_am_df.query('Water_supply != "ALL" and `Land-use` != "ALL" and `Management Type` != "ALL"'),
+                revenue_non_ag_df,
+                cost_ag_df.query('Water_supply != "ALL" and Type != "ALL" and `Land-use` != "ALL"'),
+                cost_am_df.query('Water_supply != "ALL" and `Land-use` != "ALL" and `Management Type` != "ALL"'),
+                cost_non_ag_df,
+                cost_transition_ag2ag_df.query('`From-land-use` != "ALL" and `To-land-use` != "ALL" and Type != "ALL"'),
+                cost_transition_ag2non_ag_df.query('`From-land-use` != "ALL" and `To-land-use` != "ALL" and `Cost-type` != "ALL"'),
+                cost_transition_non_ag2ag_df.query('`From-land-use` != "ALL" and `To-land-use` != "ALL" and `Cost-type` != "ALL"')
+            ]
+        ).round({'Value ($)': 2}
+        ).query('abs(`Value ($)`) > 1e-4'
+        ).reset_index(drop=True
+        ).groupby(['region', 'Source', 'Year']
         )[['Value ($)']].sum(numeric_only=True
         ).reset_index()
 
@@ -494,7 +483,7 @@ def process_economics_data(files, SAVE_DIR):
 
 
     # Overview: ag cost/revenue by type
-    economics_ag = pd.concat([revenue_ag_df_non_all, cost_ag_df_non_all])\
+    economics_ag = pd.concat([revenue_ag_df.query('Water_supply != "ALL" and Type != "ALL" and `Land-use` != "ALL"'), cost_ag_df.query('Water_supply != "ALL" and Type != "ALL" and `Land-use` != "ALL"')])\
         .query('abs(`Value ($)`) > 1')\
         .groupby(['region', 'Type','Year'])['Value ($)']\
         .sum(numeric_only=True)\
@@ -529,8 +518,8 @@ def process_economics_data(files, SAVE_DIR):
     # Overview: ag-man cost/revenue by type
     economics_am = pd.concat(
         [
-            revenue_am_df_non_all.assign(Rev_Cost='Revenue'),
-            cost_am_df_non_all.assign(Rev_Cost='Cost')
+            revenue_am_df.query('Water_supply != "ALL" and `Land-use` != "ALL" and `Management Type` != "ALL"').assign(Rev_Cost='Revenue'),
+            cost_am_df.query('Water_supply != "ALL" and `Land-use` != "ALL" and `Management Type` != "ALL"').assign(Rev_Cost='Cost')
         ]
         ).query('abs(`Value ($)`) > 1'
         ).round({'Value ($)': 2}
@@ -545,9 +534,6 @@ def process_economics_data(files, SAVE_DIR):
     df_wide.columns = ['region', 'name', 'Rev_Cost', 'data']
     df_wide['type'] = 'column'
     df_wide['color'] = df_wide.apply(lambda x: COLORS[x['name']], axis=1)
-    df_wide['id'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Revenue' else None, axis=1)
-    df_wide['linkedTo'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Cost' else None, axis=1)
-    df_wide.loc[df_wide['name'] == 'Early dry-season savanna burning', 'linkedTo'] = None
 
     out_dict = {}
     for region, df in df_wide.groupby('region'):
@@ -580,20 +566,35 @@ def process_economics_data(files, SAVE_DIR):
     df_wide['color'] = df_wide.apply(lambda x: COLORS[x['name']], axis=1)
     df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
     df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
-    df_wide['id'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Revenue' else None, axis=1)
-    df_wide['linkedTo'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Cost' else None, axis=1)
-    df_wide.loc[df_wide['name'].isin([
-        'Environmental plantings (mixed species)',
-        'Riparian buffer restoration (mixed species)',
-        'Carbon plantings (monoculture)',
-        'Destocked - natural land'
-        ]), 'linkedTo'] = None
-
 
     out_dict = {}
-    for region, df in df_wide.groupby('region'):
-        df = df.drop(['region','Rev_Cost'], axis=1)
-        out_dict[region] = df.to_dict(orient='records')
+    for (region, rev_cost), df in df_wide.groupby(['region', 'Rev_Cost']):
+        df = df.drop(['region', 'Rev_Cost'], axis=1)
+        if region not in out_dict:
+            out_dict[region] = {}
+        out_dict[region][rev_cost] = df.to_dict(orient='records')
+
+    # Add Profit from pre-computed profit CSVs
+    profit_na_files = files.query('base_name == "economics_non_ag_profit"').reset_index(drop=True)
+    profit_na_df = pd.concat([df for p in profit_na_files['path'] if not (df := pd.read_csv(p)).empty], ignore_index=True)
+    profit_na_df = profit_na_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False)
+    profit_na_df = profit_na_df.query('`Land-use` != "ALL"').round({'Value ($)': 2})
+
+    df_profit = profit_na_df\
+        .groupby(['region', 'Land-use'])[['Year', 'Value ($)']]\
+        .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
+        .reset_index()
+    df_profit.columns = ['region', 'name', 'data']
+    df_profit['type'] = 'column'
+    df_profit['color'] = df_profit['name'].apply(lambda x: COLORS[x])
+    df_profit['name_order'] = df_profit['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+    df_profit = df_profit.sort_values('name_order').drop(columns=['name_order'])
+
+    for region, df in df_profit.groupby('region'):
+        df = df.drop(['region'], axis=1)
+        if region not in out_dict:
+            out_dict[region] = {}
+        out_dict[region]['Profit'] = df.to_dict(orient='records')
 
     filename = f'Economics_overview_Non_Ag'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
@@ -604,94 +605,344 @@ def process_economics_data(files, SAVE_DIR):
 
 
 
-    # -------------------- Economics for ag --------------------
-    revenue_ag_df = revenue_ag_df.assign(Rev_Cost='Revenue')
-    cost_ag_df = cost_ag_df.assign(Rev_Cost='Cost')
+    # -------------------- Economics for ag (separate files per MapType) --------------------
 
-    economics_ag = pd.concat([revenue_ag_df, cost_ag_df]
-        ).query('`Land-use` != "ALL"'
-        ).round({'Value ($)': 2}
-        ).query('abs(`Value ($)`) > 1'
-        ).reset_index(drop=True)
+    def write_chart_js(out_dict, filename):
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
 
-    df_wide = economics_ag\
-        .groupby(['region', 'Type', 'Water_supply', 'Rev_Cost', 'Land-use'])[['Year','Value ($)']]\
+    # Ag Revenue: region → Type(source) → Water → [series by LU]
+    ag_rev = revenue_ag_df.query('`Land-use` != "ALL"').round({'Value ($)': 2}).query('abs(`Value ($)`) > 1')
+    df_wide = ag_rev\
+        .groupby(['region', 'Type', 'Water_supply', 'Land-use'])[['Year','Value ($)']]\
         .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
-        .reset_index()\
-        .round({'Value ($)': 2})
-
-    df_wide.columns = ['region', '_type', 'water', 'Rev_Cost', 'name', 'data']
+        .reset_index()
+    df_wide.columns = ['region', '_type', 'water', 'name', 'data']
     df_wide['type'] = 'column'
-    df_wide['color'] = df_wide.apply(lambda x: COLORS[x['name']], axis=1)
+    df_wide['color'] = df_wide['name'].apply(lambda x: COLORS[x])
     df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
     df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
-    df_wide['id'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Revenue' else None, axis=1)
-    df_wide['linkedTo'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Cost' else None, axis=1)
-
 
     out_dict = {}
     for (region, _type, water), df in df_wide.groupby(['region', '_type', 'water']):
-        df = df.drop(['region', '_type', 'water', 'Rev_Cost'], axis=1)
-        if region not in out_dict:
-            out_dict[region] = {}
-        if _type not in out_dict[region]:
-            out_dict[region][_type] = {}
-        if water not in out_dict[region][_type]:
-            out_dict[region][_type][water] = {}
-        out_dict[region][_type][water] = df.to_dict(orient='records')
+        df = df.drop(['region', '_type', 'water'], axis=1)
+        out_dict.setdefault(region, {}).setdefault(_type, {})[water] = df.to_dict(orient='records')
+    write_chart_js(out_dict, 'Economics_Ag_revenue')
 
-    filename = 'Economics_Ag'
-    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-        f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
-        f.write(';\n')
-
-
-
-    # -------------------- Economics for ag-management --------------------
-    revenue_am_df = revenue_am_df.assign(Rev_Cost='Revenue')
-    cost_am_df = cost_am_df.assign(Rev_Cost='Cost')
-
-    economics_am = pd.concat([revenue_am_df, cost_am_df]
-        ).query('`Land-use` != "ALL"'
-        ).round({'Value ($)': 2}
-        ).query('abs(`Value ($)`) > 1'
-        ).reset_index(drop=True)
-
-    df_wide = economics_am\
-        .groupby(['region', 'Water_supply', 'Land-use', 'Rev_Cost', 'Management Type'])[['Year', 'Value ($)']]\
+    # Ag Cost: region → Type(source) → Water → [series by LU]
+    ag_cost = cost_ag_df.query('`Land-use` != "ALL"').round({'Value ($)': 2}).query('abs(`Value ($)`) > 1')
+    df_wide = ag_cost\
+        .groupby(['region', 'Type', 'Water_supply', 'Land-use'])[['Year','Value ($)']]\
         .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
-        .reset_index()\
-        .round({'Value ($)': 2})
-
-    df_wide.columns = ['region', 'water', 'landuse', 'Rev_Cost', 'name', 'data']
+        .reset_index()
+    df_wide.columns = ['region', '_type', 'water', 'name', 'data']
     df_wide['type'] = 'column'
     df_wide['color'] = df_wide['name'].apply(lambda x: COLORS[x])
-    df_wide['id'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Revenue' else None, axis=1)
-    df_wide['linkedTo'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Cost' else None, axis=1)
-    df_wide.loc[df_wide['name'] == 'Early dry-season savanna burning', 'linkedTo'] = None
+    df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
 
     out_dict = {}
-    for (region, water, landuse, Rev_Cost), df in df_wide.groupby(['region', 'water', 'landuse', 'Rev_Cost']):
-        df = df.drop(['region', 'water', 'landuse', 'Rev_Cost'], axis=1)
+    for (region, _type, water), df in df_wide.groupby(['region', '_type', 'water']):
+        df = df.drop(['region', '_type', 'water'], axis=1)
+        out_dict.setdefault(region, {}).setdefault(_type, {})[water] = df.to_dict(orient='records')
+    write_chart_js(out_dict, 'Economics_Ag_cost')
+
+    # Ag Profit: region → Water → [series by LU]
+    profit_ag_files = files.query('base_name == "economics_ag_profit"').reset_index(drop=True)
+    profit_ag_df = pd.concat([pd.read_csv(p) for p in profit_ag_files['path']], ignore_index=True)
+    profit_ag_df = profit_ag_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False)
+    profit_ag_df = profit_ag_df.query('`Land-use` != "ALL"').round({'Value ($)': 2})
+
+    df_profit = profit_ag_df\
+        .groupby(['region', 'Water_supply', 'Land-use'])[['Year', 'Value ($)']]\
+        .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
+        .reset_index()
+    df_profit.columns = ['region', 'water', 'name', 'data']
+    df_profit['type'] = 'column'
+    df_profit['color'] = df_profit['name'].apply(lambda x: COLORS[x])
+    df_profit['name_order'] = df_profit['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+    df_profit = df_profit.sort_values('name_order').drop(columns=['name_order'])
+
+    out_dict = {}
+    for (region, water), df in df_profit.groupby(['region', 'water']):
+        df = df.drop(['region', 'water'], axis=1)
+        out_dict.setdefault(region, {})[water] = df.to_dict(orient='records')
+    write_chart_js(out_dict, 'Economics_Ag_profit')
+
+
+    # Ag Transition (Ag2Ag): region → Type(source) → Water → [series by To-LU]
+    ag2ag_files = files.query('base_name == "economics_ag_transition_Ag2Ag"').reset_index(drop=True)
+    ag2ag_df = pd.concat([df for p in ag2ag_files['path'] if not (df := pd.read_csv(p)).empty], ignore_index=True)
+    ag2ag_df = ag2ag_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False)
+    ag2ag_df['Value ($)'] = ag2ag_df['Value ($)'] * -1   # Convert cost to negative
+
+    out_dict = {}
+    if not ag2ag_df.empty:
+        ag2ag_filt = ag2ag_df.query('`To_Land-use` != "ALL"').round({'Value ($)': 2}).query('abs(`Value ($)`) > 1')
+        if not ag2ag_filt.empty:
+            df_wide = ag2ag_filt \
+                .groupby(['region', 'Type', 'Water_supply', 'To_Land-use'])[['Year', 'Value ($)']] \
+                .apply(lambda x: x[['Year', 'Value ($)']].values.tolist()) \
+                .reset_index()
+            df_wide.columns = ['region', '_type', 'water', 'name', 'data']
+            df_wide['type'] = 'column'
+            df_wide['color'] = df_wide['name'].apply(lambda x: COLORS.get(x, '#999999'))
+            df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x) if x in LANDUSE_ALL_RENAMED else 999)
+            df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+            for (region, _type, water), df in df_wide.groupby(['region', '_type', 'water']):
+                df = df.drop(['region', '_type', 'water'], axis=1)
+                out_dict.setdefault(region, {}).setdefault(_type, {})[water] = df.to_dict(orient='records')
+    write_chart_js(out_dict, 'Economics_Ag_transition_ag2ag')
+
+    # Ag Transition (NonAg2Ag): region → Type(source) → Water → [series by From-LU]
+    nonag2ag_files = files.query('base_name == "economics_ag_transition_NonAg2Ag"').reset_index(drop=True)
+    out_dict = {}
+    if not nonag2ag_files.empty:
+        _dfs = [df for p in nonag2ag_files['path'] if not (df := pd.read_csv(p)).empty]
+        if _dfs:
+            nonag2ag_df = pd.concat(_dfs, ignore_index=True)
+            nonag2ag_df = nonag2ag_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False)
+            nonag2ag_df['Value ($)'] = nonag2ag_df['Value ($)'] * -1   # Convert cost to negative
+            nonag2ag_filt = nonag2ag_df.query('`From_Land-use` != "ALL"').round({'Value ($)': 2}).query('abs(`Value ($)`) > 1')
+            if not nonag2ag_filt.empty:
+                df_wide = nonag2ag_filt \
+                    .groupby(['region', 'Type', 'Water_supply', 'From_Land-use'])[['Year', 'Value ($)']] \
+                    .apply(lambda x: x[['Year', 'Value ($)']].values.tolist()) \
+                    .reset_index()
+                df_wide.columns = ['region', '_type', 'water', 'name', 'data']
+                df_wide['type'] = 'column'
+                df_wide['color'] = df_wide['name'].apply(lambda x: COLORS.get(x, '#999999'))
+                df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x) if x in LANDUSE_ALL_RENAMED else 999)
+                df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                for (region, _type, water), df in df_wide.groupby(['region', '_type', 'water']):
+                    df = df.drop(['region', '_type', 'water'], axis=1)
+                    out_dict.setdefault(region, {}).setdefault(_type, {})[water] = df.to_dict(orient='records')
+    write_chart_js(out_dict, 'Economics_Ag_transition_nonag2ag')
+
+
+    # -------------------- Economics for ag-management (separate files per MapType) --------------------
+
+    # Am Revenue: region → Water → LU → [series by mgmt]
+    am_rev = revenue_am_df.query('`Management Type` != "ALL"').round({'Value ($)': 2}).query('abs(`Value ($)`) > 1')
+    df_wide = am_rev\
+        .groupby(['region', 'Water_supply', 'Land-use', 'Management Type'])[['Year', 'Value ($)']]\
+        .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
+        .reset_index()
+    df_wide.columns = ['region', 'water', 'landuse', 'name', 'data']
+    df_wide['type'] = 'column'
+    df_wide['color'] = df_wide['name'].apply(lambda x: COLORS[x])
+
+    out_dict = {}
+    for (region, water, landuse), df in df_wide.groupby(['region', 'water', 'landuse']):
+        df = df.drop(['region', 'water', 'landuse'], axis=1)
+        out_dict.setdefault(region, {}).setdefault(water, {})[landuse] = df.to_dict(orient='records')
+    write_chart_js(out_dict, 'Economics_Am_revenue')
+
+    # Am Cost: region → Water → LU → [series by mgmt]
+    am_cost = cost_am_df.query('`Management Type` != "ALL"').round({'Value ($)': 2}).query('abs(`Value ($)`) > 1')
+    df_wide = am_cost\
+        .groupby(['region', 'Water_supply', 'Land-use', 'Management Type'])[['Year', 'Value ($)']]\
+        .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
+        .reset_index()
+    df_wide.columns = ['region', 'water', 'landuse', 'name', 'data']
+    df_wide['type'] = 'column'
+    df_wide['color'] = df_wide['name'].apply(lambda x: COLORS[x])
+
+    out_dict = {}
+    for (region, water, landuse), df in df_wide.groupby(['region', 'water', 'landuse']):
+        df = df.drop(['region', 'water', 'landuse'], axis=1)
+        out_dict.setdefault(region, {}).setdefault(water, {})[landuse] = df.to_dict(orient='records')
+    write_chart_js(out_dict, 'Economics_Am_cost')
+
+    # Am Profit: region → Water → LU → [series by mgmt]
+    profit_am_files = files.query('base_name == "economics_am_profit"').reset_index(drop=True)
+    profit_am_df = pd.concat([df for p in profit_am_files['path'] if not (df := pd.read_csv(p)).empty], ignore_index=True)
+    profit_am_df = profit_am_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False)
+    profit_am_df = profit_am_df.query('`Management Type` != "ALL"').round({'Value ($)': 2})
+
+    df_profit = profit_am_df\
+        .groupby(['region', 'Water_supply', 'Land-use', 'Management Type'])[['Year', 'Value ($)']]\
+        .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
+        .reset_index()
+    df_profit.columns = ['region', 'water', 'landuse', 'name', 'data']
+    df_profit['type'] = 'column'
+    df_profit['color'] = df_profit['name'].apply(lambda x: COLORS[x])
+
+    out_dict = {}
+    for (region, water, landuse), df in df_profit.groupby(['region', 'water', 'landuse']):
+        df = df.drop(['region', 'water', 'landuse'], axis=1)
+        out_dict.setdefault(region, {}).setdefault(water, {})[landuse] = df.to_dict(orient='records')
+    write_chart_js(out_dict, 'Economics_Am_profit')
+
+
+    # -------------------- Economics for non-ag (separate files per MapType) --------------------
+
+    # NonAg Revenue: region → [series by LU]
+    na_rev = revenue_non_ag_df.query('`Land-use` != "ALL" and abs(`Value ($)`) > 1').round({'Value ($)': 2})
+    df_wide = na_rev\
+        .groupby(['region', 'Land-use'])[['Year', 'Value ($)']]\
+        .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
+        .reset_index()
+    df_wide.columns = ['region', 'name', 'data']
+    df_wide['type'] = 'column'
+    df_wide['color'] = df_wide['name'].apply(lambda x: COLORS[x])
+    df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+
+    out_dict = {}
+    for region, df in df_wide.groupby('region'):
+        df = df.drop('region', axis=1)
+        out_dict[region] = df.to_dict(orient='records')
+    write_chart_js(out_dict, 'Economics_NonAg_revenue')
+
+    # NonAg Cost: region → [series by LU]
+    na_cost = cost_non_ag_df.query('`Land-use` != "ALL" and abs(`Value ($)`) > 1').round({'Value ($)': 2})
+    df_wide = na_cost\
+        .groupby(['region', 'Land-use'])[['Year', 'Value ($)']]\
+        .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
+        .reset_index()
+    df_wide.columns = ['region', 'name', 'data']
+    df_wide['type'] = 'column'
+    df_wide['color'] = df_wide['name'].apply(lambda x: COLORS[x])
+    df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+
+    out_dict = {}
+    for region, df in df_wide.groupby('region'):
+        df = df.drop('region', axis=1)
+        out_dict[region] = df.to_dict(orient='records')
+    write_chart_js(out_dict, 'Economics_NonAg_cost')
+
+    # NonAg Profit: region → [series by LU]
+    profit_na_files = files.query('base_name == "economics_non_ag_profit"').reset_index(drop=True)
+    profit_na_df = pd.concat([df for p in profit_na_files['path'] if not (df := pd.read_csv(p)).empty], ignore_index=True)
+    profit_na_df = profit_na_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False)
+    profit_na_df = profit_na_df.query('`Land-use` != "ALL"').round({'Value ($)': 2})
+
+    df_profit = profit_na_df\
+        .groupby(['region', 'Land-use'])[['Year', 'Value ($)']]\
+        .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
+        .reset_index()
+    df_profit.columns = ['region', 'name', 'data']
+    df_profit['type'] = 'column'
+    df_profit['color'] = df_profit['name'].apply(lambda x: COLORS[x])
+    df_profit['name_order'] = df_profit['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+    df_profit = df_profit.sort_values('name_order').drop(columns=['name_order'])
+
+    out_dict = {}
+    for region, df in df_profit.groupby('region'):
+        df = df.drop('region', axis=1)
+        out_dict[region] = df.to_dict(orient='records')
+    write_chart_js(out_dict, 'Economics_NonAg_profit')
+
+    # NonAg Transition (Ag2NonAg): region → [series by LU]
+    t_ag2nonag_files = files.query('base_name == "economics_non_ag_transition_Ag2NonAg"').reset_index(drop=True)
+    t_ag2nonag_df = pd.concat([df for p in t_ag2nonag_files['path'] if not (df := pd.read_csv(p)).empty], ignore_index=True)
+    t_ag2nonag_df = t_ag2nonag_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False)
+    t_ag2nonag_df['Value ($)'] = t_ag2nonag_df['Value ($)'] * -1   # Convert cost to negative
+    t_ag2nonag_filt = t_ag2nonag_df.query('`Land-use` != "ALL"').round({'Value ($)': 2}).query('abs(`Value ($)`) > 1')
+
+    out_dict = {}
+    if not t_ag2nonag_filt.empty:
+        df_wide = t_ag2nonag_filt \
+            .groupby(['region', 'Land-use'])[['Year', 'Value ($)']] \
+            .apply(lambda x: x[['Year', 'Value ($)']].values.tolist()) \
+            .reset_index()
+        df_wide.columns = ['region', 'name', 'data']
+        df_wide['type'] = 'column'
+        df_wide['color'] = df_wide['name'].apply(lambda x: COLORS[x])
+        df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x) if x in LANDUSE_ALL_RENAMED else 999)
+        df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+        for region, df in df_wide.groupby('region'):
+            df = df.drop('region', axis=1)
+            out_dict[region] = df.to_dict(orient='records')
+    write_chart_js(out_dict, 'Economics_NonAg_transition_ag2nonag')
+
+    # NonAg Transition (NonAg2NonAg): region → [series by LU]
+    t_nonag2nonag_files = files.query('base_name == "economics_non_ag_transition_NonAg2NonAg"').reset_index(drop=True)
+    out_dict = {}
+    if not t_nonag2nonag_files.empty:
+        _dfs = [df for p in t_nonag2nonag_files['path'] if not (df := pd.read_csv(p)).empty]
+        if _dfs:
+            t_nonag2nonag_df = pd.concat(_dfs, ignore_index=True)
+            t_nonag2nonag_df = t_nonag2nonag_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False)
+            t_nonag2nonag_df['Value ($)'] = t_nonag2nonag_df['Value ($)'] * -1   # Convert cost to negative
+            t_nonag2nonag_filt = t_nonag2nonag_df.query('`Land-use` != "ALL"').round({'Value ($)': 2}).query('abs(`Value ($)`) > 1')
+            if not t_nonag2nonag_filt.empty:
+                df_wide = t_nonag2nonag_filt \
+                    .groupby(['region', 'Land-use'])[['Year', 'Value ($)']] \
+                    .apply(lambda x: x[['Year', 'Value ($)']].values.tolist()) \
+                    .reset_index()
+                df_wide.columns = ['region', 'name', 'data']
+                df_wide['type'] = 'column'
+                df_wide['color'] = df_wide['name'].apply(lambda x: COLORS.get(x, '#999999'))
+                df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x) if x in LANDUSE_ALL_RENAMED else 999)
+                df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                for region, df in df_wide.groupby('region'):
+                    df = df.drop('region', axis=1)
+                    out_dict[region] = df.to_dict(orient='records')
+    write_chart_js(out_dict, 'Economics_NonAg_transition_nonag2nonag')
+
+
+    # -------------------- Economics Sum (Ag + Am + NonAg profit) --------------------
+    # Load profit CSVs
+    profit_ag_files = files.query('base_name == "economics_ag_profit"').reset_index(drop=True)
+    profit_ag_sum_df = pd.concat([pd.read_csv(p) for p in profit_ag_files['path']], ignore_index=True)
+    profit_ag_sum_df = profit_ag_sum_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False)
+    profit_ag_sum_df = profit_ag_sum_df.query('`Land-use` != "ALL" and Water_supply != "ALL"')
+
+    profit_am_files = files.query('base_name == "economics_am_profit"').reset_index(drop=True)
+    profit_am_sum_df = pd.concat([df for p in profit_am_files['path'] if not (df := pd.read_csv(p)).empty], ignore_index=True)
+    profit_am_sum_df = profit_am_sum_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False)
+    profit_am_sum_df = profit_am_sum_df.query('`Land-use` != "ALL" and Water_supply != "ALL" and `Management Type` != "ALL"')
+    # Sum over management types to get (region, Water_supply, Land-use, Year) level
+    profit_am_sum_df = profit_am_sum_df.groupby(['region', 'Water_supply', 'Land-use', 'Year'])[['Value ($)']].sum().reset_index()
+
+    profit_na_files = files.query('base_name == "economics_non_ag_profit"').reset_index(drop=True)
+    profit_na_sum_df = pd.concat([df for p in profit_na_files['path'] if not (df := pd.read_csv(p)).empty], ignore_index=True)
+    profit_na_sum_df = profit_na_sum_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False)
+    profit_na_sum_df = profit_na_sum_df.query('`Land-use` != "ALL"')
+    # Assign nonag to Dryland to avoid double counting
+    profit_na_sum_df['Water_supply'] = 'Dryland'
+
+    # Combine all three
+    econ_sum = pd.concat([
+        profit_ag_sum_df[['region', 'Water_supply', 'Land-use', 'Year', 'Value ($)']],
+        profit_am_sum_df[['region', 'Water_supply', 'Land-use', 'Year', 'Value ($)']],
+        profit_na_sum_df[['region', 'Water_supply', 'Land-use', 'Year', 'Value ($)']],
+    ], ignore_index=True)
+
+    # Group to sum ag+am for same land uses, then add ALL water aggregate
+    econ_sum = econ_sum.groupby(['region', 'Water_supply', 'Land-use', 'Year'])[['Value ($)']].sum().reset_index()
+
+    econ_sum_all_water = econ_sum.groupby(['region', 'Land-use', 'Year'])[['Value ($)']].sum().reset_index().assign(Water_supply='ALL')
+    econ_sum = pd.concat([econ_sum_all_water, econ_sum], ignore_index=True)
+
+    df_wide = econ_sum\
+        .groupby(['region', 'Water_supply', 'Land-use'])[['Year', 'Value ($)']]\
+        .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
+        .reset_index()
+
+    df_wide.columns = ['region', 'water', 'name', 'data']
+    df_wide['type'] = 'column'
+    df_wide['color'] = df_wide['name'].apply(lambda x: COLORS[x])
+    df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x) if x in LANDUSE_ALL_RENAMED else 999)
+    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+
+    out_dict = {}
+    for (region, water), df in df_wide.groupby(['region', 'water']):
+        df = df.drop(['region', 'water'], axis=1)
         if region not in out_dict:
             out_dict[region] = {}
-        if water not in out_dict[region]:
-            out_dict[region][water] = {}
-        if landuse not in out_dict[region][water]:
-            out_dict[region][water][landuse] = {}
-        out_dict[region][water][landuse][Rev_Cost] = df.to_dict(orient='records')
+        out_dict[region][water] = df.to_dict(orient='records')
 
-    filename = f'Economics_Am'
+    filename = 'Economics_Sum'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
         json.dump(out_dict, f, separators=(',', ':'), indent=2)
         f.write(';\n')
-
-
-    # -------------------- Economics for non-agriculture --------------------
-
-    # This is the same as the "Economics_overview_Non_Ag"
 
 
 
@@ -1010,10 +1261,6 @@ def process_production_data(files, SAVE_DIR, years):
     quantity_am = quantity_df.query('Type == "Agricultural_Management"').copy()
     quantity_non_ag = quantity_df.query('Type == "Non_Agricultural"').copy()
 
-    quantity_ag_non_all = quantity_ag.query('Water_supply != "ALL"').copy()
-    quantity_am_non_all = quantity_am.query('Water_supply != "ALL"').copy()
-    
-    
     # Fill 0 for empty non-agr dataframe
     if quantity_non_ag.empty:
         quantity_non_ag = pd.DataFrame(
@@ -1046,7 +1293,7 @@ def process_production_data(files, SAVE_DIR, years):
 
     # -------------------- Ranking --------------------
 
-    quantity_rank = pd.concat([quantity_ag_non_all, quantity_non_ag, quantity_am_non_all])\
+    quantity_rank = pd.concat([quantity_ag.query('Water_supply != "ALL"'), quantity_non_ag, quantity_am.query('Water_supply != "ALL" and Commodity != "ALL"')])\
         .groupby(['Year', 'region', 'group'])[['Production (t/KL)']]\
         .sum(numeric_only=True)\
         .reset_index()\
@@ -1249,6 +1496,52 @@ def process_production_data(files, SAVE_DIR, years):
         f.write(';\n')
 
 
+    # -------------------- Sum production (Ag + Am + NonAg) --------------------
+    # Assign non_ag Water_supply='Dryland' to avoid double counting, then sum all types
+    quantity_non_ag_with_water = quantity_non_ag.copy()
+    quantity_non_ag_with_water['Water_supply'] = 'Dryland'
+
+    quantity_sum = pd.concat([
+        quantity_ag.query('Water_supply != "ALL"')[['region', 'Water_supply', 'Commodity', 'Year', 'Production (t/KL)']],
+        quantity_am.query('Water_supply != "ALL" and Commodity != "ALL"')[['region', 'Water_supply', 'Commodity', 'Year', 'Production (t/KL)']],
+        quantity_non_ag_with_water[['region', 'Water_supply', 'Commodity', 'Year', 'Production (t/KL)']],
+    ], ignore_index=True)
+
+    # Add ALL water level
+    quantity_sum_all_water = quantity_sum\
+        .groupby(['region', 'Commodity', 'Year'])[['Production (t/KL)']]\
+        .sum(numeric_only=True)\
+        .reset_index()\
+        .assign(Water_supply='ALL')
+    quantity_sum = pd.concat([quantity_sum_all_water, quantity_sum], ignore_index=True)
+
+    # Group by region, water, commodity → time series
+    df_wide = quantity_sum\
+        .groupby(['region', 'Water_supply', 'Commodity', 'Year'])[['Production (t/KL)']]\
+        .sum(numeric_only=True)\
+        .reset_index()\
+        .groupby(['region', 'Water_supply', 'Commodity'])[['Year', 'Production (t/KL)']]\
+        .apply(lambda x: x[['Year', 'Production (t/KL)']].values.tolist())\
+        .reset_index()
+
+    df_wide.columns = ['region', 'water', 'name', 'data']
+    df_wide['type'] = 'column'
+    df_wide['color'] = df_wide['name'].apply(lambda x: COLORS[x])
+    df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x) if x in COMMODITIES_ALL else 999)
+    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+
+    out_dict = {}
+    for (region, water), df in df_wide.groupby(['region', 'water']):
+        df = df.drop(['region', 'water'], axis=1)
+        if region not in out_dict:
+            out_dict[region] = {}
+        out_dict[region][water] = df.to_dict(orient='records')
+
+    filename = f'Production_Sum'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
 
 
     return "Production data processing completed"
@@ -1268,8 +1561,7 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
     GHG_ag = GHG_files.query('base_name.str.contains("agricultural_landuse")').reset_index(drop=True)
     GHG_ag = pd.concat([pd.read_csv(path) for path in GHG_ag['path']], ignore_index=True)
     GHG_ag = GHG_ag.replace(GHG_NAMES).infer_objects(copy=False).round({'Value (t CO2e)': 2})
-    GHG_ag_non_all = GHG_ag.query('Water_supply != "ALL" and Source != "ALL"').reset_index(drop=True)
-    
+
     GHG_non_ag = GHG_files.query('base_name.str.contains("no_ag_reduction")').reset_index(drop=True)
     GHG_non_ag = pd.concat([df for path in GHG_non_ag['path'] if not (df := pd.read_csv(path)).empty], ignore_index=True)
     GHG_non_ag = GHG_non_ag.replace(RENAME_AM_NON_AG).infer_objects(copy=False).round({'Value (t CO2e)': 2})
@@ -1277,8 +1569,7 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
     GHG_ag_man = GHG_files.query('base_name.str.contains("agricultural_management")').reset_index(drop=True)
     GHG_ag_man = pd.concat([df for path in GHG_ag_man['path'] if not (df := pd.read_csv(path)).empty], ignore_index=True)
     GHG_ag_man = GHG_ag_man.replace(RENAME_AM_NON_AG).infer_objects(copy=False).round({'Value (t CO2e)': 2})
-    GHG_ag_man_non_all = GHG_ag_man.query('Water_supply != "ALL" and `Land-use` != "ALL"').reset_index(drop=True)
-    
+
     GHG_transition = GHG_files.query('base_name.str.contains("transition_penalty")').reset_index(drop=True)
     GHG_transition = pd.concat([df for path in GHG_transition['path'] if not (df := pd.read_csv(path)).empty], ignore_index=True)
     GHG_transition = GHG_transition.replace(RENAME_AM_NON_AG).infer_objects(copy=False).round({'Value (t CO2e)': 2})
@@ -1299,10 +1590,10 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
     GHG_land = pd.concat([GHG_ag, GHG_non_ag, GHG_ag_man, GHG_transition], axis=0)\
         .query('abs(`Value (t CO2e)`) > 1')\
         .reset_index(drop=True)
-    GHG_land_non_all = pd.concat([GHG_ag_non_all, GHG_non_ag, GHG_ag_man_non_all, GHG_transition], axis=0)\
+    GHG_land_non_all = pd.concat([GHG_ag.query('Water_supply != "ALL" and Source != "ALL" and `Land-use` != "ALL"'), GHG_non_ag, GHG_ag_man.query('Water_supply != "ALL" and `Land-use` != "ALL" and `Agricultural Management Type` != "ALL"'), GHG_transition], axis=0)\
         .query('abs(`Value (t CO2e)`) > 1')\
-        .reset_index(drop=True)   
-        
+        .reset_index(drop=True)
+
     GHG_land['Land-use type'] = GHG_land['Land-use'].map(lu_group_map)
     GHG_land_non_all['Land-use type'] = GHG_land_non_all['Land-use'].map(lu_group_map)
 
@@ -1374,7 +1665,7 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
         
         
     # Ag
-    GHG_ag_non_all_wide = GHG_ag_non_all\
+    GHG_ag_non_all_wide = GHG_ag.query('Water_supply != "ALL" and Source != "ALL" and `Land-use` != "ALL"')\
         .groupby(['region','Land-use','Year'])[['Value (t CO2e)']]\
         .sum(numeric_only=True)\
         .reset_index()\
@@ -1400,7 +1691,7 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
         
         
     # Am
-    GHG_ag_man_non_all_wide = GHG_ag_man_non_all\
+    GHG_ag_man_non_all_wide = GHG_ag_man.query('Water_supply != "ALL" and `Land-use` != "ALL" and `Agricultural Management Type` != "ALL"')\
         .groupby(['region', 'Agricultural Management Type', 'Year'])[['Value (t CO2e)']]\
         .sum(numeric_only=True)\
         .reset_index()\
@@ -1427,6 +1718,7 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
         
     # Non-Ag
     GHG_non_ag_wide = GHG_non_ag\
+        .query('`Land-use` != "ALL"')\
         .groupby(['region','Land-use','Year'])[['Value (t CO2e)']]\
         .sum(numeric_only=True)\
         .reset_index()\
@@ -1450,6 +1742,88 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
         json.dump(out_dict, f, separators=(',', ':'), indent=2)
         f.write(';\n')
     
+
+
+    # -------------------- GHG Sum (Ag + Am + NonAg + Transition + Off-land) --------------------
+
+    # Ag: sum over source, keep water/lu/year
+    ghg_ag_sum = GHG_ag.query('Water_supply != "ALL" and Source != "ALL" and `Land-use` != "ALL"')\
+        .groupby(['region', 'Water_supply', 'Land-use', 'Year'])[['Value (t CO2e)']]\
+        .sum(numeric_only=True).reset_index()
+
+    # Am: sum over management type, keep water/lu/year
+    ghg_am_sum = GHG_ag_man.query('Water_supply != "ALL" and `Land-use` != "ALL" and `Agricultural Management Type` != "ALL"')\
+        .groupby(['region', 'Water_supply', 'Land-use', 'Year'])[['Value (t CO2e)']]\
+        .sum(numeric_only=True).reset_index()
+
+    # NonAg: assign to Dryland water supply
+    ghg_non_ag_sum = GHG_non_ag.query('`Land-use` != "ALL"').reset_index(drop=True)[['region', 'Land-use', 'Year', 'Value (t CO2e)']].copy()
+    ghg_non_ag_sum['Water_supply'] = 'Dryland'
+
+    # Transition: sum over Land-use per transition type; use Type as the series name
+    ghg_transition_sum = GHG_transition\
+        .groupby(['region', 'Water_supply', 'Type', 'Year'])[['Value (t CO2e)']]\
+        .sum(numeric_only=True).reset_index()\
+        .rename(columns={'Type': 'Land-use'})
+
+    # Combine Ag + Am + NonAg + Transition
+    ghg_sum = pd.concat([ghg_ag_sum, ghg_am_sum, ghg_non_ag_sum, ghg_transition_sum], ignore_index=True)
+    ghg_sum = ghg_sum.query('abs(`Value (t CO2e)`) > 1').reset_index(drop=True)
+
+    # Add ALL water aggregate (computed before off_land to avoid double-counting)
+    ghg_sum_all_water = ghg_sum\
+        .groupby(['region', 'Land-use', 'Year'])[['Value (t CO2e)']]\
+        .sum(numeric_only=True).reset_index().assign(Water_supply='ALL')
+    ghg_sum = pd.concat([ghg_sum_all_water, ghg_sum], ignore_index=True)
+
+    # Off-land: replicate across ALL/Dryland/Irrigated so it appears on every water tab
+    ghg_off_land_by_year = GHG_off_land.groupby('Year')[['Value (t CO2e)']].sum(numeric_only=True).reset_index()
+    ghg_off_land_rows = pd.concat([
+        ghg_off_land_by_year.assign(Water_supply=w, **{'Land-use': 'Off-land emissions', 'region': 'AUSTRALIA'})
+        for w in ['ALL', 'Dryland', 'Irrigated']
+    ], ignore_index=True).query('abs(`Value (t CO2e)`) > 1')
+    ghg_sum = pd.concat([ghg_sum, ghg_off_land_rows], ignore_index=True)
+
+    df_wide = ghg_sum\
+        .groupby(['region', 'Water_supply', 'Land-use'])[['Year', 'Value (t CO2e)']]\
+        .apply(lambda x: x[['Year', 'Value (t CO2e)']].values.tolist())\
+        .reset_index()
+    df_wide.columns = ['region', 'water', 'name', 'data']
+    df_wide['type'] = 'column'
+    df_wide['color'] = df_wide['name'].apply(lambda x: COLORS[x])
+    _ghg_sum_order = LANDUSE_ALL_RENAMED + [
+        'Unallocated natural to modified',
+        'Unallocated natural to livestock natural',
+        'Livestock natural to modified',
+        'Off-land emissions',
+    ]
+    df_wide['name_order'] = df_wide['name'].apply(lambda x: _ghg_sum_order.index(x) if x in _ghg_sum_order else 999)
+    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+
+    out_dict = {}
+    for (region, water), df in df_wide.groupby(['region', 'water']):
+        df = df.drop(['region', 'water'], axis=1)
+        if region not in out_dict:
+            out_dict[region] = {}
+        out_dict[region][water] = df.to_dict(orient='records')
+
+    # Add Net emissions and GHG emission limit lines for AUSTRALIA across all water tabs
+    if 'AUSTRALIA' in out_dict:
+        net_values = (
+            ghg_sum_all_water.query('region == "AUSTRALIA"')
+            .groupby('Year')['Value (t CO2e)'].sum()
+            + ghg_off_land_by_year.set_index('Year')['Value (t CO2e)']
+        )
+        net_australia_wide = [[y, v] for y, v in zip(net_values.index.tolist(), net_values.values)]
+        for water in out_dict['AUSTRALIA']:
+            out_dict['AUSTRALIA'][water].append({'name': 'Net emissions',    'data': net_australia_wide, 'type': 'line', 'color': COLORS['Net emissions']})
+            out_dict['AUSTRALIA'][water].append({'name': 'GHG emission limit', 'data': GHG_limit_wide,      'type': 'line', 'color': COLORS['GHG emission limit']})
+
+    filename = 'GHG_Sum'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
 
 
     # -------------------- GHG ranking --------------------
@@ -1566,7 +1940,7 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
 
 
     # -------------------- GHG by Non-Agricultural --------------------
-    Non_ag_reduction_long = GHG_land.query('Type == "Non-Agricultural Land-use"').reset_index(drop=True)
+    Non_ag_reduction_long = GHG_land.query('Type == "Non-Agricultural Land-use" and `Land-use` != "ALL"').reset_index(drop=True)
     Non_ag_reduction_long['Value (t CO2e)'] *= -1  # Convert from negative to positive
     
     df_region = Non_ag_reduction_long\
@@ -1599,7 +1973,7 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
 
     # -------------------- GHG by Agricultural Managements --------------------
     Ag_man_sequestration_long = GHG_land\
-        .query('Type == "Agricultural Management" and `Land-use` != "ALL"')\
+        .query('Type == "Agricultural Management" and `Agricultural Management Type` != "ALL"')\
         .reset_index(drop=True)
     Ag_man_sequestration_long['Value (t CO2e)'] = Ag_man_sequestration_long['Value (t CO2e)'] * -1  # Convert from negative to positive
 
@@ -1653,9 +2027,6 @@ def process_water_data(files, SAVE_DIR):
         .infer_objects(copy=False)\
         .query('abs(`Water Net Yield (ML)`) > 1e-4')\
         .rename(columns={'Water Net Yield (ML)': 'Value (ML)'})
-    water_net_yield_watershed_non_all = water_net_yield_watershed\
-        .query('`Water Supply` != "ALL" and Landuse	 != "ALL"')\
-        .reset_index(drop=True)
 
 
     hist_and_public_wny_water_region = water_files.query('base_name == "water_yield_limits_and_public_land"')
@@ -1704,7 +2075,8 @@ def process_water_data(files, SAVE_DIR):
 
 
     # -------------------- Water yield overview --------------------
-    water_inside_LUTO_wide = water_net_yield_watershed_non_all\
+    water_inside_LUTO_wide = water_net_yield_watershed\
+        .query('`Water Supply` != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
         .groupby(['Region', 'Year'])[['Value (ML)']]\
         .sum(numeric_only=True)\
         .round({'Value (ML)': 2})\
@@ -1783,20 +2155,19 @@ def process_water_data(files, SAVE_DIR):
         .infer_objects(copy=False)\
         .query('abs(`Water Net Yield (ML)`) > 1e-4')\
         .rename(columns={'Water Net Yield (ML)': 'Value (ML)'})
-    water_net_yield_NRM_region_non_all = water_net_yield_NRM_region\
-        .query('`Water Supply` != "ALL" and Landuse != "ALL"')\
-        .reset_index(drop=True)
 
 
     # -------------------- Water yield ranking by NRM --------------------
-    water_ranking_type = water_net_yield_NRM_region_non_all\
+    water_ranking_type = water_net_yield_NRM_region\
+        .query('`Water Supply` != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
         .groupby(['region_NRM', 'Type', 'Year'])[['Value (ML)']]\
         .sum(numeric_only=True)\
         .reset_index()\
         .sort_values(['Year', 'Type', 'Value (ML)'], ascending=[True, True, False])\
         .assign(Rank=lambda x: x.groupby(['Year','Type']).cumcount())
         
-    water_ranking_total = water_net_yield_NRM_region_non_all\
+    water_ranking_total = water_net_yield_NRM_region\
+        .query('`Water Supply` != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
         .groupby(['region_NRM', 'Year'])[['Value (ML)']]\
         .sum(numeric_only=True)\
         .reset_index()\
@@ -1830,7 +2201,8 @@ def process_water_data(files, SAVE_DIR):
     # -------------------- Overview  --------------------
     
     # sum
-    water_sum = water_net_yield_NRM_region_non_all\
+    water_sum = water_net_yield_NRM_region\
+        .query('`Water Supply` != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
         .groupby(['region_NRM', 'Type', 'Year'])[['Value (ML)']]\
         .sum(numeric_only=True)\
         .reset_index()\
@@ -1857,7 +2229,9 @@ def process_water_data(files, SAVE_DIR):
         
     
     # Ag
-    water_ag = water_net_yield_NRM_region_non_all.query('Type == "Agricultural Land-use"')
+    water_ag = water_net_yield_NRM_region\
+        .query('`Water Supply` != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
+        .query('Type == "Agricultural Land-use"')
     
     water_overview_ag = water_ag\
         .groupby(['region_NRM', 'Landuse', 'Year'])[['Value (ML)']]\
@@ -1886,7 +2260,9 @@ def process_water_data(files, SAVE_DIR):
         f.write(';\n')
         
     # Am
-    water_am = water_net_yield_NRM_region_non_all.query('Type == "Agricultural Management"')
+    water_am = water_net_yield_NRM_region\
+        .query('`Water Supply` != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
+        .query('Type == "Agricultural Management"')
     
     water_overview_am = water_am\
         .groupby(['region_NRM', 'Agricultural Management', 'Year'])[['Value (ML)']]\
@@ -1914,7 +2290,9 @@ def process_water_data(files, SAVE_DIR):
         
         
     # Non-Ag
-    water_nonag = water_net_yield_NRM_region_non_all.query('Type == "Non-Agricultural Land-use"')
+    water_nonag = water_net_yield_NRM_region\
+        .query('`Water Supply` != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
+        .query('Type == "Non-Agricultural Land-use"')
 
     water_overview_nonag = water_nonag\
         .groupby(['region_NRM', 'Landuse', 'Year'])[['Value (ML)']]\
@@ -1952,11 +2330,12 @@ def process_water_data(files, SAVE_DIR):
         
     water_ag = pd.concat([
         water_ag_AUS,
-        water_net_yield_NRM_region.query('Type == "Agricultural Land-use"').rename(columns={'region_NRM': 'region'})
-        ], ignore_index=True)
-    
+        water_net_yield_NRM_region.query('Type == "Agricultural Land-use" and region_NRM != "AUSTRALIA"').rename(columns={'region_NRM': 'region'})
+        ], ignore_index=True)\
+        .query('Landuse != "ALL" and `Water Supply` != "ALL"')
+
     df_region_wide = water_ag.groupby(['region', 'Water Supply', 'Landuse'])[['Year','Value (ML)']]\
-        .apply(lambda x: x[['Year', 'Value (ML)']].values.tolist())\
+        .apply(lambda x: [[int(r[0]), r[1]] for r in x[['Year', 'Value (ML)']].values.tolist()])\
         .reset_index()
   
     df_region_wide.columns = ['region', 'water', 'name',  'data']
@@ -1986,7 +2365,7 @@ def process_water_data(files, SAVE_DIR):
             
     # -------------------- Water yield for Am by NRM region --------------------
     water_am_AUS = water_net_yield_NRM_region\
-        .query('Type == "Agricultural Management" and Landuse != "ALL"')\
+        .query('Type == "Agricultural Management"')\
         .groupby(['Agricultural Management', 'Water Supply', 'Landuse', 'Year'])[['Value (ML)']]\
         .sum(numeric_only=True)\
         .reset_index()\
@@ -1995,13 +2374,13 @@ def process_water_data(files, SAVE_DIR):
     water_am = pd.concat(
         [water_am_AUS,
          water_net_yield_NRM_region\
-             .query('Type == "Agricultural Management" and Landuse != "ALL"')\
+             .query('Type == "Agricultural Management" and region_NRM != "AUSTRALIA"')\
              .rename(columns={'region_NRM': 'region'})],
         ignore_index=True
-    )
+    ).query('`Agricultural Management` != "ALL"')
 
     df_region_wide = water_am.groupby(['region', 'Water Supply', 'Landuse', 'Agricultural Management'])[['Year','Value (ML)']]\
-        .apply(lambda x: x[['Year', 'Value (ML)']].values.tolist())\
+        .apply(lambda x: [[int(r[0]), r[1]] for r in x[['Year', 'Value (ML)']].values.tolist()])\
         .reset_index()
     df_region_wide.columns = ['region', 'water', 'landuse', 'name',  'data']
     df_region_wide['type'] = 'column'
@@ -2025,7 +2404,7 @@ def process_water_data(files, SAVE_DIR):
             
     # -------------------- Water yield for Non-Agricultural Land-use by NRM region --------------------
     water_nonag_AUS = water_net_yield_NRM_region\
-        .query('Type == "Non-Agricultural Land-use"')\
+        .query('Type == "Non-Agricultural Land-use" and Landuse != "ALL"')\
         .groupby(['Landuse', 'Year'])[['Value (ML)']]\
         .sum(numeric_only=True)\
         .reset_index()\
@@ -2034,14 +2413,14 @@ def process_water_data(files, SAVE_DIR):
             name_order=lambda x: x['Landuse'].apply(lambda y: LANDUSE_ALL_RENAMED.index(y)))\
         .sort_values('name_order')\
         .drop(columns=['name_order'])
-        
+
     water_nonag = pd.concat([
         water_nonag_AUS,
-        water_net_yield_NRM_region.query('Type == "Non-Agricultural Land-use"').rename(columns={'region_NRM': 'region'})
+        water_net_yield_NRM_region.query('Type == "Non-Agricultural Land-use" and Landuse != "ALL" and region_NRM != "AUSTRALIA"').rename(columns={'region_NRM': 'region'})
         ], ignore_index=True)
 
     df_region_wide = water_nonag.groupby(['region', 'Landuse'])[['Year','Value (ML)']]\
-        .apply(lambda x: x[['Year', 'Value (ML)']].values.tolist())\
+        .apply(lambda x: [[int(r[0]), r[1]] for r in x[['Year', 'Value (ML)']].values.tolist()])\
         .reset_index()
     df_region_wide.columns = ['region', 'name', 'data']
     df_region_wide['type'] = 'column'
@@ -2059,12 +2438,72 @@ def process_water_data(files, SAVE_DIR):
         f.write(f'window["{filename}"] = ')
         json.dump(out_dict, f, separators=(',', ':'), indent=2)
         f.write(';\n')
-        
 
 
+    # -------------------- Water yield Sum (Ag + Am + NonAg) by NRM region --------------------
+    # Ag part (per NRM, exclude AUSTRALIA to avoid double-counting)
+    water_ag_nrm = water_net_yield_NRM_region\
+        .query('`Water Supply` != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
+        .query('Type == "Agricultural Land-use" and region_NRM != "AUSTRALIA"')\
+        [['region_NRM', 'Water Supply', 'Landuse', 'Year', 'Value (ML)']]
 
+    # Am part: sum over Agricultural Management to collapse that dimension
+    water_am_nrm = water_net_yield_NRM_region\
+        .query('`Water Supply` != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
+        .query('Type == "Agricultural Management" and region_NRM != "AUSTRALIA"')\
+        .groupby(['region_NRM', 'Water Supply', 'Landuse', 'Year'])[['Value (ML)']]\
+        .sum(numeric_only=True).reset_index()
+
+    # NonAg part: assign to Dryland (NonAg has no irrigation dimension)
+    water_nonag_nrm = water_net_yield_NRM_region\
+        .query('`Water Supply` != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
+        .query('Type == "Non-Agricultural Land-use" and region_NRM != "AUSTRALIA"')\
+        .assign(**{'Water Supply': 'Dryland'})\
+        [['region_NRM', 'Water Supply', 'Landuse', 'Year', 'Value (ML)']]
+
+    water_sum_nrm = pd.concat([water_ag_nrm, water_am_nrm, water_nonag_nrm], ignore_index=True)
+
+    # AUS aggregate: sum over all NRM regions
+    water_sum_AUS = water_sum_nrm\
+        .groupby(['Water Supply', 'Landuse', 'Year'])[['Value (ML)']]\
+        .sum(numeric_only=True).reset_index().assign(region='AUSTRALIA')
+
+    water_sum = pd.concat([
+        water_sum_AUS,
+        water_sum_nrm.rename(columns={'region_NRM': 'region'})
+    ], ignore_index=True)
+
+    # Add ALL water aggregate
+    water_sum_all_water = water_sum\
+        .groupby(['region', 'Landuse', 'Year'])[['Value (ML)']]\
+        .sum(numeric_only=True).reset_index().assign(**{'Water Supply': 'ALL'})
+    water_sum = pd.concat([water_sum_all_water, water_sum], ignore_index=True)
+
+    df_region_wide = water_sum.groupby(['region', 'Water Supply', 'Landuse'])[['Year', 'Value (ML)']]\
+        .apply(lambda x: [[int(r[0]), r[1]] for r in x[['Year', 'Value (ML)']].values.tolist()])\
+        .reset_index()
+    df_region_wide.columns = ['region', 'water', 'name', 'data']
+    df_region_wide['type'] = 'column'
+    df_region_wide['color'] = df_region_wide.apply(lambda x: COLORS[x['name']], axis=1)
+    df_region_wide['name_order'] = df_region_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+    df_region_wide = df_region_wide.sort_values('name_order').drop(columns=['name_order'])
+
+    out_dict = {}
+    for (region, water), df in df_region_wide.groupby(['region', 'water']):
+        df = df.drop(['region'], axis=1)
+        if region not in out_dict:
+            out_dict[region] = {}
+        out_dict[region][water] = df.to_dict(orient='records')
+
+    filename = 'Water_Sum_NRM'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
 
     return "Water data processing completed"
+
+
 
 
 def process_biodiversity_data(files, SAVE_DIR):
@@ -2086,20 +2525,15 @@ def process_biodiversity_data(files, SAVE_DIR):
         .rename(columns={'Contribution Relative to Base Year Level (%)': 'Value (%)'})\
         .round({'Value (%)': 6})
         
-    bio_df_non_all = bio_df.query('Water_supply != "ALL" and Landuse != "ALL"')
-    bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural Land-use"').copy()
-    bio_df_am_non_all = bio_df_non_all.query('Type == "Agricultural Management"').copy()
-    bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"').copy()
-    
     # ---------------- Overall quality - Ranking -----------------
-    bio_rank_type = bio_df_non_all\
+    bio_rank_type = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
         .groupby(['Year', 'region', 'Type'])\
         .sum(numeric_only=True)\
         .reset_index()\
         .sort_values(['Year', 'Type', 'Value (%)'], ascending=[True, True, False])\
         .assign(Rank=lambda x: x.groupby(['Year','Type']).cumcount())\
         .assign(color=lambda x: x['Rank'].map(get_rank_color))
-    bio_rank_total = bio_df_non_all\
+    bio_rank_total = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
         .groupby(['Year', 'region'])\
         .sum(numeric_only=True)\
         .reset_index()\
@@ -2142,7 +2576,7 @@ def process_biodiversity_data(files, SAVE_DIR):
 
     # ---------------- Overall quality - Overview ----------------
     # sum
-    df_region = bio_df_non_all\
+    df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
         .groupby(['region', 'Year', 'Type'])\
         .sum(numeric_only=True)\
         .reset_index()
@@ -2167,7 +2601,7 @@ def process_biodiversity_data(files, SAVE_DIR):
     
     
     # ag
-    df_region = bio_df_ag_non_all\
+    df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Agricultural Land-use"')\
         .groupby(['Year', 'region', 'Landuse'])\
         .sum(numeric_only=True)\
         .reset_index()
@@ -2185,15 +2619,15 @@ def process_biodiversity_data(files, SAVE_DIR):
     for region, df in df_wide.groupby('region'):
         df = df.drop(['region'], axis=1)
         out_dict[region] = df.to_dict(orient='records')
-        
+
     filename = f'BIO_quality_overview_Ag'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
         json.dump(out_dict, f, separators=(',', ':'), indent=2)
         f.write(';\n')
-            
+
     # am
-    df_region = bio_df_am_non_all\
+    df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Agricultural Management"')\
         .groupby(['Year', 'region', "Agricultural Management"])\
         .sum(numeric_only=True)\
         .reset_index()
@@ -2203,13 +2637,13 @@ def process_biodiversity_data(files, SAVE_DIR):
     df_wide.columns = ['name', 'region', 'data']
     df_wide['type'] = 'column'
     df_wide['color'] = df_wide.apply(lambda x: COLORS[x['name']], axis=1)
-    
-    
+
+
     out_dict = {}
     for region, df in df_wide.groupby('region'):
         df = df.drop(['region'], axis=1)
         out_dict[region] = df.to_dict(orient='records')
-        
+
     filename = f'BIO_quality_overview_Am'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
@@ -2218,7 +2652,7 @@ def process_biodiversity_data(files, SAVE_DIR):
 
 
     # non-ag
-    df_region = bio_df_nonag\
+    df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Non-Agricultural Land-use"')\
         .groupby(['Year', 'region', 'Landuse'])\
         .sum(numeric_only=True)\
         .reset_index()
@@ -2270,7 +2704,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         f.write(';\n')
         
     # ---------------- Overall quality - Am ----------------
-    bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL"').copy()
+    bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` != "ALL"').copy()
 
     df_wide = bio_df_am.groupby(['region', 'Water_supply', "Agricultural Management", 'Landuse'])[['Year','Value (%)']]\
         .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
@@ -2278,20 +2712,18 @@ def process_biodiversity_data(files, SAVE_DIR):
     df_wide.columns = ['region', 'water', 'am', 'name', 'data']
     df_wide['type'] = 'column'
     df_wide['color'] = df_wide.apply(lambda x: COLORS[x['name']], axis=1)
-    
-    df_wide_all_am = bio_df_am\
-        .groupby(['region', 'Water_supply', 'Landuse', 'Year'])[['Value (%)']]\
-        .sum(numeric_only=True)\
-        .reset_index()\
+
+    df_wide_all_am = bio_df\
+        .query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` == "ALL"')\
         .groupby(['region', 'Water_supply', 'Landuse'])[['Year','Value (%)']]\
         .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
         .reset_index()
-        
+
     df_wide_all_am.columns = ['region', 'water', 'name', 'data']
     df_wide_all_am['am'] = 'ALL'
     df_wide_all_am['type'] = 'column'
     df_wide_all_am['color'] = df_wide_all_am.apply(lambda x: COLORS[x['name']], axis=1)
-    
+
     df_wide = pd.concat([df_wide, df_wide_all_am], ignore_index=True)
 
     out_dict = {}
@@ -2313,8 +2745,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         
         
     # ---------------- Overall quality - Non-Ag ----------------
-    bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"').copy()
-    df_wide = bio_df_nonag.groupby(['region', 'Landuse'])[['Year','Value (%)']]\
+    df_wide = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Non-Agricultural Land-use"').groupby(['region', 'Landuse'])[['Year','Value (%)']]\
         .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
         .reset_index()
     df_wide.columns = ['region', 'name', 'data']
@@ -2351,13 +2782,8 @@ def process_biodiversity_data(files, SAVE_DIR):
             .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
             .round({'Value (%)': 2})
 
-        bio_df_non_all = bio_df.query('Water_supply != "ALL" and Landuse != "ALL"')
-        bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural Land-use"')
-        bio_df_am_non_all = bio_df_non_all.query('Type == "Agricultural Management"')
-        bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"')
-        
         # ---------------- (GBF2) ranking  ----------------
-        bio_rank_total = bio_df_non_all\
+        bio_rank_total = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
             .groupby(['Year', 'region'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -2381,7 +2807,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         bio_df_target = bio_df.groupby(['Year'])[['Priority Target (%)']].agg('first').reset_index()
         bio_df_target = bio_df_target[['Year','Priority Target (%)']].values.tolist()
 
-        df_region = bio_df_non_all\
+        df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
             .groupby(['Year', 'region', 'Type'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -2409,7 +2835,7 @@ def process_biodiversity_data(files, SAVE_DIR):
 
 
         # ag
-        df_region = bio_df_ag_non_all\
+        df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Agricultural Land-use"')\
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -2437,7 +2863,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             f.write(';\n')
                 
         # am
-        df_region = bio_df_am_non_all\
+        df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Agricultural Management"')\
             .groupby(['Year', 'region', 'Agricultural Management'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -2459,10 +2885,10 @@ def process_biodiversity_data(files, SAVE_DIR):
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
-            
-                
+
+
         # non-ag
-        df_region = bio_df_nonag\
+        df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Non-Agricultural Land-use"')\
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -2518,7 +2944,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             
         
         # ---------------- (GBF2) Ag-Mgt  ----------------
-        bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL"').copy()
+        bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` != "ALL"').copy()
 
         df_wide = bio_df_am\
             .groupby(['region', 'Water_supply', 'Agricultural Management', 'Landuse'])[['Year', 'Value (%)']]\
@@ -2528,11 +2954,9 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_wide['type'] = 'column'
         df_wide['color'] = df_wide.apply(lambda x: COLORS[x['name']], axis=1)
 
-        df_wide_all_am = bio_df_am\
-            .groupby(['region', 'Water_supply', 'Landuse', 'Year'])[['Value (%)']]\
-            .sum(numeric_only=True)\
-            .reset_index()\
-            .groupby(['region', 'Water_supply', 'Landuse'])[['Year','Value (%)']]\
+        df_wide_all_am = bio_df\
+            .query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` == "ALL"')\
+            .groupby(['region', 'Water_supply', 'Landuse'])[['Year', 'Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
             .reset_index()
 
@@ -2562,8 +2986,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             
             
         # ---------------- (GBF2) Non-Ag  ----------------
-        bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"').copy()
-        df_region = bio_df_nonag\
+        df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Non-Agricultural Land-use"')\
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -2605,14 +3028,9 @@ def process_biodiversity_data(files, SAVE_DIR):
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)', 'Vegetation Group': 'species'})\
             .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
             .round(6)
-        bio_df_non_all = bio_df.query('Water_supply != "ALL" and Landuse != "ALL"')
-        bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural Land-use"')
-        bio_df_am_non_all = bio_df_non_all.query('Type == "Agricultural Management"')
-        bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"')
-        
-        
+
         # ---------------- (GBF3-NVIS) Ranking  ----------------
-        bio_rank_total = bio_df_non_all\
+        bio_rank_total = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
             .groupby(['Year', 'region'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -2634,9 +3052,9 @@ def process_biodiversity_data(files, SAVE_DIR):
         # ---------------- (GBF3-NVIS) Overview  ----------------
         
         # sum
-        bio_df_target = bio_df_non_all.groupby(['Year', 'species'])[['Target_by_Percent']].agg('first').reset_index()
+        bio_df_target = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').groupby(['Year', 'species'])[['Target_by_Percent']].agg('first').reset_index()
 
-        df_region = bio_df_non_all\
+        df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
             .groupby(['Year', 'region', 'Type'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -2658,11 +3076,11 @@ def process_biodiversity_data(files, SAVE_DIR):
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
-                
-                
-                
+
+
+
         # ag
-        df_region = bio_df_ag_non_all\
+        df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Agricultural Land-use"')\
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -2690,7 +3108,7 @@ def process_biodiversity_data(files, SAVE_DIR):
 
 
         # am
-        df_region = bio_df_am_non_all\
+        df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Agricultural Management"')\
             .groupby(['Year', 'region', 'Agricultural Management'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -2715,7 +3133,7 @@ def process_biodiversity_data(files, SAVE_DIR):
 
 
         # non-ag
-        df_region = bio_df_nonag\
+        df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Non-Agricultural Land-use"')\
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -2741,8 +3159,8 @@ def process_biodiversity_data(files, SAVE_DIR):
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
-            
-            
+
+
         # ---------------- (GBF3-NVIS) - Ag  ----------------
         bio_df_ag = bio_df.query('Type == "Agricultural Land-use" and Landuse != "ALL"').copy()
 
@@ -2775,7 +3193,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             
             
         # ---------------- (GBF3-NVIS) - Am  ----------------
-        bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL"').copy()
+        bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` != "ALL"').copy()
 
         df_wide = bio_df_am\
             .groupby(['region', 'species', 'Water_supply', 'Agricultural Management', 'Landuse'])[['Year', 'Value (%)']]\
@@ -2785,11 +3203,9 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_wide['type'] = 'column'
         df_wide['color'] = df_wide.apply(lambda x: COLORS[x['name']], axis=1)
 
-        df_wide_all_am = bio_df_am\
-            .groupby(['region', 'species', 'Water_supply', 'Landuse', 'Year'])[['Value (%)']]\
-            .sum(numeric_only=True)\
-            .reset_index()\
-            .groupby(['region', 'species', 'Water_supply', 'Landuse'])[['Year','Value (%)']]\
+        df_wide_all_am = bio_df\
+            .query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` == "ALL"')\
+            .groupby(['region', 'species', 'Water_supply', 'Landuse'])[['Year', 'Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
             .reset_index()
 
@@ -2820,9 +3236,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             f.write(';\n')
             
         # ---------------- (GBF3-NVIS) - Non-Ag  ----------------
-        bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"').copy()
-        
-        df_wide = bio_df_nonag\
+        df_wide = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Non-Agricultural Land-use"')\
             .groupby(['region', 'species', 'Landuse'])[['Year', 'Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
             .reset_index()
@@ -2859,14 +3273,9 @@ def process_biodiversity_data(files, SAVE_DIR):
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)', 'IBRA Bioregion': 'species'})\
             .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
             .round(6)
-        bio_df_non_all = bio_df.query('Water_supply != "ALL" and Landuse != "ALL"')
-        bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural Land-use"')
-        bio_df_am_non_all = bio_df_non_all.query('Type == "Agricultural Management"')
-        bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"')
-
 
         # ---------------- (GBF3-IBRA) Ranking  ----------------
-        bio_rank_total = bio_df_non_all\
+        bio_rank_total = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
             .groupby(['Year', 'region'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -2888,9 +3297,9 @@ def process_biodiversity_data(files, SAVE_DIR):
         # ---------------- (GBF3-IBRA) Overview  ----------------
 
         # sum
-        bio_df_target = bio_df_non_all.groupby(['Year', 'species'])[['Target_by_Percent']].agg('first').reset_index()
+        bio_df_target = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').groupby(['Year', 'species'])[['Target_by_Percent']].agg('first').reset_index()
 
-        df_region = bio_df_non_all\
+        df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
             .groupby(['Year', 'region', 'Type'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -2916,7 +3325,7 @@ def process_biodiversity_data(files, SAVE_DIR):
 
 
         # ag
-        df_region = bio_df_ag_non_all\
+        df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Agricultural Land-use"')\
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -2944,7 +3353,7 @@ def process_biodiversity_data(files, SAVE_DIR):
 
 
         # am
-        df_region = bio_df_am_non_all\
+        df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Agricultural Management"')\
             .groupby(['Year', 'region', 'Agricultural Management'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -2969,7 +3378,7 @@ def process_biodiversity_data(files, SAVE_DIR):
 
 
         # non-ag
-        df_region = bio_df_nonag\
+        df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Non-Agricultural Land-use"')\
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -3029,7 +3438,7 @@ def process_biodiversity_data(files, SAVE_DIR):
 
 
         # ---------------- (GBF3-IBRA) - Am  ----------------
-        bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL"').copy()
+        bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` != "ALL"').copy()
 
         df_wide = bio_df_am\
             .groupby(['region', 'species', 'Water_supply', 'Agricultural Management', 'Landuse'])[['Year', 'Value (%)']]\
@@ -3039,11 +3448,9 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_wide['type'] = 'column'
         df_wide['color'] = df_wide.apply(lambda x: COLORS[x['name']], axis=1)
 
-        df_wide_all_am = bio_df_am\
-            .groupby(['region', 'species', 'Water_supply', 'Landuse', 'Year'])[['Value (%)']]\
-            .sum(numeric_only=True)\
-            .reset_index()\
-            .groupby(['region', 'species', 'Water_supply', 'Landuse'])[['Year','Value (%)']]\
+        df_wide_all_am = bio_df\
+            .query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` == "ALL"')\
+            .groupby(['region', 'species', 'Water_supply', 'Landuse'])[['Year', 'Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
             .reset_index()
 
@@ -3074,9 +3481,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             f.write(';\n')
 
         # ---------------- (GBF3-IBRA) - Non-Ag  ----------------
-        bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"').copy()
-
-        df_wide = bio_df_nonag\
+        df_wide = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Non-Agricultural Land-use"')\
             .groupby(['region', 'species', 'Landuse'])[['Year', 'Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
             .reset_index()
@@ -3115,13 +3520,8 @@ def process_biodiversity_data(files, SAVE_DIR):
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)'})\
             .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
             .round(6)
-        bio_df_non_all = bio_df.query('Water_supply != "ALL" and Landuse != "ALL"')
-        bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural Land-use"')
-        bio_df_am_non_all = bio_df_non_all.query('Type == "Agricultural Management"')
-        bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"')
-
         # ---------------- (GBF4 SNES) Ranking  ----------------
-        bio_rank_total = bio_df_non_all\
+        bio_rank_total = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
             .groupby(['Year', 'region'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -3144,7 +3544,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         # ---------------- (GBF4 SNES) Overview  ----------------
 
         # sum
-        df_region = bio_df_non_all\
+        df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
             .groupby(['Year', 'region', 'Type'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -3168,7 +3568,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             f.write(';\n')
 
         # ag
-        df_region = bio_df_ag_non_all\
+        df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Agricultural Land-use"')\
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -3195,7 +3595,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             f.write(';\n')
 
         # am
-        df_region = bio_df_am_non_all\
+        df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Agricultural Management"')\
             .groupby(['Year', 'region', 'Agricultural Management'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -3219,7 +3619,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             f.write(';\n')
 
         # non-ag
-        df_region = bio_df_nonag\
+        df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Non-Agricultural Land-use"')\
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -3277,7 +3677,7 @@ def process_biodiversity_data(files, SAVE_DIR):
 
 
         # ---------------- (GBF4 SNES) Agricultural Management  ----------------
-        bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL"').copy()
+        bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` != "ALL"').copy()
 
         df_wide = bio_df_am\
             .groupby(['region', 'species', 'Water_supply', 'Agricultural Management', 'Landuse'])[['Year', 'Value (%)']]\
@@ -3287,11 +3687,9 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_wide['type'] = 'column'
         df_wide['color'] = df_wide.apply(lambda x: COLORS[x['name']], axis=1)
 
-        df_wide_all_am = bio_df_am\
-            .groupby(['region', 'species', 'Water_supply', 'Landuse', 'Year'])[['Value (%)']]\
-            .sum(numeric_only=True)\
-            .reset_index()\
-            .groupby(['region', 'species', 'Water_supply', 'Landuse'])[['Year','Value (%)']]\
+        df_wide_all_am = bio_df\
+            .query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` == "ALL"')\
+            .groupby(['region', 'species', 'Water_supply', 'Landuse'])[['Year', 'Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
             .reset_index()
 
@@ -3322,9 +3720,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             f.write(';\n')
 
         # ---------------- (GBF4 SNES) Non-ag  ----------------
-        bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"').copy()
-
-        df_wide = bio_df_nonag\
+        df_wide = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Non-Agricultural Land-use"')\
             .groupby(['region', 'species', 'Landuse'])[['Year', 'Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
             .reset_index()
@@ -3361,14 +3757,8 @@ def process_biodiversity_data(files, SAVE_DIR):
             .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
             .round(6)
 
-        bio_df_non_all = bio_df.query('Water_supply != "ALL" and Landuse != "ALL"')
-        bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural Land-use"')
-        bio_df_am_non_all = bio_df_non_all.query('Type == "Agricultural Management"')
-        bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"')
-
-
         # ---------------- (GBF4 ECNES) Ranking  ----------------
-        bio_rank_total = bio_df_non_all\
+        bio_rank_total = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
             .groupby(['Year', 'region'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -3389,7 +3779,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         # ---------------- (GBF4 ECNES) Overview  ----------------
 
         # sum
-        df_region = bio_df_non_all\
+        df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
             .groupby(['Year', 'region', 'Type'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -3413,7 +3803,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             f.write(';\n')
 
         # ag
-        df_region = bio_df_ag_non_all\
+        df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Agricultural Land-use"')\
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -3440,7 +3830,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             f.write(';\n')
 
         # am
-        df_region = bio_df_am_non_all\
+        df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Agricultural Management"')\
             .groupby(['Year', 'region', 'Agricultural Management'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -3464,7 +3854,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             f.write(';\n')
 
         # non-ag
-        df_region = bio_df_nonag\
+        df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Non-Agricultural Land-use"')\
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -3522,7 +3912,7 @@ def process_biodiversity_data(files, SAVE_DIR):
 
 
         # ---------------- (GBF4 ECNES) Agricultural Management  ----------------
-        bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL"').copy()
+        bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` != "ALL"').copy()
 
         df_wide = bio_df_am\
             .groupby(['region', 'species', 'Water_supply', 'Agricultural Management', 'Landuse'])[['Year', 'Value (%)']]\
@@ -3532,11 +3922,9 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_wide['type'] = 'column'
         df_wide['color'] = df_wide.apply(lambda x: COLORS[x['name']], axis=1)
 
-        df_wide_all_am = bio_df_am\
-            .groupby(['region', 'species', 'Water_supply', 'Landuse', 'Year'])[['Value (%)']]\
-            .sum(numeric_only=True)\
-            .reset_index()\
-            .groupby(['region', 'species', 'Water_supply', 'Landuse'])[['Year','Value (%)']]\
+        df_wide_all_am = bio_df\
+            .query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` == "ALL"')\
+            .groupby(['region', 'species', 'Water_supply', 'Landuse'])[['Year', 'Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
             .reset_index()
 
@@ -3567,9 +3955,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             f.write(';\n')
 
         # ---------------- (GBF4 ECNES) Non-ag  ----------------
-        bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"').copy()
-
-        df_wide = bio_df_nonag\
+        df_wide = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Non-Agricultural Land-use"')\
             .groupby(['region', 'species', 'Landuse'])[['Year', 'Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
             .reset_index()
@@ -3613,13 +3999,8 @@ def process_biodiversity_data(files, SAVE_DIR):
             .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
             .round(6)
 
-        bio_df_non_all = bio_df.query('Water_supply != "ALL" and Landuse != "ALL"')
-        bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural Land-use"')
-        bio_df_am_non_all = bio_df_non_all.query('Type == "Agricultural Management"')
-        bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"')
-
         # ---------------- (GBF8 SPECIES) Ranking  ----------------
-        bio_rank_total = bio_df_non_all\
+        bio_rank_total = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
             .groupby(['Year', 'region'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -3640,7 +4021,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         # ---------------- (GBF8 SPECIES) Overview  ----------------
 
         # sum
-        df_region = bio_df_non_all\
+        df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
             .groupby(['Year', 'region', 'Type'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -3663,7 +4044,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             f.write(';\n')
 
         # ag
-        df_region = bio_df_ag_non_all\
+        df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Agricultural Land-use"')\
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -3690,7 +4071,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             f.write(';\n')
 
         # am
-        df_region = bio_df_am_non_all\
+        df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Agricultural Management"')\
             .groupby(['Year', 'region', 'Agricultural Management'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -3713,7 +4094,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             f.write(';\n')
 
         # non-ag
-        df_region = bio_df_nonag\
+        df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Non-Agricultural Land-use"')\
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -3771,7 +4152,7 @@ def process_biodiversity_data(files, SAVE_DIR):
 
 
         # ---------------- (GBF8 SPECIES) Agricultural Management  ----------------
-        bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL"').copy()
+        bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` != "ALL"').copy()
 
         df_wide = bio_df_am\
             .groupby(['region', 'species', 'Water_supply', 'Agricultural Management', 'Landuse'])[['Year', 'Value (%)']]\
@@ -3781,11 +4162,9 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_wide['type'] = 'column'
         df_wide['color'] = df_wide.apply(lambda x: COLORS[x['name']], axis=1)
 
-        df_wide_all_am = bio_df_am\
-            .groupby(['region', 'species', 'Water_supply', 'Landuse', 'Year'])[['Value (%)']]\
-            .sum(numeric_only=True)\
-            .reset_index()\
-            .groupby(['region', 'species', 'Water_supply', 'Landuse'])[['Year','Value (%)']]\
+        df_wide_all_am = bio_df\
+            .query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` == "ALL"')\
+            .groupby(['region', 'species', 'Water_supply', 'Landuse'])[['Year', 'Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
             .reset_index()
 
@@ -3816,9 +4195,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             f.write(';\n')
 
         # ---------------- (GBF8 SPECIES) Non-ag  ----------------
-        bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"').copy()
-
-        df_wide = bio_df_nonag\
+        df_wide = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Non-Agricultural Land-use"')\
             .groupby(['region', 'species', 'Landuse'])[['Year', 'Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
             .reset_index()
@@ -3854,13 +4231,8 @@ def process_biodiversity_data(files, SAVE_DIR):
             .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
             .round(6)
 
-        bio_df_non_all = bio_df.query('Water_supply != "ALL" and Landuse != "ALL"')
-        bio_df_ag_non_all = bio_df_non_all.query('Type == "Agricultural Land-use"')
-        bio_df_am_non_all = bio_df_non_all.query('Type == "Agricultural Management"')
-        bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"')
-
         # ---------------- (GBF8 GROUP) Ranking  ----------------
-        bio_rank_total = bio_df_non_all\
+        bio_rank_total = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
             .groupby(['Year', 'region'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -3881,7 +4253,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         # ---------------- (GBF8 GROUP) Overview  ----------------
 
         # sum
-        df_region = bio_df_non_all\
+        df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
             .groupby(['Year', 'region', 'Type'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -3904,7 +4276,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             f.write(';\n')
 
         # ag
-        df_region = bio_df_ag_non_all\
+        df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Agricultural Land-use"')\
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -3931,7 +4303,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             f.write(';\n')
 
         # am
-        df_region = bio_df_am_non_all\
+        df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Agricultural Management"')\
             .groupby(['Year', 'region', 'Agricultural Management'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -3954,7 +4326,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             f.write(';\n')
 
         # non-ag
-        df_region = bio_df_nonag\
+        df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Non-Agricultural Land-use"')\
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -4012,7 +4384,7 @@ def process_biodiversity_data(files, SAVE_DIR):
 
 
         # ---------------- (GBF8 GROUP) Agricultural Management  ----------------
-        bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL"').copy()
+        bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` != "ALL"').copy()
 
         df_wide = bio_df_am\
             .groupby(['region', 'species', 'Water_supply', 'Agricultural Management', 'Landuse'])[['Year', 'Value (%)']]\
@@ -4022,11 +4394,9 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_wide['type'] = 'column'
         df_wide['color'] = df_wide.apply(lambda x: COLORS[x['name']], axis=1)
 
-        df_wide_all_am = bio_df_am\
-            .groupby(['region', 'species', 'Water_supply', 'Landuse', 'Year'])[['Value (%)']]\
-            .sum(numeric_only=True)\
-            .reset_index()\
-            .groupby(['region', 'species', 'Water_supply', 'Landuse'])[['Year','Value (%)']]\
+        df_wide_all_am = bio_df\
+            .query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` == "ALL"')\
+            .groupby(['region', 'species', 'Water_supply', 'Landuse'])[['Year', 'Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
             .reset_index()
 
@@ -4057,9 +4427,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             f.write(';\n')
 
         # ---------------- (GBF8 GROUP) Non-ag  ----------------
-        bio_df_nonag = bio_df_non_all.query('Type == "Non-Agricultural Land-use"').copy()
-
-        df_wide = bio_df_nonag\
+        df_wide = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Non-Agricultural Land-use"')\
             .groupby(['region', 'species', 'Landuse'])[['Year', 'Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
             .reset_index()

@@ -69,7 +69,7 @@ def map2base64(
             'legend': legend['legend'],
         }
     else:
-        # Map values to color codes: positives → red (51–100), negatives → blue (1–50), zeros → grey (0)
+        # Rescale layers using the provided magnitude: positives → red (51–100), negatives → blue (1–50)
         global_min, global_max = layer_magnitude
         vals = arr_sel.values.copy()
         codes = np.full(vals.shape, 0, dtype=np.int8)  # default: no-data grey
@@ -79,8 +79,6 @@ def map2base64(
         if global_min < 0:
             codes[vals < 0] = np.clip(50 + (vals[vals < 0] / abs(global_min)) * 50, 1, 49)
         
-        # Set values in the range [48,52) to 0 (grey) to avoid color confusion around zero 
-        codes[(codes >= 48) & (codes <= 52)] = 0
 
         arr_sel.values = codes
         min_max = (global_min, global_max)
@@ -122,57 +120,65 @@ def get_map2json(
     save_path:str, 
     ) -> None:
     
-    # Determine number of workers based on max memory setting
-    #    The MEM for RESFACTOR=13 is ~0.5 GB, so scale accordingly
-    workers = (settings.WRITE_REPORT_MAX_MEM_GB) // (0.5 * (13/settings.RESFACTOR)**2)
-    workers = max(4, int(workers))      # At least 4 workers
-    workers = min(workers, 32)          # At most 32 workers
+    # Determine number of workers from memory budget.
+    ncells = 5_000_000 // (settings.RESFACTOR ** 2)    # Number of cells in resfactored layer.
+    mem_per_worker = 1000 * ncells * 4 / 1e9           # ~1000 layers × ncells × float32, in GB
+    workers = min(60, max(1, int(settings.WRITE_REPORT_MAX_MEM_GB // mem_per_worker)))
     
-    # Loop through each year
-    tasks = []
+    # Process one file at a time so only one file's arrays are in memory at once
+    output = {}
     for _,row in files_df.iterrows():
-        
-        xr_arr = cfxr.decode_compress_to_multi_index(xr.load_dataset(row['path'], chunks={}), 'layer')['data']
+
+        xr_arr = cfxr.decode_compress_to_multi_index(xr.open_dataset(row['path']), 'layer')['data']
         ds_template = f'{os.path.dirname(row['path'])}/xr_map_template_{row['Year']}.nc'
         valid_layers = xr_arr['layer'].to_index().to_frame().to_dict(orient='records')
-        
-        for sel in valid_layers:
-            
-            # Select the array for this layer
-            arr_sel = xr_arr.sel(**sel)
-            sel_rename = rename_reorder_hierarchy(sel)
-            hierarchy_tp = tuple(list(sel_rename.values()) + [row['Year']])
 
-            # Determine if this layer should use integer legend
-            if legend_int_level is None:
-                isInt = False
-            elif isinstance(legend_int_level, dict):
-                isInt = legend_int_level.items() <= sel.items()
-            elif isinstance(legend_int_level, str):
-                isInt = legend_int_level in sel.keys()
-            else:
-                raise ValueError('legend_int_level must be None, a dict, or a str')
+        # Build tasks in batches to avoid OOM when there are many layers
+        # (e.g. GBF4 ECNES: 92 communities × 30 land-use combos = ~2700 layers).
+        # Each batch creates only `workers` cell-array copies at a time.
+        for batch_start in range(0, len(valid_layers), workers):
+            batch_layers = valid_layers[batch_start : batch_start + workers]
+            tasks = []
 
-            # Set legend and metadata based on type
-            if isInt:
-                legend = legend_int
-                layer_magnitude = None
-            elif isinstance(float_magnitude, dict):
-                legend = legend_float
-                layer_magnitude = float_magnitude[sel['Commodity']]
-            elif isinstance(float_magnitude, tuple):
-                legend = legend_float
-                layer_magnitude = float_magnitude
-            
-            tasks.append(
-                delayed(map2base64)(ds_template, arr_sel, isInt, legend, hierarchy_tp, layer_magnitude)
-            )    
-            
-    # Gather results and save to JSON
-    output = {}
-    for res in Parallel(n_jobs=workers, return_as='generator')(tasks):
-        hierarchy_tp, val_dict = res
-        output[hierarchy_tp] = val_dict
+            for sel in batch_layers:
+
+                # Select the array for this layer; .copy() detaches from the parent
+                # so joblib only serializes the small slice, not the full dataset
+                arr_sel = xr_arr.sel(**sel).copy()
+                sel_rename = rename_reorder_hierarchy(sel)
+                hierarchy_tp = tuple(list(sel_rename.values()) + [row['Year']])
+
+                # Determine if this layer should use integer legend
+                if legend_int_level is None:
+                    isInt = False
+                elif isinstance(legend_int_level, dict):
+                    isInt = legend_int_level.items() <= sel.items()
+                elif isinstance(legend_int_level, str):
+                    isInt = legend_int_level in sel.keys()
+                else:
+                    raise ValueError('legend_int_level must be None, a dict, or a str')
+
+                # Set legend and metadata based on type
+                if isInt:
+                    legend = legend_int
+                    layer_magnitude = None
+                elif isinstance(float_magnitude, dict):
+                    legend = legend_float
+                    layer_magnitude = float_magnitude[sel['Commodity']]
+                elif isinstance(float_magnitude, tuple):
+                    legend = legend_float
+                    layer_magnitude = float_magnitude
+
+                tasks.append(
+                    delayed(map2base64)(ds_template, arr_sel, isInt, legend, hierarchy_tp, layer_magnitude)
+                )
+
+            # Run this batch, then release its arrays before building the next batch
+            for res in Parallel(n_jobs=workers, return_as='generator', max_nbytes=None)(tasks):
+                hierarchy_tp, val_dict = res
+                output[hierarchy_tp] = val_dict
+
+        xr_arr.close()
         
     # To nested dict
     output = tuple_dict_to_nested(output)
@@ -323,7 +329,11 @@ def save_report_layer(raw_data_dir:str):
         bio_GBF2_nonag = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_non_ag"')
         get_map2json(bio_GBF2_nonag, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF2_NonAg.js')
         print('│   ├── Biodiversity GBF2 Non-Ag layer saved.')
-        
+
+        bio_GBF2_sum = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_sum"')
+        get_map2json(bio_GBF2_sum, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Sum.js')
+        print('│   ├── Biodiversity GBF2 Sum layer saved.')
+
     # TODO: need to create cell magnitude and determine colorbar limit for these GBF layers.
     # Now just use the quality magnitude, which could be incorrect for specific GBFs.
 
@@ -435,8 +445,8 @@ def save_report_layer(raw_data_dir:str):
         *cell_magnitudes['Economics_ag']['ag2ag_cost'],
         *cell_magnitudes['Economics_ag']['non_ag2ag_cost'],
         *cell_magnitudes['Economics_am']['am_transition'],
-        *cell_magnitudes['Economics_non_ag']['non_ag_to_non_ag_cost'],
-        *cell_magnitudes['Economics_non_ag']['non_ag_to_ag_cost']
+        *cell_magnitudes['Economics_non_ag']['nonag2nonag_cost'],
+        *cell_magnitudes['Economics_non_ag']['ag2nonag_cost']
     )
     
     economic_min_max_ag = (min(ecnomic_magnitudes_ag), max(ecnomic_magnitudes_ag))
@@ -456,6 +466,13 @@ def save_report_layer(raw_data_dir:str):
     profit_nonag = files.query('base_name == "xr_economics_non_ag_profit"')
     get_map2json(profit_nonag, None, None, legend_float, economic_min_max_nonag, f'{SAVE_DIR}/map_layers/map_economics_NonAg_profit.js')
     print('│   ├── Economics NonAg profit layer saved.')
+
+    # Sum profit (Ag + Am + NonAg)
+    economic_magnitudes_sum = cell_magnitudes.get('Economics_sum', {}).get('sum_profit', [0.0, 0.0])
+    economic_min_max_sum = (min(economic_magnitudes_sum), max(economic_magnitudes_sum))
+    profit_sum = files.query('base_name == "xr_economics_sum_profit"')
+    get_map2json(profit_sum, None, None, legend_float, economic_min_max_sum, f'{SAVE_DIR}/map_layers/map_economics_Sum_profit.js')
+    print('│   ├── Economics Sum profit layer saved.')
 
 
     # ---------------- Revenue ----------------
@@ -487,19 +504,27 @@ def save_report_layer(raw_data_dir:str):
 
 
     # ---------------- Transition Cost ----------------
-    cost_trans_ag2ag = files.query('base_name == "xr_economics_ag_transition_ag2ag"')
+    cost_trans_ag2ag = files.query('base_name == "xr_economics_ag_transition_Ag2Ag"')
     get_map2json(cost_trans_ag2ag, None, None, legend_float, economic_min_max_ag, f'{SAVE_DIR}/map_layers/map_economics_Ag_transition_ag2ag.js')
     print('│   ├── Economics Ag transition ag2ag layer saved.')
 
-    cost_trans_ag2nonag = files.query('base_name == "xr_economics_ag_transition_non_ag2ag"')
-    get_map2json(cost_trans_ag2nonag, None, None, legend_float, economic_min_max_nonag, f'{SAVE_DIR}/map_layers/map_economics_Ag_transition_ag2nonag.js')
-    print('│   ├── Economics Ag transition ag2nonag layer saved.')
+    cost_trans_nonag2ag = files.query('base_name == "xr_economics_ag_transition_NonAg2Ag"')
+    get_map2json(cost_trans_nonag2ag, None, None, legend_float, economic_min_max_ag, f'{SAVE_DIR}/map_layers/map_economics_Ag_transition_nonag2ag.js')
+    print('│   ├── Economics Ag transition nonag2ag layer saved.')
+
+    cost_trans_ag2nonag = files.query('base_name == "xr_economics_non_ag_transition_Ag2NonAg"')
+    get_map2json(cost_trans_ag2nonag, None, None, legend_float, economic_min_max_nonag, f'{SAVE_DIR}/map_layers/map_economics_NonAg_transition_ag2non_ag.js')
+    print('│   ├── Economics NonAg transition ag2nonag layer saved.')
+
+    cost_trans_nonag2nonag = files.query('base_name == "xr_economics_non_ag_transition_NonAg2NonAg"')
+    get_map2json(cost_trans_nonag2nonag, None, None, legend_float, economic_min_max_nonag, f'{SAVE_DIR}/map_layers/map_economics_NonAg_transition_nonag2nonag.js')
+    print('│   ├── Economics NonAg transition nonag2nonag layer saved.')
 
     # AgMgt has 0 transition cost, so skipping
     # cost_ag_man = files.query('base_name == "xr_economics_am_transition"')
 
     # Non-Ag to Ag transition cost is not allowed, so skipping
-    # cost_trans_nonag2ag = files.query('base_name == "xr_economics_non_ag_transition_non_ag2ag"')
+    # cost_trans_nonag2ag = files.query('base_name == "xr_economics_non_ag_transition_NonAg2NonAg"')
     
     
 
@@ -515,8 +540,9 @@ def save_report_layer(raw_data_dir:str):
         *cell_magnitudes['ghg_emission']['non_ag'],
         *cell_magnitudes['ghg_emission']['ag_man'],
         # *cell_magnitudes['ghg_emission']['transition'],
+        *cell_magnitudes['ghg_emission'].get('sum', []),
     )
-    
+
     ghg_min_max = (min(ghg_magnitudes), max(ghg_magnitudes))
 
     ghg_ag = files_ghg.query('base_name == "xr_GHG_ag"')
@@ -530,6 +556,10 @@ def save_report_layer(raw_data_dir:str):
     ghg_nonag = files_ghg.query('base_name == "xr_GHG_non_ag"')
     get_map2json(ghg_nonag, None, None, legend_float, ghg_min_max, f'{SAVE_DIR}/map_layers/map_GHG_NonAg.js')
     print('│   ├── GHG Non-Ag layer saved.')
+
+    ghg_sum = files_ghg.query('base_name == "xr_GHG_sum"')
+    get_map2json(ghg_sum, None, None, legend_float, ghg_min_max, f'{SAVE_DIR}/map_layers/map_GHG_Sum.js')
+    print('│   ├── GHG Sum layer saved.')
 
 
 
@@ -553,6 +583,10 @@ def save_report_layer(raw_data_dir:str):
     quantities_nonag = files_quantities.query('base_name == "xr_quantities_non_agricultural"')
     get_map2json(quantities_nonag, legend_non_ag, {'Commodity':'ALL'}, legend_float, prod_min_max, f'{SAVE_DIR}/map_layers/map_quantities_NonAg.js')
     print('│   ├── Quantities Non-Ag layer saved.')
+
+    quantities_sum = files_quantities.query('base_name == "xr_quantities_sum"')
+    get_map2json(quantities_sum, legend_ag, {'Commodity':'ALL'}, legend_float, prod_min_max, f'{SAVE_DIR}/map_layers/map_quantities_Sum.js')
+    print('│   ├── Quantities Sum layer saved.')
 
 
 
@@ -582,9 +616,14 @@ def save_report_layer(raw_data_dir:str):
         *cell_magnitudes['water_yield']['ag'],
         *cell_magnitudes['water_yield']['non_ag'],
         *cell_magnitudes['water_yield']['am'],
+        *cell_magnitudes['water_yield']['sum'],
     )
 
     water_min_max = (min(water_magnitudes), max(water_magnitudes))
+
+    water_sum = files_water.query('base_name == "xr_water_yield_sum"')
+    get_map2json(water_sum, None, None, legend_float, water_min_max, f'{SAVE_DIR}/map_layers/map_water_yield_Sum.js')
+    print('│   ├── Water Yield Sum layer saved.')
 
     water_ag = files_water.query('base_name == "xr_water_yield_ag"')
     get_map2json(water_ag, None, None, legend_float, water_min_max, f'{SAVE_DIR}/map_layers/map_water_yield_Ag.js')
@@ -597,3 +636,6 @@ def save_report_layer(raw_data_dir:str):
     water_nonag = files_water.query('base_name == "xr_water_yield_non_ag"')
     get_map2json(water_nonag, None, None, legend_float, water_min_max, f'{SAVE_DIR}/map_layers/map_water_yield_NonAg.js')
     print('│   └── Water Yield Non-Ag layer saved.')
+    
+    
+    
