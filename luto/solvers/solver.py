@@ -261,15 +261,20 @@ class LutoSolver:
                         dry_lu_cells, self._input_data.savanna_eligible_r
                     )
 
+                # Headroom upper bound: per-cell fractional cap derived from
+                # remaining installable MW. None for non-renewable AMs -> ub=1.
+                headroom_ub_r = self._input_data.renewable_headroom_ub.get(am)
+
                 for r in dry_lu_cells:
                     dry_x_lb = (
                         0
                         if AG_MANAGEMENTS_REVERSIBLE[am]
                         else self._input_data.ag_man_lb_mrj[am][0, r, j]
                     )
+                    ub_dry = float(headroom_ub_r[r]) if headroom_ub_r is not None else 1.0
                     self.X_ag_man_dry_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
                         lb=dry_x_lb,
-                        ub=1,
+                        ub=ub_dry,
                         name=f"X_ag_man_dry_{am_name}_{j}_{r}".replace(" ", "_"),
                     )
                 
@@ -279,9 +284,10 @@ class LutoSolver:
                         if AG_MANAGEMENTS_REVERSIBLE[am]
                         else self._input_data.ag_man_lb_mrj[am][1, r, j]
                     )
+                    ub_irr = float(headroom_ub_r[r]) if headroom_ub_r is not None else 1.0
                     self.X_ag_man_irr_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
                         lb=irr_x_lb,
-                        ub=1,
+                        ub=ub_irr,
                         name=f"X_ag_man_irr_{am_name}_{j}_{r}".replace(" ", "_"),
                     )
 

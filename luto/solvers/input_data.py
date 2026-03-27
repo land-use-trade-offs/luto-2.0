@@ -78,6 +78,7 @@ class SolverInputData:
     
     renewable_solar_r: np.ndarray                                       # Renewable energy - solar yield matrix.
     renewable_wind_r: np.ndarray                                        # Renewable energy - wind yield matrix.
+    renewable_headroom_ub: dict[str, np.ndarray]                        # Per-cell fractional upper bounds derived from headroom rasters: {am_name -> [NCELLS]}.
     
     region_state_r: np.ndarray                                          # Region state index for each cell.
     region_state_name2idx: dict[str, int]                               # Map of region state names to indices.
@@ -469,6 +470,55 @@ def get_renewable_solar_r(data: Data, target_idx):
 def get_renewable_wind_r(data: Data, target_idx):
     print('Getting renewable energy - wind footprint matrix...', flush = True)
     return ag_quantity.get_quantity_renewable(data, 'Wind', target_idx)
+
+def get_renewable_headroom_ub(data: Data, target_idx: int) -> dict[str, np.ndarray]:
+    """
+    Task 6: Translate headroom_capacity_mw rasters into per-cell fractional upper
+    bounds for each renewable AM. Returned dict is sparse: only 'Utility Solar PV'
+    and 'Onshore Wind' are present; all other AMs default to ub=1 in the solver.
+
+    Formula (fully vectorised, no loops):
+        ub[r] = min(1.0,  headroom_mw[r] / (real_area[r] * MW_per_ha))
+
+    Edge cases:
+    - real_area == 0: denominator is 0 -> ub set to 0.0 (cell is masked, unreachable).
+    - Missing file (headroom == np.finfo(float32).max): result >> 1 -> clamped to 1.0.
+    """
+    if settings.RENEWABLE_ENERGY_CONSTRAINTS != 'on':
+        return {}
+
+    if 'headroom_capacity_mw' not in data.RENEWABLE_LAYERS:
+        return {}
+
+    yr_cal = data.YR_CAL_BASE + target_idx
+    real_area = data.REAL_AREA  # shape [NCELLS]
+
+    # Map from LUTO AM name -> (Type coord in DataArray, MW/ha density)
+    tech_map = {
+        'Utility Solar PV': ('Utility Solar PV', settings.INSTALL_CAPACITY_MW_HA['Utility Solar PV']),
+        'Onshore Wind':     ('Wind',              settings.INSTALL_CAPACITY_MW_HA['Onshore Wind']),
+    }
+
+    result = {}
+    for am_name, (type_coord, mw_per_ha) in tech_map.items():
+        headroom_mw = data.RENEWABLE_LAYERS['headroom_capacity_mw'].sel(
+            Type=type_coord, year=yr_cal
+        ).data.astype(np.float64)  # float64 to avoid overflow near finfo(float32).max
+
+        denominator = real_area.astype(np.float64) * mw_per_ha
+
+        # Safe divide: where denominator == 0 yield 0.0 (masked cell)
+        ub = np.where(
+            denominator > 0,
+            np.divide(headroom_mw, denominator,
+                      where=denominator > 0,
+                      out=np.zeros_like(headroom_mw)),
+            0.0
+        )
+        ub = np.minimum(ub, 1.0).astype(np.float32)
+        result[am_name] = ub
+
+    return result
 
 def get_region_state_r(data: Data):
     print('Getting region state index for each cell...', flush = True)
@@ -909,6 +959,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     
     renewable_solar_r=get_renewable_solar_r(data, target_index)
     renewable_wind_r=get_renewable_wind_r(data, target_index)
+    renewable_headroom_ub=get_renewable_headroom_ub(data, target_index)
     
     region_state_r = get_region_state_r(data)
     region_state_name2idx = get_region_state_name2idx(data)
@@ -1063,6 +1114,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         
         renewable_solar_r,
         renewable_wind_r,
+        renewable_headroom_ub,
         
         region_state_r,
         region_state_name2idx,
