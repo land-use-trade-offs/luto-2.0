@@ -473,27 +473,32 @@ def get_renewable_wind_r(data: Data, target_idx):
 
 def get_renewable_headroom_ub(data: Data, target_idx: int) -> dict[str, np.ndarray]:
     """
-    Task 6: Translate headroom_capacity_mw rasters into per-cell fractional upper
-    bounds for each renewable AM. Returned dict is sparse: only 'Utility Solar PV'
-    and 'Onshore Wind' are present; all other AMs default to ub=1 in the solver.
+    Dynamically calculate per-cell fractional upper bounds for renewable AM
+    decision variables from the already-loaded baseline_capacity_mw data.
 
-    Formula (fully vectorised, no loops):
-        ub[r] = min(1.0,  headroom_mw[r] / (real_area[r] * MW_per_ha))
+    Formula (fully vectorised):
+        max_capacity_mw[r] = real_area[r] * INSTALL_CAPACITY_MW_HA[tech]
+        ub[r] = 1.0 - (baseline_capacity_mw[r] / max_capacity_mw[r])
 
-    Edge cases:
-    - real_area == 0: denominator is 0 -> ub set to 0.0 (cell is masked, unreachable).
-    - Missing file (headroom == np.finfo(float32).max): result >> 1 -> clamped to 1.0.
+    Edge cases handled:
+    - max_capacity_mw == 0 (zero real_area): safe divide yields 0.0 (cell is masked).
+    - baseline == 0 (pre-2025 or missing data): ub evaluates to 1.0 (fully available).
+    - Float artifacts where baseline > max: ub is clamped to [0.0, 1.0].
+
+    Returns a sparse dict keyed by AM name ('Utility Solar PV', 'Onshore Wind').
+    Non-renewable AMs are absent and default to ub=1 in the solver.
     """
     if settings.RENEWABLE_ENERGY_CONSTRAINTS != 'on':
         return {}
 
-    if 'headroom_capacity_mw' not in data.RENEWABLE_LAYERS:
+    if 'baseline_capacity_mw' not in data.RENEWABLE_LAYERS:
         return {}
 
     yr_cal = data.YR_CAL_BASE + target_idx
-    real_area = data.REAL_AREA  # shape [NCELLS]
+    # float64 throughout to avoid precision loss in the division
+    real_area = data.REAL_AREA.astype(np.float64)
 
-    # Map from LUTO AM name -> (Type coord in DataArray, MW/ha density)
+    # AM name -> (DataArray Type coord, MW/ha install density)
     tech_map = {
         'Utility Solar PV': ('Utility Solar PV', settings.INSTALL_CAPACITY_MW_HA['Utility Solar PV']),
         'Onshore Wind':     ('Wind',              settings.INSTALL_CAPACITY_MW_HA['Onshore Wind']),
@@ -501,21 +506,23 @@ def get_renewable_headroom_ub(data: Data, target_idx: int) -> dict[str, np.ndarr
 
     result = {}
     for am_name, (type_coord, mw_per_ha) in tech_map.items():
-        headroom_mw = data.RENEWABLE_LAYERS['headroom_capacity_mw'].sel(
+        baseline_mw = data.RENEWABLE_LAYERS['baseline_capacity_mw'].sel(
             Type=type_coord, year=yr_cal
-        ).data.astype(np.float64)  # float64 to avoid overflow near finfo(float32).max
+        ).data.astype(np.float64)
 
-        denominator = real_area.astype(np.float64) * mw_per_ha
+        max_capacity_mw = real_area * mw_per_ha   # [NCELLS], zero where cell is masked
 
-        # Safe divide: where denominator == 0 yield 0.0 (masked cell)
-        ub = np.where(
-            denominator > 0,
-            np.divide(headroom_mw, denominator,
-                      where=denominator > 0,
-                      out=np.zeros_like(headroom_mw)),
+        # Safe divide: cells with zero max capacity get fraction=0 (unreachable by solver)
+        fraction_used = np.where(
+            max_capacity_mw > 0,
+            np.divide(baseline_mw, max_capacity_mw,
+                      where=max_capacity_mw > 0,
+                      out=np.zeros_like(baseline_mw)),
             0.0
         )
-        ub = np.minimum(ub, 1.0).astype(np.float32)
+
+        # ub = remaining fraction; clamp to [0, 1] to absorb float artefacts
+        ub = np.clip(1.0 - fraction_used, 0.0, 1.0).astype(np.float32)
         result[am_name] = ub
 
     return result
