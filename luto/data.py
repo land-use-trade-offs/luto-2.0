@@ -794,6 +794,70 @@ class Data:
                 dim='year'
             )
 
+            # --- Task 1: Load Exogenous Baseline Renewable Capacities ---
+            print("│   ├── Loading exogenous baseline renewable capacities", flush=True)
+            
+            tech_file_map = {
+                'Utility Solar PV': 'Solar_PV',
+                'Wind': 'Wind_Onshore'
+            }
+            
+            baseline_das = []
+            
+            for tech_name, file_suffix in tech_file_map.items():
+                yearly_data = []
+                for yr_idx, yr in enumerate(settings.SIM_YEARS):
+                    
+                    if yr < 2025:
+                        masked_arr = np.zeros(self.NCELLS, dtype=np.float32)
+                    else:
+                        target_yr = min(yr, 2030) 
+                        tif_path = os.path.join(settings.INPUT_DIR, f"LUTO2_Baseline_{file_suffix}_{target_yr}.tif")
+                        
+                        if yr >= 2030 and not os.path.exists(tif_path):
+                            target_yr = 2029
+                            tif_path = os.path.join(settings.INPUT_DIR, f"LUTO2_Baseline_{file_suffix}_{target_yr}.tif")
+                        
+                        if os.path.exists(tif_path):
+                            with rasterio.open(tif_path) as rst:
+                                arr = rst.read(1)
+                                if rst.meta['nodata'] is not None:
+                                    arr = np.where(arr == rst.meta['nodata'], 0, arr)
+                                
+                                if settings.RESFACTOR > 1:
+                                    res_factor = settings.RESFACTOR
+                                    h, w = arr.shape
+                                    
+                                    h_pad = (res_factor - h % res_factor) % res_factor
+                                    w_pad = (res_factor - w % res_factor) % res_factor
+                                    pad_arr = np.pad(arr, ((0, h_pad), (0, w_pad)), mode='constant')
+                                    
+                                    h_new = pad_arr.shape[0] // res_factor
+                                    w_new = pad_arr.shape[1] // res_factor
+                                    
+                                    sum_arr = pad_arr.reshape(h_new, res_factor, w_new, res_factor).sum(axis=(1, 3))
+                                    masked_arr = sum_arr[self.COORD_ROW_COL_RESFACTORED[0], self.COORD_ROW_COL_RESFACTORED[1]]
+                                else:
+                                    masked_arr = arr.flatten()[self.MASK]
+                        else:
+                            masked_arr = np.zeros(self.NCELLS, dtype=np.float32)
+
+                    yearly_data.append(masked_arr)
+
+                stacked = np.stack(yearly_data, axis=0)
+                
+                da = xr.DataArray(
+                    stacked,
+                    dims=['year', 'cell'],
+                    coords={'year': settings.SIM_YEARS, 'cell': self.RENEWABLE_LAYERS.coords['cell']}
+                )
+                
+                da = da.assign_coords(Type=tech_name)
+                baseline_das.append(da)
+
+            baseline_capacity_da = xr.concat(baseline_das, dim='Type')
+            self.RENEWABLE_LAYERS['baseline_capacity_mw'] = baseline_capacity_da
+
             # Renewable bundle data (productivity impacts, cost multipliers, etc)
             renewable_bundle = pd.read_csv(f'{settings.INPUT_DIR}/renewable_energy_bundle.csv')
             self.RENEWABLE_BUNDLE_WIND = renewable_bundle.query('Lever == "Onshore Wind"')

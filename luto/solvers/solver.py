@@ -782,14 +782,17 @@ class LutoSolver:
                     if not reg_AND_j_cells.size:continue
                     
                     am_exprs.append(
-                        gp.quicksum(self.X_ag_man_dry_vars_jr[am][j_idx, reg_AND_j_cells] * energy_r[reg_AND_j_cells])
-                        + gp.quicksum(self.X_ag_man_irr_vars_jr[am][j_idx, reg_AND_j_cells] * energy_r[reg_AND_j_cells])
+                        gp.quicksum(self.X_ag_man_dry_vars_jr[am][j_idx, reg_AND_j_cells] * energy_r['endogenous'][reg_AND_j_cells])
+                        + gp.quicksum(self.X_ag_man_irr_vars_jr[am][j_idx, reg_AND_j_cells] * energy_r['endogenous'][reg_AND_j_cells])
                     )
 
                 if am_exprs:
+                    reg_baseline_yield_rescaled = energy_r['exogenous'][reg_idx].sum()
+                    rhs_limit = target_rescal - reg_baseline_yield_rescaled
+                    
                     self.renewable_constraints[f'{limit_key}_{reg_name}'] = (
                         self.gurobi_model.addConstr(
-                            gp.quicksum(am_exprs) >= target_rescal,
+                            gp.quicksum(am_exprs) >= rhs_limit,
                             name=f"renewable_{limit_key}_target_{reg_name}".replace(" ", "_")
                         )
                     )

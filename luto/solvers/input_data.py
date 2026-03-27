@@ -464,13 +464,11 @@ def get_ag_man_lb_mrj(data: Data, base_year):
 
 def get_renewable_solar_r(data: Data, target_idx):
     print('Getting renewable energy - solar footprint matrix...', flush = True)
-    output = data.REAL_AREA.astype(np.float32)
-    return output
+    return ag_quantity.get_quantity_renewable(data, 'Utility Solar PV', target_idx)
 
 def get_renewable_wind_r(data: Data, target_idx):
     print('Getting renewable energy - wind footprint matrix...', flush = True)
-    output = data.REAL_AREA.astype(np.float32)
-    return output
+    return ag_quantity.get_quantity_renewable(data, 'Wind', target_idx)
 
 def get_region_state_r(data: Data):
     print('Getting region state index for each cell...', flush = True)

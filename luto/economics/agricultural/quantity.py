@@ -637,36 +637,57 @@ For renewable products, the quantity is calculated as:
 '''
 
 
-def get_quantity_renewable(data, re_type: str, yr_idx: int):
+def get_quantity_renewable(data, re_type: str, yr_idx: int) -> dict[str, np.ndarray]:
     """
-    Return electricity yield [MWh] for renewable product `pr`.
-    
-    Args:
-        data (object/module): Data object or module.
-        re_type (str): Renewable product that defined in settings.RENEWABLES_OPTIONS (e.g., 'Utility Solar PV').
-        yr_idx (int): Number of years post base-year ('YR_CAL_BASE').
+    Return electricity yield [MWh] for renewable product `re_type`.
+    Returns a dictionary isolating 'endogenous', 'exogenous', and 'total' generation.
     """
 
     if settings.RENEWABLE_ENERGY_CONSTRAINTS != 'on':
-        return np.zeros(data.NCELLS, dtype=np.float32)
+        return {
+            'endogenous': np.zeros(data.NCELLS, dtype=np.float32),
+            'exogenous': np.zeros(data.NCELLS, dtype=np.float32),
+            'total': np.zeros(data.NCELLS, dtype=np.float32)
+        }
 
     yr_cal = data.YR_CAL_BASE + yr_idx
 
-    if not re_type in settings.RENEWABLES_OPTIONS:
-        raise KeyError(f"Renewable re_typeoduct '{re_type}' not found in settings.RENEWABLES_OPTIONS.")
+    settings_re_type = 'Onshore Wind' if re_type == 'Wind' else re_type
 
-    re_lyr = data.RENEWABLE_LAYERS.sel(tech_name=re_type, year=yr_cal)
+    if not settings_re_type in settings.RENEWABLES_OPTIONS:
+        raise KeyError(f"Renewable product '{settings_re_type}' not found in settings.RENEWABLES_OPTIONS.")
+
+    re_lyr = data.RENEWABLE_LAYERS.sel(tech_name=settings_re_type, year=yr_cal)
     
-    capacity_factor_multiplier = re_lyr['capacity_factor_multiplier']
-    distribution_loss_factor_multiplier = re_lyr['distribution_loss_factor_multiplier']
-    yield_per_ha = (
-        settings.INSTALL_CAPACITY_MW_HA[re_type] 
-        * capacity_factor_multiplier            # Range 0-1, indicates how much installed capacity is converted to electricity on average over the year.
-        * distribution_loss_factor_multiplier   # Range 0-1, indicates how much electricity was sent to customers.
+    capacity_factor = re_lyr['capacity_factor_multiplier']
+    distribution_loss = re_lyr['distribution_loss_factor_multiplier']
+    endogenous_yield_per_ha = (
+        settings.INSTALL_CAPACITY_MW_HA[settings_re_type] 
+        * capacity_factor            # Range 0-1, indicates how much installed capacity is converted to electricity on average over the year.
+        * distribution_loss          # Range 0-1, indicates how much electricity was sent to customers.
         * 365 * 24
     )
 
-    quantity = yield_per_ha * data.REAL_AREA
-    
-    return quantity.data.astype(np.float32)
+    endogenous_quantity = endogenous_yield_per_ha * data.REAL_AREA
 
+    if 'baseline_capacity_mw' in data.RENEWABLE_LAYERS:
+        type_coord = 'Wind' if settings_re_type == 'Onshore Wind' else settings_re_type
+        baseline_mw = data.RENEWABLE_LAYERS['baseline_capacity_mw'].sel(Type=type_coord, year=yr_cal)
+        exogenous_quantity = (
+            baseline_mw
+            * capacity_factor            
+            * distribution_loss   
+            * 365 * 24
+        ).data
+    else:
+        exogenous_quantity = np.zeros(data.NCELLS, dtype=np.float32)
+
+    endogenous_quantity = endogenous_quantity.data.astype(np.float32)
+    exogenous_quantity = exogenous_quantity.astype(np.float32)
+    total_quantity = endogenous_quantity + exogenous_quantity
+    
+    return {
+        'endogenous': endogenous_quantity,
+        'exogenous': exogenous_quantity,
+        'total': total_quantity
+    }
