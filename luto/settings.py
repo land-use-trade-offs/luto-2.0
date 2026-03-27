@@ -401,6 +401,9 @@ Lower values = fewer cells excluded, higher values = more cells excluded.
 RENEWABLE_TARGET_SCENARIO_TARGETS = 'CNS - Accelerated Transition'
 '''
 The renewable energy target scenario to use when `RENEWABLE_ENERGY_CONSTRAINTS` is set to 'on'. One of
+ - AEMO 2026 ISP - Accelerated Transition
+ - AEMO 2026 ISP - Slower Growth
+ - AEMO 2026 ISP - Step Change
  - CNS - Accelerated Transition
  - CNS - Current Targets
  - Gladstone - Current Targets

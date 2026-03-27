@@ -174,7 +174,7 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 ### Renewable Energy Settings
 - `RENEWABLE_ENERGY_CONSTRAINTS`: Enable renewable energy generation targets ('on' or 'off')
 - `RENEWABLES_OPTIONS`: Renewable energy types: `['Utility Solar PV', 'Onshore Wind']`
-- `RENEWABLE_TARGET_SCENARIO`: Target scenario ('CNS25 - Accelerated Transition' or 'CNS25 - Current Targets')
+- `RENEWABLE_TARGET_SCENARIO`: Target scenario (one of: 'AEMO 2026 ISP - Accelerated Transition', 'AEMO 2026 ISP - Slower Growth', 'AEMO 2026 ISP - Step Change', 'CNS - Accelerated Transition', 'CNS - Current Targets', 'Gladstone - Current Targets')
 - `RE_TARGET_LEVEL`: Spatial level for constraints ('STATE' or 'NRM'; only STATE currently supported)
 - `INSTALL_CAPACITY_MW_HA`: Per-hectare capacity (MW/ha) per renewable type
 - `RENEWABLES_ADOPTION_LIMITS`: Maximum adoption fraction per type (default: 1.0 for both)
