@@ -28,7 +28,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/LUF_20260318_RE5_CORE"
+TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/LUF_20260323_CORE"
 
 
 # Set the grid search parameters
@@ -48,7 +48,7 @@ grid_search = {
     ###############################################################
     'OBJECTIVE': ['maxprofit'],                                             # 'maxprofit' or 'mincost'
     'RESFACTOR': [5],
-    'SIM_YEARS': [range(2020,2051,5)],                                      # 2010-2050 (2010 is base year; 2060 not yet supported)
+    'SIM_YEARS': [range(2020,2051,5)],                                      # 2010-2060 (2010 is base year)
     'WRITE_THREADS': [4],
     
  
@@ -60,7 +60,7 @@ grid_search = {
     # --------------- Scenarios ---------------
     'SSP': ['245'],                                                         # Core: SSP2-RCP4.5. Add '585' separately for higher climate impacts sensitivity (lower priority, LUF Report 2026)
     'CARBON_EFFECTS_WINDOW': [60],
-    'RISK_OF_REVERSAL': [0.05],                                             # Risk of reversal buffer under ERF (aligns with ACCU methods)
+    'RISK_OF_REVERSAL': [0],                                                # OFF per Third iteration (aligns with ACCU methods)
     'FIRE_RISK': ['med'],                                                   # Not effect as of 20260318 following decision to drop fire risk and just use the 5% ERF risk of reversal
     'CONVERGENCE': [2050],                                                  # Year at which dietary transformation is completed
     'CO2_FERT': ['off'],                                                    # 'on' or 'off'
@@ -108,12 +108,13 @@ grid_search = {
     
     # --------------- Biodiversity overall ---------------
     'BIO_QUALITY_LAYER': ['Suitability'],
-    'CONTRIBUTION_PERCENTILE': ['USER_DEFINED'],                            # 50th percentile of HCAS per LUF Report 2026 (was 'USER_DEFINED')
+    'CONTRIBUTION_PERCENTILE': ['USER_DEFINED'],                            # 50th percentile of HCAS per LUF Report 2026 (need to be 'USER_DEFINED', which is 50th percentile but with nudges for sheep/beef/dairy nat land)
+    'AG_UNIFORM_BIO_CONTRIBUTION': [0],                                     # Set the biodiversity degradation score for all agricultural land uses to be the same as unallocated natural land; test 0.7 and 0.9 alongside (Third iteration)
     'CONNECTIVITY_SOURCE': ['NCI'],
     'CONNECTIVITY_LB': [0.7],                                               # Connectivity score importance: 0.7 per LUF Report 2026
 
     # --------------- Biodiversity contribution parameters ---------------
-    'BIO_CONTRIBUTION_LDS': [0.7],                                          # Late dry season savanna fire regime (doc=0.7, default=0.8)
+    'BIO_CONTRIBUTION_LDS': [0.85, 0.8, 0.75],                              # Late dry season savanna fire regime; test [0.15,0.2,0.25] per Third iteration
     'BIO_CONTRIBUTION_ENV_PLANTING': [0.7],                                 # Environmental plantings (doc=0.7, default=0.8)
     'BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK': [0.12],                       # Carbon plantings block (doc=0.12, default=0.1)
     'BIO_CONTRIBUTION_CARBON_PLANTING_BELT': [0.12],                        # Carbon plantings belt (doc=0.12, default=0.1)
@@ -124,7 +125,7 @@ grid_search = {
     
     # --------------- Biodiversity settings - GBF 2 ---------------
     'BIODIVERSITY_TARGET_GBF_2': ['high'],                                  # 'off', 'low', 'medium', 'high'
-    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [15, 20, 25, 30],        # Core: 20% central; test [15,25,30] alongside (LUF Report 2026)
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [15, 20, 30],            # Core: 20% central; test [15,30] alongside (Third iteration)
     'GBF2_CONSTRAINT_TYPE': ['hard'],                                       # 'hard' or 'soft'
 
     # --------------- Biodiversity settings - GBF 3 ---------------
@@ -141,7 +142,10 @@ grid_search = {
     # --------------- Renewable energy ---------------
     # Core: RE OFF. REN1-REN4 are separate renewable energy scenario runs (not part of this grid search).
     # REN1: No GBF2 + RE ON; REN2: Core + RE ON; REN3: REN2 + GBF2 exclusion mask; REN4: REN3 + QLD EPBC MNES layer
-    'RENEWABLE_ENERGY_CONSTRAINTS': ['off'],                               # 'off'=core (LUF Report 2026); 'on' for REN1-REN4 scenarios
+    'RENEWABLES_OPTIONS':[{
+        'Utility Solar PV': False,                                          # OFF for core; ON for REN1-REN4
+        'Onshore Wind': False,                                              # OFF for core; ON for REN1-REN4
+    }],
     'RENEWABLE_TARGET_SCENARIO_TARGETS': ['Gladstone - Current Targets'],  # 'CNS - Accelerated Transition', 'CNS - Current Targets', 'Gladstone - Current Targets'
     
     

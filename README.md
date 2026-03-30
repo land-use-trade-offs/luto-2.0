@@ -231,7 +231,7 @@ settings.BIODIVERSITY_TARGET_GBF_8 = 'off'              # 'on' or 'off'
 
 settings.DYNAMIC_PRICE = False                          # Enable demand elasticity-based dynamic pricing
 
-settings.RENEWABLE_ENERGY_CONSTRAINTS = 'on'             # Enable renewable energy targets
+settings.RENEWABLES_OPTIONS = {'Utility Solar PV': True, 'Onshore Wind': True}  # Enable renewable energy types
 settings.RENEWABLE_TARGET_SCENARIO = 'CNS25 - Accelerated Transition'  # Target scenario
 
 # Load data with custom parameters
@@ -290,8 +290,7 @@ LUTO2 behavior can be customized through the `luto.settings` module. Key paramet
 - `BIODIVERSITY_TARGET_GBF_8`: Species and group targets ('on' or 'off')
 
 ### Renewable Energy Constraints
-- `RENEWABLE_ENERGY_CONSTRAINTS`: Enable/disable renewable energy generation targets ('on' or 'off')
-- `RENEWABLES_OPTIONS`: List of renewable energy types (`['Utility Solar PV', 'Onshore Wind']`)
+- `RENEWABLES_OPTIONS`: Dict of renewable energy types and whether each is enabled (e.g., `{'Utility Solar PV': True, 'Onshore Wind': True}`). Set values to `False` to disable individual types.
 - `RENEWABLE_TARGET_SCENARIO`: Target scenario ('CNS25 - Accelerated Transition' or 'CNS25 - Current Targets')
 - `RE_TARGET_LEVEL`: Spatial level for targets ('STATE' or 'NRM')
 - `INSTALL_CAPACITY_MW_HA`: Per-hectare generation capacity (MW/ha) for each renewable type

@@ -548,7 +548,7 @@ def get_utility_solar_pv_effect_q_mrp(data, q_mrp, yr_idx):
     # Initialize output matrix with dimensions (NLMS, NCELLS, NPRS)
     new_q_mrp = np.zeros((data.NLMS, data.NCELLS, data.NPRS)).astype(np.float32)
 
-    if settings.RENEWABLE_ENERGY_CONSTRAINTS != 'on':
+    if not settings.AG_MANAGEMENTS['Utility Solar PV']:
         return new_q_mrp
 
     # Iterate through land uses affected by Solar PV
@@ -576,7 +576,7 @@ def get_onshore_wind_effect_q_mrp(data, q_mrp, yr_idx):
     # Initialize output matrix with dimensions (NLMS, NCELLS, NPRS)
     new_q_mrp = np.zeros((data.NLMS, data.NCELLS, data.NPRS)).astype(np.float32)
 
-    if settings.RENEWABLE_ENERGY_CONSTRAINTS != 'on':
+    if not settings.AG_MANAGEMENTS['Onshore Wind']:
         return new_q_mrp
 
     for lu, j in zip(land_uses, lu_codes):
@@ -647,12 +647,9 @@ def get_quantity_renewable(data, re_type: str, yr_idx: int):
         yr_idx (int): Number of years post base-year ('YR_CAL_BASE').
     """
 
-    if settings.RENEWABLE_ENERGY_CONSTRAINTS != 'on':
-        return np.zeros(data.NCELLS, dtype=np.float32)
-
     yr_cal = data.YR_CAL_BASE + yr_idx
 
-    if not re_type in settings.RENEWABLES_OPTIONS:
+    if not re_type in settings.RENEWABLES_OPTIONS.keys():
         raise KeyError(f"Renewable re_typeoduct '{re_type}' not found in settings.RENEWABLES_OPTIONS.")
 
     re_lyr = data.RENEWABLE_LAYERS.sel(tech_name=re_type, year=yr_cal)

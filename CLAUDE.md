@@ -172,8 +172,7 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
   - `BIODIVERSITY_TARGET_GBF_8`: Species conservation targets ('on' or 'off')
 
 ### Renewable Energy Settings
-- `RENEWABLE_ENERGY_CONSTRAINTS`: Enable renewable energy generation targets ('on' or 'off')
-- `RENEWABLES_OPTIONS`: Renewable energy types: `['Utility Solar PV', 'Onshore Wind']`
+- `RENEWABLES_OPTIONS`: Dict controlling which renewable energy types are enabled, e.g. `{'Utility Solar PV': True, 'Onshore Wind': True}`. Set values to `False` to disable individual types. Also drives the corresponding `AG_MANAGEMENTS` entries.
 - `RENEWABLE_TARGET_SCENARIO`: Target scenario (one of: 'AEMO 2026 ISP - Accelerated Transition', 'AEMO 2026 ISP - Slower Growth', 'AEMO 2026 ISP - Step Change', 'CNS - Accelerated Transition', 'CNS - Current Targets', 'Gladstone - Current Targets')
 - `RE_TARGET_LEVEL`: Spatial level for constraints ('STATE' or 'NRM'; only STATE currently supported)
 - `INSTALL_CAPACITY_MW_HA`: Per-hectare capacity (MW/ha) per renewable type

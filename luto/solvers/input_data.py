@@ -682,25 +682,25 @@ def get_GBF2_mask_idx(data: Data) -> np.ndarray:
 
 
 def get_renewable_GBF2_mask_solar_idx(data: Data) -> np.ndarray:
-    if settings.RENEWABLE_ENERGY_CONSTRAINTS == 'off' or not settings.EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS:
+    if not any(settings.RENEWABLES_OPTIONS.values()) or not settings.EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS:
         return np.empty(0, dtype=int)
     return np.where(data.RENEWABLE_GBF2_MASK_SOLAR)[0]
 
 
 def get_renewable_GBF2_mask_wind_idx(data: Data) -> np.ndarray:
-    if settings.RENEWABLE_ENERGY_CONSTRAINTS == 'off' or not settings.EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS:
+    if not any(settings.RENEWABLES_OPTIONS.values()) or not settings.EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS:
         return np.empty(0, dtype=int)
     return np.where(data.RENEWABLE_GBF2_MASK_WIND)[0]
 
 
 def get_renewable_MNES_mask_solar_idx(data: Data) -> np.ndarray:
-    if settings.RENEWABLE_ENERGY_CONSTRAINTS == 'off' or not settings.EXCLUDE_RENEWABLES_IN_EPBC_MNES_MASK:
+    if not any(settings.RENEWABLES_OPTIONS.values()) or not settings.EXCLUDE_RENEWABLES_IN_EPBC_MNES_MASK:
         return np.empty(0, dtype=int)
     return np.where(data.RENEWABLE_MNES_MASK_SOLAR)[0]
 
 
 def get_renewable_MNES_mask_wind_idx(data: Data) -> np.ndarray:
-    if settings.RENEWABLE_ENERGY_CONSTRAINTS == 'off' or not settings.EXCLUDE_RENEWABLES_IN_EPBC_MNES_MASK:
+    if not any(settings.RENEWABLES_OPTIONS.values()) or not settings.EXCLUDE_RENEWABLES_IN_EPBC_MNES_MASK:
         return np.empty(0, dtype=int)
     return np.where(data.RENEWABLE_MNES_MASK_WIND)[0]
 
@@ -805,7 +805,7 @@ def get_limits(data: Data, yr_cal: int, resale_factors) -> dict[str, Any]:
         limits['ghg'] = data.GHG_TARGETS[yr_cal]
         limits['ghg_rescale'] = limits['ghg'] / resale_factors['GHG']
         
-    if settings.RENEWABLE_ENERGY_CONSTRAINTS == 'on':
+    if any(settings.RENEWABLES_OPTIONS.values()):
         renewable_targets = data.RENEWABLE_TARGETS.query('Year == @yr_cal and scen == @settings.RENEWABLE_TARGET_SCENARIO_TARGETS').set_index('state')
         limits['renewable_solar'] = renewable_targets.query('tech == "Utility Solar"')['Renewable_Target_MWh'].to_dict()
         limits['renewable_wind'] = renewable_targets.query('tech == "Wind"')['Renewable_Target_MWh'].to_dict()
@@ -953,7 +953,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     else:
         ghg_scale = 1.0
 
-    if settings.RENEWABLE_ENERGY_CONSTRAINTS == 'on':
+    if any(settings.RENEWABLES_OPTIONS.values()):
         [renewable_solar_r], solar_scale = rescale_solver_input_data([renewable_solar_r])
         [renewable_wind_r],  wind_scale  = rescale_solver_input_data([renewable_wind_r])
     else:

@@ -730,7 +730,7 @@ class LutoSolver:
 
     def _add_renewable_energy_constraints(self) -> None:
 
-        if settings.RENEWABLE_ENERGY_CONSTRAINTS == "off":
+        if not any(settings.RENEWABLES_OPTIONS.values()):
             print("│   └── TURNING OFF renewable energy constraints ...")
             return
 

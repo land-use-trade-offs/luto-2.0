@@ -178,21 +178,18 @@ def submit_task(task_root_dir:str, col:str, mode:Literal['single','cluster'], ma
 
     
 def write_settings(task_dir:str, settings_dict:dict):
-    # Read the raw AG_MANAGEMENTS block from source settings.py to preserve inline expressions
     with open('luto/settings.py', 'r') as src:
         src_text = src.read()
-        
-    ag_managements_raw = re.search(
-        r'^AG_MANAGEMENTS\s*=\s*\{.*?\}', 
-        src_text, 
-        re.MULTILINE | re.DOTALL
-        ).group(0) + '\n'
+
+    # Reorder settings_dict to match the original settings.py key order
+    parameter_reg = re.compile(r"^(\s*[A-Z].*?)\s*=")
+    src_key_order = [m[1].strip() for line in src_text.splitlines() if (m := parameter_reg.match(line))]
+    settings_dict = {k: settings_dict[k] for k in src_key_order if k in settings_dict} | \
+                    {k: v for k, v in settings_dict.items() if k not in src_key_order}
 
     with open(f'{task_dir}/luto/settings.py', 'w') as file:
         for k, v in settings_dict.items():
-            if k == 'AG_MANAGEMENTS':
-                file.write(ag_managements_raw)
-            elif isinstance(v, str):
+            if isinstance(v, str):
                 file.write(f'{k}="{v}"\n')
             else:
                 file.write(f'{k}={v}\n')

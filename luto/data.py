@@ -765,7 +765,7 @@ class Data:
         # #########################################################
         # RENEWABLE ENERGY DATA LOADING                           #
         # #########################################################
-        if settings.RENEWABLE_ENERGY_CONSTRAINTS != "off":
+        if any(settings.RENEWABLES_OPTIONS.values()):
 
             print("├── Loading renewable energy data...", flush=True)
 
@@ -1357,7 +1357,7 @@ class Data:
         """
 
         
-        biodiv_contribution_lookup = pd.read_csv(os.path.join(settings.INPUT_DIR, 'bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv'))                              
+        biodiv_contribution_lookup = pd.read_csv(os.path.join(settings.INPUT_DIR, 'bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv'))
         
 
         # ------------- Biodiversity priority scores for maximising overall biodiversity conservation in Australia ----------------------------
@@ -1397,8 +1397,10 @@ class Data:
                 bio_HCAS_contribution_lookup = {int(k): v * (1 / unallow_nat_scale) for k, v in bio_HCAS_contribution_lookup.items()}                   # Normalise the biodiversity degradation score to the unallocated natural land score
             case 'USER_DEFINED':
                 bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')['USER_DEFINED'].to_dict()
+            case 'AG_UNIFORM':
+                bio_HCAS_contribution_lookup = {int(k): settings.AG_UNIFORM_BIO_CONTRIBUTION for k in biodiv_contribution_lookup['lu']}                                                   # Set the biodiversity degradation score for all land uses to be the same as unallocated natural land
             case _:
-                print(f"│   ⚠ WARNING: Invalid habitat condition source: {settings.CONTRIBUTION_PERCENTILE}, must be one of [10, 25, 50, 75, 90], or 'USER_DEFINED'", flush=True)
+                print(f"│   ⚠ WARNING: Invalid habitat condition source: {settings.CONTRIBUTION_PERCENTILE}, must be one of [10, 25, 50, 75, 90], 'USER_DEFINED', or 'AG_UNIFORM'", flush=True)
         
         self.BIO_HABITAT_CONTRIBUTION_LOOK_UP = {j: round(x, settings.ROUND_DECMIALS) for j, x in bio_HCAS_contribution_lookup.items()}                 # Round to the specified decimal places to avoid numerical issues in the GUROBI solver
         
@@ -1448,12 +1450,12 @@ class Data:
 
 
         # Renewable energy exclusion masks using biodiversity quality and independent cut values
-        if settings.RENEWABLE_ENERGY_CONSTRAINTS != "off" and settings.EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS:
+        if any(settings.RENEWABLES_OPTIONS.values()) and settings.EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS:
             self.RENEWABLE_GBF2_MASK_SOLAR = bio_quality_raw >= conservation_performance_curve[settings.RENEWABLE_GBF2_CUT_SOLAR]
             self.RENEWABLE_GBF2_MASK_WIND = bio_quality_raw >= conservation_performance_curve[settings.RENEWABLE_GBF2_CUT_WIND]
 
         # Renewable energy exclusion masks using EPBC MNES prioritization layer
-        if settings.RENEWABLE_ENERGY_CONSTRAINTS != "off" and settings.EXCLUDE_RENEWABLES_IN_EPBC_MNES_MASK:
+        if any(settings.RENEWABLES_OPTIONS.values()) and settings.EXCLUDE_RENEWABLES_IN_EPBC_MNES_MASK:
             mnes_rank_raw = xr.open_dataset(os.path.join(settings.INPUT_DIR, 'renewable_QLD_EPBC_MNES_prioritization.nc'))['data'].values[self.MASK]
             mnes_performance = pd.read_csv(os.path.join(settings.INPUT_DIR, 'renewable_QLD_EPBC_MNES_prioritization_performance.csv')).set_index('AREA_COVERAGE_PERCENT')['PRIORITY_RANK'].to_dict()
             self.RENEWABLE_MNES_MASK_SOLAR = mnes_rank_raw >= mnes_performance[settings.RENEWABLE_EPBC_MNES_CUT_SOLAR]

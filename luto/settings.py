@@ -357,12 +357,10 @@ AF_FENCING_LENGTH_HA = 100 * no_belts_per_ha * 2 # Length of fencing required pe
 # ---------------------------------------------------------------------------- #
 # Renewable energy parameters
 # ---------------------------------------------------------------------------- #
-RENEWABLE_ENERGY_CONSTRAINTS = 'on'         # 'on' or 'off'
-
-RENEWABLES_OPTIONS = [
-    'Utility Solar PV',
-    'Onshore Wind'
-]
+RENEWABLES_OPTIONS = {
+    'Utility Solar PV': True,
+    'Onshore Wind': True,
+}
 
 EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS = True
 '''
@@ -400,7 +398,7 @@ Lower values = fewer cells excluded, higher values = more cells excluded.
 
 RENEWABLE_TARGET_SCENARIO_TARGETS = 'Gladstone - Core'
 '''
-The renewable energy target scenario to use when `RENEWABLE_ENERGY_CONSTRAINTS` is set to 'on'. One of
+The renewable energy target scenario to use when `RENEWABLES_OPTIONS` is set to True. One of
  - 'AEMO 2026 ISP - Accelerated Transition'
  - 'AEMO 2026 ISP - Slower Growth'
  - 'AEMO 2026 ISP - Step Change'
@@ -411,8 +409,8 @@ The renewable energy target scenario to use when `RENEWABLE_ENERGY_CONSTRAINTS` 
 
 RENEWABLE_TARGET_SCENARIO_INPUT_LAYERS = 'step_change'
 '''
-The renewable energy target scenario for input spatial layersto use when `RENEWABLE_ENERGY_CONSTRAINTS`
-is set to 'on'. One of
+The renewable energy target scenario for input spatial layersto use when `RENEWABLES_OPTIONS`
+is set to True. One of
  - 'step_change',
  - 'accelerated_transition',
  - 'ANU_transmission_T3',
@@ -422,7 +420,7 @@ is set to 'on'. One of
 
 RE_TARGET_LEVEL = "STATE"  # options: "STATE", "NRM"; TODO: currently (20260205) only support STATE, will add NRM in the future.
 '''
-The spatial level at which to apply the renewable energy targets when `RENEWABLE_ENERGY_CONSTRAINTS` is set to 'on'.
+The spatial level at which to apply the renewable energy targets when `RENEWABLES_OPTIONS` is set to True.
 Options include "STATE" or "NRM". Currently (20260205) only support STATE.
 '''
 
@@ -506,8 +504,8 @@ AG_MANAGEMENTS = {
     'Biochar': True,
     'HIR - Beef': True,
     'HIR - Sheep': True,
-    'Utility Solar PV': RENEWABLE_ENERGY_CONSTRAINTS == 'on',
-    'Onshore Wind': RENEWABLE_ENERGY_CONSTRAINTS == 'on',
+    'Utility Solar PV': RENEWABLES_OPTIONS['Utility Solar PV'],
+    'Onshore Wind': RENEWABLES_OPTIONS['Onshore Wind'],
 }
 """
 The dictionary below contains a master list of all agricultural management options and
@@ -813,7 +811,7 @@ I.e., the lower bound of the connectivity score for weighting the raw biodiversi
 
 
 # Habitat condition data source
-CONTRIBUTION_PERCENTILE = 'USER_DEFINED'                  # One of [10, 25, 50, 75, 90], or 'USER_DEFINED'
+CONTRIBUTION_PERCENTILE = 'USER_DEFINED'                  # One of [10, 25, 50, 75, 90], 'USER_DEFINED', or 'AG_UNIFORM'
 '''
 Different land-use types have different biodiversity degradation impacts. We calculated the percentiles values of HCAS (indicating the
 suitability for wild animals ranging between 0-1) for each land-use type.Avaliable percentiles is one of [10, 25, 50, 75, 90].
@@ -822,6 +820,10 @@ For example, the 50th percentile for 'Beef - Modified land' is 0.22, meaning thi
 to undisturbed natural land.
 '''
 
+AG_UNIFORM_BIO_CONTRIBUTION = 0
+'''
+If CONTRIBUTION_PERCENTILE is set to 'AG_UNIFORM', then the biodiversity contribution of all agricultural land uses will be set to the same value, which is determined by AG_UNIFORM_BIO_CONTRIBUTION. For example, if AG_UNIFORM_BIO_CONTRIBUTION is set to 0.5, then all agricultural land uses will have a biodiversity contribution of 0.5 (i.e., they will retain 50% of the biodiversity score compared to undisturbed natural land).
+'''
 
 # Biodiversity value under default late dry season savanna fire regime
 BIO_CONTRIBUTION_LDS = 0.8
