@@ -54,6 +54,7 @@ The LUTO2 documentation is split into themed files for better memory efficiency.
 **Step-by-step skill guides for common tasks:**
 - [adding_sum_tab.md](docs/CLAUDE_SKILL/adding_sum_tab.md): Adding a "Sum" tab (Ag + Am + NonAg) — covers write.py, report data/layers, Vue services, and view wiring
 - [debug_ecnes_infeasibility.md](docs/CLAUDE_SKILL/debug_ecnes_infeasibility.md): Debug ECNES infeasibility — run simulation, detect infeasible constraints, submit PBS jobs
+- [debug_iis_from_zip.md](docs/CLAUDE_SKILL/debug_iis_from_zip.md): Debug IIS from Run_Archive.zip — extract MPS + lz4, compute IIS with Gurobi, analyze via PBS jobs
 - [fakedata_inspection.md](docs/CLAUDE_SKILL/fakedata_inspection.md): Use `fakedata` as a lightweight `data.py` substitute for inspecting arrays and prototyping spatial helpers without loading full simulation inputs
 - [task_run_plots.md](docs/CLAUDE_SKILL/task_run_plots.md): Extract data from task run Report_Data zips and build interactive ECharts HTML plots for sensitivity/grid search analysis
 

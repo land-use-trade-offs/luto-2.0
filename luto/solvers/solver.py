@@ -221,14 +221,15 @@ class LutoSolver:
                 continue
             lu_cells = self._input_data.non_ag_lu2cells[k]
             for r in lu_cells:
+                x_ub = self._input_data.non_ag_x_rk[r, k]
                 x_lb = (
                     0
                     if NON_AG_LAND_USES_REVERSIBLE[k_name]
-                    else self._input_data.non_ag_lb_rk[r, k]
+                    else min(self._input_data.non_ag_lb_rk[r, k], x_ub)
                 )
                 self.X_non_ag_vars_kr[k, r] = self.gurobi_model.addVar(
                     lb=x_lb,
-                    ub=self._input_data.non_ag_x_rk[r, k],
+                    ub=x_ub,
                     name=f"X_non_ag_{k}_{r}".replace(" ", "_")
                 )
 
@@ -1462,14 +1463,15 @@ class LutoSolver:
                     continue
 
                 if self._input_data.non_ag_x_rk[r, k]:
+                    x_ub = self._input_data.non_ag_x_rk[r, k]
                     x_lb = (
                         0
                         if NON_AG_LAND_USES_REVERSIBLE[k_name]
-                        else self._input_data.non_ag_lb_rk[r, k]
+                        else min(self._input_data.non_ag_lb_rk[r, k], x_ub) # Avoid infeasibility (non_ag_lb_rk[r, k] in truncated, might loss priceission and be higher than x_ub)
                     )
                     self.X_non_ag_vars_kr[k, r] = self.gurobi_model.addVar(
                         lb=x_lb,
-                        ub=self._input_data.non_ag_x_rk[r, k],
+                        ub=x_ub,
                         name=f"X_non_ag_{k}_{r}",
                     )
 
