@@ -2609,6 +2609,15 @@ def write_biodiversity_quality_scores(data: Data, yr_cal, path):
     )
     
     # Create zeros values to fill the first row for am/non-ag if their df is empty
+    if priority_ag_df.empty:
+        priority_ag_df = pd.DataFrame({
+            'region': ['AUSTRALIA'],
+            'Year': [yr_cal],
+            'lm': ['dry'],
+            'lu': ['Unallocated - natural land'],
+            'Area Weighted Score (ha)': [0.0],
+            'Relative_Contribution_Percentage': [0.0]
+        })
     if priority_non_ag_df.empty:
         priority_non_ag_df = pd.DataFrame({
             'region': ['AUSTRALIA'],
@@ -2859,8 +2868,16 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
     # ------------------------- Stack array, get valid layers -------------------------
 
     # ---- Ag valid layers ----
-    valid_ag_layers = pd.MultiIndex.from_frame(GBF2_score_ag_AUS[['lm', 'lu']]).sort_values()
-    valid_layers_stack_ag = xr_gbf2_ag.stack(layer=['lm', 'lu']).sel(layer=valid_ag_layers).drop_vars('region').compute()
+    if GBF2_score_ag_AUS.empty:
+        valid_layers_stack_ag = xr.DataArray(
+            np.zeros((1, 1, data.NCELLS), dtype=np.float32),
+            dims=['lm', 'lu', 'cell'],
+            coords={'lm': ['ALL'], 'lu': ['ALL'], 'cell': range(data.NCELLS)}
+        ).stack(layer=['lm', 'lu'])
+
+    else:
+        valid_ag_layers = pd.MultiIndex.from_frame(GBF2_score_ag_AUS[['lm', 'lu']]).sort_values()
+        valid_layers_stack_ag = xr_gbf2_ag.stack(layer=['lm', 'lu']).sel(layer=valid_ag_layers).drop_vars('region').compute()
 
     # ---- Non-ag valid layers ----
     valid_non_ag_layers = pd.MultiIndex.from_frame(GBF2_score_non_ag_AUS[['lu']]).sort_values()
@@ -3055,8 +3072,16 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
     # ------------------------- Stack array, get valid layers -------------------------
 
     # ---- Ag valid layers (include group in layer so each parallel task gets 1D cell data) ----
-    valid_ag_layers = pd.MultiIndex.from_frame(GBF3_score_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['group', 'lm', 'lu']]).sort_values()
-    valid_layers_stack_ag = xr_gbf3_ag.stack(layer=['group', 'lm', 'lu']).sel(layer=valid_ag_layers).drop_vars('region').compute()
+    if GBF3_score_ag_AUS['Area Weighted Score (ha)'].abs().sum() < 1e-3:
+        valid_layers_stack_ag = xr.DataArray(
+            np.zeros((1, 1, 1, data.NCELLS), dtype=np.float32),
+            dims=['group', 'lm', 'lu', 'cell'],
+            coords={'group': ['ALL'], 'lm': ['ALL'], 'lu': ['ALL'], 'cell': range(data.NCELLS)}
+        ).stack(layer=['group', 'lm', 'lu'])
+
+    else:
+        valid_ag_layers = pd.MultiIndex.from_frame(GBF3_score_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['group', 'lm', 'lu']]).sort_values()
+        valid_layers_stack_ag = xr_gbf3_ag.stack(layer=['group', 'lm', 'lu']).sel(layer=valid_ag_layers).drop_vars('region').compute()
 
     # ---- Non-ag valid layers ----
     valid_non_ag_layers = pd.MultiIndex.from_frame(GBF3_score_non_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['group', 'lu']]).sort_values()
@@ -3240,8 +3265,16 @@ def write_biodiversity_GBF3_IBRA_scores(data: Data, yr_cal: int, path) -> None:
     # ------------------------- Stack array, get valid layers -------------------------
 
     # ---- Ag valid layers (include group in layer so each parallel task gets 1D cell data) ----
-    valid_ag_layers = pd.MultiIndex.from_frame(GBF3_IBRA_score_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['group', 'lm', 'lu']]).sort_values()
-    valid_layers_stack_ag = xr_gbf3_ibra_ag.stack(layer=['group', 'lm', 'lu']).sel(layer=valid_ag_layers).drop_vars('region').compute()
+    if GBF3_IBRA_score_ag_AUS['Area Weighted Score (ha)'].abs().sum() < 1e-3:
+        valid_layers_stack_ag = xr.DataArray(
+            np.zeros((1, 1, 1, data.NCELLS), dtype=np.float32),
+            dims=['group', 'lm', 'lu', 'cell'],
+            coords={'group': ['ALL'], 'lm': ['ALL'], 'lu': ['ALL'], 'cell': range(data.NCELLS)}
+        ).stack(layer=['group', 'lm', 'lu'])
+
+    else:
+        valid_ag_layers = pd.MultiIndex.from_frame(GBF3_IBRA_score_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['group', 'lm', 'lu']]).sort_values()
+        valid_layers_stack_ag = xr_gbf3_ibra_ag.stack(layer=['group', 'lm', 'lu']).sel(layer=valid_ag_layers).drop_vars('region').compute()
 
     # ---- Non-ag valid layers ----
     valid_non_ag_layers = pd.MultiIndex.from_frame(GBF3_IBRA_score_non_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['group', 'lu']]).sort_values()
@@ -3424,8 +3457,16 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
     # ------------------------- Stack array, get valid layers -------------------------
 
     # ---- Ag valid layers (include species in layer so each parallel task gets 1D cell data) ----
-    valid_ag_layers = pd.MultiIndex.from_frame(GBF4_score_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['species', 'lm', 'lu']]).sort_values()
-    valid_layers_stack_ag = xr_gbf4_snes_ag.stack(layer=['species', 'lm', 'lu']).sel(layer=valid_ag_layers).drop_vars('region').compute()
+    if GBF4_score_ag_AUS['Area Weighted Score (ha)'].abs().sum() < 1e-3:
+        valid_layers_stack_ag = xr.DataArray(
+            np.zeros((1, 1, 1, data.NCELLS), dtype=np.float32),
+            dims=['species', 'lm', 'lu', 'cell'],
+            coords={'species': ['ALL'], 'lm': ['ALL'], 'lu': ['ALL'], 'cell': range(data.NCELLS)}
+        ).stack(layer=['species', 'lm', 'lu'])
+
+    else:
+        valid_ag_layers = pd.MultiIndex.from_frame(GBF4_score_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['species', 'lm', 'lu']]).sort_values()
+        valid_layers_stack_ag = xr_gbf4_snes_ag.stack(layer=['species', 'lm', 'lu']).sel(layer=valid_ag_layers).drop_vars('region').compute()
 
     # ---- Non-ag valid layers ----
     valid_non_ag_layers = pd.MultiIndex.from_frame(GBF4_score_non_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['species', 'lu']]).sort_values()
@@ -3604,8 +3645,16 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
     
 
     # ==================== Ag Valid Layers ====================
-    valid_ag_layers = pd.MultiIndex.from_frame(GBF4_score_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['species', 'lm', 'lu']]).sort_values()
-    valid_layers_stack_ag = xr_gbf4_ecnes_ag.stack(layer=['species', 'lm', 'lu']).sel(layer=valid_ag_layers).drop_vars('region').compute()
+    if GBF4_score_ag_AUS['Area Weighted Score (ha)'].abs().sum() < 1e-3:
+        valid_layers_stack_ag = xr.DataArray(
+            np.zeros((1, 1, 1, data.NCELLS), dtype=np.float32),
+            dims=['species', 'lm', 'lu', 'cell'],
+            coords={'species': ['ALL'], 'lm': ['ALL'], 'lu': ['ALL'], 'cell': range(data.NCELLS)}
+        ).stack(layer=['species', 'lm', 'lu'])
+
+    else:
+        valid_ag_layers = pd.MultiIndex.from_frame(GBF4_score_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['species', 'lm', 'lu']]).sort_values()
+        valid_layers_stack_ag = xr_gbf4_ecnes_ag.stack(layer=['species', 'lm', 'lu']).sel(layer=valid_ag_layers).drop_vars('region').compute()
 
     # ==================== Non-Ag Valid Layers ====================
     valid_non_ag_layers = pd.MultiIndex.from_frame(GBF4_score_non_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['species', 'lu']]).sort_values()
@@ -3785,8 +3834,16 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
     
 
     # ==================== Ag Valid Layers ====================
-    valid_ag_layers = pd.MultiIndex.from_frame(GBF8_scores_groups_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['group', 'lm', 'lu']]).sort_values()
-    valid_layers_stack_ag = xr_gbf8_groups_ag.stack(layer=['group', 'lm', 'lu']).sel(layer=valid_ag_layers).drop_vars('region').compute()
+    if GBF8_scores_groups_ag_AUS['Area Weighted Score (ha)'].abs().sum() < 1e-3:
+        valid_layers_stack_ag = xr.DataArray(
+            np.zeros((1, 1, 1, data.NCELLS), dtype=np.float32),
+            dims=['group', 'lm', 'lu', 'cell'],
+            coords={'group': ['ALL'], 'lm': ['ALL'], 'lu': ['ALL'], 'cell': range(data.NCELLS)}
+        ).stack(layer=['group', 'lm', 'lu'])
+
+    else:
+        valid_ag_layers = pd.MultiIndex.from_frame(GBF8_scores_groups_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['group', 'lm', 'lu']]).sort_values()
+        valid_layers_stack_ag = xr_gbf8_groups_ag.stack(layer=['group', 'lm', 'lu']).sel(layer=valid_ag_layers).drop_vars('region').compute()
 
     # ==================== Non-Ag Valid Layers ====================
     valid_non_ag_layers = pd.MultiIndex.from_frame(GBF8_scores_groups_non_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['group', 'lu']]).sort_values()
@@ -3968,8 +4025,16 @@ def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
     
 
     # ==================== Ag Valid Layers ====================
-    valid_ag_layers = pd.MultiIndex.from_frame(GBF8_scores_species_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['species', 'lm', 'lu']]).sort_values()
-    valid_layers_stack_ag = xr_gbf8_species_ag.stack(layer=['species', 'lm', 'lu']).sel(layer=valid_ag_layers).drop_vars('region').compute()
+    if GBF8_scores_species_ag_AUS['Area Weighted Score (ha)'].abs().sum() < 1e-3:
+        valid_layers_stack_ag = xr.DataArray(
+            np.zeros((1, 1, 1, data.NCELLS), dtype=np.float32),
+            dims=['species', 'lm', 'lu', 'cell'],
+            coords={'species': ['ALL'], 'lm': ['ALL'], 'lu': ['ALL'], 'cell': range(data.NCELLS)}
+        ).stack(layer=['species', 'lm', 'lu'])
+
+    else:
+        valid_ag_layers = pd.MultiIndex.from_frame(GBF8_scores_species_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['species', 'lm', 'lu']]).sort_values()
+        valid_layers_stack_ag = xr_gbf8_species_ag.stack(layer=['species', 'lm', 'lu']).sel(layer=valid_ag_layers).drop_vars('region').compute()
 
     # ==================== Non-Ag Valid Layers ====================
     valid_non_ag_layers = pd.MultiIndex.from_frame(GBF8_scores_species_non_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['species', 'lu']]).sort_values()

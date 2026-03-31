@@ -2779,7 +2779,6 @@ def process_biodiversity_data(files, SAVE_DIR):
         bio_df = bio_df.replace(RENAME_AM_NON_AG)\
             .infer_objects(copy=False)\
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)'})\
-            .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
             .round({'Value (%)': 2})
 
         # ---------------- (GBF2) ranking  ----------------
@@ -2793,6 +2792,8 @@ def process_biodiversity_data(files, SAVE_DIR):
 
         for region, df in bio_rank_total.groupby('region'):
             df = df.drop(columns='region')
+            if region not in bio_rank_dict:
+                bio_rank_dict[region] = {}
             if 'GBF2' not in bio_rank_dict[region]:
                 bio_rank_dict[region]['GBF2'] = {}
 
@@ -2810,8 +2811,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
             .groupby(['Year', 'region', 'Type'])\
             .sum(numeric_only=True)\
-            .reset_index()\
-            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
+            .reset_index()
         df_wide = df_region.groupby(['Type', 'region'])[['Year','Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
             .reset_index()
@@ -2838,8 +2838,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Agricultural Land-use"')\
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
-            .reset_index()\
-            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
+            .reset_index()
         df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
             .reset_index()
@@ -2866,8 +2865,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Agricultural Management"')\
             .groupby(['Year', 'region', 'Agricultural Management'])\
             .sum(numeric_only=True)\
-            .reset_index()\
-            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
+            .reset_index()
         df_wide = df_region.groupby(['Agricultural Management', 'region'])[['Year','Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
             .reset_index()
@@ -2891,8 +2889,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Non-Agricultural Land-use"')\
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
-            .reset_index()\
-            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
+            .reset_index()
         df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
             .reset_index()
@@ -2989,8 +2986,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Non-Agricultural Land-use"')\
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
-            .reset_index()\
-            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
+            .reset_index()
         df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
             .reset_index()
@@ -3026,7 +3022,6 @@ def process_biodiversity_data(files, SAVE_DIR):
         bio_df = bio_df.replace(RENAME_AM_NON_AG)\
             .infer_objects(copy=False)\
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)', 'Vegetation Group': 'species'})\
-            .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
             .round(6)
 
         # ---------------- (GBF3-NVIS) Ranking  ----------------
@@ -3041,6 +3036,8 @@ def process_biodiversity_data(files, SAVE_DIR):
             
         for region, df in bio_rank_total.groupby('region'):
             df = df.drop(columns='region')
+            if region not in bio_rank_dict:
+                bio_rank_dict[region] = {}
             if 'GBF3-NVIS' not in bio_rank_dict[region]:
                 bio_rank_dict[region]['GBF3-NVIS'] = {}
                 
@@ -3057,8 +3054,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
             .groupby(['Year', 'region', 'Type'])\
             .sum(numeric_only=True)\
-            .reset_index()\
-            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
+            .reset_index()
         df_wide = df_region.groupby(['Type', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -3083,8 +3079,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Agricultural Land-use"')\
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
-            .reset_index()\
-            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
+            .reset_index()
         df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -3111,8 +3106,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Agricultural Management"')\
             .groupby(['Year', 'region', 'Agricultural Management'])\
             .sum(numeric_only=True)\
-            .reset_index()\
-            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
+            .reset_index()
         df_wide = df_region.groupby(['Agricultural Management', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -3136,8 +3130,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Non-Agricultural Land-use"')\
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
-            .reset_index()\
-            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
+            .reset_index()
         df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -3271,7 +3264,6 @@ def process_biodiversity_data(files, SAVE_DIR):
         bio_df = bio_df.replace(RENAME_AM_NON_AG)\
             .infer_objects(copy=False)\
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)', 'IBRA Bioregion': 'species'})\
-            .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
             .round(6)
 
         # ---------------- (GBF3-IBRA) Ranking  ----------------
@@ -3286,6 +3278,8 @@ def process_biodiversity_data(files, SAVE_DIR):
 
         for region, df in bio_rank_total.groupby('region'):
             df = df.drop(columns='region')
+            if region not in bio_rank_dict:
+                bio_rank_dict[region] = {}
             if 'GBF3_IBRA' not in bio_rank_dict[region]:
                 bio_rank_dict[region]['GBF3_IBRA'] = {}
 
@@ -3302,8 +3296,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
             .groupby(['Year', 'region', 'Type'])\
             .sum(numeric_only=True)\
-            .reset_index()\
-            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
+            .reset_index()
         df_wide = df_region.groupby(['Type', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -3328,8 +3321,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Agricultural Land-use"')\
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
-            .reset_index()\
-            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
+            .reset_index()
         df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -3356,8 +3348,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Agricultural Management"')\
             .groupby(['Year', 'region', 'Agricultural Management'])\
             .sum(numeric_only=True)\
-            .reset_index()\
-            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
+            .reset_index()
         df_wide = df_region.groupby(['Agricultural Management', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -3381,8 +3372,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Non-Agricultural Land-use"')\
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
-            .reset_index()\
-            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
+            .reset_index()
         df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -3518,7 +3508,6 @@ def process_biodiversity_data(files, SAVE_DIR):
         bio_df = bio_df.replace(RENAME_AM_NON_AG)\
             .infer_objects(copy=False)\
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)'})\
-            .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
             .round(6)
         # ---------------- (GBF4 SNES) Ranking  ----------------
         bio_rank_total = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
@@ -3532,6 +3521,8 @@ def process_biodiversity_data(files, SAVE_DIR):
             
         for region, df in bio_rank_total.groupby('region'):
             df = df.drop(columns='region')
+            if region not in bio_rank_dict:
+                bio_rank_dict[region] = {}
             if 'GBF4 (SNES)' not in bio_rank_dict[region]:
                 bio_rank_dict[region]['GBF4 (SNES)'] = {}
 
@@ -3547,8 +3538,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
             .groupby(['Year', 'region', 'Type'])\
             .sum(numeric_only=True)\
-            .reset_index()\
-            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
+            .reset_index()
         df_wide = df_region.groupby(['Type', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -3571,8 +3561,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Agricultural Land-use"')\
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
-            .reset_index()\
-            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
+            .reset_index()
         df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -3598,8 +3587,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Agricultural Management"')\
             .groupby(['Year', 'region', 'Agricultural Management'])\
             .sum(numeric_only=True)\
-            .reset_index()\
-            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
+            .reset_index()
         df_wide = df_region.groupby(['Agricultural Management', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -3622,8 +3610,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Non-Agricultural Land-use"')\
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
-            .reset_index()\
-            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
+            .reset_index()
         df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -3754,7 +3741,6 @@ def process_biodiversity_data(files, SAVE_DIR):
         bio_df = bio_df.replace(RENAME_AM_NON_AG)\
             .infer_objects(copy=False)\
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)'})\
-            .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
             .round(6)
 
         # ---------------- (GBF4 ECNES) Ranking  ----------------
@@ -3769,6 +3755,8 @@ def process_biodiversity_data(files, SAVE_DIR):
 
         for region, df in bio_rank_total.groupby('region'):
             df = df.drop(columns='region')
+            if region not in bio_rank_dict:
+                bio_rank_dict[region] = {}
             if 'GBF4 (ECNES)' not in bio_rank_dict[region]:
                 bio_rank_dict[region]['GBF4 (ECNES)'] = {}
 
@@ -3782,8 +3770,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
             .groupby(['Year', 'region', 'Type'])\
             .sum(numeric_only=True)\
-            .reset_index()\
-            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
+            .reset_index()
         df_wide = df_region.groupby(['Type', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -3806,8 +3793,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Agricultural Land-use"')\
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
-            .reset_index()\
-            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
+            .reset_index()
         df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -3833,8 +3819,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Agricultural Management"')\
             .groupby(['Year', 'region', 'Agricultural Management'])\
             .sum(numeric_only=True)\
-            .reset_index()\
-            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
+            .reset_index()
         df_wide = df_region.groupby(['Agricultural Management', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -3857,8 +3842,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Non-Agricultural Land-use"')\
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
-            .reset_index()\
-            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
+            .reset_index()
         df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -3996,7 +3980,6 @@ def process_biodiversity_data(files, SAVE_DIR):
         bio_df = bio_df.replace(RENAME_AM_NON_AG)\
             .infer_objects(copy=False)\
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)', 'Species':'species'})\
-            .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
             .round(6)
 
         # ---------------- (GBF8 SPECIES) Ranking  ----------------
@@ -4011,6 +3994,8 @@ def process_biodiversity_data(files, SAVE_DIR):
 
         for region, df in bio_rank_total.groupby('region'):
             df = df.drop(columns='region')
+            if region not in bio_rank_dict:
+                bio_rank_dict[region] = {}
             if 'GBF8 (SPECIES)' not in bio_rank_dict[region]:
                 bio_rank_dict[region]['GBF8 (SPECIES)'] = {}
 
@@ -4024,8 +4009,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
             .groupby(['Year', 'region', 'Type'])\
             .sum(numeric_only=True)\
-            .reset_index()\
-            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
+            .reset_index()
         df_wide = df_region.groupby(['Type', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -4047,8 +4031,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Agricultural Land-use"')\
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
-            .reset_index()\
-            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
+            .reset_index()
         df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -4074,8 +4057,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Agricultural Management"')\
             .groupby(['Year', 'region', 'Agricultural Management'])\
             .sum(numeric_only=True)\
-            .reset_index()\
-            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
+            .reset_index()
         df_wide = df_region.groupby(['Agricultural Management', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -4097,8 +4079,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Non-Agricultural Land-use"')\
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
-            .reset_index()\
-            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
+            .reset_index()
         df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -4228,7 +4209,6 @@ def process_biodiversity_data(files, SAVE_DIR):
         bio_df = bio_df.replace(RENAME_AM_NON_AG)\
             .infer_objects(copy=False)\
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)', 'Group':'species'})\
-            .query('abs(`Area Weighted Score (ha)`) > 1e-4')\
             .round(6)
 
         # ---------------- (GBF8 GROUP) Ranking  ----------------
@@ -4243,6 +4223,8 @@ def process_biodiversity_data(files, SAVE_DIR):
 
         for region, df in bio_rank_total.groupby('region'):
             df = df.drop(columns='region')
+            if region not in bio_rank_dict:
+                bio_rank_dict[region] = {}
             if 'GBF8 (GROUP)' not in bio_rank_dict[region]:
                 bio_rank_dict[region]['GBF8 (GROUP)'] = {}
 
@@ -4256,8 +4238,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
             .groupby(['Year', 'region', 'Type'])\
             .sum(numeric_only=True)\
-            .reset_index()\
-            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
+            .reset_index()
         df_wide = df_region.groupby(['Type', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -4279,8 +4260,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Agricultural Land-use"')\
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
-            .reset_index()\
-            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
+            .reset_index()
         df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -4306,8 +4286,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Agricultural Management"')\
             .groupby(['Year', 'region', 'Agricultural Management'])\
             .sum(numeric_only=True)\
-            .reset_index()\
-            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
+            .reset_index()
         df_wide = df_region.groupby(['Agricultural Management', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
@@ -4329,8 +4308,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Non-Agricultural Land-use"')\
             .groupby(['Year', 'region', 'Landuse'])\
             .sum(numeric_only=True)\
-            .reset_index()\
-            .query('abs(`Area Weighted Score (ha)`) > 1e-4')
+            .reset_index()
         df_wide = df_region.groupby(['Landuse', 'region'])[['Year','Area Weighted Score (ha)']]\
             .apply(lambda x: x[['Year', 'Area Weighted Score (ha)']].values.tolist())\
             .reset_index()
