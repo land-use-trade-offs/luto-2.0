@@ -1467,7 +1467,7 @@ class LutoSolver:
                     x_lb = (
                         0
                         if NON_AG_LAND_USES_REVERSIBLE[k_name]
-                        else min(self._input_data.non_ag_lb_rk[r, k], x_ub) # Avoid infeasibility (non_ag_lb_rk[r, k] in truncated, might loss priceission and be higher than x_ub)
+                        else min(self._input_data.non_ag_lb_rk[r, k], x_ub) # Avoid infeasibility (non_ag_lb_rk[r, k] in truncated, might loss precision and be higher than x_ub)
                     )
                     self.X_non_ag_vars_kr[k, r] = self.gurobi_model.addVar(
                         lb=x_lb,

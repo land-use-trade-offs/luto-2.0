@@ -647,6 +647,9 @@ def get_quantity_renewable(data, re_type: str, yr_idx: int):
         yr_idx (int): Number of years post base-year ('YR_CAL_BASE').
     """
 
+    if not settings.RENEWABLES_OPTIONS.get(re_type, False):
+        return np.zeros(data.NCELLS, dtype=np.float32)
+
     yr_cal = data.YR_CAL_BASE + yr_idx
 
     if not re_type in settings.RENEWABLES_OPTIONS.keys():
