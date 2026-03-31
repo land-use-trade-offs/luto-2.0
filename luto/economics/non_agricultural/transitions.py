@@ -1146,7 +1146,9 @@ def get_lower_bound_non_agricultural_matrices(data: Data, base_year) -> np.ndarr
     if base_year == data.YR_CAL_BASE or base_year not in data.non_ag_dvars:
         return np.zeros((data.NCELLS, len(settings.NON_AG_LAND_USES))).astype(np.float32)
         
-    return np.divide(
-        np.floor(data.non_ag_dvars[base_year].astype(np.float32) * 10 ** settings.ROUND_DECMIALS),
-        10 ** settings.ROUND_DECMIALS,
-    )
+    # return np.divide(
+    #     np.floor(data.non_ag_dvars[base_year].astype(np.float32) * 10 ** settings.ROUND_DECIMALS),
+    #     10 ** settings.ROUND_DECIMALS,
+    # )
+    
+    return data.non_ag_dvars[base_year].astype(np.float32)

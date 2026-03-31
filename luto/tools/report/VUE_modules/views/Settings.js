@@ -74,7 +74,7 @@ window.SettingsView = {
       },
       'Output & Processing': {
         icon: '📊',
-        keywords: ['WRITE', 'OUTPUT', 'WRITE_PARALLEL', 'WRITE_THREADS', 'GEOTIFFS', 'VERBOSE', 'KEEP_OUTPUTS', 'ROUND_DECMIALS']
+        keywords: ['WRITE', 'OUTPUT', 'WRITE_PARALLEL', 'WRITE_THREADS', 'GEOTIFFS', 'VERBOSE', 'KEEP_OUTPUTS', 'ROUND_DECIMALS']
       },
       'System Resources': {
         icon: '💻',

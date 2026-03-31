@@ -221,15 +221,14 @@ class LutoSolver:
                 continue
             lu_cells = self._input_data.non_ag_lu2cells[k]
             for r in lu_cells:
-                x_ub = self._input_data.non_ag_x_rk[r, k]
                 x_lb = (
                     0
                     if NON_AG_LAND_USES_REVERSIBLE[k_name]
-                    else min(self._input_data.non_ag_lb_rk[r, k], x_ub)
+                    else self._input_data.non_ag_lb_rk[r, k]
                 )
                 self.X_non_ag_vars_kr[k, r] = self.gurobi_model.addVar(
                     lb=x_lb,
-                    ub=x_ub,
+                    ub=self._input_data.non_ag_x_rk[r, k],
                     name=f"X_non_ag_{k}_{r}".replace(" ", "_")
                 )
 
@@ -1463,15 +1462,14 @@ class LutoSolver:
                     continue
 
                 if self._input_data.non_ag_x_rk[r, k]:
-                    x_ub = self._input_data.non_ag_x_rk[r, k]
                     x_lb = (
                         0
                         if NON_AG_LAND_USES_REVERSIBLE[k_name]
-                        else min(self._input_data.non_ag_lb_rk[r, k], x_ub) # Avoid infeasibility (non_ag_lb_rk[r, k] in truncated, might loss precision and be higher than x_ub)
+                        else self._input_data.non_ag_lb_rk[r, k]
                     )
                     self.X_non_ag_vars_kr[k, r] = self.gurobi_model.addVar(
                         lb=x_lb,
-                        ub=x_ub,
+                        ub=self._input_data.non_ag_x_rk[r, k],
                         name=f"X_non_ag_{k}_{r}",
                     )
 
@@ -1690,8 +1688,6 @@ class LutoSolver:
         # Process agricultural land usage information
         # Stack dryland and irrigated decision variables
         ag_X_mrj = np.stack((X_dry_sol_rj, X_irr_sol_rj))  # Float32
-        ag_X_mrj = np.floor(ag_X_mrj * 10 ** settings.ROUND_DECMIALS) / 10 ** settings.ROUND_DECMIALS
-        ag_X_mrj[ag_X_mrj < 10 ** -settings.ROUND_DECMIALS] = 0
         ag_X_mrj_processed = ag_X_mrj
 
         ## Note - uncomment the following block of code to revert the processed agricultural variables to be binary.
@@ -1713,10 +1709,6 @@ class LutoSolver:
         # )
         # ag_X_mrj_processed = np.moveaxis(ag_X_mrj_processed, 0, 1)
 
-        # Use floor (not round) so the stored dvar never exceeds the solver value.
-        # np.round can round up, making the lb for the next year exceed the ub (fresh float32 computation), causing infeasibility.
-        non_ag_X_sol_rk = np.floor(non_ag_X_sol_rk.astype(np.float32) * 10 ** settings.ROUND_DECMIALS) / 10 ** settings.ROUND_DECMIALS
-        non_ag_X_sol_rk[non_ag_X_sol_rk < 10 ** -settings.ROUND_DECMIALS] = 0
 
         # Process non-agricultural land usage information
         # Boolean matrix where the maximum value for each cell across all non-ag LUs is True
@@ -1753,8 +1745,6 @@ class LutoSolver:
             #     (ag_man_X_shape[1], ag_man_X_shape[0], ag_man_X_shape[2])
             # )
             # ag_man_processed = np.moveaxis(ag_man_processed, 0, 1)
-            ag_man_processed = np.floor(ag_man_processed * 10 ** settings.ROUND_DECMIALS) / 10 ** settings.ROUND_DECMIALS
-            ag_man_processed[ag_man_processed < 10 ** -settings.ROUND_DECMIALS] = 0
             ag_man_X_mrj_processed[am] = ag_man_processed
 
         # Calculate 1D array (maps) of land-use and land management, considering only agricultural LUs

@@ -1402,7 +1402,7 @@ class Data:
             case _:
                 print(f"│   ⚠ WARNING: Invalid habitat condition source: {settings.CONTRIBUTION_PERCENTILE}, must be one of [10, 25, 50, 75, 90], 'USER_DEFINED', or 'AG_UNIFORM'", flush=True)
         
-        self.BIO_HABITAT_CONTRIBUTION_LOOK_UP = {j: round(x, settings.ROUND_DECMIALS) for j, x in bio_HCAS_contribution_lookup.items()}                 # Round to the specified decimal places to avoid numerical issues in the GUROBI solver
+        self.BIO_HABITAT_CONTRIBUTION_LOOK_UP = {j: round(x, settings.ROUND_DECIMALS) for j, x in bio_HCAS_contribution_lookup.items()}                 # Round to the specified decimal places to avoid numerical issues in the GUROBI solver
         
         
         # Get the biodiversity quantity score for each land use in each cell

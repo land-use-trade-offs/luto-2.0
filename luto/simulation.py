@@ -28,6 +28,8 @@ model that has 'global' varying state.
 import time
 import threading
 
+import numpy as np
+
 from gurobipy import GRB
 import joblib
 from luto import settings
@@ -170,14 +172,18 @@ def solve_timeseries(data: Data, years_to_run: list[int], do_analyze_iis: bool) 
         luto_solver.formulate()
         solution = luto_solver.solve()
         
-        data.last_year = target_year 
+        data.last_year = target_year
+
+        ag_X_mrj     = np.floor(solution.ag_X_mrj * 10 ** settings.ROUND_DECIMALS) / (10 ** settings.ROUND_DECIMALS)
+        non_ag_X_rk  = np.floor(solution.non_ag_X_rk * 10 ** settings.ROUND_DECIMALS) / (10 ** settings.ROUND_DECIMALS)
+        ag_man_X_mrj = {k: np.floor(v * 10 ** settings.ROUND_DECIMALS) / (10 ** settings.ROUND_DECIMALS) for k, v in solution.ag_man_X_mrj.items()}
 
         data.add_lumap(target_year, solution.lumap)
         data.add_lmmap(target_year, solution.lmmap)
         data.add_ammaps(target_year, solution.ammaps)
-        data.add_ag_dvars(target_year, solution.ag_X_mrj)
-        data.add_non_ag_dvars(target_year, solution.non_ag_X_rk)
-        data.add_ag_man_dvars(target_year, solution.ag_man_X_mrj)
+        data.add_ag_dvars(target_year, ag_X_mrj)
+        data.add_non_ag_dvars(target_year, non_ag_X_rk)
+        data.add_ag_man_dvars(target_year, ag_man_X_mrj)
         data.add_obj_vals(target_year, solution.obj_val)
 
         for data_type, prod_data in solution.prod_data.items():

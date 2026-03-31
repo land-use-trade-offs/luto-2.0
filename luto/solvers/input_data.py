@@ -745,24 +745,12 @@ def rescale_solver_input_data(arries: list) -> tuple[list, float]:
 
     scale = (np.max(max_vals) / settings.RESCALE_FACTOR).astype(np.float32)
 
-    # Clamp threshold: values smaller than this (relative to RESCALE_FACTOR)
-    # are set to zero after rescaling. This prevents tiny residual coefficients
-    # (e.g. 1e-08) from degrading the solver's numerical conditioning.
-    clamp_threshold = settings.RESCALE_FACTOR * 1e-6  # default: 1e3 * 1e-6 = 1e-3
-
     scaled = []
     for arr in arries:
         if isinstance(arr, np.ndarray):
-            rescaled = (arr / scale).astype(np.float32)
-            rescaled[np.abs(rescaled) < clamp_threshold] = 0
-            scaled.append(rescaled)
+            scaled.append((arr / scale).astype(np.float32))
         elif isinstance(arr, dict):
-            clamped = {}
-            for k, v in arr.items():
-                rescaled = (v / scale).astype(np.float32)
-                rescaled[np.abs(rescaled) < clamp_threshold] = 0
-                clamped[k] = rescaled
-            scaled.append(clamped)
+            scaled.append({k: (v / scale).astype(np.float32) for k, v in arr.items()})
         else:
             scaled.append(arr)
 
