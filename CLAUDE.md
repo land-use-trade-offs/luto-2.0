@@ -57,6 +57,8 @@ The LUTO2 documentation is split into themed files for better memory efficiency.
 - [debug_iis_from_zip.md](docs/CLAUDE_SKILL/debug_iis_from_zip.md): Debug IIS from Run_Archive.zip — extract MPS + lz4, compute IIS with Gurobi, analyze via PBS jobs
 - [fakedata_inspection.md](docs/CLAUDE_SKILL/fakedata_inspection.md): Use `fakedata` as a lightweight `data.py` substitute for inspecting arrays and prototyping spatial helpers without loading full simulation inputs
 - [task_run_plots.md](docs/CLAUDE_SKILL/task_run_plots.md): Extract data from task run Report_Data zips and build interactive ECharts HTML plots for sensitivity/grid search analysis
+- [make_run_index_html.md](docs/CLAUDE_SKILL/make_run_index_html.md): Generate a self-contained interactive `index.html` for any task run directory — reads GEP params from `merged_grid_search_parameters_unique.csv`, full settings from `merged_grid_search_template.csv`, and model status from PBS stdout logs
+- [iis_to_story.md](docs/CLAUDE_SKILL/iis_to_story.md): Translate IIS analysis summaries, ILP files, and PBS stdout logs into plain-language story tables grouped by scenario — diagnoses numerical stagnation vs rounding artefacts vs structural infeasibility
 
 ## Diagnostic Tools (`luto/tests/`)
 
