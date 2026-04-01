@@ -116,6 +116,16 @@ AMORTISATION_PERIOD = 30 # years
 # Set whether to use demand elasticity when calculating commodity prices
 DYNAMIC_PRICE = False
 
+"""
+Enable to use 'blended' agr. -> agr. transition costs when a cell currently utilises multiple land uses.
+  E.g.: if a 60% of a cell stocks natural beef and 40% grows rice, the cell's transition cost to apples 
+  equal to '60% of the transition cost of natural beef to apples, and 40% the transition cost of rice to apples'. 
+  
+When disabled, the transition cost is set assuming the whole cell was assigned
+  to Natural Beef, as it has the highest assignment within the cell.
+"""
+BLENDED_AG_TRANSITION_COSTS = True
+
 
 
 # ---------------------------------------------------------------------------- #

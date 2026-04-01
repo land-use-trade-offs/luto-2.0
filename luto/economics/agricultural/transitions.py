@@ -189,8 +189,37 @@ def get_transition_matrices_ag2ag_from_base_year(data: Data, yr_idx, base_year, 
     """
     lumap = data.lumaps[base_year]
     lmmap = data.lmmaps[base_year]
-    return get_transition_matrices_ag2ag(data, yr_idx, lumap, lmmap, separate)
+    if not settings.BLENDED_AG_TRANSITION_COSTS:
+        return get_transition_matrices_ag2ag(data, yr_idx, lumap, lmmap, separate)
     
+    else:
+        ag_X_mrj = data.ag_dvars[base_year]
+        ag_t_mrj: dict | np.ndarray = {} if separate else np.zeros(
+            (data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32
+        )
+        for m in range(data.NLMS):
+            all_m_lumap = np.ones(data.NCELLS, dtype=np.int8) * m
+            for j in range(data.N_AG_LUS):
+                all_j_lumap = np.ones(data.NCELLS, dtype=np.int8) * j
+
+                current_lus_X_r = ag_X_mrj[m, :, j]
+                # repeat current (m, j) land use array to get weights for ag_t_mrj contributiom
+                lus_weight_mrj = np.swapaxes(np.tile(current_lus_X_r, (2, 28, 1)), 1, 2)
+
+                from_current_lus_t_mrj = get_transition_matrices_ag2ag(
+                    data, yr_idx, all_j_lumap, all_m_lumap, separate
+                )
+                if separate:
+                    for key, array in from_current_lus_t_mrj.items():
+                        if key not in ag_t_mrj:
+                            ag_t_mrj[key] = lus_weight_mrj * array
+                        else:
+                            ag_t_mrj[key] += lus_weight_mrj * array
+                else:
+                    ag_t_mrj += lus_weight_mrj * from_current_lus_t_mrj
+        
+        return ag_t_mrj
+
 
 def get_asparagopsis_effect_t_mrj(data: Data):
     """
