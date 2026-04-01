@@ -117,6 +117,7 @@ def run(
                 years.insert(0, data.YR_CAL_BASE)
             # Solve and write outputs
             solve_timeseries(data, years, do_analyze_iis)
+            # Save and write outputs
             save_data_to_disk(data, f"{save_dir}/Data_RES{settings.RESFACTOR}.lz4")
             write_outputs(data)
         except Exception as e:
@@ -142,6 +143,7 @@ def solve_timeseries(data: Data, years_to_run: list[int], do_analyze_iis: bool) 
         
         start_time = time.time()
         input_data = get_input_data(data, base_year, target_year)
+        data.last_year = target_year
 
         # if step == 0:
         #     luto_solver = LutoSolver(input_data, d_c)
@@ -168,31 +170,41 @@ def solve_timeseries(data: Data, years_to_run: list[int], do_analyze_iis: bool) 
         #         current_lmmap=data.lmmaps[base_year],
         #     )
 
-        luto_solver = LutoSolver(input_data)
-        luto_solver.formulate()
-        solution = luto_solver.solve()
         
-        data.last_year = target_year
+        for nf in settings.NUMERIC_FOCUS:
+            print(f"Trying NumericFocus={nf} for year {target_year}...")
 
-        ag_X_mrj     = np.floor(solution.ag_X_mrj * 10 ** settings.ROUND_DECIMALS) / (10 ** settings.ROUND_DECIMALS)
-        non_ag_X_rk  = np.floor(solution.non_ag_X_rk * 10 ** settings.ROUND_DECIMALS) / (10 ** settings.ROUND_DECIMALS)
-        ag_man_X_mrj = {k: np.floor(v * 10 ** settings.ROUND_DECIMALS) / (10 ** settings.ROUND_DECIMALS) for k, v in solution.ag_man_X_mrj.items()}
+            luto_solver = LutoSolver(input_data)
+            luto_solver.gurobi_model.Params.NumericFocus = nf
+            luto_solver.formulate()
+            solution = luto_solver.solve()
+
+            status = luto_solver.gurobi_model.Status
+            if status == GRB.OPTIMAL:
+                print(f"Feasible solution found with NumericFocus={nf}")
+                break
+
 
         data.add_lumap(target_year, solution.lumap)
         data.add_lmmap(target_year, solution.lmmap)
         data.add_ammaps(target_year, solution.ammaps)
-        data.add_ag_dvars(target_year, ag_X_mrj)
-        data.add_non_ag_dvars(target_year, non_ag_X_rk)
-        data.add_ag_man_dvars(target_year, ag_man_X_mrj)
+        data.add_ag_dvars(target_year, solution.ag_X_mrj)
+        data.add_non_ag_dvars(target_year, solution.non_ag_X_rk)
+        data.add_ag_man_dvars(target_year, solution.ag_man_X_mrj)
         data.add_obj_vals(target_year, solution.obj_val)
+
+        # Floor-truncate dvars immediately so the next year's lb derivation uses
+        # consistent values (prevents raw float32 precision noise from making lb > ub).
+        _rd = 10 ** settings.ROUND_DECIMALS
+        data.ag_dvars[target_year]     = np.floor(data.ag_dvars[target_year]     * _rd) / _rd
+        data.non_ag_dvars[target_year] = np.floor(data.non_ag_dvars[target_year] * _rd) / _rd
+        data.ag_man_dvars[target_year] = {k: np.floor(v * _rd) / _rd for k, v in data.ag_man_dvars[target_year].items()}
 
         for data_type, prod_data in solution.prod_data.items():
             data.add_production_data(target_year, data_type, prod_data)
-            
 
         print(f'Processing for {target_year} completed in {round(time.time() - start_time)} seconds\n\n' )
-        
-        status = luto_solver.gurobi_model.Status
+
         if status != GRB.OPTIMAL:
             print('!' * 100)
 
