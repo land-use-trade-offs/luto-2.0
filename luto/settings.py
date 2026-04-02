@@ -820,10 +820,6 @@ For example, the 50th percentile for 'Beef - Modified land' is 0.22, meaning thi
 to undisturbed natural land.
 '''
 
-AG_UNIFORM_BIO_CONTRIBUTION = 0
-'''
-If CONTRIBUTION_PERCENTILE is set to 'AG_UNIFORM', then the biodiversity contribution of all agricultural land uses will be set to the same value, which is determined by AG_UNIFORM_BIO_CONTRIBUTION. For example, if AG_UNIFORM_BIO_CONTRIBUTION is set to 0.5, then all agricultural land uses will have a biodiversity contribution of 0.5 (i.e., they will retain 50% of the biodiversity score compared to undisturbed natural land).
-'''
 
 # Biodiversity value under default late dry season savanna fire regime
 BIO_CONTRIBUTION_LDS = 0.8

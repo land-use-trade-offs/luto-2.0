@@ -746,7 +746,7 @@ class Data:
             self.AGTECH_EI_DATA[lu] = horticulture_data
 
         # Load BioChar data
-        biochar_file = os.path.join(settings.INPUT_DIR, '20240918_Bundle_BC.xlsx')
+        biochar_file = os.path.join(settings.INPUT_DIR, '20260401_Bundle_BC.xlsx')
         self.BIOCHAR_DATA = {}
         cropping_data = pd.read_excel(biochar_file, sheet_name='Biochar (cropping)', index_col='Year' )
         horticulture_data = pd.read_excel(biochar_file, sheet_name='Biochar (horticulture)', index_col='Year' )
@@ -798,6 +798,18 @@ class Data:
             renewable_bundle = pd.read_csv(f'{settings.INPUT_DIR}/renewable_energy_bundle.csv')
             self.RENEWABLE_BUNDLE_WIND = renewable_bundle.query('Lever == "Onshore Wind"')
             self.RENEWABLE_BUNDLE_SOLAR = renewable_bundle.query('Lever == "Utility Solar PV"')
+            
+            # Existing capacity 
+            #    The existing capacity is MW/cell, so here we need to sum the resfactor cells 
+            #    to get the total existing capacity in each resfactor cell. 
+            renewable_existing_capacity_lyr = xr.load_dataarray(f'{settings.INPUT_DIR}/renewable_existing_capacity_MW_1D.nc')
+            self.RENEWABLE_EXISTING_CAPACITY_LAYER_SOLAR = self.get_resfactored_sum(renewable_existing_capacity_lyr.sel(tech_name='Utility Solar PV'))
+            self.RENEWABLE_EXISTING_CAPACITY_LAYER_WIND = self.get_resfactored_sum(renewable_existing_capacity_lyr.sel(tech_name='Onshore Wind'))
+            self.RENEWABLE_EXISTING_CAPACITY_OUT_LUTO_BY_STATE = (
+                pd.read_csv(f'{settings.INPUT_DIR}/renewable_existing_capacity_outside_LUTO_by_state.csv')
+                .set_index('State')
+                .to_dict(orient='index')
+            )
 
 
 
@@ -1398,7 +1410,7 @@ class Data:
             case 'USER_DEFINED':
                 bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')['USER_DEFINED'].to_dict()
             case 'AG_UNIFORM':
-                bio_HCAS_contribution_lookup = {int(k): settings.AG_UNIFORM_BIO_CONTRIBUTION for k in biodiv_contribution_lookup['lu']}                                                   # Set the biodiversity degradation score for all land uses to be the same as unallocated natural land
+                bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')['AG_UNIFORM'].to_dict()                                     
             case _:
                 print(f"│   ⚠ WARNING: Invalid habitat condition source: {settings.CONTRIBUTION_PERCENTILE}, must be one of [10, 25, 50, 75, 90], 'USER_DEFINED', or 'AG_UNIFORM'", flush=True)
         
@@ -1509,7 +1521,7 @@ class Data:
 
             # Process layers with resfactoring
             nvis_layers_arr = np.array(
-                [self.get_average_fraction_from_int_map(arr) for arr in nvis_layers_sel],
+                [self.get_resfactored_average_fraction(arr) for arr in nvis_layers_sel],
                 dtype=np.float32
             )
             nvis_layers_arr = nvis_layers_arr / 100.0  # Convert to percentage
@@ -1572,7 +1584,7 @@ class Data:
 
             # Process layers with resfactoring (IBRA already in correct units, no /100 needed)
             ibra_layers_arr = np.array(
-                [self.get_average_fraction_from_int_map(arr) for arr in ibra_layers_sel],
+                [self.get_resfactored_average_fraction(arr) for arr in ibra_layers_sel],
                 dtype=np.float32
             )
 
@@ -1634,7 +1646,7 @@ class Data:
             if self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL:
                 snes_parts.append(BIO_GBF4_SPECIES_raw.sel(species=self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL, presence='LIKELY_AND_MAYBE'))
             snes_arr = xr.concat(snes_parts, dim='species') if snes_parts else BIO_GBF4_SPECIES_raw.isel(species=[], cell=slice(None))
-            self.BIO_GBF4_SPECIES_LAYERS = np.array([self.get_average_fraction_from_int_map(arr) for arr in snes_arr]) 
+            self.BIO_GBF4_SPECIES_LAYERS = np.array([self.get_resfactored_average_fraction(arr) for arr in snes_arr]) 
         
         
         if settings.BIODIVERSITY_TARGET_GBF_4_ECNES != 'off':
@@ -1677,7 +1689,7 @@ class Data:
             if self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL:
                 ecnes_parts.append(BIO_GBF4_COMUNITY_raw.sel(species=self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL, presence='LIKELY_AND_MAYBE').compute())
             ecnes_arr = xr.concat(ecnes_parts, dim='species') if ecnes_parts else BIO_GBF4_COMUNITY_raw.isel(species=[], cell=slice(None))
-            self.BIO_GBF4_COMUNITY_LAYERS = np.array([self.get_average_fraction_from_int_map(arr) for arr in ecnes_arr])
+            self.BIO_GBF4_COMUNITY_LAYERS = np.array([self.get_resfactored_average_fraction(arr) for arr in ecnes_arr])
         
   
         
@@ -1825,12 +1837,12 @@ class Data:
             for idx_w, _ in enumerate(self.LANDMANS):
                 # Get the cells with the same ID and water supply
                 lu_arr = (self.LUMAP_NO_RESFACTOR == idx_lu) * (self.LMMAP_NO_RESFACTOR == idx_w)
-                lumap_mrj[idx_w, :, idx_lu] = self.get_average_fraction_from_int_map(lu_arr, use_valid_cell_count=False)
+                lumap_mrj[idx_w, :, idx_lu] = self.get_resfactored_average_fraction(lu_arr, use_valid_cell_count=False)
                     
         return lumap_mrj
     
     
-    def get_average_fraction_from_int_map(self, arr: np.ndarray, use_valid_cell_count: bool = True) -> np.ndarray:
+    def get_resfactored_average_fraction(self, arr: np.ndarray, use_valid_cell_count: bool = True) -> np.ndarray:
         '''
         Calculate the average value for each resfactored cell, given the input arr is masked by the land-use mask
         (has a length of the number of cells in the full-resolution 1D array, i.e., 6956407).
@@ -1867,6 +1879,25 @@ class Data:
         arr_2d_xr_resfactored = (arr_sum / denom).values[0:self.LUMAP_2D_RESFACTORED.shape[0], 0:self.LUMAP_2D_RESFACTORED.shape[1]]
 
         return arr_2d_xr_resfactored[self.COORD_ROW_COL_RESFACTORED[0], self.COORD_ROW_COL_RESFACTORED[1]]
+    
+    
+    def get_resfactored_sum(self, arr: np.ndarray) -> np.ndarray:
+        '''
+        Calculate the sum for each resfactored cell, given the input arr is masked by the land-use mask
+        (has a length of the number of cells in the full-resolution 1D array, i.e., 6956407).
+
+        Args:
+            arr (np.ndarray): A 1D array containing the values for the full-resolution array, should be the length
+                of the number of cells in the full-resolution array (i.e., 6956407).
+        Returns:
+            np.ndarray: A 1D array containing the sum for each cell in the
+            resfactored array, with the same length as the number of cells in the resfactored array.
+        '''
+        arr_2d = np.zeros_like(self.LUMAP_2D_FULLRES, dtype=np.float32)
+        np.place(arr_2d, self.NLUM_MASK, arr)
+        arr_2d_xr = xr.DataArray(arr_2d, dims=['y', 'x']) * self.LUMASK_2D_FULLRES  # Ensure outside LUTO cells are zeroed out and don't contribute to the sum
+        arr_sum = arr_2d_xr.coarsen(x=settings.RESFACTOR, y=settings.RESFACTOR, boundary='pad').sum()
+        return arr_sum.values[self.COORD_ROW_COL_RESFACTORED[0], self.COORD_ROW_COL_RESFACTORED[1]]
 
     
     def get_resfactored_lumap(self) -> np.ndarray:

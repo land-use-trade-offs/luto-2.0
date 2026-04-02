@@ -167,9 +167,9 @@ When `RESFACTOR > 1`, each coarsened cell may only partially overlap the LUTO st
   - `get_GBF2_target_for_yr_cal()` baseline sum → `* AG_MASK_PROPORTION_R`
 
 **Does NOT need `AG_MASK_PROPORTION_R`:**
-- **GBF3 NVIS/IBRA, GBF4 SNES/ECNES, GBF8** — Their layer arrays (`GBF3_NVIS_LAYERS_LDS`, `BIO_GBF4_SPECIES_LAYERS`, etc.) are built via `get_average_fraction_from_int_map()`, which coarsens by computing `mean()` over all RESFACTOR² subcells (including zeros outside LUTO). A boundary cell with 7/25 subcells in LUTO gets fraction 7/25. Multiplied by `REAL_AREA` (= cell_area × RESFACTOR²), this correctly yields `7 × cell_area`. The partial-cell correction is already implicit in the fractional layer values.
+- **GBF3 NVIS/IBRA, GBF4 SNES/ECNES, GBF8** — Their layer arrays (`GBF3_NVIS_LAYERS_LDS`, `BIO_GBF4_SPECIES_LAYERS`, etc.) are built via `get_resfactored_average_fraction()`, which coarsens by computing `mean()` over all RESFACTOR² subcells (including zeros outside LUTO). A boundary cell with 7/25 subcells in LUTO gets fraction 7/25. Multiplied by `REAL_AREA` (= cell_area × RESFACTOR²), this correctly yields `7 × cell_area`. The partial-cell correction is already implicit in the fractional layer values.
 
-**Rule of thumb:** If the constraint coefficient is a **binary mask** or scalar per coarsened cell, multiply by `AG_MASK_PROPORTION_R`. If it comes from `get_average_fraction_from_int_map()`, the correction is already built in.
+**Rule of thumb:** If the constraint coefficient is a **binary mask** or scalar per coarsened cell, multiply by `AG_MASK_PROPORTION_R`. If it comes from `get_resfactored_average_fraction()`, the correction is already built in.
 
 ## Renewable Energy Module
 

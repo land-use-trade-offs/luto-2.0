@@ -168,7 +168,7 @@ def create_new_dataset(refresh=False):
     shutil.copyfile(luto_1D_inpath + '20260317_Bundle_AgTech_NE.xlsx', outpath + '20260317_Bundle_AgTech_NE.xlsx')
     shutil.copyfile(luto_1D_inpath + '20260317_Bundle_AgTech_EI.xlsx', outpath + '20260317_Bundle_AgTech_EI.xlsx')
     shutil.copyfile(luto_1D_inpath + '20231107_ECOGRAZE_Bundle.xlsx', outpath + '20231107_ECOGRAZE_Bundle.xlsx')
-    shutil.copyfile(luto_1D_inpath + '20240918_Bundle_BC.xlsx', outpath + '20240918_Bundle_BC.xlsx')
+    shutil.copyfile(luto_1D_inpath + '20260401_Bundle_BC.xlsx', outpath + '20260401_Bundle_BC.xlsx')
     
     # Copy biodiversity HACS data from DCCEEW
     shutil.copyfile(bio_HACS_inpath + 'HABITAT_CONDITION.csv', outpath + 'bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv')
@@ -215,6 +215,8 @@ def create_new_dataset(refresh=False):
     shutil.copyfile(f'{renewable_energy_inpath}/renewable_price_AUD_MWh_wind.csv', outpath + 'renewable_price_AUD_MWh_wind.csv')
     shutil.copyfile(f'{renewable_energy_inpath}/renewable_QLD_EPBC_MNES_prioritization.nc', outpath + 'renewable_QLD_EPBC_MNES_prioritization.nc')
     shutil.copyfile(f'{renewable_energy_inpath}/renewable_QLD_EPBC_MNES_prioritization_performance.csv', outpath + 'renewable_QLD_EPBC_MNES_prioritization_performance.csv')
+    shutil.copyfile(f'{renewable_energy_inpath}/renewable_existing_capacity_MW_1D.nc', outpath + 'renewable_existing_capacity_MW_1D.nc')
+    shutil.copyfile(f'{renewable_energy_inpath}/renewable_existing_capacity_outside_LUTO_by_state.csv', outpath + 'renewable_existing_capacity_outside_LUTO_by_state.csv')
 
 
 

@@ -109,7 +109,6 @@ grid_search = {
     # --------------- Biodiversity overall ---------------
     'BIO_QUALITY_LAYER': ['Suitability'],
     'CONTRIBUTION_PERCENTILE': ['USER_DEFINED'],                            # 50th percentile of HCAS per LUF Report 2026 (need to be 'USER_DEFINED', which is 50th percentile but with nudges for sheep/beef/dairy nat land)
-    'AG_UNIFORM_BIO_CONTRIBUTION': [0],                                     # Set the biodiversity degradation score for all agricultural land uses to be the same as unallocated natural land; test 0.7 and 0.9 alongside (Third iteration)
     'CONNECTIVITY_SOURCE': ['NCI'],
     'CONNECTIVITY_LB': [0.7],                                               # Connectivity score importance: 0.7 per LUF Report 2026
 
