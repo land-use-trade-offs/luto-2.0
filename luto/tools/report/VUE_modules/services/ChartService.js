@@ -484,6 +484,12 @@ window.ChartService = {
         },
       },
     },
+    "Renewable": {
+      "Ag Mgt": {
+        "path": "data/Renewable_energy_Am.js",
+        "name": "Renewable_energy_Am",
+      },
+    },
     "Supporting": {
       "info": {
         "path": "data/Supporting_info.js",

@@ -101,6 +101,9 @@ window.MapService = {
       'Ag': { 'path': 'data/map_layers/map_water_yield_Ag.js', 'name': 'map_water_yield_Ag' },
       'Ag Mgt': { 'path': 'data/map_layers/map_water_yield_Am.js', 'name': 'map_water_yield_Am' },
       'Non-Ag': { 'path': 'data/map_layers/map_water_yield_NonAg.js', 'name': 'map_water_yield_NonAg' },
+    },
+    'Renewable': {
+      'Ag Mgt': { 'path': 'data/map_layers/map_renewable_energy_Am.js', 'name': 'map_renewable_energy_Am' },
     }
   }
 }

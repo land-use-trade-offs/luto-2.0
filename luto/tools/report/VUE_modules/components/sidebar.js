@@ -17,6 +17,7 @@ window.Sidebar = {
       { id: "GHG", label: "GHG Analysis", path: "/ghg", icon: standardizeIcon(window.NavIcons.GHG) },
       { id: "water", label: "Water Analysis", path: "/water", icon: standardizeIcon(window.NavIcons.water) },
       { id: "biodiversity", label: "Biodiversity", path: "/biodiversity", icon: standardizeIcon(window.NavIcons.biodiversity) },
+      { id: "renewable", label: "Renewable Energy", path: "/renewable", icon: standardizeIcon(window.NavIcons.renewable) },
       { id: "map", label: "Map View", path: "/map", icon: standardizeIcon(window.NavIcons.map) },
       { id: "settings", label: "Settings and Log", path: "/settings", icon: standardizeIcon(window.NavIcons.settings) },
     ];

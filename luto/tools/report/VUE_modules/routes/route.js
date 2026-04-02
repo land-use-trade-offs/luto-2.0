@@ -9,6 +9,7 @@ const routes = [
   { path: "/ghg", component: window.GHGView },
   { path: "/water", component: window.WaterView },
   { path: "/biodiversity", component: window.BiodiversityView },
+  { path: "/renewable", component: window.RenewableView },
   { path: "/settings", component: window.SettingsView },
   { path: "/map", component: window.MapView },
   { path: "/:pathMatch(.*)*", component: window.NotFound },
