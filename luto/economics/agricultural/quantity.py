@@ -637,6 +637,24 @@ For renewable products, the quantity is calculated as:
 '''
 
 
+def get_exist_renewable_capacity(data, re_type: str) -> np.ndarray:
+    """
+    Return existing renewable capacity converted to annual energy yield [MWh/cell].
+
+    Args:
+        data: Data object.
+        re_type (str): Renewable type ('Utility Solar PV' or 'Onshore Wind').
+    """
+    if re_type == 'Utility Solar PV':
+        capacity_mw = data.RENEWABLE_EXISTING_CAPACITY_LAYER_SOLAR
+    elif re_type == 'Onshore Wind':
+        capacity_mw = data.RENEWABLE_EXISTING_CAPACITY_LAYER_WIND
+    else:
+        raise KeyError(f"Renewable type '{re_type}' not found in existing capacity data.")
+
+    return (capacity_mw * 24 * 365).astype(np.float32)
+
+
 def get_quantity_renewable(data, re_type: str, yr_idx: int):
     """
     Return electricity yield [MWh] for renewable product `pr`.

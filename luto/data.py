@@ -806,8 +806,9 @@ class Data:
             self.RENEWABLE_EXISTING_CAPACITY_LAYER_SOLAR = self.get_resfactored_sum(renewable_existing_capacity_lyr.sel(tech_name='Utility Solar PV'))
             self.RENEWABLE_EXISTING_CAPACITY_LAYER_WIND = self.get_resfactored_sum(renewable_existing_capacity_lyr.sel(tech_name='Onshore Wind'))
             self.RENEWABLE_EXISTING_CAPACITY_OUT_LUTO_BY_STATE = (
-                pd.read_csv(f'{settings.INPUT_DIR}/renewable_existing_capacity_outside_LUTO_by_state.csv')
-                .set_index('State')
+                pd.read_csv(f'{settings.INPUT_DIR}/renewable_existing_capacity_by_state.csv')
+                .set_index(['state', 'tech'])['capacity_MW']
+                .unstack('tech')
                 .to_dict(orient='index')
             )
 

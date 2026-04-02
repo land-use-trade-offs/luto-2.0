@@ -78,6 +78,8 @@ class SolverInputData:
     
     renewable_solar_r: np.ndarray                                       # Renewable energy - solar yield matrix.
     renewable_wind_r: np.ndarray                                        # Renewable energy - wind yield matrix.
+    exist_renewable_solar_r: np.ndarray                                 # Existing solar capacity converted to annual MWh per cell.
+    exist_renewable_wind_r: np.ndarray                                  # Existing wind capacity converted to annual MWh per cell.
     
     region_state_r: np.ndarray                                          # Region state index for each cell.
     region_state_name2idx: dict[str, int]                               # Map of region state names to indices.
@@ -462,15 +464,37 @@ def get_ag_man_lb_mrj(data: Data, base_year):
     output = ag_transition.get_lower_bound_agricultural_management_matrices(data, base_year)
     return output
 
-def get_renewable_solar_r(data: Data, target_idx):
+def get_potential_renewable_solar_r(data: Data, target_idx):
     print('Getting renewable energy - solar yield matrix...', flush = True)
     output = ag_quantity.get_quantity_renewable(data, 'Utility Solar PV', target_idx)
     return output
 
-def get_renewable_wind_r(data: Data, target_idx):
+def get_potential_renewable_wind_r(data: Data, target_idx):
     print('Getting renewable energy - wind yield matrix...', flush = True)
     output = ag_quantity.get_quantity_renewable(data, 'Onshore Wind', target_idx)
     return output
+
+def get_exist_renewable_capacity_solar_r(data: Data):
+    print('Getting existing solar capacity (MWh/cell)...', flush=True)
+    return ag_quantity.get_exist_renewable_capacity(data, 'Utility Solar PV')
+
+def get_exist_renewable_capacity_wind_r(data: Data):
+    print('Getting existing wind capacity (MWh/cell)...', flush=True)
+    return ag_quantity.get_exist_renewable_capacity(data, 'Onshore Wind')
+
+def get_exist_renewable_capacity_solar_state(data: Data) -> dict:
+    print('Getting existing solar capacity by state (MWh)...', flush=True)
+    return {
+        state: vals.get('Utility Solar PV', 0.0) * 24 * 365
+        for state, vals in data.RENEWABLE_EXISTING_CAPACITY_OUT_LUTO_BY_STATE.items()
+    }
+
+def get_exist_renewable_capacity_wind_state(data: Data) -> dict:
+    print('Getting existing wind capacity by state (MWh)...', flush=True)
+    return {
+        state: vals.get('Onshore Wind', 0.0) * 24 * 365
+        for state, vals in data.RENEWABLE_EXISTING_CAPACITY_OUT_LUTO_BY_STATE.items()
+    }
 
 def get_region_state_r(data: Data):
     print('Getting region state index for each cell...', flush = True)
@@ -766,20 +790,7 @@ def get_limits(data: Data, yr_cal: int, resale_factors) -> dict[str, Any]:
     """
     print('Getting environmental limits...', flush = True)
     
-    limits = {
-        'demand': None,
-        'water': None,
-        'ghg': None,
-        'renewable_solar': None,
-        'renewable_wind': None,
-        'GBF2': None,
-        'GBF3': None,
-        'GBF4_SNES': None,
-        'GBF4_ECNES': None,
-        'GBF8': None,
-        'ag_regional_adoption': None,
-        'non_ag_regional_adoption': None,
-    }
+    limits = {}
     
     if True:    # Always set demand limits
         limits['demand'] = data.D_CY[yr_cal - data.YR_CAL_BASE]
@@ -795,10 +806,14 @@ def get_limits(data: Data, yr_cal: int, resale_factors) -> dict[str, Any]:
         
     if any(settings.RENEWABLES_OPTIONS.values()):
         renewable_targets = data.RENEWABLE_TARGETS.query('Year == @yr_cal and scen == @settings.RENEWABLE_TARGET_SCENARIO_TARGETS').set_index('state')
-        limits['renewable_solar'] = renewable_targets.query('tech == "Utility Solar"')['Renewable_Target_MWh'].to_dict()
-        limits['renewable_wind'] = renewable_targets.query('tech == "Wind"')['Renewable_Target_MWh'].to_dict()
-        limits['renewable_solar_rescale'] = {k: v / resale_factors['Renewable_Solar'] for k, v in limits['renewable_solar'].items()}
-        limits['renewable_wind_rescale'] = {k: v / resale_factors['Renewable_Wind'] for k, v in limits['renewable_wind'].items()}
+        limits['renewable_Utility Solar PV'] = renewable_targets.query('tech == "Utility Solar"')['Renewable_Target_MWh'].to_dict()
+        limits['renewable_Onshore Wind'] = renewable_targets.query('tech == "Wind"')['Renewable_Target_MWh'].to_dict()
+        limits['renewable_Utility Solar PV_rescale'] = {k: v / resale_factors['Renewable_Solar'] for k, v in limits['renewable_Utility Solar PV'].items()}
+        limits['renewable_Onshore Wind_rescale'] = {k: v / resale_factors['Renewable_Wind'] for k, v in limits['renewable_Onshore Wind'].items()}
+        limits['renewable_Utility Solar PV_exist'] = get_exist_renewable_capacity_solar_state(data)
+        limits['renewable_Onshore Wind_exist'] = get_exist_renewable_capacity_wind_state(data)
+        limits['renewable_Utility Solar PV_exist_rescale'] = {k: v / resale_factors['Renewable_Solar'] for k, v in limits['renewable_Utility Solar PV_exist'].items()}
+        limits['renewable_Onshore Wind_exist_rescale'] = {k: v / resale_factors['Renewable_Wind'] for k, v in limits['renewable_Onshore Wind_exist'].items()}
 
     if settings.BIODIVERSITY_TARGET_GBF_2 != 'off':
         limits["GBF2"] = data.get_GBF2_target_for_yr_cal(yr_cal)
@@ -897,9 +912,11 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     ag_man_limits=get_ag_man_limits(data, target_index)                            
     ag_man_lb_mrj=get_ag_man_lb_mrj(data, base_year)
     
-    renewable_solar_r=get_renewable_solar_r(data, target_index)
-    renewable_wind_r=get_renewable_wind_r(data, target_index)
-    
+    renewable_solar_r=get_potential_renewable_solar_r(data, target_index)
+    renewable_wind_r=get_potential_renewable_wind_r(data, target_index)
+    exist_renewable_solar_r=get_exist_renewable_capacity_solar_r(data)
+    exist_renewable_wind_r=get_exist_renewable_capacity_wind_r(data)
+
     region_state_r = get_region_state_r(data)
     region_state_name2idx = get_region_state_name2idx(data)
     
@@ -942,8 +959,8 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ghg_scale = 1.0
 
     if any(settings.RENEWABLES_OPTIONS.values()):
-        [renewable_solar_r], solar_scale = rescale_solver_input_data([renewable_solar_r])
-        [renewable_wind_r],  wind_scale  = rescale_solver_input_data([renewable_wind_r])
+        [renewable_solar_r, exist_renewable_solar_r], solar_scale = rescale_solver_input_data([renewable_solar_r, exist_renewable_solar_r])
+        [renewable_wind_r,  exist_renewable_wind_r],  wind_scale  = rescale_solver_input_data([renewable_wind_r,  exist_renewable_wind_r])
     else:
         solar_scale = wind_scale = 1.0
 
@@ -1053,7 +1070,9 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         
         renewable_solar_r,
         renewable_wind_r,
-        
+        exist_renewable_solar_r,
+        exist_renewable_wind_r,
+
         region_state_r,
         region_state_name2idx,
         
