@@ -524,6 +524,7 @@ class Data:
             self.REGION_STATE_NAME2CODE.pop('Other Territories')                            # Remove 'Other Territories' from the dict.
         
         self.REGION_STATE_CODE = REGION_STATE_r['STE_CODE11'].values
+        self.REGION_STATE_NAME = REGION_STATE_r['STE_NAME11'].values.to_numpy()
 
 
         ###############################################################
@@ -805,9 +806,15 @@ class Data:
             renewable_existing_capacity_lyr = xr.load_dataarray(f'{settings.INPUT_DIR}/renewable_existing_capacity_MW_1D.nc')
             self.RENEWABLE_EXISTING_CAPACITY_LAYER_SOLAR = self.get_resfactored_sum(renewable_existing_capacity_lyr.sel(tech_name='Utility Solar PV'))
             self.RENEWABLE_EXISTING_CAPACITY_LAYER_WIND = self.get_resfactored_sum(renewable_existing_capacity_lyr.sel(tech_name='Onshore Wind'))
-            self.RENEWABLE_EXISTING_CAPACITY_OUT_LUTO_BY_STATE = (
+            
+            renewable_existing_capacity = (
                 pd.read_csv(f'{settings.INPUT_DIR}/renewable_existing_capacity_by_state.csv')
-                .set_index(['state', 'tech'])['capacity_MW']
+                .eval('capacity_MWH=capacity_MW * 365 * 24')
+            )
+            
+            self.RENEWABLE_EXISTING_CAPACITY_MWH_BY_STATE = (
+                renewable_existing_capacity
+                .set_index(['state', 'tech'])['capacity_MWH']
                 .unstack('tech')
                 .to_dict(orient='index')
             )
