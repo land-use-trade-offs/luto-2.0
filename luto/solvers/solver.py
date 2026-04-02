@@ -523,12 +523,36 @@ class LutoSolver:
         """
         print("│   ├── Adding constraints for agricultural management adoption limits...")
 
+        # Map renewable AM names to their existing-capacity arrays so that cells
+        # with pre-existing infrastructure are excluded from new adoption decisions.
+        # Their energy contribution is accounted for separately via exist_power_rescale
+        # in the renewable energy constraints.
+        renewable_exist_map = {
+            'Utility Solar PV': self._input_data.exist_renewable_solar_r,
+            'Onshore Wind':     self._input_data.exist_renewable_wind_r,
+        }
+
         for am, am_j_list in self._input_data.am2j.items():
+            exist_r = renewable_exist_map.get(am)
+
             for j_idx, j in enumerate(am_j_list):
                 adoption_limit = self._input_data.ag_man_limits[am][j]
 
                 dry_cells = self._input_data.ag_lu2cells[0, j]
                 irr_cells = self._input_data.ag_lu2cells[1, j]
+
+                # For renewable AMs: pin am dvars to 0 for cells that already have
+                # existing capacity — the optimizer must not "re-install" them.
+                if exist_r is not None:
+                    for cells, vars_jr in [
+                        (dry_cells, self.X_ag_man_dry_vars_jr),
+                        (irr_cells, self.X_ag_man_irr_vars_jr),
+                    ]:
+                        for r in cells[exist_r[cells] > 0]:
+                            var = vars_jr[am][j_idx, r]
+                            if isinstance(var, gp.Var):
+                                var.lb = 0
+                                var.ub = 0
 
                 # Sum of all usage of the AM option must be less than the limit
                 ag_man_vars_sum = (
@@ -765,7 +789,6 @@ class LutoSolver:
                 energy_r      = re_data['energy_r']
                 gbf2_mask_idx = re_data['gbf2_mask_idx']
                 mnes_mask_idx = re_data['mnes_mask_idx']
-                exist_r       = re_data['exist_r']
 
                 target_raw    = self._input_data.limits[f"renewable_{am}"][reg_name]
                 target_rescal = self._input_data.limits[f"renewable_{am}_rescale"][reg_name]
@@ -775,15 +798,11 @@ class LutoSolver:
 
                 print(f"│   │   │   ├── target for {am} is {target_raw:5,.0f} MWh  (existing: {exist_power_mwh:5,.0f} MWh)")
 
-                # Get indices of cells with existing renewable infrastructure
-                existing_cells_idx = reg_idx[exist_r[reg_idx] > 0]
-
                 am_exprs = []
                 for j_idx, j in enumerate(self._input_data.am2j[am]):
 
                     j_cells         = np.union1d(self._input_data.ag_lu2cells[0, j], self._input_data.ag_lu2cells[1, j])
                     reg_AND_j_cells = np.intersect1d(j_cells, reg_idx)                      # Get cells that are both in the region and in the agricultural land use
-                    reg_AND_j_cells = np.setdiff1d(reg_AND_j_cells, existing_cells_idx)     # Mask out cells with existing renewable capacity
 
                     if settings.EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS == True:
                         reg_AND_j_cells = np.setdiff1d(reg_AND_j_cells, gbf2_mask_idx)      # Disallowing renewable energy production in GBF2-masked cells, using type-specific cut values

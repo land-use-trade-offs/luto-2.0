@@ -474,13 +474,17 @@ def get_potential_renewable_wind_r(data: Data, target_idx):
     output = ag_quantity.get_quantity_renewable(data, 'Onshore Wind', target_idx)
     return output
 
-def get_exist_renewable_capacity_solar_r(data: Data):
+def get_exist_renewable_capacity_solar_r(data: Data, yr_cal: int):
     print('Getting existing solar capacity (MWh/cell)...', flush=True)
-    return ag_quantity.get_exist_renewable_capacity(data, 'Utility Solar PV')
+    return ag_quantity.get_exist_renewable_capacity_layer(data, 'Utility Solar PV', yr_cal)
 
-def get_exist_renewable_capacity_wind_r(data: Data):
+def get_exist_renewable_capacity_wind_r(data: Data, yr_cal: int):
     print('Getting existing wind capacity (MWh/cell)...', flush=True)
-    return ag_quantity.get_exist_renewable_capacity(data, 'Onshore Wind')
+    return ag_quantity.get_exist_renewable_capacity_layer(data, 'Onshore Wind', yr_cal)
+
+def get_exist_renewable_capacity_by_state_input(data: Data, yr_cal: int):
+    print('Getting existing renewable capacity by state...', flush=True)
+    return ag_quantity.get_exist_renewable_capacity_by_state(data, yr_cal)
 
 def get_region_state_r(data: Data):
     print('Getting region state index for each cell...', flush = True)
@@ -798,8 +802,9 @@ def get_limits(data: Data, yr_cal: int, resale_factors) -> dict[str, Any]:
         limits['renewable_Utility Solar PV_rescale'] = {k: v / resale_factors['Renewable_Solar'] for k, v in limits['renewable_Utility Solar PV'].items()}
         limits['renewable_Onshore Wind_rescale'] = {k: v / resale_factors['Renewable_Wind'] for k, v in limits['renewable_Onshore Wind'].items()}
         
-        limits['renewable_Utility Solar PV_exist'] = {state: vals['Utility Solar PV'] for state, vals in data.RENEWABLE_EXISTING_CAPACITY_MWH_BY_STATE.items()}
-        limits['renewable_Onshore Wind_exist']     = {state: vals['Onshore Wind']     for state, vals in data.RENEWABLE_EXISTING_CAPACITY_MWH_BY_STATE.items()}
+        renewable_existing_capacity = get_exist_renewable_capacity_by_state_input(data, yr_cal)
+        limits['renewable_Utility Solar PV_exist'] = {state: vals['Utility Solar PV'] for state, vals in renewable_existing_capacity.items()}
+        limits['renewable_Onshore Wind_exist']     = {state: vals['Onshore Wind']     for state, vals in renewable_existing_capacity.items()}
         limits['renewable_Utility Solar PV_exist_rescale'] = {k: v / resale_factors['Renewable_Solar'] for k, v in limits['renewable_Utility Solar PV_exist'].items()}
         limits['renewable_Onshore Wind_exist_rescale'] = {k: v / resale_factors['Renewable_Wind'] for k, v in limits['renewable_Onshore Wind_exist'].items()}
 
@@ -902,8 +907,8 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     
     renewable_solar_r=get_potential_renewable_solar_r(data, target_index)
     renewable_wind_r=get_potential_renewable_wind_r(data, target_index)
-    exist_renewable_solar_r=get_exist_renewable_capacity_solar_r(data)
-    exist_renewable_wind_r=get_exist_renewable_capacity_wind_r(data)
+    exist_renewable_solar_r=get_exist_renewable_capacity_solar_r(data, target_year)
+    exist_renewable_wind_r=get_exist_renewable_capacity_wind_r(data, target_year)
 
     region_state_r = get_region_state_r(data)
     region_state_name2idx = get_region_state_name2idx(data)

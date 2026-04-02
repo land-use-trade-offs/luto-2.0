@@ -362,6 +362,8 @@ RENEWABLES_OPTIONS = {
     'Onshore Wind': True,
 }
 
+RENEWABLE_EXISTING_END_YEAR = 2030
+
 EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS = True
 '''
 Whether to exclude renewable energy installation on cells inside the GBF2 masked layer (i.e., cells with very high biodiversity value).
