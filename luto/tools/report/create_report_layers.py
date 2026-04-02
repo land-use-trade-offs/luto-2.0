@@ -635,7 +635,21 @@ def save_report_layer(raw_data_dir:str):
 
     water_nonag = files_water.query('base_name == "xr_water_yield_non_ag"')
     get_map2json(water_nonag, None, None, legend_float, water_min_max, f'{SAVE_DIR}/map_layers/map_water_yield_NonAg.js')
-    print('│   └── Water Yield Non-Ag layer saved.')
-    
-    
+    print('│   ├── Water Yield Non-Ag layer saved.')
+
+
+    ####################################################
+    #             10) Renewable Energy                 #
+    ####################################################
+
+    files_renewable = files.query('base_name == "xr_renewable_energy"')
+
+    if not files_renewable.empty:
+        re_magnitudes = cell_magnitudes.get('renewable_energy', [0.0, 0.0])
+        re_min_max = (min(re_magnitudes), max(re_magnitudes))
+
+        get_map2json(files_renewable, None, None, legend_float, re_min_max, f'{SAVE_DIR}/map_layers/map_renewable_energy_Am.js')
+        print('│   └── Renewable Energy Am layer saved.')
+
+
     

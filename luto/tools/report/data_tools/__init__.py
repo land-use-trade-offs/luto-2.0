@@ -54,6 +54,7 @@ def extract_dtype_from_path(path):
             'economics_non_ag':['economics_non_ag_'],
             'transition':['transition_ag2ag_', 'transition_ag2nonag_', 'transition_nonag2ag_'],
             'biodiversity':['biodiversity'],
+            'renewable':['renewable_energy_'],
             # Metrics xarrays
             'xarray_layer':['xr_'],
     }

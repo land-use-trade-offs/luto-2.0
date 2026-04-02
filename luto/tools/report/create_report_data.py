@@ -96,6 +96,7 @@ def save_report_data(raw_data_dir:str):
         delayed(process_area_data)(files, SAVE_DIR, lu_group_map),
         delayed(process_production_data)(files, SAVE_DIR, years),
         delayed(process_economics_data)(files, SAVE_DIR),
+        delayed(process_renewable_data)(files, SAVE_DIR, years),
         delayed(process_ghg_data)(files, SAVE_DIR, lu_group_map, years),
         delayed(process_water_data)(files, SAVE_DIR),
         delayed(process_biodiversity_data)(files, SAVE_DIR),
@@ -1545,6 +1546,47 @@ def process_production_data(files, SAVE_DIR, years):
 
 
     return "Production data processing completed"
+
+
+def process_renewable_data(files, SAVE_DIR, years):
+    """Process and save renewable energy data (ag-mgt level only)."""
+
+    re_state_files = files.query('base_name == "renewable_energy_with_existing_state"').reset_index(drop=True)
+    
+    if re_state_files.empty:
+        return "Renewable energy data processing skipped (no files found)"
+
+    re_df = pd.concat([df for path in re_state_files['path'] if not (df := pd.read_csv(path)).empty], ignore_index=True)
+
+    # Rename am labels to match COLORS keys
+    re_df['am'] = re_df['am'].replace(RENAME_AM_NON_AG)
+
+    # Exclude lu=ALL only; am=ALL and lm=ALL are valid hierarchy buttons in the report
+    re_am_df = re_df.query('lu != "ALL"')
+
+    # -------------------- Renewable energy by AgMgt (am → lm → lu hierarchy) --------------------
+    df_wide = (
+        re_am_df
+        .groupby(['region', 'am', 'lm', 'lu'])[['Year', 'Value (MWh)']]
+        .apply(lambda x: x[['Year', 'Value (MWh)']].values.tolist())
+        .reset_index()
+    )
+    df_wide.columns = ['region', 'am', 'lm', 'name', 'data']
+    df_wide['type'] = 'column'
+    df_wide['color'] = df_wide['name'].apply(lambda x: COLORS.get(x, '#AAAAAA'))
+
+    out_dict = {}
+    for (region, am, lm), df in df_wide.groupby(['region', 'am', 'lm']):
+        df = df.drop(columns=['region', 'am', 'lm'])
+        out_dict.setdefault(region, {}).setdefault(am, {})[lm] = df.to_dict(orient='records')
+
+    filename = 'Renewable_energy_Am'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
+
+    return "Renewable energy data processing completed"
 
 
 def process_ghg_data(files, SAVE_DIR, lu_group_map, years):

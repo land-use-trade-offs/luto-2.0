@@ -394,6 +394,9 @@ COLORS_PLOT = {
     'TCO2E_Carbon Plantings (Belt)':            '#2b908f',
     'TCO2E_Carbon Plantings (Block)':           '#f45b5b',
     'TCO2E_BECCS':                              '#7cb5ec',
+
+    # --- Renewable energy ---
+    'Existing Capacity':                        '#B0B0B0',
 }
 COLORS_PLOT = {RENAME_AM_NON_AG.get(k, k): v for k, v in COLORS_PLOT.items()}
 COLORS_PLOT = {GHG_NAMES.get(k, k): v for k, v in COLORS_PLOT.items()}

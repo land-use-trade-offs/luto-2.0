@@ -120,15 +120,15 @@ def to_region_and_aus_df(da, group_dims, yr_cal):
     aus_dims = [d for d in group_dims if d != 'region'] + ['Year']
     region = (
         da.groupby('region').sum(dim='cell')
-        .to_dataframe('Value ($)').reset_index()
-        .groupby(group_dims)[['Value ($)']].sum().reset_index()
+        .to_dataframe('Value').reset_index()
+        .groupby(group_dims)[['Value']].sum().reset_index()
         .assign(Year=yr_cal)
-        .query('abs(`Value ($)`) > 1')
+        .query('abs(Value) > 1')
     )
     aus = (
         region.groupby(aus_dims).sum().reset_index()
         .assign(region='AUSTRALIA')
-        .query('abs(`Value ($)`) > 1')
+        .query('abs(Value) > 1')
     )
     return pd.concat([aus, region]), aus
 
@@ -339,6 +339,7 @@ def write_output_single_year(data: Data, yr_cal, path_yr):
         delayed(write_transition_ag2nonag)(data, yr_cal, path_yr),
         delayed(write_transition_nonag2ag)(data, yr_cal, path_yr),
         delayed(write_water)(data, yr_cal, path_yr),
+        delayed(write_renewable_energy)(data, yr_cal, path_yr),
         delayed(write_ghg)(data, yr_cal, path_yr),
         delayed(write_biodiversity_quality_scores)(data, yr_cal, path_yr),
         delayed(write_biodiversity_GBF2_scores)(data, yr_cal, path_yr),
@@ -910,23 +911,23 @@ def write_economics(data: Data, yr_cal, path):
     xr_nonag2ag_cost = add_all(xr_nonag2ag_cost, ['from_lu'])
     xr_profit_ag     = add_all(xr_profit_ag,     ['lm', 'lu'])
 
-    ag_rev_jms,       ag_rev_jms_AUS       = to_region_and_aus_df(xr_ag_rev,        ['region', 'lu', 'lm', 'source'], yr_cal)
-    ag_cost_jms,      ag_cost_jms_AUS      = to_region_and_aus_df(xr_ag_cost,       ['region', 'lu', 'lm', 'source'], yr_cal)
-    ag2ag_cost_jms,   ag2ag_cost_jms_AUS   = to_region_and_aus_df(xr_ag2ag_cost,   ['region', 'lu', 'lm', 'source'], yr_cal)
-    nonag2ag_cost_jms, nonag2ag_cost_jms_AUS = to_region_and_aus_df(xr_nonag2ag_cost, ['region', 'from_lu', 'lm', 'source'], yr_cal)
-    profit_ag_jms,    profit_ag_jms_AUS    = to_region_and_aus_df(xr_profit_ag,     ['region', 'lu', 'lm'], yr_cal)
+    ag_rev_jms,       ag_rev_jms_AUS            = to_region_and_aus_df(xr_ag_rev,        ['region', 'lu', 'lm', 'source'], yr_cal)
+    ag_cost_jms,      ag_cost_jms_AUS           = to_region_and_aus_df(xr_ag_cost,       ['region', 'lu', 'lm', 'source'], yr_cal)
+    ag2ag_cost_jms,   ag2ag_cost_jms_AUS        = to_region_and_aus_df(xr_ag2ag_cost,   ['region', 'lu', 'lm', 'source'], yr_cal)
+    nonag2ag_cost_jms, nonag2ag_cost_jms_AUS    = to_region_and_aus_df(xr_nonag2ag_cost, ['region', 'from_lu', 'lm', 'source'], yr_cal)
+    profit_ag_jms,    profit_ag_jms_AUS         = to_region_and_aus_df(xr_profit_ag,     ['region', 'lu', 'lm'], yr_cal)
 
     if nonag2ag_cost_jms.empty:
         nonag2ag_cost_jms = pd.DataFrame({
             'from_lu': ['ALL'], 'lm': ['ALL'], 'source': ['ALL'],
-            'Year': [yr_cal], 'region': ['AUSTRALIA'], 'Value ($)': [0.0]
+            'Year': [yr_cal], 'region': ['AUSTRALIA'], 'Value': [0.0]
         })
 
-    save_csv(ag_rev_jms,          {'lu': 'Land-use',           'lm': 'Water_supply', 'source': 'Type'}, os.path.join(path, f'economics_ag_revenue_{yr_cal}.csv'))
-    save_csv(ag_cost_jms,         {'lu': 'Land-use',           'lm': 'Water_supply', 'source': 'Type'}, os.path.join(path, f'economics_ag_cost_{yr_cal}.csv'))
-    save_csv(ag2ag_cost_jms,      {'lu': 'To_Land-use',        'lm': 'Water_supply', 'source': 'Type'}, os.path.join(path, f'economics_ag_transition_Ag2Ag_{yr_cal}.csv'))
-    save_csv(nonag2ag_cost_jms,   {'from_lu': 'From_Land-use', 'lm': 'Water_supply', 'source': 'Type'}, os.path.join(path, f'economics_ag_transition_NonAg2Ag_{yr_cal}.csv'))
-    save_csv(profit_ag_jms,       {'lu': 'Land-use',           'lm': 'Water_supply', 'source': 'Type'}, os.path.join(path, f'economics_ag_profit_{yr_cal}.csv'))
+    save_csv(ag_rev_jms,          {'lu': 'Land-use',           'lm': 'Water_supply', 'source': 'Type', 'Value': 'Value ($)'}, os.path.join(path, f'economics_ag_revenue_{yr_cal}.csv'))
+    save_csv(ag_cost_jms,         {'lu': 'Land-use',           'lm': 'Water_supply', 'source': 'Type', 'Value': 'Value ($)'}, os.path.join(path, f'economics_ag_cost_{yr_cal}.csv'))
+    save_csv(ag2ag_cost_jms,      {'lu': 'To_Land-use',        'lm': 'Water_supply', 'source': 'Type', 'Value': 'Value ($)'}, os.path.join(path, f'economics_ag_transition_Ag2Ag_{yr_cal}.csv'))
+    save_csv(nonag2ag_cost_jms,   {'from_lu': 'From_Land-use', 'lm': 'Water_supply', 'source': 'Type', 'Value': 'Value ($)'}, os.path.join(path, f'economics_ag_transition_NonAg2Ag_{yr_cal}.csv'))
+    save_csv(profit_ag_jms,       {'lu': 'Land-use',           'lm': 'Water_supply', 'source': 'Type', 'Value': 'Value ($)'}, os.path.join(path, f'economics_ag_profit_{yr_cal}.csv'))
 
     valid_rev_layers          = pd.MultiIndex.from_frame(ag_rev_jms_AUS[['lm', 'source', 'lu']]).sort_values()
     valid_cost_layers         = pd.MultiIndex.from_frame(ag_cost_jms_AUS[['lm', 'source', 'lu']]).sort_values()
@@ -980,7 +981,7 @@ def write_economics(data: Data, yr_cal, path):
     trans_am_df,   trans_am_df_AUS   = to_region_and_aus_df(xr_trans_am,   ['region', 'am', 'lm', 'lu'], yr_cal)
     profit_am_df,  profit_am_df_AUS  = to_region_and_aus_df(xr_profit_am,  ['region', 'am', 'lm', 'lu'], yr_cal)
 
-    rename_map_am = {'lu': 'Land-use', 'lm': 'Water_supply', 'am': 'Management Type'}
+    rename_map_am = {'lu': 'Land-use', 'lm': 'Water_supply', 'am': 'Management Type', 'Value': 'Value ($)'}
     save_csv(revenue_am_df, rename_map_am, os.path.join(path, f'economics_am_revenue_{yr_cal}.csv'))
     save_csv(cost_am_df,    rename_map_am, os.path.join(path, f'economics_am_cost_{yr_cal}.csv'))
     save_csv(trans_am_df,   rename_map_am, os.path.join(path, f'economics_am_transition_{yr_cal}.csv'))
@@ -1059,7 +1060,7 @@ def write_economics(data: Data, yr_cal, path):
     t_ag2nonag_df,       t_ag2nonag_df_AUS       = to_region_and_aus_df(xr_ag2nonag,       ['region', 'lu'], yr_cal)
     profit_na_df,        profit_na_df_AUS        = to_region_and_aus_df(xr_non_ag_profit,  ['region', 'lu'], yr_cal)
 
-    rename_map_na = {'lu': 'Land-use'}
+    rename_map_na = {'lu': 'Land-use', 'Value': 'Value ($)'}
     save_csv(revenue_na_df,    rename_map_na, os.path.join(path, f'economics_non_ag_revenue_{yr_cal}.csv'))
     save_csv(cost_na_df,       rename_map_na, os.path.join(path, f'economics_non_ag_cost_{yr_cal}.csv'))
     save_csv(t_nonag2nonag_df, rename_map_na, os.path.join(path, f'economics_non_ag_transition_NonAg2NonAg_{yr_cal}.csv'))
@@ -1149,6 +1150,69 @@ def write_economics(data: Data, yr_cal, path):
         },
     }
     return (f"Economics (Ag + Am + NonAg + Sum) written for year {yr_cal}", magnitudes)
+
+
+# ── Renewable energy ────────────────────────────────────────────────────────────────
+
+def write_renewable_energy(data: Data, yr_cal, path):
+    
+    yr_idx = yr_cal - data.YR_CAL_BASE
+    
+    # Get decision variable for renewable energy land-use
+    am_dvar_mrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
+        ).assign_coords({'region': ('cell', data.REGION_STATE_NAME)}
+        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
+        ).sel(am=list(settings.RENEWABLES_OPTIONS.keys()))
+        
+    # Get potential renewable energy production (MWh/ha) for each renewable type
+    renewable_potentials = xr.DataArray(
+        [
+            ag_quantity.get_quantity_renewable(data, 'Utility Solar PV', yr_idx),
+            ag_quantity.get_quantity_renewable(data, 'Onshore Wind', yr_idx)
+        ],
+        dims=['am', 'cell'],
+        coords={
+            'am': list(settings.RENEWABLES_OPTIONS.keys()),
+            'cell': range(data.NCELLS)
+        }
+    )
+    
+    
+    # Get renewable energy by dvar * potential
+    renewable_energy = am_dvar_mrj * renewable_potentials
+    renewable_energy = add_all(renewable_energy, ['am', 'lu', 'lm'])  # Add ALL aggregates for each dimension (except cell)
+    
+    # Regionally aggregate renewable energy for reporting
+    renewable_energy_df, renewable_energy_df_AUS = to_region_and_aus_df(renewable_energy, ['region', 'am', 'lm', 'lu'], yr_cal)
+    # Combine existing capacity then save to csv
+    existing_renewable_prod_state = (
+        pd.DataFrame(data.RENEWABLE_EXISTING_CAPACITY_MWH_BY_STATE)
+        .unstack()
+        .reset_index()
+        .rename(columns={'level_0': 'region', 'level_1': 'am', 0: 'Value'})
+        .merge(pd.DataFrame({'lm': renewable_energy_df_AUS['lm'].unique()}), how='cross')
+        .assign(Year=yr_cal, lu='Existing Capacity')
+    )
+    existing_renewable_prod_AUS = (
+        existing_renewable_prod_state
+        .groupby(['am', 'lm'], as_index=False)['Value']
+        .sum()
+        .assign(region='AUSTRALIA', Year=yr_cal, lu='Existing Capacity')
+    )
+
+    rename_map_re = {'Value': 'Value (MWh)'}
+    renewable_energy_df_with_existing = pd.concat([renewable_energy_df, existing_renewable_prod_AUS, existing_renewable_prod_state], ignore_index=True)
+    save_csv(renewable_energy_df_with_existing, rename_map_re, os.path.join(path, f'renewable_energy_with_existing_state_{yr_cal}.csv'))
+
+    # Stack and save to netcdf for later use in report (e.g., for setting colorbar limits)
+    valid_layers = pd.MultiIndex.from_frame(renewable_energy_df_AUS[['am', 'lm', 'lu']]).sort_values()
+    renewable_energy_stack = renewable_energy.stack(layer=['am', 'lm', 'lu']).sel(layer=valid_layers).drop_vars('region').compute()
+    save2nc(renewable_energy_stack, os.path.join(path, f'xr_renewable_energy_{yr_cal}.nc'))
+
+    magnitudes = {'renewable_energy': _get_mag(renewable_energy_stack)}
+    return (f"Renewable energy written for year {yr_cal}", magnitudes)
+
+
 
 
 
