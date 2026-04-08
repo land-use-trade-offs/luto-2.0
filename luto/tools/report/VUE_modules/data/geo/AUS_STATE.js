@@ -1,6 +1,5 @@
 window.AUS_STATE = {
   "type": "FeatureCollection",
-  "name": "3b5b21352757494eb153af775843d471",
   "crs": {
     "type": "name",
     "properties": {
@@ -11,12 +10,7 @@ window.AUS_STATE = {
     {
       "type": "Feature",
       "properties": {
-        "STATE_NAME": "New South Wales",
-        "OBJECTID": 7,
-        "STATE_CODE": "1",
-        "Area": 1122780000000.0,
-        "Shape_Leng": 7603171.82534,
-        "Shape_Area": 1122967791530.0
+        "STATE_NAME": "New South Wales"
       },
       "geometry": {
         "type": "MultiPolygon",
@@ -6307,12 +6301,7 @@ window.AUS_STATE = {
     {
       "type": "Feature",
       "properties": {
-        "STATE_NAME": "Northern Territory",
-        "OBJECTID": 6,
-        "STATE_CODE": "7",
-        "Area": 1518450000000.0,
-        "Shape_Leng": 8432999.8572,
-        "Shape_Area": 1518602750400.0
+        "STATE_NAME": "Northern Territory"
       },
       "geometry": {
         "type": "MultiPolygon",
@@ -10799,12 +10788,7 @@ window.AUS_STATE = {
     {
       "type": "Feature",
       "properties": {
-        "STATE_NAME": "Queensland",
-        "OBJECTID": 1,
-        "STATE_CODE": "3",
-        "Area": 2042780000000.0,
-        "Shape_Leng": 9985707.29155,
-        "Shape_Area": 2042735656990.0
+        "STATE_NAME": "Queensland"
       },
       "geometry": {
         "type": "MultiPolygon",
@@ -16647,12 +16631,7 @@ window.AUS_STATE = {
     {
       "type": "Feature",
       "properties": {
-        "STATE_NAME": "South Australia",
-        "OBJECTID": 3,
-        "STATE_CODE": "4",
-        "Area": 1316380000000.0,
-        "Shape_Leng": 7800016.66972,
-        "Shape_Area": 1316795942730.0
+        "STATE_NAME": "South Australia"
       },
       "geometry": {
         "type": "Polygon",
@@ -19269,12 +19248,7 @@ window.AUS_STATE = {
     {
       "type": "Feature",
       "properties": {
-        "STATE_NAME": "Tasmania",
-        "OBJECTID": 5,
-        "STATE_CODE": "6",
-        "Area": 115110000000.0,
-        "Shape_Leng": 4283145.60539,
-        "Shape_Area": 115177750010.0
+        "STATE_NAME": "Tasmania"
       },
       "geometry": {
         "type": "MultiPolygon",
@@ -24467,12 +24441,7 @@ window.AUS_STATE = {
     {
       "type": "Feature",
       "properties": {
-        "STATE_NAME": "Victoria",
-        "OBJECTID": 2,
-        "STATE_CODE": "2",
-        "Area": 355510000000.0,
-        "Shape_Leng": 4550925.92348,
-        "Shape_Area": 356050079639.0
+        "STATE_NAME": "Victoria"
       },
       "geometry": {
         "type": "Polygon",
@@ -27897,12 +27866,7 @@ window.AUS_STATE = {
     {
       "type": "Feature",
       "properties": {
-        "STATE_NAME": "Western Australia",
-        "OBJECTID": 4,
-        "STATE_CODE": "5",
-        "Area": 3137400000000.0,
-        "Shape_Leng": 14990908.1959,
-        "Shape_Area": 3137687004020.0
+        "STATE_NAME": "Western Australia"
       },
       "geometry": {
         "type": "MultiPolygon",

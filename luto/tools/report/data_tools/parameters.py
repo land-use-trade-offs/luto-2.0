@@ -138,7 +138,13 @@ NON_AG_LANDUSE_RAW = [i for i in NON_AG_LANDUSE_RAW if settings.NON_AG_LAND_USES
 
 # Merge the land uses
 LANDUSE_ALL_RAW = AG_LANDUSE + NON_AG_LANDUSE_RAW
-LANDUSE_ALL_RENAMED = ['Agricultural Management', 'ALL'] + AG_LANDUSE + list(RENAME_NON_AG.values())  + ['Outside LUTO study area'] 
+LANDUSE_ALL_RENAMED = (
+    ['Agricultural Management', 'ALL']
+    + AG_LANDUSE
+    + list(RENAME_NON_AG.values())
+    + ['Outside LUTO study area']
+    + ['Existing Capacity']
+)
 
 
 # Define the land use groups
@@ -396,7 +402,7 @@ COLORS_PLOT = {
     'TCO2E_BECCS':                              '#7cb5ec',
 
     # --- Renewable energy ---
-    'Existing Capacity':                        '#B0B0B0',
+    'Existing Capacity':                        '#d5e8eb',
 }
 COLORS_PLOT = {RENAME_AM_NON_AG.get(k, k): v for k, v in COLORS_PLOT.items()}
 COLORS_PLOT = {GHG_NAMES.get(k, k): v for k, v in COLORS_PLOT.items()}

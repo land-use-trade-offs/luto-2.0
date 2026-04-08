@@ -10,6 +10,10 @@ window.RegionsMap = {
       type: Object,
       default: null
     },
+    regionType: {
+      type: String,
+      default: 'NRM'  // 'NRM' or 'STATE'
+    }
   },
 
   setup(props) {
@@ -81,7 +85,9 @@ window.RegionsMap = {
         }
 
         // Calculate bounds for smooth transition
-        const bbox = window.NRM_AUS_centroid_bbox[selectedRegion.value].bounding_box;
+        const centroidBbox = props.regionType === 'STATE' ? window.AUS_STATE_centroid_bbox : window.NRM_AUS_centroid_bbox;
+        const bbox = centroidBbox?.[selectedRegion.value]?.bounding_box;
+        if (!bbox) return;
         const bounds = [
           [bbox[1], bbox[0]], // Southwest corner
           [bbox[3], bbox[2]]  // Northeast corner
@@ -129,9 +135,11 @@ window.RegionsMap = {
         return;
       }
 
-      // Find the actual region feature from NRM_AUS data
-      const regionLayer = window.NRM_AUS.features.find(feature =>
-        feature.properties.NRM_REGION === selectedRegion.value
+      // Find the actual region feature from the appropriate GeoJSON data
+      const geoJsonData = props.regionType === 'STATE' ? window.AUS_STATE : window.NRM_AUS;
+      const regionProp = props.regionType === 'STATE' ? 'STATE_NAME' : 'NRM_REGION';
+      const regionLayer = geoJsonData?.features.find(feature =>
+        feature.properties[regionProp] === selectedRegion.value
       );
 
       // Add the actual region polygon with initial opacity 0
@@ -186,8 +194,13 @@ window.RegionsMap = {
       try {
         // Load region data
         await loadScript("services/MapService.js", 'MapService');
-        await loadScript('data/geo/NRM_AUS_centroid_bbox.js', 'NRM_AUS_centroid_bbox');
-        await loadScript('data/geo/NRM_AUS.js', 'NRM_AUS');
+        if (props.regionType === 'STATE') {
+          await loadScript('data/geo/AUS_STATE_centroid_bbox.js', 'AUS_STATE_centroid_bbox');
+          await loadScript('data/geo/AUS_STATE.js', 'AUS_STATE');
+        } else {
+          await loadScript('data/geo/NRM_AUS_centroid_bbox.js', 'NRM_AUS_centroid_bbox');
+          await loadScript('data/geo/NRM_AUS.js', 'NRM_AUS');
+        }
 
         // Initialize map first
         initMap();

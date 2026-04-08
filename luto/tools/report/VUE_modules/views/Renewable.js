@@ -154,7 +154,7 @@ window.RenewableView = {
 
       <!-- Region selection dropdown -->
       <div class="absolute w-[262px] top-32 left-[20px] z-50 bg-white/70 rounded-lg shadow-lg max-w-xs z-[9999]">
-        <filterable-dropdown></filterable-dropdown>
+        <filterable-dropdown region-type="STATE"></filterable-dropdown>
       </div>
 
       <!-- Year slider -->
@@ -216,6 +216,7 @@ window.RenewableView = {
         <!-- Map component takes full space -->
         <regions-map
           :mapData="selectMapData"
+          region-type="STATE"
           style="width: 100%; height: 100%;">
         </regions-map>
 

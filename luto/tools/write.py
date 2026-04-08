@@ -1126,27 +1126,27 @@ def write_economics(data: Data, yr_cal, path):
     # ==================== Record Cell Magnitudes ====================
     magnitudes = {
         'Economics_ag': {
-            'ag_revenue':    _get_mag(ag_rev_valid_layers),
-            'ag_cost':       _get_mag(ag_cost_valid_layers),
-            'ag2ag_cost':    _get_mag(ag2ag_cost_valid_layers),
-            'non_ag2ag_cost':_get_mag(nonag2ag_cost_valid_layers),
-            'profit_ag':     _get_mag(profit_ag_valid_layers),
+            'ag_revenue':       _get_mag(ag_rev_valid_layers),
+            'ag_cost':          _get_mag(ag_cost_valid_layers),
+            'ag2ag_cost':       _get_mag(ag2ag_cost_valid_layers),
+            'non_ag2ag_cost':   _get_mag(nonag2ag_cost_valid_layers),
+            'profit_ag':        _get_mag(profit_ag_valid_layers),
         },
         'Economics_am': {
-            'am_revenue':   _get_mag(valid_layers_stack_rev_am),
-            'am_cost':      _get_mag(valid_layers_stack_cost_am),
-            'am_transition':_get_mag(valid_layers_stack_transition_am),
-            'am_profit':    _get_mag(valid_layers_stack_profit_am),
+            'am_revenue':       _get_mag(valid_layers_stack_rev_am),
+            'am_cost':          _get_mag(valid_layers_stack_cost_am),
+            'am_transition':    _get_mag(valid_layers_stack_transition_am),
+            'am_profit':        _get_mag(valid_layers_stack_profit_am),
         },
         'Economics_non_ag': {
-            'non_ag_revenue':        _get_mag(vl_stack_rev_na),
-            'non_ag_cost':           _get_mag(vl_stack_cost_na),
-            'nonag2nonag_cost':      _get_mag(vl_stack_t_nonag2nonag),
-            'ag2nonag_cost':         _get_mag(vl_stack_t_ag2nonag),
-            'non_ag_profit':         _get_mag(vl_stack_profit_na),
+            'non_ag_revenue':   _get_mag(vl_stack_rev_na),
+            'non_ag_cost':      _get_mag(vl_stack_cost_na),
+            'nonag2nonag_cost': _get_mag(vl_stack_t_nonag2nonag),
+            'ag2nonag_cost':    _get_mag(vl_stack_t_ag2nonag),
+            'non_ag_profit':    _get_mag(vl_stack_profit_na),
         },
         'Economics_sum': {
-            'sum_profit':    _get_mag(sum_profit_stack),
+            'sum_profit':       _get_mag(sum_profit_stack),
         },
     }
     return (f"Economics (Ag + Am + NonAg + Sum) written for year {yr_cal}", magnitudes)
@@ -1184,15 +1184,27 @@ def write_renewable_energy(data: Data, yr_cal, path):
     
     # Regionally aggregate renewable energy for reporting
     renewable_energy_df, renewable_energy_df_AUS = to_region_and_aus_df(renewable_energy, ['region', 'am', 'lm', 'lu'], yr_cal)
+    
     # Combine existing capacity then save to csv
     existing_renewable_prod_state = (
-        pd.DataFrame(data.RENEWABLE_EXISTING_CAPACITY_MWH_BY_STATE)
+        pd.DataFrame(ag_quantity.get_exist_renewable_capacity_by_state(data, yr_cal))
         .unstack()
         .reset_index()
         .rename(columns={'level_0': 'region', 'level_1': 'am', 0: 'Value'})
-        .merge(pd.DataFrame({'lm': renewable_energy_df_AUS['lm'].unique()}), how='cross')
-        .assign(Year=yr_cal, lu='Existing Capacity')
     )
+    existing_renewable_prod_state_ALL = (
+        existing_renewable_prod_state
+        .groupby(['region'], as_index=False)['Value']
+        .sum()
+        .assign(am='ALL', lu='Existing Capacity')
+    )
+    
+    existing_renewable_prod_state = (
+        pd.concat([existing_renewable_prod_state, existing_renewable_prod_state_ALL])
+        .merge(pd.DataFrame({'lm': renewable_energy_df['lm'].unique()}), how='cross')
+        .assign(Year=yr_cal)
+    )
+    
     existing_renewable_prod_AUS = (
         existing_renewable_prod_state
         .groupby(['am', 'lm'], as_index=False)['Value']
@@ -1201,7 +1213,7 @@ def write_renewable_energy(data: Data, yr_cal, path):
     )
 
     rename_map_re = {'Value': 'Value (MWh)'}
-    renewable_energy_df_with_existing = pd.concat([renewable_energy_df, existing_renewable_prod_AUS, existing_renewable_prod_state], ignore_index=True)
+    renewable_energy_df_with_existing = pd.concat([renewable_energy_df, existing_renewable_prod_state, existing_renewable_prod_AUS])
     save_csv(renewable_energy_df_with_existing, rename_map_re, os.path.join(path, f'renewable_energy_with_existing_state_{yr_cal}.csv'))
 
     # Stack and save to netcdf for later use in report (e.g., for setting colorbar limits)

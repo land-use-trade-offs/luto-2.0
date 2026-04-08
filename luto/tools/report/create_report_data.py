@@ -1574,6 +1574,8 @@ def process_renewable_data(files, SAVE_DIR, years):
     df_wide.columns = ['region', 'am', 'lm', 'name', 'data']
     df_wide['type'] = 'column'
     df_wide['color'] = df_wide['name'].apply(lambda x: COLORS.get(x, '#AAAAAA'))
+    df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x) if x in LANDUSE_ALL_RENAMED else 999)
+    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
 
     out_dict = {}
     for (region, am, lm), df in df_wide.groupby(['region', 'am', 'lm']):

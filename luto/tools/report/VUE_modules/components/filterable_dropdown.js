@@ -20,6 +20,10 @@ window.FilterableDropdown = {
     searchPlaceholder: {
       type: String,
       default: 'Search...'
+    },
+    regionType: {
+      type: String,
+      default: 'NRM'  // 'NRM' or 'STATE'
     }
   },
   setup(props, { emit }) {
@@ -36,13 +40,26 @@ window.FilterableDropdown = {
       if (props.items && props.items.length > 0) {
         items.value = [...props.items];
         selectedItem.value = props.selectedValue;
+      } else if (props.regionType === 'STATE') {
+        // State region mode
+        await window.loadScript("./data/geo/AUS_STATE.js", 'AUS_STATE');
+        const regions = window.AUS_STATE.features.map(feature => feature.properties.STATE_NAME);
+        const otherRegions = regions.filter(region => region !== 'AUSTRALIA').sort();
+        items.value = ['AUSTRALIA', ...otherRegions];
+        const currentRegion = globalSelectedRegion?.value || '';
+        const validRegion = items.value.includes(currentRegion) ? currentRegion : 'AUSTRALIA';
+        selectedItem.value = validRegion;
+        if (globalSelectedRegion && validRegion !== currentRegion) globalSelectedRegion.value = validRegion;
       } else {
-        // Legacy behavior for regions
+        // Default NRM region mode
         await window.loadScript("./data/geo/NRM_AUS.js", 'NRM_AUS');
         const regions = window.NRM_AUS.features.map(feature => feature.properties.NRM_REGION);
         const otherRegions = regions.filter(region => region !== 'AUSTRALIA').sort();
         items.value = ['AUSTRALIA', ...otherRegions];
-        selectedItem.value = globalSelectedRegion?.value || '';
+        const currentRegion = globalSelectedRegion?.value || '';
+        const validRegion = items.value.includes(currentRegion) ? currentRegion : 'AUSTRALIA';
+        selectedItem.value = validRegion;
+        if (globalSelectedRegion && validRegion !== currentRegion) globalSelectedRegion.value = validRegion;
       }
     });
 
