@@ -109,7 +109,7 @@ RENAME_AM = {
     'HIR - Beef': "Human-induced regeneration (Beef)",
     'HIR - Sheep': "Human-induced regeneration (Sheep)",
     'Utility Solar PV': "Utility Solar PV",
-    'Onshore Wind': "Onshore wind"
+    'Onshore Wind': "Onshore Wind"
 }
 
 RENAME_NON_AG = {

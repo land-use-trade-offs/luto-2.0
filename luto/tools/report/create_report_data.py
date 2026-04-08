@@ -1574,11 +1574,25 @@ def process_renewable_data(files, SAVE_DIR, years):
     df_wide.columns = ['region', 'am', 'lm', 'name', 'data']
     df_wide['type'] = 'column'
     df_wide['color'] = df_wide['name'].apply(lambda x: COLORS.get(x, '#AAAAAA'))
-    df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x) if x in LANDUSE_ALL_RENAMED else 999)
+    df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
     df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+    
+    # Get targets
+    re_targets_files = files.query('base_name.str.contains("renewable_energy_targets")').reset_index(drop=True)
+    re_targets_df = pd.concat([df for path in re_targets_files['path'] if not (df := pd.read_csv(path)).empty], ignore_index=True)
+    re_targets_df_wide = re_targets_df\
+        .groupby(['region', 'am', 'lm'])[['Year', 'Value (MWh)']]\
+        .apply(lambda x: x[['Year', 'Value (MWh)']].values.tolist())\
+        .reset_index()
+    re_targets_df_wide.columns = ['region', 'am', 'lm', 'data']
+    re_targets_df_wide['type'] = 'line'
+    re_targets_df_wide['name'] = 'Target'
+    re_targets_df_wide['color'] = "#424040"
 
+    # Save to json
+    re_df_wide = pd.concat([df_wide, re_targets_df_wide], ignore_index=True)
     out_dict = {}
-    for (region, am, lm), df in df_wide.groupby(['region', 'am', 'lm']):
+    for (region, am, lm), df in re_df_wide.groupby(['region', 'am', 'lm']):
         df = df.drop(columns=['region', 'am', 'lm'])
         out_dict.setdefault(region, {}).setdefault(am, {})[lm] = df.to_dict(orient='records')
 
@@ -1682,7 +1696,8 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
         if region == "AUSTRALIA":
             df_reg.loc[len(df_reg)] = ['Off-land emissions', net_offland_AUS_wide,  'column']
             df_reg.loc[len(df_reg)] = ['GHG emission limit', GHG_limit_wide, 'line']
-            df_reg.loc[len(df_reg)] = ['Net emissions', 
+            df_reg.loc[len(df_reg)] = [
+                'Net emissions', 
                 list(zip(years, (df.groupby('Year')['Value (t CO2e)'].sum().values + GHG_off_land.groupby('Year')['Value (t CO2e)'].sum()))),
                 'line'
             ]
@@ -2594,7 +2609,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             bio_rank_dict[region]['Quality'] = {}
 
         df = df.drop(columns='region')
-        bio_rank_dict[region]['Quality']['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
+        bio_rank_dict[region]['Quality']['Rank']  = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
         bio_rank_dict[region]['Quality']['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
         bio_rank_dict[region]['Quality']['value'] = df.set_index('Year')['Value (%)'].apply( lambda x: format_with_suffix(x)).to_dict()
 

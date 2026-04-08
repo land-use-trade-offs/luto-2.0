@@ -796,7 +796,7 @@ def get_limits(data: Data, yr_cal: int, resale_factors) -> dict[str, Any]:
         
     if any(settings.RENEWABLES_OPTIONS.values()):
         
-        renewable_targets = data.RENEWABLE_TARGETS.query('Year == @yr_cal and scen == @settings.RENEWABLE_TARGET_SCENARIO_TARGETS').set_index('state')
+        renewable_targets = data.RENEWABLE_TARGETS.query('Year == @yr_cal').set_index('state')
         limits['renewable_Utility Solar PV'] = renewable_targets.query('tech == "Utility Solar"')['Renewable_Target_MWh'].to_dict()
         limits['renewable_Onshore Wind'] = renewable_targets.query('tech == "Wind"')['Renewable_Target_MWh'].to_dict()
         limits['renewable_Utility Solar PV_rescale'] = {k: v / resale_factors['Renewable_Solar'] for k, v in limits['renewable_Utility Solar PV'].items()}

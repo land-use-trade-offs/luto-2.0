@@ -650,6 +650,4 @@ def save_report_layer(raw_data_dir:str):
 
         get_map2json(files_renewable, None, None, legend_float, re_min_max, f'{SAVE_DIR}/map_layers/map_renewable_energy_Am.js')
         print('│   └── Renewable Energy Am layer saved.')
-
-
     

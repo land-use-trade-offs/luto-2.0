@@ -1185,7 +1185,7 @@ def write_renewable_energy(data: Data, yr_cal, path):
     # Regionally aggregate renewable energy for reporting
     renewable_energy_df, renewable_energy_df_AUS = to_region_and_aus_df(renewable_energy, ['region', 'am', 'lm', 'lu'], yr_cal)
     
-    # Combine existing capacity then save to csv
+    # Get existing capacity then save to csv
     existing_renewable_prod_state = (
         pd.DataFrame(ag_quantity.get_exist_renewable_capacity_by_state(data, yr_cal))
         .unstack()
@@ -1196,25 +1196,38 @@ def write_renewable_energy(data: Data, yr_cal, path):
         existing_renewable_prod_state
         .groupby(['region'], as_index=False)['Value']
         .sum()
-        .assign(am='ALL', lu='Existing Capacity')
+        .assign(am='ALL')
     )
     
     existing_renewable_prod_state = (
         pd.concat([existing_renewable_prod_state, existing_renewable_prod_state_ALL])
-        .merge(pd.DataFrame({'lm': renewable_energy_df['lm'].unique()}), how='cross')
-        .assign(Year=yr_cal)
+        .merge(pd.DataFrame({'lm': ['ALL', 'dry', 'irr']}), how='cross')
+        .assign(Year=yr_cal, lu='Existing Capacity')
     )
     
     existing_renewable_prod_AUS = (
         existing_renewable_prod_state
-        .groupby(['am', 'lm'], as_index=False)['Value']
+        .groupby(['am', 'lm', 'lu'], as_index=False)['Value']
         .sum()
-        .assign(region='AUSTRALIA', Year=yr_cal, lu='Existing Capacity')
+        .assign(region='AUSTRALIA', Year=yr_cal)
     )
-
+    
     rename_map_re = {'Value': 'Value (MWh)'}
     renewable_energy_df_with_existing = pd.concat([renewable_energy_df, existing_renewable_prod_state, existing_renewable_prod_AUS])
     save_csv(renewable_energy_df_with_existing, rename_map_re, os.path.join(path, f'renewable_energy_with_existing_state_{yr_cal}.csv'))
+    
+    # Save renewable targets
+    re_targets = (
+        data.RENEWABLE_TARGETS
+        .query('Year == @yr_cal')
+        .rename(columns={'state': 'region', 'Renewable_Target_MWh': 'Value (MWh)'})
+        .replace({'Utility Solar': 'Utility Solar PV', 'Wind': 'Onshore Wind'})
+        [['tech', 'region', 'Year', 'Value (MWh)']]
+    )
+    re_targets = pd.concat([re_targets, re_targets.groupby(['Year','region'], as_index=False)['Value (MWh)'].sum().assign(tech='ALL')])
+    re_targets = pd.concat([re_targets, re_targets.groupby(['Year', 'tech'], as_index=False)['Value (MWh)'].sum().assign(region='AUSTRALIA')])
+    re_targets = re_targets.sort_values(['region', 'tech']).rename(columns={'tech': 'am'}).assign(lm='ALL')
+    re_targets.to_csv(os.path.join(path, f'renewable_energy_targets_{yr_cal}.csv'), index=False)
 
     # Stack and save to netcdf for later use in report (e.g., for setting colorbar limits)
     valid_layers = pd.MultiIndex.from_frame(renewable_energy_df_AUS[['am', 'lm', 'lu']]).sort_values()
