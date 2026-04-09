@@ -647,7 +647,7 @@ def get_exist_renewable_capacity_layer(data, re_type: str, yr_cal: int) -> np.nd
         yr_cal (int): Calendar year.
     """
     
-    if yr_cal >= settings.RENEWABLE_EXISTING_END_YEAR:
+    if not any(settings.RENEWABLES_OPTIONS.values()) or yr_cal >= settings.RENEWABLE_EXISTING_END_YEAR:
         return np.zeros(data.NCELLS, dtype=np.float32)
 
     if re_type == 'Utility Solar PV':
@@ -670,6 +670,9 @@ def get_exist_renewable_capacity_by_state(data, yr_cal: int) -> np.ndarray:
         yr_cal (int): Calendar year.
     """
     
+    if not any(settings.RENEWABLES_OPTIONS.values()):
+        return {}
+
     if yr_cal >= settings.RENEWABLE_EXISTING_END_YEAR:
         return {state: {tech: 0 for tech in techs} for state, techs in data.RENEWABLE_EXISTING_CAPACITY_MWH_BY_STATE.items()}
 

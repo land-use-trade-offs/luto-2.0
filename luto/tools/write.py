@@ -1157,24 +1157,31 @@ def write_economics(data: Data, yr_cal, path):
 def write_renewable_energy(data: Data, yr_cal, path):
     
     yr_idx = yr_cal - data.YR_CAL_BASE
-    
+    re_types = list(settings.RENEWABLES_OPTIONS.keys())
+
     # Get decision variable for renewable energy land-use
-    am_dvar_mrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
+    am_dvar_mrj_base = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
         ).assign_coords({'region': ('cell', data.REGION_STATE_NAME)}
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
-        ).sel(am=list(settings.RENEWABLES_OPTIONS.keys()))
-        
-    # Get potential renewable energy production (MWh/ha) for each renewable type
+        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
+
+    am_dvar_mrj = xr.concat(
+        [
+            am_dvar_mrj_base.sel(am=re_type) if settings.RENEWABLES_OPTIONS[re_type]
+            else xr.zeros_like(am_dvar_mrj_base.isel(am=0)).assign_coords(am=re_type)
+            for re_type in re_types
+        ],
+        dim='am',
+    )
+
+    # Get potential renewable energy production (MWh) for each renewable type — zeros if disabled
     renewable_potentials = xr.DataArray(
         [
-            ag_quantity.get_quantity_renewable(data, 'Utility Solar PV', yr_idx),
-            ag_quantity.get_quantity_renewable(data, 'Onshore Wind', yr_idx)
+            ag_quantity.get_quantity_renewable(data, re_type, yr_idx) if settings.RENEWABLES_OPTIONS[re_type]
+            else np.zeros(data.NCELLS, dtype=np.float32)
+            for re_type in re_types
         ],
         dims=['am', 'cell'],
-        coords={
-            'am': list(settings.RENEWABLES_OPTIONS.keys()),
-            'cell': range(data.NCELLS)
-        }
+        coords={'am': re_types, 'cell': range(data.NCELLS)},
     )
     
     
@@ -1216,17 +1223,20 @@ def write_renewable_energy(data: Data, yr_cal, path):
     renewable_energy_df_with_existing = pd.concat([renewable_energy_df, existing_renewable_prod_state, existing_renewable_prod_AUS])
     save_csv(renewable_energy_df_with_existing, rename_map_re, os.path.join(path, f'renewable_energy_with_existing_state_{yr_cal}.csv'))
     
-    # Save renewable targets
-    re_targets = (
-        data.RENEWABLE_TARGETS
-        .query('Year == @yr_cal')
-        .rename(columns={'state': 'region', 'Renewable_Target_MWh': 'Value (MWh)'})
-        .replace({'Utility Solar': 'Utility Solar PV', 'Wind': 'Onshore Wind'})
-        [['tech', 'region', 'Year', 'Value (MWh)']]
-    )
-    re_targets = pd.concat([re_targets, re_targets.groupby(['Year','region'], as_index=False)['Value (MWh)'].sum().assign(tech='ALL')])
-    re_targets = pd.concat([re_targets, re_targets.groupby(['Year', 'tech'], as_index=False)['Value (MWh)'].sum().assign(region='AUSTRALIA')])
-    re_targets = re_targets.sort_values(['region', 'tech']).rename(columns={'tech': 'am'}).assign(lm='ALL')
+    # Save renewable targets (empty when renewables are off)
+    if any(settings.RENEWABLES_OPTIONS.values()):
+        re_targets = (
+            data.RENEWABLE_TARGETS
+            .query('Year == @yr_cal')
+            .rename(columns={'state': 'region', 'Renewable_Target_MWh': 'Value (MWh)'})
+            .replace({'Utility Solar': 'Utility Solar PV', 'Wind': 'Onshore Wind'})
+            [['tech', 'region', 'Year', 'Value (MWh)']]
+        )
+        re_targets = pd.concat([re_targets, re_targets.groupby(['Year','region'], as_index=False)['Value (MWh)'].sum().assign(tech='ALL')])
+        re_targets = pd.concat([re_targets, re_targets.groupby(['Year', 'tech'], as_index=False)['Value (MWh)'].sum().assign(region='AUSTRALIA')])
+        re_targets = re_targets.sort_values(['region', 'tech']).rename(columns={'tech': 'am'}).assign(lm='ALL')
+    else:
+        re_targets = pd.DataFrame(columns=['am', 'region', 'Year', 'Value (MWh)', 'lm'])
     re_targets.to_csv(os.path.join(path, f'renewable_energy_targets_{yr_cal}.csv'), index=False)
 
     # Stack and save to netcdf for later use in report (e.g., for setting colorbar limits)
