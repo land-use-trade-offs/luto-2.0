@@ -1556,7 +1556,10 @@ def process_renewable_data(files, SAVE_DIR, years):
     if re_state_files.empty:
         return "Renewable energy data processing skipped (no files found)"
 
-    re_df = pd.concat([df for path in re_state_files['path'] if not (df := pd.read_csv(path)).empty], ignore_index=True)
+    _re_dfs = [df for path in re_state_files['path'] if not (df := pd.read_csv(path)).empty]
+    if not _re_dfs:
+        return "Renewable energy data processing skipped (all CSV files are empty)"
+    re_df = pd.concat(_re_dfs, ignore_index=True)
 
     # Rename am labels to match COLORS keys
     re_df['am'] = re_df['am'].replace(RENAME_AM_NON_AG)
@@ -2070,6 +2073,9 @@ def process_water_data(files, SAVE_DIR):
     """Process and save water data (Section 5)."""
     
     water_files = files.query('category == "water"').reset_index(drop=True)
+
+    if water_files.empty:
+        return "Water data processing skipped (no files found)"
     
     ############ Watershed level  ##############
 
