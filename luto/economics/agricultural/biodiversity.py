@@ -176,7 +176,7 @@ def get_biochar_effect_b_mrj(data:Data, ag_b_mrj: np.ndarray, yr_idx):
         return b_mrj_effect
 
     for lu_idx, lu in enumerate(land_uses):
-        biodiv_impact = data.BIOCHAR_DATA[lu].loc[yr_cal, 'Biodiversity_impact']
+        biodiv_impact = data.BIOCHAR_DATA[data.LU2TYPE[lu]].loc[yr_cal, 'Biodiversity_impact']
 
         if biodiv_impact != 1:
             j = lu_codes[lu_idx]
@@ -450,7 +450,7 @@ def get_ag_management_biodiversity_contribution(
     Return the biodiversity contribution of each agricultural management practice by land-use type.
     
     - If settings.AG_MANAGEMENTS['Biochar'] is True, then the biodiversity contribution 
-      of Biochar for land-use j is calculated as (data.BIOCHAR_DATA[lu].loc[yr_cal, 'Biodiversity_impact'] - 1),
+      of Biochar for land-use j is calculated as (data.BIOCHAR_DATA[data.LU2TYPE[lu]].loc[yr_cal, 'Biodiversity_impact'] - 1),
       where lu is the land-use corresponding to land-use code j. 
       
     - If settings.AG_MANAGEMENTS['Biochar'] is False, then the biodiversity contribution 
@@ -486,7 +486,7 @@ def get_ag_management_biodiversity_contribution(
         }
     if settings.AG_MANAGEMENTS['Biochar']:
         am_contr_dict['Biochar'] = {
-            j_idx: (data.BIOCHAR_DATA[lu].loc[yr_cal, 'Biodiversity_impact'] - 1) * np.ones(data.NCELLS).astype(np.float32)
+            j_idx: (data.BIOCHAR_DATA[data.LU2TYPE[lu]].loc[yr_cal, 'Biodiversity_impact'] - 1) * np.ones(data.NCELLS).astype(np.float32)
             for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Biochar'])
         }
     if settings.AG_MANAGEMENTS['HIR - Beef']:

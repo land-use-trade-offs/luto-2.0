@@ -365,7 +365,7 @@ def get_precision_agriculture_effect_q_mrp(data, q_mrp, yr_idx):
 
     # Update values in the new matrix    
     for lu, j in zip(land_uses, lu_codes):
-        multiplier = data.PRECISION_AGRICULTURE_DATA[lu].loc[yr_cal, 'Productivity']
+        multiplier = data.PRECISION_AGRICULTURE_DATA[data.LU2TYPE[lu]].loc[yr_cal, 'Productivity']
         if multiplier != 1:
             # Apply to all products associated with land use
             for p in range(data.NPRS):
@@ -452,7 +452,7 @@ def get_agtech_ei_effect_q_mrp(data, q_mrp, yr_idx):
 
     # Update values in the new matrix    
     for lu, j in zip(land_uses, lu_codes):
-        multiplier = data.AGTECH_EI_DATA[lu].loc[yr_cal, 'Productivity']
+        multiplier = data.AGTECH_EI_DATA[data.LU2TYPE[lu]].loc[yr_cal, 'Productivity']
         if multiplier != 1:
             # Apply to all products associated with land use
             for p in range(data.NPRS):
@@ -487,7 +487,7 @@ def get_biochar_effect_q_mrp(data, q_mrp, yr_idx):
 
     # Update values in the new matrix    
     for lu, j in zip(land_uses, lu_codes):
-        multiplier = data.BIOCHAR_DATA[lu].loc[yr_cal, 'Productivity']
+        multiplier = data.BIOCHAR_DATA[data.LU2TYPE[lu]].loc[yr_cal, 'Productivity']
         if multiplier != 1:
             # Apply to all products associated with land use
             for p in range(data.NPRS):

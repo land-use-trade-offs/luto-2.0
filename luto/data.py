@@ -641,78 +641,44 @@ class Data:
         # Agricultural Management options data.
         ###############################################################
         print("├── Loading agricultural management options' data", flush=True)
+        
+        # Land use type mapping shared across AgTech bundles
+        self.LU2TYPE = (
+            {lu: "cropping"     for lu in ["Hay", "Summer cereals", "Summer legumes", "Summer oilseeds", "Winter cereals", "Winter legumes", "Winter oilseeds"]}
+          | {lu: "int_cropping" for lu in ["Cotton", "Other non-cereal crops", "Rice", "Sugar", "Vegetables"]}
+          | {lu: "horticulture" for lu in ["Apples", "Citrus", "Grapes", "Nuts", "Pears", "Plantation fruit", "Stone fruit", "Tropical stone fruit"]}
+        )
+        
+        # Rename soil CO2E to match the AGGHG_CROPS/LVSTK data.
+        _bundle_rename = {"CO2E_KG_HA_SOIL_N_SURP": "CO2E_KG_HA_SOIL"}
+
 
         # Asparagopsis taxiformis data
         asparagopsis_file = os.path.join(settings.INPUT_DIR, "20260317_Bundle_MR.xlsx")
-        self.ASPARAGOPSIS_DATA = {}
-        self.ASPARAGOPSIS_DATA["Beef - modified land"] = pd.read_excel(
-            asparagopsis_file, sheet_name="MR bundle (ext cattle)", index_col="Year"
-        )
-        self.ASPARAGOPSIS_DATA["Sheep - modified land"] = pd.read_excel(
-            asparagopsis_file, sheet_name="MR bundle (sheep)", index_col="Year"
-        )
-        self.ASPARAGOPSIS_DATA["Dairy - natural land"] = pd.read_excel(
-            asparagopsis_file, sheet_name="MR bundle (dairy)", index_col="Year"
-        )
-        self.ASPARAGOPSIS_DATA["Dairy - modified land"] = self.ASPARAGOPSIS_DATA[
-            "Dairy - natural land"
-        ]
+        self.ASPARAGOPSIS_DATA = {
+            "Beef - modified land": pd.read_excel(asparagopsis_file, sheet_name="MR bundle (ext cattle)", index_col="Year"),
+            "Sheep - modified land": pd.read_excel(asparagopsis_file, sheet_name="MR bundle (sheep)", index_col="Year"),
+            "Dairy - natural land": pd.read_excel(asparagopsis_file, sheet_name="MR bundle (dairy)", index_col="Year"),
+            "Dairy - modified land": pd.read_excel(asparagopsis_file, sheet_name="MR bundle (dairy)", index_col="Year")
+        }
+
 
         # Precision agriculture data
         prec_agr_file = os.path.join(settings.INPUT_DIR, "20260317_Bundle_AgTech_NE.xlsx")
-        self.PRECISION_AGRICULTURE_DATA = {}
-        int_cropping_data = pd.read_excel(
-            prec_agr_file, sheet_name="AgTech NE bundle (int cropping)", index_col="Year"
-        )
-        cropping_data = pd.read_excel(
-            prec_agr_file, sheet_name="AgTech NE bundle (cropping)", index_col="Year"
-        )
-        horticulture_data = pd.read_excel(
-            prec_agr_file, sheet_name="AgTech NE bundle (horticulture)", index_col="Year"
-        )
-        horticulture_data = horticulture_data.rename(columns={'CO2E_KG_HA_SOIL_N_SURP': 'CO2E_KG_HA_SOIL'})
-
-        for lu in [
-            "Hay",
-            "Summer cereals",
-            "Summer legumes",
-            "Summer oilseeds",
-            "Winter cereals",
-            "Winter legumes",
-            "Winter oilseeds",
-        ]:
-            # Cropping land uses
-            self.PRECISION_AGRICULTURE_DATA[lu] = cropping_data
-
-        for lu in ["Cotton", "Other non-cereal crops", "Rice", "Sugar", "Vegetables"]:
-            # Intensive Cropping land uses
-            self.PRECISION_AGRICULTURE_DATA[lu] = int_cropping_data
-
-        for lu in [
-            "Apples",
-            "Citrus",
-            "Grapes",
-            "Nuts",
-            "Pears",
-            "Plantation fruit",
-            "Stone fruit",
-            "Tropical stone fruit",
-        ]:
-            # Horticulture land uses
-            self.PRECISION_AGRICULTURE_DATA[lu] = horticulture_data
+        self.PRECISION_AGRICULTURE_DATA = {
+            "cropping":     pd.read_excel(prec_agr_file, sheet_name="AgTech NE bundle (cropping)", index_col="Year"),
+            "int_cropping": pd.read_excel(prec_agr_file, sheet_name="AgTech NE bundle (int cropping)", index_col="Year"),
+            "horticulture": pd.read_excel(prec_agr_file, sheet_name="AgTech NE bundle (horticulture)", index_col="Year").rename(columns=_bundle_rename),
+        }
 
         # Ecological grazing data
         eco_grazing_file = os.path.join(settings.INPUT_DIR, "20231107_ECOGRAZE_Bundle.xlsx")
-        self.ECOLOGICAL_GRAZING_DATA = {}
-        self.ECOLOGICAL_GRAZING_DATA["Beef - modified land"] = pd.read_excel(
-            eco_grazing_file, sheet_name="Ecograze bundle (ext cattle)", index_col="Year"
-        )
-        self.ECOLOGICAL_GRAZING_DATA["Sheep - modified land"] = pd.read_excel(
-            eco_grazing_file, sheet_name="Ecograze bundle (sheep)", index_col="Year"
-        )
-        self.ECOLOGICAL_GRAZING_DATA["Dairy - modified land"] = pd.read_excel(
-            eco_grazing_file, sheet_name="Ecograze bundle (dairy)", index_col="Year"
-        )
+        self.ECOLOGICAL_GRAZING_DATA = {
+            "Beef - modified land": pd.read_excel(eco_grazing_file, sheet_name="Ecograze bundle (ext cattle)", index_col="Year"),
+            "Sheep - modified land": pd.read_excel(eco_grazing_file, sheet_name="Ecograze bundle (sheep)", index_col="Year"),
+            "Dairy - modified land": pd.read_excel(eco_grazing_file, sheet_name="Ecograze bundle (dairy)", index_col="Year")
+        }
+
 
         # Load soil carbon data, convert C to CO2e (x 44/12), and average over years
         self.SOIL_CARBON_AVG_T_CO2_HA_PER_YR = (
@@ -723,44 +689,19 @@ class Data:
 
 
         # Load AgTech EI data
-        prec_agr_file = os.path.join(settings.INPUT_DIR, '20260317_Bundle_AgTech_EI.xlsx')
-        self.AGTECH_EI_DATA = {}
-        int_cropping_data = pd.read_excel(
-            prec_agr_file, sheet_name='AgTech EI bundle (int cropping)', index_col='Year',
-            usecols=lambda c: not str(c).startswith('Unnamed')
-        )
-        cropping_data = pd.read_excel(prec_agr_file, sheet_name='AgTech EI bundle (cropping)', index_col='Year')
-        horticulture_data = pd.read_excel(prec_agr_file, sheet_name='AgTech EI bundle (horticulture)', index_col='Year')
+        agtech_ei_file = os.path.join(settings.INPUT_DIR, '20260317_Bundle_AgTech_EI.xlsx')
+        self.AGTECH_EI_DATA = {
+            "cropping":     pd.read_excel(agtech_ei_file, sheet_name='AgTech EI bundle (cropping)', index_col='Year'),
+            "int_cropping": pd.read_excel(agtech_ei_file, sheet_name='AgTech EI bundle (int cropping)', index_col='Year', usecols=lambda c: not str(c).startswith('Unnamed')),
+            "horticulture": pd.read_excel(agtech_ei_file, sheet_name='AgTech EI bundle (horticulture)', index_col='Year').rename(columns=_bundle_rename),
+        }
 
-        for lu in ['Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds',
-                'Winter cereals', 'Winter legumes', 'Winter oilseeds']:
-            # Cropping land uses
-            self.AGTECH_EI_DATA[lu] = cropping_data
-
-        for lu in ['Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables']:
-            # Intensive Cropping land uses
-            self.AGTECH_EI_DATA[lu] = int_cropping_data
-
-        for lu in ['Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears',
-                'Plantation fruit', 'Stone fruit', 'Tropical stone fruit']:
-            # Horticulture land uses
-            self.AGTECH_EI_DATA[lu] = horticulture_data
-
-        # Load BioChar data
+        # Load BioChar data (no int_cropping group)
         biochar_file = os.path.join(settings.INPUT_DIR, '20260401_Bundle_BC.xlsx')
-        self.BIOCHAR_DATA = {}
-        cropping_data = pd.read_excel(biochar_file, sheet_name='Biochar (cropping)', index_col='Year' )
-        horticulture_data = pd.read_excel(biochar_file, sheet_name='Biochar (horticulture)', index_col='Year' )
-
-        for lu in ['Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds',
-                'Winter cereals', 'Winter legumes', 'Winter oilseeds']:
-            # Cropping land uses
-            self.BIOCHAR_DATA[lu] = cropping_data
-
-        for lu in ['Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears',
-                'Plantation fruit', 'Stone fruit', 'Tropical stone fruit']:
-            # Horticulture land uses
-            self.BIOCHAR_DATA[lu] = horticulture_data
+        self.BIOCHAR_DATA = {
+            "cropping":     pd.read_excel(biochar_file, sheet_name='Biochar (cropping)', index_col='Year').rename(columns=_bundle_rename),
+            "horticulture": pd.read_excel(biochar_file, sheet_name='Biochar (horticulture)', index_col='Year').rename(columns=_bundle_rename),
+        }
 
 
         # #########################################################

@@ -323,7 +323,7 @@ def get_precision_agriculture_effect_c_mrj(data:Data, yr_idx):
 
     for m in range(data.NLMS):
         for j_idx, lu in enumerate(land_uses):
-            cost_per_ha = data.PRECISION_AGRICULTURE_DATA[lu].loc[yr_cal, 'AnnCost_per_Ha']
+            cost_per_ha = data.PRECISION_AGRICULTURE_DATA[data.LU2TYPE[lu]].loc[yr_cal, 'AnnCost_per_Ha']
             new_c_mrj[m, :, j_idx] = cost_per_ha * data.REAL_AREA
 
     return new_c_mrj
@@ -423,7 +423,7 @@ def get_agtech_ei_effect_c_mrj(data:Data, yr_idx):
 
     for m in range(data.NLMS):
         for j_idx, lu in enumerate(land_uses):
-            cost_per_ha = data.AGTECH_EI_DATA[lu].loc[yr_cal, 'AnnCost_per_Ha']
+            cost_per_ha = data.AGTECH_EI_DATA[data.LU2TYPE[lu]].loc[yr_cal, 'AnnCost_per_Ha']
             new_c_mrj[m, :, j_idx] = cost_per_ha * data.REAL_AREA
 
     return new_c_mrj
@@ -452,7 +452,7 @@ def get_biochar_effect_c_mrj(data:Data, yr_idx: int):
 
     for m in range(data.NLMS):
         for j_idx, lu in enumerate(land_uses):
-            cost_per_ha = data.BIOCHAR_DATA[lu].loc[yr_cal, 'AnnCost_per_Ha']
+            cost_per_ha = data.BIOCHAR_DATA[data.LU2TYPE[lu]].loc[yr_cal, 'AnnCost_per_Ha']
             new_c_mrj[m, :, j_idx] = cost_per_ha * data.REAL_AREA
 
     return new_c_mrj

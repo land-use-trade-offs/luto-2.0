@@ -1039,7 +1039,11 @@ def create_new_dataset(refresh=False):
     agGHG_crops['LU_ID'] = agGHG_crops['LU_ID'].astype('Int64')
 
     # Create the MultiIndex structure
-    GHG_sources_crops = ['CO2E_KG_HA_FERT_PROD', 'CO2E_KG_HA_PEST_PROD', 'CO2E_KG_HA_IRRIG', 'CO2E_KG_HA_CHEM_APPL', 'CO2E_KG_HA_CROP_MGT', 'CO2E_KG_HA_CULTIV', 'CO2E_KG_HA_HARVEST', 'CO2E_KG_HA_SOWING', 'CO2E_KG_HA_SOIL']
+    GHG_sources_crops = [
+        'CO2E_KG_HA_FERT_PROD', 'CO2E_KG_HA_PEST_PROD', 'CO2E_KG_HA_IRRIG', 
+        'CO2E_KG_HA_CHEM_APPL', 'CO2E_KG_HA_CROP_MGT', 'CO2E_KG_HA_CULTIV', 
+        'CO2E_KG_HA_HARVEST', 'CO2E_KG_HA_SOWING', 'CO2E_KG_HA_SOIL'
+    ]
     agGHG_crops = agGHG_crops.pivot( index='CELL_ID',
                                      columns = ['IRRIGATION', 'LU_ID'],
                                      values = GHG_sources_crops
