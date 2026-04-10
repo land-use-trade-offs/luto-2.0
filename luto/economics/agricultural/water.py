@@ -199,7 +199,7 @@ def get_precision_agriculture_effect_w_mrj(data, yr_idx):
 
     # Update values in the new matrix using the correct multiplier for each land use
     for lu_idx, lu in enumerate(land_uses):
-        multiplier = data.PRECISION_AGRICULTURE_DATA[data.LU2TYPE[lu]].loc[yr_cal, "Water_use"]
+        multiplier = data.PRECISION_AGRICULTURE_DATA[settings.LU2TYPE[lu]].loc[yr_cal, "Water_use"]
         if multiplier != 1:
             j = lu_codes[lu_idx]
             # The effect is: new value = old value * multiplier - old value
@@ -292,7 +292,7 @@ def get_agtech_ei_effect_w_mrj(data, yr_idx):
 
     # Update values in the new matrix using the correct multiplier for each LU
     for lu_idx, lu in enumerate(land_uses):
-        multiplier = data.AGTECH_EI_DATA[data.LU2TYPE[lu]].loc[yr_cal, "Water_use"]
+        multiplier = data.AGTECH_EI_DATA[settings.LU2TYPE[lu]].loc[yr_cal, "Water_use"]
         if multiplier != 1:
             j = lu_codes[lu_idx]
             # The effect is: new value = old value * multiplier - old value
@@ -329,7 +329,7 @@ def get_biochar_effect_w_mrj(data, yr_idx):
 
     # Update values in the new matrix using the correct multiplier for each LU
     for lu_idx, lu in enumerate(land_uses):
-        multiplier = data.BIOCHAR_DATA[data.LU2TYPE[lu]].loc[yr_cal, "Water_use"]
+        multiplier = data.BIOCHAR_DATA[settings.LU2TYPE[lu]].loc[yr_cal, "Water_use"]
         if multiplier != 1:
             j = lu_codes[lu_idx]
             w_mrj_effect[:, :, lu_idx] = wreq_mrj[:, :, j] * (1- multiplier)

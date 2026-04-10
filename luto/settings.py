@@ -448,53 +448,41 @@ the land can be used for Utility Solar PV.
 
 
 # ---------------------------------------------------------------------------- #
+# Land use type groupings (used by AgTech bundles)
+# ---------------------------------------------------------------------------- #
+
+LUS_CROPPING     = ['Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds']
+LUS_INT_CROPPING = ['Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables']
+LUS_HORTICULTURE = ['Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 'Plantation fruit', 'Stone fruit', 'Tropical stone fruit']
+
+LU2TYPE = (
+    {lu: "cropping"     for lu in LUS_CROPPING}
+  | {lu: "int_cropping" for lu in LUS_INT_CROPPING}
+  | {lu: "horticulture" for lu in LUS_HORTICULTURE}
+)
+
+
+# ---------------------------------------------------------------------------- #
 # Agricultural Management parameters
 # ---------------------------------------------------------------------------- #
 
-
 AG_MANAGEMENTS_TO_LAND_USES = {
     'Asparagopsis taxiformis':  ['Beef - modified land', 'Sheep - modified land', 'Dairy - natural land', 'Dairy - modified land'],
-    
-    'Precision Agriculture':    [# Cropping:
-                                'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
-                                # Intensive Cropping:
-                                'Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables',
-                                # Horticulture:
-                                'Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 'Plantation fruit', 'Stone fruit', 'Tropical stone fruit'],
-    
+    'Precision Agriculture':    LUS_CROPPING + LUS_INT_CROPPING + LUS_HORTICULTURE,
     'Ecological Grazing':       ['Beef - modified land', 'Sheep - modified land', 'Dairy - modified land'],
-    
     'Savanna Burning':          ['Beef - natural land', 'Dairy - natural land', 'Sheep - natural land', 'Unallocated - natural land'],
-    
-    'AgTech EI':                [# Cropping:
-                                'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
-                                # Intensive Cropping:
-                                'Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables',
-                                # Horticulture:
-                                'Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 'Plantation fruit', 'Stone fruit', 'Tropical stone fruit'],
-    
-    'Biochar':                  [# Cropping
-                                'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
-                                # Horticulture:
-                                'Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 'Plantation fruit', 'Stone fruit', 'Tropical stone fruit'],
-
+    'AgTech EI':                LUS_CROPPING + LUS_INT_CROPPING + LUS_HORTICULTURE,
+    'Biochar':                  LUS_CROPPING + LUS_HORTICULTURE,
     'HIR - Beef':               ['Beef - natural land'],
     'HIR - Sheep':              ['Sheep - natural land'],
-    'Utility Solar PV':         [# Unallocated lands
-                                'Unallocated - modified land',
-                                # Livestock
-                                'Beef - modified land', 'Sheep - modified land', 'Dairy - modified land',
-                                # Cropping:
-                                'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds'], 
-    'Onshore Wind':             [#Unallocated lands
-                                'Unallocated - modified land',
-                                # Livestock
-                                'Beef - modified land', 'Sheep - modified land', 'Dairy - modified land',
-                                # Cropping:
-                                'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
-                                # Intensive Cropping:
-                                'Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables']
-                                }                                
+    'Utility Solar PV':         ['Unallocated - modified land',
+                                 'Beef - modified land', 'Sheep - modified land', 'Dairy - modified land',
+                                 *[lu for lu in LUS_CROPPING if lu != 'Hay']],  # 'Hay' is missing in the PV raw bundle data.
+    'Onshore Wind':             ['Unallocated - modified land',
+                                 'Beef - modified land', 'Sheep - modified land', 'Dairy - modified land',
+                                 *LUS_CROPPING,
+                                 *LUS_INT_CROPPING]
+}                                
 
 
 AG_MANAGEMENTS = {

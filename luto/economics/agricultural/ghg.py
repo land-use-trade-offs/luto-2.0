@@ -451,7 +451,7 @@ def get_precision_agriculture_effect_g_mrj(data:Data, yr_idx):
 
     # Update values in the new matrix
     for lu_idx, lu in enumerate(land_uses):
-        lu_data = data.PRECISION_AGRICULTURE_DATA[data.LU2TYPE[lu]]
+        lu_data = data.PRECISION_AGRICULTURE_DATA[settings.LU2TYPE[lu]]
 
         for lm in data.LANDMANS:
             m = 0 if lm == 'dry' else 1
@@ -588,7 +588,7 @@ def get_agtech_ei_effect_g_mrj(data:Data, yr_idx):
 
     # Update values in the new matrix
     for lu_idx, lu in enumerate(land_uses):
-        lu_data = data.AGTECH_EI_DATA[data.LU2TYPE[lu]]
+        lu_data = data.AGTECH_EI_DATA[settings.LU2TYPE[lu]]
 
         for lm in data.LANDMANS:
             m = 0 if lm == 'dry' else 1
@@ -660,7 +660,7 @@ def get_biochar_effect_g_mrj(data:Data, yr_idx):
 
     # Update values in the new matrix
     for lu_idx, lu in enumerate(land_uses):
-        lu_data = data.BIOCHAR_DATA[data.LU2TYPE[lu]]
+        lu_data = data.BIOCHAR_DATA[settings.LU2TYPE[lu]]
 
         for lm in data.LANDMANS:
             m = 0 if lm == 'dry' else 1

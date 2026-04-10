@@ -300,7 +300,7 @@ def get_precision_agriculture_effect_r_mrj(data:Data, r_mrj, yr_idx):
 
     # Update values in the new matrix using the correct multiplier for each LU
     for lu_idx, lu in enumerate(land_uses):
-        multiplier = data.PRECISION_AGRICULTURE_DATA[data.LU2TYPE[lu]].loc[yr_cal, 'Productivity']
+        multiplier = data.PRECISION_AGRICULTURE_DATA[settings.LU2TYPE[lu]].loc[yr_cal, 'Productivity']
         if multiplier != 1:
             j = lu_codes[lu_idx]
             new_r_mrj[:, :, lu_idx] = r_mrj[:, :, j] * (multiplier - 1)
@@ -361,7 +361,7 @@ def get_agtech_ei_effect_r_mrj(data:Data, r_mrj, yr_idx):
 
     # Update values in the new matrix using the correct multiplier for each LU
     for lu_idx, lu in enumerate(land_uses):
-        multiplier = data.AGTECH_EI_DATA[data.LU2TYPE[lu]].loc[yr_cal, 'Productivity']
+        multiplier = data.AGTECH_EI_DATA[settings.LU2TYPE[lu]].loc[yr_cal, 'Productivity']
         if multiplier != 1:
             j = lu_codes[lu_idx]
             new_r_mrj[:, :, lu_idx] = r_mrj[:, :, j] * (multiplier - 1)
@@ -386,7 +386,7 @@ def get_biochar_effect_r_mrj(data:Data, r_mrj, yr_idx):
 
     # Update values in the new matrix using the correct multiplier for each LU
     for lu_idx, lu in enumerate(land_uses):
-        multiplier = data.BIOCHAR_DATA[data.LU2TYPE[lu]].loc[yr_cal, 'Productivity']
+        multiplier = data.BIOCHAR_DATA[settings.LU2TYPE[lu]].loc[yr_cal, 'Productivity']
         if multiplier != 1:
             j = lu_codes[lu_idx]
             new_r_mrj[:, :, lu_idx] = r_mrj[:, :, j] * (multiplier - 1)

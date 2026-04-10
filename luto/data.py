@@ -642,13 +642,6 @@ class Data:
         ###############################################################
         print("├── Loading agricultural management options' data", flush=True)
         
-        # Land use type mapping shared across AgTech bundles
-        self.LU2TYPE = (
-            {lu: "cropping"     for lu in ["Hay", "Summer cereals", "Summer legumes", "Summer oilseeds", "Winter cereals", "Winter legumes", "Winter oilseeds"]}
-          | {lu: "int_cropping" for lu in ["Cotton", "Other non-cereal crops", "Rice", "Sugar", "Vegetables"]}
-          | {lu: "horticulture" for lu in ["Apples", "Citrus", "Grapes", "Nuts", "Pears", "Plantation fruit", "Stone fruit", "Tropical stone fruit"]}
-        )
-        
         # Rename soil CO2E to match the AGGHG_CROPS/LVSTK data.
         _bundle_rename = {"CO2E_KG_HA_SOIL_N_SURP": "CO2E_KG_HA_SOIL"}
 
@@ -661,16 +654,7 @@ class Data:
             "Dairy - natural land": pd.read_excel(asparagopsis_file, sheet_name="MR bundle (dairy)", index_col="Year"),
             "Dairy - modified land": pd.read_excel(asparagopsis_file, sheet_name="MR bundle (dairy)", index_col="Year")
         }
-
-
-        # Precision agriculture data
-        prec_agr_file = os.path.join(settings.INPUT_DIR, "20260317_Bundle_AgTech_NE.xlsx")
-        self.PRECISION_AGRICULTURE_DATA = {
-            "cropping":     pd.read_excel(prec_agr_file, sheet_name="AgTech NE bundle (cropping)", index_col="Year"),
-            "int_cropping": pd.read_excel(prec_agr_file, sheet_name="AgTech NE bundle (int cropping)", index_col="Year"),
-            "horticulture": pd.read_excel(prec_agr_file, sheet_name="AgTech NE bundle (horticulture)", index_col="Year").rename(columns=_bundle_rename),
-        }
-
+        
         # Ecological grazing data
         eco_grazing_file = os.path.join(settings.INPUT_DIR, "20231107_ECOGRAZE_Bundle.xlsx")
         self.ECOLOGICAL_GRAZING_DATA = {
@@ -679,14 +663,13 @@ class Data:
             "Dairy - modified land": pd.read_excel(eco_grazing_file, sheet_name="Ecograze bundle (dairy)", index_col="Year")
         }
 
-
-        # Load soil carbon data, convert C to CO2e (x 44/12), and average over years
-        self.SOIL_CARBON_AVG_T_CO2_HA_PER_YR = (
-            pd.read_hdf(os.path.join(settings.INPUT_DIR, "soil_carbon_t_ha.h5"), where=self.MASK).to_numpy(dtype=np.float32) 
-            * (44 / 12)  # Convert C to CO2e
-            / settings.CARBON_EFFECTS_WINDOW
-        )
-
+        # Precision agriculture data
+        prec_agr_file = os.path.join(settings.INPUT_DIR, "20260317_Bundle_AgTech_NE.xlsx")
+        self.PRECISION_AGRICULTURE_DATA = {
+            "cropping":     pd.read_excel(prec_agr_file, sheet_name="AgTech NE bundle (cropping)", index_col="Year"),
+            "int_cropping": pd.read_excel(prec_agr_file, sheet_name="AgTech NE bundle (int cropping)", index_col="Year"),
+            "horticulture": pd.read_excel(prec_agr_file, sheet_name="AgTech NE bundle (horticulture)", index_col="Year").rename(columns=_bundle_rename),
+        }
 
         # Load AgTech EI data
         agtech_ei_file = os.path.join(settings.INPUT_DIR, '20260317_Bundle_AgTech_EI.xlsx')
@@ -702,6 +685,13 @@ class Data:
             "cropping":     pd.read_excel(biochar_file, sheet_name='Biochar (cropping)', index_col='Year').rename(columns=_bundle_rename),
             "horticulture": pd.read_excel(biochar_file, sheet_name='Biochar (horticulture)', index_col='Year').rename(columns=_bundle_rename),
         }
+        
+        # Load soil carbon data, convert C to CO2e (x 44/12), and average over years
+        self.SOIL_CARBON_AVG_T_CO2_HA_PER_YR = (
+            pd.read_hdf(os.path.join(settings.INPUT_DIR, "soil_carbon_t_ha.h5"), where=self.MASK).to_numpy(dtype=np.float32) 
+            * (44 / 12)  # Convert C to CO2e
+            / settings.CARBON_EFFECTS_WINDOW
+        )
 
 
         # #########################################################
