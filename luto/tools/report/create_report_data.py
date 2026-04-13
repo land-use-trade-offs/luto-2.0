@@ -2573,7 +2573,6 @@ def process_water_data(files, SAVE_DIR):
 
 def process_biodiversity_data(files, SAVE_DIR):
     """Process and save biodiversity data (Section 6)."""
-    #########################################################
 
     bio_rank_dict = {}
     

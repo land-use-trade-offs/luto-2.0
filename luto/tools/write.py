@@ -2722,18 +2722,19 @@ def write_biodiversity_quality_scores(data: Data, yr_cal, path):
             'region': ['AUSTRALIA'],
             'Year': [yr_cal],
             'lu': ['Environmental Plantings'],
+            'lm': ['dry'],
             'Area Weighted Score (ha)': [0.0],
             'Relative_Contribution_Percentage': [0.0]
         })
     if priority_am_df.empty:
         priority_am_df = pd.DataFrame({
-            'region': ['AUSTRALIA'],
-            'Year': [yr_cal],
-            'am': ['ALL'],
-            'lm': ['dry'],
-            'lu': ['Apples'],
-            'Area Weighted Score (ha)': [0.0],
-            'Relative_Contribution_Percentage': [0.0]
+            'region': ['AUSTRALIA', 'AUSTRALIA'],
+            'Year': [yr_cal, yr_cal],
+            'am': ['ALL', 'Savanna Burning'],
+            'lm': ['dry', 'dry'],
+            'lu': ['Apples', 'Apples'],
+            'Area Weighted Score (ha)': [0.0, 0.0],
+            'Relative_Contribution_Percentage': [0.0, 0.0]
         })
 
 
@@ -2897,19 +2898,43 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
         
     # Fill nan to empty dataframes
     if GBF2_score_ag.empty:
-        GBF2_score_ag.loc[0] = 0
-        GBF2_score_ag = GBF2_score_ag.astype({'Type':str, 'lu':str,'Year':'int'})
-        GBF2_score_ag.loc[0, ['Type', 'lu' ,'Year']] = ['Agricultural Land-use', 'Apples', yr_cal]
+        GBF2_score_ag = pd.DataFrame(
+            {
+                'region': ['AUSTRALIA', 'AUSTRALIA'], 
+                'Year': [yr_cal, yr_cal], 
+                'lm': ['dry', 'dry'], 
+                'lu': ['ALL', 'Apples'], 
+                'Area Weighted Score (ha)': [0.0, 0.0], 
+                'Relative_Contribution_Percentage': [0.0, 0.0], 
+                'Type': ['Agricultural Land-use', 'Agricultural Land-use']
+            }
+        )
 
     if GBF2_score_non_ag.empty:
-        GBF2_score_non_ag.loc[0] = 0
-        GBF2_score_non_ag = GBF2_score_non_ag.astype({'Type':str, 'lu':str,'Year':'int'})
-        GBF2_score_non_ag.loc[0, ['Type', 'lu' ,'Year']] = ['Agricultural Management', 'Apples', yr_cal]
-
+        GBF2_score_non_ag = pd.DataFrame(
+            {
+                'region': ['AUSTRALIA', 'AUSTRALIA'], 
+                'Year': [yr_cal, yr_cal], 
+                'lm': ['dry', 'dry'], 
+                'lu': ['ALL', 'Environmental Plantings'], 
+                'Area Weighted Score (ha)': [0.0, 0.0], 
+                'Relative_Contribution_Percentage': [0.0, 0.0], 
+                'Type': ['Non-Agricultural Land-use', 'Non-Agricultural Land-use']
+            }
+        )
     if GBF2_score_am.empty:
-        GBF2_score_am.loc[0] = 0
-        GBF2_score_am = GBF2_score_am.astype({'Type':str, 'lu':str,'Year':'int'})
-        GBF2_score_am.loc[0, ['Type', 'lu' ,'Year']] = ['Non-Agricultural Land-use', 'Environmental Plantings', yr_cal]
+        GBF2_score_am = pd.DataFrame(
+            {
+                'region': ['AUSTRALIA', 'AUSTRALIA'], 
+                'Year': [yr_cal, yr_cal], 
+                'am': ['ALL', 'Savanna Burning'],
+                'lm': ['dry', 'dry'], 
+                'lu': ['ALL', 'Apples'], 
+                'Area Weighted Score (ha)': [0.0, 0.0], 
+                'Relative_Contribution_Percentage': [0.0, 0.0], 
+                'Type': ['Agricultural Management', 'Agricultural Management']
+            }
+        )
         
     # Save to disk  
     df = pd.concat([

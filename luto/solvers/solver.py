@@ -963,10 +963,10 @@ class LutoSolver:
         for am, am_j_list in self._input_data.am2j.items():
             if not AG_MANAGEMENTS[am]:
                 continue
-            for j_idx in range(len(am_j_list)):
-                
-                ind_dry = np.intersect1d(self._input_data.ag_lu2cells[0, j_idx], self._input_data.GBF2_mask_idx)
-                ind_irr = np.intersect1d(self._input_data.ag_lu2cells[1, j_idx], self._input_data.GBF2_mask_idx)
+            for j_idx, j in enumerate(am_j_list):
+
+                ind_dry = np.intersect1d(self._input_data.ag_lu2cells[0, j], self._input_data.GBF2_mask_idx)
+                ind_irr = np.intersect1d(self._input_data.ag_lu2cells[1, j], self._input_data.GBF2_mask_idx)
                 bio_ag_man_exprs.append(
                     gp.quicksum(
                         self._input_data.GBF2_mask_area_r[ind_dry]
