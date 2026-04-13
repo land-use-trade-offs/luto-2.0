@@ -140,12 +140,14 @@ grid_search = {
 
     # --------------- Renewable energy ---------------
     # Core: RE OFF. REN1-REN4 are separate renewable energy scenario runs (not part of this grid search).
-    # REN1: No GBF2 + RE ON; REN2: Core + RE ON; REN3: REN2 + GBF2 exclusion mask; REN4: REN3 + QLD EPBC MNES layer
+    # REN1: No GBF2 + RE ON; REN2: Core + RE ON; REN3: REN2 + GBF2 exclusion mask; REN4: REN3 + EPBC MNES mask
     'RENEWABLES_OPTIONS':[{
         'Utility Solar PV': False,                                          # OFF for core; ON for REN1-REN4
         'Onshore Wind': False,                                              # OFF for core; ON for REN1-REN4
     }],
-    'RENEWABLE_TARGET_SCENARIO_TARGETS': ['Gladstone - Current Targets'],  # 'CNS - Accelerated Transition', 'CNS - Current Targets', 'Gladstone - Current Targets'
+    'RENEWABLE_EXISTING_END_YEAR': [2030],
+    'RENEWABLE_TARGET_SCENARIO_TARGETS': ['Gladstone - Core'],             # 'Gladstone - Core', 'Gladstone - BESS Sensitivity', 'AEMO 2026 ISP - Step Change', etc.
+    'RENEWABLE_TARGET_SCENARIO_INPUT_LAYERS': ['step_change'],             # 'step_change', 'accelerated_transition', 'ANU_transmission_T3/T5/T10'
     
     
     # --------------- Objective function weights ---------------

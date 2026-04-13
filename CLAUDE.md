@@ -60,6 +60,7 @@ The LUTO2 documentation is split into themed files for better memory efficiency.
 - [make_run_index_html.md](docs/CLAUDE_SKILL/make_run_index_html.md): Generate a self-contained interactive `index.html` for any task run directory — reads GEP params from `merged_grid_search_parameters_unique.csv`, full settings from `merged_grid_search_template.csv`, and model status from PBS stdout logs
 - [iis_to_story.md](docs/CLAUDE_SKILL/iis_to_story.md): Translate IIS analysis summaries, ILP files, and PBS stdout logs into plain-language story tables grouped by scenario — diagnoses numerical stagnation vs rounding artefacts vs structural infeasibility
 - [redo_failed_write.md](docs/CLAUDE_SKILL/redo_failed_write.md): Re-run write_outputs for runs that completed simulation but failed during write — copy fixed source files into each run's luto/ dir, then submit PBS jobs via submit_redo_write.py
+- [create_luf_task_runs.md](docs/CLAUDE_SKILL/create_luf_task_runs.md): Create and submit multi-scenario LUF task runs — write create_tasks_*.py scripts, merge_unique_parameters.py, verify settings alignment, generate CSVs, and submit to cluster
 
 ## Diagnostic Tools (`luto/tests/`)
 
