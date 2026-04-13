@@ -358,8 +358,8 @@ AF_FENCING_LENGTH_HA = 100 * no_belts_per_ha * 2 # Length of fencing required pe
 # Renewable energy parameters
 # ---------------------------------------------------------------------------- #
 RENEWABLES_OPTIONS = {
-    'Utility Solar PV': True,
-    'Onshore Wind': True,
+    'Utility Solar PV': False,
+    'Onshore Wind': False,
 }
 
 RENEWABLE_EXISTING_END_YEAR = 2030
