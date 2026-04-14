@@ -145,32 +145,6 @@ def solve_timeseries(data: Data, years_to_run: list[int], do_analyze_iis: bool) 
         input_data = get_input_data(data, base_year, target_year)
         data.last_year = target_year
 
-        # if step == 0:
-        #     luto_solver = LutoSolver(input_data, d_c)
-        #     luto_solver.formulate()
-
-        # if step > 0:
-        #     prev_base_year = years_to_run[step - 1]
-
-        #     old_ag_x_mrj = luto_solver._input_data.ag_x_mrj.copy()
-        #     old_ag_man_lb_mrj = luto_solver._input_data.ag_man_lb_mrj.copy()
-        #     old_non_ag_x_rk = luto_solver._input_data.non_ag_x_rk.copy()
-        #     old_non_ag_lb_rk = luto_solver._input_data.non_ag_lb_rk.copy()
-
-        #     luto_solver.update_formulation(
-        #         input_data=input_data,
-        #         d_c=d_c,
-        #         old_ag_x_mrj=old_ag_x_mrj,
-        #         old_ag_man_lb_mrj=old_ag_man_lb_mrj,
-        #         old_non_ag_x_rk=old_non_ag_x_rk,
-        #         old_non_ag_lb_rk=old_non_ag_lb_rk,
-        #         old_lumap=data.lumaps[prev_base_year],
-        #         current_lumap=data.lumaps[base_year],
-        #         old_lmmap=data.lmmaps[prev_base_year],
-        #         current_lmmap=data.lmmaps[base_year],
-        #     )
-
-        
         for nf in settings.NUMERIC_FOCUS:
             print(f"Trying NumericFocus={nf} for year {target_year}...")
 

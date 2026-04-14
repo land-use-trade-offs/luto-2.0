@@ -557,7 +557,7 @@ def get_lower_bound_agricultural_management_matrices(data: Data, base_year) -> d
         if lb_update.any():
             gap = am_lb_raw[lb_update] - am_lb_capped[lb_update]
             print(
-                f"  Ag man lb capped [{am}]: {lb_update.sum()} cells updated,"
+                f"  └── Ag man lb capped [{am}]: {lb_update.sum()} cells updated,"
                 f" max gap={gap.max():.2e}, mean gap={gap.mean():.2e}"
             )
         result[am] = am_lb_capped

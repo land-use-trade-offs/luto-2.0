@@ -504,15 +504,13 @@ class LutoSolver:
 
                 for r in lm_dry_r_vals:
                     constr = self.gurobi_model.addConstr(
-                        self.X_ag_man_dry_vars_jr[am][j_idx, r]
-                        <= self.X_ag_dry_vars_jr[j, r],
+                        self.X_ag_man_dry_vars_jr[am][j_idx, r] <= self.X_ag_dry_vars_jr[j, r],
                         name=f"const_ag_mam_dry_usage_{am}_{j}_{r}".replace(" ", "_"),
                     )
                     self.ag_management_constraints_r[r].append(constr)
                 for r in lm_irr_r_vals:
                     constr = self.gurobi_model.addConstr(
-                        self.X_ag_man_irr_vars_jr[am][j_idx, r]
-                        <= self.X_ag_irr_vars_jr[j, r],
+                        self.X_ag_man_irr_vars_jr[am][j_idx, r] <= self.X_ag_irr_vars_jr[j, r],
                         name=f"const_ag_mam_irr_usage_{am}_{j}_{r}".replace(" ", "_"),
                     )
                     self.ag_management_constraints_r[r].append(constr)
@@ -1382,265 +1380,6 @@ class LutoSolver:
 
 
 
-
-    def update_formulation(
-        self,
-        input_data: SolverInputData,
-        d_c: np.array,
-        old_ag_x_mrj: np.ndarray,
-        old_ag_man_lb_mrj: dict,
-        old_non_ag_x_rk: np.ndarray,
-        old_non_ag_lb_rk: np.ndarray,
-        old_lumap: np.array,
-        current_lumap: np.array,
-        old_lmmap: np.array,
-        current_lmmap: np.array,
-    ):
-        """
-        Dynamically updates the existing formulation based on new input data and demands.
-        """
-        self._input_data = input_data
-        self._input_data.limits['demand'] = d_c
-
-        print("\nUpdating variables...", flush=True)
-        updated_cells = self._update_variables(
-            old_ag_x_mrj,
-            old_ag_man_lb_mrj,
-            old_non_ag_x_rk,
-            old_non_ag_lb_rk,
-            old_lumap,
-            current_lumap,
-            old_lmmap,
-            current_lmmap,
-        )
-        print("├── Updating constraints...", flush=True)
-        self._update_constraints(updated_cells)
-
-        print("└── Updating objective function...", flush=True)
-        self._setup_objective()
-
-    def _update_variables(
-        self,
-        old_ag_x_mrj: np.ndarray,
-        old_ag_man_lb_mrj: dict,
-        old_non_ag_x_rk: np.ndarray,
-        old_non_ag_lb_rk: np.ndarray,
-        old_lumap: np.array,
-        current_lumap: np.array,
-        old_lmmap: np.array,
-        current_lmmap: np.array,
-    ):
-        """
-        Updates the variables only for cells that have changed land use or land management.
-        Returns an array of cells that have been updated.
-        """
-        # metrics
-        num_cells_skipped = 0
-        updated_cells = []
-
-        for r in range(self._input_data.ncells):
-            old_j = old_lumap[r]
-            new_j = current_lumap[r]
-            old_m = old_lmmap[r]
-            new_m = current_lmmap[r]
-
-            if (
-                old_j == new_j
-                and old_m == new_m
-                and (old_ag_x_mrj[:, r, :] == self._input_data.ag_x_mrj[:, r, :]).all()
-                and (old_non_ag_x_rk[r, :] == self._input_data.non_ag_x_rk[r, :]).all()
-                and all(
-                    old_non_ag_lb_rk[r, k] == self._input_data.non_ag_lb_rk[r, k]
-                    for k, k_name in enumerate(NON_AG_LAND_USES)
-                    if not NON_AG_LAND_USES_REVERSIBLE[k_name]
-                )
-                and all(
-                    (old_ag_man_lb_mrj.get(am)[:, r, :] == self._input_data.ag_man_lb_mrj.get(am)[:, r, :]).all()
-                    for am in (i for i in AG_MANAGEMENTS if AG_MANAGEMENTS[i])
-                    if not AG_MANAGEMENTS_REVERSIBLE[am]
-                )
-            ):
-                # cell has not changed between years. No need to update variables
-                num_cells_skipped += 1
-                continue
-
-            # agricultural land usage
-            self.gurobi_model.remove(
-                list(self.X_ag_dry_vars_jr[:, r][np.where(self.X_ag_dry_vars_jr[:, r])])
-            )
-            self.gurobi_model.remove(
-                list(self.X_ag_irr_vars_jr[:, r][np.where(self.X_ag_irr_vars_jr[:, r])])
-            )
-            self.X_ag_dry_vars_jr[:, r] = np.zeros(self._input_data.n_ag_lus)
-            self.X_ag_irr_vars_jr[:, r] = np.zeros(self._input_data.n_ag_lus)
-            for j in range(self._input_data.n_ag_lus):
-                if self._input_data.ag_x_mrj[0, r, j]:
-                    self.X_ag_dry_vars_jr[j, r] = self.gurobi_model.addVar(
-                        ub=1, name=f"X_ag_dry_{j}_{r}"
-                    )
-
-                if self._input_data.ag_x_mrj[1, r, j]:
-                    self.X_ag_irr_vars_jr[j, r] = self.gurobi_model.addVar(
-                        ub=1, name=f"X_ag_irr_{j}_{r}"
-                    )
-
-            # non-agricultural land usage
-            self.gurobi_model.remove(
-                list(self.X_non_ag_vars_kr[:, r][np.where(self.X_non_ag_vars_kr[:, r])])
-            )
-            self.X_non_ag_vars_kr[:, r] = np.zeros(self._input_data.n_non_ag_lus)
-            for k, k_name in enumerate(NON_AG_LAND_USES):
-                if not NON_AG_LAND_USES[k_name]:
-                    continue
-
-                if self._input_data.non_ag_x_rk[r, k]:
-                    x_lb = (
-                        0
-                        if NON_AG_LAND_USES_REVERSIBLE[k_name]
-                        else self._input_data.non_ag_lb_rk[r, k]
-                    )
-                    self.X_non_ag_vars_kr[k, r] = self.gurobi_model.addVar(
-                        lb=x_lb,
-                        ub=self._input_data.non_ag_x_rk[r, k],
-                        name=f"X_non_ag_{k}_{r}",
-                    )
-
-            # agricultural management
-            for am, am_j_list in self._input_data.am2j.items():
-                # remove old am variables
-                self.gurobi_model.remove(
-                    list(
-                        self.X_ag_man_dry_vars_jr[am][:, r][
-                            np.where(self.X_ag_man_dry_vars_jr[am][:, r])
-                        ]
-                    )
-                )
-                self.gurobi_model.remove(
-                    list(
-                        self.X_ag_man_irr_vars_jr[am][:, r][
-                            np.where(self.X_ag_man_irr_vars_jr[am][:, r])
-                        ]
-                    )
-                )
-                self.X_ag_man_dry_vars_jr[am][:, r] = np.zeros(len(am_j_list))
-                self.X_ag_man_irr_vars_jr[am][:, r] = np.zeros(len(am_j_list))
-
-            for m, j in self._input_data.cells2ag_lu[r]:
-                # replace am variables
-                for am in self._input_data.j2am[j]:
-                    if not AG_MANAGEMENTS[am]:
-                        continue
-
-                    # Get snake_case version of the AM name for the variable name
-                    am_name = am.lower().replace(" ", "_")
-
-                    x_lb = (
-                        0
-                        if AG_MANAGEMENTS_REVERSIBLE[am]
-                        else self._input_data.ag_man_lb_mrj[am][m, r, j]
-                    )
-                    m_str = "dry" if m == 0 else "irr"
-                    var_name = f"X_ag_man_{m_str}_{am_name}_{j}_{r}"
-
-                    j_idx = self._input_data.am2j[am].index(j)
-                    if m == 0:
-                        self.X_ag_man_dry_vars_jr[am][j_idx, r] = (
-                            self.gurobi_model.addVar(
-                                lb=x_lb,
-                                ub=1,
-                                name=var_name,
-                            )
-                        )
-                    else:
-                        self.X_ag_man_irr_vars_jr[am][j_idx, r] = (
-                            self.gurobi_model.addVar(
-                                lb=x_lb,
-                                ub=1,
-                                name=var_name,
-                            )
-                        )
-
-            updated_cells.append(r)
-
-        updated_cells = np.array(updated_cells)
-        print(f"    ...skipped {num_cells_skipped} cells, updated {len(updated_cells)} cells.\n")
-        return updated_cells
-
-    def _update_constraints(self, updated_cells: np.array):
-        if len(updated_cells) == 0:
-            print("    No constraints need updating.")
-            return
-
-        print("    ...removing existing constraints...\n")
-        for r in updated_cells:
-            self.gurobi_model.remove(self.cell_usage_constraint_r.pop(r, []))
-            self.gurobi_model.remove(self.ag_management_constraints_r.pop(r, []))
-
-        self.gurobi_model.remove(self.adoption_limit_constraints)
-        self.gurobi_model.remove(self.demand_penalty_constraints)
-        if self.bio_GBF2_constrs is not None:
-            self.gurobi_model.remove(self.bio_GBF2_constrs)
-        if self.water_limit_constraints:
-            self.gurobi_model.remove(self.water_limit_constraints)
-        if self.bio_GBF3_NVIS_constrs:
-            for constr in self.bio_GBF3_NVIS_constrs.values():
-                self.gurobi_model.remove(constr)
-
-        if self.bio_GBF3_IBRA_constrs:
-            for constr in self.bio_GBF3_IBRA_constrs.values():
-                self.gurobi_model.remove(constr)
-        if self.bio_GBF4_SNES_constrs:
-            for constr in self.bio_GBF4_SNES_constrs.values():
-                self.gurobi_model.remove(constr)
-        if self.bio_GBF4_ECNES_constrs:
-            for constr in self.bio_GBF4_ECNES_constrs.values():
-                self.gurobi_model.remove(constr)
-        if self.bio_GBF8_constrs:
-            for constr in self.bio_GBF8_constrs.values():
-                self.gurobi_model.remove(constr)
-        
-
-        self.adoption_limit_constraints = []
-        self.demand_penalty_constraints = []
-        self.water_limit_constraints = []
-        self.bio_GBF3_NVIS_exprs = {}
-        self.bio_GBF3_NVIS_constrs = {}
-        self.bio_GBF3_IBRA_exprs = {}
-        self.bio_GBF3_IBRA_constrs = {}
-        self.bio_GBF8_exprs = {}
-        self.bio_GBF8_constrs = {}
-        self.bio_GBF4_SNES_exprs = {}
-        self.bio_GBF4_SNES_constrs = {}
-        self.bio_GBF4_ECNES_exprs = {}
-        self.bio_GBF4_ECNES_constrs = {}
-
-        if self.ghg_consts_ub is not None:
-            self.gurobi_model.remove(self.ghg_consts_ub)
-            self.ghg_consts_ub = None
-
-        if self.ghg_consts_lb is not None:
-            self.gurobi_model.remove(self.ghg_consts_lb)
-            self.ghg_consts_lb = None
-
-        if len(self.ghg_consts_soft) > 0:
-            for constr in self.ghg_consts_soft:
-                self.gurobi_model.remove(constr)
-            self.ghg_consts_soft = []
-
-        if self.regional_adoption_constrs:
-            self.gurobi_model.remove(self.regional_adoption_constrs)
-
-        self.regional_adoption_constrs = []
-
-        self._add_cell_usage_constraints(updated_cells)
-        self._add_agricultural_management_constraints(updated_cells)
-        self._add_agricultural_management_adoption_limit_constraints()
-        self._add_demand_penalty_constraints()
-        self._add_water_usage_limit_constraints()
-        self._add_ghg_emissions_limit_constraints()
-        self._add_biodiversity_constraints()
-        self._add_regional_adoption_constraints()
-
     def solve(self) -> SolverSolution:
         print("Starting solve...\n")
 
@@ -1661,6 +1400,7 @@ class LutoSolver:
         non_ag_X_sol_rk = np.zeros(
             (self._input_data.ncells, self._input_data.n_non_ag_lus)
         ).astype(np.float32)
+        
         am_X_dry_sol_rj = {
             am: np.zeros((self._input_data.ncells, self._input_data.n_ag_lus)).astype(
                 np.float32
@@ -1713,75 +1453,19 @@ class LutoSolver:
                         j_idx, r
                     ].X
 
-        """Note that output decision variables are mostly 0 or 1 but in some cases they are somewhere in between which creates issues
-            when converting to maps etc. as individual cells can have non-zero values for multiple land-uses and land management type.
-            This code creates a boolean X_mrj output matrix and ensure that each cell has one and only one land-use and land management"""
-
-        # Process agricultural land usage information
-        # Stack dryland and irrigated decision variables
+        # Stack dryland and irrigated decision variables — fractional values preserved as-is
         ag_X_mrj = np.stack((X_dry_sol_rj, X_irr_sol_rj))  # Float32
-        ag_X_mrj_processed = ag_X_mrj
+        ag_man_X_mrj = {
+            am: np.stack((am_X_dry_sol_rj[am], am_X_irr_sol_rj[am]))
+            for am in self._input_data.am2j
+        }
 
-        ## Note - uncomment the following block of code to revert the processed agricultural variables to be binary.
-
-        # ag_X_mrj_shape = ag_X_mrj.shape
-
-        # # Reshape so that cells are along the first axis and land management and use are flattened along second axis i.e. (XXXXXXX,  56)
-        # ag_X_mrj_processed = np.moveaxis(ag_X_mrj, 1, 0)
-        # ag_X_mrj_processed = ag_X_mrj_processed.reshape(ag_X_mrj_processed.shape[0], -1)
-
-        # # Boolean matrix where the maximum value for each cell across all land management types and land uses is True
-        # ag_X_mrj_processed = ag_X_mrj_processed.argmax(axis=1)[:, np.newaxis] == range(
-        #     ag_X_mrj_processed.shape[1]
-        # )
-
-        # # Reshape to mrj structure
-        # ag_X_mrj_processed = ag_X_mrj_processed.reshape(
-        #     (ag_X_mrj_shape[1], ag_X_mrj_shape[0], ag_X_mrj_shape[2])
-        # )
-        # ag_X_mrj_processed = np.moveaxis(ag_X_mrj_processed, 0, 1)
-
-
-        # Process non-agricultural land usage information
-        # Boolean matrix where the maximum value for each cell across all non-ag LUs is True
-        non_ag_X_rk_processed = non_ag_X_sol_rk.argmax(axis=1)[:, np.newaxis] == range(
-            self._input_data.n_non_ag_lus
-        )
-
-        # Make land use and land management maps
-        # Vector indexed by cell that denotes whether the cell is non-agricultural land (True) or agricultural land (False)
+        # Vector indexed by cell: True where non-ag dvar dominates (used for lumap/lmmap only)
         non_ag_bools_r = non_ag_X_sol_rk.max(axis=1) > ag_X_mrj.max(axis=(0, 2))
 
-        # Update processed variables accordingly
-        ag_X_mrj_processed[:, non_ag_bools_r, :] = False
-        non_ag_X_rk_processed[~non_ag_bools_r, :] = False
-
-        # Process agricultural management variables
-        # Repeat the steps for the regular agricultural management variables
-        ag_man_X_mrj_processed = {}
-        for am in self._input_data.am2j:
-            ag_man_processed = np.stack((am_X_dry_sol_rj[am], am_X_irr_sol_rj[am]))
-
-            ## Note - uncomment the following block of code to revert the processed AM variables to be binary.
-
-            # ag_man_X_shape = ag_man_processed.shape
-
-            # ag_man_processed = np.moveaxis(ag_man_processed, 1, 0)
-            # ag_man_processed = ag_man_processed.reshape(ag_man_processed.shape[0], -1)
-
-            # ag_man_processed = (
-            #        ag_man_processed.argmax(axis = 1)[:, np.newaxis]
-            #     == range(ag_man_processed.shape[1])
-            # )
-            # ag_man_processed = ag_man_processed.reshape(
-            #     (ag_man_X_shape[1], ag_man_X_shape[0], ag_man_X_shape[2])
-            # )
-            # ag_man_processed = np.moveaxis(ag_man_processed, 0, 1)
-            ag_man_X_mrj_processed[am] = ag_man_processed
-
         # Calculate 1D array (maps) of land-use and land management, considering only agricultural LUs
-        lumap = ag_X_mrj_processed.sum(axis=0).argmax(axis=1).astype("int8")
-        lmmap = ag_X_mrj_processed.sum(axis=2).argmax(axis=0).astype("int8")
+        lumap = ag_X_mrj.sum(axis=0).argmax(axis=1).astype("int8")
+        lmmap = ag_X_mrj.sum(axis=2).argmax(axis=0).astype("int8")
 
         # Update lxmaps and processed variable matrices to consider non-agricultural LUs
         lumap[non_ag_bools_r] = (
@@ -1879,9 +1563,9 @@ class LutoSolver:
             lumap=lumap,
             lmmap=lmmap,
             ammaps=ammaps,
-            ag_X_mrj=ag_X_mrj_processed,
+            ag_X_mrj=ag_X_mrj,
             non_ag_X_rk=non_ag_X_sol_rk,
-            ag_man_X_mrj=ag_man_X_mrj_processed,
+            ag_man_X_mrj=ag_man_X_mrj,
             prod_data=prod_data,
             obj_val={
                 "ObjVal":(

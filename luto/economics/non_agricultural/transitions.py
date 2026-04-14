@@ -1165,7 +1165,7 @@ def get_lower_bound_non_agricultural_matrices(data: Data, base_year) -> np.ndarr
     if lb_update.any():
         gap = lb_rk[lb_update] - lb_capped[lb_update]
         print(
-            f"  NonAg lb capped: {lb_update.sum()} cells updated,"
+            f"  └── NonAg lb capped: {lb_update.sum()} cells updated,"
             f" max gap={gap.max():.2e}, mean gap={gap.mean():.2e}"
         )
 
