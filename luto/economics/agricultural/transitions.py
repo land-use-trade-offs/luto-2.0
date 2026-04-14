@@ -534,14 +534,34 @@ def get_lower_bound_agricultural_management_matrices(data: Data, base_year) -> d
             if settings.AG_MANAGEMENTS[am]
         }
 
-    return {
-        am: np.divide(
-            np.floor(data.ag_man_dvars[base_year][am].astype(np.float32) * 10 ** settings.ROUND_DECIMALS)
-            , 10 ** settings.ROUND_DECIMALS
+    # ag_man lb is derived from the previous year's decision variable, floor-truncated to
+    # ROUND_DECIMALS precision.  However the solver can return ag_man_dvar slightly above
+    # ag_dvar (because of the settings.FEASIBILITY_TOLERANCE), so the raw floor can produce 
+    # a lb that exceeds the corresponding ag_dvar — making the next year structurally infeasible.
+    # Cap each am lb against the floor-truncated ag_dvar to guarantee lb <= ag_dvar.
+    ag_lb = np.divide(
+        np.floor(data.ag_dvars[base_year].astype(np.float32) * 10 ** settings.ROUND_DECIMALS),
+        10 ** settings.ROUND_DECIMALS,
+    )  # shape: (NLMS, NCELLS, N_AG_LUS)
+
+    result = {}
+    for am in settings.AG_MANAGEMENTS_TO_LAND_USES:
+        if not settings.AG_MANAGEMENTS[am]:
+            continue
+        am_lb_raw = np.divide(
+            np.floor(data.ag_man_dvars[base_year][am].astype(np.float32) * 10 ** settings.ROUND_DECIMALS),
+            10 ** settings.ROUND_DECIMALS,
         )
-        for am in settings.AG_MANAGEMENTS_TO_LAND_USES
-        if settings.AG_MANAGEMENTS[am]
-    }
+        am_lb_capped = np.minimum(am_lb_raw, ag_lb)
+        lb_update = am_lb_capped < am_lb_raw
+        if lb_update.any():
+            gap = am_lb_raw[lb_update] - am_lb_capped[lb_update]
+            print(
+                f"  Ag man lb capped [{am}]: {lb_update.sum()} cells updated,"
+                f" max gap={gap.max():.2e}, mean gap={gap.mean():.2e}"
+            )
+        result[am] = am_lb_capped
+    return result
 
 
 def get_regional_adoption_limits(data: Data, yr_cal: int):

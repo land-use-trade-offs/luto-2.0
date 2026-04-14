@@ -1145,10 +1145,28 @@ def get_lower_bound_non_agricultural_matrices(data: Data, base_year) -> np.ndarr
 
     if base_year == data.YR_CAL_BASE or base_year not in data.non_ag_dvars:
         return np.zeros((data.NCELLS, len(settings.NON_AG_LAND_USES))).astype(np.float32)
-        
-    # return np.divide(
-    #     np.floor(data.non_ag_dvars[base_year].astype(np.float32) * 10 ** settings.ROUND_DECIMALS),
-    #     10 ** settings.ROUND_DECIMALS,
-    # )
+
+    # Floor-truncate to ROUND_DECIMALS precision (prevents float32 upward rounding
+    # from inflating the lb above the stored dvar value).
+    lb_rk = np.divide(
+        np.floor(data.non_ag_dvars[base_year].astype(np.float32) * 10 ** settings.ROUND_DECIMALS),
+        10 ** settings.ROUND_DECIMALS,
+    )
+
+    # Cap each lb against the cell capacity (AG_MASK_PROPORTION_R) — the same float32
+    # value used as the const_cell_usage RHS.  This prevents a float32 rounding
+    # artefact (e.g. float32(0.92) = 0.9200000169) from exceeding a cell capacity
+    # stored as a slightly different float32 value (e.g. 0.9199999571), which would
+    # make the cell-usage equality constraint structurally infeasible.
+    lb_capped = np.minimum(lb_rk, data.AG_MASK_PROPORTION_R[:, np.newaxis]).astype(np.float32)
+
+    lb_update = lb_capped < lb_rk
     
-    return data.non_ag_dvars[base_year].astype(np.float32)
+    if lb_update.any():
+        gap = lb_rk[lb_update] - lb_capped[lb_update]
+        print(
+            f"  NonAg lb capped: {lb_update.sum()} cells updated,"
+            f" max gap={gap.max():.2e}, mean gap={gap.mean():.2e}"
+        )
+
+    return lb_capped
