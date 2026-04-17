@@ -28,7 +28,7 @@ import pandas as pd
 import luto.settings as settings
 
 from luto.data import Data
-from luto.economics.agricultural.quantity import get_yield_pot, get_quantity, lvs_veg_types, get_quantity_renewable
+from luto.economics.agricultural.quantity import get_yield_pot, get_quantity, lvs_veg_types, get_quantity_renewable, get_exist_renewable_capacity
 from luto.economics.agricultural.ghg import get_savanna_burning_effect_g_mrj
 from functools import lru_cache
 
@@ -511,14 +511,68 @@ def get_onshore_wind_effect_r_mrj(data: Data, r_mrj, yr_idx):
 
     return new_r_mrj
 
-def get_agricultural_management_revenue_matrices(data:Data, r_mrj, yr_idx) -> dict[str, np.ndarray]:
+
+def get_existing_renewable_revenue_by_state(data: Data, base_year: int, target_year: int) -> dict:
+    """
+    Return existing renewable revenue by state and type, for cells locked out of the LP (ub=0).
+
+    Revenue = actual delivered MWh × state price, for all capacity installed strictly before target_year.
+    Actual MWh = nominal_MWh (MW × 8760) × capacity_factor × distribution_loss_factor,
+    via get_exist_renewable_capacity (uses yr=2030 proxy).
+
+    Return format: {state: {'Utility Solar PV': revenue_AUD, 'Onshore Wind': revenue_AUD}}
+    """
+    if not any(settings.RENEWABLES_OPTIONS.values()):
+        return {}
+
+    # ── Utility Solar PV ──────────────────────────────────────────────────────
+    # Step 1: Get actual delivered MWh per cell — cumulative up to and including target_year
+    solar_mwh_r = (
+        get_exist_renewable_capacity(data, 'Utility Solar PV', target_year)         # Cumulative MWh with CF × DL applied
+        .assign_coords({'state': ('cell', data.REGION_STATE_NAME)})                 # Tag each cell with its state
+    )
+
+    # Step 2: Sum MWh by state, then multiply by state electricity price (AUD/MWh)
+    solar_prices        = data.SOLAR_PRICES.query('Year == @target_year').set_index('State')['Price_AUD_per_MWh'].to_dict()
+    solar_mwh_by_state  = solar_mwh_r.groupby('state').sum('cell').to_dataframe('mwh').to_dict()['mwh']
+    solar_by_state = {
+        state: mwh * solar_prices[state]                                            # Revenue = MWh × price (AUD/MWh)
+        for state, mwh in solar_mwh_by_state.items()
+    }
+
+    # ── Onshore Wind ──────────────────────────────────────────────────────────
+    # Step 1: Get actual delivered MWh per cell — cumulative up to and including target_year
+    wind_mwh_r = (
+        get_exist_renewable_capacity(data, 'Onshore Wind', target_year)             # Cumulative MWh with CF × DL applied
+        .assign_coords({'state': ('cell', data.REGION_STATE_NAME)})                 # Tag each cell with its state
+    )
+
+    # Step 2: Sum MWh by state, then multiply by state electricity price (AUD/MWh)
+    wind_prices         = data.WIND_PRICES.query('Year == @target_year').set_index('State')['Price_AUD_per_MWh'].to_dict()
+    wind_mwh_by_state   = wind_mwh_r.groupby('state').sum('cell').to_dataframe('mwh').to_dict()['mwh']
+    wind_by_state = {
+        state: mwh * wind_prices[state]                                             # Revenue = MWh × price (AUD/MWh)
+        for state, mwh in wind_mwh_by_state.items()
+    }
+
+    all_states = set(solar_by_state) | set(wind_by_state)
+    return {
+        state: {
+            'Utility Solar PV': solar_by_state[state],
+            'Onshore Wind':     wind_by_state[state],
+        }
+        for state in all_states
+    }
+
+
+def get_agricultural_management_revenue_matrices(data:Data, r_mrj, yr_idx: int) -> dict[str, np.ndarray]:
     """
     Calculate the revenue matrices for different agricultural management practices.
 
     Args:
         data: The input data for revenue calculation.
         r_mrj: The value of r_mrj parameter.
-        yr_idx: The index of the year.
+        yr_idx: The index of the target year for which to calculate the revenue matrices.
 
     Returns
         A dictionary containing revenue matrices for different agricultural management practices.
@@ -536,6 +590,6 @@ def get_agricultural_management_revenue_matrices(data:Data, r_mrj, yr_idx) -> di
     ag_mam_r_mrj['HIR - Beef'] = get_beef_hir_effect_r_mrj(data, r_mrj)                                    
     ag_mam_r_mrj['HIR - Sheep'] = get_sheep_hir_effect_r_mrj(data, r_mrj)
     ag_mam_r_mrj['Utility Solar PV'] = get_utility_solar_pv_effect_r_mrj(data, r_mrj, yr_idx)
-    ag_mam_r_mrj['Onshore Wind'] = get_onshore_wind_effect_r_mrj(data, r_mrj, yr_idx)                                  
+    ag_mam_r_mrj['Onshore Wind'] = get_onshore_wind_effect_r_mrj(data, r_mrj, yr_idx)
 
     return ag_mam_r_mrj

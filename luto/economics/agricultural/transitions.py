@@ -253,39 +253,60 @@ def get_beef_hir_effect_t_mrj(data: Data):
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef']
     return np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
+
 def get_sheep_hir_effect_t_mrj(data: Data):
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep']
     return np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
 
 def get_utility_solar_pv_effect_t_mrj(data: Data, yr_idx):
     """
     Calculate establishment-related transition costs for Utility Solar PV
     as a 3D array indexed by management (m), cell (r), and land use (j) for year yr_idx.
-    
-    UPDATED: Uses dynamic CAPEX maps and returns Upfront cost (no amortisation).
+
+    NOTE — This function calculates CAPEX repeatedly for each year. Ie., even a solar was
+        built in a previous year, it will still have  CAPEX applied in every subsequent year.
+        
+        <This is a speciall case compared to how we calculate transition cost for ag and nonag>
+        
+        Repeated CAPEX is intentional and does not distort optimisation ranking:
+        The full installation CAPEX is applied as a coefficient on X_am in every simulation
+        year, including years where the cell already carries solar from a prior period.
+        This mirrors the convention used for ag2ag transition costs, which are similarly
+        applied to the full allocation rather than only the incremental change.
+
+        Repeating CAPEX does not change which cells the optimiser selects because the RE
+        target is a hard constraint (>= MWh target).  The solver ranks cells by
+        (revenue - cost - CAPEX) to fill that quota at minimum cost.  Since every cell
+        carries the repeated-CAPEX structure uniformly, their relative ranking is identical
+        to the ranking under a one-time CAPEX regime — only the absolute objective value
+        differs, not the ordering.
+
+        The economically correct one-time CAPEX (charged only on the new-installation
+        increment: dvar_target - dvar_base) is calculated in write.py for accurate
+        economic reporting.
     """
-    
+
     yr_cal = data.YR_CAL_BASE + yr_idx
     solar_lus = settings.AG_MANAGEMENTS_TO_LAND_USES['Utility Solar PV']
-    
+
     if not settings.AG_MANAGEMENTS['Utility Solar PV']:
         return np.zeros((data.NLMS, data.NCELLS, len(solar_lus)), dtype=np.float32)
 
-    # Get upfront installation cost map (AUD/Cell)
-    capex_map = (
-        data.RENEWABLE_LAYERS.sel(year=yr_cal, tech_name='Utility Solar PV')['Cost_of_install_AUD_kw'] 
+    # Get installation cost map and amortise (respects AMORTISE_UPFRONT_COSTS setting)
+    # RENEWABLE_LAYERS starts at 2030; clamp pre-2030 simulation years to first available year.
+    yr_lyr = max(yr_cal, int(data.RENEWABLE_LAYERS['year'].values[0]))
+    capex_map = tools.amortise(
+        data.RENEWABLE_LAYERS.sel(year=yr_lyr, tech_name='Utility Solar PV')['Cost_of_install_AUD_kw']
         * 1000                                                  # Convert from AUD/kW to AUD/MW
         * 0.6944                                                # Adjust AUD from 2024 to 2010
         * settings.INSTALL_CAPACITY_MW_HA['Utility Solar PV']   # Convert from AUD/MW to AUD/ha
         * data.REAL_AREA                                        # Convert from AUD/ha to AUD/cell
     )
-    
-    # Assign to mrj matrix
+
     effect_array = np.zeros((data.NLMS, data.NCELLS, len(solar_lus)), dtype=np.float32)
-    
     for m in range(data.NLMS):
-        for j, lu in enumerate(solar_lus):
-            # Assign upfront cost directly
+        for j, _ in enumerate(solar_lus):
             effect_array[m, :, j] = capex_map
 
     return effect_array
@@ -295,31 +316,50 @@ def get_onshore_wind_effect_t_mrj(data: Data, yr_idx):
     """
     Calculate establishment-related transition costs for Onshore Wind
     as a 3D array indexed by management (m), cell (r), and land use (j) for year yr_idx.
-    
-    UPDATED: Uses dynamic CAPEX maps and returns Upfront cost (no amortisation).
+
+    NOTE — This function calculates CAPEX repeatedly for each year. Ie., even a wind farm was
+        built in a previous year, it will still have  CAPEX applied in every subsequent year.
+        
+        <This is a speciall case compared to how we calculate transition cost for ag and nonag>
+        
+        Repeated CAPEX is intentional and does not distort optimisation ranking:
+        The full installation CAPEX is applied as a coefficient on X_am in every simulation
+        year, including years where the cell already carries wind farm from a prior period.
+        This mirrors the convention used for ag2ag transition costs, which are similarly
+        applied to the full allocation rather than only the incremental change.
+
+        Repeating CAPEX does not change which cells the optimiser selects because the RE
+        target is a hard constraint (>= MWh target).  The solver ranks cells by
+        (revenue - cost - CAPEX) to fill that quota at minimum cost.  Since every cell
+        carries the repeated-CAPEX structure uniformly, their relative ranking is identical
+        to the ranking under a one-time CAPEX regime — only the absolute objective value
+        differs, not the ordering.
+
+        The economically correct one-time CAPEX (charged only on the new-installation
+        increment: dvar_target - dvar_base) is calculated in write.py for accurate
+        economic reporting.
     """
-    
+
     yr_cal = data.YR_CAL_BASE + yr_idx
     wind_lus = settings.AG_MANAGEMENTS_TO_LAND_USES['Onshore Wind']
-    
+
     if not settings.AG_MANAGEMENTS['Onshore Wind']:
         return np.zeros((data.NLMS, data.NCELLS, len(wind_lus)), dtype=np.float32)
 
-    # Get upfront installation cost map (AUD/Cell)
-    capex_map = (
-        data.RENEWABLE_LAYERS.sel(year=yr_cal, tech_name='Onshore Wind')['Cost_of_install_AUD_kw'] 
+    # Get installation cost map and amortise (respects AMORTISE_UPFRONT_COSTS setting)
+    # RENEWABLE_LAYERS starts at 2030; clamp pre-2030 simulation years to first available year.
+    yr_lyr = max(yr_cal, int(data.RENEWABLE_LAYERS['year'].values[0]))
+    capex_map = tools.amortise(
+        data.RENEWABLE_LAYERS.sel(year=yr_lyr, tech_name='Onshore Wind')['Cost_of_install_AUD_kw']
         * 1000                                              # Convert from AUD/kW to AUD/MW
         * 0.6944                                            # Adjust AUD from 2024 to 2010
         * settings.INSTALL_CAPACITY_MW_HA['Onshore Wind']   # Convert from AUD/MW to AUD/ha
         * data.REAL_AREA                                    # Convert from AUD/ha to AUD/cell
     )
-    
-    # Assign to mrj matrix
-    effect_array = np.zeros((data.NLMS, data.NCELLS, len(wind_lus)), dtype=np.float32)
 
+    effect_array = np.zeros((data.NLMS, data.NCELLS, len(wind_lus)), dtype=np.float32)
     for m in range(data.NLMS):
-        for j,lu in enumerate(wind_lus):
-            # Assign upfront cost directly
+        for j, _ in enumerate(wind_lus):
             effect_array[m, :, j] = capex_map
 
     return effect_array

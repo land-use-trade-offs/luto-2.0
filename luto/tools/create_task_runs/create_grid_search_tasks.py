@@ -145,7 +145,6 @@ grid_search = {
         'Utility Solar PV': False,                                          # OFF for core; ON for REN1-REN4
         'Onshore Wind': False,                                              # OFF for core; ON for REN1-REN4
     }],
-    'RENEWABLE_EXISTING_END_YEAR': [2030],
     'RENEWABLE_TARGET_SCENARIO_TARGETS': ['Gladstone - Core'],             # 'Gladstone - Core', 'Gladstone - BESS Sensitivity', 'AEMO 2026 ISP - Step Change', etc.
     'RENEWABLE_TARGET_SCENARIO_INPUT_LAYERS': ['step_change'],             # 'step_change', 'accelerated_transition', 'ANU_transmission_T3/T5/T10'
     

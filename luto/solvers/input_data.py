@@ -474,13 +474,13 @@ def get_potential_renewable_wind_r(data: Data, target_idx):
     output = ag_quantity.get_quantity_renewable(data, 'Onshore Wind', target_idx)
     return output
 
-def get_exist_renewable_capacity_solar_r(data: Data, yr_cal: int):
+def get_exist_renewable_fraction_solar_r(data: Data, yr_cal: int):
     print('Getting existing solar capacity (MWh/cell)...', flush=True)
-    return ag_quantity.get_exist_renewable_capacity_layer(data, 'Utility Solar PV', yr_cal)
+    return ag_quantity.get_existing_renewable_dvar_fraction(data, 'Utility Solar PV', yr_cal)
 
-def get_exist_renewable_capacity_wind_r(data: Data, yr_cal: int):
+def get_exist_renewable_fraction_wind_r(data: Data, yr_cal: int):
     print('Getting existing wind capacity (MWh/cell)...', flush=True)
-    return ag_quantity.get_exist_renewable_capacity_layer(data, 'Onshore Wind', yr_cal)
+    return ag_quantity.get_existing_renewable_dvar_fraction(data, 'Onshore Wind', yr_cal)
 
 def get_exist_renewable_capacity_by_state_input(data: Data, yr_cal: int):
     print('Getting existing renewable capacity by state...', flush=True)
@@ -500,9 +500,9 @@ def get_non_ag_lb_rk(data: Data, base_year):
     return output
 
 
-def get_ag_man_c_mrj(data: Data, target_index, ag_c_mrj: np.ndarray):
+def get_ag_man_c_mrj(data: Data, ag_c_mrj: np.ndarray, base_year, target_year):
     print('Getting agricultural management options\' cost effects...', flush = True)
-    output = ag_cost.get_agricultural_management_cost_matrices(data, ag_c_mrj, target_index)
+    output = ag_cost.get_agricultural_management_cost_matrices(data, ag_c_mrj, base_year, target_year)
     return output
 
 
@@ -858,7 +858,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     non_ag_t_rk = get_non_ag_t_rk(data, base_year)
     non_ag_to_ag_t_mrj = get_non_ag_to_ag_t_mrj(data, base_year, target_index)
     
-    ag_man_c_mrj = get_ag_man_c_mrj(data, target_index, ag_c_mrj)
+    ag_man_c_mrj = get_ag_man_c_mrj(data, ag_c_mrj, base_year, target_year)
     ag_man_r_mrj = get_ag_man_r_mrj(data, target_index, ag_r_mrj)
     ag_man_t_mrj = get_ag_man_t_mrj(data, target_index)
     
@@ -907,8 +907,8 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     
     renewable_solar_r=get_potential_renewable_solar_r(data, target_index)
     renewable_wind_r=get_potential_renewable_wind_r(data, target_index)
-    exist_renewable_solar_r=get_exist_renewable_capacity_solar_r(data, target_year)
-    exist_renewable_wind_r=get_exist_renewable_capacity_wind_r(data, target_year)
+    exist_renewable_solar_r=get_exist_renewable_fraction_solar_r(data, target_year)
+    exist_renewable_wind_r=get_exist_renewable_fraction_wind_r(data, target_year)
 
     region_state_r = get_region_state_r(data)
     region_state_name2idx = get_region_state_name2idx(data)
@@ -950,12 +950,13 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         [ag_g_mrj, non_ag_g_rk, ag_man_g_mrj, ag_ghg_t_mrj], ghg_scale = rescale_solver_input_data([ag_g_mrj, non_ag_g_rk, ag_man_g_mrj, ag_ghg_t_mrj])
     else:
         ghg_scale = 1.0
-
+  
     if any(settings.RENEWABLES_OPTIONS.values()):
-        [renewable_solar_r, exist_renewable_solar_r], solar_scale = rescale_solver_input_data([renewable_solar_r, exist_renewable_solar_r])
-        [renewable_wind_r,  exist_renewable_wind_r],  wind_scale  = rescale_solver_input_data([renewable_wind_r,  exist_renewable_wind_r])
+            [renewable_solar_r], renewable_solar_scale = rescale_solver_input_data([renewable_solar_r])
+            [renewable_wind_r],  renewable_wind_scale  = rescale_solver_input_data([renewable_wind_r])
     else:
-        solar_scale = wind_scale = 1.0
+        renewable_solar_scale = 1.0
+        renewable_wind_scale  = 1.0
 
     if settings.WATER_LIMITS == 'on':
         [ag_w_mrj, non_ag_w_rk, ag_man_w_mrj], water_scale = rescale_solver_input_data([ag_w_mrj, non_ag_w_rk, ag_man_w_mrj])
@@ -997,8 +998,6 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         "Demand":           demand_scale,
         "Biodiversity":     biodiv_scale,
         "GHG":              ghg_scale,
-        "Renewable_Solar":  solar_scale,
-        "Renewable_Wind":   wind_scale,
         "Water":            water_scale,
         "GBF2":             gbf2_scale,
         "GBF3_NVIS":        gbf3_nvis_scale,
@@ -1006,6 +1005,8 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         "GBF4_SNES":        gbf4_snes_scale,
         "GBF4_ECNES":       gbf4_ecnes_scale,
         "GBF8":             gbf8_scale,
+        "Renewable_Solar":  renewable_solar_scale,
+        "Renewable_Wind":   renewable_wind_scale,
     }
 
     base_yr_prod = {

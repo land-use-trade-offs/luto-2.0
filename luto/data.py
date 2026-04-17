@@ -700,6 +700,11 @@ class Data:
         if any(settings.RENEWABLES_OPTIONS.values()):
 
             print("├── Loading renewable energy data...", flush=True)
+            
+            # Renewable bundle data (productivity impacts, cost multipliers, etc)
+            renewable_bundle = pd.read_csv(f'{settings.INPUT_DIR}/renewable_energy_bundle.csv')
+            self.RENEWABLE_BUNDLE_WIND = renewable_bundle.query('Lever == "Onshore Wind"')
+            self.RENEWABLE_BUNDLE_SOLAR = renewable_bundle.query('Lever == "Utility Solar PV"')
 
             # Renewable targets and prices
             self.RENEWABLE_TARGETS = (
@@ -722,37 +727,71 @@ class Data:
                 .isel(cell=self.MASK)
             )
 
-            # TODO: remove when all years of renewable layers are available.
-            #   Now is a temporary fix to duplicate 2030 to 2010-2029.
-            self.RENEWABLE_LAYERS = xr.concat(
-                [self.RENEWABLE_LAYERS.sel(year=2030, drop=True).expand_dims(year=range(self.YR_CAL_BASE, 2030))
-                , self.RENEWABLE_LAYERS],
-                dim='year'
-            )
 
-            # Renewable bundle data (productivity impacts, cost multipliers, etc)
-            renewable_bundle = pd.read_csv(f'{settings.INPUT_DIR}/renewable_energy_bundle.csv')
-            self.RENEWABLE_BUNDLE_WIND = renewable_bundle.query('Lever == "Onshore Wind"')
-            self.RENEWABLE_BUNDLE_SOLAR = renewable_bundle.query('Lever == "Utility Solar PV"')
-            
             # Existing capacity 
             #    The existing capacity is MW/cell, so here we need to sum the resfactor cells 
             #    to get the total existing capacity in each resfactor cell. 
             renewable_existing_capacity_lyr = xr.load_dataarray(f'{settings.INPUT_DIR}/renewable_existing_capacity_MW_1D.nc')
-            self.RENEWABLE_EXISTING_CAPACITY_LAYER_SOLAR = self.get_resfactored_sum(renewable_existing_capacity_lyr.sel(tech_name='Utility Solar PV'))
-            self.RENEWABLE_EXISTING_CAPACITY_LAYER_WIND = self.get_resfactored_sum(renewable_existing_capacity_lyr.sel(tech_name='Onshore Wind'))
             
-            renewable_existing_capacity = (
-                pd.read_csv(f'{settings.INPUT_DIR}/renewable_existing_capacity_by_state.csv')
-                .eval('capacity_MWH=capacity_MW * 365 * 24')
+            renewable_existing_capacity_solar = [
+                xr.DataArray(
+                    self.get_resfactored_sum(renewable_existing_capacity_lyr.sel(year=year, tech_name='Utility Solar PV')),
+                    dims=['cell'],
+                    coords={'cell': np.where(self.MASK)[0]}
+                ).astype(np.float32)
+                for year in renewable_existing_capacity_lyr['year'].values
+            ]
+            renewable_existing_capacity_wind = [
+                xr.DataArray(
+                    self.get_resfactored_sum(renewable_existing_capacity_lyr.sel(year=year, tech_name='Onshore Wind')),
+                    dims=['cell'],
+                    coords={'cell': np.where(self.MASK)[0]}
+                ).astype(np.float32)
+                for year in renewable_existing_capacity_lyr['year'].values
+            ] 
+            
+            self.RENEWABLE_EXISTING_CAPACITY_LAYER_SOLAR_MWH_CELL = (
+                xr.concat(renewable_existing_capacity_solar, dim='year')
+                .assign_coords(year=renewable_existing_capacity_lyr['year'].values)
+                * 24
+                * 365
+            )
+            self.RENEWABLE_EXISTING_CAPACITY_LAYER_WIND_MWH_CELL = (
+                xr.concat(renewable_existing_capacity_wind, dim='year')
+                .assign_coords(year=renewable_existing_capacity_lyr['year'].values)
+                * 24
+                * 365
             )
             
-            self.RENEWABLE_EXISTING_CAPACITY_MWH_BY_STATE = (
-                renewable_existing_capacity
-                .set_index(['state', 'tech'])['capacity_MWH']
-                .unstack('tech')
-                .to_dict(orient='index')
+            # Existing dvar fraction of renewable energy in each cell
+            re_exist_frac_lyr = xr.load_dataarray(f'{settings.INPUT_DIR}/renewable_existing_capacity_area_fraction_1D.nc')
+
+            re_exist_frac_solar = [
+                xr.DataArray(
+                    self.get_resfactored_average_fraction(re_exist_frac_lyr.sel(year=year, tech_name='Utility Solar PV')),
+                    dims=['cell'],
+                    coords={'cell': np.where(self.MASK)[0]}
+                ).astype(np.float32)
+                for year in re_exist_frac_lyr['year'].values
+            ]
+            re_exist_frac_wind = [
+                xr.DataArray(
+                    self.get_resfactored_average_fraction(re_exist_frac_lyr.sel(year=year, tech_name='Onshore Wind')),
+                    dims=['cell'],
+                    coords={'cell': np.where(self.MASK)[0]}
+                ).astype(np.float32)
+                for year in re_exist_frac_lyr['year'].values
+            ]
+            
+            self.RENEWABME_EXISTING_DVAR_FRACTION_SOLAR = (
+                xr.concat(re_exist_frac_solar, dim='year')
+                .assign_coords(year=re_exist_frac_lyr['year'].values)
             )
+            self.RENEWABME_EXISTING_DVAR_FRACTION_WIND = (
+                xr.concat(re_exist_frac_wind, dim='year')
+                .assign_coords(year=re_exist_frac_lyr['year'].values)
+            )
+
 
 
 

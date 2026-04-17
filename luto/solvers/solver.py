@@ -254,12 +254,38 @@ class LutoSolver:
                 dry_lu_cells = self._input_data.ag_lu2cells[0, j]
                 irr_lu_cells = self._input_data.ag_lu2cells[1, j]
 
-                # for savanna burning, remove extra ineligible cells
+                # For savanna burning, remove extra ineligible cells
                 if am_name == "savanna_burning":
                     dry_lu_cells = np.intersect1d(
                         dry_lu_cells, self._input_data.savanna_eligible_r
                     )
+                    
+                # For renewable energy AMs, cells with existing capacity (exist_r > 0) can still
+                # receive new installations up to the remaining fraction (1 - exist_r). Cells with
+                # no existing capacity (exist_r == 0) are open for full optimization up to ub=1.
+                if am in settings.RENEWABLES_OPTIONS:
+                    exist_r = (
+                        self._input_data.exist_renewable_solar_r
+                        if am == "Utility Solar PV"
+                        else self._input_data.exist_renewable_wind_r
+                    )
+                    for r in dry_lu_cells:
+                        model_lb = 0 if AG_MANAGEMENTS_REVERSIBLE[am] else self._input_data.ag_man_lb_mrj[am][0, r, j]
+                        self.X_ag_man_dry_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
+                            lb=model_lb,
+                            ub=1 - exist_r[r],            # ub shrinks by existing fraction; 0 when fully occupied
+                            name=f"X_ag_man_dry_{am_name}_{j}_{r}".replace(" ", "_"),
+                        )
+                    for r in irr_lu_cells:
+                        model_lb = 0 if AG_MANAGEMENTS_REVERSIBLE[am] else self._input_data.ag_man_lb_mrj[am][1, r, j]
+                        self.X_ag_man_irr_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
+                            lb=model_lb,
+                            ub=1 - exist_r[r],            # ub shrinks by existing fraction; 0 when fully occupied
+                            name=f"X_ag_man_irr_{am_name}_{j}_{r}".replace(" ", "_"),
+                        )
+                    continue  # skip generic loop below; variables already created with correct lbs
 
+                # Generic loop: all other AM options use transition-based lower bounds.
                 for r in dry_lu_cells:
                     dry_x_lb = (
                         0
@@ -521,36 +547,14 @@ class LutoSolver:
         """
         print("│   ├── Adding constraints for agricultural management adoption limits...")
 
-        # Map renewable AM names to their existing-capacity arrays so that cells
-        # with pre-existing infrastructure are excluded from new adoption decisions.
-        # Their energy contribution is accounted for separately via exist_power_rescale
-        # in the renewable energy constraints.
-        renewable_exist_map = {
-            'Utility Solar PV': self._input_data.exist_renewable_solar_r,
-            'Onshore Wind':     self._input_data.exist_renewable_wind_r,
-        }
 
         for am, am_j_list in self._input_data.am2j.items():
-            exist_r = renewable_exist_map.get(am)
 
             for j_idx, j in enumerate(am_j_list):
                 adoption_limit = self._input_data.ag_man_limits[am][j]
 
                 dry_cells = self._input_data.ag_lu2cells[0, j]
                 irr_cells = self._input_data.ag_lu2cells[1, j]
-
-                # For renewable AMs: pin am dvars to 0 for cells that already have
-                # existing capacity — the optimizer must not "re-install" them.
-                if exist_r is not None:
-                    for cells, vars_jr in [
-                        (dry_cells, self.X_ag_man_dry_vars_jr),
-                        (irr_cells, self.X_ag_man_irr_vars_jr),
-                    ]:
-                        for r in cells[exist_r[cells] > 0]:
-                            var = vars_jr[am][j_idx, r]
-                            if isinstance(var, gp.Var):
-                                var.lb = 0
-                                var.ub = 0
 
                 # Sum of all usage of the AM option must be less than the limit
                 ag_man_vars_sum = (
@@ -762,22 +766,25 @@ class LutoSolver:
                 'energy_r':      self._input_data.renewable_solar_r,
                 'gbf2_mask_idx': self._input_data.renewable_GBF2_mask_solar_idx,
                 'mnes_mask_idx': self._input_data.renewable_MNES_mask_solar_idx,
-                'exist_r':       self._input_data.exist_renewable_solar_r,
             },
             'Onshore Wind': {
                 'energy_r':      self._input_data.renewable_wind_r,
                 'gbf2_mask_idx': self._input_data.renewable_GBF2_mask_wind_idx,
                 'mnes_mask_idx': self._input_data.renewable_MNES_mask_wind_idx,
-                'exist_r':       self._input_data.exist_renewable_wind_r,
             },
         }
 
-        # Pop Australian Capital Territory out of the region_state_name2idx
-        #   as its renewable energy target is being merged to NSW
-        self._input_data.region_state_name2idx.pop('Australian Capital Territory', None)
+        # Work on a local copy — pop() would mutate data.REGION_STATE_NAME2CODE in-place
+        # (the dict is returned by reference), causing a KeyError on subsequent simulation years.
+        region_state_name2idx = dict(self._input_data.region_state_name2idx)
+        act_code = region_state_name2idx.pop('Australian Capital Territory')
 
-        for reg_name, reg_id in self._input_data.region_state_name2idx.items():
+        for reg_name, reg_id in region_state_name2idx.items():
             reg_idx = np.where(self._input_data.region_state_r == reg_id)[0]
+            # Merge ACT cells into NSW so they count toward the combined NSW+ACT target
+            if reg_name == 'New South Wales':
+                act_idx = np.where(self._input_data.region_state_r == act_code)[0]
+                reg_idx = np.union1d(reg_idx, act_idx)
             print(f"│   │   ├── Adding renewable energy constraints for {reg_name} ...")
 
             for am, re_data in re_types.items():
@@ -811,6 +818,8 @@ class LutoSolver:
                     if not reg_AND_j_cells.size:
                         continue
 
+                    # Existing capacity cells have ub=0 so X_am=0; quicksum only covers new potential cells.
+                    # exist_power_rescale accounts for real-world existing generation separately.
                     am_exprs.append(
                         gp.quicksum(self.X_ag_man_dry_vars_jr[am][j_idx, reg_AND_j_cells] * energy_r[reg_AND_j_cells])
                         + gp.quicksum(self.X_ag_man_irr_vars_jr[am][j_idx, reg_AND_j_cells] * energy_r[reg_AND_j_cells])

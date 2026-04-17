@@ -818,6 +818,57 @@ def write_quantity(data: Data, yr_cal: int, path: str) -> np.ndarray:
 
 # ── Economics ────────────────────────────────────────────────────────────────
 
+def write_economics_renewables(data: Data, yr_cal: int) -> tuple[pd.DataFrame, pd.DataFrame]:
+    
+    yr_idx = yr_cal - data.YR_CAL_BASE
+
+    if yr_idx == 0:
+        yr_cal_sim_pre = None
+    else:
+        yr_cal_sim_pre = sorted(list(data.lumaps.keys()))[sorted(list(data.lumaps.keys())).index(yr_cal) - 1]
+
+    # Return empty DataFrame if renewable modelling is disabled 
+    if not any(settings.RENEWABLES_OPTIONS.values()):
+        return pd.DataFrame({
+            're_type': settings.RENEWABLES_OPTIONS.keys(),
+            'region':  ['AUSTRALIA', 'Victoria'],
+            'am': settings.RENEWABLES_OPTIONS.keys(),
+            'lm': ['ALL', 'dry'],
+            'lu': ['Existing Capacity', 'Existing Capacity'],
+            'Year': [yr_cal, yr_cal],
+            'Value': [0, 0]
+        }
+    )
+    
+    # Get the existing renewable revenue and cost by state 
+    rev_by_state  = ag_revenue.get_existing_renewable_revenue_by_state(data, yr_cal_sim_pre, yr_cal)
+    cost_by_state = ag_cost.get_existing_renewable_cost_by_state(data, yr_cal_sim_pre, yr_cal)
+
+    # Flatten both dicts into one long DataFrame tagged by re_type
+    rows = [
+        {'re_type': re_type, 'region': state, 'am': re_type, 'Value': value}
+        for re_type, by_state in [('Revenue', rev_by_state), ('Cost', cost_by_state)]
+        for state, types in by_state.items()
+        for re_type, value in types.items()
+    ]
+    df = pd.DataFrame(rows)
+
+    # Build aggregate rows across both re_types in one pass
+    aus_per_am        = df.groupby(['re_type', 'am'],     as_index=False)['Value'].sum().assign(region='AUSTRALIA')
+    all_am_per_region = df.groupby(['re_type', 'region'], as_index=False)['Value'].sum().assign(am='ALL')
+    aus_all_am        = df.groupby(['re_type'],           as_index=False)['Value'].sum().assign(region='AUSTRALIA', am='ALL')
+
+    df = (
+        pd.concat([df, aus_per_am, all_am_per_region, aus_all_am], ignore_index=True)
+        .assign(lm='ALL', lu='Existing Capacity', Year=yr_cal)
+        .query('abs(Value) > 1')
+        [['re_type', 'region', 'am', 'lm', 'lu', 'Year', 'Value']]
+        .reset_index(drop=True)
+    )
+
+    return df
+
+
 def write_economics(data: Data, yr_cal, path):
     """Calculate agricultural, agricultural management, and non-agricultural revenue, cost, and profit.
     Also produces a Sum profit layer combining all three categories."""
@@ -827,8 +878,10 @@ def write_economics(data: Data, yr_cal, path):
 
     if yr_idx == 0:
         yr_cal_sim_pre = None
+        yr_idx_pre = None
     else:
         yr_cal_sim_pre = sorted(list(data.lumaps.keys()))[sorted(list(data.lumaps.keys())).index(yr_cal) - 1]
+        yr_idx_pre = yr_cal_sim_pre - data.YR_CAL_BASE
 
 
     # ==================== Agricultural Economics ====================
@@ -954,8 +1007,13 @@ def write_economics(data: Data, yr_cal, path):
 
     # ==================== Agricultural Management Economics ====================
 
-    am_dvar_mrj = (
+    am_dvar_mrj_now = (
         tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
+        .chunk(chunk)
+        .assign_coords(region=('cell', data.REGION_NRM_NAME))
+    )
+    am_dvar_mrj_pre = (
+        tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal_sim_pre])
         .chunk(chunk)
         .assign_coords(region=('cell', data.REGION_NRM_NAME))
     )
@@ -963,12 +1021,27 @@ def write_economics(data: Data, yr_cal, path):
     ag_rev_mrj  = ag_revenue.get_rev_matrices(data, yr_idx)
     ag_cost_mrj = ag_cost.get_cost_matrices(data, yr_idx)
     am_revenue_mat = tools.am_mrj_to_xr(data, ag_revenue.get_agricultural_management_revenue_matrices(data, ag_rev_mrj, yr_idx))
-    am_cost_mat    = tools.am_mrj_to_xr(data, ag_cost.get_agricultural_management_cost_matrices(data, ag_cost_mrj, yr_idx))
-    am_trans_mat   = tools.am_mrj_to_xr(data, ag_transitions.get_agricultural_management_transition_matrices(data, yr_idx))
+    am_cost_mat    = tools.am_mrj_to_xr(data, ag_cost.get_agricultural_management_cost_matrices(data, ag_cost_mrj, yr_cal_sim_pre, yr_cal))
+    
+    # The transition cost for agMgt (currently just for Renewable Energy) are calculated repeatedly for each year. 
+    # Ie., even a solar was built in a previous year, it will still have installation costs applied in subsequent year.
+    # So, to avoid double counting, we calculate the transition cost for the current year and subtract the transition 
+    # cost from the previous year (which would have been counted in the previous year's profit calculation).
+    if yr_idx == 0:
+        am_trans_mat_pre = 0
+        am_trans_mat_now = 0
+    elif yr_idx == 1:
+        am_trans_mat_pre = 0
+        am_trans_mat_now = tools.am_mrj_to_xr(data, ag_transitions.get_agricultural_management_transition_matrices(data, yr_idx))
+    else:
+        am_trans_mat_pre = tools.am_mrj_to_xr(data, ag_transitions.get_agricultural_management_transition_matrices(data, yr_idx_pre))
+        am_trans_mat_now = tools.am_mrj_to_xr(data, ag_transitions.get_agricultural_management_transition_matrices(data, yr_idx))
+    
+    am_trans_mat = am_trans_mat_now - am_trans_mat_pre
 
-    xr_revenue_am = am_dvar_mrj * am_revenue_mat
-    xr_cost_am    = am_dvar_mrj * am_cost_mat
-    xr_trans_am   = am_dvar_mrj * am_trans_mat
+    xr_revenue_am = am_dvar_mrj_now * am_revenue_mat
+    xr_cost_am    = am_dvar_mrj_now * am_cost_mat
+    xr_trans_am   = am_dvar_mrj_now * am_trans_mat - am_dvar_mrj_pre * am_trans_mat_pre
     xr_profit_am  = xr_revenue_am - (xr_cost_am + xr_trans_am)
 
     xr_revenue_am = add_all(xr_revenue_am, ['lm', 'lu', 'am'])
@@ -1193,31 +1266,35 @@ def write_renewable_energy(data: Data, yr_cal, path):
     renewable_energy_df, renewable_energy_df_AUS = to_region_and_aus_df(renewable_energy, ['region', 'am', 'lm', 'lu'], yr_cal)
     
     # Get existing capacity then save to csv
-    existing_renewable_prod_state = (
-        pd.DataFrame(ag_quantity.get_exist_renewable_capacity_by_state(data, yr_cal))
-        .unstack()
-        .reset_index()
-        .rename(columns={'level_0': 'region', 'level_1': 'am', 0: 'Value'})
-    )
-    existing_renewable_prod_state_ALL = (
-        existing_renewable_prod_state
-        .groupby(['region'], as_index=False)['Value']
-        .sum()
-        .assign(am='ALL')
-    )
-    
-    existing_renewable_prod_state = (
-        pd.concat([existing_renewable_prod_state, existing_renewable_prod_state_ALL])
-        .merge(pd.DataFrame({'lm': ['ALL', 'dry', 'irr']}), how='cross')
-        .assign(Year=yr_cal, lu='Existing Capacity')
-    )
-    
-    existing_renewable_prod_AUS = (
-        existing_renewable_prod_state
-        .groupby(['am', 'lm', 'lu'], as_index=False)['Value']
-        .sum()
-        .assign(region='AUSTRALIA', Year=yr_cal)
-    )
+    _exist_cap_dict = ag_quantity.get_exist_renewable_capacity_by_state(data, yr_cal)
+    _empty_cols = ['region', 'am', 'lm', 'lu', 'Year', 'Value']
+    if _exist_cap_dict:
+        existing_renewable_prod_state = (
+            pd.DataFrame(_exist_cap_dict)
+            .unstack()
+            .reset_index()
+            .rename(columns={'level_0': 'region', 'level_1': 'am', 0: 'Value'})
+        )
+        existing_renewable_prod_state_ALL = (
+            existing_renewable_prod_state
+            .groupby(['region'], as_index=False)['Value']
+            .sum()
+            .assign(am='ALL')
+        )
+        existing_renewable_prod_state = (
+            pd.concat([existing_renewable_prod_state, existing_renewable_prod_state_ALL])
+            .merge(pd.DataFrame({'lm': ['ALL', 'dry', 'irr']}), how='cross')
+            .assign(Year=yr_cal, lu='Existing Capacity')
+        )
+        existing_renewable_prod_AUS = (
+            existing_renewable_prod_state
+            .groupby(['am', 'lm', 'lu'], as_index=False)['Value']
+            .sum()
+            .assign(region='AUSTRALIA', Year=yr_cal)
+        )
+    else:
+        existing_renewable_prod_state = pd.DataFrame(columns=_empty_cols)
+        existing_renewable_prod_AUS   = pd.DataFrame(columns=_empty_cols)
     
     rename_map_re = {'Value': 'Value (MWh)'}
     renewable_energy_df_with_existing = pd.concat([renewable_energy_df, existing_renewable_prod_state, existing_renewable_prod_AUS])

@@ -216,7 +216,7 @@ def create_new_dataset(refresh=False):
     shutil.copyfile(f'{renewable_energy_inpath}/renewable_QLD_EPBC_MNES_prioritization.nc', outpath + 'renewable_QLD_EPBC_MNES_prioritization.nc')
     shutil.copyfile(f'{renewable_energy_inpath}/renewable_QLD_EPBC_MNES_prioritization_performance.csv', outpath + 'renewable_QLD_EPBC_MNES_prioritization_performance.csv')
     shutil.copyfile(f'{renewable_energy_inpath}/renewable_existing_capacity_MW_1D.nc', outpath + 'renewable_existing_capacity_MW_1D.nc')
-    shutil.copyfile(f'{renewable_energy_inpath}/renewable_existing_capacity_by_state.csv', outpath + 'renewable_existing_capacity_by_state.csv')
+    shutil.copyfile(f'{renewable_energy_inpath}/renewable_existing_capacity_area_fraction_1D.nc', outpath + 'renewable_existing_capacity_area_fraction_1D.nc')
 
 
 

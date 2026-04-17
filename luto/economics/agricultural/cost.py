@@ -29,7 +29,8 @@ import pandas as pd
 
 from luto.data import Data
 import luto.settings as settings
-from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types, get_quantity
+from luto import tools
+from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types, get_quantity, get_exist_renewable_capacity
 from luto.settings import AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
 from functools import lru_cache
 
@@ -516,6 +517,7 @@ def get_sheep_hir_effect_c_mrj(data: Data, yr_idx: int):
     
     return cost_mrj
 
+
 def get_utility_solar_pv_effect_c_mrj(data: Data, c_mrj, yr_idx):
     """
     Applies Utility Solar PV cost effects.
@@ -542,17 +544,19 @@ def get_utility_solar_pv_effect_c_mrj(data: Data, c_mrj, yr_idx):
         j = lu_codes[lu_idx]
         ag_cost_delta = c_mrj[:, :, j] * (om_mult - 1)
 
-        # Cost of renewable energy operation/maintenance
-        re_lyr = data.RENEWABLE_LAYERS.sel(tech_name='Utility Solar PV', year=yr_cal)
+        # Cost of renewable energy operation/maintenance (OPEX only; CAPEX is in t_mrj)
+        # RENEWABLE_LAYERS starts at 2030; clamp pre-2030 simulation years to first available year.
+        yr_lyr = max(yr_cal, int(data.RENEWABLE_LAYERS['year'].values[0]))
+        re_lyr = data.RENEWABLE_LAYERS.sel(tech_name='Utility Solar PV', year=yr_lyr)
         re_cost_operation_AUD_ha = (
-            re_lyr['Cost_of_operation_AUD_kw'] 
+            re_lyr['Cost_of_operation_AUD_kw']
             * 1000                                                  # Convert from AUD/kW to AUD/MW
             * 0.6944                                                # Adjust AUD from 2024 to 2010
-            * settings.INSTALL_CAPACITY_MW_HA['Utility Solar PV']   # Convert from AUD/MW to AUD/ha 
-            * data.REAL_AREA                                        # Convert from AUD/ha to AUD/cell 
+            * settings.INSTALL_CAPACITY_MW_HA['Utility Solar PV']   # Convert from AUD/MW to AUD/ha
+            * data.REAL_AREA                                        # Convert from AUD/ha to AUD/cell
         )
 
-        # Assign combined cost effects to output matrix
+        # Assign combined cost effects to output matrix (OPEX only; CAPEX handled in t_mrj)
         new_c_mrj[:, :, lu_idx] = ag_cost_delta + re_cost_operation_AUD_ha.data[None, :]
         
 
@@ -591,34 +595,135 @@ def get_onshore_wind_effect_c_mrj(data: Data, c_mrj, yr_idx):
         j = lu_codes[lu_idx]
         ag_cost_delta = c_mrj[:, :, j] * (om_mult - 1)
 
-        # Cost of renewable energy operation/maintenance
-        re_lyr = data.RENEWABLE_LAYERS.sel(tech_name='Onshore Wind', year=yr_cal) 
+        # Cost of renewable energy operation/maintenance (OPEX only; CAPEX is in t_mrj)
+        # RENEWABLE_LAYERS starts at 2030; clamp pre-2030 simulation years to first available year.
+        yr_lyr = max(yr_cal, int(data.RENEWABLE_LAYERS['year'].values[0]))
+        re_lyr = data.RENEWABLE_LAYERS.sel(tech_name='Onshore Wind', year=yr_lyr)
         re_cost_operation_AUD_ha = (
-            re_lyr['Cost_of_operation_AUD_kw'] 
+            re_lyr['Cost_of_operation_AUD_kw']
             * 1000                                                  # Convert from AUD/kW to AUD/MW
             * 0.6944                                                # Adjust AUD from 2024 to 2010
             * settings.INSTALL_CAPACITY_MW_HA['Onshore Wind']       # Convert from AUD/MW to AUD/ha
             * data.REAL_AREA                                        # Convert from AUD/ha to AUD/cell
         )
 
-        # Assign combined cost effects to output matrix
+        # Assign combined cost effects to output matrix (OPEX only; CAPEX handled in t_mrj)
         new_c_mrj[:, :, lu_idx] = ag_cost_delta + re_cost_operation_AUD_ha.data[None, :]
+        
     return new_c_mrj
 
 
-def get_agricultural_management_cost_matrices(data: Data, c_mrj, yr_idx):
+
+def get_existing_renewable_cost_by_state(data: Data, base_year: int, target_year: int) -> dict:
+    """
+    Return existing renewable cost (OPEX + amortised CAPEX) by state and type.
+
+    - OPEX  : all capacity installed strictly before target_year, at target_year cost rates.
+    - CAPEX : capacity added in range(base_year+1, target_year+1), amortised.
+
+    Cost is per installed MW (nominal), so uses the raw layer (MW × 8760) divided by 8760.
+    CF and DL are not applied here — those are for energy yield, not cost.
+
+    Return format: {state: {'Utility Solar PV': cost_AUD, 'Onshore Wind': cost_AUD}}
+    """
+    if not any(settings.RENEWABLES_OPTIONS.values()):
+        return {}
+
+    # Since existing RE are mostly between 2010-2030, use RENEWABLE_LAYERS 2030 (which is 2030 and onwards) as a proxy
+
+    # ── Utility Solar PV ──────────────────────────────────────────────────────
+    re_lyr_solar = data.RENEWABLE_LAYERS.sel(tech_name='Utility Solar PV', year=2030)
+
+    # OPEX: all installations up to and including target_year
+    solar_opex_mw_r = (
+        get_exist_renewable_capacity(data, 'Utility Solar PV', target_year)         # Cumulative MWh with CF × DL
+        / 8760                                                                      # Convert MWh → MW
+    )
+    solar_opex_r = (
+        solar_opex_mw_r
+        * 1000                                                                      # Convert MW → kW
+        * re_lyr_solar['Cost_of_operation_AUD_kw']                                  # AUD/kW/yr → AUD/cell/yr
+    ).assign_coords({'state': ('cell', data.REGION_STATE_NAME)})
+
+    # CAPEX: new installations in (base_year, target_year]
+    solar_new_mw_r = (
+        get_exist_renewable_capacity(data, 'Utility Solar PV', target_year)         # Cumulative MWh up to target_year
+        - get_exist_renewable_capacity(data, 'Utility Solar PV', base_year)         # Cumulative MWh up to base_year
+    ) / 8760                                                                        # Convert MWh → MW (new capacity only)
+    solar_capex_r = (
+        solar_new_mw_r
+        * 1000                                                                      # Convert MW → kW
+        * re_lyr_solar['Cost_of_install_AUD_kw']                                    # AUD/kW → AUD/cell
+    ).assign_coords({'state': ('cell', data.REGION_STATE_NAME)})
+    solar_capex_r.data = tools.amortise(solar_capex_r.data)                         # Amortise upfront CAPEX
+
+    # Sum OPEX and CAPEX by state
+    solar_opex_by_state  = solar_opex_r.groupby('state').sum('cell').to_dataframe('v').to_dict()['v']
+    solar_capex_by_state = solar_capex_r.groupby('state').sum('cell').to_dataframe('v').to_dict()['v']
+    solar_by_state = {
+        state: solar_opex_by_state[state] + solar_capex_by_state[state]
+        for state in solar_opex_by_state
+    }
+
+    # ── Onshore Wind ──────────────────────────────────────────────────────────
+    re_lyr_wind = data.RENEWABLE_LAYERS.sel(tech_name='Onshore Wind', year=2030)
+
+    # OPEX: all installations up to and including target_year
+    wind_opex_mw_r = (
+        get_exist_renewable_capacity(data, 'Onshore Wind', target_year)             # Cumulative MWh with CF × DL
+        / 8760                                                                      # Convert MWh → MW
+    )
+    wind_opex_r = (
+        wind_opex_mw_r
+        * 1000                                                                      # Convert MW → kW
+        * re_lyr_wind['Cost_of_operation_AUD_kw']                                   # AUD/kW/yr → AUD/cell/yr
+    ).assign_coords({'state': ('cell', data.REGION_STATE_NAME)})
+
+    # CAPEX: new installations in (base_year, target_year]
+    wind_new_mw_r = (
+        get_exist_renewable_capacity(data, 'Onshore Wind', target_year)             # Cumulative MWh up to target_year
+        - get_exist_renewable_capacity(data, 'Onshore Wind', base_year)             # Cumulative MWh up to base_year
+    ) / 8760                                                                        # Convert MWh → MW (new capacity only)
+    wind_capex_r = (
+        wind_new_mw_r
+        * 1000                                                                      # Convert MW → kW
+        * re_lyr_wind['Cost_of_install_AUD_kw']                                     # AUD/kW → AUD/cell
+    ).assign_coords({'state': ('cell', data.REGION_STATE_NAME)})
+    wind_capex_r.data = tools.amortise(wind_capex_r.data)                           # Amortise upfront CAPEX
+
+    # Sum OPEX and CAPEX by state
+    wind_opex_by_state  = wind_opex_r.groupby('state').sum('cell').to_dataframe('v').to_dict()['v']
+    wind_capex_by_state = wind_capex_r.groupby('state').sum('cell').to_dataframe('v').to_dict()['v']
+    wind_by_state = {
+        state: wind_opex_by_state[state] + wind_capex_by_state[state]
+        for state in wind_opex_by_state
+    }
+
+    all_states = set(solar_by_state) | set(wind_by_state)
+    return {
+        state: {
+            'Utility Solar PV': solar_by_state[state],
+            'Onshore Wind':     wind_by_state[state],
+        }
+        for state in all_states
+    }
+
+
+def get_agricultural_management_cost_matrices(data: Data, c_mrj, base_year, target_year):
     """
     Calculate the cost matrices for different agricultural management practices.
 
     Args:
         data (dict): The input data for cost calculations.
         c_mrj (float): The cost of marginal reduction in emissions.
-        yr_idx (int): The index of the year.
-
+        base_year (int): The base year for the calculations.
+        target_year (int): The target year for the calculations.
     Returns
         dict: A dictionary containing the cost matrices for different agricultural management practices.
             The keys are the names of the practices and the values are the corresponding cost matrices.
     """
+    
+    yr_idx = target_year - data.YR_CAL_BASE
     ag_mam_c_mrj = {}
 
     ag_mam_c_mrj['Asparagopsis taxiformis'] = get_asparagopsis_effect_c_mrj(data, yr_idx)           
