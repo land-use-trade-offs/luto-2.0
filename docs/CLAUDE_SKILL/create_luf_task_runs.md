@@ -92,7 +92,7 @@ if __name__ == '__main__':
 
 ### Standard base block (copy into every script, then change only the axes)
 
-This is the current LUF core scenario settings as of 2026-04. Copy this verbatim into every `create_tasks_*.py` and modify only the lines that differ for that group.
+This is the current LUF core scenario settings as of 2026-04 (Sixth iteration). Copy this verbatim into every `create_tasks_*.py` and modify only the lines that differ for that group.
 
 ```python
     # --------------- Scenarios ---------------
@@ -113,7 +113,7 @@ This is the current LUF core scenario settings as of 2026-04. Copy this verbatim
     'CARBON_PRICE_COSTANT': [0],
     'BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR': [100],
     'SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR': [100],
-    'HIR_CEILING_PERCENTAGE': [0.9],
+    'HIR_CEILING_PERCENTAGE': [0.7, 0.8, 0.9],
 
     # --------------- Target deviation weight ---------------
     'SOLVER_WEIGHT_DEMAND': [1],
@@ -246,7 +246,8 @@ This is the current LUF core scenario settings as of 2026-04. Copy this verbatim
 | Sensitivity | What to change from base block |
 |---|---|
 | **ECNES** | `'BIODIVERSITY_TARGET_GBF_4_ECNES': ['on']` |
-| **Regional** | `'REGIONAL_ADOPTION_CONSTRAINTS': ['NON_AG_UNIFORM']`, `'REGIONAL_ADOPTION_NON_AG_UNIFORM': [5, 10, 15]` |
+| **HIR Ceiling** | `'HIR_CEILING_PERCENTAGE': [0.7, 0.8, 0.9]` — already a core axis; apply consistently across all groups |
+| **Regional** | `'REGIONAL_ADOPTION_CONSTRAINTS': ['NON_AG_UNIFORM']`, `'REGIONAL_ADOPTION_NON_AG_UNIFORM': [5, 10]` (15% dropped in Sixth iteration) |
 | **GBF2 Area** | `'CONTRIBUTION_PERCENTILE': ['AG_UNIFORM']`, `'AG_UNIFORM_BIO_CONTRIBUTION': [0]`, `BIO_CONTRIBUTION_ENV_PLANTING/RIPARIAN/DESTOCKING: [1.0]`, `BIO_CONTRIBUTION_CARBON_PLANTING_*: [0.0]`, `BIO_CONTRIBUTION_AGROFORESTRY: [1.0, 0.0]`, `GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT: [10, 15, 20]` |
 | **Lower Productivity** | `AG_MANAGEMENTS` with `'Precision Agriculture': False, 'AgTech EI': False` |
 | **Alt Productivity** | `'PRODUCTIVITY_TREND': ['MEDIUM', 'HIGH']` |
@@ -392,7 +393,7 @@ Inspect before submitting:
 ```python
 import pandas as pd
 df = pd.read_csv("/g/data/jk53/jinzhu/LUTO/Custom_runs/LUF_Nth_iteration/merged_grid_search_parameters_unique.csv")
-print(df[['scenario_group', 'global_run_idx', 'BIO_CONTRIBUTION_LDS', 'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT']])
+print(df[['scenario_group', 'global_run_idx', 'HIR_CEILING_PERCENTAGE', 'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT']])
 ```
 
 ---
@@ -422,7 +423,7 @@ qstat -u jw6041
 
 - [ ] Copy the latest `create_tasks_core.py` from the previous iteration as a starting point
 - [ ] Update `TASK_ROOT_DIR` path to the new iteration name
-- [ ] Update the varying axes in `grid_search` (e.g. `BIO_CONTRIBUTION_LDS`, `GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT`)
+- [ ] Update the varying axes in `grid_search` (e.g. `HIR_CEILING_PERCENTAGE`, `GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT`)
 - [ ] Copy and modify for each sensitivity group
 - [ ] Write `merge_unique_parameters.py` with correct `SCRIPTS_DIR` (match actual dir name on disk)
 - [ ] Verify all renewable energy settings present: `RENEWABLE_EXISTING_END_YEAR`, `RENEWABLE_TARGET_SCENARIO_TARGETS`, `RENEWABLE_TARGET_SCENARIO_INPUT_LAYERS`

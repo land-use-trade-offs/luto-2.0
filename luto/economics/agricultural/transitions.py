@@ -601,6 +601,23 @@ def get_lower_bound_agricultural_management_matrices(data: Data, base_year) -> d
             f" max gap={gap.max():.2e}, mean gap={gap.mean():.2e}"
         )
 
+    # Ensure sum of ag_lb across land uses ≤ cell_area for each (m, cell).
+    # FEASIBILITY_TOLERANCE relaxes the aggregate cell-usage equality: the solver
+    # accepts sum(dvars) = cell_area ± FEASIBILITY_TOLERANCE, so it can return
+    # beef≈cell_area AND sheep=ε with sum slightly above cell_area (within tolerance).
+    # After floor-truncation both become nonzero lbs, and their sum exceeds cell_area,
+    # making HIR am_lb constraints jointly infeasible even though each individual
+    # am_lb passes the per-LU cap above.  Proportionally scale any row that overflows.
+    ag_lb_sum_mr = ag_lb.sum(axis=2)  # (NLMS, NCELLS)
+    cell_area_mr = data.AG_MASK_PROPORTION_R[np.newaxis, :]  # (1, NCELLS)
+    overflow = ag_lb_sum_mr > cell_area_mr
+    if overflow.any():
+        scale = np.where(overflow, cell_area_mr / ag_lb_sum_mr, 1.0)  # (NLMS, NCELLS)
+        ag_lb = ag_lb * scale[:, :, np.newaxis]
+        print(
+            f"  └── Ag lb sum-overflow scaled: {overflow.sum()} (m,cell) entries rescaled"
+        )
+
     result = {}
     for am in settings.AG_MANAGEMENTS_TO_LAND_USES:
         if not settings.AG_MANAGEMENTS[am]:

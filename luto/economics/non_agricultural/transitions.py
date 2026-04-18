@@ -1160,8 +1160,16 @@ def get_lower_bound_non_agricultural_matrices(data: Data, base_year) -> np.ndarr
     # make the cell-usage equality constraint structurally infeasible.
     lb_capped = np.minimum(lb_rk, data.AG_MASK_PROPORTION_R[:, np.newaxis]).astype(np.float32)
 
+    # Also cap each lb against the variable's own upper bound (non_ag_x_rk).
+    # For Riparian Plantings, ub = RP_PROPORTION which is an area value independent of
+    # AG_MASK_PROPORTION_R.  When RP_PROPORTION < AG_MASK_PROPORTION_R (common), the
+    # AG_MASK cap above does not prevent lb > RP_PROPORTION, causing a trivially
+    # infeasible variable (lb > ub) that Gurobi detects before any constraint is checked.
+    non_ag_x_rk = get_to_non_ag_exclude_matrices(data, data.lumaps[base_year]).astype(np.float32)
+    lb_capped = np.minimum(lb_capped, non_ag_x_rk)
+
     lb_update = lb_capped < lb_rk
-    
+
     if lb_update.any():
         gap = lb_rk[lb_update] - lb_capped[lb_update]
         print(
