@@ -444,7 +444,7 @@ def save_report_layer(raw_data_dir:str):
     economic_magnitudes_transition = (
         *cell_magnitudes['Economics_ag']['ag2ag_cost'],
         *cell_magnitudes['Economics_ag']['non_ag2ag_cost'],
-        *cell_magnitudes['Economics_am']['am_transition'],
+        # Am transition is all zeros (CAPEX moved to cost matrix), so excluded here
         *cell_magnitudes['Economics_non_ag']['nonag2nonag_cost'],
         *cell_magnitudes['Economics_non_ag']['ag2nonag_cost']
     )
@@ -649,5 +649,14 @@ def save_report_layer(raw_data_dir:str):
         re_min_max = (min(re_magnitudes), max(re_magnitudes))
 
         get_map2json(files_renewable, None, None, legend_float, re_min_max, f'{SAVE_DIR}/map_layers/map_renewable_energy_Am.js')
-        print('│   └── Renewable Energy Am layer saved.')
+        print('│   ├── Renewable Energy Am layer saved.')
+
+    files_renewable_exist = files.query('base_name == "xr_renewable_existing_dvar"')
+
+    if not files_renewable_exist.empty:
+        exist_magnitudes = cell_magnitudes.get('renewable_existing_dvar', [0.0, 1.0])
+        exist_min_max = (min(exist_magnitudes), max(exist_magnitudes))
+
+        get_map2json(files_renewable_exist, None, None, legend_float, exist_min_max, f'{SAVE_DIR}/map_layers/map_renewable_existing_dvar_Am.js')
+        print('│   └── Renewable Existing Dvar Am layer saved.')
     

@@ -338,9 +338,9 @@ def write_output_single_year(data: Data, yr_cal, path_yr):
         delayed(write_transition_ag2ag)(data, yr_cal, path_yr),
         delayed(write_transition_ag2nonag)(data, yr_cal, path_yr),
         delayed(write_transition_nonag2ag)(data, yr_cal, path_yr),
-        delayed(write_water)(data, yr_cal, path_yr),
-        delayed(write_renewable_energy)(data, yr_cal, path_yr),
         delayed(write_ghg)(data, yr_cal, path_yr),
+        delayed(write_water)(data, yr_cal, path_yr),
+        delayed(write_renewable_production)(data, yr_cal, path_yr),
         delayed(write_biodiversity_quality_scores)(data, yr_cal, path_yr),
         delayed(write_biodiversity_GBF2_scores)(data, yr_cal, path_yr),
         delayed(write_biodiversity_GBF3_NVIS_scores)(data, yr_cal, path_yr),
@@ -366,6 +366,29 @@ def write_dvar_and_mosaic_map(data: Data, yr_cal, path):
     ag_mask = ag_map.sum(['lm','lu']) > 0.001
     am_mask = am_map.sum(['am','lm', 'lu']) > 0.001
     non_ag_mask = non_ag_map.sum('lu') > 0.001
+
+    # ── Inject existing renewable capacity as lu='Existing Capacity' ──────────
+    # Same pattern as write_dvar_area: lm='dry' carries the real dvar fraction,
+    # lm='irr' is zeros, reindexed to all am types so the lu dimension stays
+    # Cartesian. add_all then handles lm='ALL' and lu='ALL' for free.
+    # am_mask is computed above from optimised dvars only — intentional, since
+    # the argmax mosaic reflects LP allocation, not existing installations.
+    if any(settings.RENEWABLES_OPTIONS.values()):
+        solar_exist_r = ag_quantity.get_existing_renewable_dvar_fraction(data, 'Utility Solar PV', yr_cal)
+        wind_exist_r  = ag_quantity.get_existing_renewable_dvar_fraction(data, 'Onshore Wind',     yr_cal)
+
+        exist_re_dry = xr.DataArray(
+            np.stack([solar_exist_r, wind_exist_r], axis=0),
+            dims=['am', 'cell'],
+            coords={'am': ['Utility Solar PV', 'Onshore Wind'], 'cell': range(data.NCELLS)},
+        ).expand_dims(lm=['dry'], lu=['Existing Capacity'])
+
+        exist_re_irr  = xr.zeros_like(exist_re_dry).assign_coords(lm=['irr'])
+        exist_re_full = (
+            xr.concat([exist_re_dry, exist_re_irr], dim='lm')
+            .reindex(am=am_map.am.values, fill_value=0.0)
+        )
+        am_map = xr.concat([am_map, exist_re_full], dim='lu')
 
     ag_map = add_all(ag_map, ['lm'])
     am_map = add_all(am_map, ['lm', 'lu'])
@@ -451,6 +474,36 @@ def write_dvar_area(data: Data, yr_cal, path):
     area_ag = (ag_dvar_mrj * real_area_r)
     area_non_ag = (non_ag_rj * real_area_r)
     area_am = (am_dvar_mrj * real_area_r)
+
+    # ── Existing renewable capacity: inject as lu='Existing Capacity' before add_all ──
+    # Design: all existing capacity is attributed to lm='dry' (irr layer is zero) so that
+    # downstream groupby sums (over lm) do not double-count existing area.
+    # Reindex to all am types so the lu dimension is Cartesian with the rest of area_am.
+    # Non-renewable am types get fill_value=0, preserving the Cartesian hierarchy without
+    # inflating their totals. add_all then handles lm='ALL' and lu='ALL' for free.
+    if any(settings.RENEWABLES_OPTIONS.values()):
+        solar_exist_r = ag_quantity.get_existing_renewable_dvar_fraction(data, 'Utility Solar PV', yr_cal)
+        wind_exist_r  = ag_quantity.get_existing_renewable_dvar_fraction(data, 'Onshore Wind',     yr_cal)
+
+        exist_re_dry = xr.DataArray(
+            np.stack([solar_exist_r * data.REAL_AREA, wind_exist_r * data.REAL_AREA], axis=0),
+            dims=['am', 'cell'],
+            coords={
+                'am':     ['Utility Solar PV', 'Onshore Wind'],
+                'cell':   range(data.NCELLS),
+                'region': ('cell', data.REGION_NRM_NAME),
+            },
+        ).expand_dims(lm=['dry'], lu=['Existing Capacity']
+        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
+
+        exist_re_irr = xr.zeros_like(exist_re_dry).assign_coords(lm=['irr'])  # zero — avoids double-counting
+
+        exist_re_full = (
+            xr.concat([exist_re_dry, exist_re_irr], dim='lm')
+            .reindex(am=area_am['am'].values, fill_value=0.0)  # broadcast to all am types
+        )
+
+        area_am = xr.concat([area_am, exist_re_full], dim='lu')
 
     area_ag = add_all(area_ag, ['lm'])
     area_am = add_all(area_am, ['lm', 'lu'])
@@ -555,21 +608,17 @@ def write_dvar_area(data: Data, yr_cal, path):
 
 
     # ==================== Agricultural Management Area ====================
-    # Get valid data layers (Am: am → lm → lu dimension order)
     valid_am_layers = pd.MultiIndex.from_frame(df_am_area_AUS[['am', 'lm', 'lu']]).sort_values()
 
-    if df_am_area_AUS['Area (ha)'].abs().sum() < 1e-3:
-        area_am_cat = xr.DataArray(
-            np.zeros((1, 1, 1, data.NCELLS), dtype=np.float32),
-            dims=['am', 'lm', 'lu', 'cell'],
-            coords={'am': ['ALL'], 'lm': ['ALL'], 'lu': ['ALL'], 'cell': range(data.NCELLS)}
-        ).stack(layer=['am', 'lm', 'lu'])
+    if yr_cal == data.YR_CAL_BASE:
+        # Base year: no dvar file exists, so build from existing capacity layers only (no mosaic)
+        area_am_cat = area_am.stack(layer=['am', 'lm', 'lu']).sel(layer=valid_am_layers).drop_vars('region')
 
     else:
-        # Stack and select valid data layers
+        # Stack and select valid data layers (includes 'Existing Capacity' lu naturally)
         area_am_valid_layers = area_am.stack(layer=['am', 'lm', 'lu']).sel(layer=valid_am_layers)
 
-        # Get mosaic and filter
+        # Get mosaic and filter.
         am_mosaic = cfxr.decode_compress_to_multi_index(
             xr.load_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc')), 'layer'
         )['data'].sel(am='ALL', lm='ALL', lu='ALL')
@@ -579,17 +628,18 @@ def write_dvar_area(data: Data, yr_cal, path):
             area_am.sum('am').transpose('cell', ...)
         ).expand_dims('am')
 
-        # Stack mosaic and filter by lm and lu (NOT am since mosaic has am='ALL' only)
+        # Stack mosaic and filter by lm and lu (NOT am since mosaic has am='ALL' only).
+        # Exclude 'Existing Capacity' from lu filter — float layer, not a categorical mosaic entry.
+        valid_am_lu_mosaic = valid_am_layers.get_level_values('lu').difference(['Existing Capacity'])
         am_mosaic_area_stack = am_mosaic_area.stack(layer=['am', 'lm', 'lu'])
         am_mosaic_area_stack = am_mosaic_area_stack.sel(
             layer=(
                 am_mosaic_area_stack['layer']['lm'].isin(valid_am_layers.get_level_values('lm')) &
-                am_mosaic_area_stack['layer']['lu'].isin(valid_am_layers.get_level_values('lu'))
+                am_mosaic_area_stack['layer']['lu'].isin(valid_am_lu_mosaic)
             )
         )
-
-        # Combine valid layers from data and mosaic
         area_am_cat = xr.concat([area_am_valid_layers, am_mosaic_area_stack], dim='layer').drop_vars('region')
+
 
     # Save to netcdf with valid layers
     save2nc(area_ag_cat, os.path.join(path, f'xr_area_agricultural_landuse_{yr_cal}.nc'))
@@ -818,57 +868,6 @@ def write_quantity(data: Data, yr_cal: int, path: str) -> np.ndarray:
 
 # ── Economics ────────────────────────────────────────────────────────────────
 
-def write_economics_renewables(data: Data, yr_cal: int) -> tuple[pd.DataFrame, pd.DataFrame]:
-    
-    yr_idx = yr_cal - data.YR_CAL_BASE
-
-    if yr_idx == 0:
-        yr_cal_sim_pre = None
-    else:
-        yr_cal_sim_pre = sorted(list(data.lumaps.keys()))[sorted(list(data.lumaps.keys())).index(yr_cal) - 1]
-
-    # Return empty DataFrame if renewable modelling is disabled 
-    if not any(settings.RENEWABLES_OPTIONS.values()):
-        return pd.DataFrame({
-            're_type': settings.RENEWABLES_OPTIONS.keys(),
-            'region':  ['AUSTRALIA', 'Victoria'],
-            'am': settings.RENEWABLES_OPTIONS.keys(),
-            'lm': ['ALL', 'dry'],
-            'lu': ['Existing Capacity', 'Existing Capacity'],
-            'Year': [yr_cal, yr_cal],
-            'Value': [0, 0]
-        }
-    )
-    
-    # Get the existing renewable revenue and cost by state 
-    rev_by_state  = ag_revenue.get_existing_renewable_revenue_by_state(data, yr_cal_sim_pre, yr_cal)
-    cost_by_state = ag_cost.get_existing_renewable_cost_by_state(data, yr_cal_sim_pre, yr_cal)
-
-    # Flatten both dicts into one long DataFrame tagged by re_type
-    rows = [
-        {'re_type': re_type, 'region': state, 'am': re_type, 'Value': value}
-        for re_type, by_state in [('Revenue', rev_by_state), ('Cost', cost_by_state)]
-        for state, types in by_state.items()
-        for re_type, value in types.items()
-    ]
-    df = pd.DataFrame(rows)
-
-    # Build aggregate rows across both re_types in one pass
-    aus_per_am        = df.groupby(['re_type', 'am'],     as_index=False)['Value'].sum().assign(region='AUSTRALIA')
-    all_am_per_region = df.groupby(['re_type', 'region'], as_index=False)['Value'].sum().assign(am='ALL')
-    aus_all_am        = df.groupby(['re_type'],           as_index=False)['Value'].sum().assign(region='AUSTRALIA', am='ALL')
-
-    df = (
-        pd.concat([df, aus_per_am, all_am_per_region, aus_all_am], ignore_index=True)
-        .assign(lm='ALL', lu='Existing Capacity', Year=yr_cal)
-        .query('abs(Value) > 1')
-        [['re_type', 'region', 'am', 'lm', 'lu', 'Year', 'Value']]
-        .reset_index(drop=True)
-    )
-
-    return df
-
-
 def write_economics(data: Data, yr_cal, path):
     """Calculate agricultural, agricultural management, and non-agricultural revenue, cost, and profit.
     Also produces a Sum profit layer combining all three categories."""
@@ -1007,13 +1006,8 @@ def write_economics(data: Data, yr_cal, path):
 
     # ==================== Agricultural Management Economics ====================
 
-    am_dvar_mrj_now = (
+    am_dvar_mrj = (
         tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
-        .chunk(chunk)
-        .assign_coords(region=('cell', data.REGION_NRM_NAME))
-    )
-    am_dvar_mrj_pre = (
-        tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal_sim_pre])
         .chunk(chunk)
         .assign_coords(region=('cell', data.REGION_NRM_NAME))
     )
@@ -1021,43 +1015,113 @@ def write_economics(data: Data, yr_cal, path):
     ag_rev_mrj  = ag_revenue.get_rev_matrices(data, yr_idx)
     ag_cost_mrj = ag_cost.get_cost_matrices(data, yr_idx)
     am_revenue_mat = tools.am_mrj_to_xr(data, ag_revenue.get_agricultural_management_revenue_matrices(data, ag_rev_mrj, yr_idx))
-    am_cost_mat    = tools.am_mrj_to_xr(data, ag_cost.get_agricultural_management_cost_matrices(data, ag_cost_mrj, yr_cal_sim_pre, yr_cal))
-    
-    # The transition cost for agMgt (currently just for Renewable Energy) are calculated repeatedly for each year. 
-    # Ie., even a solar was built in a previous year, it will still have installation costs applied in subsequent year.
-    # So, to avoid double counting, we calculate the transition cost for the current year and subtract the transition 
-    # cost from the previous year (which would have been counted in the previous year's profit calculation).
-    if yr_idx == 0:
-        am_trans_mat_pre = 0
-        am_trans_mat_now = 0
-    elif yr_idx == 1:
-        am_trans_mat_pre = 0
-        am_trans_mat_now = tools.am_mrj_to_xr(data, ag_transitions.get_agricultural_management_transition_matrices(data, yr_idx))
-    else:
-        am_trans_mat_pre = tools.am_mrj_to_xr(data, ag_transitions.get_agricultural_management_transition_matrices(data, yr_idx_pre))
-        am_trans_mat_now = tools.am_mrj_to_xr(data, ag_transitions.get_agricultural_management_transition_matrices(data, yr_idx))
-    
-    am_trans_mat = am_trans_mat_now - am_trans_mat_pre
+    am_cost_mat    = tools.am_mrj_to_xr(data, ag_cost.get_agricultural_management_cost_matrices(data, ag_cost_mrj, yr_cal))
 
-    xr_revenue_am = am_dvar_mrj_now * am_revenue_mat
-    xr_cost_am    = am_dvar_mrj_now * am_cost_mat
-    xr_trans_am   = am_dvar_mrj_now * am_trans_mat - am_dvar_mrj_pre * am_trans_mat_pre
-    xr_profit_am  = xr_revenue_am - (xr_cost_am + xr_trans_am)
+    # Zero out wind/solar entries — the injection block below replaces these zeros with
+    # gap-CAPEX corrected values after the dvar multiplication, before add_all.
+    renewable_ams = [am for am, enabled in settings.RENEWABLES_OPTIONS.items() if enabled]
+    if renewable_ams:
+        re_mask = am_revenue_mat.am.isin(renewable_ams)
+        am_revenue_mat = am_revenue_mat.where(~re_mask, other=0.0)
+        am_cost_mat    = am_cost_mat.where(~re_mask, other=0.0)
+
+    # Am transition matrices are all zeros for every agMgt type so the transition term is skipped entirely.
+    xr_revenue_am = am_dvar_mrj * am_revenue_mat
+    xr_cost_am    = am_dvar_mrj * am_cost_mat
+
+    # ── Renewable cost injection (xarray level, before add_all) ──────────────
+    # am_cost_mat / am_revenue_mat have zeros for solar/wind (zeroed above to avoid CAPEX
+    # duplication). We now inject the correct gap-CAPEX cost in two parts:
+    #   1. Potential (optimised) track: replace zeroed slices with dvar × gap-CAPEX cost.
+    #   2. Existing track: concat lu='Existing Capacity' carrying per-cell opex + gap-capex.
+    # Injecting here — before add_all — ensures xr_cost_am and cost_am_df_AUS are always
+    # in sync, so the downstream valid_layers .sel() never raises a KeyError.
+    if renewable_ams:
+        # ── Part 1: potential cost (gap-CAPEX) ────────────────────────────────
+        solar_cost_opt = ag_cost.get_utility_solar_pv_effect_c_mrj(data, ag_cost_mrj, yr_idx, aggregate=False)
+        wind_cost_opt  = ag_cost.get_onshore_wind_effect_c_mrj(data, ag_cost_mrj, yr_idx, aggregate=False)
+
+        solar_lu = settings.AG_MANAGEMENTS_TO_LAND_USES['Utility Solar PV']
+        wind_lu  = settings.AG_MANAGEMENTS_TO_LAND_USES['Onshore Wind']
+
+        solar_opex_xr  = xr.DataArray(solar_cost_opt['opex'],  dims=['lm', 'cell', 'lu'], coords={'lu': solar_lu})
+        solar_capex_xr = xr.DataArray(solar_cost_opt['capex'], dims=['lm', 'cell', 'lu'], coords={'lu': solar_lu})
+        wind_opex_xr   = xr.DataArray(wind_cost_opt['opex'],   dims=['lm', 'cell', 'lu'], coords={'lu': wind_lu})
+        wind_capex_xr  = xr.DataArray(wind_cost_opt['capex'],  dims=['lm', 'cell', 'lu'], coords={'lu': wind_lu})
+
+        solar_dvar_now = am_dvar_mrj.sel(am='Utility Solar PV')
+        wind_dvar_now  = am_dvar_mrj.sel(am='Onshore Wind')
+
+        if yr_cal_sim_pre is None:
+            solar_dvar_delta = solar_dvar_now
+            wind_dvar_delta  = wind_dvar_now
+        else:
+            am_dvar_xr_pre   = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal_sim_pre])
+            solar_dvar_delta = solar_dvar_now - am_dvar_xr_pre.sel(am='Utility Solar PV')
+            wind_dvar_delta  = wind_dvar_now  - am_dvar_xr_pre.sel(am='Onshore Wind')
+
+        solar_potential = (
+            (solar_dvar_now * solar_opex_xr + solar_dvar_delta * solar_capex_xr)
+            .reindex(lu=xr_cost_am.lu.values, fill_value=0.0)
+            .expand_dims(am=['Utility Solar PV'])
+        )
+        wind_potential = (
+            (wind_dvar_now * wind_opex_xr + wind_dvar_delta * wind_capex_xr)
+            .reindex(lu=xr_cost_am.lu.values, fill_value=0.0)
+            .expand_dims(am=['Onshore Wind'])
+        )
+        re_potential_xr = xr.concat([solar_potential, wind_potential], dim='am')
+        xr_cost_am = xr_cost_am + re_potential_xr.reindex_like(xr_cost_am, fill_value=0.0)
+
+        # ── Part 2: existing capacity as lu='Existing Capacity' ───────────────
+        solar_cells_now = ag_cost.get_utility_solar_pv_existing_cost_by_region(data, yr_idx, return_cells=True)
+        wind_cells_now  = ag_cost.get_onshore_wind_existing_cost_by_region(data, yr_idx, return_cells=True)
+
+        if yr_cal_sim_pre is None:
+            solar_capex_pre_vals = 0.0
+            wind_capex_pre_vals  = 0.0
+        else:
+            solar_cells_pre      = ag_cost.get_utility_solar_pv_existing_cost_by_region(data, yr_idx_pre, return_cells=True)
+            wind_cells_pre       = ag_cost.get_onshore_wind_existing_cost_by_region(data, yr_idx_pre, return_cells=True)
+            solar_capex_pre_vals = solar_cells_pre['capex_r'].values
+            wind_capex_pre_vals  = wind_cells_pre['capex_r'].values
+
+        solar_exist_cost = solar_cells_now['opex_r'].values + solar_cells_now['capex_r'].values - solar_capex_pre_vals
+        wind_exist_cost  = wind_cells_now['opex_r'].values  + wind_cells_now['capex_r'].values  - wind_capex_pre_vals
+
+        exist_re_cost_dry = xr.DataArray(
+            np.stack([solar_exist_cost, wind_exist_cost], axis=0),
+            dims=['am', 'cell'],
+            coords={
+                'am':     ['Utility Solar PV', 'Onshore Wind'],
+                'cell':   np.arange(data.NCELLS),
+                'region': ('cell', data.REGION_NRM_NAME),
+            },
+        ).expand_dims(lm=['dry'], lu=['Existing Capacity'])
+
+        exist_re_cost_irr  = xr.zeros_like(exist_re_cost_dry).assign_coords(lm=['irr'])
+        exist_re_cost_full = (
+            xr.concat([exist_re_cost_dry, exist_re_cost_irr], dim='lm')
+            .reindex(am=xr_cost_am.am.values, fill_value=0.0)
+        )
+        exist_re_rev_full = xr.zeros_like(exist_re_cost_full)
+
+        xr_cost_am    = xr.concat([xr_cost_am,    exist_re_cost_full], dim='lu')
+        xr_revenue_am = xr.concat([xr_revenue_am, exist_re_rev_full],  dim='lu')
+
+    xr_profit_am  = xr_revenue_am - xr_cost_am
 
     xr_revenue_am = add_all(xr_revenue_am, ['lm', 'lu', 'am'])
     xr_cost_am    = add_all(xr_cost_am, ['lm', 'lu', 'am'])
-    xr_trans_am   = add_all(xr_trans_am, ['lm', 'lu', 'am'])
     xr_profit_am  = add_all(xr_profit_am, ['lm', 'lu', 'am'])
 
     revenue_am_df, revenue_am_df_AUS = to_region_and_aus_df(xr_revenue_am, ['region', 'am', 'lm', 'lu'], yr_cal)
     cost_am_df,    cost_am_df_AUS    = to_region_and_aus_df(xr_cost_am,    ['region', 'am', 'lm', 'lu'], yr_cal)
-    trans_am_df,   trans_am_df_AUS   = to_region_and_aus_df(xr_trans_am,   ['region', 'am', 'lm', 'lu'], yr_cal)
     profit_am_df,  profit_am_df_AUS  = to_region_and_aus_df(xr_profit_am,  ['region', 'am', 'lm', 'lu'], yr_cal)
 
     rename_map_am = {'lu': 'Land-use', 'lm': 'Water_supply', 'am': 'Management Type', 'Value': 'Value ($)'}
     save_csv(revenue_am_df, rename_map_am, os.path.join(path, f'economics_am_revenue_{yr_cal}.csv'))
     save_csv(cost_am_df,    rename_map_am, os.path.join(path, f'economics_am_cost_{yr_cal}.csv'))
-    save_csv(trans_am_df,   rename_map_am, os.path.join(path, f'economics_am_transition_{yr_cal}.csv'))
     save_csv(profit_am_df,  rename_map_am, os.path.join(path, f'economics_am_profit_{yr_cal}.csv'))
 
     if revenue_am_df_AUS.empty:
@@ -1068,24 +1132,18 @@ def write_economics(data: Data, yr_cal, path):
         valid_layers_cost_am = pd.MultiIndex.from_tuples([('ALL', 'ALL', 'ALL')], names=['am', 'lm', 'lu'])
     else:
         valid_layers_cost_am = pd.MultiIndex.from_frame(cost_am_df_AUS[['am', 'lm', 'lu']]).sort_values()
-    if trans_am_df_AUS.empty:
-        valid_layers_trans_am = pd.MultiIndex.from_tuples([('ALL', 'ALL', 'ALL')], names=['am', 'lm', 'lu'])
-    else:
-        valid_layers_trans_am = pd.MultiIndex.from_frame(trans_am_df_AUS[['am', 'lm', 'lu']]).sort_values()
     if profit_am_df_AUS.empty:
         valid_layers_profit_am = pd.MultiIndex.from_tuples([('ALL', 'ALL', 'ALL')], names=['am', 'lm', 'lu'])
     else:
         valid_layers_profit_am = pd.MultiIndex.from_frame(profit_am_df_AUS[['am', 'lm', 'lu']]).sort_values()
 
-    valid_layers_stack_rev_am = xr_revenue_am.stack(layer=['am', 'lm', 'lu']).sel(layer=valid_layers_rev_am).drop_vars('region')
-    valid_layers_stack_cost_am = xr_cost_am.stack(layer=['am', 'lm', 'lu']).sel(layer=valid_layers_cost_am).drop_vars('region')
-    valid_layers_stack_transition_am = xr_trans_am.stack(layer=['am', 'lm', 'lu']).sel(layer=valid_layers_trans_am).drop_vars('region')
+    valid_layers_stack_rev_am    = xr_revenue_am.stack(layer=['am', 'lm', 'lu']).sel(layer=valid_layers_rev_am).drop_vars('region')
+    valid_layers_stack_cost_am   = xr_cost_am.stack(layer=['am', 'lm', 'lu']).sel(layer=valid_layers_cost_am).drop_vars('region')
     valid_layers_stack_profit_am = xr_profit_am.stack(layer=['am', 'lm', 'lu']).sel(layer=valid_layers_profit_am).drop_vars('region')
 
-    save2nc(valid_layers_stack_rev_am,        os.path.join(path, f'xr_economics_am_revenue_{yr_cal}.nc'))
-    save2nc(valid_layers_stack_cost_am,       os.path.join(path, f'xr_economics_am_cost_{yr_cal}.nc'))
-    save2nc(valid_layers_stack_transition_am, os.path.join(path, f'xr_economics_am_transition_{yr_cal}.nc'))
-    save2nc(valid_layers_stack_profit_am,     os.path.join(path, f'xr_economics_am_profit_{yr_cal}.nc'))
+    save2nc(valid_layers_stack_rev_am,    os.path.join(path, f'xr_economics_am_revenue_{yr_cal}.nc'))
+    save2nc(valid_layers_stack_cost_am,   os.path.join(path, f'xr_economics_am_cost_{yr_cal}.nc'))
+    save2nc(valid_layers_stack_profit_am, os.path.join(path, f'xr_economics_am_profit_{yr_cal}.nc'))
 
 
     # ==================== Non-Agricultural Economics ====================
@@ -1164,9 +1222,9 @@ def write_economics(data: Data, yr_cal, path):
     # xr_profit_ag before add_all is ag_dvar_mrj * profit_ag => dims (lm, lu, cell) with region coord
     # We need the raw (pre-ALL) profits, so recompute from the pre-ALL vars
     raw_profit_ag = (ag_dvar_mrj * profit_ag).drop_vars('region')                          # (lm, lu, cell)
-    raw_profit_am = (xr_revenue_am - (xr_cost_am + xr_trans_am))                           # already has ALL dims
+    raw_profit_am = (xr_revenue_am - xr_cost_am)                                            # already has ALL dims
     # Use pre-ALL am profit: select non-ALL am, sum over am => (lm, lu, cell)
-    raw_profit_am_pre = (am_dvar_mrj * (am_revenue_mat - (am_cost_mat + am_trans_mat)))     # (am, lm, lu, cell)
+    raw_profit_am_pre = (am_dvar_mrj * (am_revenue_mat - am_cost_mat))                      # (am, lm, lu, cell)
     am_sum_profit = raw_profit_am_pre.sel(lm=['dry', 'irr']).sum('am').drop_vars('region')  # (lm, lu, cell)
 
     # NonAg profit: assign to lm='dry', append nonag land uses to ag land uses
@@ -1208,7 +1266,6 @@ def write_economics(data: Data, yr_cal, path):
         'Economics_am': {
             'am_revenue':       _get_mag(valid_layers_stack_rev_am),
             'am_cost':          _get_mag(valid_layers_stack_cost_am),
-            'am_transition':    _get_mag(valid_layers_stack_transition_am),
             'am_profit':        _get_mag(valid_layers_stack_profit_am),
         },
         'Economics_non_ag': {
@@ -1227,7 +1284,7 @@ def write_economics(data: Data, yr_cal, path):
 
 # ── Renewable energy ────────────────────────────────────────────────────────────────
 
-def write_renewable_energy(data: Data, yr_cal, path):
+def write_renewable_production(data: Data, yr_cal, path):
     
     yr_idx = yr_cal - data.YR_CAL_BASE
     re_types = list(settings.RENEWABLES_OPTIONS.keys())
@@ -1260,45 +1317,37 @@ def write_renewable_energy(data: Data, yr_cal, path):
     
     # Get renewable energy by dvar * potential
     renewable_energy = am_dvar_mrj * renewable_potentials
-    renewable_energy = add_all(renewable_energy, ['am', 'lu', 'lm'])  # Add ALL aggregates for each dimension (except cell)
-    
+
+    # ── Inject existing capacity as lu='Existing Capacity' before add_all ────
+    # Per-cell MWh already available from get_exist_renewable_capacity.
+    # Follows the same injection pattern as write_dvar_area and write_economics:
+    # lm='dry' carries real values, lm='irr' is zeros (avoids double-counting),
+    # and add_all then handles lm='ALL' and lu='ALL' for free.
+    if any(settings.RENEWABLES_OPTIONS.values()):
+        solar_exist_mwh_r = ag_quantity.get_exist_renewable_capacity(data, 'Utility Solar PV', yr_cal)
+        wind_exist_mwh_r  = ag_quantity.get_exist_renewable_capacity(data, 'Onshore Wind',     yr_cal)
+
+        exist_re_dry = xr.DataArray(
+            np.stack([solar_exist_mwh_r.values, wind_exist_mwh_r.values], axis=0),
+            dims=['am', 'cell'],
+            coords={
+                'am':     re_types,
+                'cell':   range(data.NCELLS),
+                'region': ('cell', data.REGION_STATE_NAME),
+            },
+        ).expand_dims(lm=['dry'], lu=['Existing Capacity'])
+
+        exist_re_irr  = xr.zeros_like(exist_re_dry).assign_coords(lm=['irr'])
+        exist_re_full = xr.concat([exist_re_dry, exist_re_irr], dim='lm')
+        renewable_energy = xr.concat([renewable_energy, exist_re_full], dim='lu')
+
+    renewable_energy = add_all(renewable_energy, ['am', 'lu', 'lm'])
+
     # Regionally aggregate renewable energy for reporting
     renewable_energy_df, renewable_energy_df_AUS = to_region_and_aus_df(renewable_energy, ['region', 'am', 'lm', 'lu'], yr_cal)
-    
-    # Get existing capacity then save to csv
-    _exist_cap_dict = ag_quantity.get_exist_renewable_capacity_by_state(data, yr_cal)
-    _empty_cols = ['region', 'am', 'lm', 'lu', 'Year', 'Value']
-    if _exist_cap_dict:
-        existing_renewable_prod_state = (
-            pd.DataFrame(_exist_cap_dict)
-            .unstack()
-            .reset_index()
-            .rename(columns={'level_0': 'region', 'level_1': 'am', 0: 'Value'})
-        )
-        existing_renewable_prod_state_ALL = (
-            existing_renewable_prod_state
-            .groupby(['region'], as_index=False)['Value']
-            .sum()
-            .assign(am='ALL')
-        )
-        existing_renewable_prod_state = (
-            pd.concat([existing_renewable_prod_state, existing_renewable_prod_state_ALL])
-            .merge(pd.DataFrame({'lm': ['ALL', 'dry', 'irr']}), how='cross')
-            .assign(Year=yr_cal, lu='Existing Capacity')
-        )
-        existing_renewable_prod_AUS = (
-            existing_renewable_prod_state
-            .groupby(['am', 'lm', 'lu'], as_index=False)['Value']
-            .sum()
-            .assign(region='AUSTRALIA', Year=yr_cal)
-        )
-    else:
-        existing_renewable_prod_state = pd.DataFrame(columns=_empty_cols)
-        existing_renewable_prod_AUS   = pd.DataFrame(columns=_empty_cols)
-    
+
     rename_map_re = {'Value': 'Value (MWh)'}
-    renewable_energy_df_with_existing = pd.concat([renewable_energy_df, existing_renewable_prod_state, existing_renewable_prod_AUS])
-    save_csv(renewable_energy_df_with_existing, rename_map_re, os.path.join(path, f'renewable_energy_with_existing_state_{yr_cal}.csv'))
+    save_csv(renewable_energy_df, rename_map_re, os.path.join(path, f'renewable_energy_with_existing_state_{yr_cal}.csv'))
     
     # Save renewable targets (empty when renewables are off)
     if any(settings.RENEWABLES_OPTIONS.values()):
@@ -1322,6 +1371,29 @@ def write_renewable_energy(data: Data, yr_cal, path):
     save2nc(renewable_energy_stack, os.path.join(path, f'xr_renewable_energy_{yr_cal}.nc'))
 
     magnitudes = {'renewable_energy': _get_mag(renewable_energy_stack)}
+
+    # ── Existing dvar fraction spatial layer ──────────────────────────────────
+    # Build a (am, lm, lu, cell) DataArray representing the fraction of each cell
+    # already occupied by real-world existing renewable installations.
+    # lm='ALL' and lu='Existing Capacity' since the fraction is not lm/lu specific.
+    solar_exist_r = ag_quantity.get_existing_renewable_dvar_fraction(data, 'Utility Solar PV', yr_cal)
+    wind_exist_r  = ag_quantity.get_existing_renewable_dvar_fraction(data, 'Onshore Wind',     yr_cal)
+
+    # Only the 'am' dimension is needed: in the Vue report the existing layer is shown
+    # unconditionally whenever the user selects a renewable AM type, independent of lm/lu.
+    exist_dvar = xr.DataArray(
+        np.stack([solar_exist_r, wind_exist_r], axis=0),
+        dims=['am', 'cell'],
+        coords={'am': re_types, 'cell': range(data.NCELLS)},
+    )
+    exist_dvar = add_all(exist_dvar, ['am'])   # prepend ALL (sum of solar + wind fractions)
+
+    # Stack am into layer MultiIndex so save2nc / get_map2json can handle it
+    # consistently with other NetCDF layers (cfxr encode/decode pattern).
+    exist_dvar_stack = exist_dvar.stack(layer=['am'])
+    save2nc(exist_dvar_stack, os.path.join(path, f'xr_renewable_existing_dvar_{yr_cal}.nc'))
+
+    magnitudes['renewable_existing_dvar'] = _get_mag(exist_dvar_stack)
     return (f"Renewable energy written for year {yr_cal}", magnitudes)
 
 

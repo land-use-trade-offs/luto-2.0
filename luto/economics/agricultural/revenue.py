@@ -512,57 +512,58 @@ def get_onshore_wind_effect_r_mrj(data: Data, r_mrj, yr_idx):
     return new_r_mrj
 
 
-def get_existing_renewable_revenue_by_state(data: Data, base_year: int, target_year: int) -> dict:
+def get_utility_solar_pv_existing_revenue_by_region(data: Data, target_year: int, region: str = 'state') -> dict:
     """
-    Return existing renewable revenue by state and type, for cells locked out of the LP (ub=0).
+    Return Utility Solar PV existing revenue grouped by region.
 
-    Revenue = actual delivered MWh × state price, for all capacity installed strictly before target_year.
-    Actual MWh = nominal_MWh (MW × 8760) × capacity_factor × distribution_loss_factor,
-    via get_exist_renewable_capacity (uses yr=2030 proxy).
+    Revenue = cumulative delivered MWh up to target_year × state solar price.
 
-    Return format: {state: {'Utility Solar PV': revenue_AUD, 'Onshore Wind': revenue_AUD}}
+    Args:
+        region: 'state' (default) or 'NRM'. For NRM, per-cell revenue is computed
+                using the cell's state price, then summed by NRM region.
+    Return format: {region_name: revenue_AUD}
     """
-    if not any(settings.RENEWABLES_OPTIONS.values()):
+    if not settings.AG_MANAGEMENTS['Utility Solar PV']:
         return {}
 
-    # ── Utility Solar PV ──────────────────────────────────────────────────────
-    # Step 1: Get actual delivered MWh per cell — cumulative up to and including target_year
-    solar_mwh_r = (
-        get_exist_renewable_capacity(data, 'Utility Solar PV', target_year)         # Cumulative MWh with CF × DL applied
-        .assign_coords({'state': ('cell', data.REGION_STATE_NAME)})                 # Tag each cell with its state
-    )
+    mwh_r  = get_exist_renewable_capacity(data, 'Utility Solar PV', target_year)   # Cumulative MWh (CF × DL applied)
+    prices = data.SOLAR_PRICES.query('Year == @target_year').set_index('State')['Price_AUD_per_MWh'].to_dict()
 
-    # Step 2: Sum MWh by state, then multiply by state electricity price (AUD/MWh)
-    solar_prices        = data.SOLAR_PRICES.query('Year == @target_year').set_index('State')['Price_AUD_per_MWh'].to_dict()
-    solar_mwh_by_state  = solar_mwh_r.groupby('state').sum('cell').to_dataframe('mwh').to_dict()['mwh']
-    solar_by_state = {
-        state: mwh * solar_prices[state]                                            # Revenue = MWh × price (AUD/MWh)
-        for state, mwh in solar_mwh_by_state.items()
-    }
+    if region == 'NRM':
+        prices_lyr = np.vectorize(prices.get, otypes=[np.float32])(data.REGION_STATE_NAME)
+        rev_r = (mwh_r * prices_lyr).assign_coords({'nrm': ('cell', data.REGION_NRM_NAME)})
+        return rev_r.groupby('nrm').sum('cell').to_dataframe('v').to_dict()['v']
 
-    # ── Onshore Wind ──────────────────────────────────────────────────────────
-    # Step 1: Get actual delivered MWh per cell — cumulative up to and including target_year
-    wind_mwh_r = (
-        get_exist_renewable_capacity(data, 'Onshore Wind', target_year)             # Cumulative MWh with CF × DL applied
-        .assign_coords({'state': ('cell', data.REGION_STATE_NAME)})                 # Tag each cell with its state
-    )
+    mwh_r         = mwh_r.assign_coords({'state': ('cell', data.REGION_STATE_NAME)})
+    mwh_by_state  = mwh_r.groupby('state').sum('cell').to_dataframe('mwh').to_dict()['mwh']
+    return {state: mwh * prices[state] for state, mwh in mwh_by_state.items()}
 
-    # Step 2: Sum MWh by state, then multiply by state electricity price (AUD/MWh)
-    wind_prices         = data.WIND_PRICES.query('Year == @target_year').set_index('State')['Price_AUD_per_MWh'].to_dict()
-    wind_mwh_by_state   = wind_mwh_r.groupby('state').sum('cell').to_dataframe('mwh').to_dict()['mwh']
-    wind_by_state = {
-        state: mwh * wind_prices[state]                                             # Revenue = MWh × price (AUD/MWh)
-        for state, mwh in wind_mwh_by_state.items()
-    }
 
-    all_states = set(solar_by_state) | set(wind_by_state)
-    return {
-        state: {
-            'Utility Solar PV': solar_by_state[state],
-            'Onshore Wind':     wind_by_state[state],
-        }
-        for state in all_states
-    }
+def get_onshore_wind_existing_revenue_by_region(data: Data, target_year: int, region: str = 'state') -> dict:
+    """
+    Return Onshore Wind existing revenue grouped by region.
+
+    Revenue = cumulative delivered MWh up to target_year × state wind price.
+
+    Args:
+        region: 'state' (default) or 'NRM'. For NRM, per-cell revenue is computed
+                using the cell's state price, then summed by NRM region.
+    Return format: {region_name: revenue_AUD}
+    """
+    if not settings.AG_MANAGEMENTS['Onshore Wind']:
+        return {}
+
+    mwh_r  = get_exist_renewable_capacity(data, 'Onshore Wind', target_year)        # Cumulative MWh (CF × DL applied)
+    prices = data.WIND_PRICES.query('Year == @target_year').set_index('State')['Price_AUD_per_MWh'].to_dict()
+
+    if region == 'NRM':
+        prices_lyr = np.vectorize(prices.get, otypes=[np.float32])(data.REGION_STATE_NAME)
+        rev_r = (mwh_r * prices_lyr).assign_coords({'nrm': ('cell', data.REGION_NRM_NAME)})
+        return rev_r.groupby('nrm').sum('cell').to_dataframe('v').to_dict()['v']
+
+    mwh_r         = mwh_r.assign_coords({'state': ('cell', data.REGION_STATE_NAME)})
+    mwh_by_state  = mwh_r.groupby('state').sum('cell').to_dataframe('mwh').to_dict()['mwh']
+    return {state: mwh * prices[state] for state, mwh in mwh_by_state.items()}
 
 
 def get_agricultural_management_revenue_matrices(data:Data, r_mrj, yr_idx: int) -> dict[str, np.ndarray]:

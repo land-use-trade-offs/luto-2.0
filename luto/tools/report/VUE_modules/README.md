@@ -132,6 +132,7 @@ Each analysis view follows a progressive selection pattern for data exploration:
 - Agricultural commodity production quantities and trends
 - Production targets and achievement analysis
 - Export, import, and domestic consumption breakdowns
+- **Renewable energy production**: MWh output for Utility Solar PV and Onshore Wind, including pre-simulation existing installations surfaced as `lu='Existing Capacity'`
 - Progressive selection: Region → Category → Water → Landuse
 
 #### Biodiversity Analysis
@@ -197,7 +198,7 @@ The application uses a custom script loading system (`helpers.js`) that:
 
 #### Progressive Selection Hierarchies
 - **Water Level Options**: `"ALL"`, `"Dryland"`, `"Irrigated"` (Ag/AgMgt only)
-- **AgMgt Options**: `"ALL"`, `"AgTech EI"`, `"Asparagopsis taxiformis"`, `"Biochar"`, `"Precision Agriculture"`
+- **AgMgt Options**: `"ALL"`, `"AgTech EI"`, `"Asparagopsis taxiformis"`, `"Biochar"`, `"Precision Agriculture"`, `"Utility Solar PV"`, `"Onshore Wind"` (renewable energy types; `lu='Existing Capacity'` appears automatically when renewables are enabled)
 - **Category Types**: `"Ag"` (Agricultural), `"Ag Mgt"` (Agricultural Management), `"Non-Ag"` (Non-Agricultural)
 
 #### Special Data Structures

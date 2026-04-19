@@ -500,9 +500,9 @@ def get_non_ag_lb_rk(data: Data, base_year):
     return output
 
 
-def get_ag_man_c_mrj(data: Data, ag_c_mrj: np.ndarray, base_year, target_year):
+def get_ag_man_c_mrj(data: Data, ag_c_mrj: np.ndarray, target_year):
     print('Getting agricultural management options\' cost effects...', flush = True)
-    output = ag_cost.get_agricultural_management_cost_matrices(data, ag_c_mrj, base_year, target_year)
+    output = ag_cost.get_agricultural_management_cost_matrices(data, ag_c_mrj, target_year)
     return output
 
 
@@ -858,7 +858,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     non_ag_t_rk = get_non_ag_t_rk(data, base_year)
     non_ag_to_ag_t_mrj = get_non_ag_to_ag_t_mrj(data, base_year, target_index)
     
-    ag_man_c_mrj = get_ag_man_c_mrj(data, ag_c_mrj, base_year, target_year)
+    ag_man_c_mrj = get_ag_man_c_mrj(data, ag_c_mrj, target_year)
     ag_man_r_mrj = get_ag_man_r_mrj(data, target_index, ag_r_mrj)
     ag_man_t_mrj = get_ag_man_t_mrj(data, target_index)
     

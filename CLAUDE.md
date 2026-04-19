@@ -61,6 +61,7 @@ The LUTO2 documentation is split into themed files for better memory efficiency.
 - [iis_to_story.md](docs/CLAUDE_SKILL/iis_to_story.md): Translate IIS analysis summaries, ILP files, and PBS stdout logs into plain-language story tables grouped by scenario — diagnoses numerical stagnation vs rounding artefacts vs structural infeasibility
 - [redo_failed_write.md](docs/CLAUDE_SKILL/redo_failed_write.md): Re-run write_outputs for runs that completed simulation but failed during write — copy fixed source files into each run's luto/ dir, then submit PBS jobs via submit_redo_write.py
 - [create_luf_task_runs.md](docs/CLAUDE_SKILL/create_luf_task_runs.md): Create and submit multi-scenario LUF task runs — write create_tasks_*.py scripts, merge_unique_parameters.py, verify settings alignment, generate CSVs, and submit to cluster
+- [patch_existing_renewable_capacity.md](docs/CLAUDE_SKILL/patch_existing_renewable_capacity.md): Inject real-world existing renewable capacity as `lu='Existing Capacity'` into output xarrays before `add_all` — covers write_dvar_and_mosaic_map, write_dvar_area, write_economics, and write_renewable_production
 
 ## Diagnostic Tools (`luto/tests/`)
 
@@ -178,9 +179,12 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 
 ### Renewable Energy Settings
 - `RENEWABLES_OPTIONS`: Dict controlling which renewable energy types are enabled, e.g. `{'Utility Solar PV': True, 'Onshore Wind': True}`. Set values to `False` to disable individual types. Also drives the corresponding `AG_MANAGEMENTS` entries.
-- `RENEWABLE_TARGET_SCENARIO`: Target scenario (one of: 'AEMO 2026 ISP - Accelerated Transition', 'AEMO 2026 ISP - Slower Growth', 'AEMO 2026 ISP - Step Change', 'CNS - Accelerated Transition', 'CNS - Current Targets', 'Gladstone - Current Targets')
+- `RENEWABLE_TARGET_SCENARIO_TARGETS`: Generation target scenario (one of: 'AEMO 2026 ISP - Accelerated Transition', 'AEMO 2026 ISP - Slower Growth', 'AEMO 2026 ISP - Step Change', 'Gladstone - BESS Sensitivity', 'Gladstone - Core')
+- `RENEWABLE_TARGET_SCENARIO_INPUT_LAYERS`: Spatial layer scenario (one of: 'step_change', 'accelerated_transition', 'ANU_transmission_T3', 'ANU_transmission_T5', 'ANU_transmission_T10')
 - `RE_TARGET_LEVEL`: Spatial level for constraints ('STATE' or 'NRM'; only STATE currently supported)
 - `INSTALL_CAPACITY_MW_HA`: Per-hectare capacity (MW/ha) per renewable type
+- `EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS`: Exclude renewables from high-biodiversity GBF2 cells (default: True)
+- `EXCLUDE_RENEWABLES_IN_EPBC_MNES_MASK`: Exclude renewables from EPBC MNES high-priority cells (default: True)
 - `RENEWABLES_ADOPTION_LIMITS`: Maximum adoption fraction per type (default: 1.0 for both)
 - Both renewable types are registered as non-reversible agricultural management options in `AG_MANAGEMENTS`
 - Compatible land uses differ: Solar PV excludes Hay; Wind includes Hay and horticulture crops
@@ -353,6 +357,9 @@ Renewable energy types (Utility Solar PV, Onshore Wind) are implemented as agric
 - **GHG effects return zeros**: No direct on-farm GHG impact; displacement benefits handled externally via AusTIMES energy model
 - **Separate rescaling**: Solar and wind yield arrays are rescaled independently (`Renewable_Solar` / `Renewable_Wind` scale factors)
 - **ACT excluded**: Australian Capital Territory skipped in state-level constraints
+- **`write_renewable_economics` deleted**: Superseded by xarray injection in `write_economics` (cost/revenue/profit) and `write_renewable_production` (MWh). Old function had a broken parallel task-list call and patched DataFrames post-hoc, causing `KeyError` in `xr.stack(...).sel(layer=valid_layers)`.
+- **Existing capacity injection pattern**: Patch the result xarray of `dvar × mat` (after multiplication) with `lu='Existing Capacity'` **before** `add_all` — never patch the dvar arrays or the DataFrame. `lm='dry'` carries real values; `lm='irr'` is zeros to avoid double-counting. See skill: [patch_existing_renewable_capacity.md](docs/CLAUDE_SKILL/patch_existing_renewable_capacity.md).
+- **`return_cells=True`**: `get_utility_solar_pv_existing_cost_by_region` and `get_onshore_wind_existing_cost_by_region` in `cost.py` accept `return_cells=True` to return per-cell `{'opex_r': DataArray[cell], 'capex_r': DataArray[cell]}` before any regional groupby — used by `write_economics` for xarray injection.
 
 ## Vue.js Reporting System Architecture
 

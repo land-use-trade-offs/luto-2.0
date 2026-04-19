@@ -66,7 +66,7 @@ window.SettingsView = {
       },
       'Agricultural Management': {
         icon: '🚜',
-        keywords: ['AG_MANAGEMENTS_TO_LAND_USES', 'AG_MANAGEMENTS', 'ASPARAGOPSIS', 'PRECISION_AGRICULTURE', 'ECOLOGICAL_GRAZING', 'SAVANNA_BURNING', 'AGTECH_EI', 'BIOCHAR', 'HIR', 'SAVBURN', 'AGRICULTURAL_MANAGEMENT_USE_THRESHOLD']
+        keywords: ['AG_MANAGEMENTS_TO_LAND_USES', 'AG_MANAGEMENTS', 'ASPARAGOPSIS', 'PRECISION_AGRICULTURE', 'ECOLOGICAL_GRAZING', 'SAVANNA_BURNING', 'AGTECH_EI', 'BIOCHAR', 'HIR', 'SAVBURN', 'AGRICULTURAL_MANAGEMENT_USE_THRESHOLD', 'LUS_', 'LU2TYPE']
       },
       'Solver & Optimization': {
         icon: '🔧',
@@ -171,9 +171,17 @@ window.SettingsView = {
       }
 
       if (activeFilter.value && activeFilter.value !== 'all') {
-        filtered = filtered.filter(param =>
-          param.parameter.includes(activeFilter.value)
-        );
+        if (activeFilter.value === 'RENEWABLE') {
+          filtered = filtered.filter(param =>
+            param.parameter.includes('RENEWABLE') ||
+            param.parameter.includes('RE_TARGET') ||
+            param.parameter.includes('INSTALL_CAPACITY_MW')
+          );
+        } else {
+          filtered = filtered.filter(param =>
+            param.parameter.includes(activeFilter.value)
+          );
+        }
       }
 
       return filtered;

@@ -231,8 +231,9 @@ settings.BIODIVERSITY_TARGET_GBF_8 = 'off'              # 'on' or 'off'
 
 settings.DYNAMIC_PRICE = False                          # Enable demand elasticity-based dynamic pricing
 
-settings.RENEWABLES_OPTIONS = {'Utility Solar PV': True, 'Onshore Wind': True}  # Enable renewable energy types
-settings.RENEWABLE_TARGET_SCENARIO = 'CNS25 - Accelerated Transition'  # Target scenario
+settings.RENEWABLES_OPTIONS = {'Utility Solar PV': True, 'Onshore Wind': True}      # Enable renewable energy types
+settings.RENEWABLE_TARGET_SCENARIO_TARGETS = 'Gladstone - Core'                      # Generation target scenario
+settings.RENEWABLE_TARGET_SCENARIO_INPUT_LAYERS = 'step_change'                      # Spatial layer scenario
 
 # Load data with custom parameters
 data = sim.load_data()
@@ -291,10 +292,17 @@ LUTO2 behavior can be customized through the `luto.settings` module. Key paramet
 
 ### Renewable Energy Constraints
 - `RENEWABLES_OPTIONS`: Dict of renewable energy types and whether each is enabled (e.g., `{'Utility Solar PV': True, 'Onshore Wind': True}`). Set values to `False` to disable individual types.
-- `RENEWABLE_TARGET_SCENARIO`: Target scenario ('CNS25 - Accelerated Transition' or 'CNS25 - Current Targets')
-- `RE_TARGET_LEVEL`: Spatial level for targets ('STATE' or 'NRM')
+- `RENEWABLE_TARGET_SCENARIO_TARGETS`: Generation target scenario. Valid values: `'AEMO 2026 ISP - Accelerated Transition'`, `'AEMO 2026 ISP - Slower Growth'`, `'AEMO 2026 ISP - Step Change'`, `'Gladstone - BESS Sensitivity'`, `'Gladstone - Core'`
+- `RENEWABLE_TARGET_SCENARIO_INPUT_LAYERS`: Spatial layer scenario. Valid values: `'step_change'`, `'accelerated_transition'`, `'ANU_transmission_T3'`, `'ANU_transmission_T5'`, `'ANU_transmission_T10'`
+- `RE_TARGET_LEVEL`: Spatial level for targets ('STATE' or 'NRM'; only STATE currently supported)
 - `INSTALL_CAPACITY_MW_HA`: Per-hectare generation capacity (MW/ha) for each renewable type
 - `RENEWABLES_ADOPTION_LIMITS`: Maximum fraction of compatible land available for each renewable type (default: 1.0)
+- `EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS`: Prevent renewable installation on high-biodiversity GBF2-masked cells (default: True)
+- `RENEWABLE_GBF2_CUT_SOLAR` / `RENEWABLE_GBF2_CUT_WIND`: Biodiversity area coverage % threshold for GBF2 exclusion (default: 20)
+- `EXCLUDE_RENEWABLES_IN_EPBC_MNES_MASK`: Prevent renewable installation on EPBC MNES high-priority cells (default: True)
+- `RENEWABLE_EPBC_MNES_CUT_SOLAR` / `RENEWABLE_EPBC_MNES_CUT_WIND`: MNES priority rank % threshold for EPBC exclusion (default: 10)
+
+> **Existing capacity reporting**: Pre-simulation real-world solar/wind installations are automatically included in all output reports as `lu='Existing Capacity'` — visible in area, economics, production, and map layers without any extra configuration.
 
 ### Land Use Options
 - `NON_AG_LAND_USES`: Enable/disable non-agricultural land uses (Environmental Plantings, Carbon Plantings, etc.)
