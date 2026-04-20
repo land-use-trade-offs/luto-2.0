@@ -1,6 +1,50 @@
 window.RegionsMap = {
   name: 'RegionsMap',
 
+  // v-draggable: makes any absolutely-positioned element freely moveable via mouse drag.
+  // On first mousedown it snapshots the element's rendered position (handling bottom/transform
+  // initial placement) and switches to explicit top/left so subsequent moves are predictable.
+  directives: {
+    draggable: {
+      mounted(el) {
+        el.style.cursor = 'grab';
+        el.style.userSelect = 'none';
+        let startX, startY, startLeft, startTop;
+
+        const onMouseMove = (e) => {
+          el.style.left = (startLeft + e.clientX - startX) + 'px';
+          el.style.top = (startTop + e.clientY - startY) + 'px';
+          el.style.cursor = 'grabbing';
+        };
+
+        const onMouseUp = () => {
+          document.removeEventListener('mousemove', onMouseMove);
+          document.removeEventListener('mouseup', onMouseUp);
+          el.style.cursor = 'grab';
+        };
+
+        el.addEventListener('mousedown', (e) => {
+          // Convert current rendered position to explicit top/left, clearing any
+          // bottom/right/transform that were set by the initial CSS classes.
+          const rect = el.getBoundingClientRect();
+          const parentRect = el.offsetParent ? el.offsetParent.getBoundingClientRect() : { left: 0, top: 0 };
+          el.style.transform = 'none';
+          el.style.bottom = 'auto';
+          el.style.right = 'auto';
+          startLeft = rect.left - parentRect.left;
+          startTop = rect.top - parentRect.top;
+          el.style.left = startLeft + 'px';
+          el.style.top = startTop + 'px';
+          startX = e.clientX;
+          startY = e.clientY;
+          document.addEventListener('mousemove', onMouseMove);
+          document.addEventListener('mouseup', onMouseUp);
+          e.preventDefault();
+        });
+      }
+    }
+  },
+
   props: {
     mapData: {
       type: Object,
@@ -13,6 +57,10 @@ window.RegionsMap = {
     regionType: {
       type: String,
       default: 'NRM'  // 'NRM' or 'STATE'
+    },
+    showLegend: {
+      type: Boolean,
+      default: true
     }
   },
 
@@ -304,13 +352,71 @@ window.RegionsMap = {
       }
     };
 
+    // Colorbar for float map layers — derived from min_max embedded in mapData
+    const colorbarInfo = computed(() => {
+      const data = props.mapData;
+      if (!data || data.intOrFloat !== 'float') return null;
+      const [minVal, maxVal] = data.min_max || [0, 1];
+
+      // Format a number compactly; use exponential notation for very small values to avoid
+      // long strings like "-0.000300" that clutter the colorbar.
+      const fmt = (v) => {
+        if (v === 0) return '0';
+        const abs = Math.abs(v);
+        if (abs >= 1e6) return (v / 1e6).toPrecision(3) + 'M';
+        if (abs >= 1e3) return (v / 1e3).toPrecision(3) + 'k';
+        if (abs >= 1) return v.toPrecision(4);
+        if (abs >= 0.01) return v.toPrecision(3);
+        return v.toExponential(1);  // e.g. -3.0e-4 for very small values
+      };
+
+      // Build a CSS gradient that mirrors the COLORS_FLOAT ramp used during rendering:
+      //   codes 1–50  → dark navy (#000E2B) to light blue (#5D94DC)  [negative range]
+      //   codes 51–100 → pale yellow (#FFF6B0) to dark red (#800026) [positive range]
+      let gradient;
+      // displayZeroFrac: fraction of the bar at the zero crossing (null = one-sided).
+      // Clamped to MIN_BLUE_FRAC so the blue section is always wide enough for the min label.
+      let displayZeroFrac = null;
+      const MIN_BLUE_FRAC = 0.15;
+
+      if (minVal >= 0) {
+        // Positive-only: yellow → orange → dark red
+        gradient = 'linear-gradient(to right, #FFF6B0, #FD933E, #800026)';
+      } else if (maxVal <= 0) {
+        // Negative-only: dark blue → lighter blue
+        gradient = 'linear-gradient(to right, #000E2B, #104991, #5D94DC)';
+      } else {
+        // Bipolar: clamp the blue section to a minimum visual width for readability
+        const rawFrac = Math.abs(minVal) / (Math.abs(minVal) + Math.abs(maxVal));
+        const clamped = rawFrac < MIN_BLUE_FRAC;
+        displayZeroFrac = clamped ? MIN_BLUE_FRAC : rawFrac;
+        const pct = (displayZeroFrac * 100).toFixed(1);
+        gradient = `linear-gradient(to right, #000E2B 0%, #5D94DC ${pct}%, #FFF6B0 ${pct}%, #800026 100%)`;
+        // Hide the '0' tick when clamped: its position is artificial and would overlap min label
+        if (clamped) displayZeroFrac = null;
+      }
+
+      return { minVal, maxVal, gradient, displayZeroFrac, fmtMin: fmt(minVal), fmtMax: fmt(maxVal) };
+    });
+
+    // Categorical legend for integer map layers — {label: hexColor} dict from mapData.legend
+    const intLegend = computed(() => {
+      const data = props.mapData;
+      if (!data || data.intOrFloat !== 'int') return null;
+      const legend = data.legend;
+      if (!legend || Object.keys(legend).length === 0) return null;
+      return legend;
+    });
+
     return {
       selectedRegion,
       updateMap,
       selectedBaseMap,
       changeBaseMap,
       baseMapOptions,
-      handleBaseMapChange
+      handleBaseMapChange,
+      colorbarInfo,
+      intLegend,
     };
   },
   template: `
@@ -334,6 +440,42 @@ window.RegionsMap = {
 
         <!-- Map Container - Leaflet map will be initialized here -->
         <div id="map" class="w-full h-full relative z-10"></div>
+
+        <!-- Categorical (integer) legend — shown for DVAR / land-use map layers -->
+        <div v-if="intLegend && showLegend"
+             v-draggable
+             class="absolute right-[20px] z-[1001] bg-white/80 p-2 rounded-lg shadow"
+             style="top: 50%; transform: translateY(-50%); max-width: 220px; max-height: 60vh; overflow-y: auto;">
+          <div class="flex flex-col space-y-0.5">
+            <div v-for="(color, label) in intLegend" :key="label" class="flex items-center gap-1.5">
+              <span class="inline-block flex-shrink-0 w-3 h-3 rounded-sm" :style="{ backgroundColor: color }"></span>
+              <span class="text-[0.6rem] text-gray-700 leading-tight">{{ label }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Float colorbar legend — shown only for continuous (non-categorical) map layers -->
+        <div v-if="colorbarInfo"
+             v-draggable
+             class="absolute bottom-[28px] left-1/2 z-[1001] bg-white/80 px-3 py-2 rounded-lg shadow"
+             style="transform: translateX(-50%); min-width: 260px; max-width: 380px;">
+          <!-- Header row: unit label -->
+          <div class="text-[0.6rem] text-gray-400 text-right mb-0.5 italic">per ha</div>
+          <!-- Gradient bar -->
+          <div class="h-3 w-full rounded" :style="{ background: colorbarInfo.gradient }"></div>
+          <!-- Tick labels -->
+          <div class="relative text-[0.65rem] text-gray-600 mt-1" style="height: 1.1em;">
+            <!-- Min label — always at left -->
+            <span class="absolute left-0">{{ colorbarInfo.fmtMin }}</span>
+            <!-- Zero tick — only for bipolar data; position matches the (clamped) gradient stop -->
+            <span v-if="colorbarInfo.displayZeroFrac !== null"
+                  class="absolute -translate-x-1/2"
+                  :style="{ left: (colorbarInfo.displayZeroFrac * 100).toFixed(1) + '%' }">0</span>
+            <!-- Max label — always at right -->
+            <span class="absolute right-0">{{ colorbarInfo.fmtMax }}</span>
+          </div>
+        </div>
+
       </div>
     </div>
   `

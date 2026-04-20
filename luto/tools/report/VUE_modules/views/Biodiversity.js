@@ -445,6 +445,7 @@ window.BiodiversityView = {
         <regions-map
           :mapData="selectMapData"
           :overlayGeoJSON="gbf2MaskOverlay"
+          :show-legend="!isDrawerOpen"
           style="width: 100%; height: 100%;">
         </regions-map>
 

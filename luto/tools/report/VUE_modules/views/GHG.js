@@ -392,6 +392,7 @@ window.GHGView = {
         <!-- Map component takes full space -->
         <regions-map
           :mapData="selectMapData"
+          :show-legend="!isDrawerOpen"
           style="width: 100%; height: 100%;">
         </regions-map>
 

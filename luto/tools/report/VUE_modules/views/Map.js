@@ -289,17 +289,6 @@ window['MapView'] = {
             style="width: 100%; height: 100%;">
         </regions-map>
 
-        <!-- Legend -->
-        <div v-if="selectLegend && Object.keys(selectLegend).length > 0" class="absolute top-[20px] right-[20px] z-[1001] bg-white/70 p-3 rounded-lg max-w-[300px]">
-            <div class="font-bold text-sm mb-2 text-gray-600">{{ selectCategory }}</div>
-            <div class="flex flex-col space-y-1">
-                <div v-for="(color, label) in selectLegend" :key="label" class="flex items-center">
-                    <span class="inline-block w-[12px] h-[12px] mr-[6px]" :style="{ backgroundColor: color }"></span>
-                    <span class="text-xs text-gray-600">{{ label }}</span>
-                </div>
-            </div>
-        </div>
-
     </div>
     `
 };

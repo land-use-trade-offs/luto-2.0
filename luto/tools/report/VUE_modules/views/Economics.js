@@ -38,8 +38,8 @@ window.EconomicsView = {
 
     // Previous selection memory per category
     const previousSelections = ref({
-      "Sum":    { mapType: "", water: "", landuse: "" },
-      "Ag":     { mapType: "", water: "", source: "", landuse: "" },
+      "Sum": { mapType: "", water: "", landuse: "" },
+      "Ag": { mapType: "", water: "", source: "", landuse: "" },
       "Ag Mgt": { mapType: "", agMgt: "", water: "", landuse: "" },
       "Non-Ag": { mapType: "", landuse: "" },
     });
@@ -357,8 +357,8 @@ window.EconomicsView = {
     // Landuse → just save
     watch(selectLanduse, (newLanduse) => {
       const cat = selectCategory.value;
-      if (cat === "Sum")     previousSelections.value["Sum"].landuse = newLanduse;
-      else if (cat === "Ag")     previousSelections.value["Ag"].landuse = newLanduse;
+      if (cat === "Sum") previousSelections.value["Sum"].landuse = newLanduse;
+      else if (cat === "Ag") previousSelections.value["Ag"].landuse = newLanduse;
       else if (cat === "Ag Mgt") previousSelections.value["Ag Mgt"].landuse = newLanduse;
       else if (cat === "Non-Ag") previousSelections.value["Non-Ag"].landuse = newLanduse;
     });
@@ -476,6 +476,7 @@ window.EconomicsView = {
         <!-- Map component takes full space -->
         <regions-map
           :mapData="selectMapData"
+          :show-legend="!isDrawerOpen"
           style="width: 100%; height: 100%;">
         </regions-map>
 
