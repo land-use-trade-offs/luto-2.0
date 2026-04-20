@@ -65,7 +65,8 @@ grid_search = {
     'CONVERGENCE': [2050],                                                  # Year at which dietary transformation is completed
     'CO2_FERT': ['off'],                                                    # 'on' or 'off'
     'APPLY_DEMAND_MULTIPLIERS': [True],                                     # True or False. Whether to apply demand multipliers from AusTIME model.
-    
+    'PRODUCTIVITY_TREND': ['BAU'],                                          # 'BAU', 'LOW', 'MEDIUM', 'HIGH', 'VERY_HIGH'
+
 
     # --------------- Economics ---------------
     'DYNAMIC_PRICE' : [True],                                               # True or False (ON per LUF Report 2026)
@@ -147,8 +148,14 @@ grid_search = {
     }],
     'RENEWABLE_TARGET_SCENARIO_TARGETS': ['Gladstone - Core'],             # 'Gladstone - Core', 'Gladstone - BESS Sensitivity', 'AEMO 2026 ISP - Step Change', etc.
     'RENEWABLE_TARGET_SCENARIO_INPUT_LAYERS': ['step_change'],             # 'step_change', 'accelerated_transition', 'ANU_transmission_T3/T5/T10'
-    
-    
+    'EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS': [True],                    # True: exclude renewables from GBF2 high-biodiversity cells
+    'RENEWABLE_GBF2_CUT_SOLAR': [20],                                     # % coverage threshold for GBF2 exclusion mask (solar)
+    'RENEWABLE_GBF2_CUT_WIND': [20],                                      # % coverage threshold for GBF2 exclusion mask (wind)
+    'EXCLUDE_RENEWABLES_IN_EPBC_MNES_MASK': [True],                       # True: exclude renewables from EPBC MNES high-priority cells
+    'RENEWABLE_EPBC_MNES_CUT_SOLAR': [10],                                # % MNES coverage threshold for exclusion mask (solar)
+    'RENEWABLE_EPBC_MNES_CUT_WIND': [10],                                 # % MNES coverage threshold for exclusion mask (wind)
+
+
     # --------------- Objective function weights ---------------
     'SOLVE_WEIGHT_ALPHA': [1],                                              # between 0 and 1, if 1 will turn off biodiversity objective, if 0 will turn off profit objective
     'SOLVE_WEIGHT_BETA':  [0.5],         
