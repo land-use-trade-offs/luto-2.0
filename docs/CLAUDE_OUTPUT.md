@@ -544,6 +544,53 @@ The Vue.js reporting interface aggregates chart data at the land use (`lu`) leve
 
 This maintains consistency between spatial maps and statistical charts, ensuring synchronized filtering throughout the interactive dashboard.
 
+## Colorbar Range: MAX_CELL_MAGNITUDE Design
+
+Each map layer in the report needs a consistent `min_max` colorbar range that spans **all simulated years**, not just a single year. This is achieved via `MAX_CELL_MAGNITUDE` in `write.py`.
+
+### Pipeline
+
+1. **`get_mag(arr)`** — called once per output xarray per year. Returns `[MIN_P-quantile, MAX_P-quantile]` (currently `[0.5%, 99.5%]`) of non-zero cell values. Using quantiles avoids extreme outliers distorting the colorbar.
+
+2. **`MAX_CELL_MAGNITUDE`** — a plain pre-initialized 2-level dict (`write.py:71`). Each leaf is a list that accumulates `[min_q, max_q]` pairs from every year's parallel job:
+   ```python
+   MAX_CELL_MAGNITUDE = {
+       'area':        {'ag': [], 'non_ag': [], 'am': []},
+       'ghg_emission': {'ag': [], 'non_ag': [], 'ag_man': [], 'transition': [], 'sum': []},
+       'production':  defaultdict(list),   # commodity names are dynamic
+       'renewable_energy': [],             # 1-level (no sub-key)
+       ...
+   }
+   ```
+   Two-level keys (e.g. `area → ag`) use a nested dict. Single-level keys (renewables) use a bare list. `production` uses `defaultdict(list)` because commodity names are not known at module load time.
+
+3. **Merge loop** — after each parallel job returns `(msg, mag)`, the driver checks the *target* type to dispatch:
+   ```python
+   target = MAX_CELL_MAGNITUDE[top_key]
+   if isinstance(target, list):
+       target.extend(sub)           # 1-level leaf
+   else:
+       for sub_key, vals in sub.items():
+           target[sub_key].extend(vals)  # 2-level leaf
+   ```
+
+4. **Serialization** — after all years complete, lists are NaN-cleaned and written to `max_cell_magnitudes.json`:
+   ```python
+   clean = lambda lst: [0.0 if np.isnan(v) else float(v) for v in lst]
+   json.dump(
+       {k: (clean(v) if isinstance(v, list) else {sk: clean(sv) for sk, sv in v.items()})
+        for k, v in MAX_CELL_MAGNITUDE.items()},
+       f, indent=2
+   )
+   ```
+
+5. **`create_report_layers.py`** loads `max_cell_magnitudes.json` and takes `(min(vals), max(vals))` across the accumulated list to get the cross-year colorbar range, which is embedded as `min_max` in each map layer's JSON entry.
+
+### Key invariants
+- `get_mag` always returns a 2-element list `[float, float]` — never a scalar.
+- Water yield is the exception: it returns raw `(min, max)` tuples via `.min().item()` / `.max().item()` rather than quantiles, because water yield can legitimately be zero over large areas.
+- Do **not** add a new output type without adding its key to `MAX_CELL_MAGNITUDE` — missing keys will raise `KeyError` at merge time.
+
 ## Carbon Sequestration Data Format
 
 The carbon sequestration data has been migrated from HDF5/pandas format to NetCDF/xarray format for improved performance and flexibility.

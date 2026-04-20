@@ -62,46 +62,30 @@ import luto.economics.non_agricultural.biodiversity as non_ag_biodiversity
 
 
 
-# ── Write parameters ─────────────────────────────────────────────────────────
+# ── Magnitude parameters ─────────────────────────────────────────────────────────
+'''
+Dictionary that holds lists of non-zero cell values for each output type/layer, to calculate quantiles 
+for setting colorbar limits in the report.
+'''
 
-MAX_CELL_MAGNITUDE = (f := lambda: defaultdict(f))()
-# Arbitrary-depth nested defaultdict.
-# Innermost leaf: list of scalar values accumulated across workers/years.
+MAX_CELL_MAGNITUDE = {
+    'area':                  {'ag': [], 'non_ag': [], 'am': []},
+    'bio_quality':           {'ag': [], 'non_ag': [], 'am': [], 'all': []},
+    'Economics_ag':          {'ag_revenue': [], 'ag_cost': [], 'ag2ag_cost': [], 'non_ag2ag_cost': [], 'profit_ag': []},
+    'Economics_am':          {'am_revenue': [], 'am_cost': [], 'am_profit': []},
+    'Economics_non_ag':      {'non_ag_revenue': [], 'non_ag_cost': [], 'nonag2nonag_cost': [], 'ag2nonag_cost': [], 'non_ag_profit': []},
+    'Economics_sum':         {'sum_profit': []},
+    'ghg_emission':          {'ag': [], 'non_ag': [], 'ag_man': [], 'transition': [], 'sum': []},
+    'production':            defaultdict(list),  # commodity names are dynamic
+    'water_yield':           {'ag': [], 'non_ag': [], 'am': [], 'sum': []},
+    'renewable_energy':      [],
+    'renewable_existing_dvar': [],
+    'transition_area':       {'ag2ag': [], 'ag2non_ag': []},
+}
 
 # Quantiles to get a robust estimate of the magnitude for setting colorbar limits in the report.
 # This elinimates extreme values calculates using vanilla min/max.
 MIN_P, MAX_P = 0.005, 0.995
-
-def _get_mag(arr: xr.DataArray) -> list:
-    """Return [MIN_P-quantile, MAX_P-quantile] of non-zero values via numpy (avoids MultiIndex quantile bug)."""
-    vals = arr.where(arr != 0).compute().values.ravel()
-    return [float(np.nanquantile(vals, MIN_P)), float(np.nanquantile(vals, MAX_P))]
-
-
-def _mag_merge(contributions):
-    """
-    Merge per-worker magnitude contributions into `MAX_CELL_MAGNITUDE`.
-
-    contributions: {top_key: {sub_key: tuple_or_dict}}
-    At each leaf, the tuple is extended into a flat list stored under '_vals'.
-    """
-    def _apply(node, val):
-        if isinstance(val, dict):
-            for k, v in val.items():
-                _apply(node[k], v)
-        else:
-            if '_vals' not in node:
-                node['_vals'] = []
-            node['_vals'].extend(val)
-
-    for top_key, val in contributions.items():
-        _apply(MAX_CELL_MAGNITUDE[top_key], val)
-
-
-
-
-
-
 
 
 # ── Shared helpers ────────────────────────────────────────────────────────────
@@ -112,6 +96,30 @@ def add_all(da, dims):
         ds = da.sum(dim=dim, keepdims=True).assign_coords({dim: ['ALL']})
         da = xr.concat([ds, da], dim=dim)
     return da
+
+
+def get_mag(arr: xr.DataArray) -> list:
+    """Return [MIN_P-quantile, MAX_P-quantile] of non-zero values via numpy (avoids MultiIndex quantile bug)."""
+    vals = arr.where(arr != 0).compute().values.ravel()
+    return [float(np.nanquantile(vals, MIN_P)), float(np.nanquantile(vals, MAX_P))]
+
+
+def save2nc(in_xr: xr.DataArray, save_path: str):
+    chunks = {dim: (size if dim == 'cell' else 1) for dim, size in in_xr.sizes.items()}
+    ds = cfxr.encode_multi_index_as_compress(
+        in_xr.chunk(chunks).to_dataset(name='data'), 'layer'
+    )
+    ds.to_netcdf(
+        save_path,
+        encoding={'data': {'dtype': 'float32', 'zlib': True, 'complevel': 4, 'chunksizes': list(chunks.values())}},
+    )
+    
+    
+def save_csv(df, rename_map, filepath):
+    (df.rename(columns=rename_map)
+       .infer_objects(copy=False)
+       .replace({'dry': 'Dryland', 'irr': 'Irrigated'})
+       .to_csv(filepath, index=False))
 
 
 def to_region_and_aus_df(da, group_dims, yr_cal):
@@ -133,7 +141,7 @@ def to_region_and_aus_df(da, group_dims, yr_cal):
     return pd.concat([aus, region]), aus
 
 
-def _bio_to_region_and_aus_df(da, group_dims, value_name, base_score, yr_cal):
+def bio_to_region_and_aus_df(da, group_dims, value_name, base_score, yr_cal):
     """
     Aggregate xarray to region-level DataFrame; return (AUS+region combined, AUS only).
     group_dims must include 'region' as the first element.
@@ -158,28 +166,6 @@ def _bio_to_region_and_aus_df(da, group_dims, value_name, base_score, yr_cal):
         .query(f'abs(`{value_name}`) > 1')
     )
     return pd.concat([aus, region]), aus
-
-def save2nc(in_xr: xr.DataArray, save_path: str):
-    chunks = {dim: (size if dim == 'cell' else 1) for dim, size in in_xr.sizes.items()}
-    ds = cfxr.encode_multi_index_as_compress(
-        in_xr.chunk(chunks).to_dataset(name='data'), 'layer'
-    )
-    ds.to_netcdf(
-        save_path,
-        encoding={'data': {'dtype': 'float32', 'zlib': True, 'complevel': 4, 'chunksizes': list(chunks.values())}},
-    )
-    
-def save_csv(df, rename_map, filepath):
-    (df.rename(columns=rename_map)
-       .infer_objects(copy=False)
-       .replace({'dry': 'Dryland', 'irr': 'Irrigated'})
-       .to_csv(filepath, index=False))
-
-
-def valid_layers_na(df):
-    if df.empty:
-        return pd.MultiIndex.from_tuples([('ALL',)], names=['lu'])
-    return pd.MultiIndex.from_frame(df[['lu']]).sort_values()
 
 
 def process_cost_chunks(trans_xr, data, yr_cal, chunk_size, groupby_cols, value_col):
@@ -276,22 +262,24 @@ def write_data(data: Data):
     for result in Parallel(n_jobs=num_jobs, return_as='generator_unordered')(jobs):
         if isinstance(result, tuple):
             msg, mag = result
-            _mag_merge(mag)
+            for top_key, sub in mag.items():
+                target = MAX_CELL_MAGNITUDE[top_key]
+                if isinstance(target, list):
+                    target.extend(sub)
+                else:
+                    for sub_key, vals in sub.items():
+                        target[sub_key].extend(vals)
             print(msg)
         else:
             print(result)
-            
-    # After all jobs are done, we collapse the MAX_CELL_MAGNITUDE dict to get the final maximum magnitudes 
-    # for each variable, which can be used for setting colorbar limits in the report.
-    def _defaultdict_to_dict(d):
-        if isinstance(d, defaultdict):
-            if '_vals' in d:
-                return [0.0 if np.isnan(v) else float(v) for v in d['_vals']]
-            return {k: _defaultdict_to_dict(v) for k, v in d.items()}
-        return d
 
+    clean = lambda lst: [0.0 if np.isnan(v) else float(v) for v in lst]
     with open(os.path.join(data.path, 'max_cell_magnitudes.json'), 'w') as f:
-        json.dump(_defaultdict_to_dict(MAX_CELL_MAGNITUDE), f, indent=2)
+        json.dump(
+            {k: (clean(v) if isinstance(v, list) else {sk: clean(sv) for sk, sv in v.items()})
+             for k, v in MAX_CELL_MAGNITUDE.items()},
+            f, indent=2
+        )
   
   
 
@@ -646,13 +634,16 @@ def write_dvar_area(data: Data, yr_cal, path):
     save2nc(area_non_ag_cat, os.path.join(path, f'xr_area_non_agricultural_landuse_{yr_cal}.nc'))
     save2nc(area_am_cat, os.path.join(path, f'xr_area_agricultural_management_{yr_cal}.nc'))
     
+    # Save REAL_AREA for calculating val/ha in report layers
+    save2nc(real_area_r.expand_dims({'lu': ['ALL']}).stack(layer=['lu']), os.path.join(path, f'xr_area_real_area_ha_{yr_cal}.nc'))
+    
     
     # Records cell magnitudes
     area_magnitudes = {
         'area': {
-            'ag':     _get_mag(area_ag_cat),
-            'non_ag': _get_mag(area_non_ag_cat),
-            'am':     _get_mag(area_am_cat),
+            'ag':     get_mag(area_ag_cat),
+            'non_ag': get_mag(area_non_ag_cat),
+            'am':     get_mag(area_am_cat),
         }
     }
     
@@ -848,10 +839,10 @@ def write_quantity(data: Data, yr_cal: int, path: str) -> np.ndarray:
 
     # Record max cell value for report generation later (e.g., for setting colorbar limits)
     prod_magnitudes = {
-        'ag':     {cm: _get_mag(ag_q_mrc.sel(Commodity=cm)) for cm in data.COMMODITIES},
-        'non_ag': {cm: _get_mag(non_ag_p_rc.sel(Commodity=cm)) for cm in data.COMMODITIES},
-        'am':     {cm: _get_mag(am_p_amrc.sel(Commodity=cm)) for cm in data.COMMODITIES},
-        'sum':    {cm: _get_mag(sum_mrc.sel(Commodity=cm)) for cm in data.COMMODITIES},
+        'ag':     {cm: get_mag(ag_q_mrc.sel(Commodity=cm)) for cm in data.COMMODITIES},
+        'non_ag': {cm: get_mag(non_ag_p_rc.sel(Commodity=cm)) for cm in data.COMMODITIES},
+        'am':     {cm: get_mag(am_p_amrc.sel(Commodity=cm)) for cm in data.COMMODITIES},
+        'sum':    {cm: get_mag(sum_mrc.sel(Commodity=cm)) for cm in data.COMMODITIES},
     }
     
     commodity_magnitudes = {'production': {}}
@@ -873,7 +864,7 @@ def write_economics(data: Data, yr_cal, path):
     Also produces a Sum profit layer combining all three categories."""
 
     yr_idx = yr_cal - data.YR_CAL_BASE
-    chunk  = {'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
+    chunk = {'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
 
     if yr_idx == 0:
         yr_cal_sim_pre = None
@@ -1198,11 +1189,11 @@ def write_economics(data: Data, yr_cal, path):
     save_csv(t_ag2nonag_df,    rename_map_na, os.path.join(path, f'economics_non_ag_transition_Ag2NonAg_{yr_cal}.csv'))
     save_csv(profit_na_df,     rename_map_na, os.path.join(path, f'economics_non_ag_profit_{yr_cal}.csv'))
 
-    vl_rev_na          = valid_layers_na(revenue_na_df_AUS)
-    vl_cost_na         = valid_layers_na(cost_na_df_AUS)
-    vl_t_nonag2nonag   = valid_layers_na(t_nonag2nonag_df_AUS)
-    vl_t_ag2nonag      = valid_layers_na(t_ag2nonag_df_AUS)
-    vl_profit_na       = valid_layers_na(profit_na_df_AUS)
+    vl_rev_na          = pd.MultiIndex.from_tuples([('ALL',)], names=['lu']) if revenue_na_df_AUS.empty    else pd.MultiIndex.from_frame(revenue_na_df_AUS[['lu']]).sort_values()
+    vl_cost_na         = pd.MultiIndex.from_tuples([('ALL',)], names=['lu']) if cost_na_df_AUS.empty       else pd.MultiIndex.from_frame(cost_na_df_AUS[['lu']]).sort_values()
+    vl_t_nonag2nonag   = pd.MultiIndex.from_tuples([('ALL',)], names=['lu']) if t_nonag2nonag_df_AUS.empty else pd.MultiIndex.from_frame(t_nonag2nonag_df_AUS[['lu']]).sort_values()
+    vl_t_ag2nonag      = pd.MultiIndex.from_tuples([('ALL',)], names=['lu']) if t_ag2nonag_df_AUS.empty    else pd.MultiIndex.from_frame(t_ag2nonag_df_AUS[['lu']]).sort_values()
+    vl_profit_na       = pd.MultiIndex.from_tuples([('ALL',)], names=['lu']) if profit_na_df_AUS.empty     else pd.MultiIndex.from_frame(profit_na_df_AUS[['lu']]).sort_values()
 
     vl_stack_rev_na        = xr_revenue_non_ag.stack(layer=['lu']).sel(layer=vl_rev_na).drop_vars('region').compute()
     vl_stack_cost_na       = xr_cost_non_ag.stack(layer=['lu']).sel(layer=vl_cost_na).drop_vars('region').compute()
@@ -1257,26 +1248,26 @@ def write_economics(data: Data, yr_cal, path):
     # ==================== Record Cell Magnitudes ====================
     magnitudes = {
         'Economics_ag': {
-            'ag_revenue':       _get_mag(ag_rev_valid_layers),
-            'ag_cost':          _get_mag(ag_cost_valid_layers),
-            'ag2ag_cost':       _get_mag(ag2ag_cost_valid_layers),
-            'non_ag2ag_cost':   _get_mag(nonag2ag_cost_valid_layers),
-            'profit_ag':        _get_mag(profit_ag_valid_layers),
+            'ag_revenue':       get_mag(ag_rev_valid_layers),
+            'ag_cost':          get_mag(ag_cost_valid_layers),
+            'ag2ag_cost':       get_mag(ag2ag_cost_valid_layers),
+            'non_ag2ag_cost':   get_mag(nonag2ag_cost_valid_layers),
+            'profit_ag':        get_mag(profit_ag_valid_layers),
         },
         'Economics_am': {
-            'am_revenue':       _get_mag(valid_layers_stack_rev_am),
-            'am_cost':          _get_mag(valid_layers_stack_cost_am),
-            'am_profit':        _get_mag(valid_layers_stack_profit_am),
+            'am_revenue':       get_mag(valid_layers_stack_rev_am),
+            'am_cost':          get_mag(valid_layers_stack_cost_am),
+            'am_profit':        get_mag(valid_layers_stack_profit_am),
         },
         'Economics_non_ag': {
-            'non_ag_revenue':   _get_mag(vl_stack_rev_na),
-            'non_ag_cost':      _get_mag(vl_stack_cost_na),
-            'nonag2nonag_cost': _get_mag(vl_stack_t_nonag2nonag),
-            'ag2nonag_cost':    _get_mag(vl_stack_t_ag2nonag),
-            'non_ag_profit':    _get_mag(vl_stack_profit_na),
+            'non_ag_revenue':   get_mag(vl_stack_rev_na),
+            'non_ag_cost':      get_mag(vl_stack_cost_na),
+            'nonag2nonag_cost': get_mag(vl_stack_t_nonag2nonag),
+            'ag2nonag_cost':    get_mag(vl_stack_t_ag2nonag),
+            'non_ag_profit':    get_mag(vl_stack_profit_na),
         },
         'Economics_sum': {
-            'sum_profit':       _get_mag(sum_profit_stack),
+            'sum_profit':       get_mag(sum_profit_stack),
         },
     }
     return (f"Economics (Ag + Am + NonAg + Sum) written for year {yr_cal}", magnitudes)
@@ -1370,7 +1361,7 @@ def write_renewable_production(data: Data, yr_cal, path):
     renewable_energy_stack = renewable_energy.stack(layer=['am', 'lm', 'lu']).sel(layer=valid_layers).drop_vars('region').compute()
     save2nc(renewable_energy_stack, os.path.join(path, f'xr_renewable_energy_{yr_cal}.nc'))
 
-    magnitudes = {'renewable_energy': _get_mag(renewable_energy_stack)}
+    magnitudes = {'renewable_energy': get_mag(renewable_energy_stack)}
 
     # ── Existing dvar fraction spatial layer ──────────────────────────────────
     # Build a (am, lm, lu, cell) DataArray representing the fraction of each cell
@@ -1393,7 +1384,7 @@ def write_renewable_production(data: Data, yr_cal, path):
     exist_dvar_stack = exist_dvar.stack(layer=['am'])
     save2nc(exist_dvar_stack, os.path.join(path, f'xr_renewable_existing_dvar_{yr_cal}.nc'))
 
-    magnitudes['renewable_existing_dvar'] = _get_mag(exist_dvar_stack)
+    magnitudes['renewable_existing_dvar'] = get_mag(exist_dvar_stack)
     return (f"Renewable energy written for year {yr_cal}", magnitudes)
 
 
@@ -2445,7 +2436,7 @@ def write_ghg(data: Data, yr_cal: int, path: str):
         valid_transition_layers = pd.MultiIndex.from_frame(ghg_df_AUS[['Type', 'lm', 'lu']]).sort_values()
         transition_valid_layers = xr_ghg_transition.stack(layer=['Type', 'lm', 'lu']).sel(layer=valid_transition_layers).drop_vars('region').compute()
         save2nc(transition_valid_layers, os.path.join(path, f'xr_transition_GHG_{yr_cal}.nc'))
-        transition_magnitudes = _get_mag(transition_valid_layers)
+        transition_magnitudes = get_mag(transition_valid_layers)
 
     # ==================== Sum (Ag + Am + NonAg + Transition) ====================
 
@@ -2489,11 +2480,11 @@ def write_ghg(data: Data, yr_cal: int, path: str):
 
     magnitudes = {
         'ghg_emission': {
-            'ag':         _get_mag(valid_layers_stack_ghg),
-            'non_ag':     _get_mag(xr_ghg_non_ag_cat),
-            'ag_man':     _get_mag(valid_layers_stack_am_ghg),
+            'ag':         get_mag(valid_layers_stack_ghg),
+            'non_ag':     get_mag(xr_ghg_non_ag_cat),
+            'ag_man':     get_mag(valid_layers_stack_am_ghg),
             'transition': transition_magnitudes,
-            'sum':        _get_mag(sum_ghg_stack),
+            'sum':        get_mag(sum_ghg_stack),
         }
     }
     return (f"GHG emissions written for year {yr_cal}", magnitudes)
@@ -2827,28 +2818,28 @@ def write_biodiversity_quality_scores(data: Data, yr_cal, path):
     xr_priority_am = add_all(xr_priority_am, dims=['am', 'lm', 'lu'])
     xr_priority_all = add_all(xr_priority_all, dims=['Type'])
     
-    priority_ag_df, priority_ag_df_AUS = _bio_to_region_and_aus_df(
+    priority_ag_df, priority_ag_df_AUS = bio_to_region_and_aus_df(
         xr_priority_ag,
         group_dims=['region', 'lm', 'lu'],
         value_name='Area Weighted Score (ha)',
         base_score=base_yr_score,
         yr_cal=yr_cal
     )
-    priority_non_ag_df, priority_non_ag_df_AUS = _bio_to_region_and_aus_df(
+    priority_non_ag_df, priority_non_ag_df_AUS = bio_to_region_and_aus_df(
         xr_priority_non_ag,
         group_dims=['region', 'lu'],
         value_name='Area Weighted Score (ha)',
         base_score=base_yr_score,
         yr_cal=yr_cal
     )
-    priority_am_df, priority_am_df_AUS = _bio_to_region_and_aus_df(
+    priority_am_df, priority_am_df_AUS = bio_to_region_and_aus_df(
         xr_priority_am,
         group_dims=['region', 'am', 'lm', 'lu'],
         value_name='Area Weighted Score (ha)',
         base_score=base_yr_score,
         yr_cal=yr_cal
     )
-    priority_all_df, priority_all_df_AUS = _bio_to_region_and_aus_df(
+    priority_all_df, priority_all_df_AUS = bio_to_region_and_aus_df(
         xr_priority_all,
         group_dims=['region', 'Type'],
         value_name='Area Weighted Score (ha)',
@@ -2958,10 +2949,10 @@ def write_biodiversity_quality_scores(data: Data, yr_cal, path):
 
     magnitudes = {
         'bio_quality': {
-            'ag':     _get_mag(valid_layers_stack_ag),
-            'non_ag': _get_mag(valid_layers_stack_non_ag),
-            'am':     _get_mag(valid_layers_stack_am),
-            'all':    _get_mag(valid_layers_stack_all),
+            'ag':     get_mag(valid_layers_stack_ag),
+            'non_ag': get_mag(valid_layers_stack_non_ag),
+            'am':     get_mag(valid_layers_stack_am),
+            'all':    get_mag(valid_layers_stack_all),
         }
     }
     return (f"Biodiversity overall priority scores written for year {yr_cal}", magnitudes)
@@ -3031,13 +3022,13 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
     xr_gbf2_non_ag = add_all(xr_gbf2_non_ag, ['lu'])
     xr_gbf2_am     = add_all(xr_gbf2_am,     ['lm', 'lu', 'am'])
 
-    GBF2_score_ag, GBF2_score_ag_AUS = _bio_to_region_and_aus_df(
+    GBF2_score_ag, GBF2_score_ag_AUS = bio_to_region_and_aus_df(
         xr_gbf2_ag, group_dims=['region', 'lm', 'lu'],
         value_name='Area Weighted Score (ha)', base_score=total_priority_degraded_area, yr_cal=yr_cal)
-    GBF2_score_non_ag, GBF2_score_non_ag_AUS = _bio_to_region_and_aus_df(
+    GBF2_score_non_ag, GBF2_score_non_ag_AUS = bio_to_region_and_aus_df(
         xr_gbf2_non_ag, group_dims=['region', 'lu'],
         value_name='Area Weighted Score (ha)', base_score=total_priority_degraded_area, yr_cal=yr_cal)
-    GBF2_score_am, GBF2_score_am_AUS = _bio_to_region_and_aus_df(
+    GBF2_score_am, GBF2_score_am_AUS = bio_to_region_and_aus_df(
         xr_gbf2_am, group_dims=['region', 'am', 'lm', 'lu'],
         value_name='Area Weighted Score (ha)', base_score=total_priority_degraded_area, yr_cal=yr_cal)
 

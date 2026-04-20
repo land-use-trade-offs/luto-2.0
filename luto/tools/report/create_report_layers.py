@@ -46,7 +46,6 @@ from luto.tools.report.data_tools.parameters import (
 
 
 
-
 def map2base64(
     ds_template:str, 
     arr_sel:xr.DataArray, 
@@ -72,16 +71,18 @@ def map2base64(
         # Rescale layers using the provided magnitude: positives → red (51–100), negatives → blue (1–50)
         global_min, global_max = layer_magnitude
         vals = arr_sel.values.copy()
-        codes = np.full(vals.shape, 0, dtype=np.int8)  # default: no-data grey
+        codes = np.full(vals.shape, 0, dtype=np.int8)   # default: no-data grey
 
         if global_max > 0:
             codes[vals > 0] = np.clip(51 + (vals[vals > 0] / global_max) * 50, 51, 100)
         if global_min < 0:
             codes[vals < 0] = np.clip(50 + (vals[vals < 0] / abs(global_min)) * 50, 1, 49)
         
-
         arr_sel.values = codes
-        min_max = (global_min, global_max)
+        min_max = (
+            round(global_min / settings.RESFACTOR ** 2 / 121, 2),  
+            round(global_max / settings.RESFACTOR ** 2 / 121, 2)
+        )
 
         arr_sel = arr_sel.astype(np.float32)
         img_attrs = {
@@ -125,57 +126,36 @@ def get_map2json(
     mem_per_worker = 1000 * ncells * 4 / 1e9           # ~1000 layers × ncells × float32, in GB
     workers = min(60, max(1, int(settings.WRITE_REPORT_MAX_MEM_GB // mem_per_worker)))
     
+    def get_legend_params(sel):
+        if legend_int_level is None:
+            isInt = False
+        elif isinstance(legend_int_level, dict):
+            isInt = legend_int_level.items() <= sel.items()
+        elif isinstance(legend_int_level, str):
+            isInt = legend_int_level in sel.keys()
+        else:
+            raise ValueError('legend_int_level must be None, a dict, or a str')
+        if isInt:
+            return True, legend_int, None
+        magnitude = float_magnitude[sel['Commodity']] if isinstance(float_magnitude, dict) else float_magnitude
+        return False, legend_float, magnitude
+
     # Process one file at a time so only one file's arrays are in memory at once
     output = {}
-    for _,row in files_df.iterrows():
-
+    for _, row in files_df.iterrows():
         xr_arr = cfxr.decode_compress_to_multi_index(xr.open_dataset(row['path']), 'layer')['data']
-        ds_template = f'{os.path.dirname(row['path'])}/xr_map_template_{row['Year']}.nc'
+        ds_template = f'{os.path.dirname(row["path"])}/xr_map_template_{row["Year"]}.nc'
         valid_layers = xr_arr['layer'].to_index().to_frame().to_dict(orient='records')
 
-        # Build tasks in batches to avoid OOM when there are many layers
-        # (e.g. GBF4 ECNES: 92 communities × 30 land-use combos = ~2700 layers).
-        # Each batch creates only `workers` cell-array copies at a time.
-        for batch_start in range(0, len(valid_layers), workers):
-            batch_layers = valid_layers[batch_start : batch_start + workers]
+        # Batch to avoid OOM on large layer counts (e.g. GBF4 ECNES: ~2700 layers)
+        for batch in (valid_layers[i:i+workers] for i in range(0, len(valid_layers), workers)):
             tasks = []
+            for sel in batch:
+                isInt, legend, magnitude = get_legend_params(sel)
+                hierarchy_tp = tuple(list(rename_reorder_hierarchy(sel).values()) + [row['Year']])
+                tasks.append(delayed(map2base64)(ds_template, xr_arr.sel(**sel).copy(), isInt, legend, hierarchy_tp, magnitude))
 
-            for sel in batch_layers:
-
-                # Select the array for this layer; .copy() detaches from the parent
-                # so joblib only serializes the small slice, not the full dataset
-                arr_sel = xr_arr.sel(**sel).copy()
-                sel_rename = rename_reorder_hierarchy(sel)
-                hierarchy_tp = tuple(list(sel_rename.values()) + [row['Year']])
-
-                # Determine if this layer should use integer legend
-                if legend_int_level is None:
-                    isInt = False
-                elif isinstance(legend_int_level, dict):
-                    isInt = legend_int_level.items() <= sel.items()
-                elif isinstance(legend_int_level, str):
-                    isInt = legend_int_level in sel.keys()
-                else:
-                    raise ValueError('legend_int_level must be None, a dict, or a str')
-
-                # Set legend and metadata based on type
-                if isInt:
-                    legend = legend_int
-                    layer_magnitude = None
-                elif isinstance(float_magnitude, dict):
-                    legend = legend_float
-                    layer_magnitude = float_magnitude[sel['Commodity']]
-                elif isinstance(float_magnitude, tuple):
-                    legend = legend_float
-                    layer_magnitude = float_magnitude
-
-                tasks.append(
-                    delayed(map2base64)(ds_template, arr_sel, isInt, legend, hierarchy_tp, layer_magnitude)
-                )
-
-            # Run this batch, then release its arrays before building the next batch
-            for res in Parallel(n_jobs=workers, return_as='generator', max_nbytes=None)(tasks):
-                hierarchy_tp, val_dict = res
+            for hierarchy_tp, val_dict in Parallel(n_jobs=workers, return_as='generator', max_nbytes=None)(tasks):
                 output[hierarchy_tp] = val_dict
 
         xr_arr.close()
@@ -270,9 +250,8 @@ def save_report_layer(raw_data_dir:str):
     get_map2json(area_ag, legend_ag, {'lu':'ALL'}, legend_float, area_min_max, f'{SAVE_DIR}/map_layers/map_area_Ag.js')
     print('│   ├── Area Ag layer saved.')
     
-    
     # files_df,legend_int,legend_int_level,legend_float,float_magnitude,save_path = area_ag, legend_ag, {'lu':'ALL'}, legend_float, area_min_max, f'{SAVE_DIR}/map_layers/map_area_Ag.js'
-
+    
     area_nonag = files_area.query('base_name == "xr_area_non_agricultural_landuse"')
     get_map2json(area_nonag, legend_non_ag, {'lu':'ALL'}, legend_float, area_min_max, f'{SAVE_DIR}/map_layers/map_area_NonAg.js')
     print('│   ├── Area Non-Ag layer saved.')
