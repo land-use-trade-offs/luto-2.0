@@ -37,26 +37,27 @@ window['MapView'] = {
         // Previous selections memory
         const previousSelections = ref({
             "Land-use": { water: "" },
-            "Ag":       { water: "", landuse: "" },
-            "Ag Mgt":   { agMgt: "", water: "", landuse: "" },
-            "Non-Ag":   { landuse: "" }
+            "Ag": { water: "", landuse: "" },
+            "Ag Mgt": { agMgt: "", water: "", landuse: "" },
+            "Non-Ag": { landuse: "" }
         });
 
         // UI state
         const dataLoaded = ref(false);
+        const isLoadingData = ref(false);
 
         // Raw data refs (set in onMounted)
-        const lumap   = ref(null);
-        const agData  = ref(null);
-        const amData  = ref(null);
+        const lumap = ref(null);
+        const agData = ref(null);
+        const amData = ref(null);
         const nonAgData = ref(null);
 
         const mapReady = computed(() => {
             if (!selectCategory.value) return false;
             if (selectCategory.value === "Land-use") return !!(lumap.value && selectWater.value);
-            if (selectCategory.value === "Ag")       return !!(agData.value  && selectWater.value && selectLanduse.value);
-            if (selectCategory.value === "Ag Mgt")   return !!(amData.value  && selectAgMgt.value && selectWater.value && selectLanduse.value);
-            if (selectCategory.value === "Non-Ag")   return !!(nonAgData.value && selectLanduse.value);
+            if (selectCategory.value === "Ag") return !!(agData.value && selectWater.value && selectLanduse.value);
+            if (selectCategory.value === "Ag Mgt") return !!(amData.value && selectAgMgt.value && selectWater.value && selectLanduse.value);
+            if (selectCategory.value === "Non-Ag") return !!(nonAgData.value && selectLanduse.value);
             return false;
         });
 
@@ -81,20 +82,31 @@ window['MapView'] = {
             return mapObj.legend || {};
         });
 
+        // ── Lazy loader ──────────────────────────────────────────────────────────
+        // Load the map file for a category and update its reactive ref.
+        async function ensureDataLoaded(cat) {
+            const CAT_TO_KEY = { "Land-use": "Lumap", "Ag": "Ag", "Ag Mgt": "Ag Mgt", "Non-Ag": "Non-Ag" };
+            const key = CAT_TO_KEY[cat] || cat;
+            const entry = mapRegister[key];
+            if (entry && !window[entry.name]) {
+                isLoadingData.value = true;
+                await loadScript(entry.path, entry.name, VIEW_NAME);
+                isLoadingData.value = false;
+            }
+            // Update the reactive ref so computed properties react
+            if (cat === "Land-use") lumap.value = window[mapRegister["Lumap"]['name']];
+            else if (cat === "Ag") agData.value = window[mapRegister["Ag"]['name']];
+            else if (cat === "Ag Mgt") amData.value = window[mapRegister["Ag Mgt"]['name']];
+            else if (cat === "Non-Ag") nonAgData.value = window[mapRegister["Non-Ag"]['name']];
+        }
+
         onMounted(async () => {
             await loadScript("./data/Supporting_info.js", "Supporting_info", VIEW_NAME);
-            await loadScript(mapRegister["Ag"]['path'],     mapRegister["Ag"]['name'],     VIEW_NAME);
-            await loadScript(mapRegister["Ag Mgt"]['path'], mapRegister["Ag Mgt"]['name'], VIEW_NAME);
-            await loadScript(mapRegister["Non-Ag"]['path'], mapRegister["Non-Ag"]['name'], VIEW_NAME);
-            await loadScript(mapRegister["Lumap"]['path'],  mapRegister["Lumap"]['name'],  VIEW_NAME);
 
-            lumap.value    = window[mapRegister["Lumap"]['name']];
-            agData.value   = window[mapRegister["Ag"]['name']];
-            amData.value   = window[mapRegister["Ag Mgt"]['name']];
-            nonAgData.value = window[mapRegister["Non-Ag"]['name']];
-
-            // Initial selections
             availableYears.value = window.Supporting_info.years;
+
+            // Pre-load only the initial category
+            await ensureDataLoaded(availableCategories[0]);
             selectCategory.value = availableCategories[0];
 
             await nextTick(() => {
@@ -113,7 +125,7 @@ window['MapView'] = {
         });
 
         // Category → cascade all downstream
-        watch(selectCategory, (newCat, oldCat) => {
+        watch(selectCategory, async (newCat, oldCat) => {
             if (oldCat) {
                 previousSelections.value[oldCat] = {
                     agMgt: selectAgMgt.value,
@@ -121,18 +133,19 @@ window['MapView'] = {
                     landuse: selectLanduse.value
                 };
             }
+            await ensureDataLoaded(newCat);
             const prev = previousSelections.value[newCat] || {};
 
             if (newCat === "Land-use") {
-                availableAgMgt.value   = [];
-                availableWater.value   = Object.keys(lumap.value || {});
+                availableAgMgt.value = [];
+                availableWater.value = Object.keys(lumap.value || {});
                 availableLanduse.value = [];
                 selectWater.value = (prev.water && availableWater.value.includes(prev.water))
                     ? prev.water : (availableWater.value[0] || '');
 
             } else if (newCat === "Ag") {
-                availableAgMgt.value   = [];
-                availableWater.value   = Object.keys(agData.value || {});
+                availableAgMgt.value = [];
+                availableWater.value = Object.keys(agData.value || {});
                 selectWater.value = (prev.water && availableWater.value.includes(prev.water))
                     ? prev.water : (availableWater.value[0] || '');
                 availableLanduse.value = Object.keys(agData.value?.[selectWater.value] || {});
@@ -151,8 +164,8 @@ window['MapView'] = {
                     ? prev.landuse : (availableLanduse.value[0] || '');
 
             } else if (newCat === "Non-Ag") {
-                availableAgMgt.value   = [];
-                availableWater.value   = [];
+                availableAgMgt.value = [];
+                availableWater.value = [];
                 availableLanduse.value = Object.keys(nonAgData.value || {});
                 selectLanduse.value = (prev.landuse && availableLanduse.value.includes(prev.landuse))
                     ? prev.landuse : (availableLanduse.value[0] || '');
@@ -205,7 +218,7 @@ window['MapView'] = {
             selectMapData,
             selectLegend,
 
-            dataLoaded,
+            dataLoaded, isLoadingData,
             mapReady,
         };
         window._debug && (window._debug[VIEW_NAME] = _state);
@@ -284,10 +297,25 @@ window['MapView'] = {
         </div>
 
         <!-- Map container -->
-        <regions-map
+        <div style="position: relative; width: 100%; height: 100%;">
+
+          <!-- Loading overlay shown while lazy-loading a new map file -->
+          <div v-if="isLoadingData"
+            class="absolute inset-0 z-[2000] flex items-center justify-center bg-white/60 backdrop-blur-sm">
+            <div class="flex flex-col items-center gap-2 text-gray-600 text-sm font-medium">
+              <svg class="animate-spin h-8 w-8 text-sky-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+              </svg>
+              Loading map data…
+            </div>
+          </div>
+
+          <regions-map
             :mapData="selectMapData"
             style="width: 100%; height: 100%;">
-        </regions-map>
+          </regions-map>
+        </div>
 
     </div>
     `

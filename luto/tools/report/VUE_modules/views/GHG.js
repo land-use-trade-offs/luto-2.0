@@ -50,6 +50,8 @@ window.GHGView = {
 
     // UI state
     const dataLoaded = ref(false);
+    const isLoadingData = ref(false);
+    const triggerVersion = ref(0);
     const isDrawerOpen = ref(false);
 
     // Reactive data
@@ -58,16 +60,23 @@ window.GHGView = {
     // map_GHG_Am:    AgMgt → Water → LU → Year
     // map_GHG_NonAg: LU → Year
     const selectMapData = computed(() => {
+      const cat = selectCategory.value;
+      const agMgt = selectAgMgt.value;
+      const water = selectWater.value;
+      const source = selectSource.value;
+      const landuse = selectLanduse.value;
+      const year = selectYear.value;
+      void triggerVersion.value;
       if (!dataLoaded.value) return {};
-      const mapData = window[mapRegister[selectCategory.value]["name"]];
-      if (selectCategory.value === "Sum") {
-        return mapData?.[selectWater.value]?.[selectLanduse.value]?.[selectYear.value] || {};
-      } else if (selectCategory.value === "Ag") {
-        return mapData?.[selectWater.value]?.[selectSource.value]?.[selectLanduse.value]?.[selectYear.value] || {};
-      } else if (selectCategory.value === "Ag Mgt") {
-        return mapData?.[selectAgMgt.value]?.[selectWater.value]?.[selectLanduse.value]?.[selectYear.value] || {};
-      } else if (selectCategory.value === "Non-Ag") {
-        return mapData?.[selectLanduse.value]?.[selectYear.value] || {};
+      const mapData = window[mapRegister[cat]["name"]];
+      if (cat === "Sum") {
+        return mapData?.[water]?.[landuse]?.[year] || {};
+      } else if (cat === "Ag") {
+        return mapData?.[water]?.[source]?.[landuse]?.[year] || {};
+      } else if (cat === "Ag Mgt") {
+        return mapData?.[agMgt]?.[water]?.[landuse]?.[year] || {};
+      } else if (cat === "Non-Ag") {
+        return mapData?.[landuse]?.[year] || {};
       }
       return {};
     });
@@ -77,20 +86,27 @@ window.GHGView = {
     // GHG_Am chart:    Region → Water → LU → [series(name=AgMgt)]
     // GHG_NonAg chart: Region → [series(name=LU)]
     const selectChartData = computed(() => {
+      const cat = selectCategory.value;
+      const agMgt = selectAgMgt.value;
+      const water = selectWater.value;
+      const source = selectSource.value;
+      const landuse = selectLanduse.value;
+      const region = selectRegion.value;
+      void triggerVersion.value;
       if (!dataLoaded.value) return {};
-      const chartData = window[chartRegister[selectCategory.value]["name"]]?.[selectRegion.value];
+      const chartData = window[chartRegister[cat]["name"]]?.[region];
       let seriesData;
 
-      if (selectCategory.value === "Sum") {
-        seriesData = (chartData?.[selectWater.value] || []).filter(s => selectLanduse.value === "ALL" || s.name === selectLanduse.value);
-      } else if (selectCategory.value === "Ag") {
-        seriesData = chartData?.[selectWater.value]?.[selectSource.value] || [];
-        seriesData = seriesData.filter(s => selectLanduse.value === "ALL" || s.name === selectLanduse.value);
-      } else if (selectCategory.value === "Ag Mgt") {
-        seriesData = chartData?.[selectWater.value]?.[selectLanduse.value] || [];
-        seriesData = seriesData.filter(s => selectAgMgt.value === "ALL" || s.name === selectAgMgt.value);
-      } else if (selectCategory.value === "Non-Ag") {
-        seriesData = (chartData || []).filter(s => selectLanduse.value === "ALL" || s.name === selectLanduse.value);
+      if (cat === "Sum") {
+        seriesData = (chartData?.[water] || []).filter(s => landuse === "ALL" || s.name === landuse);
+      } else if (cat === "Ag") {
+        seriesData = chartData?.[water]?.[source] || [];
+        seriesData = seriesData.filter(s => landuse === "ALL" || s.name === landuse);
+      } else if (cat === "Ag Mgt") {
+        seriesData = chartData?.[water]?.[landuse] || [];
+        seriesData = seriesData.filter(s => agMgt === "ALL" || s.name === agMgt);
+      } else if (cat === "Non-Ag") {
+        seriesData = (chartData || []).filter(s => landuse === "ALL" || s.name === landuse);
       }
 
       return {
@@ -106,27 +122,45 @@ window.GHGView = {
       window.MemoryService.cleanupViewData(VIEW_NAME);
     });
 
+    // ── Lazy loader (maps only) ──────────────────────────────────────────────
+    async function ensureDataLoaded(cat) {
+      const mapEntry = mapRegister[cat];
+      if (mapEntry && !window[mapEntry.name]) {
+        isLoadingData.value = true;
+        await loadScript(mapEntry.path, mapEntry.name, VIEW_NAME);
+        isLoadingData.value = false;
+      }
+    }
+
+    // Pre-load ALL chart files on mount (they are small)
+    async function loadAllCharts() {
+      const pending = [];
+      for (const entry of Object.values(chartRegister)) {
+        if (entry?.name && !window[entry.name])
+          pending.push(loadScript(entry.path, entry.name, VIEW_NAME));
+      }
+      if (pending.length > 0) await Promise.all(pending);
+    }
+
     onMounted(async () => {
       await loadScript("./data/Supporting_info.js", "Supporting_info", VIEW_NAME);
       await loadScript("./data/chart_option/Chart_default_options.js", "Chart_default_options", VIEW_NAME);
 
-      // Load data
-      await loadScript(mapRegister["Sum"]["path"], mapRegister["Sum"]["name"], VIEW_NAME);
-      await loadScript(mapRegister["Ag"]["path"], mapRegister["Ag"]["name"], VIEW_NAME);
-      await loadScript(mapRegister["Ag Mgt"]["path"], mapRegister["Ag Mgt"]["name"], VIEW_NAME);
-      await loadScript(mapRegister["Non-Ag"]["path"], mapRegister["Non-Ag"]["name"], VIEW_NAME);
-      await loadScript(chartRegister["Sum"]["path"], chartRegister["Sum"]["name"], VIEW_NAME);
-      await loadScript(chartRegister["Ag"]["path"], chartRegister["Ag"]["name"], VIEW_NAME);
-      await loadScript(chartRegister["Ag Mgt"]["path"], chartRegister["Ag Mgt"]["name"], VIEW_NAME);
-      await loadScript(chartRegister["Non-Ag"]["path"], chartRegister["Non-Ag"]["name"], VIEW_NAME);
-
-      // Initial selections
       availableYears.value = window.Supporting_info.years;
-      selectCategory.value = availableCategories[0];
 
-      await nextTick(() => {
-        dataLoaded.value = true;
-      });
+      // Load initial map + ALL charts in parallel
+      const initCat = availableCategories[0]; // "Sum"
+      await Promise.all([ensureDataLoaded(initCat), loadAllCharts()]);
+
+      // Cascade initial selections synchronously (Sum: Water → LU)
+      const initData = window[mapRegister[initCat]["name"]];
+      availableWater.value = Object.keys(initData || {});
+      selectWater.value = availableWater.value[0] || '';
+      availableLanduse.value = Object.keys(initData?.[selectWater.value] || {});
+      selectLanduse.value = availableLanduse.value[0] || '';
+
+      selectCategory.value = initCat;
+      dataLoaded.value = true;
     });
 
     // Watchers and methods
@@ -139,7 +173,7 @@ window.GHGView = {
     });
 
     // Progressive selection chain watchers
-    watch(selectCategory, (newCategory, oldCategory) => {
+    watch(selectCategory, async (newCategory, oldCategory) => {
       // Save previous selections before switching
       if (oldCategory === "Sum") {
         previousSelections.value["Sum"] = { water: selectWater.value, landuse: selectLanduse.value };
@@ -156,6 +190,12 @@ window.GHGView = {
       const curLanduse = selectLanduse.value;
       const curAgMgt = selectAgMgt.value;
       const curSource = selectSource.value;
+
+      // Only fetch if not already loaded (avoid unnecessary microtask yield)
+      const _me = mapRegister[newCategory];
+      if (_me && !window[_me.name]) {
+        await ensureDataLoaded(newCategory);
+      }
 
       const sumData = window[mapRegister["Sum"]["name"]];
       const agData = window[mapRegister["Ag"]["name"]];
@@ -206,6 +246,7 @@ window.GHGView = {
         const prevLanduse = previousSelections.value["Non-Ag"].landuse || curLanduse;
         selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
       }
+      triggerVersion.value++;
     });
 
     watch(selectAgMgt, (newAgMgt) => {
@@ -296,7 +337,7 @@ window.GHGView = {
       selectMapData,
       selectChartData,
 
-      dataLoaded,
+      dataLoaded, isLoadingData,
       isDrawerOpen,
       toggleDrawer,
     };
@@ -388,6 +429,18 @@ window.GHGView = {
 
       <!-- Map container with slide-out chart drawer -->
       <div style="position: relative; width: 100%; height: 100%; overflow: hidden;">
+
+        <!-- Loading overlay shown while lazy-loading a new map file -->
+        <div v-if="isLoadingData"
+          class="absolute inset-0 z-[2000] flex items-center justify-center bg-white/60 backdrop-blur-sm">
+          <div class="flex flex-col items-center gap-2 text-gray-600 text-sm font-medium">
+            <svg class="animate-spin h-8 w-8 text-sky-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+            </svg>
+            Loading map data…
+          </div>
+        </div>
 
         <!-- Map component takes full space -->
         <regions-map

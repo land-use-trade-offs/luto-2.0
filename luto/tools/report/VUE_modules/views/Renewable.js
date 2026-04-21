@@ -34,6 +34,7 @@ window.RenewableView = {
 
     // UI state
     const dataLoaded = ref(false);
+    const isLoadingData = ref(false);
     const isDrawerOpen = ref(false);
 
     // map_renewable_energy_Am: AgMgt → Water → LU → Year
@@ -67,9 +68,13 @@ window.RenewableView = {
       await loadScript("./data/Supporting_info.js", "Supporting_info", VIEW_NAME);
       await loadScript("./data/chart_option/Chart_default_options.js", "Chart_default_options", VIEW_NAME);
 
-      // Load map and chart data
-      await loadScript(mapRegister["Ag Mgt"]["path"], mapRegister["Ag Mgt"]["name"], VIEW_NAME);
-      await loadScript(chartRegister["Ag Mgt"]["path"], chartRegister["Ag Mgt"]["name"], VIEW_NAME);
+      // Load map and chart data in parallel
+      isLoadingData.value = true;
+      await Promise.all([
+        loadScript(mapRegister["Ag Mgt"]["path"], mapRegister["Ag Mgt"]["name"], VIEW_NAME),
+        loadScript(chartRegister["Ag Mgt"]["path"], chartRegister["Ag Mgt"]["name"], VIEW_NAME),
+      ]);
+      isLoadingData.value = false;
 
       // Initial selections
       availableYears.value = window.Supporting_info.years;
@@ -142,7 +147,7 @@ window.RenewableView = {
       selectMapData,
       selectChartData,
 
-      dataLoaded,
+      dataLoaded, isLoadingData,
       isDrawerOpen,
       toggleDrawer,
     };
@@ -212,6 +217,18 @@ window.RenewableView = {
 
       <!-- Map container with slide-out chart drawer -->
       <div style="position: relative; width: 100%; height: 100%; overflow: hidden;">
+
+        <!-- Loading overlay shown while lazy-loading a new map file -->
+        <div v-if="isLoadingData"
+          class="absolute inset-0 z-[2000] flex items-center justify-center bg-white/60 backdrop-blur-sm">
+          <div class="flex flex-col items-center gap-2 text-gray-600 text-sm font-medium">
+            <svg class="animate-spin h-8 w-8 text-sky-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+            </svg>
+            Loading map data…
+          </div>
+        </div>
 
         <!-- Map component takes full space -->
         <regions-map

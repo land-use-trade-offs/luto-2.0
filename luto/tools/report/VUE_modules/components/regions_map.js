@@ -277,7 +277,10 @@ window.RegionsMap = {
       const data = props.mapData;
 
       if (!data.img_str || !data.bounds) {
-        console.warn('Map data is missing required properties (img_str or bounds):', data);
+        // Only warn if data has content but is missing required fields (not just an empty loading guard)
+        if (Object.keys(data).length > 0) {
+          console.warn('Map data is missing required properties (img_str or bounds):', data);
+        }
         // No overlay will be added - map shows base layer only
         return;
       }
@@ -467,10 +470,6 @@ window.RegionsMap = {
           <div class="relative text-[0.65rem] text-gray-600 mt-1" style="height: 1.1em;">
             <!-- Min label — always at left -->
             <span class="absolute left-0">{{ colorbarInfo.fmtMin }}</span>
-            <!-- Zero tick — only for bipolar data; position matches the (clamped) gradient stop -->
-            <span v-if="colorbarInfo.displayZeroFrac !== null"
-                  class="absolute -translate-x-1/2"
-                  :style="{ left: (colorbarInfo.displayZeroFrac * 100).toFixed(1) + '%' }">0</span>
             <!-- Max label — always at right -->
             <span class="absolute right-0">{{ colorbarInfo.fmtMax }}</span>
           </div>

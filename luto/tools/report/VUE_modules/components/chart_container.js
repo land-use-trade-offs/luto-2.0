@@ -166,23 +166,11 @@ window.Highchart = {
       window.removeEventListener('mouseup', stopDrag);
     });
 
-    // Watch for changes in chart data with infinite loop prevention
-    let isUpdating = false;
+    // Watch for changes in chart data and update Highcharts.
+    // No loop-guard needed: updateChart only calls Highcharts APIs and never
+    // writes back to Vue reactive state, so the watcher cannot re-trigger itself.
     watch(() => props.chartData, (newValue) => {
-      // Prevent infinite loops
-      if (isUpdating) {
-        return;
-      }
-
-      isUpdating = true;
-
-      // Then update the chart
       updateChart(ChartInstance.value, newValue);
-
-      // Reset flag after a delay to ensure all reactive updates complete
-      setTimeout(() => {
-        isUpdating = false;
-      }, 100);
     }, { deep: true });
 
     // Watch for sidebar collapsed state changes via inject

@@ -46,6 +46,8 @@ window.EconomicsView = {
 
     // UI state
     const dataLoaded = ref(false);
+    const isLoadingData = ref(false);
+    const triggerVersion = ref(0);
     const isDrawerOpen = ref(false);
 
     // Source level is only present for Ag + non-Profit map types
@@ -62,24 +64,31 @@ window.EconomicsView = {
 
     // ── Computed map data ────────────────────────────────────────────────────
     const selectMapData = computed(() => {
-      if (!dataLoaded.value) return {};
       const cat = selectCategory.value;
-      const mapData = window[mapRegister[cat]?.[selectMapType.value]?.name];
-      if (!mapData) return {};
+      const mapType = selectMapType.value;
+      const agMgt = selectAgMgt.value;
+      const water = selectWater.value;
+      const source = selectSource.value;
+      const landuse = selectLanduse.value;
       const yr = String(selectYear.value);
+      const hasSrc = hasSourceLevel.value;
+      void triggerVersion.value;
+      if (!dataLoaded.value) return {};
+      const mapData = window[mapRegister[cat]?.[mapType]?.name];
+      if (!mapData) return {};
 
       if (cat === "Sum") {
-        return mapData?.[selectWater.value]?.[selectLanduse.value]?.[yr] || {};
+        return mapData?.[water]?.[landuse]?.[yr] || {};
       } else if (cat === "Ag") {
-        if (hasSourceLevel.value) {
-          return mapData?.[selectWater.value]?.[selectSource.value]?.[selectLanduse.value]?.[yr] || {};
+        if (hasSrc) {
+          return mapData?.[water]?.[source]?.[landuse]?.[yr] || {};
         } else {
-          return mapData?.[selectWater.value]?.[selectLanduse.value]?.[yr] || {};
+          return mapData?.[water]?.[landuse]?.[yr] || {};
         }
       } else if (cat === "Ag Mgt") {
-        return mapData?.[selectAgMgt.value]?.[selectWater.value]?.[selectLanduse.value]?.[yr] || {};
+        return mapData?.[agMgt]?.[water]?.[landuse]?.[yr] || {};
       } else if (cat === "Non-Ag") {
-        return mapData?.[selectLanduse.value]?.[yr] || {};
+        return mapData?.[landuse]?.[yr] || {};
       }
       return {};
     });
@@ -92,44 +101,51 @@ window.EconomicsView = {
     });
 
     const selectChartData = computed(() => {
-      if (!dataLoaded.value) return emptyChart();
       const cat = selectCategory.value;
       const mt = selectMapType.value;
+      const agMgt = selectAgMgt.value;
+      const water = selectWater.value;
+      const source = selectSource.value;
+      const landuse = selectLanduse.value;
+      const region = selectRegion.value;
+      const hasSrc = hasSourceLevel.value;
+      void triggerVersion.value;
+      if (!dataLoaded.value) return emptyChart();
       // For Sum, mapType is always "Profit"
       const effectiveMt = cat === "Sum" ? "Profit" : mt;
       const chartEntry = chartRegister[cat]?.[effectiveMt];
       if (!chartEntry) return emptyChart();
-      const chartData = window[chartEntry.name]?.[selectRegion.value];
+      const chartData = window[chartEntry.name]?.[region];
       if (!chartData) return emptyChart();
 
       let seriesData;
       if (cat === "Sum") {
         // Sum: region → water → [series by landuse]
-        const items = chartData?.[selectWater.value];
+        const items = chartData?.[water];
         if (items) {
-          seriesData = (selectLanduse.value === "ALL" || !selectLanduse.value)
-            ? items : items.filter(s => s.name === selectLanduse.value);
+          seriesData = (landuse === "ALL" || !landuse)
+            ? items : items.filter(s => s.name === landuse);
         }
       } else if (cat === "Ag") {
         // Revenue/Cost: region → source → water → [series by LU]
         // Profit: region → water → [series by LU]
         let items;
-        if (hasSourceLevel.value && effectiveMt !== "Profit") {
-          items = chartData?.[selectSource.value || "ALL"]?.[selectWater.value];
+        if (hasSrc && effectiveMt !== "Profit") {
+          items = chartData?.[source || "ALL"]?.[water];
         } else {
-          items = chartData?.[selectWater.value];
+          items = chartData?.[water];
         }
         if (items && items.length) {
-          seriesData = (selectLanduse.value === "ALL" || !selectLanduse.value)
-            ? items : items.filter(s => s.name === selectLanduse.value);
+          seriesData = (landuse === "ALL" || !landuse)
+            ? items : items.filter(s => s.name === landuse);
         }
       } else if (cat === "Ag Mgt") {
         // All: region → water → landuse → [series by mgmt]
-        seriesData = chartData?.[selectWater.value]?.[selectLanduse.value];
+        seriesData = chartData?.[water]?.[landuse];
       } else if (cat === "Non-Ag") {
         // All: region → [series by landuse]
-        if (selectLanduse.value && selectLanduse.value !== "ALL") {
-          seriesData = chartData?.filter(s => s.name === selectLanduse.value);
+        if (landuse && landuse !== "ALL") {
+          seriesData = chartData?.filter(s => s.name === landuse);
         } else {
           seriesData = chartData;
         }
@@ -247,30 +263,48 @@ window.EconomicsView = {
       }
     }
 
+    // ── Lazy loader (maps only) ──────────────────────────────────────────────
+    async function ensureDataLoaded(cat, mapType) {
+      const mapEntry = mapRegister[cat]?.[mapType];
+      if (mapEntry && !window[mapEntry.name]) {
+        isLoadingData.value = true;
+        await loadScript(mapEntry.path, mapEntry.name, VIEW_NAME);
+        isLoadingData.value = false;
+      }
+    }
+
+    // Pre-load ALL chart files on mount (they are small)
+    async function loadAllCharts() {
+      const pending = [];
+      for (const mapTypeDict of Object.values(chartRegister)) {
+        for (const entry of Object.values(mapTypeDict || {})) {
+          if (entry?.name && !window[entry.name])
+            pending.push(loadScript(entry.path, entry.name, VIEW_NAME));
+        }
+      }
+      if (pending.length > 0) await Promise.all(pending);
+    }
+
     // ── Lifecycle ────────────────────────────────────────────────────────────
     onMounted(async () => {
       await loadScript("./data/Supporting_info.js", "Supporting_info", VIEW_NAME);
       await loadScript("./data/chart_option/Chart_default_options.js", "Chart_default_options", VIEW_NAME);
 
-      // Load all economics map layers
-      for (const mapTypes of Object.values(mapRegister)) {
-        for (const entry of Object.values(mapTypes)) {
-          await loadScript(entry.path, entry.name, VIEW_NAME);
-        }
-      }
-      // Load chart data (per-MapType files)
-      for (const [cat, mapTypes] of Object.entries(chartRegister)) {
-        if (cat === "overview" || cat === "ranking") continue;
-        for (const entry of Object.values(mapTypes)) {
-          await loadScript(entry.path, entry.name, VIEW_NAME);
-        }
-      }
-
       availableYears.value = window.Supporting_info.years;
       selectYear.value = availableYears.value[0] || 2020;
-      selectCategory.value = availableCategories[0]; // triggers cascade watcher
 
-      await nextTick(() => { dataLoaded.value = true; });
+      // Load initial map + ALL chart files in parallel
+      const initCat = availableCategories[0];
+      const initMapType = Object.keys(mapRegister[initCat] || {})[0] || '';
+      await Promise.all([ensureDataLoaded(initCat, initMapType), loadAllCharts()]);
+
+      // Cascade initial selections synchronously so computed has all values when dataLoaded=true
+      availableMapTypes.value = Object.keys(mapRegister[initCat] || {});
+      selectMapType.value = initMapType;
+      cascadeAll(initCat, initMapType);
+
+      selectCategory.value = initCat;
+      dataLoaded.value = true;
     });
 
     onUnmounted(() => { window.MemoryService.cleanupViewData(VIEW_NAME); });
@@ -282,8 +316,9 @@ window.EconomicsView = {
       selectYear.value = availableYears.value[newIndex];
     });
 
-    // Combined watcher: Category + MapType drive all downstream options
-    watch([selectCategory, selectMapType], ([newCat, newMapType], [oldCat]) => {
+    // Combined watcher: Category + MapType drive all downstream options.
+    // Async so we can lazy-load the required data file before cascading.
+    watch([selectCategory, selectMapType], async ([newCat, newMapType], [oldCat]) => {
       if (!newCat) return;
 
       // Save previous selections when category changes
@@ -304,7 +339,13 @@ window.EconomicsView = {
         return; // Watcher re-fires with the resolved mapType
       }
 
+      // Only fetch map if not already loaded (charts are always pre-loaded)
+      const _me = mapRegister[newCat]?.[newMapType];
+      if (_me && !window[_me.name]) {
+        await ensureDataLoaded(newCat, newMapType);
+      }
       cascadeAll(newCat, newMapType);
+      triggerVersion.value++;
     }, { immediate: true });
 
     // AgMgt → Water → Landuse (Ag Mgt only)
@@ -370,7 +411,7 @@ window.EconomicsView = {
       selectCategory, selectMapType, selectAgMgt, selectWater, selectSource, selectLanduse,
       hasSourceLevel, isTransition,
       selectMapData, selectChartData,
-      dataLoaded, isDrawerOpen, toggleDrawer,
+      dataLoaded, isLoadingData, isDrawerOpen, toggleDrawer,
     };
     window._debug[VIEW_NAME] = _state;
     return _state;
@@ -472,6 +513,18 @@ window.EconomicsView = {
 
       <!-- Map container with slide-out chart drawer -->
       <div style="position: relative; width: 100%; height: 100%; overflow: hidden;">
+
+        <!-- Loading overlay shown while lazy-loading a new map file -->
+        <div v-if="isLoadingData"
+          class="absolute inset-0 z-[2000] flex items-center justify-center bg-white/60 backdrop-blur-sm">
+          <div class="flex flex-col items-center gap-2 text-gray-600 text-sm font-medium">
+            <svg class="animate-spin h-8 w-8 text-sky-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+            </svg>
+            Loading map data…
+          </div>
+        </div>
 
         <!-- Map component takes full space -->
         <regions-map

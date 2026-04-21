@@ -17,7 +17,7 @@ window.loadScript = (src, name) => {
         document.head.appendChild(script);
 
         script.onload = async () => {
-            const timeout = 5000;
+            const timeout = 60000;
             const startTime = Date.now();
             while (!window[name]) {
                 if (Date.now() - startTime > timeout) {
@@ -47,7 +47,7 @@ window.loadScriptWithTracking = (src, name, viewName) => {
         }
 
         script.onload = async () => {
-            const timeout = 5000;
+            const timeout = 60000;
             const startTime = Date.now();
             while (!window[name]) {
                 if (Date.now() - startTime > timeout) {

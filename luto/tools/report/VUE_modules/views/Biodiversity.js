@@ -82,6 +82,8 @@ window.BiodiversityView = {
 
     // UI state
     const dataLoaded = ref(false);
+    const isLoadingData = ref(false);
+    const triggerVersion = ref(0);
     const isDrawerOpen = ref(false);
 
     // GBF2 mask overlay — only active when GBF2 metric is selected
@@ -144,17 +146,24 @@ window.BiodiversityView = {
     // map_bio_*_Am:    AgMgt → Water → LU → Year
     // map_bio_*_NonAg: LU → Year
     const selectMapData = computed(() => {
+      const metric = selectMetric.value;
+      const cat = selectCategory.value;
+      const agMgt = selectAgMgt.value;
+      const water = selectWater.value;
+      const landuse = selectLanduse.value;
+      const year = selectYear.value;
+      void triggerVersion.value;
       if (!dataLoaded.value) return {};
-      const mr = mapRegister[selectMetric.value];
-      const mapData = window[mr?.[selectCategory.value]?.["name"]];
-      if (selectCategory.value === "Sum") {
-        return mapData?.[selectLanduse.value]?.[selectYear.value] || {};
-      } else if (selectCategory.value === "Ag") {
-        return mapData?.[selectWater.value]?.[selectLanduse.value]?.[selectYear.value] || {};
-      } else if (selectCategory.value === "Ag Mgt") {
-        return mapData?.[selectAgMgt.value]?.[selectWater.value]?.[selectLanduse.value]?.[selectYear.value] || {};
-      } else if (selectCategory.value === "Non-Ag") {
-        return mapData?.[selectLanduse.value]?.[selectYear.value] || {};
+      const mr = mapRegister[metric];
+      const mapData = window[mr?.[cat]?.["name"]];
+      if (cat === "Sum") {
+        return mapData?.[landuse]?.[year] || {};
+      } else if (cat === "Ag") {
+        return mapData?.[water]?.[landuse]?.[year] || {};
+      } else if (cat === "Ag Mgt") {
+        return mapData?.[agMgt]?.[water]?.[landuse]?.[year] || {};
+      } else if (cat === "Non-Ag") {
+        return mapData?.[landuse]?.[year] || {};
       }
       return {};
     });
@@ -164,24 +173,31 @@ window.BiodiversityView = {
     // BIO_*_NonAg chart: Region → [series(name=LU)]
     // Sum: no chart data available
     const selectChartData = computed(() => {
+      const metric = selectMetric.value;
+      const cat = selectCategory.value;
+      const agMgt = selectAgMgt.value;
+      const water = selectWater.value;
+      const landuse = selectLanduse.value;
+      const region = selectRegion.value;
+      void triggerVersion.value;
       if (!dataLoaded.value) return {};
-      const cr = chartRegister[selectMetric.value];
-      const chartData = window[cr?.[selectCategory.value]?.["name"]]?.[selectRegion.value];
+      const cr = chartRegister[metric];
+      const chartData = window[cr?.[cat]?.["name"]]?.[region];
       let seriesData;
 
-      if (selectCategory.value === "Sum") {
-        const sumEntry = chartRegister[selectMetric.value]?.['overview']?.['sum'];
-        const sumData = window[sumEntry?.['name']]?.[selectRegion.value] || [];
-        const filterName = SUM_TYPE_TO_SERIES[selectLanduse.value];
+      if (cat === "Sum") {
+        const sumEntry = cr?.['overview']?.['sum'];
+        const sumData = window[sumEntry?.['name']]?.[region] || [];
+        const filterName = SUM_TYPE_TO_SERIES[landuse];
         seriesData = filterName ? sumData.filter(s => s.name === filterName) : sumData;
-      } else if (selectCategory.value === "Ag") {
-        seriesData = chartData?.[selectWater.value] || [];
-        seriesData = seriesData.filter(s => selectLanduse.value === "ALL" || s.name === selectLanduse.value);
-      } else if (selectCategory.value === "Ag Mgt") {
-        seriesData = chartData?.[selectAgMgt.value]?.[selectWater.value] || [];
-        seriesData = seriesData.filter(s => selectLanduse.value === "ALL" || s.name === selectLanduse.value);
-      } else if (selectCategory.value === "Non-Ag") {
-        seriesData = (chartData || []).filter(s => selectLanduse.value === "ALL" || s.name === selectLanduse.value);
+      } else if (cat === "Ag") {
+        seriesData = chartData?.[water] || [];
+        seriesData = seriesData.filter(s => landuse === "ALL" || s.name === landuse);
+      } else if (cat === "Ag Mgt") {
+        seriesData = chartData?.[agMgt]?.[water] || [];
+        seriesData = seriesData.filter(s => landuse === "ALL" || s.name === landuse);
+      } else if (cat === "Non-Ag") {
+        seriesData = (chartData || []).filter(s => landuse === "ALL" || s.name === landuse);
       }
 
       return {
@@ -196,6 +212,34 @@ window.BiodiversityView = {
     onUnmounted(() => {
       window.MemoryService.cleanupViewData(VIEW_NAME);
     });
+
+    // ── Lazy loader (maps only) ──────────────────────────────────────────────
+    async function ensureDataLoaded(metric, cat) {
+      const mapEntry = mapRegister[metric]?.[cat];
+      if (mapEntry && !window[mapEntry.name]) {
+        isLoadingData.value = true;
+        await loadScript(mapEntry.path, mapEntry.name, VIEW_NAME);
+        isLoadingData.value = false;
+      }
+    }
+
+    // Pre-load ALL chart files on mount (they are small)
+    async function loadAllCharts() {
+      const pending = [];
+      for (const metricCr of Object.values(chartRegister)) {
+        for (const [key, val] of Object.entries(metricCr || {})) {
+          if (key === 'overview') {
+            for (const entry of Object.values(val || {})) {
+              if (entry?.name && !window[entry.name])
+                pending.push(loadScript(entry.path, entry.name, VIEW_NAME));
+            }
+          } else if (val?.name && !window[val.name]) {
+            pending.push(loadScript(val.path, val.name, VIEW_NAME));
+          }
+        }
+      }
+      if (pending.length > 0) await Promise.all(pending);
+    }
 
     onMounted(async () => {
       await loadScript("./data/Supporting_info.js", "Supporting_info", VIEW_NAME);
@@ -216,38 +260,23 @@ window.BiodiversityView = {
       }
       availableMetrics.value = enabledMetrics;
 
-      // Load all enabled metrics
-      for (const metric of enabledMetrics) {
-        const mr = mapRegister[metric];
-        const cr = chartRegister[metric];
-        if (mr) {
-          if (mr["Sum"]) await loadScript(mr["Sum"]["path"], mr["Sum"]["name"], VIEW_NAME);
-          await loadScript(mr["Ag"]["path"], mr["Ag"]["name"], VIEW_NAME);
-          await loadScript(mr["Ag Mgt"]["path"], mr["Ag Mgt"]["name"], VIEW_NAME);
-          await loadScript(mr["Non-Ag"]["path"], mr["Non-Ag"]["name"], VIEW_NAME);
-        }
-        if (cr) {
-          await loadScript(cr["Ag"]["path"], cr["Ag"]["name"], VIEW_NAME);
-          await loadScript(cr["Ag Mgt"]["path"], cr["Ag Mgt"]["name"], VIEW_NAME);
-          await loadScript(cr["Non-Ag"]["path"], cr["Non-Ag"]["name"], VIEW_NAME);
-          if (cr["overview"]?.["sum"]) await loadScript(cr["overview"]["sum"]["path"], cr["overview"]["sum"]["name"], VIEW_NAME);
-        }
-      }
-
-      // Initial selections
-      availableYears.value = window.Supporting_info.years;
-      selectMetric.value = enabledMetrics[0];
-      selectCategory.value = availableCategories[0];
-
-      // Load GBF2 mask overlay if GBF2 is enabled
+      // Load GBF2 mask overlay upfront if enabled (small file)
       if (enabledMetrics.includes('GBF2')) {
         const mask = mapRegister['GBF2']['mask'];
         await loadScript(mask.path, mask.name, VIEW_NAME);
       }
 
-      await nextTick(() => {
-        dataLoaded.value = true;
-      });
+      availableYears.value = window.Supporting_info.years;
+
+      // Load initial map + ALL chart files in parallel
+      const initMetric = enabledMetrics[0];
+      await Promise.all([ensureDataLoaded(initMetric, availableCategories[0]), loadAllCharts()]);
+
+      // Cascade initial selections synchronously so computed has all values when dataLoaded=true
+      selectMetric.value = initMetric; // doCascade reads mapRegister[selectMetric.value]
+      doCascade(availableCategories[0]);
+      selectCategory.value = availableCategories[0];
+      dataLoaded.value = true;
     });
 
     // Watchers and methods
@@ -260,12 +289,17 @@ window.BiodiversityView = {
     });
 
     // Metric change: re-cascade based on current category
-    watch(selectMetric, () => {
+    watch(selectMetric, async (newMetric) => {
+      const _me = mapRegister[newMetric]?.[selectCategory.value];
+      if (_me && !window[_me.name]) {
+        await ensureDataLoaded(newMetric, selectCategory.value);
+      }
       doCascade(selectCategory.value);
+      triggerVersion.value++;
     });
 
     // Progressive selection chain watchers
-    watch(selectCategory, (newCategory, oldCategory) => {
+    watch(selectCategory, async (newCategory, oldCategory) => {
       // Save previous selections before switching
       if (oldCategory === "Sum") {
         previousSelections.value["Sum"] = { landuse: selectLanduse.value };
@@ -276,7 +310,12 @@ window.BiodiversityView = {
       } else if (oldCategory === "Non-Ag") {
         previousSelections.value["Non-Ag"] = { landuse: selectLanduse.value };
       }
+      const _me = mapRegister[selectMetric.value]?.[newCategory];
+      if (_me && !window[_me.name]) {
+        await ensureDataLoaded(selectMetric.value, newCategory);
+      }
       doCascade(newCategory);
+      triggerVersion.value++;
     });
 
     watch(selectAgMgt, (newAgMgt) => {
@@ -348,7 +387,7 @@ window.BiodiversityView = {
       selectChartData,
       gbf2MaskOverlay,
 
-      dataLoaded,
+      dataLoaded, isLoadingData,
       isDrawerOpen,
       toggleDrawer,
     };
@@ -440,6 +479,18 @@ window.BiodiversityView = {
 
       <!-- Map container with slide-out chart drawer -->
       <div style="position: relative; width: 100%; height: 100%; overflow: hidden;">
+
+        <!-- Loading overlay shown while lazy-loading a new map file -->
+        <div v-if="isLoadingData"
+          class="absolute inset-0 z-[2000] flex items-center justify-center bg-white/60 backdrop-blur-sm">
+          <div class="flex flex-col items-center gap-2 text-gray-600 text-sm font-medium">
+            <svg class="animate-spin h-8 w-8 text-sky-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+            </svg>
+            Loading map data…
+          </div>
+        </div>
 
         <!-- Map component takes full space -->
         <regions-map
