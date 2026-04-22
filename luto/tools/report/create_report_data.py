@@ -99,6 +99,7 @@ def save_report_data(raw_data_dir:str):
         delayed(process_renewable_data)(files, SAVE_DIR, years),
         delayed(process_ghg_data)(files, SAVE_DIR, lu_group_map, years),
         delayed(process_water_data)(files, SAVE_DIR),
+        delayed(process_transition_data)(files, SAVE_DIR),
         delayed(process_biodiversity_data)(files, SAVE_DIR),
         delayed(process_supporting_info_data)(SAVE_DIR, years, raw_data_dir),
     ]
@@ -2569,6 +2570,194 @@ def process_water_data(files, SAVE_DIR):
     return "Water data processing completed"
 
 
+def process_transition_data(files, SAVE_DIR):
+    
+    # Helper function to wrap labels, because some are too long that should be 
+    # wrapped into two lines for better display in the Highcharts heatmap. 
+    def _wrap_label(label: str, max_chars: int = 14) -> str:
+        """Wrap a label at the nearest word boundary using <br> (for Highcharts useHTML labels)."""
+        if len(label) <= max_chars:
+            return label
+        mid = len(label) // 2
+        left  = label.rfind(" ", 0, mid + 1)
+        right = label.find(" ", mid)
+        if left == -1 and right == -1:
+            return label
+        if left == -1:
+            split = right
+        elif right == -1:
+            split = left
+        else:
+            split = left if (mid - left) <= (right - mid) else right
+        return label[:split] + "<br>" + label[split + 1:]
+    
+    
+    # --------------------- Transition Area start-end --------------------
+    # JSON structure: region → from_water → to_water → {x_categories, y_categories, data, max_val}
+    # x_categories (To-LU):   ag LUs + non-ag LUs + ALL  (all possible destinations)
+    # y_categories (From-LU): ag LUs + ALL only           (land can only transition FROM ag)
+    # Single start→end snapshot covering ag2ag + ag2non_ag; lives in the last year output dir.
+
+    start_end_file = files.query('base_name == "transition_matrix_start_end"').iloc[0]
+
+    trans_start_end_df = (
+        pd.read_csv(start_end_file['path'])
+        .replace(RENAME_AM_NON_AG)
+        .infer_objects(copy=False)
+        .round({'Area (ha)': 2})
+    )
+
+    # x-axis (To-LU): ag first, non-ag last, ALL at end — all possible destinations
+    non_ag_names = set(RENAME_NON_AG.values())
+    se_lus_set = (
+        set(trans_start_end_df.loc[trans_start_end_df['From-land-use'] != 'ALL', 'From-land-use'].unique())
+        | set(trans_start_end_df.loc[trans_start_end_df['To-land-use'] != 'ALL', 'To-land-use'].unique())
+    )
+    se_x_lus_orig = sorted(se_lus_set - non_ag_names) + sorted(se_lus_set & non_ag_names) + ['ALL']
+    se_x_lus = [_wrap_label(lu) for lu in se_x_lus_orig[:-1]] + ['ALL']  # wrapped labels for JSON; ALL kept as-is
+    # y-axis (From-LU): ag LUs only + ALL — non-ag cannot be a source land use
+    se_y_lus = sorted(se_lus_set - non_ag_names) + ['ALL']
+
+    se_out_dict = {}
+    for (region, from_water, to_water), grp in trans_start_end_df.groupby(
+        ['region', 'From-water-supply', 'To-water-supply']
+    ):
+        pivot = (
+            grp
+            .pivot_table(
+                index='From-land-use',
+                columns='To-land-use',
+                values='Area (ha)',
+                aggfunc='sum',
+                fill_value=0,
+            )
+            .reindex(index=se_y_lus, columns=se_x_lus_orig, fill_value=0)
+        )
+        points = []
+        max_val = 0.0
+        x_all_idx = len(se_x_lus) - 1
+        y_all_idx = len(se_y_lus) - 1
+        for yi, from_lu in enumerate(se_y_lus):
+            for xi, (to_lu_wrapped, to_lu) in enumerate(zip(se_x_lus, se_x_lus_orig)):
+                val = float(pivot.loc[from_lu, to_lu])
+                is_all  = (xi == x_all_idx or yi == y_all_idx)
+                is_diag = (from_lu == to_lu)
+                if is_all:
+                    points.append({'x': xi, 'y': yi, 'value': round(val, 2) if val > 0 else None, 'color': '#f8f8f8'})
+                elif is_diag:
+                    # Diagonal (no-change): grey, excluded from colour scale and max
+                    points.append({'x': xi, 'y': yi, 'value': round(val, 2) if val > 0 else None, 'color': '#cccccc'})
+                elif val > 0:
+                    points.append([xi, yi, round(val, 2)])
+                    if val > max_val:
+                        max_val = val
+                else:
+                    points.append([xi, yi, None])
+
+        se_out_dict.setdefault(region, {}).setdefault(from_water, {})[to_water] = {
+            'x_categories': se_x_lus,
+            'y_categories': se_y_lus,
+            'data': points,
+            'max_val': round(max_val, 2),
+        }
+
+    filename = 'Transition_start_end_area'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(se_out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
+
+    # --------------------- Transition Area ag2ag --------------------
+    # JSON structure: year → region → from_water → to_water → {categories, data: [[x,y,val|null]...], max_val}
+    # Vue selection chain: year slider → region → from_water button → to_water button → ready-to-plot leaf.
+
+    trans_area_files = files.query('base_name == "transition_ag2ag_area"').reset_index(drop=True)
+
+    # Collect all years from file paths so the base year (e.g. 2010) is represented
+    # even when its CSV is empty and has no transitions to plot.
+    all_years_from_files = sorted(
+        os.path.basename(p).split('_')[-1].replace('.csv', '')
+        for p in trans_area_files['path']
+    )
+
+    non_empty_dfs = [df for path in trans_area_files['path'] if not (df := pd.read_csv(path)).empty]
+    if non_empty_dfs:
+        trans_area_df = (
+            pd.concat(non_empty_dfs, ignore_index=True)
+            .replace(RENAME_AM_NON_AG)
+            .infer_objects(copy=False)
+            .round({'Transition Area (ha)': 2})
+        )
+        trans_area_df['Year'] = trans_area_df['Year'].astype(str)  # string key for JSON
+    else:
+        trans_area_df = pd.DataFrame(
+            columns=['Year', 'region', 'From-land-use', 'To-land-use',
+                     'From-water-supply', 'To-water-supply', 'Transition Area (ha)']
+        )
+
+    # Land-use categories: ag first, non-ag last, ALL appended as summary row/column.
+    _ag2ag_lus_set = (
+        set(trans_area_df.loc[trans_area_df['From-land-use'] != 'ALL', 'From-land-use'].unique())
+        | set(trans_area_df.loc[trans_area_df['To-land-use']   != 'ALL', 'To-land-use'].unique())
+    )
+    individual_lus = sorted(_ag2ag_lus_set - non_ag_names) + sorted(_ag2ag_lus_set & non_ag_names)
+    all_lus = individual_lus + ['ALL']  # ALL appended at end as summary row/column
+    all_x_lus = [_wrap_label(lu) for lu in all_lus]  # wrapped labels for x-axis (To-LU)
+
+    out_dict = {}
+    for (yr, region, from_water, to_water), grp in trans_area_df.groupby(
+        ['Year', 'region', 'From-water-supply', 'To-water-supply']
+    ):
+        # Build pivot: From-LU (rows/y) × To-LU (cols/x)
+        pivot = (
+            grp
+            .pivot_table(
+                index='From-land-use',
+                columns='To-land-use',
+                values='Transition Area (ha)',
+                aggfunc='sum',
+                fill_value=0,
+            )
+            .reindex(index=all_lus, columns=all_lus, fill_value=0)
+        )
+        points = []
+        max_val = 0.0
+        all_idx = len(all_lus) - 1  # ALL is always last
+        for yi, from_lu in enumerate(all_lus):
+            for xi, to_lu in enumerate(all_lus):
+                val = float(pivot.loc[from_lu, to_lu])
+                is_all = (xi == all_idx or yi == all_idx)
+                if is_all:
+                    # ALL row/column: fixed neutral color, bypasses colorAxis in Highcharts
+                    points.append({'x': xi, 'y': yi, 'value': round(val, 2) if val > 0 else None, 'color': '#f8f8f8'})
+                elif val > 0:
+                    points.append([xi, yi, round(val, 2)])
+                    if val > max_val:
+                        max_val = val
+                else:
+                    points.append([xi, yi, None])
+
+        out_dict.setdefault(yr, {}).setdefault(region, {}).setdefault(from_water, {})[to_water] = {
+            'x_categories': all_x_lus,   # To-LU: wrapped labels for Highcharts x-axis
+            'y_categories': all_lus,      # From-LU: plain labels for Highcharts y-axis
+            'data': points,
+            'max_val': round(max_val, 2),
+        }
+
+    # Ensure every year (including base year with no transitions) has at least
+    # one placeholder leaf so the Vue year-slider can include it.
+    empty_leaf = {'x_categories': all_x_lus, 'y_categories': all_lus, 'data': [], 'max_val': 0.0}
+    for yr in all_years_from_files:
+        if yr not in out_dict:
+            out_dict[yr] = {'AUSTRALIA': {'ALL': {'ALL': empty_leaf}}}
+
+    filename = 'Transition_ag2ag_area'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
+
+    return "Transition data processing completed"
 
 
 def process_biodiversity_data(files, SAVE_DIR):
@@ -2583,7 +2772,7 @@ def process_biodiversity_data(files, SAVE_DIR):
     '''.strip().replace('\n','')
     
     bio_paths = files.query(filter_str).reset_index(drop=True)
-    bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])\
+    bio_df = pd.concat([df for path in bio_paths['path'] if not (df := pd.read_csv(path)).empty], ignore_index=True)\
         .replace(RENAME_AM_NON_AG)\
         .infer_objects(copy=False)\
         .rename(columns={'Contribution Relative to Base Year Level (%)': 'Value (%)'})\

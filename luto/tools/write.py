@@ -168,7 +168,7 @@ def bio_to_region_and_aus_df(da, group_dims, value_name, base_score, yr_cal):
     return pd.concat([aus, region]), aus
 
 
-def process_cost_chunks(trans_xr, data, yr_cal, chunk_size, groupby_cols, value_col):
+def process_chunks(trans_xr, data, yr_cal, chunk_size, groupby_cols, value_col):
     """
     Process large xarray in chunks and aggregate to DataFrame.This is because the input array
     is a huge intermediate array that consumes a lot of memory. By mannually select each chunk,
@@ -187,7 +187,7 @@ def process_cost_chunks(trans_xr, data, yr_cal, chunk_size, groupby_cols, value_
         value_col: Name of value column
 
     Returns:
-        List of DataFrames, one per chunk
+        Aggregated DataFrame with columns groupby_cols + [value_col, 'Year']
     """
     trans_dfs = []
     for i in range(0, data.NCELLS, chunk_size):
@@ -203,12 +203,18 @@ def process_cost_chunks(trans_xr, data, yr_cal, chunk_size, groupby_cols, value_
             )[value_col
             ].sum(
             ).reset_index(
-            ).query(f'abs(`{value_col}`) > 1'
-            ).assign(Year=yr_cal, chunk_idx=i//chunk_size)
+            ).query(f'abs(`{value_col}`) > 1')
 
         trans_dfs.append(df_region)
 
-    return trans_dfs
+    return (
+        pd.concat(trans_dfs, ignore_index=True)
+        .groupby(groupby_cols)[value_col]
+        .sum()
+        .reset_index()
+        .assign(Year=yr_cal)
+        .query(f'abs(`{value_col}`) > 1')
+    )
 
 
 # ── Config / Orchestration ────────────────────────────────────────────────────
@@ -1462,18 +1468,16 @@ def write_transition_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     xr_ag_trans_area = add_all(xr_ag_trans_area, dims=['From-land-use', 'To-land-use', 'From-water-supply', 'To-water-supply'])
 
     # Calculate total transition area by region and land-use (for report generation later)
-    area_dfs = process_cost_chunks(
+    transition_area_region = process_chunks(
         xr_ag_trans_area, data, yr_cal, chunk_size,
         groupby_cols=['region', 'From-land-use', 'To-land-use', 'From-water-supply', 'To-water-supply'],
         value_col='Transition Area (ha)'
     )
-
-    transition_area_region = pd.concat(area_dfs, ignore_index=True)
     transition_area_AUS = transition_area_region.groupby(['From-land-use', 'To-land-use', 'From-water-supply', 'To-water-supply']
         )['Transition Area (ha)'
         ].sum(
         ).reset_index(
-        ).assign(region='AUSTRALIA'
+        ).assign(region='AUSTRALIA', Year=yr_cal
         ).query('`Transition Area (ha)` > 1') # Skip transitions under 1 ha at national level
 
 
@@ -1524,17 +1528,11 @@ def write_transition_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     cost_xr = add_all(cost_xr, ['From-land-use', 'To-land-use', 'Type'])
 
     # Get transition cost by region and land-use; This is for report generation later (e.g., for setting colorbar limits)
-    cost_dfs = process_cost_chunks(
+    cost_df_region = process_chunks(
         cost_xr, data, yr_cal, chunk_size,
         groupby_cols=['region', 'Type', 'From-land-use', 'To-land-use'],
         value_col='Cost ($)'
     )
-
-    cost_df_region = pd.concat(cost_dfs, ignore_index=True
-        ).groupby(['region', 'From-land-use', 'To-land-use', 'Year', 'Type']
-        )['Cost ($)'
-        ].sum(
-        ).reset_index()
     cost_df_AUS = cost_df_region.groupby(['From-land-use', 'To-land-use', 'Type', 'Year']
         )['Cost ($)'
         ].sum(
@@ -1592,17 +1590,11 @@ def write_transition_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     xr_ghg_transition = add_all(xr_ghg_transition, ['From-land-use', 'To-land-use', 'Type'])
 
     # Get transition GHG emissions by region and land-use; This is for report generation later (e.g., for setting colorbar limits)
-    ghg_dfs = process_cost_chunks(
+    ghg_df_region = process_chunks(
         xr_ghg_transition, data, yr_cal, chunk_size,
         groupby_cols=['region', 'Type', 'From-land-use', 'To-land-use'],
         value_col='Value (t CO2e)'
     )
-
-    ghg_df_region = pd.concat(ghg_dfs, ignore_index=True
-        ).groupby(['region', 'From-land-use', 'To-land-use', 'Year', 'Type']
-        )['Value (t CO2e)'
-        ].sum(
-        ).reset_index()
     ghg_df_AUS = ghg_df_region.groupby(['From-land-use', 'To-land-use', 'Type', 'Year']
         )['Value (t CO2e)'
         ].sum(
@@ -1656,21 +1648,13 @@ def write_transition_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     xr_water_transition = add_all(xr_water_transition, ['From-land-use', 'To-land-use', 'From-water-supply', 'To-water-supply'])
     
     # Get transition water requirement changes by region and land-use; This is for report generation later (e.g., for setting colorbar limits)
-    water_dfs = process_cost_chunks(
+    # Flip the water requirement to water yield change for easier
+    #   interpolation in report (i.e., requirement decrease = yield increase).
+    water_df_region = process_chunks(
         xr_water_transition, data, yr_cal, chunk_size,
         groupby_cols=['region', 'From-land-use', 'To-land-use', 'From-water-supply', 'To-water-supply'],
         value_col='Water Requirement Change (ML)'
     )
-    
-    # Concat chunks and aggregate to region level; 
-    #   Then aggregate to national level; 
-    #   Flip the water requirement to water yield change for easier 
-    #   interpolation in report (i.e., requirement decrease = yield increase);
-    water_df_region = pd.concat(water_dfs, ignore_index=True
-        ).groupby(['region', 'From-land-use', 'To-land-use', 'Year', 'From-water-supply', 'To-water-supply']
-        )['Water Requirement Change (ML)'
-        ].sum(
-        ).reset_index()
     water_df_region['Water Yield Change (ML)'] = -water_df_region['Water Requirement Change (ML)']
     water_df_region = water_df_region.drop(columns='Water Requirement Change (ML)')
     water_df_AUS = water_df_region.groupby(['From-land-use', 'To-land-use', 'Year', 'From-water-supply', 'To-water-supply']
@@ -1762,17 +1746,11 @@ def write_transition_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     non_ag_transitions_area = add_all(non_ag_transitions_area, ['From-water-supply', 'From-land-use', 'To-land-use'])
     
     # Get transition area by region and land-use; This is for report generation later (e.g., for setting colorbar limits)
-    area_dfs = process_cost_chunks(
-        non_ag_transitions_area, data, yr_cal, chunk_size, 
+    area_df_region = process_chunks(
+        non_ag_transitions_area, data, yr_cal, chunk_size,
         groupby_cols=['region', 'From-water-supply', 'From-land-use', 'To-land-use'],
         value_col='Transition Area (ha)'
     )
-    
-    area_df_region = pd.concat(area_dfs, ignore_index=True).groupby(
-        ['region', 'From-water-supply', 'From-land-use', 'To-land-use', 'Year']
-        )['Transition Area (ha)'
-        ].sum(
-        ).reset_index()
     area_df_AUS = area_df_region.groupby(['From-water-supply', 'From-land-use', 'To-land-use', 'Year']
         )['Transition Area (ha)'
         ].sum(
@@ -1832,17 +1810,11 @@ def write_transition_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 
 
     # Get transition cost by region and land-use
-    cost_dfs = process_cost_chunks(
+    cost_df_region = process_chunks(
         cost_xr, data, yr_cal, chunk_size,
         groupby_cols=['region', 'From-land-use', 'To-land-use', 'Cost-type'],
         value_col='Cost ($)'
     )
-
-    cost_df_region = pd.concat(cost_dfs, ignore_index=True).groupby(
-        ['region', 'From-land-use', 'To-land-use', 'Cost-type', 'Year']
-        )['Cost ($)'
-        ].sum(
-        ).reset_index()
     cost_df_AUS = cost_df_region.groupby(['From-land-use', 'To-land-use', 'Cost-type', 'Year']
         )['Cost ($)'
         ].sum(
@@ -2034,9 +2006,12 @@ def write_area_transition_start_end(data: Data, path, yr_cal_end):
 
     xr_ag2ag = ag_dvar_base_mrj * ag_dvar_target_mrj * real_area_r
     xr_ag2non_ag = ag_dvar_base_mrj * non_ag_dvar_target_rk * real_area_r
+    
+    # Assign dry to water supply dimension for non-ag
+    xr_ag2non_ag = xr_ag2non_ag.expand_dims({'To-water-supply': ['dry']})
 
     xr_ag2ag     = add_all(xr_ag2ag,     ['From-water-supply', 'From-land-use', 'To-water-supply', 'To-land-use'])
-    xr_ag2non_ag = add_all(xr_ag2non_ag, ['From-water-supply', 'From-land-use', 'To-land-use'])
+    xr_ag2non_ag = add_all(xr_ag2non_ag, ['From-water-supply', 'From-land-use', 'To-water-supply', 'To-land-use'])
 
 
     # ==================== Chunk Level Aggregation ====================
@@ -2074,7 +2049,7 @@ def write_area_transition_start_end(data: Data, path, yr_cal_end):
             ).sum(dim='cell'
             ).to_dataframe('Area (ha)'
             ).reset_index(
-            ).groupby(['region', 'From-water-supply', 'From-land-use', 'To-land-use']
+            ).groupby(['region', 'From-water-supply', 'From-land-use', 'To-water-supply', 'To-land-use']
             )['Area (ha)'
             ].sum(
             ).reset_index(
@@ -2097,29 +2072,26 @@ def write_area_transition_start_end(data: Data, path, yr_cal_end):
         ).query('abs(`Area (ha)`) > 1')  # Skip transitions under 1 ha at national level
 
     # Combine all chunks df for ag2non_ag
+    # To-water-supply is already set ('dry' and 'ALL') from xr_ag2non_ag via add_all.
     transition_ag2non_ag = pd.concat(transition_ag2non_ag_dfs, ignore_index=True
-        ).groupby(['region', 'From-water-supply', 'From-land-use', 'To-land-use']
+        ).groupby(['region', 'From-water-supply', 'From-land-use', 'To-water-supply', 'To-land-use']
         )['Area (ha)'
         ].sum(
         ).reset_index()
 
-    transition_ag2non_ag_AUS = transition_ag2non_ag.groupby(['From-water-supply', 'From-land-use', 'To-land-use']
+    transition_ag2non_ag_AUS = transition_ag2non_ag.groupby(['From-water-supply', 'From-land-use', 'To-land-use', 'To-water-supply']
         )['Area (ha)'
         ].sum(
         ).reset_index(
         ).assign(region='AUSTRALIA'
         ).query('abs(`Area (ha)`) > 1')  # Skip transitions under 1 ha at national level
 
-    # Write the transition matrix to a csv file
-    pd.concat([transition_ag2ag, transition_ag2ag_AUS]
+    # Write the unified transition matrix (ag2ag + ag2non_ag)
+    pd.concat([transition_ag2ag, transition_ag2ag_AUS,
+               transition_ag2non_ag, transition_ag2non_ag_AUS]
         ).infer_objects(copy=False
         ).replace({'dry':'Dryland', 'irr':'Irrigated'}
-        ).to_csv(os.path.join(path, f'transition_matrix_ag2ag_start_end.csv'), index=False)
-
-    pd.concat([transition_ag2non_ag, transition_ag2non_ag_AUS]
-        ).infer_objects(copy=False
-        ).replace({'dry':'Dryland', 'irr':'Irrigated'}
-        ).to_csv(os.path.join(path, f'transition_matrix_ag2non_ag_start_end.csv'), index=False)
+        ).to_csv(os.path.join(path, f'transition_matrix_start_end.csv'), index=False)
 
 
     # ==================== Stack Array, Get Valid Layers for ag2ag ====================
@@ -2157,12 +2129,13 @@ def write_area_transition_start_end(data: Data, path, yr_cal_end):
 
     # ==================== Stack Array, Get Valid Layers for ag2non_ag ====================
 
-    # Get valid data layers for ag2non_ag
+    # Get valid data layers for ag2non_ag (spatial nc only needs the 'dry' slice;
+    # 'ALL' is the same values since non-ag has no irrigation dimension)
     valid_layers_ag2non_ag = pd.MultiIndex.from_frame(
-        transition_ag2non_ag_AUS[['From-water-supply', 'From-land-use', 'To-land-use']]
+        transition_ag2non_ag_AUS.query('`To-water-supply` == "dry"')[['From-water-supply', 'From-land-use', 'To-land-use']]
     ).sort_values()
 
-    xr_ag2non_ag_stacked = xr_ag2non_ag.stack({
+    xr_ag2non_ag_stacked = xr_ag2non_ag.sel({'To-water-supply': 'dry'}).stack({
         'layer': ['From-water-supply', 'From-land-use', 'To-land-use']
     }).sel(layer=valid_layers_ag2non_ag)
 
