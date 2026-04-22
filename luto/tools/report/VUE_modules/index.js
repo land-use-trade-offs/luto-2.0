@@ -44,6 +44,7 @@ const app = createApp({
 
 // Register other components
 app.component("chart-container", window.Highchart);
+app.component("heatmap-container", window.HeatmapContainer);
 app.component("side-bar", window.Sidebar);
 app.component('map-geojson', window.map_geojson);
 app.component('ranking-cards', window.RankingCards);

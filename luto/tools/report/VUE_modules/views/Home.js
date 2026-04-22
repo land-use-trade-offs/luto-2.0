@@ -13,6 +13,12 @@ window.HomeView = {
     // Global variables
     const selectRegion = inject('globalSelectedRegion');
     const ChartData = ref({});
+
+    // Transition heatmap state
+    const transitionData = ref(null);
+    const transitionFromWater = ref('ALL');
+    const transitionToWater = ref('ALL');
+    const WATER_OPTIONS = ['ALL', 'Dryland', 'Irrigated'];
     const rankingData = ref({});
     const rankingColors = ref({});
     const runScenario = ref({});
@@ -45,9 +51,28 @@ window.HomeView = {
     const selectChartSubCategory = ref('');
     const selectRankingSubCategory = ref('');
 
+    // Computed leaf for the transition heatmap
+    const transitionHeatmapLeaf = computed(() => {
+      if (!transitionData.value) return null;
+      const region = selectRegion.value || 'AUSTRALIA';
+      // Fall back to AUSTRALIA if the region doesn't exist in the data
+      const regionData = transitionData.value[region] || transitionData.value['AUSTRALIA'];
+      if (!regionData) return null;
+      const fromData = regionData[transitionFromWater.value];
+      if (!fromData) return null;
+      return fromData[transitionToWater.value] || null;
+    });
+
+    const transitionFormattedMax = computed(() => {
+      const v = transitionHeatmapLeaf.value?.max_val;
+      if (!v && v !== 0) return '0';
+      return v >= 1e6 ? (v / 1e6).toFixed(1) + 'M'
+        : v >= 1e3 ? (v / 1e3).toFixed(0) + 'k'
+          : String(Math.round(v));
+    });
+
     //  Reactive data
     const selectChartData = computed(() => {
-
       let seriesData, yAxisTitle = null;
       const originalData = ChartData.value?.[selectChartCategory.value]?.[selectChartSubCategory.value]?.[selectRegion.value] || [];
       seriesData = JSON.parse(JSON.stringify(originalData));
@@ -293,6 +318,11 @@ window.HomeView = {
       selectRankingSubCategory.value = rankingKeys[0] || 'N/A';
       rankingColors.value = window.Supporting_info.colors_ranking;
 
+      // Load transition start-end heatmap data
+      const transitionStartEnd = chartRegister['Transition']['start_end'];
+      await loadScript(transitionStartEnd['path'], transitionStartEnd['name'], VIEW_NAME);
+      transitionData.value = window[transitionStartEnd['name']];
+
       await nextTick(() => { dataLoaded.value = true; });
 
     });
@@ -335,6 +365,14 @@ window.HomeView = {
       selectChartData,
       selectRankingColors,
       selectRanking,
+
+      // Transition heatmap
+      transitionData,
+      transitionFromWater,
+      transitionToWater,
+      transitionHeatmapLeaf,
+      transitionFormattedMax,
+      WATER_OPTIONS,
     };
     window._debug[VIEW_NAME] = _state;
     return _state;
@@ -484,6 +522,64 @@ window.HomeView = {
             />
           </div>
         </div>
+
+        <!-- ── Transition Heatmap Section ─────────────────────────────── -->
+        <div class="flex flex-col mb-8 mr-4 mt-8">
+
+          <p class="text-[#505051] font-bold p-1 mb-2">
+            Land-use Transition Area: {{ selectRegion }} ({{ availableYears[0] }} → {{ availableYears[availableYears.length - 1] }})
+          </p>
+
+          <!-- Card: controls overlaid at top-left, heatmap fills the card -->
+          <div class="relative rounded-[10px] bg-white shadow-md overflow-x-auto">
+
+            <!-- Controls overlay top-left -->
+            <div class="absolute top-2 left-3 z-10 flex items-center gap-4 bg-white/80 rounded px-2 py-1">
+              <!-- From-Water buttons -->
+              <div class="flex items-center gap-1">
+                <span class="text-[0.75rem] text-[#505051] mr-1">From Water:</span>
+                <button
+                  v-for="opt in WATER_OPTIONS" :key="'fw-' + opt"
+                  @click="transitionFromWater = opt"
+                  class="bg-[#e8eaed] text-[#1f1f1f] text-[0.7rem] px-2 py-1 rounded"
+                  :class="{'bg-sky-500 text-white': transitionFromWater === opt}"
+                >{{ opt }}</button>
+              </div>
+              <!-- To-Water buttons -->
+              <div class="flex items-center gap-1">
+                <span class="text-[0.75rem] text-[#505051] mr-1">To Water:</span>
+                <button
+                  v-for="opt in WATER_OPTIONS" :key="'tw-' + opt"
+                  @click="transitionToWater = opt"
+                  class="bg-[#e8eaed] text-[#1f1f1f] text-[0.7rem] px-2 py-1 rounded"
+                  :class="{'bg-sky-500 text-white': transitionToWater === opt}"
+                >{{ opt }}</button>
+              </div>
+              <!-- Color legend -->
+              <div v-if="transitionHeatmapLeaf" class="flex items-center gap-1 ml-2">
+                <span style="font-size:0.72rem;color:#666;">0</span>
+                <div style="width:120px;height:10px;border-radius:3px;border:1px solid #ddd;background:linear-gradient(to right,#ffffb2,#fecc5c,#fd8d3c,#f03b20,#bd0026);"></div>
+                <span style="font-size:0.72rem;color:#666;">{{ transitionFormattedMax }} ha</span>
+              </div>
+            </div>
+
+            <!-- Heatmap or placeholder -->
+            <heatmap-container
+              v-if="transitionHeatmapLeaf"
+              :xCats="transitionHeatmapLeaf.x_categories"
+              :yCats="transitionHeatmapLeaf.y_categories"
+              :data="transitionHeatmapLeaf.data"
+              :maxVal="transitionHeatmapLeaf.max_val"
+            />
+            <div
+              v-else
+              class="flex items-center justify-center h-[200px] text-gray-400 text-sm"
+            >
+              No transition data for the selected combination.
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   `,
