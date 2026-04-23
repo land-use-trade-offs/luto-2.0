@@ -32,7 +32,7 @@ window.Highchart = {
     // Function to handle dataset loading and chart creation
     const createChart = () => {
       isLoading.value = true;
-      
+
       // CRITICAL: Destroy existing chart before creating new one
       if (ChartInstance.value) {
         ChartInstance.value.destroy();
@@ -159,7 +159,7 @@ window.Highchart = {
         ChartInstance.value.destroy();
         ChartInstance.value = null;
       }
-      
+
       // Remove event listeners
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('mousemove', onDrag);
@@ -197,7 +197,7 @@ window.Highchart = {
     <div class="m-2 relative" 
       :style="{ transform: 'translate(' + position.x + 'px, ' + position.y + 'px) scale(' + scale + ')', cursor: draggable ? 'move' : 'default' }" 
       @mousedown="startDrag"
-      @wheel.prevent="handleWheel">
+      @wheel="handleWheel">
       <div v-if="isLoading" class="flex justify-center items-center text-lg">Loading data...</div>
       <div ref="chartElement" id="chart-container"></div>
       <div v-if="zoomable" class="absolute top-[40px] right-2 flex flex-col space-y-1">

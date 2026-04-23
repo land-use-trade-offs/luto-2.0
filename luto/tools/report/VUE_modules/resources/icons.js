@@ -561,7 +561,8 @@ M208.136215,241.128769
 	C224.073959,293.127625 210.514313,288.043518 203.785873,277.150543 
 	C196.598236,265.514099 198.147293,251.988129 208.136215,241.128769 
 z"/>
-</svg>`
+</svg>`,
+	transition: `<svg xmlns="http://www.w3.org/2000/svg" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/><path d="M5 5v4a4 4 0 0 0 4 4h2"/></svg>`,
 };
 
 window.CommonIcons = {

@@ -527,7 +527,7 @@ window.HomeView = {
         <div class="flex flex-col mb-8 mr-4 mt-8">
 
           <p class="text-[#505051] font-bold p-1 mb-2">
-            Land-use Transition Area: {{ selectRegion }} ({{ availableYears[0] }} → {{ availableYears[availableYears.length - 1] }})
+            Land-use Transition Area: {{ selectRegion }} (2010 → {{ availableYears[availableYears.length - 1] }})
           </p>
 
           <!-- Card: controls overlaid at top-left, heatmap fills the card -->
@@ -570,6 +570,7 @@ window.HomeView = {
               :yCats="transitionHeatmapLeaf.y_categories"
               :data="transitionHeatmapLeaf.data"
               :maxVal="transitionHeatmapLeaf.max_val"
+              :exportable="true"
             />
             <div
               v-else

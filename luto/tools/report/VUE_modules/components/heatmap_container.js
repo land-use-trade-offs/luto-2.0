@@ -21,6 +21,12 @@ window.HeatmapContainer = {
         data: { type: Array, required: true },
         maxVal: { type: Number, required: true },
         nullColor: { type: String, default: '#f0f0f0' },
+        showAxisLabels: { type: Boolean, default: true },
+        showDataLabels: { type: Boolean, default: true },
+        onCellClick: { type: Function, default: null },
+        exportable: { type: Boolean, default: false },
+        zoomable: { type: Boolean, default: false },
+        draggable: { type: Boolean, default: false },
     },
 
     setup(props) {
@@ -34,26 +40,41 @@ window.HeatmapContainer = {
         const buildConfig = () => {
             const xCats = props.xCats || [];
             const yCats = props.yCats || [];
-            const data = props.data || [];
             const maxVal = props.maxVal || 0;
+
+            // Fill every missing grid cell with a null point so the series
+            // borderColor still draws a faint outline even for absent cells.
+            const existingKeys = new Set(
+                (props.data || []).map(p => Array.isArray(p) ? p[0] + ',' + p[1] : p.x + ',' + p.y)
+            );
+            const data = [...(props.data || [])];
+            for (let yi = 0; yi < yCats.length; yi++) {
+                for (let xi = 0; xi < xCats.length; xi++) {
+                    if (!existingKeys.has(xi + ',' + yi)) {
+                        data.push({ x: xi, y: yi, value: null });
+                    }
+                }
+            }
 
             return {
                 chart: {
                     type: 'heatmap',
                     backgroundColor: null,
-                    marginTop: 150,
-                    marginBottom: 30,
-                    marginLeft: 185,
-                    marginRight: 15,
-                    height: Math.max(500, yCats.length * 22 + 140),
+                    marginTop: props.showAxisLabels ? 150 : 10,
+                    marginBottom: props.showAxisLabels ? 30 : 5,
+                    marginLeft: props.showAxisLabels ? 185 : 10,
+                    marginRight: props.showAxisLabels ? 15 : 5,
+                    height: props.showAxisLabels ? Math.max(500, yCats.length * 22 + 140) : '100%',
                     style: { fontFamily: 'sans-serif' },
                     animation: false,
                 },
+
                 title: { text: null },
                 xAxis: {
                     categories: xCats,
                     opposite: true,
                     labels: {
+                        enabled: props.showAxisLabels,
                         useHTML: true,
                         allowOverlap: false,
                         style: { color: '#444444', fontSize: '9px' },
@@ -75,6 +96,7 @@ window.HeatmapContainer = {
                     reversed: true,
                     title: null,
                     labels: {
+                        enabled: props.showAxisLabels,
                         style: { color: '#444444', fontSize: '9px' },
                         useHTML: true,
                         formatter: function () {
@@ -103,9 +125,11 @@ window.HeatmapContainer = {
                 legend: { enabled: false },
                 tooltip: {
                     useHTML: true,
-                    backgroundColor: '#ffffff',
+                    backgroundColor: 'rgba(255,255,255,1)',
                     borderColor: '#e0e0e0',
-                    style: { color: '#333333' },
+                    borderWidth: 1,
+                    shadow: true,
+                    style: { color: '#333333', opacity: 1, zIndex: 9999 },
                     formatter: function () {
                         const ha = this.point.value;
                         if (ha === null || ha === undefined) return false;
@@ -116,13 +140,25 @@ window.HeatmapContainer = {
                             '<b>Area:</b> ' + Highcharts.numberFormat(ha, 0) + ' ha';
                     },
                 },
+                plotOptions: {
+                    series: {
+                        cursor: props.onCellClick ? 'pointer' : 'default',
+                        point: {
+                            events: {
+                                click: props.onCellClick
+                                    ? function () { props.onCellClick({ xi: this.x, yi: this.y, value: this.value }); }
+                                    : undefined,
+                            },
+                        },
+                    },
+                },
                 series: [{
                     name: 'Transition Area (ha)',
                     borderWidth: 1,
                     borderColor: 'rgba(180,180,180,0.28)',
                     data: data,
                     dataLabels: {
-                        enabled: true,
+                        enabled: props.showDataLabels,
                         useHTML: true,
                         style: {
                             fontSize: '8px',
@@ -145,7 +181,39 @@ window.HeatmapContainer = {
                     },
                 }],
                 credits: { enabled: false },
+                exporting: { enabled: props.exportable },
             };
+        };
+
+        // ------------------------------------------------------------------
+        // CSS scale + drag (mirrors chart_container pattern)
+        // ------------------------------------------------------------------
+        const { ref: vRef } = Vue;
+        const scale = vRef(1);
+        const scaleStep = 0.1;
+        const position = vRef({ x: 0, y: 0 });
+        const isDragging = vRef(false);
+        const dragStartPos = vRef({ x: 0, y: 0 });
+
+        const startDrag = (e) => {
+            if (!props.draggable) return;
+            isDragging.value = true;
+            dragStartPos.value = { x: e.clientX - position.value.x, y: e.clientY - position.value.y };
+        };
+        const onDrag = (e) => {
+            if (!isDragging.value) return;
+            position.value = { x: e.clientX - dragStartPos.value.x, y: e.clientY - dragStartPos.value.y };
+        };
+        const stopDrag = () => { isDragging.value = false; };
+
+        const scaleUp = () => { if (props.zoomable) scale.value = Math.round((scale.value + scaleStep) * 100) / 100; };
+        const scaleDown = () => { if (props.zoomable && scale.value > scaleStep) scale.value = Math.round((scale.value - scaleStep) * 100) / 100; };
+
+        const handleWheel = (e) => {
+            if (!props.zoomable) return;
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.deltaY < 0) scaleUp(); else scaleDown();
         };
 
         // ------------------------------------------------------------------
@@ -156,6 +224,10 @@ window.HeatmapContainer = {
             if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
             if (!props.data || props.data.length === 0) return;
             chartInstance = Highcharts.chart(chartEl.value, buildConfig());
+            // Lower z-index of HTML axis label containers so the tooltip always renders above them
+            chartEl.value.querySelectorAll('.highcharts-axis-labels').forEach(el => {
+                el.style.zIndex = '1';
+            });
         };
 
         const handleResize = () => { createChart(); };
@@ -163,21 +235,46 @@ window.HeatmapContainer = {
         onMounted(() => {
             createChart();
             window.addEventListener('resize', handleResize);
+            window.addEventListener('mousemove', onDrag);
+            window.addEventListener('mouseup', stopDrag);
         });
         onUnmounted(() => {
             window.removeEventListener('resize', handleResize);
+            window.removeEventListener('mousemove', onDrag);
+            window.removeEventListener('mouseup', stopDrag);
             if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
         });
 
         // Re-render whenever any prop changes
         watch(
-            () => [props.xCats, props.yCats, props.data, props.maxVal],
+            () => [props.xCats, props.yCats, props.data, props.maxVal, props.showAxisLabels, props.showDataLabels, props.zoomable, props.exportable],
             () => { createChart(); },
             { deep: true }
         );
 
-        return { chartEl };
+        return { chartEl, scale, scaleUp, scaleDown, handleWheel, position, startDrag };
     },
 
-    template: /*html*/`<div ref="chartEl" style="width:100%;position:relative;z-index:0;"></div>`,
+    template: /*html*/`
+        <div style="width:100%;position:relative;z-index:0;"
+            @wheel="handleWheel">
+            <div
+                ref="chartEl"
+                :style="{
+                    width: '100%',
+                    height: '100%',
+                    transformOrigin: 'top left',
+                    transform: 'translate(' + position.x + 'px, ' + position.y + 'px) scale(' + scale + ')',
+                    cursor: draggable ? 'move' : 'default',
+                }"
+                @mousedown="startDrag">
+            </div>
+            <div v-if="zoomable" style="position:absolute;top:8px;right:8px;display:flex;flex-direction:column;gap:4px;">
+                <button @click="scaleUp"
+                    style="background:rgba(255,255,255,0.85);border:1px solid #ccc;border-radius:50%;width:28px;height:28px;font-size:16px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;">+</button>
+                <button @click="scaleDown"
+                    style="background:rgba(255,255,255,0.85);border:1px solid #ccc;border-radius:50%;width:28px;height:28px;font-size:16px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;">−</button>
+            </div>
+        </div>
+    `,
 };

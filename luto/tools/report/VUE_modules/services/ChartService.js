@@ -527,6 +527,10 @@ window.ChartService = {
         path: "data/Transition_start_end_area.js",
         name: "Transition_start_end_area",
       },
+      Ag2Ag: {
+        path: "data/Transition_ag2ag_area.js",
+        name: "Transition_ag2ag_area",
+      },
     },
     Supporting: {
       info: {

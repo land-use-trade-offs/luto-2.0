@@ -146,6 +146,10 @@ def get_map2json(
         xr_arr = cfxr.decode_compress_to_multi_index(xr.open_dataset(row['path']), 'layer')['data']
         ds_template = f'{os.path.dirname(row["path"])}/xr_map_template_{row["Year"]}.nc'
         valid_layers = xr_arr['layer'].to_index().to_frame().to_dict(orient='records')
+        
+        if len(valid_layers) == 0:
+            print(f'│   ├── No valid layers found in {row["base_name"]}_{row["Year"]}, skipping.')
+            continue
 
         # Batch to avoid OOM on large layer counts (e.g. GBF4 ECNES: ~2700 layers)
         for batch in (valid_layers[i:i+workers] for i in range(0, len(valid_layers), workers)):
@@ -570,23 +574,25 @@ def save_report_layer(raw_data_dir:str):
 
 
     ####################################################
-    #                8) Transition Cost                #
+    #                8) Transitions                    #
     ####################################################
 
-    # files_transition = files.query('base_name.str.contains("transition")')
+    # Transitions Area
+    files_transition_area_ag2ag = files.query('base_name == "xr_transition_ag2ag_area"')
+    
+    trans_area_ag2ag_magnitudes = cell_magnitudes['transition_area']['ag2ag']
+    trans_area_ag2ag_min_max = (min(trans_area_ag2ag_magnitudes), max(trans_area_ag2ag_magnitudes))
+    
+    get_map2json(files_transition_area_ag2ag, None, None, legend_float, trans_area_ag2ag_min_max, f'{SAVE_DIR}/map_layers/map_transition_area_ag2ag.js')
+    print('│   ├── Transition Area (Ag2Ag) layer saved.')
 
-    # transition_cost = files_transition.query('base_name == "xr_transition_cost_ag2non_ag"')
-    # get_map2json(transition_cost, f'{SAVE_DIR}/map_layers/map_transition_cost.js')
-    # print('     ... Transition Cost layer saved.')
-
-    # transition_ghg = files_transition.query('base_name == "xr_transition_GHG"')
-    # get_map2json(transition_ghg, f'{SAVE_DIR}/map_layers/map_transition_GHG.js')
-    # print('     ... Transition GHG layer saved.')
+    
+    # files_df,legend_int,legend_int_level,legend_float,float_magnitude,save_path = files_transition_area_ag2ag, None, None, legend_float, trans_area_ag2ag_min_max, f'{SAVE_DIR}/map_layers/map_transition_area_ag2ag.js'
 
 
 
     ####################################################
-    #               9) Water Yield                    #
+    #               9) Water Yield                     #
     ####################################################
 
     files_water = files.query('base_name.str.contains("water_yield")')

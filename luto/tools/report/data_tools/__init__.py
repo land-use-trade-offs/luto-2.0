@@ -191,7 +191,7 @@ def rename_reorder_hierarchy(sel: dict) -> dict:
     if 'group' in sel:
         sel_rename['group'] = sel['group']
         
-    # 4-1: Commodity dimensions
+    # 4: Commodity dimensions
     if 'Commodity' in sel:
         commodity = sel['Commodity'].capitalize()
         sel_rename['Commodity'] = {
@@ -200,7 +200,24 @@ def rename_reorder_hierarchy(sel: dict) -> dict:
             'Beef lexp': 'Beef live export'
         }.get(commodity, commodity)
         
-    # 4-2: Profit/Revenue/Cost/Source
+    # 5: Transitions. 
+    if 'From-water-supply' in sel:
+        sel_rename['From-water-supply'] = {'irr': 'Irrigated', 'dry': 'Dryland'}.get(sel['From-water-supply'], sel['From-water-supply'])
+    if 'To-water-supply' in sel:
+        sel_rename['To-water-supply'] = {'irr': 'Irrigated', 'dry': 'Dryland'}.get(sel['To-water-supply'], sel['To-water-supply'])
+    if 'From-land-use' in sel:
+        sel_rename['From-land-use'] = RENAME_AM_NON_AG.get(sel['From-land-use'], sel['From-land-use'])
+    if 'To-land-use' in sel:
+        sel_rename['To-land-use'] = RENAME_AM_NON_AG.get(sel['To-land-use'], sel['To-land-use'])
+
+    # 6: last: 'lu' or 'from_lu' (treated identically as the land-use selection level)
+    if 'lu' in sel:
+        sel_rename['lu'] = RENAME_AM_NON_AG.get(sel['lu'], sel['lu'])
+    elif 'from_lu' in sel:
+        sel_rename['from_lu'] = RENAME_AM_NON_AG.get(sel['from_lu'], sel['from_lu'])
+        
+        
+    # 7: Profit/Revenue/Cost/Source
     leftover_keys = set(sel.keys()) - set(sel_rename.keys()) - {'lu', 'from_lu', 'species', 'group'}
     for key in leftover_keys:
         sel_rename[key] = {
@@ -210,12 +227,6 @@ def rename_reorder_hierarchy(sel: dict) -> dict:
             'Transition-cost-nonag2ag': 'Cost (trans NonAg2Ag)',
             'Transition-cost-agMgt': 'Cost (trans AgMgt)',
         }.get(sel[key], sel[key])
-
-    # 5 last: 'lu' or 'from_lu' (treated identically as the land-use selection level)
-    if 'lu' in sel:
-        sel_rename['lu'] = RENAME_AM_NON_AG.get(sel['lu'], sel['lu'])
-    elif 'from_lu' in sel:
-        sel_rename['from_lu'] = RENAME_AM_NON_AG.get(sel['from_lu'], sel['from_lu'])
 
     return sel_rename
 
