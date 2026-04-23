@@ -2722,6 +2722,81 @@ def process_transition_data(files, SAVE_DIR):
         json.dump(out_dict, f, separators=(',', ':'), indent=2)
         f.write(';\n')
 
+    # --------------------- Transition Area year-by-years (ag2nonag) --------------------
+    # JSON structure: region → from_water → to_water → year → {x_categories, y_categories, data, max_val}
+    # To-water-supply values: 'Non-Ag' (all non-ag land uses share the same water label) + 'ALL'.
+    # x-axis (To-LU): non-ag land uses + ALL;  y-axis (From-LU): ag land uses + ALL.
+
+    trans_area_ag2nonag_files = files.query('base_name == "transition_ag2nonag_area"').reset_index(drop=True)
+
+    all_years_ag2nonag = sorted(
+        os.path.basename(p).split('_')[-1].replace('.csv', '')
+        for p in trans_area_ag2nonag_files['path']
+    )
+
+    trans_area_ag2nonag_df = (
+        pd.concat([df for path in trans_area_ag2nonag_files['path'] if not (df := pd.read_csv(path)).empty], ignore_index=True)
+        .replace(RENAME_AM_NON_AG)
+        .infer_objects(copy=False)
+        .round({'Transition Area (ha)': 2})
+    )
+    trans_area_ag2nonag_df['Year'] = trans_area_ag2nonag_df['Year'].astype(str)
+
+    # Separate From-LU (ag) and To-LU (non-ag) land uses for ag2nonag transition
+    non_ag_names = set(RENAME_NON_AG.values())
+    from_lus_ag2nonag = set(trans_area_ag2nonag_df.loc[trans_area_ag2nonag_df['From-land-use'] != 'ALL', 'From-land-use'].unique())
+    to_lus_ag2nonag   = set(trans_area_ag2nonag_df.loc[trans_area_ag2nonag_df['To-land-use']   != 'ALL', 'To-land-use'].unique())
+    # y-axis (From-LU): ag land uses + ALL  (land can only transition FROM ag)
+    all_y_lus_ag2nonag = sorted(from_lus_ag2nonag - non_ag_names) + ['ALL']
+    # x-axis (To-LU): non-ag land uses + ALL  (land transitions TO non-ag)
+    all_x_lus_ag2nonag = sorted(to_lus_ag2nonag & non_ag_names) + ['ALL']
+
+    out_ag2nonag_dict = {}
+    for (yr, region, from_water, to_water), grp in trans_area_ag2nonag_df.groupby(
+        ['Year', 'region', 'From-water-supply', 'To-water-supply']
+    ):
+        pivot = grp.pivot_table(
+            index='From-land-use',
+            columns='To-land-use',
+            values='Transition Area (ha)',
+            aggfunc='sum',
+            fill_value=0,
+        )
+        lu_x_to_idx = {lu: i for i, lu in enumerate(all_x_lus_ag2nonag)}
+        lu_y_to_idx = {lu: i for i, lu in enumerate(all_y_lus_ag2nonag)}
+        x_all_idx = len(all_x_lus_ag2nonag) - 1
+        y_all_idx = len(all_y_lus_ag2nonag) - 1
+        points, max_val = [], 0.0
+        for (from_lu, to_lu), val in pivot.stack().items():
+            xi, yi = lu_x_to_idx.get(to_lu), lu_y_to_idx.get(from_lu)
+            if xi is None or yi is None or val <= 0:
+                continue
+            val = round(float(val), 2)
+            if xi == x_all_idx or yi == y_all_idx:
+                points.append({'x': xi, 'y': yi, 'value': val, 'color': '#f8f8f8'})
+            elif from_lu == to_lu:
+                points.append({'x': xi, 'y': yi, 'value': val, 'color': '#cccccc'})
+            else:
+                points.append([xi, yi, val])
+                if val > max_val:
+                    max_val = val
+        out_ag2nonag_dict.setdefault(region, {}).setdefault(from_water, {}).setdefault(to_water, {})[yr] = {
+            'x_categories': all_x_lus_ag2nonag,
+            'y_categories': all_y_lus_ag2nonag,
+            'data': points,
+            'max_val': round(max_val, 2),
+        }
+
+    empty_leaf_ag2nonag = {'x_categories': all_x_lus_ag2nonag, 'y_categories': all_y_lus_ag2nonag, 'data': [], 'max_val': 0.0}
+    for yr in all_years_ag2nonag:
+        out_ag2nonag_dict.setdefault('AUSTRALIA', {}).setdefault('ALL', {}).setdefault('ALL', {}).setdefault(yr, empty_leaf_ag2nonag)
+
+    filename = 'Transition_ag2nonag_area'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_ag2nonag_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
+
     return "Transition data processing completed"
 
 

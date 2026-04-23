@@ -113,8 +113,8 @@ def save2nc(in_xr: xr.DataArray, save_path: str):
         save_path,
         encoding={'data': {'dtype': 'float32', 'zlib': True, 'complevel': 4, 'chunksizes': list(chunks.values())}},
     )
-    
-    
+
+
 def save_csv(df, rename_map, filepath):
     (df.rename(columns=rename_map)
        .infer_objects(copy=False)
@@ -1727,6 +1727,7 @@ def write_transition_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     non_ag_dvar_target = tools.non_ag_rk_to_xr(data, tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
         ).assign_coords(region=('cell', data.REGION_NRM_NAME)
         ).rename({'lu': 'To-land-use'}
+        ).expand_dims({'To-water-supply': ['Non-Ag']}
         ).chunk({'cell': chunk_size})
 
     
@@ -1751,15 +1752,15 @@ def write_transition_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     
     # Calculate transition area, then expand dimension (has to be after multiplication to avoid double counting)
     non_ag_transitions_area = ag_dvar_base * non_ag_transitions_area_mat * non_ag_dvar_target
-    non_ag_transitions_area = add_all(non_ag_transitions_area, ['From-water-supply', 'From-land-use', 'To-land-use'])
+    non_ag_transitions_area = add_all(non_ag_transitions_area, ['From-water-supply', 'To-water-supply', 'From-land-use', 'To-land-use'])
     
     # Get transition area by region and land-use; This is for report generation later (e.g., for setting colorbar limits)
     area_df_region = process_chunks(
         non_ag_transitions_area, data, yr_cal, chunk_size,
-        groupby_cols=['region', 'From-water-supply', 'From-land-use', 'To-land-use'],
+        groupby_cols=['region', 'From-water-supply', 'To-water-supply', 'From-land-use', 'To-land-use'],
         value_col='Transition Area (ha)'
     )
-    area_df_AUS = area_df_region.groupby(['From-water-supply', 'From-land-use', 'To-land-use', 'Year']
+    area_df_AUS = area_df_region.groupby(['From-water-supply', 'To-water-supply', 'From-land-use', 'To-land-use', 'Year']
         )['Transition Area (ha)'
         ].sum(
         ).reset_index(
@@ -1767,16 +1768,17 @@ def write_transition_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         ).query('`Transition Area (ha)` > 1') # Skip transitions under 1 ha at national level
         
         
-    # Save to csv
-    pd.concat([area_df_region, area_df_AUS]
-        ).to_csv(os.path.join(path, f'transition_ag2nonag_area_{yr_cal}.csv'), index=False)
-    
     # Get valid data layers (before renaming/replacing)
     valid_layers_transition = pd.MultiIndex.from_frame(
-        area_df_AUS[['From-water-supply', 'From-land-use', 'To-land-use']]
+        area_df_AUS[['From-water-supply', 'To-water-supply', 'From-land-use', 'To-land-use']]
     ).sort_values()
     
-    valid_layers_stack_area = non_ag_transitions_area.stack({'layer': ['From-water-supply', 'From-land-use', 'To-land-use']}
+    # Save to csv
+    pd.concat([area_df_region, area_df_AUS]
+        ).replace({'dry': 'Dryland', 'irr': 'Irrigated'}
+        ).to_csv(os.path.join(path, f'transition_ag2nonag_area_{yr_cal}.csv'), index=False)
+    
+    valid_layers_stack_area = non_ag_transitions_area.stack({'layer': ['From-water-supply', 'To-water-supply', 'From-land-use', 'To-land-use']}
         ).sel(layer=valid_layers_transition).drop_vars('region').compute()
     
     save2nc(valid_layers_stack_area, os.path.join(path, f'xr_transition_ag2nonag_area_{yr_cal}.nc'))
@@ -1830,15 +1832,15 @@ def write_transition_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         ).assign(region='AUSTRALIA'
         ).query('abs(`Cost ($)`) > 1000') # Skip transitions under $1,000 at national level
         
-    pd.concat([cost_df_AUS, cost_df_region]
-        ).infer_objects(copy=False
-        ).replace({'dry':'Dryland', 'irr':'Irrigated'}
-        ).to_csv(os.path.join(path, f'transition_ag2nonag_cost_{yr_cal}.csv'), index=False)
-        
     # Get valid data layers (before renaming/replacing)
     valid_layers_transition = pd.MultiIndex.from_frame(
         cost_df_AUS[['From-land-use', 'To-land-use', 'Cost-type']]
     ).sort_values()
+    
+    pd.concat([cost_df_AUS, cost_df_region]
+        ).infer_objects(copy=False
+        ).replace({'dry':'Dryland', 'irr':'Irrigated'}
+        ).to_csv(os.path.join(path, f'transition_ag2nonag_cost_{yr_cal}.csv'), index=False)
     
     valid_layers_stack_cost = cost_xr.stack({'layer': ['From-land-use', 'To-land-use', 'Cost-type']}
         ).sel(layer=valid_layers_transition).drop_vars('region').compute()
@@ -1967,18 +1969,19 @@ def write_transition_nonag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         ).reset_index(
         ).assign(region='AUSTRALIA', Year=yr_cal)
         
+    '''
+    NoAg to Ag are currently all zeros, so we skip below calculation.
+    '''
+    # Get valid data layers (before renaming/replacing)
+    valid_layers_transition = pd.MultiIndex.from_frame(
+        cost_df_AUS[['From-land-use', 'Cost-type']].iloc[:1] # Only take the first row to avoid empty layers, since all costs are zero for now
+    ).sort_values()
+    
     # Save to csv
     pd.concat([cost_df_AUS, cost_df_region]
         ).infer_objects(copy=False
         ).replace({'dry':'Dryland', 'irr':'Irrigated'}
         ).to_csv(os.path.join(path, f'transition_nonag2ag_cost_{yr_cal}.csv'), index=False)
-        
-    '''
-    NoAg to Ag are currently all zeros, so we skip below calculation.
-    '''
-    valid_layers_transition = pd.MultiIndex.from_frame(
-        cost_df_AUS[['From-land-use', 'Cost-type']].iloc[:1] # Only take the first row to avoid empty layers, since all costs are zero for now
-    ).sort_values()
     
     cost_xr_stacked = cost_xr.stack({
         'layer': ['From-land-use', 'Cost-type']

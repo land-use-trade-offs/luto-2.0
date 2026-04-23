@@ -107,6 +107,7 @@ window.MapService = {
     },
     'Transition': {
       'Ag2Ag': { 'path': 'data/map_layers/map_transition_area_ag2ag.js', 'name': 'map_transition_area_ag2ag' },
+      'Ag2NonAg': { 'path': 'data/map_layers/map_transition_area_ag2nonag.js', 'name': 'map_transition_area_ag2nonag' },
     },
   }
 }

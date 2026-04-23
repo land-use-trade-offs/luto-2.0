@@ -586,8 +586,15 @@ def save_report_layer(raw_data_dir:str):
     get_map2json(files_transition_area_ag2ag, None, None, legend_float, trans_area_ag2ag_min_max, f'{SAVE_DIR}/map_layers/map_transition_area_ag2ag.js')
     print('│   ├── Transition Area (Ag2Ag) layer saved.')
 
-    
     # files_df,legend_int,legend_int_level,legend_float,float_magnitude,save_path = files_transition_area_ag2ag, None, None, legend_float, trans_area_ag2ag_min_max, f'{SAVE_DIR}/map_layers/map_transition_area_ag2ag.js'
+
+    files_transition_area_ag2nonag = files.query('base_name == "xr_transition_ag2nonag_area"')
+
+    trans_area_ag2non_ag_magnitudes = cell_magnitudes['transition_area']['ag2non_ag']
+    trans_area_ag2non_ag_min_max = (min(trans_area_ag2non_ag_magnitudes), max(trans_area_ag2non_ag_magnitudes))
+
+    get_map2json(files_transition_area_ag2nonag, None, None, legend_float, trans_area_ag2non_ag_min_max, f'{SAVE_DIR}/map_layers/map_transition_area_ag2nonag.js')
+    print('│   ├── Transition Area (Ag2NonAg) layer saved.')
 
 
 

@@ -1,390 +1,411 @@
-# VUE_LUTO - Land Use Trade-Offs (LUTO) 2.0 Dashboard
+# LUTO 2.0 Reporting Dashboard
 
 ## Overview
 
-VUE_LUTO is a web-based dashboard application for visualizing and analyzing results from the Land Use Trade-Offs (LUTO) 2.0 model. It provides interactive charts, maps, and data exploration tools for understanding the environmental, economic, and social impacts of different land use scenarios in Australia.
+This directory contains the web-based reporting dashboard for the Land Use Trade-Offs (LUTO) 2.0 model. It is generated automatically as part of `DATA_REPORT/` when a LUTO simulation run completes. The dashboard provides interactive charts, maps, and data exploration tools for understanding the environmental, economic, and social impacts of different land use scenarios in Australia.
+
+Open the report by double-clicking `index.html` — no server or internet connection required.
 
 ## Purpose
 
-The LUTO model is designed to analyze trade-offs between different land uses in Australia, considering factors such as:
-- **Economics**: Revenue, costs, and economic indicators across agricultural and non-agricultural sectors
-- **Area Analysis**: Land use distribution and changes over time
-- **Greenhouse Gas (GHG) Emissions**: Carbon footprint and climate impacts by land use type
-- **Water Usage**: Water consumption and management across regions
-- **Production**: Agricultural production and commodity analysis
-- **Biodiversity**: Environmental conservation metrics including GBF (Global Biodiversity Framework) targets
-- **Decision Variables (DVAR)**: Spatial optimization results and land use allocation
+The dashboard visualises LUTO 2.0 model outputs across nine analysis modules:
+- **Area**: Land use area distribution and temporal changes
+- **Economics**: Revenue, cost, and profit across agricultural and non-agricultural sectors
+- **GHG**: Greenhouse gas emissions by land use and management type
+- **Water**: Water yield changes by NRM region
+- **Production**: Agricultural commodity output and demand achievement
+- **Biodiversity**: GBF2/3/4/8 biodiversity framework target indicators and habitat quality scores
+- **Renewable Energy**: Solar PV and wind MWh generation, including pre-existing installations
+- **Transitions**: From→To land use transition area with dual heatmap + spatial map
+- **Map (DVAR)**: Spatial decision-variable allocation (categorical land use maps)
 
-This dashboard provides an intuitive interface to explore model outputs through a progressive selection pattern, allowing users to drill down from national overviews to specific regions, land use types, and management practices.
+All views share a progressive selection pattern — users drill from national overviews into specific regions, categories, management types, and land uses.
 
 ## Technology Stack
 
-- **Frontend Framework**: Vue.js 3.5.18 with Composition API
-- **Routing**: Vue Router 4.5.1
-- **Styling**: Tailwind CSS 3.4.16
-- **UI Components**: Element Plus 2.10.4 for enhanced UI components
-- **Charts**: Highcharts 12.3.0 with accessibility features
-- **Maps**: Leaflet 1.9.4 for interactive Australian region mapping
-- **Architecture**: Single Page Application (SPA) with no build process
-- **Dependencies**: All libraries are locally hosted in the `lib/` directory for offline use
+| Library | Version | Role |
+|---------|---------|------|
+| Vue.js  | 3.5.18  | Frontend framework (Composition API, Options-style `window.XxxView`) |
+| Vue Router | 4.5.1 | Hash-based client-side routing |
+| Tailwind CSS | 3.4.16 | Utility-first styling |
+| Element Plus | 2.10.4 | UI component library |
+| Highcharts | 12.3.0 | Time-series charts and heatmaps |
+| Leaflet | 1.9.4 | Interactive region map |
+
+All libraries are locally bundled in `lib/` — no CDN or build step required.
 
 ## Project Structure
 
 ```
-VUE_LUTO/
-├── components/                         # Reusable Vue components
-│   ├── chart_container.js              # Highcharts wrapper component
-│   ├── helpers.js                      # Utility functions for script/data loading
-│   ├── map_geojson.js                  # Interactive map component
-│   ├── ranking_cards.js                # Ranking cards component
-│   ├── filterable_dropdown.js          # Searchable dropdown component
-│   ├── regions_map.js                  # Region selection map component
-│   └── sidebar.js                      # Navigation sidebar
-├── views/                              # Page components (routes)
-│   ├── Home.js                         # Main dashboard with overview
-│   ├── Area.js                         # Area analysis view
-│   ├── Economics.js                    # Economics analysis view
-│   ├── GHG.js                          # Greenhouse Gas analysis view
-│   ├── Water.js                        # Water usage analysis view
-│   ├── Production.js                   # Production analysis view
-│   ├── Biodiversity.js                 # Biodiversity analysis view
-│   ├── Map.js                          # Interactive map view
-│   ├── Settings.js                     # Application settings view
-│   ├── Test.js                         # Test view for development
-│   └── NotFound.js                     # 404 error page
-├── services/                           # Service modules
-│   ├── ChartService.js                  # Data handling service
-│   └── MapService.js                   # Map data and interactions service
-├── routes/                             # Routing configuration
-│   └── route.js                        # Vue Router setup
-├── data/                               # Data files and model outputs
-│   ├── chart_option/                   # Chart configuration templates
-│   │   ├── Chart_default_options.js    # Default chart styles
-│   │   └── chartMemLogOptions.js       # Memory log chart configuration
-│   ├── geo/                            # Geographic data (Australian regions)
-│   ├── map_layers/                     # Map visualization data
-│   │   ├── map_area_*.js               # Area map data files
-│   │   ├── map_bio_*.js                # Biodiversity map data files
-│   │   ├── map_cost_*.js               # Cost map data files
-│   │   ├── map_revenue_*.js            # Revenue map data files
-│   │   ├── map_GHG_*.js                # GHG emissions map data files
-│   │   ├── map_water_*.js              # Water usage map data files
-│   │   ├── map_quantities_*.js         # Production quantities map data files
-│   │   └── map_dvar_*.js               # Decision variables map data files
-│   ├── Area_*.js                       # Area analysis chart data
-│   ├── Economics_*.js                  # Economics analysis chart data
-│   ├── GHG_*.js                        # GHG emissions chart data
-│   ├── Water_*.js                      # Water usage chart data
-│   ├── Production_*.js                 # Production analysis chart data
-│   ├── BIO_*.js                        # Biodiversity analysis chart data
-│   └── Supporting_info.js              # Consolidated model settings and information
-├── lib/                                # Local library dependencies
-│   ├── Highcharts-12.3.0/              # Highcharts library and modules
-│   ├── vue.global.prod_3.5.18.js       # Vue.js library
-│   ├── vue-router.global_4.5.1.js      # Vue Router library
-│   └── tailwind_3.4.16.js              # Tailwind CSS library
-├── assets/                             # Raw data assets (JSON format)
-├── dataTransform/                      # Data transformation scripts
-│   ├── 01_JSON2JS_dataTrans.py         # JSON to JS conversion utility
-│   └── NRM_SIMPLIFY_FILTER/            # Geographic data processing tools
-├── resources/                          # Static assets
-│   ├── icons.js                        # SVG icons
-│   ├── LUTO.png                        # Logo
-│   └── Roboto-Light.ttf                # Custom font
-├── index.html                          # Main HTML entry point
-└── index.js                            # Application bootstrap
-
+VUE_modules/
+├── index.html                          # Entry point — loads libs, registers components, mounts app
+├── index.js                            # App bootstrap: provides globalSelectedRegion / globalMapViewpoint
+│
+├── components/                         # Globally registered Vue components
+│   ├── chart_container.js              # <chart-container>   — Highcharts time-series wrapper
+│   ├── heatmap_container.js            # <heatmap-container> — Highcharts heatmap (From→To matrix)
+│   ├── regions_map.js                  # <regions-map>       — NRM region selector with base64 overlay
+│   ├── map_geojson.js                  # <map-geojson>       — Leaflet NRM choropleth
+│   ├── sidebar.js                      # <side-bar>          — Navigation sidebar
+│   ├── ranking_cards.js                # <ranking-cards>     — Top-N land-use ranking cards
+│   ├── filterable_dropdown.js          # <filterable-dropdown> — Searchable dropdown
+│   └── helpers.js                      # loadScriptWithTracking() — on-demand JS loader
+│
+├── views/                              # Route-level page components
+│   ├── Home.js                         # / — overview charts, transition heatmap, ranking cards, run settings
+│   ├── Area.js                         # /area
+│   ├── Economics.js                    # /economics
+│   ├── GHG.js                          # /ghg
+│   ├── Water.js                        # /water
+│   ├── Production.js                   # /production
+│   ├── Biodiversity.js                 # /biodiversity
+│   ├── Renewable.js                    # /renewable
+│   ├── Transition.js                   # /transition
+│   ├── Map.js                          # /map  (Decision Variables)
+│   ├── Settings.js                     # /settings
+│   └── NotFound.js                     # /* (404)
+│
+├── services/
+│   ├── ChartService.js                 # chartCategories registry — path + window-name per dataset
+│   ├── MapService.js                   # mapCategories registry  — path + window-name per map layer
+│   └── MemoryService.js                # cleanupViewData(VIEW_NAME) — removes window globals on unmount
+│
+├── routes/
+│   └── route.js                        # createRouter(createWebHashHistory(), routes)
+│
+├── data/                               # Generated data files (produced by create_report_*.py)
+│   ├── Supporting_info.js              # Model run settings, year list, scenario metadata
+│   ├── chart_option/
+│   │   ├── Chart_default_options.js
+│   │   └── chartMemLogOptions.js
+│   ├── geo/
+│   │   ├── NRM_AUS.js                  # GeoJSON — Australian NRM boundaries
+│   │   └── biodiversity_GBF2_mask.js   # GBF2 priority-area mask polygon
+│   ├── map_layers/                     # Base64 spatial raster tiles (one JS file per layer × year)
+│   │   ├── map_area_Ag/Am/NonAg.js
+│   │   ├── map_GHG_Sum/Ag/Am/NonAg.js
+│   │   ├── map_water_yield_Sum/Ag/Am/NonAg.js
+│   │   ├── map_quantities_Sum/Ag/Am/NonAg.js
+│   │   ├── map_economics_Sum_profit.js
+│   │   ├── map_economics_Ag_profit/revenue/cost.js
+│   │   ├── map_economics_Ag_transition_ag2ag/nonag2ag.js
+│   │   ├── map_economics_Am_profit/revenue/cost.js
+│   │   ├── map_economics_NonAg_profit/revenue/cost.js
+│   │   ├── map_economics_NonAg_transition_ag2non_ag/nonag2nonag.js
+│   │   ├── map_bio_GBF2_Sum/Ag/Am/NonAg.js
+│   │   ├── map_bio_GBF3_NVIS_Ag/Am/NonAg.js
+│   │   ├── map_bio_GBF3_IBRA_Ag/Am/NonAg.js
+│   │   ├── map_bio_GBF4_ECNES_Ag/Am/NonAg.js
+│   │   ├── map_bio_GBF4_SNES_Ag/Am/NonAg.js
+│   │   ├── map_bio_GBF8_groups_Ag/Am/NonAg.js
+│   │   ├── map_bio_GBF8_Ag/Am/NonAg.js
+│   │   ├── map_bio_overall_All/Ag/Am/NonAg.js
+│   │   ├── map_dvar_Ag/Am/NonAg/lumap.js
+│   │   ├── map_renewable_energy_Am.js
+│   │   └── map_transition_area_ag2ag.js
+│   ├── Area_Ag/Am/NonAg.js             # Chart: region → lm → lu → [series]
+│   ├── Area_overview_*.js
+│   ├── Area_ranking.js
+│   ├── Economics_Ag_profit/revenue/cost.js
+│   ├── Economics_Ag_transition_ag2ag/nonag2ag.js
+│   ├── Economics_Am_profit/revenue/cost.js
+│   ├── Economics_NonAg_profit/revenue/cost.js
+│   ├── Economics_NonAg_transition_ag2nonag/nonag2nonag.js
+│   ├── Economics_Sum.js
+│   ├── Economics_overview_*.js / Economics_ranking.js
+│   ├── GHG_Sum/Ag/Am/NonAg.js
+│   ├── GHG_overview_*.js / GHG_ranking.js
+│   ├── Production_Sum/Ag/Am/NonAg.js
+│   ├── Production_overview_*.js / Production_ranking.js
+│   ├── Water_Sum/Ag/Am/NonAg_NRM.js
+│   ├── Water_overview_NRM_*.js / Water_ranking_NRM.js
+│   ├── Water_overview_watershed.js
+│   ├── BIO_GBF2/GBF3_NVIS/GBF3_IBRA/GBF4_SNES/GBF4_ECNES/GBF8_GROUP/GBF8_SPECIES_Ag/Am/NonAg.js
+│   ├── BIO_*_overview_*.js / BIO_ranking.js
+│   ├── Renewable_energy_Am.js
+│   ├── Transition_ag2ag_area.js        # Chart heatmap: region → from_water → to_water → year → leaf
+│   └── Transition_start_end_area.js    # Chart heatmap: region → from_water → to_water → leaf (no year)
+│
+├── lib/                                # Locally bundled libraries (offline-capable)
+├── assets/                             # Raw JSON (input to dataTransform scripts)
+├── dataTransform/                      # JSON → JS conversion utilities
+└── resources/                          # Logo, fonts, icons
 ```
 
-## Key Features
+## Views and Routes
 
-### 1. Interactive Dashboard (Home View)
-- **Overview Charts**: Displays key metrics for different domains (economics, area, GHG, water, biodiversity)
-- **Memory Usage Monitoring**: Real-time visualization of model execution memory consumption
-- **Parameter Summary**: Searchable list of model run settings and parameters
-- **Regional Selection**: Interactive map for selecting Australian regions
+| Route | Component | Description |
+|-------|-----------|-------------|
+| `/` | `HomeView` | Overview charts for each module, transition heatmap, ranking cards, memory profile, run settings |
+| `/area` | `AreaView` | Land use area by Ag / Ag Mgt / Non-Ag |
+| `/economics` | `EconomicsView` | Profit / revenue / cost + transition cost by Sum / Ag / Ag Mgt / Non-Ag |
+| `/ghg` | `GHGView` | GHG emissions by Sum / Ag / Ag Mgt / Non-Ag |
+| `/water` | `WaterView` | Water yield by NRM region (NRM tab) + watershed overview tab |
+| `/production` | `ProductionView` | Commodity production + demand achievement by Sum / Ag / Ag Mgt / Non-Ag |
+| `/biodiversity` | `BiodiversityView` | Biodiversity quality + GBF2/3/4/8 targets; Metric selection gates data load |
+| `/renewable` | `RenewableView` | Renewable energy MWh (solar + wind); Am-only hierarchy |
+| `/transition` | `TransitionView` | From→To transition heatmap + spatial map; SubCats auto-discovered from MapService |
+| `/map` | `MapView` | Categorical decision-variable spatial maps (Ag / Ag Mgt / Non-Ag / Land-use) |
+| `/settings` | `SettingsView` | Model run parameter browser |
 
-### 2. Analysis Views
-Each analysis view follows a progressive selection pattern for data exploration:
+### Progressive Selection Hierarchy per View
 
-#### Area Analysis
-- Land use area distribution across agricultural (Ag), agricultural management (Ag Mgt), and non-agricultural (Non-Ag) categories
-- Temporal analysis of land use changes over simulation years
-- Progressive selection: Region → Category → Water → Landuse
+| View | Selection levels |
+|------|-----------------|
+| Area | Category → Water → Landuse |
+| Economics | Category → MapType → (AgMgt) → Water → (Source) → Landuse |
+| GHG | Category → (AgMgt) → Water → Landuse |
+| Water | Category → (AgMgt) → Water → Landuse |
+| Production | Category → (AgMgt) → Water → Landuse |
+| Biodiversity | **Metric** → Category → (AgMgt) → Water → Landuse |
+| Renewable | AgMgt → Water → Landuse (Am-only) |
+| Transition | SubCat → FromWater → ToWater + heatmap cell → Year |
+| Map (DVAR) | Category → (AgMgt) → Water → Landuse |
 
-#### Economics Analysis
-- Revenue and cost analysis with dual chart/map visualization
-- Separate cost and revenue map layers with different data structures
-- Combined cost/revenue chart data with validation for agricultural management categories
-- Progressive selection with special handling for cost/revenue switching
+`(AgMgt)` / `(Source)` appear only for the categories that need them. All views inject `globalSelectedRegion` for the NRM region selector.
 
-#### GHG Emissions Analysis
-- Greenhouse gas emissions by land use type and management practice
-- Comparison across agricultural and non-agricultural sectors
-- Progressive selection: Region → Category → AgMgt → Water → Landuse
+### Home View Details
+- Displays overview charts for Area, Economics, GHG, Water, Biodiversity, Production
+- Shows a live transition heatmap (Ag2Ag start→end area) at the bottom
+- Ranking cards show top land uses per module sub-category
+- Memory profile chart shows model run RAM usage over time
+- Searchable model run parameters panel (from `Supporting_info.js`)
 
-#### Water Usage Analysis
-- Water yield and consumption analysis by Natural Resource Management (NRM) regions
-- Agricultural vs non-agricultural water usage patterns
-- Progressive selection with NRM-specific data structures
+## Service Layer
 
-#### Production Analysis
-- Agricultural commodity production quantities and trends
-- Production targets and achievement analysis
-- Export, import, and domestic consumption breakdowns
-- **Renewable energy production**: MWh output for Utility Solar PV and Onshore Wind, including pre-simulation existing installations surfaced as `lu='Existing Capacity'`
-- Progressive selection: Region → Category → Water → Landuse
+### MapService (`services/MapService.js`)
+Registry of all spatial-layer JS files, keyed by `mapCategories[module][category][subcategory]`.  
+Each leaf is `{ path: "data/map_layers/...", windowName: "window_Xxx" }`.
 
-#### Biodiversity Analysis
-- Global Biodiversity Framework (GBF) target analysis including GBF2, GBF3, GBF4, GBF8
-- Biodiversity quality metrics and species conservation indicators
-- Ecological and species-level biodiversity assessments
-- Simplified progressive selection: Region → [series] for most datasets
+| Module | Category | Sub-categories (map types) |
+|--------|----------|---------------------------|
+| Area | Ag / Ag Mgt / Non-Ag | — |
+| Biodiversity | GBF2 | Sum / Ag / Ag Mgt / Non-Ag / **mask** |
+| Biodiversity | GBF3_NVIS / GBF3_IBRA / GBF4_ECNES / GBF4_SNES / GBF8_GROUP / GBF8_SPECIES / quality | Ag / Ag Mgt / Non-Ag |
+| Dvar | Ag / Ag Mgt / Non-Ag / Lumap | — |
+| Economics | Sum | Profit |
+| Economics | Ag | Profit / Revenue / Cost / Transition(Ag2Ag) / Transition(NonAg2Ag) |
+| Economics | Ag Mgt | Profit / Revenue / Cost |
+| Economics | Non-Ag | Profit / Revenue / Cost / Transition(Ag2NonAg) / Transition(NonAg2NonAg) |
+| GHG | Sum / Ag / Ag Mgt / Non-Ag | — |
+| Production | Sum / Ag / Ag Mgt / Non-Ag | — |
+| Water | Sum / Ag / Ag Mgt / Non-Ag | — |
+| Renewable | Ag Mgt | `map_renewable_energy_Am.js` |
+| Transition | Ag2Ag | `map_transition_area_ag2ag.js` |
 
-#### Map View (Decision Variables)
-- Spatial visualization of optimization results
-- Land use allocation and water supply decisions
-- Agricultural Management practice distribution
-- Simplified hierarchy: Category → Landuse/AgMgt → Year
+### ChartService (`services/ChartService.js`)
+Registry of all chart/heatmap data JS files, keyed by `chartCategories[module][category][subcategory]`.
 
-### 3. Interactive Map System
-- **Australian Regions**: Based on Natural Resource Management (NRM) regions
-- **Hover Effects**: Region highlighting and tooltips
-- **Region Selection**: Click to select regions for detailed analysis
-- **Layer Visualization**: Supports multiple map layers including area, cost, revenue, GHG, water, biodiversity, and decision variables
-- **Base64 Image Rendering**: Efficient map tile rendering with bounds and min/max value information
-- **Responsive Design**: Adapts to different screen sizes
+| Module | Category | Sub-categories |
+|--------|----------|---------------|
+| Area | Ag / Ag Mgt / Non-Ag | — |
+| Area | overview | Land-use / Category / Source |
+| Area | ranking | — |
+| Biodiversity | GBF2 / GBF3_NVIS / GBF3_IBRA / GBF4_SNES / GBF4_ECNES / GBF8_GROUP / GBF8_SPECIES / quality | Ag / Ag Mgt / Non-Ag |
+| Biodiversity | GBF2…quality | overview → Ag / Am / NonAg / sum |
+| Biodiversity | ranking | — |
+| Economics | Sum | Profit |
+| Economics | Ag | Profit / Revenue / Cost / Transition(Ag2Ag) / Transition(NonAg2Ag) |
+| Economics | Ag Mgt | Profit / Revenue / Cost |
+| Economics | Non-Ag | Profit / Revenue / Cost / Transition(Ag2NonAg) / Transition(NonAg2NonAg) |
+| Economics | overview | Ag / Am / NonAg / sum |
+| Economics | ranking | — |
+| GHG | Sum / Ag / Ag Mgt / Non-Ag | — |
+| GHG | overview | Ag / Am / NonAg / sum |
+| GHG | ranking | — |
+| Production | Sum / Ag / Ag Mgt / Non-Ag | — |
+| Production | overview | achieve / Domestic / Exports / Feed / Imports / sum |
+| Production | ranking | — |
+| Water | **NRM** | Sum / Ag / Ag Mgt / Non-Ag |
+| Water | NRM overview | Ag / Am / NonAg / sum |
+| Water | NRM ranking | — |
+| Water | **Watershed** | overview |
+| Renewable | Ag Mgt | `Renewable_energy_Am.js` |
+| Transition | start_end | `Transition_start_end_area.js` |
+| Transition | Ag2Ag | `Transition_ag2ag_area.js` |
+| Supporting | info | `Supporting_info.js` |
 
-### 4. Chart System
-- **Highcharts Integration**: Professional-grade interactive charts
-- **Export Capabilities**: PNG, JPEG, PDF, and CSV export options
-- **Accessibility**: Screen reader support and keyboard navigation
-- **Responsive Design**: Charts adapt to container sizes
-- **Dual Series Support**: Special handling for combined cost/revenue series in economics module
+### MemoryService (`services/MemoryService.js`)
+Prevents stale `window[...]` globals accumulating when navigating between views.
 
-### 5. Progressive Selection Pattern
-All analysis views implement a standardized progressive selection architecture:
-- **Cascade Watchers**: Automatic downstream option updates when upstream selections change
-- **Memory Preservation**: Previous selections restored when switching between categories
-- **Data Validation**: Safe property access with optional chaining and fallback values
-- **Hierarchical Data Access**: Structured data access patterns based on module type
+- **`registerViewData(viewName, dataNames[])`** — records which window globals belong to a view
+- **`registerViewScript(viewName, src, scriptElement)`** — tracks injected `<script>` DOM nodes
+- **`cleanupViewData(viewName)`** — deletes all registered globals and removes script elements
+- **`getMemoryInfo()`** — returns a debug snapshot of current registry state
 
-## Data Architecture
+**Usage**: every view calls `onUnmounted(() => window.MemoryService.cleanupViewData(VIEW_NAME))`.  
+`loadScriptWithTracking()` in `helpers.js` calls `registerViewData` / `registerViewScript` automatically.
 
-### Dynamic Data Loading
-The application uses a custom script loading system (`helpers.js`) that:
-- Loads data files on-demand to optimize performance
-- Manages script dependencies and loading order
-- Provides error handling for failed data loads
-- Supports timeout mechanisms for reliable loading
-
-### Data Types and Structure
-
-#### Core Data Categories
-1. **Supporting Info** (`Supporting_info.js`): Consolidated model run settings and metadata
-2. **Chart Data**: Hierarchical time-series data organized by progressive selection patterns:
-   - **Standard Full**: Category → AgMgt → Water → Landuse → [series]
-   - **Standard Simple**: Category → Water → Landuse → [series]
-   - **NonAg Simplified**: Category → Landuse → [series] (no Water/AgMgt levels)
-   - **Economics Special**: Dual cost/revenue series in single files with validation
-3. **Map Data**: Spatial visualization data ending with `{img_str: "base64...", bounds: [...], min_max: [...]}`
-4. **Geographic Data** (`geo/NRM_AUS.js`): GeoJSON data for Australian NRM regions
-
-#### Data File Patterns
-- **Chart Files**: `ModuleName_Category.js` (e.g., `Area_Ag.js`, `BIO_GBF2_NonAg.js`)
-- **Map Files**: `map_type_Category.js` (e.g., `map_area_Ag.js`, `map_cost_Am.js`)
-- **Overview Files**: `ModuleName_overview_*.js` for summary visualizations
-- **Ranking Files**: `ModuleName_ranking.js` for comparative analysis
-
-#### Progressive Selection Hierarchies
-- **Water Level Options**: `"ALL"`, `"Dryland"`, `"Irrigated"` (Ag/AgMgt only)
-- **AgMgt Options**: `"ALL"`, `"AgTech EI"`, `"Asparagopsis taxiformis"`, `"Biochar"`, `"Precision Agriculture"`, `"Utility Solar PV"`, `"Onshore Wind"` (renewable energy types; `lu='Existing Capacity'` appears automatically when renewables are enabled)
-- **Category Types**: `"Ag"` (Agricultural), `"Ag Mgt"` (Agricultural Management), `"Non-Ag"` (Non-Agricultural)
-
-#### Special Data Structures
-- **Economics Module**: Separate cost/revenue map files but combined chart data with mixed series arrays
-- **Biodiversity Module**: Multiple GBF target datasets (GBF2, GBF3, GBF4, GBF8) plus quality metrics
-- **DVAR Module**: Simplified map-only structure with direct category access
+---
 
 ## Component Architecture
 
-### Chart Container (`chart_container.js`)
-- Wraps Highcharts functionality in a Vue component
-- Manages chart lifecycle (creation, updates, destruction)
-- Handles loading states and error conditions
-- Supports reactive data updates and dual series rendering
+### `<chart-container>` (`chart_container.js`)
+Highcharts Vue wrapper for time-series charts.  
+Props: standard Highcharts series/options structure. Manages chart lifecycle (create, update, destroy).
 
-### Map Components
-- **Map GeoJSON** (`map_geojson.js`): Leaflet integration with Vue reactivity for region visualization
-- **Regions Map** (`regions_map.js`): Interactive regional selection component
-- Manages Australian NRM region visualization with base64 image overlay support
-- Emits region selection events and handles map interactions
+### `<heatmap-container>` (`heatmap_container.js`)
+Highcharts heatmap Vue wrapper for From→To land-use transition matrices.  
+Props: `xCats`, `yCats`, `data`, `maxVal`, `nullColor`, `showAxisLabels`, `showDataLabels`, `onCellClick`, `exportable`, `zoomable`, `draggable`.  
+Accepts the `{x_categories, y_categories, data, max_val}` leaf format produced by `create_report_data.py`.
 
-### UI Components
-- **Sidebar Navigation** (`sidebar.js`): Application navigation with LUTO branding and responsive design
-- **Filterable Dropdown** (`filterable_dropdown.js`): Searchable dropdown component for data selection
-- **Ranking Cards** (`ranking_cards.js`): Comparative ranking visualization component
+### `<regions-map>` (`regions_map.js`)
+NRM region selector combining a `<map-geojson>` choropleth with a base64-image overlay.  
+Emits region selection events consumed by all analysis views via `globalSelectedRegion`.
 
-### Service Layer
-- **ChartService** (`services/ChartService.js`): Chart data registration and management
-- **MapService** (`services/MapService.js`): Map layer data registration and spatial data handling
-- **Helpers** (`components/helpers.js`): Utility functions for dynamic script loading and data management
+### `<map-geojson>` (`map_geojson.js`)
+Raw Leaflet NRM choropleth with hover tooltip.  
+Used inside `<regions-map>` and directly in views that need a standalone spatial layer.
+
+### `<side-bar>` (`sidebar.js`)
+Collapsible navigation sidebar with LUTO branding. Provides `isCollapsed` toggle.
+
+### `<ranking-cards>` (`ranking_cards.js`)
+Displays top-N land use items as sorted card list. Used on Home view.
+
+### `<filterable-dropdown>` (`filterable_dropdown.js`)
+Searchable dropdown for long option lists (e.g. land use names). Wraps Element Plus select with filter.
+
+---
+
+## Data Architecture
+
+### Leaf Data Formats
+
+**Chart leaf** (time-series) — array of Highcharts series objects:
+```js
+[{ name: "Beef - natural land", data: [[2020, 1.2e6], [2025, 1.1e6], ...] }, ...]
+```
+
+**Map leaf** — single-year spatial raster:
+```js
+{ img_str: "<base64 PNG>", bounds: [[lat0,lon0],[lat1,lon1]], min_max: [0, 12345.6] }
+```
+
+**Heatmap leaf** (transition matrix) — used by `<heatmap-container>`:
+```js
+{ x_categories: ["Beef - modified", ...], y_categories: [...], data: [[row,col,val], ...], max_val: 9876 }
+```
+
+### Chart Data Hierarchies
+
+| Module | Full path to chart leaf |
+|--------|------------------------|
+| Area (Ag) | `data[region][lm][lu]` → `[series]` |
+| Area (Am) | `data[region][lm][lu]` → `[series(name=AgMgt)]` |
+| Area (NonAg) | `data[region]` → `[series(name=LU)]` |
+| Economics (Ag Profit) | `data[region][lm][lu]` → `[series]` |
+| Economics (Ag Revenue/Cost) | `data[region][lm][source][lu]` → `[series]` |
+| Economics (Am) | `data[region][lm][lu]` → `[series(name=AgMgt)]` |
+| Economics (NonAg) | `data[region]` → `[series(name=LU)]` |
+| Economics (Transitions) | `data[region]` → `[series]` |
+| GHG (Ag) | `data[region][lm][source][lu]` → `[series]` |
+| GHG (Am) | `data[region][lm][lu]` → `[series(name=AgMgt)]` |
+| GHG (NonAg) | `data[region]` → `[series(name=LU)]` |
+| Water (Ag/Am/NonAg) | `data[region][lm][lu]` — Water chart series by AgMgt for Am |
+| Production (Ag/Am/NonAg) | same pattern as GHG |
+| Biodiversity | same pattern as Area per GBF metric |
+| Renewable (Am) | `data[region][agMgt][lm]` → `[series(name=LU)]` |
+| Transition heatmap | `data[region][from_water][to_water][year]` → `{x_categories, y_categories, data, max_val}` |
+
+### Map Data Hierarchies
+
+| Module | Full path to map leaf |
+|--------|----------------------|
+| Area (Ag/Am) | `data[lm][lu][year]` → leaf |
+| Area (NonAg) | `data[lu][year]` → leaf |
+| Economics (Ag Profit) | `data[lm][lu][year]` → leaf |
+| Economics (Ag Revenue/Cost) | `data[lm][source][lu][year]` → leaf |
+| Economics (Am) | `data[am][lm][lu][year]` → leaf |
+| Economics (NonAg) | `data[lu][year]` → leaf |
+| GHG (Ag) | `data[lm][source][lu][year]` → leaf |
+| GHG (Am) | `data[am][lm][lu][year]` → leaf |
+| GHG (NonAg) | `data[lu][year]` → leaf |
+| Biodiversity | same pattern as Area per GBF metric |
+| Dvar (Ag/Am) | `data[lm][lu][year]` → leaf (categorical integer colormap) |
+| Renewable (Am) | `data[agMgt][lm][lu][year]` → leaf |
+| Transition (Ag2Ag) | `data[from_water][to_water][from_lu][to_lu][year]` → leaf |
+
+**Note on `source` dimension**: appears only in **Ag** for GHG (emission type) and Economics (cost/revenue type). Am and NonAg do not have a source level.
+
+### Special Module Notes
+
+- **Economics `Sum` category**: chart data contains `[series]` with `{name, type: 'Profit/Revenue/Cost', data: [[year, val], ...]}` — no water/LU nesting
+- **Economics Transition types**: `Ag2Ag`, `NonAg2Ag` sit under the `Ag` category; `Ag2NonAg`, `NonAg2NonAg` under `Non-Ag`; both treat lm as irrelevant (always `ALL`)
+- **Biodiversity metric gating**: `BiodiversityView` reads `window.SupportingInfo.settings` and hides any metric whose setting value is `'off'`; `quality` metric is always shown
+- **Water NRM vs Watershed**: `WaterView` has two tabs — NRM (full progressive selection) and Watershed (overview chart only, no map)
+- **Transition SubCat auto-discovery**: `Transition.js` derives its SubCat buttons from `Object.keys(MapService.mapCategories['Transition'])` — adding a new transition type requires only a `MapService.js` + `ChartService.js` entry; `Transition.js` is never edited. The `start_end` SubCat loads a chart-only heatmap (no map).
 
 ## Setup and Usage
 
 ### Prerequisites
-- A modern web browser with JavaScript enabled
-- Python 3 (for local development server)
+A modern browser with JavaScript enabled. No server, build step, or internet connection required.
 
-### Running Locally
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/JinzhuWANG/VUE_LUTO.git
-   cd VUE_LUTO
-   ```
+### Opening the Report
+After a LUTO simulation run completes, the report is at:
 
-2. Start a local web server:
-   ```bash
-   python3 -m http.server 8000
-   ```
+```
+<run_output_dir>/DATA_REPORT/index.html
+```
 
-3. Open your browser and navigate to:
-   ```
-   http://localhost:8000
-   ```
+Double-click `index.html` or drag it into a browser window. All libraries are in `lib/`.
 
-### Data Transformation
-If you need to update data from raw JSON files:
+### Regenerating Data Files
+If you need to convert raw JSON output back into JS data files:
 
-1. Place your JSON files in the `assets/` directory
-2. Run the transformation script:
-   ```bash
-   python dataTransform/01_JSON2JS_dataTrans.py
-   ```
-3. This will convert JSON files to JavaScript files in the `data/` directory with the following features:
-   - Properly formatted with indentation for better readability
-   - Assigned to window objects with the same name as the source file
-   - Map-related files prefixed with "map_" for clearer identification
+```bash
+python dataTransform/01_JSON2JS_dataTrans.py
+```
 
-### Production Deployment
-The application is a static web application that can be deployed to any web server:
-- Upload all files to your web server
-- Ensure the web server can serve `.js` files with the correct MIME type
-- No build process or server-side rendering required
+This wraps each JSON file as a `window.XxxName = {...}` assignment and writes it to `data/`.
 
-## Model Integration
-
-The dashboard is designed to work with LUTO 2.0 model outputs. Key integration points:
-
-### Model Run Parameters
-- **Version**: Model version tracking
-- **Scenarios**: SSP (Shared Socioeconomic Pathways) and RCP (Representative Concentration Pathways)
-- **Policy Settings**: Carbon pricing, biodiversity targets, agricultural management
-- **Constraints**: Water usage, GHG emission limits, land use restrictions
-
-### Data Outputs
-The model generates comprehensive datasets organized by module:
-
-#### Area Module
-- Land use area distribution across Ag, Ag Mgt, and Non-Ag categories
-- Temporal changes in land allocation over simulation years
-- Regional breakdown by NRM areas
-
-#### Economics Module
-- Revenue and cost analysis with separate map layers but combined chart data
-- Economic indicators across agricultural and non-agricultural sectors
-- Cost-benefit analysis by land use type and management practice
-
-#### GHG Module
-- Greenhouse gas emissions by land use category and management type
-- Carbon footprint analysis across agricultural and non-agricultural sectors
-- Temporal emissions trends and mitigation potential
-
-#### Water Module
-- Water yield and consumption by NRM region
-- Agricultural vs non-agricultural water usage patterns
-- Water management efficiency metrics
-
-#### Production Module
-- Agricultural commodity production quantities and trends
-- Export, import, and domestic consumption analysis
-- Production target achievement metrics
-
-#### Biodiversity Module
-- Global Biodiversity Framework (GBF) target indicators (GBF2, GBF3, GBF4, GBF8)
-- Species conservation metrics and habitat quality assessments
-- Ecological connectivity and biodiversity quality scores
-
-#### Decision Variables (DVAR) Module
-- Spatial optimization results showing optimal land use allocation
-- Agricultural Management practice distribution
-- Water supply and infrastructure decisions
+---
 
 ## Development Notes
 
-### Code Style
-- Uses Vue 3 Composition API with reactive programming patterns
-- ES6+ JavaScript features with consistent coding standards
-- No TypeScript (pure JavaScript implementation)
-- Consistent naming conventions (camelCase for variables, kebab-case for components)
-- Progressive selection pattern implementation across all analysis views
+### Architecture Patterns
 
-### Progressive Selection Architecture
-All analysis views implement standardized cascade watcher patterns:
-- **Memory Preservation**: Previous selections restored when switching categories
-- **Cascading Updates**: Downstream options automatically update when upstream selections change
-- **Data Validation**: Safe property access with optional chaining and fallback values
-- **No Manual Clearing**: Automated handling eliminates need for manual array/selection clearing
+**No build step**: views are plain `window.XxxView = { name, setup() {...} }` objects registered in `index.js` via `app.component(...)`. No SFC, no Vite, no webpack.
 
-### Performance Considerations
-- Locally hosted libraries for offline use and faster loading
-- On-demand data loading with script management system
-- Chart reuse and proper cleanup to prevent memory leaks
-- Efficient map rendering with base64 image tiles and minimal DOM manipulation
-- Responsive design principles for various screen sizes
-- Hierarchical data organization optimized for progressive selection patterns
-- Memory-efficient cascade watchers that preserve user experience
+**MemoryService lifecycle**: every view follows:
+```js
+onMounted(() => {
+  loadScript(src, "window_name", VIEW_NAME).then(data => { ... });
+});
+onUnmounted(() => window.MemoryService.cleanupViewData(VIEW_NAME));
+```
 
-### Browser Support
-- Modern browsers supporting ES6+
-- Vue 3 compatibility requirements
-- WebGL support recommended for optimal map performance
+**Cascade watchers**: each view has a chain of `watch([...upstreamRefs], () => { ... })` blocks that repopulate downstream option arrays when an upstream selection changes. Previous selections are stored in a `previousSelections` ref keyed by category.
 
-## Contributing
+**Safe property access**: all data reads use optional chaining (`data?.[a]?.[b]?.[c]`) and fall back to `[]` or `null` to prevent white-screen errors on missing data.
 
-When contributing to this project:
-1. **Architecture Consistency**: Follow the progressive selection pattern for all analysis views
-2. **Code Standards**: Maintain existing Vue 3 Composition API patterns and cascade watcher implementations
-3. **Data Structure**: Ensure new data files follow established naming conventions and hierarchical patterns
-4. **Testing**: Test across different browsers, screen sizes, and data selection scenarios
-5. **Documentation**: Update documentation for any new features, data modules, or architectural changes
-6. **Progressive Selection**: Implement standardized cascade patterns from existing views (e.g., Area.js) when creating new analysis modules
+### Adding a New Transition Type
+The `Transition.js` view auto-discovers SubCat buttons from `MapService.mapCategories['Transition']`. To add a new metric type (e.g., Ag2Ag cost):
+1. Write the map layer in `write.py`
+2. Create the map data file and register it in `MapService.js` under `Transition → <NewSubCat>`
+3. Create the heatmap chart data file and register it in `ChartService.js` under `Transition → <NewSubCat>`
+4. **Do not edit `Transition.js`** — the new SubCat button appears automatically.
 
-## License
+See `jinzhu_inspect_code/transition_view_guide.md` for a step-by-step worked example.
 
-This project is part of the LUTO (Land Use Trade-Offs) model system. Please refer to the main LUTO project for licensing information.
+### Adding a New Analysis View
+1. Create `views/NewView.js` following the progressive selection pattern from `Area.js`
+2. Register the route in `routes/route.js`
+3. Add a sidebar entry in `sidebar.js`
+4. Register chart data in `ChartService.js` and map data in `MapService.js`
+5. Ensure `onUnmounted` calls `MemoryService.cleanupViewData(VIEW_NAME)`
+
+---
 
 ## Version History
 
-### Latest Changes
-- **Progressive Selection Architecture**: Implemented standardized cascade watcher patterns across all analysis views
-- **Biodiversity Module**: Added comprehensive GBF (Global Biodiversity Framework) target analysis including GBF2, GBF3, GBF4, GBF8
-- **Map System Enhancement**: Added Map view (Decision Variables) with spatial optimization results visualization
-- **Data Structure Expansion**: Enhanced data organization with 80+ chart files and comprehensive map layer support
-- **Economics Module Specialization**: Implemented dual cost/revenue visualization with separate map layers and combined chart data
-- **Memory Preservation**: Added intelligent selection memory across category switching for improved user experience
-- **Service Layer**: Separated ChartService and MapService for better data management and registration
-- **UI Component Expansion**: Added filterable dropdowns and ranking cards for enhanced data interaction
-
-### Architecture Highlights
-- **7 Main Analysis Views**: Area, Economics, GHG, Water, Production, Biodiversity, Map (DVAR)
-- **Progressive Selection Patterns**: Standardized data navigation across all modules with 3-4 hierarchy levels
-- **80+ Data Files**: Comprehensive chart and map data coverage across all analysis domains
-- **Dual Visualization**: Chart and map integration with synchronized data selection
-- **Memory-Efficient Watchers**: Automated cascade patterns that preserve user selections and eliminate manual clearing
-
-### Future Enhancements
-- Enhanced scenario comparison functionality across multiple model runs
-- Advanced data export capabilities for custom analysis
-- Improved accessibility features with enhanced keyboard navigation
-- Real-time collaboration features for multi-user analysis sessions
+### Current State
+- **11 routes**: Home, Area, Economics, GHG, Water, Production, Biodiversity, Renewable, Transition, Map (DVAR), Settings
+- **Transition View**: dual heatmap + spatial map; SubCats auto-discovered from MapService registry; cell-click cross-filter; `nullMessage` on NaN cells
+- **Renewable Energy View**: MWh by AgMgt/Water/Landuse; `Existing Capacity` land use shows pre-simulation installations
+- **Biodiversity View**: 8 metrics (quality + GBF2/3/4/8); metric visibility gated by model settings; `mask` map layer for GBF2 priority cells
+- **Water View**: NRM tab (full progressive selection) + Watershed tab (overview only)
+- **Economics View**: Sum/Ag/Ag Mgt/Non-Ag categories; MapType level (Profit/Revenue/Cost); Transition sub-types under Ag and Non-Ag
+- **`<heatmap-container>`**: new Highcharts heatmap Vue wrapper for transition matrices
+- **MemoryService**: per-view JS global lifecycle management via `cleanupViewData()`
+- **All libraries offline**: dashboard opens directly from `index.html`, no server needed
