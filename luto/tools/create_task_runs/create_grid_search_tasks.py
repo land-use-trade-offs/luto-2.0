@@ -28,7 +28,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/LUF_20260323_CORE"
+TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/RES1_TEST"
 
 
 # Set the grid search parameters
@@ -36,10 +36,10 @@ grid_search = {
     ###############################################################
     # Task run settings for submitting the job to the cluster
     ###############################################################
-    'MEM': ['64GB'],
-    'WRITE_REPORT_MAX_MEM_GB': [64],                                        # Max memory for writing report (in GB)
-    'NCPUS':[16],
-    'TIME': ['12:00:00'],
+    'MEM': ['300GB'],
+    'WRITE_REPORT_MAX_MEM_GB': [300],                                        # Max memory for writing report (in GB)
+    'NCPUS':[32],
+    'TIME': ['24:00:00'],
     'QUEUE': ['normalsr'],                                                  # normalsr for CPU, hugemembw for memory intensive jobs
     
  
@@ -47,8 +47,8 @@ grid_search = {
     # Working settings for the model run
     ###############################################################
     'OBJECTIVE': ['maxprofit'],                                             # 'maxprofit' or 'mincost'
-    'RESFACTOR': [5],
-    'SIM_YEARS': [range(2020,2051,5)],                                      # 2010-2060 (2010 is base year)
+    'RESFACTOR': [1],
+    'SIM_YEARS': [range(2010,2051,40)],                                      # 2010-2060 (2010 is base year)
     'WRITE_THREADS': [4],
     
  
@@ -114,7 +114,7 @@ grid_search = {
     'CONNECTIVITY_LB': [0.7],                                               # Connectivity score importance: 0.7 per LUF Report 2026
 
     # --------------- Biodiversity contribution parameters ---------------
-    'BIO_CONTRIBUTION_LDS': [0.85, 0.8, 0.75],                              # Late dry season savanna fire regime; test [0.15,0.2,0.25] per Third iteration
+    'BIO_CONTRIBUTION_LDS': [0.8],                              # Late dry season savanna fire regime; test [0.15,0.2,0.25] per Third iteration
     'BIO_CONTRIBUTION_ENV_PLANTING': [0.7],                                 # Environmental plantings (doc=0.7, default=0.8)
     'BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK': [0.12],                       # Carbon plantings block (doc=0.12, default=0.1)
     'BIO_CONTRIBUTION_CARBON_PLANTING_BELT': [0.12],                        # Carbon plantings belt (doc=0.12, default=0.1)
@@ -125,7 +125,7 @@ grid_search = {
     
     # --------------- Biodiversity settings - GBF 2 ---------------
     'BIODIVERSITY_TARGET_GBF_2': ['high'],                                  # 'off', 'low', 'medium', 'high'
-    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [15, 20, 30],            # Core: 20% central; test [15,30] alongside (Third iteration)
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [15],            # Core: 20% central; test [15,30] alongside (Third iteration)
     'GBF2_CONSTRAINT_TYPE': ['hard'],                                       # 'hard' or 'soft'
 
     # --------------- Biodiversity settings - GBF 3 ---------------
