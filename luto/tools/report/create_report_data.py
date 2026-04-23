@@ -2672,6 +2672,7 @@ def process_transition_data(files, SAVE_DIR):
     all_x_lus = all_lus
 
     out_dict = {}
+    global_max_val = 0.0
     for (yr, region, from_water, to_water), grp in trans_area_df.groupby(
         ['Year', 'region', 'From-water-supply', 'To-water-supply']
     ):
@@ -2688,7 +2689,7 @@ def process_transition_data(files, SAVE_DIR):
         )
         lu_to_idx = {lu: i for i, lu in enumerate(all_lus)}
         all_idx = len(all_lus) - 1
-        points, max_val = [], 0.0
+        points = []
         for (from_lu, to_lu), val in pivot.stack().items():
             xi, yi = lu_to_idx.get(to_lu), lu_to_idx.get(from_lu)
             if xi is None or yi is None or val <= 0:
@@ -2700,21 +2701,23 @@ def process_transition_data(files, SAVE_DIR):
                 points.append({'x': xi, 'y': yi, 'value': val, 'color': '#cccccc'})
             else:
                 points.append([xi, yi, val])
-                if val > max_val:
-                    max_val = val
+                if val > global_max_val:
+                    global_max_val = val
 
         out_dict.setdefault(region, {}).setdefault(from_water, {}).setdefault(to_water, {})[yr] = {
             'x_categories': all_x_lus,   # To-LU: wrapped labels for Highcharts x-axis
             'y_categories': all_lus,      # From-LU: plain labels for Highcharts y-axis
             'data': points,
-            'max_val': round(max_val, 2),
         }
 
-    # Ensure every year (including base year with no transitions) appears in
-    # AUSTRALIA > ALL > ALL so the Vue year-slider can include all years.
-    empty_leaf = {'x_categories': all_x_lus, 'y_categories': all_lus, 'data': [], 'max_val': 0.0}
-    for yr in all_years_from_files:
-        out_dict.setdefault('AUSTRALIA', {}).setdefault('ALL', {}).setdefault('ALL', {}).setdefault(yr, empty_leaf)
+    # Set a consistent max_val across all years for a uniform legend scale
+    global_max_val = round(global_max_val, 2)
+    for region_dict in out_dict.values():
+        for fw_dict in region_dict.values():
+            for tw_dict in fw_dict.values():
+                for leaf in tw_dict.values():
+                    leaf['max_val'] = global_max_val
+
 
     filename = 'Transition_ag2ag_area'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
@@ -2724,7 +2727,7 @@ def process_transition_data(files, SAVE_DIR):
 
     # --------------------- Transition Area year-by-years (ag2nonag) --------------------
     # JSON structure: region → from_water → to_water → year → {x_categories, y_categories, data, max_val}
-    # To-water-supply values: 'Non-Ag' (all non-ag land uses share the same water label) + 'ALL'.
+    # To-water-supply value: 'Dryland' (non-ag land uses are always dryland; raw coord 'dry' → renamed to 'Dryland') + 'ALL'.
     # x-axis (To-LU): non-ag land uses + ALL;  y-axis (From-LU): ag land uses + ALL.
 
     trans_area_ag2nonag_files = files.query('base_name == "transition_ag2nonag_area"').reset_index(drop=True)
@@ -2752,6 +2755,7 @@ def process_transition_data(files, SAVE_DIR):
     all_x_lus_ag2nonag = sorted(to_lus_ag2nonag & non_ag_names) + ['ALL']
 
     out_ag2nonag_dict = {}
+    global_max_val_ag2nonag = 0.0
     for (yr, region, from_water, to_water), grp in trans_area_ag2nonag_df.groupby(
         ['Year', 'region', 'From-water-supply', 'To-water-supply']
     ):
@@ -2766,7 +2770,7 @@ def process_transition_data(files, SAVE_DIR):
         lu_y_to_idx = {lu: i for i, lu in enumerate(all_y_lus_ag2nonag)}
         x_all_idx = len(all_x_lus_ag2nonag) - 1
         y_all_idx = len(all_y_lus_ag2nonag) - 1
-        points, max_val = [], 0.0
+        points = []
         for (from_lu, to_lu), val in pivot.stack().items():
             xi, yi = lu_x_to_idx.get(to_lu), lu_y_to_idx.get(from_lu)
             if xi is None or yi is None or val <= 0:
@@ -2778,24 +2782,158 @@ def process_transition_data(files, SAVE_DIR):
                 points.append({'x': xi, 'y': yi, 'value': val, 'color': '#cccccc'})
             else:
                 points.append([xi, yi, val])
-                if val > max_val:
-                    max_val = val
+                if val > global_max_val_ag2nonag:
+                    global_max_val_ag2nonag = val
         out_ag2nonag_dict.setdefault(region, {}).setdefault(from_water, {}).setdefault(to_water, {})[yr] = {
             'x_categories': all_x_lus_ag2nonag,
             'y_categories': all_y_lus_ag2nonag,
             'data': points,
-            'max_val': round(max_val, 2),
         }
 
-    empty_leaf_ag2nonag = {'x_categories': all_x_lus_ag2nonag, 'y_categories': all_y_lus_ag2nonag, 'data': [], 'max_val': 0.0}
-    for yr in all_years_ag2nonag:
-        out_ag2nonag_dict.setdefault('AUSTRALIA', {}).setdefault('ALL', {}).setdefault('ALL', {}).setdefault(yr, empty_leaf_ag2nonag)
+    # Set a consistent max_val across all years for a uniform legend scale
+    global_max_val_ag2nonag = round(global_max_val_ag2nonag, 2)
+    for region_dict in out_ag2nonag_dict.values():
+        for fw_dict in region_dict.values():
+            for tw_dict in fw_dict.values():
+                for leaf in tw_dict.values():
+                    leaf['max_val'] = global_max_val_ag2nonag
+
 
     filename = 'Transition_ag2nonag_area'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
         json.dump(out_ag2nonag_dict, f, separators=(',', ':'), indent=2)
         f.write(';\n')
+
+
+    # --------------------- Transition Cost year-by-years (ag2ag) --------------------
+    # JSON structure: region → cost_type → year → {x_categories, y_categories, data, max_val}
+    # Cost CSV hierarchy: From-land-use → To-land-use → Cost-type (no water dims).
+    # cost_type values: individual cost-type strings + 'ALL'.
+
+    trans_cost_ag2ag_files = files.query('base_name == "transition_ag2ag_cost"').reset_index(drop=True)
+
+    if not trans_cost_ag2ag_files.empty:
+        trans_cost_ag2ag_df = (
+            pd.concat([df for path in trans_cost_ag2ag_files['path'] if not (df := pd.read_csv(path)).empty], ignore_index=True)
+            .replace(RENAME_AM_NON_AG)
+            .infer_objects(copy=False)
+            .round({'Cost ($)': 2})
+        )
+        trans_cost_ag2ag_df['Year'] = trans_cost_ag2ag_df['Year'].astype(str)
+
+        cost_lus_ag2ag = (
+            set(trans_cost_ag2ag_df.loc[trans_cost_ag2ag_df['From-land-use'] != 'ALL', 'From-land-use'].unique())
+            | set(trans_cost_ag2ag_df.loc[trans_cost_ag2ag_df['To-land-use'] != 'ALL',   'To-land-use'].unique())
+        )
+        all_lus_cost_ag2ag = sorted(cost_lus_ag2ag) + ['ALL']
+
+        out_cost_ag2ag_dict = {}
+        global_max_val_cost_ag2ag = 0.0
+        for (yr, region, cost_type), grp in trans_cost_ag2ag_df.groupby(['Year', 'region', 'Cost-type']):
+            pivot = grp.pivot_table(
+                index='From-land-use', columns='To-land-use',
+                values='Cost ($)', aggfunc='sum', fill_value=0,
+            )
+            lu_to_idx = {lu: i for i, lu in enumerate(all_lus_cost_ag2ag)}
+            all_idx = len(all_lus_cost_ag2ag) - 1
+            points = []
+            for (from_lu, to_lu), val in pivot.stack().items():
+                xi, yi = lu_to_idx.get(to_lu), lu_to_idx.get(from_lu)
+                if xi is None or yi is None or val <= 0:
+                    continue
+                val = round(float(val), 2)
+                if xi == all_idx or yi == all_idx:
+                    points.append({'x': xi, 'y': yi, 'value': val, 'color': '#f8f8f8'})
+                elif from_lu == to_lu:
+                    points.append({'x': xi, 'y': yi, 'value': val, 'color': '#cccccc'})
+                else:
+                    points.append([xi, yi, val])
+                    if val > global_max_val_cost_ag2ag:
+                        global_max_val_cost_ag2ag = val
+            out_cost_ag2ag_dict.setdefault(region, {}).setdefault(cost_type, {})[yr] = {
+                'x_categories': all_lus_cost_ag2ag,
+                'y_categories': all_lus_cost_ag2ag,
+                'data': points,
+            }
+
+        global_max_val_cost_ag2ag = round(global_max_val_cost_ag2ag, 2)
+        for region_dict in out_cost_ag2ag_dict.values():
+            for ct_dict in region_dict.values():
+                for leaf in ct_dict.values():
+                    leaf['max_val'] = global_max_val_cost_ag2ag
+
+        filename = 'Transition_ag2ag_cost'
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(out_cost_ag2ag_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
+
+
+    # --------------------- Transition Cost year-by-years (ag2nonag) --------------------
+    # JSON structure: region → cost_type → year → {x_categories, y_categories, data, max_val}
+    # Cost CSV hierarchy: From-land-use (ag) → To-land-use (non-ag) → Cost-type (no water dims).
+
+    trans_cost_ag2nonag_files = files.query('base_name == "transition_ag2nonag_cost"').reset_index(drop=True)
+
+    if not trans_cost_ag2nonag_files.empty:
+        trans_cost_ag2nonag_df = (
+            pd.concat([df for path in trans_cost_ag2nonag_files['path'] if not (df := pd.read_csv(path)).empty], ignore_index=True)
+            .replace(RENAME_AM_NON_AG)
+            .infer_objects(copy=False)
+            .round({'Cost ($)': 2})
+        )
+        trans_cost_ag2nonag_df['Year'] = trans_cost_ag2nonag_df['Year'].astype(str)
+
+        non_ag_names_cost = set(RENAME_NON_AG.values())
+        from_lus_cost_ag2nonag = set(trans_cost_ag2nonag_df.loc[trans_cost_ag2nonag_df['From-land-use'] != 'ALL', 'From-land-use'].unique())
+        to_lus_cost_ag2nonag   = set(trans_cost_ag2nonag_df.loc[trans_cost_ag2nonag_df['To-land-use']   != 'ALL', 'To-land-use'].unique())
+        all_y_lus_cost_ag2nonag = sorted(from_lus_cost_ag2nonag - non_ag_names_cost) + ['ALL']   # ag only
+        all_x_lus_cost_ag2nonag = sorted(to_lus_cost_ag2nonag & non_ag_names_cost) + ['ALL']     # non-ag only
+
+        out_cost_ag2nonag_dict = {}
+        global_max_val_cost_ag2nonag = 0.0
+        for (yr, region, cost_type), grp in trans_cost_ag2nonag_df.groupby(['Year', 'region', 'Cost-type']):
+            pivot = grp.pivot_table(
+                index='From-land-use', columns='To-land-use',
+                values='Cost ($)', aggfunc='sum', fill_value=0,
+            )
+            lu_x_to_idx = {lu: i for i, lu in enumerate(all_x_lus_cost_ag2nonag)}
+            lu_y_to_idx = {lu: i for i, lu in enumerate(all_y_lus_cost_ag2nonag)}
+            x_all_idx = len(all_x_lus_cost_ag2nonag) - 1
+            y_all_idx = len(all_y_lus_cost_ag2nonag) - 1
+            points = []
+            for (from_lu, to_lu), val in pivot.stack().items():
+                xi, yi = lu_x_to_idx.get(to_lu), lu_y_to_idx.get(from_lu)
+                if xi is None or yi is None or val <= 0:
+                    continue
+                val = round(float(val), 2)
+                if xi == x_all_idx or yi == y_all_idx:
+                    points.append({'x': xi, 'y': yi, 'value': val, 'color': '#f8f8f8'})
+                elif from_lu == to_lu:
+                    points.append({'x': xi, 'y': yi, 'value': val, 'color': '#cccccc'})
+                else:
+                    points.append([xi, yi, val])
+                    if val > global_max_val_cost_ag2nonag:
+                        global_max_val_cost_ag2nonag = val
+            out_cost_ag2nonag_dict.setdefault(region, {}).setdefault(cost_type, {})[yr] = {
+                'x_categories': all_x_lus_cost_ag2nonag,
+                'y_categories': all_y_lus_cost_ag2nonag,
+                'data': points,
+            }
+
+        global_max_val_cost_ag2nonag = round(global_max_val_cost_ag2nonag, 2)
+        for region_dict in out_cost_ag2nonag_dict.values():
+            for ct_dict in region_dict.values():
+                for leaf in ct_dict.values():
+                    leaf['max_val'] = global_max_val_cost_ag2nonag
+
+        filename = 'Transition_ag2nonag_cost'
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(out_cost_ag2nonag_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
+
 
     return "Transition data processing completed"
 

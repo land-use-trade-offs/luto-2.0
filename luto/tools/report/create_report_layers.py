@@ -577,24 +577,37 @@ def save_report_layer(raw_data_dir:str):
     #                8) Transitions                    #
     ####################################################
 
-    # Transitions Area
+    # Transitions Area (Ag2Ag)
     files_transition_area_ag2ag = files.query('base_name == "xr_transition_ag2ag_area"')
-    
     trans_area_ag2ag_magnitudes = cell_magnitudes['transition_area']['ag2ag']
     trans_area_ag2ag_min_max = (min(trans_area_ag2ag_magnitudes), max(trans_area_ag2ag_magnitudes))
-    
     get_map2json(files_transition_area_ag2ag, None, None, legend_float, trans_area_ag2ag_min_max, f'{SAVE_DIR}/map_layers/map_transition_area_ag2ag.js')
     print('│   ├── Transition Area (Ag2Ag) layer saved.')
 
-    # files_df,legend_int,legend_int_level,legend_float,float_magnitude,save_path = files_transition_area_ag2ag, None, None, legend_float, trans_area_ag2ag_min_max, f'{SAVE_DIR}/map_layers/map_transition_area_ag2ag.js'
 
+    # Transitions Area (Ag2NonAg)
     files_transition_area_ag2nonag = files.query('base_name == "xr_transition_ag2nonag_area"')
-
     trans_area_ag2non_ag_magnitudes = cell_magnitudes['transition_area']['ag2non_ag']
     trans_area_ag2non_ag_min_max = (min(trans_area_ag2non_ag_magnitudes), max(trans_area_ag2non_ag_magnitudes))
-
     get_map2json(files_transition_area_ag2nonag, None, None, legend_float, trans_area_ag2non_ag_min_max, f'{SAVE_DIR}/map_layers/map_transition_area_ag2nonag.js')
     print('│   ├── Transition Area (Ag2NonAg) layer saved.')
+
+
+    # Transitions Cost (Ag2Ag)
+    files_transition_cost_ag2ag = files.query('base_name == "xr_transition_ag2ag_cost"')
+    trans_cost_ag2ag_magnitudes = cell_magnitudes['Economics_ag']['ag2ag_cost']
+    trans_cost_ag2ag_min_max = (min(trans_cost_ag2ag_magnitudes), max(trans_cost_ag2ag_magnitudes))
+    get_map2json(files_transition_cost_ag2ag, None, None, legend_float, trans_cost_ag2ag_min_max, f'{SAVE_DIR}/map_layers/map_transition_cost_ag2ag.js')
+    print('│   ├── Transition Cost (Ag2Ag) layer saved.')
+
+
+    # Transitions Cost (Ag2NonAg)
+    files_transition_cost_ag2nonag = files.query('base_name == "xr_transition_ag2nonag_cost"')
+    trans_cost_ag2nonag_magnitudes = cell_magnitudes['Economics_non_ag']['ag2nonag_cost']
+    trans_cost_ag2nonag_min_max = (min(trans_cost_ag2nonag_magnitudes), max(trans_cost_ag2nonag_magnitudes))
+    get_map2json(files_transition_cost_ag2nonag, None, None, legend_float, trans_cost_ag2nonag_min_max, f'{SAVE_DIR}/map_layers/map_transition_cost_ag2nonag.js')
+    print('│   ├── Transition Cost (Ag2NonAg) layer saved.')
+
 
 
 

@@ -1,4 +1,4 @@
-﻿window.TransitionView = {
+window.TransitionView = {
   name: 'TransitionView',
   setup() {
     const { ref, computed, onMounted, onUnmounted, inject, watch, nextTick } = Vue;
@@ -14,62 +14,79 @@
     // Global region state
     const selectRegion = inject("globalSelectedRegion");
 
-    // Category (always "Area")
-    const availableCategories = ["Area"];
-    const selectCategory = ref("Area");
+    // ── Category ─────────────────────────────────────────────────────────────
+    // "Area" SubCats use: region → from_water → to_water → year
+    // "Cost" SubCats use: region → cost_type  → year
+    const availableCategories = Object.keys(mapRegister);
+    const selectCategory = ref(availableCategories[0] || "Area");
 
-    // SubCat: derived from map registry keys
-    const availableSubCats = Object.keys(mapRegister);
-    const selectSubCat = ref(availableSubCats[0] || "Ag2Ag");
+    // SubCat is scoped by category
+    const availableSubCats = computed(() => Object.keys(mapRegister[selectCategory.value] || {}));
+    const selectSubCat = ref(""); // Will be initialized in onMounted
 
-    // Year state (index-driven slider)
+    // ── Year slider ───────────────────────────────────────────────────────────
     const yearIndex = ref(0);
-    const selectYear = ref("2020");
+    const selectYear = ref("");
     const availableYears = ref([]);
 
-    // Water selection state
+    // ── Area: From/To water selection ─────────────────────────────────────────
     const availableFromWater = ref([]);
     const availableToWater = ref([]);
     const selectFromWater = ref("ALL");
     const selectToWater = ref("ALL");
 
-    // UI state
+    // ── Cost: Cost-type selection ──────────────────────────────────────────────
+    const availableCostTypes = ref([]);
+    const selectCostType = ref("ALL");
+
+    // ── UI state ──────────────────────────────────────────────────────────────
     const dataLoaded = ref(false);
     const isLoadingData = ref(false);
     const isDrawerOpen = ref(false);
 
-    // Cell selection for heatmap-driven map filter: { xi, yi } or null
+    // Cell selection for heatmap-driven map filter
     const selectedCell = ref(null);
 
-    // ----------------------------------------------------------------
-    // Computed
-    // ----------------------------------------------------------------
-    const currentMapName = computed(() => mapRegister[selectSubCat.value]?.["name"] || "");
-    const currentChartName = computed(() => chartRegister[selectSubCat.value]?.["name"] || "");
+    // ── Computed ──────────────────────────────────────────────────────────────
+    const isAreaMode = computed(() => selectCategory.value === "Area");
 
-    // Map leaf: From-water -> To-water -> from_lu -> to_lu -> year
-    // When a cell is selected in the preview heatmap, filter to that from/to LU pair.
+    const currentMapName = computed(() => mapRegister[selectCategory.value]?.[selectSubCat.value]?.["name"] || "");
+    const currentChartName = computed(() => chartRegister[selectCategory.value]?.[selectSubCat.value]?.["name"] || "");
+
+    // Chart leaf — area mode: region→from_water→to_water→year
+    //              cost mode: region→cost_type→year
+    const selectChartLeaf = computed(() => {
+      if (!dataLoaded.value || !currentChartName.value) return null;
+      const chartData = window[currentChartName.value];
+      if (isAreaMode.value) {
+        return chartData?.[selectRegion.value]?.[selectFromWater.value]?.[selectToWater.value]?.[selectYear.value] || null;
+      } else {
+        return chartData?.[selectRegion.value]?.[selectCostType.value]?.[selectYear.value] || null;
+      }
+    });
+
+    // Map leaf — area mode: From-water→To-water→from_lu→to_lu→year
+    //            cost mode: from_lu→to_lu→Cost-type→year (no water dims)
     const selectMapData = computed(() => {
       if (!dataLoaded.value || !currentMapName.value) return {};
       const mapData = window[currentMapName.value];
       const cell = selectedCell.value;
       const leaf = selectChartLeaf.value;
       const fromLu = (cell && leaf) ? (leaf.y_categories[cell.yi] || 'ALL') : 'ALL';
-      const toLu = (cell && leaf) ? (leaf.x_categories[cell.xi] || 'ALL').replace(/<br>/g, ' ') : 'ALL';
-      // Try specific LU pair, fall back to ALL→ALL
-      return mapData?.[selectFromWater.value]?.[selectToWater.value]?.[fromLu]?.[toLu]?.[selectYear.value]
-        || mapData?.[selectFromWater.value]?.[selectToWater.value]?.['ALL']?.['ALL']?.[selectYear.value]
-        || {};
+      const toLu   = (cell && leaf) ? (leaf.x_categories[cell.xi] || 'ALL').replace(/<br>/g, ' ') : 'ALL';
+
+      if (isAreaMode.value) {
+        return mapData?.[selectFromWater.value]?.[selectToWater.value]?.[fromLu]?.[toLu]?.[selectYear.value]
+          || mapData?.[selectFromWater.value]?.[selectToWater.value]?.['ALL']?.['ALL']?.[selectYear.value]
+          || {};
+      } else {
+        return mapData?.[fromLu]?.[toLu]?.[selectCostType.value]?.[selectYear.value]
+          || mapData?.['ALL']?.['ALL']?.[selectCostType.value]?.[selectYear.value]
+          || {};
+      }
     });
 
-    // Chart leaf: region -> from_water -> to_water -> year
-    const selectChartLeaf = computed(() => {
-      if (!dataLoaded.value || !currentChartName.value) return null;
-      const chartData = window[currentChartName.value];
-      return chartData?.[selectRegion.value]?.[selectFromWater.value]?.[selectToWater.value]?.[selectYear.value] || null;
-    });
-
-    // Preview data: when a cell is selected, dim all other non-null cells.
+    // Preview heatmap data with cell dimming
     const DIM_COLOR = 'rgba(210,210,210,0.45)';
     const previewChartData = computed(() => {
       const leaf = selectChartLeaf.value;
@@ -77,74 +94,82 @@
       const cell = selectedCell.value;
       if (!cell) return leaf.data;
       return leaf.data.map(p => {
-        const xi = Array.isArray(p) ? p[0] : p.x;
-        const yi = Array.isArray(p) ? p[1] : p.y;
+        const xi  = Array.isArray(p) ? p[0] : p.x;
+        const yi  = Array.isArray(p) ? p[1] : p.y;
         const val = Array.isArray(p) ? p[2] : p.value;
         if (xi === cell.xi && yi === cell.yi) {
-          // Keep selected cell using colorAxis (array form)
           return Array.isArray(p) ? p : [xi, yi, val];
         }
-        // Dim everything else
         return { x: xi, y: yi, value: val, color: DIM_COLOR };
       });
     });
 
-    // ----------------------------------------------------------------
-    // Load data for current subcat
-    // ----------------------------------------------------------------
+    // ── Load data for current SubCat ──────────────────────────────────────────
     const loadSubCatData = async (subCat) => {
-      const mapEntry = mapRegister[subCat];
-      const chartEntry = chartRegister[subCat];
+      const mapEntry   = mapRegister[selectCategory.value]?.[subCat];
+      const chartEntry = chartRegister[selectCategory.value]?.[subCat];
       if (!mapEntry || !chartEntry) return;
 
       isLoadingData.value = true;
       dataLoaded.value = false;
+
+      // Clean up previous SubCat data to prevent memory growth
+      window.MemoryService.cleanupViewData(VIEW_NAME);
+
       await Promise.all([
-        loadScript(mapEntry["path"], mapEntry["name"], VIEW_NAME),
+        loadScript(mapEntry["path"],   mapEntry["name"],   VIEW_NAME),
         loadScript(chartEntry["path"], chartEntry["name"], VIEW_NAME),
       ]);
       isLoadingData.value = false;
 
-      // Derive water options from chart data (AUSTRALIA has all combinations)
       const chartData = window[chartEntry["name"]];
       const refRegion = 'AUSTRALIA';
-      availableFromWater.value = Object.keys(chartData?.[refRegion] || {});
-      selectFromWater.value = availableFromWater.value.includes("ALL") ? "ALL" : (availableFromWater.value[0] || "ALL");
 
-      availableToWater.value = Object.keys(chartData?.[refRegion]?.[selectFromWater.value] || {});
-      selectToWater.value = availableToWater.value.includes("ALL") ? "ALL" : (availableToWater.value[0] || "ALL");
+      if (isAreaMode.value) {
+        // Area: derive From/To water options
+        availableFromWater.value = Object.keys(chartData?.[refRegion] || {});
+        selectFromWater.value = availableFromWater.value.includes("ALL") ? "ALL" : (availableFromWater.value[0] || "ALL");
+
+        availableToWater.value = Object.keys(chartData?.[refRegion]?.[selectFromWater.value] || {});
+        selectToWater.value = availableToWater.value.includes("ALL") ? "ALL" : (availableToWater.value[0] || "ALL");
+
+        const twBranch = chartData?.[refRegion]?.[selectFromWater.value]?.[selectToWater.value] || {};
+        availableYears.value = Object.keys(twBranch).sort();
+      } else {
+        // Cost: derive Cost-type options (first level under region)
+        availableCostTypes.value = Object.keys(chartData?.[refRegion] || {});
+        selectCostType.value = availableCostTypes.value.includes("ALL") ? "ALL" : (availableCostTypes.value[0] || "ALL");
+
+        const ctBranch = chartData?.[refRegion]?.[selectCostType.value] || {};
+        availableYears.value = Object.keys(ctBranch).sort();
+      }
+
+      yearIndex.value = 0;
+      selectYear.value = availableYears.value[0] || "";
 
       await nextTick(() => { dataLoaded.value = true; });
     };
 
-    // ----------------------------------------------------------------
-    // Memory cleanup
-    // ----------------------------------------------------------------
+    // ── Memory cleanup ────────────────────────────────────────────────────────
     onUnmounted(() => {
       window.MemoryService.cleanupViewData(VIEW_NAME);
     });
 
-    // ----------------------------------------------------------------
-    // Mount
-    // ----------------------------------------------------------------
+    // ── Mount ─────────────────────────────────────────────────────────────────
     onMounted(async () => {
-      await loadScript("./data/Supporting_info.js", "Supporting_info", VIEW_NAME);
-      availableYears.value = window.Supporting_info.years.map(String);
-      selectYear.value = availableYears.value[0] || "2020";
-      yearIndex.value = 0;
-      await loadSubCatData(selectSubCat.value);
+      selectSubCat.value = availableSubCats.value[0];
+      if (selectSubCat.value) {
+        await loadSubCatData(selectSubCat.value);
+      }
     });
 
-    // ----------------------------------------------------------------
-    // Watchers
-    // ----------------------------------------------------------------
+    // ── Watchers ──────────────────────────────────────────────────────────────
     const toggleDrawer = () => { isDrawerOpen.value = !isDrawerOpen.value; };
 
-    // Cell click handler for compact preview heatmap
-    const nullMessage = ref(null);  // timed message for NaN cells
+    // Cell click handler
+    const nullMessage = ref(null);
     let _nullMsgTimer = null;
     const handlePreviewClick = ({ xi, yi, value }) => {
-      // Ignore clicks on null/NaN cells
       if (value === null || value === undefined || (typeof value === 'number' && isNaN(value))) {
         if (_nullMsgTimer) clearTimeout(_nullMsgTimer);
         nullMessage.value = 'This transition does not exist';
@@ -154,14 +179,14 @@
       nullMessage.value = null;
       const cell = selectedCell.value;
       if (cell && cell.xi === xi && cell.yi === yi) {
-        selectedCell.value = null;  // toggle off
+        selectedCell.value = null;
       } else {
         selectedCell.value = { xi, yi };
       }
     };
 
-    // Clear selection when water/year/subcat changes
-    watch([selectFromWater, selectToWater, selectSubCat, yearIndex], () => {
+    // Clear selection on filter/year/subcat change
+    watch([selectFromWater, selectToWater, selectCostType, selectSubCat, yearIndex], () => {
       selectedCell.value = null;
     });
 
@@ -169,11 +194,22 @@
       selectYear.value = availableYears.value[newIdx];
     });
 
+    // When category changes, switch SubCat to first of new category and reload
+    watch(selectCategory, (newCat) => {
+      const subs = Object.keys(mapRegister[newCat] || {});
+      selectSubCat.value = subs[0];
+      if (subs[0]) {
+        loadSubCatData(subs[0]);
+      }
+    });
+
     watch(selectSubCat, (newSubCat) => {
       loadSubCatData(newSubCat);
     });
 
+    // Area: when From-water changes, cascade To-water options
     watch(selectFromWater, (newFW) => {
+      if (!isAreaMode.value) return;
       const chartData = window[currentChartName.value];
       const refRegion = 'AUSTRALIA';
       availableToWater.value = Object.keys(chartData?.[refRegion]?.[newFW] || {});
@@ -187,8 +223,9 @@
       availableYears,
       availableCategories, selectCategory,
       availableSubCats, selectSubCat,
-      availableFromWater, availableToWater,
-      selectFromWater, selectToWater,
+      isAreaMode,
+      availableFromWater, availableToWater, selectFromWater, selectToWater,
+      availableCostTypes, selectCostType,
       selectMapData, selectChartLeaf, previewChartData,
       selectedCell, handlePreviewClick, nullMessage,
       dataLoaded, isLoadingData,
@@ -229,7 +266,7 @@
         <!-- Filters box -->
         <div class="flex flex-col space-y-2 bg-white/70 p-2 rounded-lg">
 
-          <!-- Category buttons -->
+          <!-- Category buttons (Area / Cost) -->
           <div class="flex flex-wrap gap-1">
             <span class="text-[0.8rem] mr-1 font-medium">Category:</span>
             <button v-for="val in availableCategories" :key="val"
@@ -240,7 +277,7 @@
             </button>
           </div>
 
-          <!-- SubCat buttons -->
+          <!-- SubCat buttons (scoped by category) -->
           <div class="flex flex-wrap gap-1">
             <span class="text-[0.8rem] mr-1 font-medium">Sub-Category:</span>
             <button v-for="val in availableSubCats" :key="val"
@@ -251,8 +288,8 @@
             </button>
           </div>
 
-          <!-- From-water buttons -->
-          <div v-if="dataLoaded && availableFromWater.length > 0" class="flex flex-wrap gap-1">
+          <!-- Area mode: From-water buttons -->
+          <div v-if="isAreaMode && dataLoaded && availableFromWater.length > 0" class="flex flex-wrap gap-1">
             <span class="text-[0.8rem] mr-1 font-medium">From Water:</span>
             <button v-for="val in availableFromWater" :key="val"
               @click="selectFromWater = val"
@@ -262,13 +299,24 @@
             </button>
           </div>
 
-          <!-- To-water buttons -->
-          <div v-if="dataLoaded && availableToWater.length > 0" class="flex flex-wrap gap-1">
+          <!-- Area mode: To-water buttons -->
+          <div v-if="isAreaMode && dataLoaded && availableToWater.length > 0" class="flex flex-wrap gap-1">
             <span class="text-[0.8rem] mr-1 font-medium">To Water:</span>
             <button v-for="val in availableToWater" :key="val"
               @click="selectToWater = val"
               class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
               :class="{'bg-sky-500 text-white': selectToWater === val}">
+              {{ val }}
+            </button>
+          </div>
+
+          <!-- Cost mode: Cost-type buttons -->
+          <div v-if="!isAreaMode && dataLoaded && availableCostTypes.length > 0" class="flex flex-wrap gap-1">
+            <span class="text-[0.8rem] mr-1 font-medium">Cost Type:</span>
+            <button v-for="val in availableCostTypes" :key="val"
+              @click="selectCostType = val"
+              class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
+              :class="{'bg-sky-500 text-white': selectCostType === val}">
               {{ val }}
             </button>
           </div>
@@ -292,6 +340,7 @@
               :yCats="selectChartLeaf.y_categories"
               :data="previewChartData"
               :maxVal="selectChartLeaf.max_val"
+              :value-type="selectCategory"
               :show-axis-labels="false"
               :show-data-labels="false"
               :on-cell-click="handlePreviewClick"
@@ -354,7 +403,7 @@
         }">
           <div v-if="dataLoaded && (!selectChartLeaf || selectChartLeaf.data.length === 0)"
             class="flex items-center justify-center h-full text-gray-400 text-sm bg-white/80 rounded-lg">
-            No transitions for {{ selectRegion }} - {{ selectFromWater }} to {{ selectToWater }} - {{ selectYear }}
+            No transitions for this selection
           </div>
           <heatmap-container
             v-else-if="dataLoaded && selectChartLeaf"
@@ -362,6 +411,7 @@
             :yCats="selectChartLeaf.y_categories"
             :data="selectChartLeaf.data"
             :maxVal="selectChartLeaf.max_val"
+            :value-type="selectCategory"
             :exportable="true"
             :zoomable="true"
             :draggable="true"

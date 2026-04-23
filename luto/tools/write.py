@@ -1511,7 +1511,7 @@ def write_transition_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     ag_transitions_cost_mat = xr.DataArray(
         np.stack(list(ag_transitions_cost_mat.values())).astype(np.float32),
         coords={
-            'Type': list(ag_transitions_cost_mat.keys()),
+            'Cost-type': list(ag_transitions_cost_mat.keys()),
             'To-water-supply': data.LANDMANS,
             'cell': range(data.NCELLS),
             'To-land-use': data.AGRICULTURAL_LANDUSES
@@ -1520,7 +1520,7 @@ def write_transition_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 
     # Use xr.dot() to contract To-water-supply without broadcasting:
     #   Plain `*` would first expand ag_dvar_mrj_target × ag_transitions_cost_mat into a full
-    #   [To-water-supply, To-land-use, Type, cell] intermediate array, then sum — allocating that
+    #   [To-water-supply, To-land-use, Cost-type, cell] intermediate array, then sum — allocating that
     #   array even though it is immediately discarded. xr.dot() fuses the multiply-and-sum into
     #   one pass so the large intermediate never exists in memory.
     #   Similarly, From-water-supply is summed on ag_dvar_mrj_base before the multiply to keep
@@ -1530,15 +1530,15 @@ def write_transition_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         * xr.dot(ag_dvar_mrj_target, ag_transitions_cost_mat, dims=['To-water-supply'])
     )
 
-    cost_xr = add_all(cost_xr, ['From-land-use', 'To-land-use', 'Type'])
+    cost_xr = add_all(cost_xr, ['From-land-use', 'To-land-use', 'Cost-type'])
 
     # Get transition cost by region and land-use; This is for report generation later (e.g., for setting colorbar limits)
     cost_df_region = process_chunks(
         cost_xr, data, yr_cal, chunk_size,
-        groupby_cols=['region', 'Type', 'From-land-use', 'To-land-use'],
+        groupby_cols=['region', 'Cost-type', 'From-land-use', 'To-land-use'],
         value_col='Cost ($)'
     )
-    cost_df_AUS = cost_df_region.groupby(['From-land-use', 'To-land-use', 'Type', 'Year']
+    cost_df_AUS = cost_df_region.groupby(['From-land-use', 'To-land-use', 'Cost-type', 'Year']
         )['Cost ($)'
         ].sum(
         ).reset_index(
@@ -1547,7 +1547,7 @@ def write_transition_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 
     # Get valid data layers (before renaming/replacing)
     valid_layers_transition = pd.MultiIndex.from_frame(
-        cost_df_AUS[['From-land-use', 'To-land-use', 'Type']]
+        cost_df_AUS[['From-land-use', 'To-land-use', 'Cost-type']]
     ).sort_values()
 
     # Write to csv
@@ -1555,7 +1555,7 @@ def write_transition_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         ).replace({'dry': 'Dryland', 'irr': 'Irrigated'}
         ).to_csv(os.path.join(path, f'transition_ag2ag_cost_{yr_cal}.csv'), index=False)
 
-    cost_xr_stacked = cost_xr.stack({'layer': ['From-land-use', 'To-land-use', 'Type']}
+    cost_xr_stacked = cost_xr.stack({'layer': ['From-land-use', 'To-land-use', 'Cost-type']}
         ).drop_vars('region'
         ).sel(layer=valid_layers_transition
         ).compute()
@@ -1616,7 +1616,9 @@ def write_transition_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         ).infer_objects(copy=False
         ).replace({'dry': 'Dryland', 'irr': 'Irrigated'}
         ).to_csv(os.path.join(path, f'transition_ag2ag_ghg_{yr_cal}.csv'), index=False)
-    transition_valid_layers = xr_ghg_transition.stack(layer=['From-land-use', 'To-land-use', 'Type']).sel(layer=valid_transition_layers).drop_vars('region')
+    transition_valid_layers = xr_ghg_transition.stack(layer=['From-land-use', 'To-land-use', 'Type']
+        ).sel(layer=valid_transition_layers
+        ).drop_vars('region')
     save2nc(transition_valid_layers, os.path.join(path, f'xr_transition_ag2ag_ghg_{yr_cal}.nc'))
 
 
@@ -1727,7 +1729,6 @@ def write_transition_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     non_ag_dvar_target = tools.non_ag_rk_to_xr(data, tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
         ).assign_coords(region=('cell', data.REGION_NRM_NAME)
         ).rename({'lu': 'To-land-use'}
-        ).expand_dims({'To-water-supply': ['Non-Ag']}
         ).chunk({'cell': chunk_size})
 
     
@@ -1750,8 +1751,8 @@ def write_transition_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
             }
         )
     
-    # Calculate transition area, then expand dimension (has to be after multiplication to avoid double counting)
-    non_ag_transitions_area = ag_dvar_base * non_ag_transitions_area_mat * non_ag_dvar_target
+    # Calculate transition area; expand To-water-supply='dry' (area only, not cost/GHG)
+    non_ag_transitions_area = ag_dvar_base * non_ag_transitions_area_mat * non_ag_dvar_target.expand_dims({'To-water-supply': ['dry']})
     non_ag_transitions_area = add_all(non_ag_transitions_area, ['From-water-supply', 'To-water-supply', 'From-land-use', 'To-land-use'])
     
     # Get transition area by region and land-use; This is for report generation later (e.g., for setting colorbar limits)

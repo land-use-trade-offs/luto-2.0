@@ -23,6 +23,7 @@ window.HeatmapContainer = {
         nullColor: { type: String, default: '#f0f0f0' },
         showAxisLabels: { type: Boolean, default: true },
         showDataLabels: { type: Boolean, default: true },
+        valueType: { type: String, default: 'Area' },
         onCellClick: { type: Function, default: null },
         exportable: { type: Boolean, default: false },
         zoomable: { type: Boolean, default: false },
@@ -131,13 +132,21 @@ window.HeatmapContainer = {
                     shadow: true,
                     style: { color: '#333333', opacity: 1, zIndex: 9999 },
                     formatter: function () {
-                        const ha = this.point.value;
-                        if (ha === null || ha === undefined) return false;
+                        const val = this.point.value;
+                        if (val === null || val === undefined) return false;
                         const xLabel = (xCats[this.point.x] || '').replace(/<br>/g, ' ');
                         const yLabel = yCats[this.point.y] || '';
+                        
+                        let valStr = '';
+                        if (props.valueType === 'Cost') {
+                            valStr = '<b>Cost:</b> $' + Highcharts.numberFormat(val / 1e9, 3) + ' B';
+                        } else {
+                            valStr = '<b>Area:</b> ' + Highcharts.numberFormat(val, 0) + ' ha';
+                        }
+
                         return '<b>From:</b> ' + yLabel + '<br>' +
                             '<b>To:</b> ' + xLabel + '<br>' +
-                            '<b>Area:</b> ' + Highcharts.numberFormat(ha, 0) + ' ha';
+                            valStr;
                     },
                 },
                 plotOptions: {
@@ -153,7 +162,7 @@ window.HeatmapContainer = {
                     },
                 },
                 series: [{
-                    name: 'Transition Area (ha)',
+                    name: props.valueType === 'Cost' ? 'Transition Cost ($)' : 'Transition Area (ha)',
                     borderWidth: 1,
                     borderColor: 'rgba(180,180,180,0.28)',
                     data: data,
@@ -167,13 +176,22 @@ window.HeatmapContainer = {
                             color: '#333333',
                         },
                         formatter: function () {
-                            const ha = this.point.value;
-                            if (ha == null || ha <= 0) return '';
+                            const val = this.point.value;
+                            if (val == null || val <= 0) return '';
                             const isAllCol = this.point.x === xCats.length - 1;
                             const isAllRow = this.point.y === yCats.length - 1;
-                            const formatted = ha >= 1e6 ? (ha / 1e6).toFixed(1) + 'M'
-                                : ha >= 1e3 ? (ha / 1e3).toFixed(1) + 'k'
-                                    : String(ha);
+                            
+                            let formatted = '';
+                            if (props.valueType === 'Cost') {
+                                formatted = val >= 1e9 ? '$' + (val / 1e9).toFixed(1) + 'B'
+                                    : val >= 1e6 ? '$' + (val / 1e6).toFixed(1) + 'M'
+                                    : '$' + String(val);
+                            } else {
+                                formatted = val >= 1e6 ? (val / 1e6).toFixed(1) + 'M'
+                                    : val >= 1e3 ? (val / 1e3).toFixed(1) + 'k'
+                                    : String(val);
+                            }
+                            
                             return (isAllCol || isAllRow)
                                 ? '<b>' + formatted + '</b>'
                                 : formatted;
@@ -247,7 +265,7 @@ window.HeatmapContainer = {
 
         // Re-render whenever any prop changes
         watch(
-            () => [props.xCats, props.yCats, props.data, props.maxVal, props.showAxisLabels, props.showDataLabels, props.zoomable, props.exportable],
+            () => [props.xCats, props.yCats, props.data, props.maxVal, props.showAxisLabels, props.showDataLabels, props.valueType, props.zoomable, props.exportable],
             () => { createChart(); },
             { deep: true }
         );

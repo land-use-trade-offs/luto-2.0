@@ -106,8 +106,14 @@ window.MapService = {
       'Ag Mgt': { 'path': 'data/map_layers/map_renewable_energy_Am.js', 'name': 'map_renewable_energy_Am' },
     },
     'Transition': {
-      'Ag2Ag': { 'path': 'data/map_layers/map_transition_area_ag2ag.js', 'name': 'map_transition_area_ag2ag' },
-      'Ag2NonAg': { 'path': 'data/map_layers/map_transition_area_ag2nonag.js', 'name': 'map_transition_area_ag2nonag' },
+      'Area': {
+        'Ag2Ag':    { 'path': 'data/map_layers/map_transition_area_ag2ag.js',    'name': 'map_transition_area_ag2ag' },
+        'Ag2NonAg': { 'path': 'data/map_layers/map_transition_area_ag2nonag.js', 'name': 'map_transition_area_ag2nonag' },
+      },
+      'Cost': {
+        'Ag2Ag':    { 'path': 'data/map_layers/map_transition_cost_ag2ag.js',    'name': 'map_transition_cost_ag2ag' },
+        'Ag2NonAg': { 'path': 'data/map_layers/map_transition_cost_ag2nonag.js', 'name': 'map_transition_cost_ag2nonag' },
+      },
     },
   }
 }

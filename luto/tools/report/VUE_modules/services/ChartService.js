@@ -523,17 +523,29 @@ window.ChartService = {
       },
     },
     Transition: {
-      start_end: {
-        path: "data/Transition_start_end_area.js",
-        name: "Transition_start_end_area",
+      Area: {
+        start_end: {
+          path: "data/Transition_start_end_area.js",
+          name: "Transition_start_end_area",
+        },
+        Ag2Ag: {
+          path: "data/Transition_ag2ag_area.js",
+          name: "Transition_ag2ag_area",
+        },
+        Ag2NonAg: {
+          path: "data/Transition_ag2nonag_area.js",
+          name: "Transition_ag2nonag_area",
+        },
       },
-      Ag2Ag: {
-        path: "data/Transition_ag2ag_area.js",
-        name: "Transition_ag2ag_area",
-      },
-      Ag2NonAg: {
-        path: "data/Transition_ag2nonag_area.js",
-        name: "Transition_ag2nonag_area",
+      Cost: {
+        Ag2Ag: {
+          path: "data/Transition_ag2ag_cost.js",
+          name: "Transition_ag2ag_cost",
+        },
+        Ag2NonAg: {
+          path: "data/Transition_ag2nonag_cost.js",
+          name: "Transition_ag2nonag_cost",
+        },
       },
     },
     Supporting: {
