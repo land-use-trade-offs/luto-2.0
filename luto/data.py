@@ -1860,7 +1860,9 @@ class Data:
 
         arr_2d_xr_resfactored = (arr_sum / denom).values[0:self.LUMAP_2D_RESFACTORED.shape[0], 0:self.LUMAP_2D_RESFACTORED.shape[1]]
 
-        return arr_2d_xr_resfactored[self.COORD_ROW_COL_RESFACTORED[0], self.COORD_ROW_COL_RESFACTORED[1]]
+        result = arr_2d_xr_resfactored[self.COORD_ROW_COL_RESFACTORED[0], self.COORD_ROW_COL_RESFACTORED[1]]
+        # At RF1, COORD_ROW_COL_RESFACTORED spans all NLUM cells (6956407); apply MASK to return only LUTO cells
+        return result[self.MASK] if settings.RESFACTOR == 1 else result
     
     
     def get_resfactored_sum(self, arr: np.ndarray) -> np.ndarray:
@@ -1879,7 +1881,9 @@ class Data:
         np.place(arr_2d, self.NLUM_MASK, arr)
         arr_2d_xr = xr.DataArray(arr_2d, dims=['y', 'x']) * self.LUMASK_2D_FULLRES  # Ensure outside LUTO cells are zeroed out and don't contribute to the sum
         arr_sum = arr_2d_xr.coarsen(x=settings.RESFACTOR, y=settings.RESFACTOR, boundary='pad').sum()
-        return arr_sum.values[self.COORD_ROW_COL_RESFACTORED[0], self.COORD_ROW_COL_RESFACTORED[1]]
+        result = arr_sum.values[self.COORD_ROW_COL_RESFACTORED[0], self.COORD_ROW_COL_RESFACTORED[1]]
+        # At RF1, COORD_ROW_COL_RESFACTORED spans all NLUM cells (6956407); apply MASK to return only LUTO cells
+        return result[self.MASK] if settings.RESFACTOR == 1 else result
 
     
     def get_resfactored_lumap(self) -> np.ndarray:
