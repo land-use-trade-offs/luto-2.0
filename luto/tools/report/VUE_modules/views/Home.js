@@ -319,7 +319,7 @@ window.HomeView = {
       rankingColors.value = window.Supporting_info.colors_ranking;
 
       // Load transition start-end heatmap data
-      const transitionStartEnd = chartRegister['Transition']['start_end'];
+      const transitionStartEnd = chartRegister['Transition']['Area']['start_end'];
       await loadScript(transitionStartEnd['path'], transitionStartEnd['name'], VIEW_NAME);
       transitionData.value = window[transitionStartEnd['name']];
 
