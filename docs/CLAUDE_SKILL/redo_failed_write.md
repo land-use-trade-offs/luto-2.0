@@ -102,15 +102,15 @@ print("create_report complete")
 
 ```bash
 #!/bin/bash
-#PBS -N redo_write_Run_G000X
+#PBS -N redo_write_<ITER>_Run_G000X
 #PBS -q normalsr
 #PBS -l storage=scratch/jk53+gdata/jk53
 #PBS -l ncpus=${NCPUS}   # match original run's settings_bash.py
 #PBS -l mem=${MEM}        # match original run's settings_bash.py
 #PBS -l jobfs=100GB
-#PBS -l walltime=04:00:00
-
-exec > /path/to/Run_G000X/redo_write.stdout 2>&1
+#PBS -l walltime=24:00:00  # match original run's settings_bash.py (write-only can be shorter, but RF=1 is slow)
+#PBS -o /path/to/Run_G000X/redo_write.stdout
+#PBS -e /path/to/Run_G000X/redo_write.stderr
 
 source ~/.bashrc
 conda activate luto
@@ -120,14 +120,13 @@ python /path/to/Run_G000X/redo_write.py
 ```
 
 Notes:
-- **Always match the original run's `NCPUS` and `MEM` from `luto/settings_bash.py`** — `joblib.load` loads the full data object into RAM, so write-only jobs need the same memory as the original simulation. Under-allocating causes OOM kills.
-- **Use `exec > ... 2>&1` for live logs** — `#PBS -o/-e` directives buffer output until the job ends; shell-level redirection writes immediately so you can `tail -f redo_write.stdout` while the job runs.
-- Walltime `04:00:00` is sufficient (write-only, no simulation)
+- **Always match the original run's `NCPUS`, `MEM`, and `TIME` from `luto/settings_bash.py`** — `joblib.load` loads the full data object into RAM, so write-only jobs need the same memory as the original simulation. Under-allocating causes OOM kills; RF=1 full-resolution writes can take many hours.
+- **Logs go in the run dir** (same dir as `redo_write.pbs`), not in `luto-2.0/` (which is a git repo and would show them as untracked changes). Use `#PBS -o/-e` with absolute paths.
 - `#PBS -d` is NOT supported on this cluster — use `cd` in the script body instead
 
 To read the correct resource values:
 ```bash
-grep -E "^export (MEM|NCPUS|QUEUE)" /path/to/Run_G000X/luto/settings_bash.py
+grep -E "^export (MEM|NCPUS|QUEUE|TIME)" /path/to/Run_G000X/luto/settings_bash.py
 ```
 
 ---
