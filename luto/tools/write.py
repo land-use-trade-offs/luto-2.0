@@ -1578,9 +1578,9 @@ def write_transition_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 
     ghg_t_smrj = xr.DataArray(
         ghg_t_smrj_values,
-        dims=['Type', 'To-water-supply', 'cell', 'To-land-use'],
+        dims=['GHG-type', 'To-water-supply', 'cell', 'To-land-use'],
         coords={
-            'Type': ghg_t_types,
+            'GHG-type': ghg_t_types,
             'To-water-supply': data.LANDMANS,
             'cell': range(data.NCELLS),
             'To-land-use': data.AGRICULTURAL_LANDUSES
@@ -1593,15 +1593,15 @@ def write_transition_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         * xr.dot(ag_dvar_mrj_target, ghg_t_smrj, dims=['To-water-supply'])
     )
 
-    xr_ghg_transition = add_all(xr_ghg_transition, ['From-land-use', 'To-land-use', 'Type'])
+    xr_ghg_transition = add_all(xr_ghg_transition, ['From-land-use', 'To-land-use', 'GHG-type'])
 
     # Get transition GHG emissions by region and land-use; This is for report generation later (e.g., for setting colorbar limits)
     ghg_df_region = process_chunks(
         xr_ghg_transition, data, yr_cal, chunk_size,
-        groupby_cols=['region', 'Type', 'From-land-use', 'To-land-use'],
+        groupby_cols=['region', 'GHG-type', 'From-land-use', 'To-land-use'],
         value_col='Value (t CO2e)'
     )
-    ghg_df_AUS = ghg_df_region.groupby(['From-land-use', 'To-land-use', 'Type', 'Year']
+    ghg_df_AUS = ghg_df_region.groupby(['From-land-use', 'To-land-use', 'GHG-type', 'Year']
         )['Value (t CO2e)'
         ].sum(
         ).reset_index(
@@ -1609,14 +1609,14 @@ def write_transition_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         ).query('abs(`Value (t CO2e)`) > 1e-3') # Skip transitions under 1 t CO2e at national level
 
     # Get valid data layers (before renaming/replacing)
-    valid_transition_layers = pd.MultiIndex.from_frame(ghg_df_AUS[['From-land-use', 'To-land-use', 'Type']]).sort_values()
+    valid_transition_layers = pd.MultiIndex.from_frame(ghg_df_AUS[['From-land-use', 'To-land-use', 'GHG-type']]).sort_values()
 
     # Write to csv
     pd.concat([ghg_df_AUS, ghg_df_region]
         ).infer_objects(copy=False
         ).replace({'dry': 'Dryland', 'irr': 'Irrigated'}
         ).to_csv(os.path.join(path, f'transition_ag2ag_ghg_{yr_cal}.csv'), index=False)
-    transition_valid_layers = xr_ghg_transition.stack(layer=['From-land-use', 'To-land-use', 'Type']
+    transition_valid_layers = xr_ghg_transition.stack(layer=['From-land-use', 'To-land-use', 'GHG-type']
         ).sel(layer=valid_transition_layers
         ).drop_vars('region')
     save2nc(transition_valid_layers, os.path.join(path, f'xr_transition_ag2ag_ghg_{yr_cal}.nc'))
@@ -1850,8 +1850,100 @@ def write_transition_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     
     
     
-    # TODO: add GHG, Water, Bio transitions after introducing their transition matrices.
-    
+
+    # ==================== Transitions - GHG ====================
+    if yr_idx == 0:
+        g_rk = xr.DataArray(
+            np.zeros((data.NCELLS, data.N_NON_AG_LUS), dtype=np.float32),
+            coords={'cell': range(data.NCELLS), 'To-land-use': data.NON_AGRICULTURAL_LANDUSES}
+        )
+    else:
+        ag_g_mrj = ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True)
+        g_rk_raw = non_ag_ghg.get_ghg_matrix(data, ag_g_mrj, data.lumaps[yr_cal_sim_pre]).astype(np.float32)
+        g_rk_eligible = np.einsum('rk,rk,rk->rk', g_rk_raw, l_rk_not, x_rk).astype(np.float32)
+        g_rk = xr.DataArray(
+            g_rk_eligible,
+            coords={'cell': range(data.NCELLS), 'To-land-use': data.NON_AGRICULTURAL_LANDUSES}
+        )
+
+    xr_ghg_transition = (
+        ag_dvar_base.sum(dim='From-water-supply')
+        * non_ag_dvar_target
+        * g_rk
+    )
+    xr_ghg_transition = add_all(xr_ghg_transition, ['From-land-use', 'To-land-use'])
+
+    ghg_df_region = process_chunks(
+        xr_ghg_transition, data, yr_cal, chunk_size,
+        groupby_cols=['region', 'From-land-use', 'To-land-use'],
+        value_col='Value (t CO2e)'
+    )
+    ghg_df_AUS = ghg_df_region.groupby(['From-land-use', 'To-land-use', 'Year']
+        )['Value (t CO2e)'
+        ].sum(
+        ).reset_index(
+        ).assign(region='AUSTRALIA'
+        ).query('abs(`Value (t CO2e)`) > 1e-3')
+
+    valid_ghg_layers = pd.MultiIndex.from_frame(ghg_df_AUS[['From-land-use', 'To-land-use']]).sort_values()
+
+    pd.concat([ghg_df_AUS, ghg_df_region]
+        ).infer_objects(copy=False
+        ).replace({'dry': 'Dryland', 'irr': 'Irrigated'}
+        ).to_csv(os.path.join(path, f'transition_ag2nonag_ghg_{yr_cal}.csv'), index=False)
+
+    ghg_transition_valid = xr_ghg_transition.stack(layer=['From-land-use', 'To-land-use']
+        ).sel(layer=valid_ghg_layers
+        ).drop_vars('region')
+    save2nc(ghg_transition_valid, os.path.join(path, f'xr_transition_ag2nonag_ghg_{yr_cal}.nc'))
+
+
+
+    # ==================== Transitions - Water ====================
+    if yr_idx == 0:
+        w_rk = xr.DataArray(
+            np.zeros((data.NCELLS, data.N_NON_AG_LUS), dtype=np.float32),
+            coords={'cell': range(data.NCELLS), 'To-land-use': data.NON_AGRICULTURAL_LANDUSES}
+        )
+    else:
+        ag_w_mrj = ag_water.get_wreq_matrices(data, yr_idx)
+        w_rk_raw = non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj, data.lumaps[yr_cal_sim_pre], yr_idx).astype(np.float32)
+        w_rk_eligible = np.einsum('rk,rk,rk->rk', w_rk_raw, l_rk_not, x_rk).astype(np.float32)
+        w_rk = xr.DataArray(
+            w_rk_eligible,
+            coords={'cell': range(data.NCELLS), 'To-land-use': data.NON_AGRICULTURAL_LANDUSES}
+        )
+
+    xr_water_transition = (
+        ag_dvar_base.sum(dim='From-water-supply')
+        * non_ag_dvar_target
+        * w_rk
+    )
+    xr_water_transition = add_all(xr_water_transition, ['From-land-use', 'To-land-use'])
+
+    water_df_region = process_chunks(
+        xr_water_transition, data, yr_cal, chunk_size,
+        groupby_cols=['region', 'From-land-use', 'To-land-use'],
+        value_col='Water Yield Change (ML)'
+    )
+    water_df_AUS = water_df_region.groupby(['From-land-use', 'To-land-use', 'Year']
+        )['Water Yield Change (ML)'
+        ].sum(
+        ).reset_index(
+        ).assign(region='AUSTRALIA')
+    water_df_AUS = water_df_AUS.loc[water_df_AUS['Water Yield Change (ML)'].abs() > 1e3]
+
+    valid_water_layers = pd.MultiIndex.from_frame(water_df_AUS[['From-land-use', 'To-land-use']]).sort_values()
+
+    pd.concat([water_df_region, water_df_AUS]
+        ).replace({'dry': 'Dryland', 'irr': 'Irrigated'}
+        ).to_csv(os.path.join(path, f'transition_ag2nonag_water_{yr_cal}.csv'), index=False)
+
+    water_transition_valid = xr_water_transition.stack(layer=['From-land-use', 'To-land-use']
+        ).sel(layer=valid_water_layers
+        ).drop_vars('region')
+    save2nc(water_transition_valid, os.path.join(path, f'xr_transition_ag2nonag_water_{yr_cal}.nc'))
+
 
 
     return f"Agricultural to non-agricultural transition written for year {yr_cal}"

@@ -187,7 +187,7 @@ def get_ghg_carbon_plantings_block(data, aggregate) -> np.ndarray|pd.DataFrame:
     if aggregate==True:
         return -data.CP_BLOCK_AVG_T_CO2_HA_PER_YR * data.REAL_AREA
     elif aggregate==False:
-        return pd.DataFrame(-data.CP_BLOCK_AVG_T_CO2_HA_PER_YR * data.REAL_AREA,columns=['CARBON_PLANTINGS_BLOCK'])
+        return pd.DataFrame(-data.CP_BLOCK_AVG_T_CO2_HA_PER_YR * data.REAL_AREA, columns=['CARBON_PLANTINGS_BLOCK'])
     else:
         raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
     
@@ -242,7 +242,7 @@ def get_ghg_sheep_carbon_plantings_belt(
     if aggregate==True:
         return ghg_total
     elif aggregate==False:
-        return pd.DataFrame(ghg_total,columns=['SHEEP_CARBON_PLANTINGS_BELT'])
+        return pd.DataFrame(ghg_total, columns=['SHEEP_CARBON_PLANTINGS_BELT'])
     else:
         raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
 
@@ -279,7 +279,7 @@ def get_ghg_beef_carbon_plantings_belt(
     if aggregate==True:
         return ghg_total
     elif aggregate==False:
-        return pd.DataFrame(ghg_total,columns=['SHEEP_CARBON_PLANTINGS_BELT'])
+        return pd.DataFrame(ghg_total, columns=['BEEF_CARBON_PLANTINGS_BELT'])
     else:
         raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
 
