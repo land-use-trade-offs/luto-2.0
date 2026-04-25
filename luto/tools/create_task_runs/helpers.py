@@ -30,6 +30,8 @@ from matplotlib import patches
 from luto import settings
 from luto.tools.create_task_runs.parameters import EXCLUDE_DIRS, HATCH_PATTERNS, SERVER_PARAMS, PLOT_COL_WIDTH
 
+LUTO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../'))
+
 
 def get_settings_df(task_root_dir:str) -> pd.DataFrame:
     '''
@@ -41,7 +43,7 @@ def get_settings_df(task_root_dir:str) -> pd.DataFrame:
         os.makedirs(task_root_dir, exist_ok=True)
     
     # Get the settings from luto.settings
-    with open('luto/settings.py', 'r') as file, \
+    with open(os.path.join(LUTO_ROOT, 'luto/settings.py'), 'r') as file, \
          open(f'{task_root_dir}/non_str_val.txt', 'w') as non_str_val_file:
         
         # Regex patterns that matches variable assignments from settings
@@ -140,7 +142,7 @@ def copy_folder_custom(source, destination, ignore_dirs=None):
     return jobs   
 
 def create_run_folders(task_root_dir:str, col:str, n_workers:int):
-    src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../'))
+    src_dir = LUTO_ROOT
     dst_dir = f'{task_root_dir}/{col}'
     # Copy the files from the source to the destination
     from_to_files = copy_folder_custom(src_dir, dst_dir, EXCLUDE_DIRS)
@@ -150,17 +152,18 @@ def create_run_folders(task_root_dir:str, col:str, n_workers:int):
     
     
 def submit_task(task_root_dir:str, col:str, mode:Literal['single','cluster']='cluster', max_concurrent_tasks:int=300):
+    _bash_scripts = os.path.join(LUTO_ROOT, 'luto/tools/create_task_runs/bash_scripts')
     if mode == 'single':
         # Deposit the run script; user executes each run manually
         shutil.copyfile(
-            'luto/tools/create_task_runs/bash_scripts/python_script.py',
+            os.path.join(_bash_scripts, 'python_script.py'),
             f'{task_root_dir}/{col}/python_script.py',
         )
         return
 
     # cluster mode — copy PBS helper scripts
-    shutil.copyfile('luto/tools/create_task_runs/bash_scripts/task_cmd.sh', f'{task_root_dir}/{col}/task_cmd.sh')
-    shutil.copyfile('luto/tools/create_task_runs/bash_scripts/python_script.py', f'{task_root_dir}/{col}/python_script.py')
+    shutil.copyfile(os.path.join(_bash_scripts, 'task_cmd.sh'), f'{task_root_dir}/{col}/task_cmd.sh')
+    shutil.copyfile(os.path.join(_bash_scripts, 'python_script.py'), f'{task_root_dir}/{col}/python_script.py')
 
     # Wait until the number of running jobs is less than max_concurrent_tasks
     while True:
@@ -180,7 +183,7 @@ def submit_task(task_root_dir:str, col:str, mode:Literal['single','cluster']='cl
 
     
 def write_settings(task_dir:str, settings_dict:dict):
-    with open('luto/settings.py', 'r') as src:
+    with open(os.path.join(LUTO_ROOT, 'luto/settings.py'), 'r') as src:
         src_text = src.read()
 
     # Reorder settings_dict to match the original settings.py key order

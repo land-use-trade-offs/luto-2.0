@@ -36,10 +36,13 @@ sys.stderr.reconfigure(encoding='utf-8')
 
 def patch_input_dir(input_dir: str):
     settings_path = pathlib.Path(__file__).parent / 'luto' / 'settings.py'
-    normalized = input_dir.replace('\\', '/')
-    text = settings_path.read_text()
-    text = re.sub(r'^INPUT_DIR\s*=.*$', f'INPUT_DIR="{normalized}"', text, flags=re.MULTILINE)
-    settings_path.write_text(text)
+    new_dir = input_dir.replace('\\', '/')
+    text = settings_path.read_text(encoding='utf-8')
+
+    # Replace INPUT_DIR=... line only — NO_GO_VECTORS uses relative paths so needs no patching
+    text = re.sub(r'^INPUT_DIR\s*=.*$', f'INPUT_DIR="{new_dir}"', text, flags=re.MULTILINE)
+
+    settings_path.write_text(text, encoding='utf-8')
 
 
 if __name__ == '__main__':

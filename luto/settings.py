@@ -231,8 +231,8 @@ The exclude no-go land-uses option.
 - False: do not exclude land-uses from no-go areas.
 '''
 NO_GO_VECTORS = {
-    'Winter cereals':           os.path.join(os.path.abspath(INPUT_DIR), 'no_go_areas', 'no_go_Winter_cereals.shp'),
-    'Environmental Plantings':  os.path.join(os.path.abspath(INPUT_DIR), 'no_go_areas', 'no_go_Enviornmental_Plantings.shp')
+    'Winter cereals':           'no_go_areas/no_go_Winter_cereals.shp',
+    'Environmental Plantings':  'no_go_areas/no_go_Enviornmental_Plantings.shp'
 }
 '''
 Land-use and vector file pairs to exclude land-use from being utilised in that area. 

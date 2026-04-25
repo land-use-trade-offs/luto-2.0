@@ -549,6 +549,7 @@ class Data:
 
         for lu, no_go_path in settings.NO_GO_VECTORS.items():
             # Read the no-go area shapefile
+            no_go_path = os.path.join(settings.INPUT_DIR, no_go_path)
             no_go_shp = gpd.read_file(no_go_path)
             # Check if the CRS is defined
             if no_go_shp.crs is None:
