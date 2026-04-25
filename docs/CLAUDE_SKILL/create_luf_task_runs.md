@@ -40,6 +40,7 @@ jinzhu_inspect_code/LUF_Nth_iteration/
 ### Script skeleton
 
 ```python
+import os
 import numpy as np
 import pandas as pd
 from luto.tools.create_task_runs.helpers import (
@@ -49,7 +50,9 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # One-line description of what makes this group different from core.
-TASK_ROOT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/LUF_Nth_iteration/<GroupName>"
+# Derive paths from __file__ so the script works on both Windows and Linux.
+_LUTO_ROOT    = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+TASK_ROOT_DIR = os.path.join(os.path.dirname(_LUTO_ROOT), "Custom_runs", "LUF_Nth_iteration", "<GroupName>")
 
 grid_search = {
     # --- PBS settings ---
@@ -288,11 +291,12 @@ One merge script per iteration. Template:
 ```python
 SUBMIT = False   # set True when ready to submit
 
-import os, shutil, subprocess
+import os, sys, shutil, subprocess
 import pandas as pd
 
-LUTO_ROOT   = "/g/data/jk53/jinzhu/LUTO/luto-2.0"
-SCRIPTS_DIR = f"{LUTO_ROOT}/jinzhu_inspect_code/LUF_Nth_iteration"   # MUST match actual dir name
+# Derive paths from __file__ — works on both Windows and Linux.
+LUTO_ROOT   = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+SCRIPTS_DIR = os.path.join(LUTO_ROOT, "jinzhu_inspect_code", "LUF_Nth_iteration")   # MUST match actual dir name
 
 CREATE_SCRIPTS = [
     "create_tasks_core.py",
@@ -300,14 +304,26 @@ CREATE_SCRIPTS = [
     # ... one entry per create_tasks_*.py
 ]
 
+_env = os.environ.copy()
+_env["PYTHONPATH"] = LUTO_ROOT
+
+print("=== Step 1: Generating per-group CSVs ===")
+for script in CREATE_SCRIPTS:
+    print(f"  Running {script} ...")
+    subprocess.run(
+        [sys.executable, os.path.join(SCRIPTS_DIR, script)],
+        check=True, cwd=LUTO_ROOT, env=_env,
+    )
+
 # Keys must match TASK_ROOT_DIR in each create_tasks_*.py
+_CUSTOM_RUNS = os.path.join(os.path.dirname(LUTO_ROOT), "Custom_runs", "LUF_Nth_iteration")
 GROUPS = {
-    "Core":               "/g/data/jk53/jinzhu/LUTO/Custom_runs/LUF_Nth_iteration/Core",
-    "Sensitivity_ECNES":  "/g/data/jk53/jinzhu/LUTO/Custom_runs/LUF_Nth_iteration/Sensitivity_ECNES",
+    "Core":               os.path.join(_CUSTOM_RUNS, "Core"),
+    "Sensitivity_ECNES":  os.path.join(_CUSTOM_RUNS, "Sensitivity_ECNES"),
     # ...
 }
 
-OUTPUT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/LUF_Nth_iteration"
+OUTPUT_DIR = _CUSTOM_RUNS
 ```
 
 **Common mistake:** `SCRIPTS_DIR` must use the actual directory name on disk (e.g. `LUF_4th_iteration`), not a long-form name (e.g. `LUF_Fourth_iteration`). This caused `CalledProcessError: exit status 2` in the 4th iteration.
@@ -326,10 +342,11 @@ When there is only one scenario group (e.g. a standalone run like `Sachi_run`), 
 Single-group `GROUPS` example:
 
 ```python
+_CUSTOM_RUNS = os.path.join(os.path.dirname(LUTO_ROOT), "Custom_runs", "MyRun")
 GROUPS = {
-    "MyRun": "/g/data/jk53/jinzhu/LUTO/Custom_runs/MyRun",
+    "MyRun": _CUSTOM_RUNS,
 }
-OUTPUT_DIR = "/g/data/jk53/jinzhu/LUTO/Custom_runs/MyRun"   # same as the single group
+OUTPUT_DIR = _CUSTOM_RUNS   # same as the single group
 ```
 
 ---
@@ -376,8 +393,12 @@ These are scenario spec overrides — do NOT "fix" them to match the defaults:
 ## Step 4: Generate CSVs and inspect
 
 ```bash
-cd /g/data/jk53/jinzhu/LUTO/luto-2.0
+# Linux / NCI
+cd /path/to/luto-2.0
 conda run -n luto python jinzhu_inspect_code/LUF_Nth_iteration/merge_unique_parameters.py
+
+# Windows (from within the luto conda env)
+python jinzhu_inspect_code/LUF_Nth_iteration/merge_unique_parameters.py
 ```
 
 This runs all `create_tasks_*.py` scripts and writes to each group's `TASK_ROOT_DIR`:
@@ -398,12 +419,17 @@ print(df[['scenario_group', 'global_run_idx', 'HIR_CEILING_PERCENTAGE', 'GBF2_PR
 
 ---
 
-## Step 5: Submit to cluster
+## Step 5: Submit runs
 
-Set `SUBMIT = True` in `merge_unique_parameters.py` and re-run:
+Set `SUBMIT = True` in `merge_unique_parameters.py` and re-run using the same command as Step 4.
+
+**Cluster (NCI):** use `mode='cluster'` in `create_task_runs` — submits PBS jobs via `qsub`.
+
+**Windows (single mode):** use `mode='single'` — deposits `python_script.py` in each run dir without executing. Run each scenario manually:
 
 ```bash
-conda run -n luto python jinzhu_inspect_code/LUF_Nth_iteration/merge_unique_parameters.py
+python Custom_runs/LUF_Nth_iteration/Run_G0001/python_script.py
+python Custom_runs/LUF_Nth_iteration/Run_G0002/python_script.py
 ```
 
 This calls `create_task_runs(OUTPUT_DIR, merged_template, mode='cluster', max_concurrent_tasks=200)` which:

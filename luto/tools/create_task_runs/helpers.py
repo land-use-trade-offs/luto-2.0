@@ -149,32 +149,34 @@ def create_run_folders(task_root_dir:str, col:str, n_workers:int):
     os.makedirs(f'{dst_dir}/output', exist_ok=True)
     
     
-def submit_task(task_root_dir:str, col:str, mode:Literal['single','cluster'], max_concurrent_tasks): 
+def submit_task(task_root_dir:str, col:str, mode:Literal['single','cluster']='cluster', max_concurrent_tasks:int=300):
+    if mode == 'single':
+        # Deposit the run script; user executes each run manually
+        shutil.copyfile(
+            'luto/tools/create_task_runs/bash_scripts/python_script.py',
+            f'{task_root_dir}/{col}/python_script.py',
+        )
+        return
+
+    # cluster mode — copy PBS helper scripts
     shutil.copyfile('luto/tools/create_task_runs/bash_scripts/task_cmd.sh', f'{task_root_dir}/{col}/task_cmd.sh')
     shutil.copyfile('luto/tools/create_task_runs/bash_scripts/python_script.py', f'{task_root_dir}/{col}/python_script.py')
-    
+
     # Wait until the number of running jobs is less than max_concurrent_tasks
-    if os.name == 'posix':
-        while True:
-            try:
-                running_jobs = int(subprocess.run('qselect | wc -l', shell=True, capture_output=True, text=True).stdout.strip())
-            except Exception as e:
-                print(f"Error checking running jobs: {e}")
-            if running_jobs < max_concurrent_tasks:
-                break
-            else:
-                print(f"Max concurrent tasks reached ({running_jobs}/{max_concurrent_tasks}), waiting to submit {col}...")
-                import time; time.sleep(10)
-        
-    # Open log files for the task run
+    while True:
+        try:
+            running_jobs = int(subprocess.run('qselect | wc -l', shell=True, capture_output=True, text=True).stdout.strip())
+        except Exception as e:
+            print(f"Error checking running jobs: {e}")
+            running_jobs = 0
+        if running_jobs < max_concurrent_tasks:
+            break
+        print(f"Max concurrent tasks reached ({running_jobs}/{max_concurrent_tasks}), waiting to submit {col}...")
+        import time; time.sleep(10)
+
     with open(f'{task_root_dir}/{col}/run_std.log', 'w') as std_file, \
          open(f'{task_root_dir}/{col}/run_err.log', 'w') as err_file:
-        if mode == 'single': 
-            subprocess.run(['python', 'python_script.py'], cwd=f'{task_root_dir}/{col}', stdout=std_file, stderr=err_file, check=True)
-        elif mode == 'cluster' and os.name == 'posix':
-            subprocess.run(['bash', 'task_cmd.sh'], cwd=f'{task_root_dir}/{col}', stdout=std_file, stderr=err_file, check=True)
-        else:
-            raise ValueError('Mode must be either "single" or "cluster"!')
+        subprocess.run(['bash', 'task_cmd.sh'], cwd=f'{task_root_dir}/{col}', stdout=std_file, stderr=err_file, check=True)
 
     
 def write_settings(task_dir:str, settings_dict:dict):
@@ -208,9 +210,9 @@ def write_terminal_vars(task_dir:str, col:str, settings_dict:dict):
 
 
 def create_task_runs(
-    task_root_dir:str, 
-    custom_settings:pd.DataFrame, 
-    mode:Literal['single','cluster']='single', 
+    task_root_dir:str,
+    custom_settings:pd.DataFrame,
+    mode:Literal['single','cluster']='cluster',
     n_workers:int=4,
     max_concurrent_tasks:int=300,
 ) -> None:

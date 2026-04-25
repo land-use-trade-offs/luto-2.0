@@ -614,8 +614,8 @@ class LogToFile:
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             with (
-                open(self.log_path_stdout, self.mode) as f_out,
-                open(self.log_path_stderr, self.mode) as f_err,
+                open(self.log_path_stdout, self.mode, encoding='utf-8') as f_out,
+                open(self.log_path_stderr, self.mode, encoding='utf-8') as f_err,
                 redirect_stdout(_TeeIO(sys.stdout, f_out)),
                 redirect_stderr(_TeeIO(sys.stderr, f_err)),
             ):

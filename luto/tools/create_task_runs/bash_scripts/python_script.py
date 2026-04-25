@@ -17,9 +17,38 @@
 # You should have received a copy of the GNU General Public License along with
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
-import os, pathlib
+# Usage:
+#   python python_script.py                          # use INPUT_DIR already in luto/settings.py
+#   python python_script.py --input_dir /path/to/input  # override INPUT_DIR before running
+
+import argparse, re, pathlib, os, sys
 import shutil
 import zipfile
+
+# Always run relative to the script's own directory so that relative paths
+# in settings.py (OUTPUT_DIR, etc.) resolve correctly regardless of cwd.
+os.chdir(pathlib.Path(__file__).parent)
+
+# Force UTF-8 on Windows consoles (default cp1252 can't handle box-drawing chars).
+sys.stdout.reconfigure(encoding='utf-8')
+sys.stderr.reconfigure(encoding='utf-8')
+
+
+def patch_input_dir(input_dir: str):
+    settings_path = pathlib.Path(__file__).parent / 'luto' / 'settings.py'
+    normalized = input_dir.replace('\\', '/')
+    text = settings_path.read_text()
+    text = re.sub(r'^INPUT_DIR\s*=.*$', f'INPUT_DIR="{normalized}"', text, flags=re.MULTILINE)
+    settings_path.write_text(text)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--input_dir', default=None, help='Override INPUT_DIR in luto/settings.py')
+    args = parser.parse_args()
+    if args.input_dir:
+        patch_input_dir(args.input_dir)
+
 import luto.simulation as sim
 
 
@@ -60,11 +89,12 @@ with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as run_zip,\
 # Remove all files after archiving
 for item in os.listdir(simulation_root):
     if item != 'Run_Archive.zip':
+        item_path = simulation_root / item
         try:
-            if os.path.isfile(item) or os.path.islink(item):
-                os.unlink(item)  
-            elif os.path.isdir(item):
-                shutil.rmtree(item) 
+            if item_path.is_file() or item_path.is_symlink():
+                item_path.unlink()
+            elif item_path.is_dir():
+                shutil.rmtree(item_path)
         except Exception as e:
-            print(f"Failed to delete {item}. Reason: {e}")
+            print(f"Failed to delete {item_path}. Reason: {e}")
             
