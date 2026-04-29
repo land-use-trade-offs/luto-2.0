@@ -122,7 +122,7 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 
 ### No-Go Areas & Regional Adoption
 - `EXCLUDE_NO_GO_LU`: Enforce no-go area constraints (True/False)
-- `REGIONAL_ADOPTION_CONSTRAINTS`: Regional adoption limits ('off', 'on', 'NON_AG_UNIFORM')
+- `REGIONAL_ADOPTION_CONSTRAINTS`: Regional adoption limits ('off', 'on', 'NON_AG_CAP')
 - `REGIONAL_ADOPTION_ZONE`: Zone type ('NRM_CODE', 'LGA_CODE', etc.)
 
 ### Land-Use Culling

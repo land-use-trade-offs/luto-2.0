@@ -583,27 +583,26 @@ class Data:
         if settings.REGIONAL_ADOPTION_CONSTRAINTS == "off":
             self.REGIONAL_ADOPTION_ZONES = None
             self.REGIONAL_ADOPTION_TARGETS = None
-        else:
+
+        elif settings.REGIONAL_ADOPTION_CONSTRAINTS == "on":
+            # Per-landuse caps (both ag and non-ag) read from the xlsx, scoped to REGIONAL_ADOPTION_ZONE.
             self.REGIONAL_ADOPTION_ZONES = pd.read_hdf(
                 os.path.join(settings.INPUT_DIR, "regional_adoption_zones.h5"), where=self.MASK
             )[settings.REGIONAL_ADOPTION_ZONE].to_numpy()
 
-            regional_adoption_targets = pd.read_excel(os.path.join(settings.INPUT_DIR, "regional_adoption_zones.xlsx"), sheet_name=settings.REGIONAL_ADOPTION_ZONE)
-
-            if (settings.REGIONAL_ADOPTION_CONSTRAINTS == 'NON_AG_UNIFORM') and (settings.REGIONAL_ADOPTION_NON_AG_UNIFORM is not None):
-                regional_adoption_targets.loc[
-                    regional_adoption_targets['TARGET_LANDUSE'].isin(settings.NON_AG_LAND_USES.keys()),
-                    ['ADOPTION_PERCENTAGE_2030', 'ADOPTION_PERCENTAGE_2050', 'ADOPTION_PERCENTAGE_2100']
-                ] = settings.REGIONAL_ADOPTION_NON_AG_UNIFORM
+            regional_adoption_targets = pd.read_excel(
+                os.path.join(settings.INPUT_DIR, "regional_adoption_zones.xlsx"),
+                sheet_name=settings.REGIONAL_ADOPTION_ZONE
+            )
 
             self.REGIONAL_ADOPTION_TARGETS = regional_adoption_targets.iloc[
                 [idx for idx, row in regional_adoption_targets.iterrows() if
-                    all([row['ADOPTION_PERCENTAGE_2030']>=0, 
-                        row['ADOPTION_PERCENTAGE_2050']>=0, 
+                    all([row['ADOPTION_PERCENTAGE_2030']>=0,
+                        row['ADOPTION_PERCENTAGE_2050']>=0,
                         row['ADOPTION_PERCENTAGE_2100']>=0])
                 ]
             ]
-            
+
             # Check missing zones due to high resfactor
             lost_zones = np.setdiff1d(
                 self.REGIONAL_ADOPTION_TARGETS[settings.REGIONAL_ADOPTION_ZONE].unique(),
@@ -612,9 +611,21 @@ class Data:
 
             if len(lost_zones) > 0:
                 print(f"│   ⚠ WARNING: {len(lost_zones)} regional adoption zones have no cells due to (RES{settings.RESFACTOR}). Please check if this is expected.", flush=True)
-                self.REGIONAL_ADOPTION_TARGETS = self.REGIONAL_ADOPTION_TARGETS.query(f"{settings.REGIONAL_ADOPTION_ZONE} not in {list(lost_zones)}").reset_index(drop=True)
-                
-            
+                self.REGIONAL_ADOPTION_TARGETS = self.REGIONAL_ADOPTION_TARGETS.query(
+                    f"{settings.REGIONAL_ADOPTION_ZONE} not in {list(lost_zones)}"
+                ).reset_index(drop=True)
+
+        elif settings.REGIONAL_ADOPTION_CONSTRAINTS == "NON_AG_CAP":
+            # SUM-of-all-non-ag cap per region (NRM or State, controlled by REGIONAL_ADOPTION_NON_AG_REGION).
+            # No xlsx involved; ag dvars are unconstrained by this mode.
+            self.REGIONAL_ADOPTION_ZONES = None
+            self.REGIONAL_ADOPTION_TARGETS = None
+
+        else:
+            raise ValueError(
+                f"Unknown REGIONAL_ADOPTION_CONSTRAINTS={settings.REGIONAL_ADOPTION_CONSTRAINTS!r}. "
+                "Expected one of: 'off', 'on', 'NON_AG_CAP'."
+            )
 
 
 
@@ -2724,15 +2735,15 @@ class Data:
     
     def get_regional_adoption_percent_by_year(self, yr: int):
         """
-        Get the regional adoption percentage for each region for the given year.
-        
+        Get the per-landuse regional adoption percentage for each region for the given year.
+        Only active under REGIONAL_ADOPTION_CONSTRAINTS == 'on'.
+
         Return a list of tuples where each tuple contains 
         - the region ID, 
         - landuse name, 
         - the adoption percentage.
-        
         """
-        if settings.REGIONAL_ADOPTION_CONSTRAINTS == "off":
+        if settings.REGIONAL_ADOPTION_CONSTRAINTS != "on":
             return ()
         
         reg_adop_limits = []
@@ -2749,14 +2760,15 @@ class Data:
     
     def get_regional_adoption_limit_ha_by_year(self, yr: int):
         """
-        Get the regional adoption area for each region for the given year.
-        
+        Get the per-landuse regional adoption area for each region for the given year.
+        Only active under REGIONAL_ADOPTION_CONSTRAINTS == 'on'.
+
         Return a list of tuples where each tuple contains
         - the region ID,
         - landuse name,
         - the adoption area (ha).
         """
-        if settings.REGIONAL_ADOPTION_CONSTRAINTS == "off":
+        if settings.REGIONAL_ADOPTION_CONSTRAINTS != "on":
             return ()
         
         reg_adop_limits = self.get_regional_adoption_percent_by_year(yr)
@@ -2766,8 +2778,43 @@ class Data:
             reg_adop_limits_ha.append((reg, landuse, reg_total_area_ha * pct / 100))
             
         return reg_adop_limits_ha
-    
-    
+
+    def get_regional_adoption_non_ag_sum_limit_ha_by_year(self, yr: int):
+        """
+        Under REGIONAL_ADOPTION_CONSTRAINTS == 'NON_AG_CAP', return per-region area caps
+        (ha) on the SUM of all non-ag land uses.
+
+        The region partition is selected by REGIONAL_ADOPTION_NON_AG_REGION:
+        - 'NRM'   uses self.REGION_NRM_NAME
+        - 'State' uses self.REGION_STATE_NAME
+
+        Returns a list of (region_name, reg_ind, area_limit_ha) tuples. The percentage
+        cap (REGIONAL_ADOPTION_NON_AG_CAP) is uniform across all regions and years.
+        """
+        if settings.REGIONAL_ADOPTION_CONSTRAINTS != 'NON_AG_CAP':
+            return ()
+        if settings.REGIONAL_ADOPTION_NON_AG_CAP is None:
+            return ()
+
+        region_mode = settings.REGIONAL_ADOPTION_NON_AG_REGION
+        if region_mode == 'NRM':
+            region_arr = np.asarray(self.REGION_NRM_NAME)
+        elif region_mode == 'State':
+            region_arr = np.asarray(self.REGION_STATE_NAME)
+        else:
+            raise ValueError(
+                f"Unknown REGIONAL_ADOPTION_NON_AG_REGION={region_mode!r}. Expected 'NRM' or 'State'."
+            )
+
+        pct = settings.REGIONAL_ADOPTION_NON_AG_CAP
+        limits = []
+        for reg in np.unique(region_arr):
+            reg_ind = np.where(region_arr == reg)[0]
+            reg_total_area_ha = self.REAL_AREA[reg_ind].sum()
+            limits.append((reg, reg_ind, reg_total_area_ha * pct / 100))
+        return limits
+
+
     def add_production_data(self, yr: int, data_type: str, prod_data: Any):
         """
         Safely save production data for a given year to the Data object.

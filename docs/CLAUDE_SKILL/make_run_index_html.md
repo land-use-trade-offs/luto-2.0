@@ -32,8 +32,8 @@ Row-per-run CSV. Required columns:
 | `global_run_idx` | Integer; maps to `Run_G####` folder name (zero-padded to 4 digits) |
 | `local_run_idx` | Integer index within the scenario group |
 | `PRODUCTIVITY_TREND` | `BAU` / `MEDIUM` / `HIGH` |
-| `REGIONAL_ADOPTION_CONSTRAINTS` | `off` / `NON_AG_UNIFORM` |
-| `REGIONAL_ADOPTION_NON_AG_UNIFORM` | Threshold % (integer or float) |
+| `REGIONAL_ADOPTION_CONSTRAINTS` | `off` / `NON_AG_CAP` |
+| `REGIONAL_ADOPTION_NON_AG_CAP` | Threshold % (integer or float) |
 | `CONTRIBUTION_PERCENTILE` | `USER_DEFINED` / `AG_UNIFORM` |
 | `BIO_CONTRIBUTION_LDS` | Float (e.g. `0.75`, `0.8`, `0.85`) |
 | `BIO_CONTRIBUTION_ENV_PLANTING` | Float |
@@ -221,7 +221,7 @@ def build_runs_js(unique_rows, infeasibility, template_rows, template_varying, t
             f'global_run_idx:{gidx}, local_run_idx:{r["local_run_idx"]}, '
             f'PRODUCTIVITY_TREND:"{r["PRODUCTIVITY_TREND"]}", '
             f'REGIONAL_ADOPTION_CONSTRAINTS:"{r["REGIONAL_ADOPTION_CONSTRAINTS"]}", '
-            f'REGIONAL_ADOPTION_NON_AG_UNIFORM:{r["REGIONAL_ADOPTION_NON_AG_UNIFORM"]}, '
+            f'REGIONAL_ADOPTION_NON_AG_CAP:{r["REGIONAL_ADOPTION_NON_AG_CAP"]}, '
             f'CONTRIBUTION_PERCENTILE:"{r["CONTRIBUTION_PERCENTILE"]}", '
             f'BIO_CONTRIBUTION_LDS:{r["BIO_CONTRIBUTION_LDS"]}, '
             f'BIO_CONTRIBUTION_ENV_PLANTING:{r["BIO_CONTRIBUTION_ENV_PLANTING"]}, '
@@ -432,7 +432,7 @@ def make_index(task_root_dir):
     <select id="filter-regional">
       <option value="">All</option>
       <option value="off">off</option>
-      <option value="NON_AG_UNIFORM">NON_AG_UNIFORM</option>
+      <option value="NON_AG_CAP">NON_AG_CAP</option>
     </select>
   </label>
   <label>Status:
@@ -575,7 +575,7 @@ function buildTable() {{
       <td style="text-align:center;font-size:11px;color:#5a6a7e">${{r.local_run_idx}}</td>
       <td>${{prodBadge(r.PRODUCTIVITY_TREND)}}</td>
       <td>${{regionalBadge(r.REGIONAL_ADOPTION_CONSTRAINTS)}}</td>
-      <td style="text-align:center;font-size:11px">${{r.REGIONAL_ADOPTION_NON_AG_UNIFORM}}%</td>
+      <td style="text-align:center;font-size:11px">${{r.REGIONAL_ADOPTION_NON_AG_CAP}}%</td>
       <td>${{ecnesBadge(r.BIODIVERSITY_TARGET_GBF_4_ECNES)}}</td>
       <td style="text-align:center;font-size:11px">${{r.BIO_CONTRIBUTION_LDS}}</td>
       <td style="text-align:center;font-size:11px">${{r.GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT}}%</td>
@@ -686,7 +686,7 @@ function selectRun(i) {{
   section('Grid-Search Parameters (GEP — varying across runs)');
   row('PRODUCTIVITY_TREND', prodBadge(r.PRODUCTIVITY_TREND), true);
   row('REGIONAL_ADOPTION_CONSTRAINTS', regionalBadge(r.REGIONAL_ADOPTION_CONSTRAINTS), true);
-  row('REGIONAL_ADOPTION_NON_AG_UNIFORM', `${{r.REGIONAL_ADOPTION_NON_AG_UNIFORM}}%`, true);
+  row('REGIONAL_ADOPTION_NON_AG_CAP', `${{r.REGIONAL_ADOPTION_NON_AG_CAP}}%`, true);
   row('CONTRIBUTION_PERCENTILE', valFmt(r.CONTRIBUTION_PERCENTILE), true);
   row('BIO_CONTRIBUTION_LDS', r.BIO_CONTRIBUTION_LDS, true);
   row('BIO_CONTRIBUTION_ENV_PLANTING', r.BIO_CONTRIBUTION_ENV_PLANTING, true);
@@ -713,7 +713,7 @@ function selectRun(i) {{
     'BIO_CONTRIBUTION_CARBON_PLANTING_BELT','BIO_CONTRIBUTION_AGROFORESTRY',
     'BIO_CONTRIBUTION_DESTOCKING','GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT',
     'CONTRIBUTION_PERCENTILE','PRODUCTIVITY_TREND',
-    'REGIONAL_ADOPTION_CONSTRAINTS','REGIONAL_ADOPTION_NON_AG_UNIFORM',
+    'REGIONAL_ADOPTION_CONSTRAINTS','REGIONAL_ADOPTION_NON_AG_CAP',
   ]);
   const fullEntries = Object.entries(r.full_settings)
     .filter(([k]) => !skipInGEP.has(k))

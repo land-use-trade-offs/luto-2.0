@@ -126,7 +126,7 @@ This is the current LUF core scenario settings as of 2026-04 (Sixth iteration). 
     # --------------- Social license ---------------
     'EXCLUDE_NO_GO_LU': [False],
     'REGIONAL_ADOPTION_CONSTRAINTS': ['off'],
-    'REGIONAL_ADOPTION_NON_AG_UNIFORM': [5],
+    'REGIONAL_ADOPTION_NON_AG_CAP': [5],
     'REGIONAL_ADOPTION_ZONE': ['NRM_CODE'],
 
     # --------------- GHG settings ---------------
@@ -250,7 +250,7 @@ This is the current LUF core scenario settings as of 2026-04 (Sixth iteration). 
 |---|---|
 | **ECNES** | `'BIODIVERSITY_TARGET_GBF_4_ECNES': ['on']` |
 | **HIR Ceiling** | `'HIR_CEILING_PERCENTAGE': [0.7, 0.8, 0.9]` — already a core axis; apply consistently across all groups |
-| **Regional** | `'REGIONAL_ADOPTION_CONSTRAINTS': ['NON_AG_UNIFORM']`, `'REGIONAL_ADOPTION_NON_AG_UNIFORM': [5, 10]` (15% dropped in Sixth iteration) |
+| **Regional** | `'REGIONAL_ADOPTION_CONSTRAINTS': ['NON_AG_CAP']`, `'REGIONAL_ADOPTION_NON_AG_CAP': [5, 10]` (15% dropped in Sixth iteration) |
 | **GBF2 Area** | `'CONTRIBUTION_PERCENTILE': ['AG_UNIFORM']`, `'AG_UNIFORM_BIO_CONTRIBUTION': [0]`, `BIO_CONTRIBUTION_ENV_PLANTING/RIPARIAN/DESTOCKING: [1.0]`, `BIO_CONTRIBUTION_CARBON_PLANTING_*: [0.0]`, `BIO_CONTRIBUTION_AGROFORESTRY: [1.0, 0.0]`, `GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT: [10, 15, 20]` |
 | **Lower Productivity** | `AG_MANAGEMENTS` with `'Precision Agriculture': False, 'AgTech EI': False` |
 | **Alt Productivity** | `'PRODUCTIVITY_TREND': ['MEDIUM', 'HIGH']` |

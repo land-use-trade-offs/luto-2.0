@@ -86,8 +86,8 @@ grid_search = {
 
     # --------------- Social license ---------------
     'EXCLUDE_NO_GO_LU': [False],                                            # True or False
-    'REGIONAL_ADOPTION_CONSTRAINTS': ['off'],                               # 'off' = core (LUF Report 2026); 'NON_AG_UNIFORM' = lower-priority sensitivity
-    'REGIONAL_ADOPTION_NON_AG_UNIFORM': [5],                                # Default value (not active when REGIONAL_ADOPTION_CONSTRAINTS='off')
+    'REGIONAL_ADOPTION_CONSTRAINTS': ['off'],                               # 'off' = core (LUF Report 2026); 'NON_AG_CAP' = lower-priority sensitivity
+    'REGIONAL_ADOPTION_NON_AG_CAP': [5],                                # Default value (not active when REGIONAL_ADOPTION_CONSTRAINTS='off')
     'REGIONAL_ADOPTION_ZONE': ['NRM_CODE'],                                 # One of 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
 
 
@@ -228,7 +228,7 @@ grid_search = {
 
 
 duplicate_runs = {
-    'REGIONAL_ADOPTION_CONSTRAINTS': ('off', 'REGIONAL_ADOPTION_NON_AG_UNIFORM'),
+    'REGIONAL_ADOPTION_CONSTRAINTS': ('off', 'REGIONAL_ADOPTION_NON_AG_CAP'),
     'BIODIVERSITY_TARGET_GBF_2': ('off', 'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT'),
 }
 

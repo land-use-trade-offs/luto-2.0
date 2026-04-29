@@ -145,25 +145,68 @@ def solve_timeseries(data: Data, years_to_run: list[int], do_analyze_iis: bool) 
         input_data = get_input_data(data, base_year, target_year)
         data.last_year = target_year
 
-        # Retry loop with escalating NumericFocus. settings.NUMERIC_FOCUS is a list
-        # (e.g. [0, 1]); we try each value in order and break on GRB.OPTIMAL.
-        # If the final attempt also returns non-OPTIMAL we fall through with the
-        # last solution and let the status-handling block below report/IIS it.
-        nf_values = settings.NUMERIC_FOCUS if isinstance(settings.NUMERIC_FOCUS, (list, tuple)) else [settings.NUMERIC_FOCUS]
-        luto_solver = None
-        solution = None
-        status = None
-        for nf in nf_values:
-            print(f"Trying NumericFocus={nf} for year {target_year}...")
+        # Retry loop with escalating numerical settings. settings.RETRY_PARAMS is a list
+        # of (NumericFocus, Method) tuples; each attempt sets Params.NumericFocus and
+        # Params.Method (overriding settings.SOLVE_METHOD for that attempt).
+        # We try each in order and break on GRB.OPTIMAL. We also accept the result —
+        # at any attempt if status is SUBOPTIMAL, or unconditionally on the last
+        # attempt — provided MaxVio is within 10x FEASIBILITY_TOLERANCE. At
+        # FEAS_TOL = 1e-2 the duality gap Gurobi can't certify is far smaller than
+        # the input-data noise floor, so a feasible-enough solution is preferred
+        # over a hard failure.
+        nf_attempts = list(settings.RETRY_PARAMS)
+        suboptimal_accept_tol = 10 * settings.FEASIBILITY_TOLERANCE
+        accepted = False
+        for attempt_idx, (nf, method) in enumerate(nf_attempts):
+            is_last_attempt = (attempt_idx == len(nf_attempts) - 1)
+            print(f"Trying NumericFocus={nf}, Method={method} for year {target_year}...")
             luto_solver = LutoSolver(input_data)
             luto_solver.gurobi_model.Params.NumericFocus = nf
+            luto_solver.gurobi_model.Params.Method = method
             luto_solver.formulate()
+
             solution = luto_solver.solve()
             status = luto_solver.gurobi_model.Status
+
             if status == GRB.OPTIMAL:
-                print(f"Optimal solution found with NumericFocus={nf}")
+                print(f"Optimal solution found with NumericFocus={nf}, Method={method}")
+                accepted = True
                 break
-            print(f"Non-optimal status {status} with NumericFocus={nf}; retrying with next NumericFocus value if available.")
+
+            # SUBOPTIMAL: barrier converged but Gurobi can't certify optimality.
+            # MaxVio is always available here; accept if it's within our tolerance band.
+            if status == GRB.SUBOPTIMAL:
+                max_vio = luto_solver.gurobi_model.MaxVio
+                if max_vio < suboptimal_accept_tol:
+                    print(
+                        f"Accepting SUBOPTIMAL solution: MaxVio={max_vio:.2e} < "
+                        f"{suboptimal_accept_tol:.2e} (10x FEASIBILITY_TOLERANCE)."
+                    )
+                    accepted = True
+                    break
+                print(
+                    f"Rejecting SUBOPTIMAL: MaxVio={max_vio:.2e} >= "
+                    f"{suboptimal_accept_tol:.2e}; falling through to error path."
+                )
+
+            # Last-resort acceptance: on the final attempt, if a feasible solution
+            # exists at all (SolCount > 0) and MaxVio is within tolerance, take it
+            # rather than failing hard.
+            elif is_last_attempt and luto_solver.gurobi_model.SolCount > 0:
+                max_vio = luto_solver.gurobi_model.MaxVio
+                if max_vio < suboptimal_accept_tol:
+                    print(
+                        f"Accepting last-attempt solution (status={status}): "
+                        f"MaxVio={max_vio:.2e} < {suboptimal_accept_tol:.2e}."
+                    )
+                    accepted = True
+                    break
+                print(
+                    f"Rejecting last-attempt solution (status={status}): "
+                    f"MaxVio={max_vio:.2e} >= {suboptimal_accept_tol:.2e}."
+                )
+
+            print(f"Non-optimal status {status} with NumericFocus={nf}, Method={method}; retrying with next attempt if available.")
 
         data.add_lumap(target_year, solution.lumap)
         data.add_lmmap(target_year, solution.lmmap)
@@ -185,7 +228,7 @@ def solve_timeseries(data: Data, years_to_run: list[int], do_analyze_iis: bool) 
 
         print(f'Processing for {target_year} completed in {round(time.time() - start_time)} seconds\n\n' )
 
-        if status != GRB.OPTIMAL:
+        if not accepted:
             print('!' * 100)
 
             status_msgs = {

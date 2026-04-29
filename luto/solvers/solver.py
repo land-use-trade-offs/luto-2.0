@@ -47,7 +47,7 @@ gurenv.setParam("Method", settings.SOLVE_METHOD)
 gurenv.setParam("OutputFlag", settings.VERBOSE)
 gurenv.setParam("Presolve", settings.PRESOLVE)
 gurenv.setParam("Aggregate", settings.AGGREGATE)
-# NumericFocus is set per-solve in simulation.py (retry loop over settings.NUMERIC_FOCUS list)
+# NumericFocus is set per-solve in simulation.py (retry loop over settings.RETRY_PARAMS list)
 gurenv.setParam("OptimalityTol", settings.OPTIMALITY_TOLERANCE)
 gurenv.setParam("FeasibilityTol", settings.FEASIBILITY_TOLERANCE)
 gurenv.setParam("BarConvTol", settings.BARRIER_CONVERGENCE_TOLERANCE)
@@ -1302,12 +1302,27 @@ class LutoSolver:
             )
             self.regional_adoption_constrs.append(self.gurobi_model.addConstr(reg_expr <= reg_area_limit, name=f"reg_adopt_limit_ag_{lu_name}_{reg_id}"))
 
-        # Add adoption constraints for non-agricultural land uses
-        reg_adopt_limits = self._input_data.limits["non_ag_regional_adoption"]
-        for reg_id, k, lu_name, reg_ind, reg_area_limit in reg_adopt_limits:
+        # Add per-(region, non-ag-landuse) caps from the xlsx ('on' mode)
+        reg_adopt_non_ag_limits = self._input_data.limits.get("non_ag_regional_adoption") or []
+        for reg_id, k, lu_name, reg_ind, reg_area_limit in reg_adopt_non_ag_limits:
             print(f"│   │   │   ├── Adding constraints for {lu_name} in {settings.REGIONAL_ADOPTION_ZONE} region {reg_id} <= {reg_area_limit:,.0f} HA...")
             reg_expr = gp.quicksum(self._input_data.real_area[reg_ind] * self.X_non_ag_vars_kr[k, reg_ind])
-            self.regional_adoption_constrs.append(self.gurobi_model.addConstr(reg_expr <= reg_area_limit, name=f"reg_adopt_limit_non_ag_{lu_name}_{reg_id}"))
+            self.regional_adoption_constrs.append(
+                self.gurobi_model.addConstr(reg_expr <= reg_area_limit, name=f"reg_adopt_limit_non_ag_{lu_name}_{reg_id}")
+            )
+
+        # Add SUM-of-non-ag adoption constraints ('NON_AG_CAP' mode):
+        # the combined area of all non-ag land uses in each region cannot exceed the uniform percentage cap.
+        reg_adopt_sum_limits = self._input_data.limits.get("non_ag_regional_adoption_sum") or []
+        for reg_id, reg_ind, reg_area_limit in reg_adopt_sum_limits:
+            print(f"│   │   │   ├── Adding SUM-of-non-ag constraint for {settings.REGIONAL_ADOPTION_NON_AG_REGION} region {reg_id} <= {reg_area_limit:,.0f} HA...")
+            reg_expr = gp.quicksum(
+                self._input_data.real_area[reg_ind] * self.X_non_ag_vars_kr[k, reg_ind]
+                for k in range(self.X_non_ag_vars_kr.shape[0])
+            )
+            self.regional_adoption_constrs.append(
+                self.gurobi_model.addConstr(reg_expr <= reg_area_limit, name=f"reg_adopt_limit_non_ag_sum_{reg_id}")
+            )
 
 
 

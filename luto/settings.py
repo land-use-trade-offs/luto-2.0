@@ -182,7 +182,7 @@ Note: 1e-4 was found to occasionally produce false-infeasibility on barrier (mod
 actually feasible — IIS subsequently fails with "Cannot compute IIS on a feasible model").
 Keeping the threshold at 1e-3 keeps the matrix coefficient range comfortably inside
 Gurobi's recommended band; the per-year retry loop in simulation.py escalates
-NUMERIC_FOCUS if the first solve still terminates non-optimally.
+RETRY_PARAMS if the first solve still terminates non-optimally.
 '''
 
 RESCALE_PERCENTILE = 97
@@ -227,17 +227,58 @@ AGGREGATE = 0    # Controls the aggregation level in presolve. The options are o
 VERBOSE = 1
 
 # Relax the tolerances for feasibility and optimality
-FEASIBILITY_TOLERANCE = 1e-2              # Primal feasility tolerance - Default: 1e-6, Min: 1e-9, Max: 1e-2
-OPTIMALITY_TOLERANCE = 1e-2               # Dual feasility tolerance - Default: 1e-6, Min: 1e-9, Max: 1e-2
-BARRIER_CONVERGENCE_TOLERANCE = 1e-5      # Range from 1e-2 to 1e-8 (default), that larger the number the faster but the less exact the solve. 1e-5 is a good compromise between optimality and speed.
+FEASIBILITY_TOLERANCE = 1e-2              
+''' Primal feasility tolerance - Default: 1e-6, Min: 1e-9, Max: 1e-2'''
 
-# Whether to use crossover in barrier solve. 0 = off, -1 = automatic. Auto cleans up sub-optimal termination errors without much additional compute time (apart from 2050 when it sometimes never finishes).
+OPTIMALITY_TOLERANCE = 1e-2               
+''' Dual feasility tolerance - Default: 1e-6, Min: 1e-9, Max: 1e-2'''
+BARRIER_CONVERGENCE_TOLERANCE = 1e-5      
+''' 
+Range from 1e-2 to 1e-8 (default), that larger the number the faster but 
+the less exact the solve. 1e-5 is a good compromise between optimality and speed.
+'''
+
 CROSSOVER = 0
+'''
+Whether to use crossover in barrier solve. 0 = off, -1 = automatic. 
+Auto cleans up sub-optimal termination errors without much additional compute time 
+(apart from 2050 when it sometimes never finishes).
+'''
 
-# Parameters for dealing with numerical issues. NUMERIC_FOCUS = 2 fixes most things but roughly doubles solve time.
-SCALE_FLAG = 0        # Scales the rows and columns of the model to improve the numerical properties of the constraint matrix. -1: Auto, 0: No scaling, 1: equilibrium scaling (First scale each row to make its largest nonzero entry to be magnitude one, then scale each column to max-norm 1), 2: geometric scaling, 3: multi-pass equilibrium scaling. Testing revealed that 1 tripled solve time, 3 led to numerical problems.
-NUMERIC_FOCUS = [0, 2]   # List of NumericFocus values to try in order, per year. simulation.py loops this list and retries the solve with the next value whenever Gurobi returns a non-OPTIMAL status (e.g. NUMERIC, SUBOPTIMAL, or false-INFEASIBLE). Default (0) gives a slight preference for speed; settings 1-3 increasingly shift the focus towards careful numerical computations. NUMERIC_FOCUS = 1 is ok, 2 increases solve time by ~4x but reliably cleans up barrier sub-optimal termination (status 13).
-BARHOMOGENOUS = 1     # Useful for recognizing infeasibility or unboundedness. At the default setting (-1), it is only used when barrier solves a node relaxation for a MIP model. 0 = off, 1 = on. It is a bit slower than the default algorithm (3x slower in testing). Set to 1 when debugging infeasibility to avoid ambiguous INF_OR_UNBD status.
+SCALE_FLAG = 0                      
+''' 
+Scales the rows and columns of the model to improve the numerical properties of 
+the constraint matrix. -1: Auto, 0: No scaling, 1: equilibrium scaling (First scale each 
+row to make its largest nonzero entry to be magnitude one, then scale each column to 
+max-norm 1), 2: geometric scaling, 3: multi-pass equilibrium scaling. Testing revealed 
+that 1 tripled solve time, 3 led to numerical problems.
+'''
+
+RETRY_PARAMS = [(0, 2), (3, 2), (0, 5)]      
+'''
+List of solve attempts to try in order, per year. Each entry MUST be a 
+(NumericFocus, Method) tuple. simulation.py loops this list and retries the 
+solve with the next entry whenever Gurobi returns a non-OPTIMAL status 
+(e.g. NUMERIC, SUBOPTIMAL, or false-INFEASIBLE).
+
+The Method value overrides settings.SOLVE_METHOD for that attempt:
+  -1 = automatic, 0 = primal simplex, 1 = dual simplex, 2 = barrier,
+   3 = concurrent, 4 = deterministic concurrent, 5 = deterministic concurrent simplex.
+
+Default sequence:
+  (0, 2)  NF=0 barrier, fast first pass
+  (3, 2)  NF=3 barrier, very careful (slower) for stubborn numerical cases
+  (0, 5)  NF=0 deterministic concurrent simplex, simplex fallback that bypasses
+          barrier numerical issues at the cost of longer solve time.
+'''
+
+BARHOMOGENOUS = 1                   
+'''
+Useful for recognizing infeasibility or unboundedness. At the default setting (-1),
+it is only used when barrier solves a node relaxation for a MIP model. 0 = off, 
+1 = on. It is a bit slower than the default algorithm (3x slower in testing). 
+Set to 1 when debugging infeasibility to avoid ambiguous INF_OR_UNBD status.
+'''
 
 # Number of threads to use in parallel algorithms (e.g., barrier). PBS_NCPUS is the requested CPUs on GADI hpc.
 THREADS = min(32, int(os.environ.get("PBS_NCPUS", os.cpu_count())))
@@ -269,15 +310,9 @@ REGIONAL_ADOPTION_CONSTRAINTS = 'off'
 Adoption mode for non-ag land uses.
 - 'off': no regional adoption constraints
 - 'on', user needs to set the percentage targets in 'input/regional_adoption_zones.xlsx'
-- 'NON_AG_UNIFORM', each of the non-ag land uses can not exceed a certain percentage (REGIONAL_ADOPTION_NON_AG_UNIFORM) in every region
+- 'NON_AG_CAP', the SUM of all non-ag land uses can not exceed a certain percentage (REGIONAL_ADOPTION_NON_AG_CAP) in every region
 '''
 
-REGIONAL_ADOPTION_NON_AG_UNIFORM = 15            
-'''
-None or numbers between 0-100 (both inclusive); 
- Only work under 'REGIONAL_ADOPTION_CONSTRAINTS = NON_AG_UNIFORM'. E.g., 5 means each non-ag land can not exceed 5% adoption in every region.
-'''
-                                        
 REGIONAL_ADOPTION_ZONE = 'NRM_CODE'              # 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
 '''
 The regional adoption zone is the spatial unit used to enforce regional adoption constraints.
@@ -288,6 +323,24 @@ The options are:
   - 'IBRA_ID': Interim Biogeographic Regionalisation of Australia (IBRA) region code.
   - 'SLA_5DIGIT': Statistical Local Area (SLA) 5-digit code.
 '''
+
+
+REGIONAL_ADOPTION_NON_AG_REGION = 'NRM'
+'''
+The regional adoption zone for non-agricultural land uses when using the 'NON_AG_CAP' mode.
+The options are the same as REGIONAL_ADOPTION_ZONE:
+- 'NRM': Natural Resource Management code.
+- 'State': Australian state regions.
+'''
+
+
+REGIONAL_ADOPTION_NON_AG_CAP = 15            
+'''
+None or numbers between 0-100 (both inclusive); 
+ Only work under 'REGIONAL_ADOPTION_CONSTRAINTS = NON_AG_CAP'. 
+ E.g., 15 means the combined area of all non-ag land uses can not exceed 15% of each region's area.
+'''
+                                        
 
 
 

@@ -70,7 +70,7 @@ window.SettingsView = {
       },
       'Solver & Optimization': {
         icon: '🔧',
-        keywords: ['SOLVE_METHOD', 'SOLVE_WEIGHT', 'SOLVER_WEIGHT', 'TOLERANCE', 'PRESOLVE', 'CROSSOVER', 'BARRIER', 'SCALE_FLAG', 'NUMERIC_FOCUS', 'BARHOMOGENOUS', 'CONSTRAINT_TYPE', 'ALPHA', 'BETA', 'RESCALE_FACTOR']
+        keywords: ['SOLVE_METHOD', 'SOLVE_WEIGHT', 'SOLVER_WEIGHT', 'TOLERANCE', 'PRESOLVE', 'CROSSOVER', 'BARRIER', 'SCALE_FLAG', 'RETRY_PARAMS', 'BARHOMOGENOUS', 'CONSTRAINT_TYPE', 'ALPHA', 'BETA', 'RESCALE_FACTOR']
       },
       'Output & Processing': {
         icon: '📊',
@@ -82,7 +82,7 @@ window.SettingsView = {
       },
       'Regional Constraints': {
         icon: '🗺️',
-        keywords: ['EXCLUDE_NO_GO', 'NO_GO_VECTORS', 'REGIONAL_ADOPTION_CONSTRAINTS', 'REGIONAL_ADOPTION_NON_AG_UNIFORM', 'REGIONAL_ADOPTION_ZONE']
+        keywords: ['EXCLUDE_NO_GO', 'NO_GO_VECTORS', 'REGIONAL_ADOPTION_CONSTRAINTS', 'REGIONAL_ADOPTION_NON_AG_CAP', 'REGIONAL_ADOPTION_ZONE']
       },
       'Off-Land Commodities': {
         icon: '🥚',

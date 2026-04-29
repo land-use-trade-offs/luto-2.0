@@ -551,24 +551,42 @@ def get_lower_bound_agricultural_management_matrices(data: Data, base_year) -> d
 
 
 def get_regional_adoption_limits(data: Data, yr_cal: int):
+    """
+    Build per-region adoption caps for the solver.
+
+    Returns
+    -------
+    ag_reg_adoption_constrs : list[[reg_id, lu_code, lu_name, reg_ind, area_limit_ha]]
+        Per-(region, ag-landuse) caps from regional_adoption_zones.xlsx. 'on' mode only.
+    non_ag_reg_adoption_constrs : list[[reg_id, lu_code, lu_name, reg_ind, area_limit_ha]]
+        Per-(region, non-ag-landuse) caps from regional_adoption_zones.xlsx. 'on' mode only.
+    non_ag_reg_adoption_sum_constrs : list[[reg_id, reg_ind, area_limit_ha]]
+        Per-region SUM-of-all-non-ag caps. 'NON_AG_CAP' mode only.
+    """
     if settings.REGIONAL_ADOPTION_CONSTRAINTS == "off":
-        return None, None
-    
+        return [], [], []
+
     ag_reg_adoption_constrs = []
     non_ag_reg_adoption_constrs = []
 
+    # Per-LU (ag + non-ag) caps from xlsx — only populated in 'on' mode
     for reg_id, lu_name, area_limit_ha in data.get_regional_adoption_limit_ha_by_year(yr_cal):
         reg_ind = np.where(data.REGIONAL_ADOPTION_ZONES == reg_id)[0]
 
         if lu_name in data.DESC2AGLU:
             lu_code = data.DESC2AGLU[lu_name]
             ag_reg_adoption_constrs.append([reg_id, lu_code, lu_name, reg_ind, area_limit_ha])
-
         elif lu_name in data.DESC2NONAGLU:
             lu_code = data.DESC2NONAGLU[lu_name] - settings.NON_AGRICULTURAL_LU_BASE_CODE
             non_ag_reg_adoption_constrs.append([reg_id, lu_code, lu_name, reg_ind, area_limit_ha])
-
         else:
             raise ValueError(f"Regional adoption constraint exists for unrecognised land use: {lu_name}")
 
-    return ag_reg_adoption_constrs, non_ag_reg_adoption_constrs
+    # SUM-of-non-ag per-region cap — only populated in 'NON_AG_CAP' mode
+    non_ag_reg_adoption_sum_constrs = [
+        [reg_id, reg_ind, area_limit_ha]
+        for reg_id, reg_ind, area_limit_ha
+        in data.get_regional_adoption_non_ag_sum_limit_ha_by_year(yr_cal)
+    ]
+
+    return ag_reg_adoption_constrs, non_ag_reg_adoption_constrs, non_ag_reg_adoption_sum_constrs
