@@ -58,7 +58,7 @@ import luto.simulation as sim
 
 # Run the simulation
 data = sim.load_data()
-sim.run(data=data)
+sim.run(data=data, do_analyze_iis=True)
 
 
 # Set up report directory and archive path
