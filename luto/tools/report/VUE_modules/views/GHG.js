@@ -147,6 +147,7 @@ window.GHGView = {
       await loadScript("./data/chart_option/Chart_default_options.js", "Chart_default_options", VIEW_NAME);
 
       availableYears.value = window.Supporting_info.years;
+      selectYear.value = availableYears.value[0] || 2020;
 
       // Load initial map + ALL charts in parallel
       const initCat = availableCategories[0]; // "Sum"

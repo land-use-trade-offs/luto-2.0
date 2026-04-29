@@ -104,6 +104,7 @@ window['MapView'] = {
             await loadScript("./data/Supporting_info.js", "Supporting_info", VIEW_NAME);
 
             availableYears.value = window.Supporting_info.years;
+            selectYear.value = availableYears.value[0] || 2020;
 
             // Pre-load only the initial category
             await ensureDataLoaded(availableCategories[0]);

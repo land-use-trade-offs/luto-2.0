@@ -126,17 +126,25 @@ window.HeatmapContainer = {
                 legend: { enabled: false },
                 tooltip: {
                     useHTML: true,
-                    backgroundColor: 'rgba(255,255,255,1)',
+                    backgroundColor: '#ffffff',
                     borderColor: '#e0e0e0',
                     borderWidth: 1,
                     shadow: true,
-                    style: { color: '#333333', opacity: 1, zIndex: 9999 },
+                    style: {
+                        color: '#333333',
+                        opacity: 1,
+                        zIndex: 9999,
+                        backgroundColor: '#ffffff',
+                        padding: '6px 8px',
+                        border: '1px solid #e0e0e0',
+                        borderRadius: '4px',
+                    },
                     formatter: function () {
                         const val = this.point.value;
                         if (val === null || val === undefined) return false;
                         const xLabel = (xCats[this.point.x] || '').replace(/<br>/g, ' ');
                         const yLabel = yCats[this.point.y] || '';
-                        
+
                         let valStr = '';
                         if (props.valueType === 'Cost') {
                             valStr = '<b>Cost:</b> $' + Highcharts.numberFormat(val / 1e9, 3) + ' B';
@@ -180,18 +188,18 @@ window.HeatmapContainer = {
                             if (val == null || val <= 0) return '';
                             const isAllCol = this.point.x === xCats.length - 1;
                             const isAllRow = this.point.y === yCats.length - 1;
-                            
+
                             let formatted = '';
                             if (props.valueType === 'Cost') {
                                 formatted = val >= 1e9 ? '$' + (val / 1e9).toFixed(1) + 'B'
                                     : val >= 1e6 ? '$' + (val / 1e6).toFixed(1) + 'M'
-                                    : '$' + String(val);
+                                        : '$' + String(val);
                             } else {
                                 formatted = val >= 1e6 ? (val / 1e6).toFixed(1) + 'M'
                                     : val >= 1e3 ? (val / 1e3).toFixed(1) + 'k'
-                                    : String(val);
+                                        : String(val);
                             }
-                            
+
                             return (isAllCol || isAllRow)
                                 ? '<b>' + formatted + '</b>'
                                 : formatted;
