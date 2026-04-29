@@ -170,6 +170,30 @@ E.g., the water yield for some cells is 10t but the Biodiversity-score is 1e-7, 
 the model sensitive to variations in input data. 
 '''
 
+RESCALE_ZERO_THRESHOLD = 1e-3
+'''
+After rescaling, any coefficient with |value| < RESCALE_ZERO_THRESHOLD is zeroed out before 
+being shipped to Gurobi. Such tiny entries contribute nothing to constraint sums dominated 
+by O(RESCALE_FACTOR) terms, but they wreck barrier numerics by stretching the matrix 
+coefficient range below Gurobi's recommended [1e-3, 1e6] band — the symptom is 
+"Numerical trouble encountered" with a Matrix range like [5e-08, 1e+03].
+
+Note: 1e-4 was found to occasionally produce false-infeasibility on barrier (model is
+actually feasible — IIS subsequently fails with "Cannot compute IIS on a feasible model").
+Keeping the threshold at 1e-3 keeps the matrix coefficient range comfortably inside
+Gurobi's recommended band; the per-year retry loop in simulation.py escalates
+NUMERIC_FOCUS if the first solve still terminates non-optimally.
+'''
+
+RESCALE_PERCENTILE = 97
+'''
+The percentile of |values| used as the rescaling reference (mapped to RESCALE_FACTOR after 
+scaling). Set to 100 to scale by the absolute max (legacy behaviour). Lower values are more 
+robust to outlier cells: a single extreme cell no longer compresses the typical 97% of cells 
+into a tiny range. Entries above the percentile end up above RESCALE_FACTOR after scaling 
+(still within Gurobi's recommended [1e-3, 1e6] band as long as max/p_pctile is moderate).
+'''
+
 
 
 # ---------------------------------------------------------------------------- #
@@ -212,7 +236,7 @@ CROSSOVER = 0
 
 # Parameters for dealing with numerical issues. NUMERIC_FOCUS = 2 fixes most things but roughly doubles solve time.
 SCALE_FLAG = 0        # Scales the rows and columns of the model to improve the numerical properties of the constraint matrix. -1: Auto, 0: No scaling, 1: equilibrium scaling (First scale each row to make its largest nonzero entry to be magnitude one, then scale each column to max-norm 1), 2: geometric scaling, 3: multi-pass equilibrium scaling. Testing revealed that 1 tripled solve time, 3 led to numerical problems.
-NUMERIC_FOCUS = 0     # Controls the degree to which the code attempts to detect and manage numerical issues. Default (0) makes an automatic choice, with a slight preference for speed. Settings 1-3 increasingly shift the focus towards being more careful in numerical computations. NUMERIC_FOCUS = 1 is ok, but 2 increases solve time by ~4x
+NUMERIC_FOCUS = [0, 2]   # List of NumericFocus values to try in order, per year. simulation.py loops this list and retries the solve with the next value whenever Gurobi returns a non-OPTIMAL status (e.g. NUMERIC, SUBOPTIMAL, or false-INFEASIBLE). Default (0) gives a slight preference for speed; settings 1-3 increasingly shift the focus towards careful numerical computations. NUMERIC_FOCUS = 1 is ok, 2 increases solve time by ~4x but reliably cleans up barrier sub-optimal termination (status 13).
 BARHOMOGENOUS = 1     # Useful for recognizing infeasibility or unboundedness. At the default setting (-1), it is only used when barrier solves a node relaxation for a MIP model. 0 = off, 1 = on. It is a bit slower than the default algorithm (3x slower in testing). Set to 1 when debugging infeasibility to avoid ambiguous INF_OR_UNBD status.
 
 # Number of threads to use in parallel algorithms (e.g., barrier). PBS_NCPUS is the requested CPUs on GADI hpc.

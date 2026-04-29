@@ -705,24 +705,61 @@ def get_renewable_MNES_mask_wind_idx(data: Data) -> np.ndarray:
     return np.where(data.RENEWABLE_MNES_MASK_WIND)[0]
 
 
+# Coefficients smaller than `settings.RESCALE_ZERO_THRESHOLD` (after rescaling to
+# max == RESCALE_FACTOR == 1e3 by default) are zeroed out before being shipped to Gurobi.
+# They contribute nothing to constraint sums dominated by O(RESCALE_FACTOR) entries, but
+# they wreck barrier numerics by stretching the matrix coefficient range below Gurobi's
+# recommended [1e-3, 1e6] band — the symptom is "Numerical trouble encountered" with a
+# Matrix range like [5e-08, 1e+03].
+
+
 def rescale_per_species_data(arr: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """
     Rescale a 2D species×cell matrix per-species (per-row) independently.
 
-    Each row is scaled so its max absolute value equals `settings.RESCALE_FACTOR` (default 1e3).
-    This avoids numerical issues when different species have vastly different area magnitudes
-    but each gets its own solver constraint.
+    Each row is scaled so its `settings.RESCALE_PERCENTILE`-th percentile of |values| equals
+    `settings.RESCALE_FACTOR` (default 1e3). Using a percentile (rather than the absolute max)
+    is robust to outlier cells — a single cell with extreme presence no longer compresses the
+    typical bulk of cells into a tiny range. Entries above the percentile end up above
+    RESCALE_FACTOR after scaling (still within Gurobi's recommended [1e-3, 1e6] band).
+
+    After rescaling, entries with |value| < `settings.RESCALE_ZERO_THRESHOLD` are zeroed out to
+    keep the matrix coefficient range inside Gurobi's recommended band.
 
     Returns:
         scaled_arr: The rescaled 2D array (float32).
-        scale_factors: 1D array of per-species scale factors. Multiply rescaled values
-                       by scale_factors[s] to recover original values for species s.
+        scale_factors: 1D array of per-species scale factors. If `arr` is an xr.DataArray,
+                       the returned `scale_factors` is an xr.DataArray that retains the row
+                       coord (e.g. 'species' or 'group') so callers can do `.sel(...)`.
+                       Multiply rescaled values by scale_factors[s] to recover original values.
     """
-    row_maxes = np.max(np.abs(arr), axis=1)  # max per species
-    # Avoid division by zero for empty species rows
-    row_maxes[row_maxes == 0] = settings.RESCALE_FACTOR
-    scale_factors = (row_maxes / settings.RESCALE_FACTOR).astype(np.float32)
-    scaled_arr = (arr / scale_factors.data[:, np.newaxis]).astype(np.float32)
+    arr_np = np.asarray(arr)
+    abs_arr = np.abs(arr_np)
+    row_refs = np.percentile(abs_arr, settings.RESCALE_PERCENTILE, axis=1)  # per-species reference
+    # Avoid division by zero for rows whose percentile reference is 0 (e.g. very sparse rows).
+    # Fall back to the row max; if that is also 0 use RESCALE_FACTOR (no-op scaling).
+    zero_ref = row_refs == 0
+    if zero_ref.any():
+        row_max = abs_arr.max(axis=1)
+        row_refs = np.where(zero_ref, np.where(row_max == 0, settings.RESCALE_FACTOR, row_max), row_refs)
+    scale_factors_np = (row_refs / settings.RESCALE_FACTOR).astype(np.float32)
+    scaled_np = (arr_np / scale_factors_np[:, np.newaxis]).astype(np.float32)
+    scaled_np[np.abs(scaled_np) < settings.RESCALE_ZERO_THRESHOLD] = 0.0
+
+    # Preserve the xarray wrapper (dims + coords) when the input is an xr.DataArray, so the
+    # solver can still do scaled_arr.sel(group=...) and scale_factors.sel(species=...).
+    if isinstance(arr, xr.DataArray):
+        row_dim = arr.dims[0]
+        scaled_arr = xr.DataArray(scaled_np, dims=arr.dims, coords=arr.coords, name=arr.name)
+        scale_factors = xr.DataArray(
+            scale_factors_np,
+            dims=[row_dim],
+            coords={row_dim: arr.coords[row_dim]} if row_dim in arr.coords else None,
+        )
+    else:
+        scaled_arr = scaled_np
+        scale_factors = scale_factors_np
+
     return scaled_arr, scale_factors
 
 
@@ -731,26 +768,47 @@ def rescale_solver_input_data(arries: list) -> tuple[list, float]:
     Rescale the solver input data based on `settings.RESCALE_FACTOR`.
     Returns scaled copies (non-in-place) and the scale factor used.
 
-    After rescaling, the arrays will be within magnitude 0 to `settings.RESCALE_FACTOR` (default 1e3).
+    The scale factor is derived from the `settings.RESCALE_PERCENTILE`-th percentile of |values|
+    pooled across all input arrays (rather than the absolute max), making it robust to outlier
+    entries. Entries with |value| < `settings.RESCALE_ZERO_THRESHOLD` after rescaling are zeroed
+    out to keep the matrix coefficient range inside Gurobi's recommended [1e-3, 1e6] band.
     To recover original values, multiply the scaled arrays by the returned scale factor.
     """
 
-    max_vals = []
+    # Pool all |values| across the inputs and take a single global percentile so every array
+    # in this group shares one scale factor (preserves relative magnitudes between e.g. ag,
+    # non-ag, and ag-management variants of the same quantity).
+    flat_pieces = []
     for arr in arries:
         if isinstance(arr, np.ndarray):
-            max_vals.append(np.max(np.abs(arr)))
+            flat_pieces.append(np.abs(arr).ravel())
         elif isinstance(arr, dict):
-            # Assume all dictionaries are {str: np.ndarray}
-            max_vals.extend([np.max(np.abs(v)) for v in arr.values()])
+            flat_pieces.extend(np.abs(v).ravel() for v in arr.values())
 
-    scale = (np.max(max_vals) / settings.RESCALE_FACTOR).astype(np.float32)
+    if flat_pieces:
+        all_abs = np.concatenate(flat_pieces)
+        # Drop exact zeros so the percentile reflects the active coefficient distribution
+        nonzero = all_abs[all_abs > 0]
+        if nonzero.size > 0:
+            ref = np.percentile(nonzero, settings.RESCALE_PERCENTILE)
+        else:
+            ref = settings.RESCALE_FACTOR  # all-zero input → no-op scaling
+    else:
+        ref = settings.RESCALE_FACTOR
+
+    scale = (ref / settings.RESCALE_FACTOR).astype(np.float32)
+
+    def _scale_and_threshold(v: np.ndarray) -> np.ndarray:
+        out = (v / scale).astype(np.float32)
+        out[np.abs(out) < settings.RESCALE_ZERO_THRESHOLD] = 0.0
+        return out
 
     scaled = []
     for arr in arries:
         if isinstance(arr, np.ndarray):
-            scaled.append((arr / scale).astype(np.float32))
+            scaled.append(_scale_and_threshold(arr))
         elif isinstance(arr, dict):
-            scaled.append({k: (v / scale).astype(np.float32) for k, v in arr.items()})
+            scaled.append({k: _scale_and_threshold(v) for k, v in arr.items()})
         else:
             scaled.append(arr)
 

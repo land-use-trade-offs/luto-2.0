@@ -145,10 +145,25 @@ def solve_timeseries(data: Data, years_to_run: list[int], do_analyze_iis: bool) 
         input_data = get_input_data(data, base_year, target_year)
         data.last_year = target_year
 
-        luto_solver = LutoSolver(input_data)
-        luto_solver.formulate()
-        solution = luto_solver.solve()
-        status = luto_solver.gurobi_model.Status
+        # Retry loop with escalating NumericFocus. settings.NUMERIC_FOCUS is a list
+        # (e.g. [0, 1]); we try each value in order and break on GRB.OPTIMAL.
+        # If the final attempt also returns non-OPTIMAL we fall through with the
+        # last solution and let the status-handling block below report/IIS it.
+        nf_values = settings.NUMERIC_FOCUS if isinstance(settings.NUMERIC_FOCUS, (list, tuple)) else [settings.NUMERIC_FOCUS]
+        luto_solver = None
+        solution = None
+        status = None
+        for nf in nf_values:
+            print(f"Trying NumericFocus={nf} for year {target_year}...")
+            luto_solver = LutoSolver(input_data)
+            luto_solver.gurobi_model.Params.NumericFocus = nf
+            luto_solver.formulate()
+            solution = luto_solver.solve()
+            status = luto_solver.gurobi_model.Status
+            if status == GRB.OPTIMAL:
+                print(f"Optimal solution found with NumericFocus={nf}")
+                break
+            print(f"Non-optimal status {status} with NumericFocus={nf}; retrying with next NumericFocus value if available.")
 
         data.add_lumap(target_year, solution.lumap)
         data.add_lmmap(target_year, solution.lmmap)
