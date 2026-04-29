@@ -425,7 +425,7 @@ class Data:
 
         # Actual hectares per cell, including projection corrections.
         self.REAL_AREA_NO_RESFACTOR = pd.read_hdf(os.path.join(settings.INPUT_DIR, "real_area.h5")).to_numpy()
-        self.REAL_AREA = self.REAL_AREA_NO_RESFACTOR[self.MASK] * self.RESMULT  # TODO: adjusting using 
+        self.REAL_AREA = self.REAL_AREA_NO_RESFACTOR[self.MASK] * self.RESMULT  # TODO: adjusting using actual area
 
         # Derive NCELLS (number of spatial cells) from the area array.
         self.NCELLS = self.REAL_AREA.shape[0]
@@ -1540,7 +1540,22 @@ class Data:
                 nvis_layers_arr
             ).astype(np.float32)
 
-
+            # Recompute targets at current RESFACTOR so the constraint LHS and RHS
+            # use the same spatial representation (RF1 CSV scores become inconsistent
+            # with RF>1 averaged layers, causing infeasibility).
+            if settings.RESFACTOR > 1 and settings.GBF3_NVIS_REGION_MODE in ('NRM', 'Australia'):
+                _nrm_full = (
+                    np.asarray(
+                        pd.read_hdf(os.path.join(settings.INPUT_DIR, 'REGION_NRM_r.h5'), columns=['NRM_NAME'])['NRM_NAME'].values,
+                        dtype=object
+                    )
+                    if settings.GBF3_NVIS_REGION_MODE == 'NRM' else None
+                )
+                nvis_targets_df = self._recompute_nvis_targets_at_rf(
+                    nvis_targets_df, nvis_layers_sel, nvis_layers_arr, _nrm_full
+                )
+                self.BIO_GBF3_NVIS_BASELINE_AND_TARGETS = nvis_targets_df
+                print(f"│   │   ├── Recomputed NVIS targets at RESFACTOR={settings.RESFACTOR}", flush=True)
 
             if settings.GBF3_NVIS_REGION_MODE == 'NRM':
                 # NRM: one name per (group, region) constraint pair
@@ -1665,14 +1680,21 @@ class Data:
                 self.BIO_GBF4_SNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY = snes_nrm_df
                 self.BIO_GBF4_SNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY_AND_MAYBE = pd.DataFrame()
 
-                # NRM masking metadata — used by biodiversity.py to expand (n_unique_species) → (n_pairs)
-                self.GBF4_SNES_NRM_REGION_MASKS = {r: (self.REGION_NRM_NAME == r) for r in snes_nrm_df['region'].unique()}
-                self.GBF4_SNES_NRM_SPECIES_FOR_CONSTRAINT = snes_nrm_df['SCIENTIFIC_NAME'].tolist()
-                self.GBF4_SNES_NRM_REGION_FOR_CONSTRAINT = snes_nrm_df['region'].tolist()
-
                 # Australia-wide unique-species layers — region masking applied in biodiversity.py
                 snes_arr = BIO_GBF4_SPECIES_raw.sel(species=unique_species, presence='LIKELY')
                 self.BIO_GBF4_SPECIES_LAYERS = np.array([self.get_resfactored_average_fraction(arr) for arr in snes_arr])
+
+                if settings.RESFACTOR > 1:
+                    _nrm_full = np.asarray(
+                        pd.read_hdf(os.path.join(settings.INPUT_DIR, 'REGION_NRM_r.h5'), columns=['NRM_NAME'])['NRM_NAME'].values,
+                        dtype=object
+                    )
+                    snes_nrm_df = self._recompute_snes_ecnes_targets_at_rf(
+                        snes_nrm_df, 'SCIENTIFIC_NAME', unique_species,
+                        snes_arr, self.BIO_GBF4_SPECIES_LAYERS, _nrm_full
+                    )
+                    self.BIO_GBF4_SNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY = snes_nrm_df
+                    print(f"│   │   ├── Recomputed SNES targets at RESFACTOR={settings.RESFACTOR}", flush=True)
 
                 print(f"│   │   └── {len(snes_nrm_df)} (species, region) constraints from {len(unique_species)} species", flush=True)
         
@@ -1764,14 +1786,21 @@ class Data:
                 self.BIO_GBF4_ECNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY = ecnes_nrm_df
                 self.BIO_GBF4_ECNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY_AND_MAYBE = pd.DataFrame()
 
-                # NRM masking metadata — used by biodiversity.py to expand (n_unique_communities) → (n_pairs)
-                self.GBF4_ECNES_NRM_REGION_MASKS = {r: (self.REGION_NRM_NAME == r) for r in ecnes_nrm_df['region'].unique()}
-                self.GBF4_ECNES_NRM_COMMUNITY_FOR_CONSTRAINT = ecnes_nrm_df['COMMUNITY'].tolist()
-                self.GBF4_ECNES_NRM_REGION_FOR_CONSTRAINT = ecnes_nrm_df['region'].tolist()
-
                 # Australia-wide unique-community layers — region masking applied in biodiversity.py
                 ecnes_arr = BIO_GBF4_COMUNITY_raw.sel(species=unique_communities, presence='LIKELY').compute()
                 self.BIO_GBF4_COMUNITY_LAYERS = np.array([self.get_resfactored_average_fraction(arr) for arr in ecnes_arr])
+
+                if settings.RESFACTOR > 1:
+                    _nrm_full = np.asarray(
+                        pd.read_hdf(os.path.join(settings.INPUT_DIR, 'REGION_NRM_r.h5'), columns=['NRM_NAME'])['NRM_NAME'].values,
+                        dtype=object
+                    )
+                    ecnes_nrm_df = self._recompute_snes_ecnes_targets_at_rf(
+                        ecnes_nrm_df, 'COMMUNITY', unique_communities,
+                        ecnes_arr, self.BIO_GBF4_COMUNITY_LAYERS, _nrm_full
+                    )
+                    self.BIO_GBF4_ECNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY = ecnes_nrm_df
+                    print(f"│   │   ├── Recomputed ECNES targets at RESFACTOR={settings.RESFACTOR}", flush=True)
 
                 print(f"│   │   └── {len(ecnes_nrm_df)} (community, region) constraints from {len(unique_communities)} communities", flush=True)
         
@@ -1927,6 +1956,158 @@ class Data:
         return lumap_mrj
     
     
+    def _compute_luto_biodiv_component_by_region(
+        self,
+        arr_rf1_all: xr.DataArray,
+        arr_rf: np.ndarray,
+        nrm_full: np.ndarray | None,
+        regions: list,
+    ) -> dict:
+        """
+        For each region, compute the LUTO-cell habitat contribution at RF1 and at the
+        current RESFACTOR, using the same hard NRM region membership that the solver uses.
+
+        Parameters
+        ----------
+        arr_rf1_all : xr.DataArray (n_items, n_all_cells), lazy, values 0-1
+            Full-resolution biodiversity layers (all 6956407 NLUM cells).
+        arr_rf : np.ndarray (n_items, NCELLS)
+            RF-resampled layers (LUTO cells only at current RESFACTOR).
+        nrm_full : np.ndarray (n_all_cells,) of str, or None for 'Australia' mode
+            NRM region name for every NLUM cell.
+        regions : list of str
+            Region names to compute; use ['Australia'] for whole-LUTO (no mask).
+
+        Returns
+        -------
+        dict  {region: {'luto_rf1': np.ndarray[n_items], 'luto_rf': np.ndarray[n_items]}}
+            luto_rf1[i] = sum_{r∈LUTO ∩ region}(arr_rf1[i,r] × area_rf1[r])
+            luto_rf [i] = sum_{r∈LUTO ∩ region}(arr_rf [i,r] × REAL_AREA_rf[r])
+        """
+        area_rf1_in_luto = self.REAL_AREA_NO_RESFACTOR[self.LUMASK]
+
+        # NRM names for LUTO cells at full-res (RF1 ordering)
+        nrm_in_luto = nrm_full[self.LUMASK] if nrm_full is not None else None
+
+        result = {}
+        for region in regions:
+            if region == 'Australia':
+                mask_rf1 = slice(None)        # all LUTO cells
+                mask_rf  = slice(None)
+            else:
+                mask_rf1 = (nrm_in_luto == region)
+                mask_rf  = (self.REGION_NRM_NAME == region)
+
+            # RF1 LUTO component: iterate lazily over items to stay memory-efficient
+            # At RF1 each LUMASK cell is fully ag (AG_MASK_PROPORTION_R == 1), so no cap needed.
+            luto_rf1 = np.array([
+                float(np.dot(arr.values[self.LUMASK][mask_rf1], area_rf1_in_luto[mask_rf1]))
+                for arr in arr_rf1_all
+            ], dtype=np.float64)
+
+            # RF LUTO component: arr_rf is already in memory (n_items, NCELLS).
+            # Cap by AG_MASK_PROPORTION_R because the solver's const_cell_usage limits the
+            # total dvar mass in a coarse cell to that fraction (see _add_cell_usage_constraints).
+            # Without this cap, recomputed targets demand more habitat than the solver can ever allocate.
+            ag_prop_rf = self.AG_MASK_PROPORTION_R[mask_rf]
+            luto_rf = (arr_rf[:, mask_rf] * self.REAL_AREA[mask_rf] * ag_prop_rf).sum(axis=1).astype(np.float64)
+
+            result[region] = {'luto_rf1': luto_rf1, 'luto_rf': luto_rf}
+
+        return result
+
+    def _recompute_nvis_targets_at_rf(
+        self,
+        nvis_targets_df: 'pd.DataFrame',
+        nvis_layers_sel: 'xr.DataArray',
+        nvis_layers_arr: 'xr.DataArray',
+        nrm_full: np.ndarray | None,
+    ) -> 'pd.DataFrame':
+        """
+        Replace ALL_HA, IN_LUTO_HA, and BASEYEAR_LEVEL in nvis_targets_df with
+        values consistent with the current RESFACTOR.
+
+        NATURAL_OUT_LUTO_HA and target levels are kept from the CSV (outside-LUTO
+        habitat does not change with RESFACTOR).
+        """
+        regions = (
+            ['Australia'] if 'region' not in nvis_targets_df.columns or
+            (nvis_targets_df['region'] == 'Australia').all()
+            else nvis_targets_df['region'].unique().tolist()
+        )
+        group_order = list(nvis_layers_sel.group.values)
+
+        luto_comps = self._compute_luto_biodiv_component_by_region(
+            nvis_layers_sel, nvis_layers_arr.values, nrm_full, regions
+        )
+
+        df = nvis_targets_df.copy()
+        for i, row in df.iterrows():
+            region = row.get('region', 'Australia')
+            g_idx  = group_order.index(row['group'])
+
+            luto_rf1 = luto_comps[region]['luto_rf1'][g_idx]
+            luto_rf  = luto_comps[region]['luto_rf'][g_idx]
+            delta    = luto_rf - luto_rf1
+
+            all_ha_rf   = row['ALL_HA'] + delta
+            nat_out     = row['NATURAL_OUT_LUTO_HA']          # unchanged
+            baseyear_rf = (luto_rf + nat_out) / all_ha_rf * 100 if all_ha_rf > 0 else 0.0
+
+            df.at[i, 'ALL_HA']         = all_ha_rf
+            df.at[i, 'IN_LUTO_HA']     = luto_rf
+            df.at[i, 'BASEYEAR_LEVEL'] = baseyear_rf
+
+        return df
+
+    def _recompute_snes_ecnes_targets_at_rf(
+        self,
+        df: 'pd.DataFrame',
+        key_col: str,
+        item_names: list,
+        arr_rf1_all: 'xr.DataArray',
+        arr_rf: np.ndarray,
+        nrm_full: np.ndarray | None,
+    ) -> 'pd.DataFrame':
+        """
+        Replace BASELINE_LEVEL_ALL_AUSTRALIA_LIKELY, ATTAINABLE_LEVEL_LIKELY, and
+        BASEYEAR_LEVEL_LIKELY with values consistent with the current RESFACTOR.
+
+        BASEYEAR_SCORE_OUT_LUTO_NATURAL_LIKELY and target levels are kept from the CSV.
+        """
+        regions = (
+            ['Australia'] if (df['region'] == 'Australia').all()
+            else df['region'].unique().tolist()
+        )
+
+        luto_comps = self._compute_luto_biodiv_component_by_region(
+            arr_rf1_all, arr_rf, nrm_full, regions
+        )
+
+        df = df.copy()
+        for i, row in df.iterrows():
+            region   = row['region']
+            item_idx = item_names.index(row[key_col])
+
+            luto_rf1   = luto_comps[region]['luto_rf1'][item_idx]
+            luto_rf    = luto_comps[region]['luto_rf'][item_idx]
+            delta      = luto_rf - luto_rf1
+
+            all_ha_rf1 = row['BASELINE_LEVEL_ALL_AUSTRALIA_LIKELY']
+            all_ha_rf  = all_ha_rf1 + delta
+            nat_out    = row['BASEYEAR_SCORE_OUT_LUTO_NATURAL_LIKELY']   # unchanged
+            # NON_NATURAL_OUT_LUTO stays fixed (outside LUTO, doesn't change with RF)
+            non_nat_out = all_ha_rf1 * (1.0 - row['ATTAINABLE_LEVEL_LIKELY'] / 100.0)
+
+            attainable_rf  = (1.0 - non_nat_out / all_ha_rf) * 100.0 if all_ha_rf > 0 else 0.0
+            baseyear_rf    = (luto_rf + nat_out) / all_ha_rf * 100.0   if all_ha_rf > 0 else 0.0
+
+            df.at[i, 'BASELINE_LEVEL_ALL_AUSTRALIA_LIKELY'] = all_ha_rf
+            df.at[i, 'ATTAINABLE_LEVEL_LIKELY']             = attainable_rf
+            df.at[i, 'BASEYEAR_LEVEL_LIKELY']               = baseyear_rf
+
+        return df
+
     def get_resfactored_average_fraction(self, arr: np.ndarray, use_valid_cell_count: bool = True) -> np.ndarray:
         '''
         Calculate the average value for each resfactored cell, given the input arr is masked by the land-use mask
@@ -1954,7 +2135,7 @@ class Data:
 
         if use_valid_cell_count:
             # Divide by valid NLUM cells per block — preserves per-valid-cell average (e.g. habitat layers)
-            nlum_2d_xr = xr.DataArray(self.NLUM_MASK.astype(np.float32), dims=['y', 'x'])
+            nlum_2d_xr = xr.DataArray(np.nan_to_num(arr_to_xr(self, arr>0)), dims=['y', 'x'])
             denom = nlum_2d_xr.coarsen(x=settings.RESFACTOR, y=settings.RESFACTOR, boundary='pad').sum()
             denom = denom.where(denom > 0, other=1)  # avoid division by zero
         else:
