@@ -289,6 +289,72 @@ in_xr.attrs['min_max'] = (float(in_xr.min().values), float(in_xr.max().values))
 in_xr.astype('float32').to_netcdf(save_path, encoding=encoding)
 ```
 
+## Greyscale Ramp for Unselected Cells (`is_selected` Coord)
+
+Some biodiversity outputs are computed nationally even when the underlying constraint is
+restricted to a subset of NRMs/IBRA bioregions (e.g. GBF3 NVIS, GBF4 SNES, GBF4 ECNES).
+The map renderer greys out cells outside the selected regions while keeping the colour
+ramp for cells inside the selection — this preserves national context without misleading
+the viewer about where the constraint actually applied.
+
+### Write-Side Pattern
+
+Write functions attach a boolean `is_selected` coord (along the `cell` dim) to each
+`valid_layers_stack_*` **before** `save2nc`. The mask is `True` for cells inside the
+selected regions and `False` otherwise. In `Australia` mode (no spatial restriction) the
+mask is all-`True` and the renderer behaves exactly as before.
+
+```python
+# In write.py: applied to GBF3 NVIS, GBF4 SNES, GBF4 ECNES write functions
+if getattr(settings, '<MODE_SETTING>', 'Australia') == 'NRM':
+    sel_regions = sorted({r for r, _ in getattr(data, '<SEL_ATTR>', []) if r != 'Australia'})
+    sel_mask = (
+        np.isin(np.asarray(data.REGION_NRM_NAME), sel_regions)
+        if sel_regions else np.ones(data.NCELLS, dtype=bool)
+    )
+else:
+    sel_mask = np.ones(data.NCELLS, dtype=bool)
+
+valid_layers_stack_ag     = valid_layers_stack_ag.assign_coords(is_selected=('cell', sel_mask))
+valid_layers_stack_non_ag = valid_layers_stack_non_ag.assign_coords(is_selected=('cell', sel_mask))
+valid_layers_stack_am     = valid_layers_stack_am.assign_coords(is_selected=('cell', sel_mask))
+
+save2nc(valid_layers_stack_ag,     os.path.join(path, f'xr_biodiversity_<METRIC>_ag_{yr_cal}.nc'))
+save2nc(valid_layers_stack_non_ag, os.path.join(path, f'xr_biodiversity_<METRIC>_non_ag_{yr_cal}.nc'))
+save2nc(valid_layers_stack_am,     os.path.join(path, f'xr_biodiversity_<METRIC>_ag_management_{yr_cal}.nc'))
+```
+
+| Metric | `<MODE_SETTING>` | `<SEL_ATTR>` | Region name attr |
+|---|---|---|---|
+| GBF3 NVIS  | `GBF3_NVIS_REGION_MODE`  | `BIO_GBF3_NVIS_SEL`  | `REGION_NRM_NAME` (or `REGION_IBRA_NAME` when mode == `'IBRA'`) |
+| GBF4 SNES  | `GBF4_SNES_REGION_MODE`  | `BIO_GBF4_SNES_SEL`  | `REGION_NRM_NAME` |
+| GBF4 ECNES | `GBF4_ECNES_REGION_MODE` | `BIO_GBF4_ECNES_SEL` | `REGION_NRM_NAME` |
+
+`save2nc` round-trips arbitrary `cell` coords cleanly via `cfxr.encode_multi_index_as_compress`,
+so `is_selected` survives the NetCDF encode/decode.
+
+GBF2 (mask-based) and GBF8 (climate-driven) have no NRM/IBRA region restriction, so they
+intentionally do **not** carry an `is_selected` coord — there is nothing to grey out.
+
+### Render-Side Pattern (`create_report_layers.py::map2base64`)
+
+The renderer reads the optional `is_selected` cell coord and remaps unselected non-zero
+cells to a dedicated greyscale palette segment (codes **151-200** in `COLORS_FLOAT`,
+`#DCDCDCFF` → `#3C3C3CFF`). Existing palette segments are untouched:
+
+| Code range | Meaning |
+|---|---|
+| `-1`        | Transparent (cell outside study area) |
+| `0`         | Nodata grey |
+| `1-49`      | Negative values (blue ramp) — cells **inside** selection |
+| `51-100`    | Positive values (red ramp) — cells **inside** selection |
+| `151-200`   | Any non-zero value in cells **outside** selection (grey ramp) |
+
+The codes array dtype is `int16` (widened from `int8`) to fit the new range.
+For unselected non-zero cells, intensity is computed against the global magnitude
+(`vals/global_max` for positives, `|vals|/|global_min|` for negatives) and clipped to
+`[151, 200]`.
+
 ## JSON Output Format: Map vs Chart Data Hierarchies
 
 The LUTO2 reporting system generates two types of JSON files with **different dimension hierarchies**:

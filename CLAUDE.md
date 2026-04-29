@@ -62,6 +62,7 @@ The LUTO2 documentation is split into themed files for better memory efficiency.
 - [redo_failed_write.md](docs/CLAUDE_SKILL/redo_failed_write.md): Re-run write_outputs for runs that completed simulation but failed during write — copy fixed source files into each run's luto/ dir, then submit PBS jobs via submit_redo_write.py
 - [create_luf_task_runs.md](docs/CLAUDE_SKILL/create_luf_task_runs.md): Create and submit multi-scenario LUF task runs — write create_tasks_*.py scripts, merge_unique_parameters.py, verify settings alignment, generate CSVs, and submit to cluster
 - [patch_existing_renewable_capacity.md](docs/CLAUDE_SKILL/patch_existing_renewable_capacity.md): Inject real-world existing renewable capacity as `lu='Existing Capacity'` into output xarrays before `add_all` — covers write_dvar_and_mosaic_map, write_dvar_area, write_economics, and write_renewable_production
+- [submit_task_runs_windows.md](docs/CLAUDE_SKILL/submit_task_runs_windows.md): Launch LUTO2 task runs locally on Windows via `run_all.py` — concurrency control, log monitoring, result verification, and failure recovery
 
 ## Diagnostic Tools (`luto/tests/`)
 
@@ -397,12 +398,14 @@ Map and Chart JSON files have different dimension hierarchies. See [CLAUDE_VUE_R
 - **Economics** (revenue/cost/profit/transitions): `ALL` = dvar mosaic (categorical) — load dvar, filter, concat
 - **GHG / Biodiversity / Water / Production**: `ALL` = sum aggregate — `xr.concat([data.sum('dim'), data], 'dim')` before stacking
 
+**Greyscale ramp for unselected NRMs** — biodiversity write functions for GBF3 NVIS / GBF4 SNES / GBF4 ECNES attach an `is_selected` cell coord (boolean) before `save2nc`. The render-side `map2base64` maps unselected non-zero cells through palette codes 151-200 (grey ramp) so cells outside the selected NRMs appear desaturated while preserving the colour ramp inside the selection. GBF2 (mask-based) and GBF8 (climate-driven) are excluded — no spatial restriction to grey out.
+
 See [CLAUDE_OUTPUT.md](docs/CLAUDE_OUTPUT.md) for detailed examples.
 
 ### Vue.js Progressive Selection Hierarchies
 
 - **Standard Full**: Category → AgMgt → Water → Landuse
-- **Biodiversity**: Metric → Category → AgMgt → Water → Landuse
+- **Biodiversity**: Metric → Category → AgMgt → Water → (Species) → Landuse
 - **NonAg Simplified**: Category → Landuse
 - **DVAR Simplified**: Category → Landuse/AgMgt → Year
 - **Economics Extended**: Category → MapType → (AgMgt) → Water → (Source) → Landuse
