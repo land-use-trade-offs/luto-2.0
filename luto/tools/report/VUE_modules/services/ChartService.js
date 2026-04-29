@@ -100,38 +100,6 @@ window.ChartService = {
           },
         },
       },
-      GBF3_IBRA: {
-        Ag: {
-          path: "data/BIO_GBF3_IBRA_Ag.js",
-          name: "BIO_GBF3_IBRA_Ag",
-        },
-        "Ag Mgt": {
-          path: "data/BIO_GBF3_IBRA_Am.js",
-          name: "BIO_GBF3_IBRA_Am",
-        },
-        "Non-Ag": {
-          path: "data/BIO_GBF3_IBRA_NonAg.js",
-          name: "BIO_GBF3_IBRA_NonAg",
-        },
-        overview: {
-          Ag: {
-            path: "data/BIO_GBF3_IBRA_overview_Ag.js",
-            name: "BIO_GBF3_IBRA_overview_Ag",
-          },
-          "Ag Mgt": {
-            path: "data/BIO_GBF3_IBRA_overview_Am.js",
-            name: "BIO_GBF3_IBRA_overview_Am",
-          },
-          "Non-Ag": {
-            path: "data/BIO_GBF3_IBRA_overview_NonAg.js",
-            name: "BIO_GBF3_IBRA_overview_NonAg",
-          },
-          sum: {
-            path: "data/BIO_GBF3_IBRA_overview_sum.js",
-            name: "BIO_GBF3_IBRA_overview_sum",
-          },
-        },
-      },
       GBF4_SNES: {
         Ag: {
           path: "data/BIO_GBF4_SNES_Ag.js",

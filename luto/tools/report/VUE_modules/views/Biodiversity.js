@@ -27,7 +27,6 @@ window.BiodiversityView = {
       'quality': 'Quality',
       'GBF2': 'GBF2',
       'GBF3_NVIS': 'GBF3 NVIS',
-      'GBF3_IBRA': 'GBF3 IBRA',
       'GBF4_SNES': 'GBF4 SNES',
       'GBF4_ECNES': 'GBF4 ECNES',
       'GBF8_GROUP': 'GBF8 Group',
@@ -39,7 +38,6 @@ window.BiodiversityView = {
       'quality': null,
       'GBF2': 'BIODIVERSITY_TARGET_GBF_2',
       'GBF3_NVIS': 'BIODIVERSITY_TARGET_GBF_3_NVIS',
-      'GBF3_IBRA': 'BIODIVERSITY_TARGET_GBF_3_IBRA',
       'GBF4_SNES': 'BIODIVERSITY_TARGET_GBF_4_SNES',
       'GBF4_ECNES': 'BIODIVERSITY_TARGET_GBF_4_ECNES',
       'GBF8_GROUP': 'BIODIVERSITY_TARGET_GBF_8',
@@ -223,10 +221,11 @@ window.BiodiversityView = {
       }
     }
 
-    // Pre-load ALL chart files on mount (they are small)
+    // Pre-load chart files for enabled metrics only
     async function loadAllCharts() {
       const pending = [];
-      for (const metricCr of Object.values(chartRegister)) {
+      for (const metric of availableMetrics.value) {
+        const metricCr = chartRegister[metric];
         for (const [key, val] of Object.entries(metricCr || {})) {
           if (key === 'overview') {
             for (const entry of Object.values(val || {})) {
@@ -250,6 +249,10 @@ window.BiodiversityView = {
       (window.Supporting_info.model_run_settings || []).forEach(s => {
         runScenario[s.parameter] = s.val;
       });
+
+      // Update GBF3_NVIS label to show region mode (NRM or IBRA)
+      const gbf3Mode = window.Supporting_info.GBF3_NVIS_REGION_MODE || 'NRM';
+      METRIC_LABELS['GBF3_NVIS'] = `GBF3 NVIS (${gbf3Mode})`;
 
       const enabledMetrics = ['quality'];
       for (const [metric, settingKey] of Object.entries(METRIC_TO_SETTING)) {

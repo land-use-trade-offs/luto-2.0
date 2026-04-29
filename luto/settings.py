@@ -137,7 +137,7 @@ DYNAMIC_PRICE = False
 RESFACTOR = 10        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-SIM_YEARS =  list(range(2010, 2051, 10))
+SIM_YEARS =  [2010, 2050] # list(range(2010, 2051, 10))
 
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
@@ -211,9 +211,9 @@ BARRIER_CONVERGENCE_TOLERANCE = 1e-5      # Range from 1e-2 to 1e-8 (default), t
 CROSSOVER = 0
 
 # Parameters for dealing with numerical issues. NUMERIC_FOCUS = 2 fixes most things but roughly doubles solve time.
-SCALE_FLAG = 0           # Scales the rows and columns of the model to improve the numerical properties of the constraint matrix. -1: Auto, 0: No scaling, 1: equilibrium scaling (First scale each row to make its largest nonzero entry to be magnitude one, then scale each column to max-norm 1), 2: geometric scaling, 3: multi-pass equilibrium scaling. Testing revealed that 1 tripled solve time, 3 led to numerical problems.
-NUMERIC_FOCUS = [0, 2]   # Controls the degree to which the code attempts to detect and manage numerical issues. Default (0) makes an automatic choice, with a slight preference for speed. Settings 1-3 increasingly shift the focus towards being more careful in numerical computations. NUMERIC_FOCUS = 1 is ok, but 2 increases solve time by ~4x
-BARHOMOGENOUS = 1        # Useful for recognizing infeasibility or unboundedness. At the default setting (-1), it is only used when barrier solves a node relaxation for a MIP model. 0 = off, 1 = on. It is a bit slower than the default algorithm (3x slower in testing). Set to 1 when debugging infeasibility to avoid ambiguous INF_OR_UNBD status.
+SCALE_FLAG = 0        # Scales the rows and columns of the model to improve the numerical properties of the constraint matrix. -1: Auto, 0: No scaling, 1: equilibrium scaling (First scale each row to make its largest nonzero entry to be magnitude one, then scale each column to max-norm 1), 2: geometric scaling, 3: multi-pass equilibrium scaling. Testing revealed that 1 tripled solve time, 3 led to numerical problems.
+NUMERIC_FOCUS = 0     # Controls the degree to which the code attempts to detect and manage numerical issues. Default (0) makes an automatic choice, with a slight preference for speed. Settings 1-3 increasingly shift the focus towards being more careful in numerical computations. NUMERIC_FOCUS = 1 is ok, but 2 increases solve time by ~4x
+BARHOMOGENOUS = 1     # Useful for recognizing infeasibility or unboundedness. At the default setting (-1), it is only used when barrier solves a node relaxation for a MIP model. 0 = off, 1 = on. It is a bit slower than the default algorithm (3x slower in testing). Set to 1 when debugging infeasibility to avoid ambiguous INF_OR_UNBD status.
 
 # Number of threads to use in parallel algorithms (e.g., barrier). PBS_NCPUS is the requested CPUs on GADI hpc.
 THREADS = min(32, int(os.environ.get("PBS_NCPUS", os.cpu_count())))
@@ -358,8 +358,8 @@ AF_FENCING_LENGTH_HA = 100 * no_belts_per_ha * 2 # Length of fencing required pe
 # Renewable energy parameters
 # ---------------------------------------------------------------------------- #
 RENEWABLES_OPTIONS = {
-    'Utility Solar PV': True,
-    'Onshore Wind': True,
+    'Utility Solar PV': False,
+    'Onshore Wind': False,
 }
 
 
@@ -835,7 +835,7 @@ will be 0.6 * 0.8 = 0.48.
 
 # ---------------------- GBF3 parameters ----------------------
 
-BIODIVERSITY_TARGET_GBF_3_NVIS = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
+BIODIVERSITY_TARGET_GBF_3_NVIS = 'USER_DEFINED'           # 'off', 'medium', 'high', or 'USER_DEFINED'
 '''
 Target 3 of the Kunming-Montreal Global Biodiversity Framework (NVIS):
 protect and manage vegetation groups using the National Vegetation Information System.
@@ -846,31 +846,11 @@ protect and manage vegetation groups using the National Vegetation Information S
 - if 'USER_DEFINED' is selected, the conservation target is reading from input Excel file.
 '''
 
-BIODIVERSITY_TARGET_GBF_3_IBRA = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
-'''
-Target 3 of the Kunming-Montreal Global Biodiversity Framework (IBRA):
-protect and manage bioregions using the Interim Biogeographic Regionalisation for Australia.
-
-- if 'off' is selected, turn off the GBF-3 IBRA target for biodiversity.
-- if 'medium' is selected, the conservation target is set to 30% for each bioregion at 2050.
-- if 'high' is selected, the conservation target is set to 50% for each bioregion at 2050.
-- if 'USER_DEFINED' is selected, the conservation target is reading from input Excel file.
-'''
-
 GBF3_NVIS_TARGET_CLASS  = 'MVG'                  # 'MVG', 'MVS'
 '''
 The National Vegetation Information System (NVIS) provides the 100m resolution information on
 the distribution of vegetation (~30 primary group layers, or ~90 subgroup layers) across Australia.
-
-We resampled the layers to 1km resolution by calculating the percentage of each type in
-each 1km cell. The original layer is converted to n-bands (n=number of types)
-raster layer, with each band representing the percentage of that type in each 1km cell.
-'''
-
-GBF3_IBRA_TARGET_CLASS  = 'IBRA_Regions'         # 'IBRA_Regions', 'IBRA_SubRegions'
-'''
-IBRA (Interim Biogeographic Regionalisation for Australia) provides bioregional classifications
-with regions or subregions. There are 89 regions and 419 subregions across Australia.
+Also used as the class selector for IBRA bioregion layers when GBF3_NVIS_REGION_MODE = 'IBRA'.
 '''
 
 
@@ -885,8 +865,8 @@ GBF3_TARGETS_DICT = {
 
 
 # ------------------------------- Species parameters -------------------------------
-BIODIVERSITY_TARGET_GBF_4_SNES =  'off'           # 'on' or 'off'.
-BIODIVERSITY_TARGET_GBF_4_ECNES = 'off'           # 'on' or 'off'.
+BIODIVERSITY_TARGET_GBF_4_SNES =  'on'           # 'on' or 'on'.
+BIODIVERSITY_TARGET_GBF_4_ECNES = 'on'           # 'on' or 'off'.
 
 '''
 Target 4 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 
@@ -894,6 +874,42 @@ halt the extinction of known threatened species, protect genetic diversity,
 and manage human-wildlife interactions
 '''
 
+
+# -------------- NRM region mode for GBF3 and GBF4 ----------------------
+# Each constraint type can independently choose 'Australia' (nationwide,
+# existing behaviour), 'NRM' (per-NRM-region), or 'IBRA' (IBRA bioregion).
+
+GBF3_NVIS_REGION_MODE = 'NRM'                    # 'Australia', 'NRM', or 'IBRA'
+'''
+Controls the spatial resolution of GBF3 NVIS constraints.
+ - 'Australia' → nationwide NVIS vegetation-group targets (existing behaviour, default)
+ - 'NRM'       → per-NRM-region NVIS targets (masked to selected NRM regions)
+ - 'IBRA'      → IBRA bioregion targets (bio_GBF3_MVG/MVS.nc + IBRA Excel file)
+'''
+
+GBF3_NVIS_SELECTED_REGIONS = ['North East', 'Goulburn Broken']
+'''
+List of NRM region names to enforce GBF3 NVIS constraints for.
+Must match region names in REGION_NRM_NAME. Only used when GBF3_NVIS_REGION_MODE = 'NRM'.
+'''
+
+GBF4_SNES_REGION_MODE = 'NRM'                    # 'Australia' or 'NRM'
+GBF4_SNES_SELECTED_REGIONS = ['North East', 'Goulburn Broken']
+'''
+Controls the spatial resolution of GBF4 SNES constraints.
+ - 'Australia' → nationwide targets (existing behaviour, default)
+ - 'NRM'       → per-NRM-region targets from NRM target files
+GBF4_SNES_SELECTED_REGIONS: list of NRM region names. Only used when mode = 'NRM'.
+'''
+
+GBF4_ECNES_REGION_MODE = 'NRM'                   # 'Australia' or 'NRM'
+GBF4_ECNES_SELECTED_REGIONS = ['North East', 'Goulburn Broken']
+'''
+Controls the spatial resolution of GBF4 ECNES constraints.
+ - 'Australia' → nationwide targets (existing behaviour, default)
+ - 'NRM'       → per-NRM-region targets from NRM target files
+GBF4_ECNES_SELECTED_REGIONS: list of NRM region names. Only used when mode = 'NRM'.
+'''
 
 
 # -------------------------------- Climate change impacts on biodiversity -------------------------------

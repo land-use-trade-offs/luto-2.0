@@ -130,11 +130,19 @@ grid_search = {
 
     # --------------- Biodiversity settings - GBF 3 ---------------
     'BIODIVERSITY_TARGET_GBF_3_NVIS': ['off'],                              # 'off', 'medium', 'high', 'USER_DEFINED'
-    'BIODIVERSITY_TARGET_GBF_3_IBRA': ['off'],                              # 'off', 'medium', 'high', 'USER_DEFINED'
+    'GBF3_NVIS_REGION_MODE': ['Australia'],                             # 'Australia', 'NRM', 'IBRA'
 
     # --------------- Biodiversity settings - GBF 4 ---------------
     'BIODIVERSITY_TARGET_GBF_4_SNES': ['off'],                              # 'on' or 'off'.
     'BIODIVERSITY_TARGET_GBF_4_ECNES': ['off'],                             # 'off'=core (LUF Report 2026); 'on'=MNES biodiversity sensitivity (lower priority)
+
+    # --------------- NRM region mode for GBF3/GBF4 ---------------
+    'GBF3_NVIS_REGION_MODE': ['Australia'],                             # 'Australia' or 'NRM'
+    'GBF3_NVIS_SELECTED_REGIONS': [['North East', 'Goulburn Broken']],  # Only used when mode = 'NRM'
+    'GBF4_SNES_REGION_MODE': ['Australia'],                             # 'Australia' or 'NRM'
+    'GBF4_SNES_SELECTED_REGIONS': [['North East', 'Goulburn Broken']],  # Only used when mode = 'NRM'
+    'GBF4_ECNES_REGION_MODE': ['Australia'],                            # 'Australia' or 'NRM'
+    'GBF4_ECNES_SELECTED_REGIONS': [['North East', 'Goulburn Broken']], # Only used when mode = 'NRM'
 
     # --------------- Biodiversity settings - GBF 8 ---------------
     'BIODIVERSITY_TARGET_GBF_8': ['off'],                                   # 'on' or 'off'

@@ -383,7 +383,7 @@ def process_economics_data(files, SAVE_DIR):
             cost_ag_df.query('Water_supply != "ALL" and Type != "ALL" and `Land-use` != "ALL"'),
             cost_am_df.query('Water_supply != "ALL" and `Land-use` != "ALL" and `Management Type` != "ALL"'),
             cost_non_ag_df,
-            cost_transition_ag2ag_df.query('`From-land-use` != "ALL" and `To-land-use` != "ALL" and Type != "ALL"'),
+            cost_transition_ag2ag_df.query('`From-land-use` != "ALL" and `To-land-use` != "ALL" and `Cost-type` != "ALL"'),
             cost_transition_ag2non_ag_df.query('`From-land-use` != "ALL" and `To-land-use` != "ALL" and `Cost-type` != "ALL"'),
             cost_transition_non_ag2ag_df.query('`From-land-use` != "ALL" and `To-land-use` != "ALL" and `Cost-type` != "ALL"')
         ]
@@ -436,7 +436,7 @@ def process_economics_data(files, SAVE_DIR):
                 cost_ag_df.query('Water_supply != "ALL" and Type != "ALL" and `Land-use` != "ALL"'),
                 cost_am_df.query('Water_supply != "ALL" and `Land-use` != "ALL" and `Management Type` != "ALL"'),
                 cost_non_ag_df,
-                cost_transition_ag2ag_df.query('`From-land-use` != "ALL" and `To-land-use` != "ALL" and Type != "ALL"'),
+                cost_transition_ag2ag_df.query('`From-land-use` != "ALL" and `To-land-use` != "ALL" and `Cost-type` != "ALL"'),
                 cost_transition_ag2non_ag_df.query('`From-land-use` != "ALL" and `To-land-use` != "ALL" and `Cost-type` != "ALL"'),
                 cost_transition_non_ag2ag_df.query('`From-land-use` != "ALL" and `To-land-use` != "ALL" and `Cost-type` != "ALL"')
             ]
@@ -3442,9 +3442,9 @@ def process_biodiversity_data(files, SAVE_DIR):
             
             
             
-    if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off':
+    if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off' and settings.GBF3_NVIS_REGION_MODE != 'IBRA':
         filter_str = '''
-            category == "biodiversity" 
+            category == "biodiversity"
             and base_name.str.contains("biodiversity_GBF3_NVIS")
         '''.strip().replace('\n','')
         
@@ -3684,7 +3684,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             f.write(';\n')
             
             
-    if settings.BIODIVERSITY_TARGET_GBF_3_IBRA != 'off':
+    if settings.GBF3_NVIS_REGION_MODE == 'IBRA' and settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off':
         filter_str = '''
             category == "biodiversity"
             and base_name.str.contains("biodiversity_GBF3_IBRA")
@@ -3711,12 +3711,12 @@ def process_biodiversity_data(files, SAVE_DIR):
             df = df.drop(columns='region')
             if region not in bio_rank_dict:
                 bio_rank_dict[region] = {}
-            if 'GBF3_IBRA' not in bio_rank_dict[region]:
-                bio_rank_dict[region]['GBF3_IBRA'] = {}
+            if 'GBF3_NVIS' not in bio_rank_dict[region]:
+                bio_rank_dict[region]['GBF3_NVIS'] = {}
 
-            bio_rank_dict[region]['GBF3_IBRA']['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
-            bio_rank_dict[region]['GBF3_IBRA']['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
-            bio_rank_dict[region]['GBF3_IBRA']['value'] = df.set_index('Year')['Area Weighted Score (ha)'].apply(lambda x: format_with_suffix(x)).to_dict()
+            bio_rank_dict[region]['GBF3_NVIS']['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
+            bio_rank_dict[region]['GBF3_NVIS']['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
+            bio_rank_dict[region]['GBF3_NVIS']['value'] = df.set_index('Year')['Area Weighted Score (ha)'].apply(lambda x: format_with_suffix(x)).to_dict()
 
 
         # ---------------- (GBF3-IBRA) Overview  ----------------
@@ -3740,7 +3740,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             df = df.drop(['region'], axis=1)
             out_dict[region] = df.to_dict(orient='records')
 
-        filename = f'BIO_GBF3_IBRA_overview_sum'
+        filename = f'BIO_GBF3_NVIS_overview_sum'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
@@ -3768,7 +3768,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             df = df.drop(['region'], axis=1)
             out_dict[region] = df.to_dict(orient='records')
 
-        filename = f'BIO_GBF3_IBRA_overview_Ag'
+        filename = f'BIO_GBF3_NVIS_overview_Ag'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
@@ -3792,7 +3792,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             df = df.drop(['region'], axis=1)
             out_dict[region] = df.to_dict(orient='records')
 
-        filename = f'BIO_GBF3_IBRA_overview_Am'
+        filename = f'BIO_GBF3_NVIS_overview_Am'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
@@ -3820,7 +3820,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             df = df.drop(['region'], axis=1)
             out_dict[region] = df.to_dict(orient='records')
 
-        filename = f'BIO_GBF3_IBRA_overview_NonAg'
+        filename = f'BIO_GBF3_NVIS_overview_NonAg'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
@@ -3851,7 +3851,7 @@ def process_biodiversity_data(files, SAVE_DIR):
                 out_dict[region][species][water] = {}
             out_dict[region][species][water] = df.to_dict(orient='records')
 
-        filename = f'BIO_GBF3_IBRA_Ag'
+        filename = f'BIO_GBF3_NVIS_Ag'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
@@ -3895,7 +3895,7 @@ def process_biodiversity_data(files, SAVE_DIR):
                 out_dict[region][species][am][water] = {}
             out_dict[region][species][am][water] = df.to_dict(orient='records')
 
-        filename = f'BIO_GBF3_IBRA_Am'
+        filename = f'BIO_GBF3_NVIS_Am'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
@@ -3919,7 +3919,7 @@ def process_biodiversity_data(files, SAVE_DIR):
                 out_dict[region] = {}
             out_dict[region][species] = df.to_dict(orient='records')
 
-        filename = f'BIO_GBF3_IBRA_NonAg'
+        filename = f'BIO_GBF3_NVIS_NonAg'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
@@ -4901,6 +4901,7 @@ def process_supporting_info_data(SAVE_DIR, years, raw_data_dir):
         'COLORSing': COLORS,
         'mem_logs': mem_logs_obj,
         'renewables_enabled': any(settings.RENEWABLES_OPTIONS.values()),
+        'GBF3_NVIS_REGION_MODE': settings.GBF3_NVIS_REGION_MODE,
     }
     
     filename = 'Supporting_info'

@@ -24,6 +24,8 @@ Pure functions to calculate biodiversity by lm, lu.
 
 import itertools
 import numpy as np
+import pandas as pd
+import xarray as xr
 
 from luto import settings
 from luto import tools
@@ -360,14 +362,14 @@ score by 20% (compared to 'pre-1750' land), thus the biodiversity contribution o
 def get_GBF2_MASK_area(data:Data) -> np.ndarray:
     return data.BIO_GBF2_MASK * data.REAL_AREA
 
-def get_GBF3_NVIS_matrices_vr(data:Data) -> np.ndarray:
+def get_GBF3_NVIS_matrices_vr(data:Data) -> xr.DataArray:
     """
     Gets the NVIS vegetation group matrices for GBF3 constraint.
 
     Returns
     -------
-    np.ndarray
-        indexed (v, r) where v is NVIS vegetation group and r is cell
+    xr.DataArray
+        dims (group, cell) — only the unique selected vegetation groups
     """
     return data.GBF3_NVIS_LAYERS_LDS * data.REAL_AREA
 
@@ -384,44 +386,70 @@ def get_GBF3_IBRA_matrices_vr(data:Data) -> np.ndarray:
     return data.GBF3_IBRA_LAYERS_LDS * data.REAL_AREA
 
 
-def get_GBF4_SNES_matrix_sr(data:Data) -> np.ndarray:
+def get_GBF4_SNES_matrix_sr(data: Data) -> xr.DataArray:
     """
-    Gets the SNES contributions  matrix.
-    
+    Gets the SNES pre-1750 area matrix.
+
     Returns
     -------
-    np.ndarray
-        indexed (s, r) where s is species (independent of species conversation limits) and r is cell
+    xr.DataArray
+        dims ['species', 'cell'] — species coord holds unique species name strings.
+        Region masking is done in the solver, not here.
     """
-    return np.where(
+    base = np.where(
         data.SAVBURN_ELIGIBLE,
         data.BIO_GBF4_SPECIES_LAYERS * data.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
-        data.BIO_GBF4_SPECIES_LAYERS * data.REAL_AREA
+        data.BIO_GBF4_SPECIES_LAYERS * data.REAL_AREA,
     ).astype(np.float32)
-    
+    return xr.DataArray(
+        base,
+        dims=['species', 'cell'],
+        coords={'species': data.BIO_GBF4_SNES_SPECIES_COORD, 'cell': np.arange(data.NCELLS)},
+    )
 
-def get_GBF4_ECNES_matrix_sr(data:Data) -> np.ndarray:
+
+def get_GBF4_ECNES_matrix_sr(data: Data) -> xr.DataArray:
     """
-    Gets the ECNES contributions  matrix.
-    
+    Gets the ECNES pre-1750 area matrix.
+
     Returns
     -------
-    np.ndarray
-        indexed (s, r) where s is species (independent of species conversation limits) and r is cell
+    xr.DataArray
+        dims ['species', 'cell'] — species coord holds unique community name strings.
+        Region masking is done in the solver; the NRM expansion into (n_pairs, n_cells)
+        is no longer performed here.
     """
-    return np.where(
+    base = np.where(
         data.SAVBURN_ELIGIBLE,
         data.BIO_GBF4_COMUNITY_LAYERS * data.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
-        data.BIO_GBF4_COMUNITY_LAYERS * data.REAL_AREA
+        data.BIO_GBF4_COMUNITY_LAYERS * data.REAL_AREA,
     ).astype(np.float32)
-    
+    return xr.DataArray(
+        base,
+        dims=['species', 'cell'],
+        coords={'species': data.BIO_GBF4_ECNES_SPECIES_COORD, 'cell': np.arange(data.NCELLS)},
+    )
 
 
-def get_GBF8_matrix_sr(data:Data, target_year: int):
-    return np.where(
+def get_GBF8_matrix_sr(data: Data, target_year: int) -> xr.DataArray:
+    """
+    Gets the GBF8 species suitability area matrix for the given year.
+
+    Returns
+    -------
+    xr.DataArray
+        dims ['species', 'cell'] — species coord holds species name strings.
+    """
+    bio_layers = data.get_GBF8_bio_layers_by_yr(target_year)  # numpy (n_species, n_cells)
+    base = np.where(
         data.SAVBURN_ELIGIBLE,
-        data.get_GBF8_bio_layers_by_yr(target_year) * data.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
-        data.get_GBF8_bio_layers_by_yr(target_year) * data.REAL_AREA
+        bio_layers * data.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
+        bio_layers * data.REAL_AREA,
+    ).astype(np.float32)
+    return xr.DataArray(
+        base,
+        dims=['species', 'cell'],
+        coords={'species': data.BIO_GBF8_SEL_SPECIES, 'cell': np.arange(data.NCELLS)},
     )
 
 
@@ -438,7 +466,7 @@ def get_ag_biodiversity_contribution(data:Data) -> np.ndarray:
     Returns
     - np.ndarray.
     """
-    return np.array(list(data.BIO_HABITAT_CONTRIBUTION_LOOK_UP.values()))
+    return np.array(list(data.BIO_HABITAT_CONTRIBUTION_LOOK_UP.values())).astype(np.float32)
 
 
 @lru_cache(maxsize=1)

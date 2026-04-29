@@ -47,6 +47,7 @@ gurenv.setParam("Method", settings.SOLVE_METHOD)
 gurenv.setParam("OutputFlag", settings.VERBOSE)
 gurenv.setParam("Presolve", settings.PRESOLVE)
 gurenv.setParam("Aggregate", settings.AGGREGATE)
+gurenv.setParam("NumericFocus", settings.NUMERIC_FOCUS)
 gurenv.setParam("OptimalityTol", settings.OPTIMALITY_TOLERANCE)
 gurenv.setParam("FeasibilityTol", settings.FEASIBILITY_TOLERANCE)
 gurenv.setParam("BarConvTol", settings.BARRIER_CONVERGENCE_TOLERANCE)
@@ -1015,31 +1016,41 @@ class LutoSolver:
             print("│   │   ├── TURNING OFF constraints for biodiversity GBF 3 NVIS")
             return
 
-        v_limits = self._input_data.limits["GBF3_NVIS_rescale"]
-        v_names = self._input_data.GBF3_NVIS_names
+        region_group = self._input_data.GBF3_NVIS_region_group          # list of (region, group) tuples
+        v_limits = self._input_data.limits["GBF3_NVIS"]                 # xarray of (layer), where layer is region-group combination
+        scale_factors = self._input_data.scale_factors['GBF3_NVIS']     # xarray of (group) 
+        val_matrix = self._input_data.GBF3_NVIS_pre_1750_area_vr        # xarray of (group, cell)
+        reg_matrix = self._input_data.region_NRM_names_r                # np.array of strings (cell)
 
         print("│   │   ├── Adding constraints for biodiversity GBF 3 NVIS...")
 
-        for v, v_area_lb_rescale in enumerate(v_limits):
+        for region, group in region_group:
 
-            v_area_lb_raw = v_area_lb_rescale * self._input_data.scale_factors['GBF3_NVIS']
+            lb_raw_vector = v_limits.sel(dict(layer=(region, group))).item()                        
 
-            if v_area_lb_raw == 0:
-                print(f"│   │   │   ├── target is {v_area_lb_raw:15,.0f} for {v_names[v]} (skipped modelling)  ")
+            if lb_raw_vector < 0:
+                print(f"│   │   │   ├── SKIPPING negative target {lb_raw_vector:15,.0f} for {region} [{group}]")
                 continue
 
-            print(f"│   │   │   ├── target is {v_area_lb_raw:15,.0f} for {v_names[v]}")
-            ind = np.where(self._input_data.GBF3_NVIS_pre_1750_area_vr[v, :] > 0)[0]
-            GBF3_NVIS_raw_area_r = self._input_data.GBF3_NVIS_pre_1750_area_vr[v, ind]
+            lb_rescale_vector = lb_raw_vector / scale_factors.sel(group=group).item()               
+            val_vector = val_matrix.sel(group=group, drop=True).data
+            # Australia mode: no NRM cell is named 'Australia', so bypass region mask
+            if region == "Australia":
+                ind = np.where(val_vector > 0)[0]
+            else:
+                reg_vector = reg_matrix == region
+                ind = np.intersect1d(np.where(val_vector > 0)[0], np.where(reg_vector)[0])
+            
+            print(f"│   │   │   ├── target is {lb_raw_vector:15,.0f} for {region} [{group}]")
 
             ag_contr = gp.quicksum(
                 gp.quicksum(
-                    GBF3_NVIS_raw_area_r
+                    val_vector[ind]
                     * self._input_data.biodiv_contr_ag_j[j]
                     * self.X_ag_dry_vars_jr[j, ind]
                 )  # Dryland agriculture contribution
                 + gp.quicksum(
-                    GBF3_NVIS_raw_area_r
+                    val_vector[ind]
                     * self._input_data.biodiv_contr_ag_j[j]
                     * self.X_ag_irr_vars_jr[j, ind]
                 )  # Irrigated agriculture contribution
@@ -1048,12 +1059,12 @@ class LutoSolver:
 
             ag_man_contr = gp.quicksum(
                 gp.quicksum(
-                    GBF3_NVIS_raw_area_r
+                    val_vector[ind]
                     * self._input_data.biodiv_contr_ag_man[am][j_idx][ind]
                     * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
                 )  # Dryland alt. ag. management contributions
                 + gp.quicksum(
-                    GBF3_NVIS_raw_area_r
+                    val_vector[ind]
                     * self._input_data.biodiv_contr_ag_man[am][j_idx][ind]
                     * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
                 )  # Irrigated alt. ag. management contributions
@@ -1063,7 +1074,7 @@ class LutoSolver:
 
             non_ag_contr = gp.quicksum(
                 gp.quicksum(
-                    GBF3_NVIS_raw_area_r
+                    val_vector[ind]
                     * self._input_data.biodiv_contr_non_ag_k[k]
                     * self.X_non_ag_vars_kr[k, ind]
                 )  # Non-agricultural contribution
@@ -1071,296 +1082,207 @@ class LutoSolver:
             )
 
 
-            self.bio_GBF3_NVIS_exprs[v] = ag_contr + ag_man_contr + non_ag_contr
+            self.bio_GBF3_NVIS_exprs[(region, group)] = ag_contr + ag_man_contr + non_ag_contr
 
-            self.bio_GBF3_NVIS_constrs[v] = self.gurobi_model.addConstr(
-                self.bio_GBF3_NVIS_exprs[v] >= v_area_lb_rescale,
-                name=f"bio_GBF3_NVIS_limit_{v_names[v]}".replace(" ", "_")
+            self.bio_GBF3_NVIS_constrs[(region, group)] = self.gurobi_model.addConstr(
+                self.bio_GBF3_NVIS_exprs[(region, group)] >= lb_rescale_vector,
+                name=f"bio_GBF3_NVIS_limit_{region}_{group}".replace(" ", "_")
             )
 
 
     def _add_GBF3_IBRA_constraints(self) -> None:
-        if settings.BIODIVERSITY_TARGET_GBF_3_IBRA == "off":
-            print("│   │   ├── TURNING OFF constraints for biodiversity GBF 3 IBRA")
-            return
-
-        v_limits = self._input_data.limits["GBF3_IBRA_rescale"]
-        v_names = self._input_data.GBF3_IBRA_names
-
-        print("│   │   ├── Adding constraints for biodiversity GBF 3 IBRA...")
-
-        for v, v_area_lb_rescale in enumerate(v_limits):
-
-            v_area_lb_raw = v_area_lb_rescale * self._input_data.scale_factors['GBF3_IBRA']
-
-            if v_area_lb_raw == 0:
-                print(f"│   │   │   ├── target is {v_area_lb_raw:15,.0f} for {v_names[v]} (skipped modelling)  ")
-                continue
-
-            print(f"│   │   │   ├── target is {v_area_lb_raw:15,.0f} for {v_names[v]}")
-            ind = np.where(self._input_data.GBF3_IBRA_pre_1750_area_vr[v, :] > 0)[0]
-            GBF3_IBRA_raw_area_r = self._input_data.GBF3_IBRA_pre_1750_area_vr[v, ind]
-
-            ag_contr = gp.quicksum(
-                gp.quicksum(
-                    GBF3_IBRA_raw_area_r
-                    * self._input_data.biodiv_contr_ag_j[j]
-                    * self.X_ag_dry_vars_jr[j, ind]
-                )  # Dryland agriculture contribution
-                + gp.quicksum(
-                    GBF3_IBRA_raw_area_r
-                    * self._input_data.biodiv_contr_ag_j[j]
-                    * self.X_ag_irr_vars_jr[j, ind]
-                )  # Irrigated agriculture contribution
-                for j in range(self._input_data.n_ag_lus)
-            )
-
-            ag_man_contr = gp.quicksum(
-                gp.quicksum(
-                    GBF3_IBRA_raw_area_r
-                    * self._input_data.biodiv_contr_ag_man[am][j_idx][ind]
-                    * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
-                )  # Dryland alt. ag. management contributions
-                + gp.quicksum(
-                    GBF3_IBRA_raw_area_r
-                    * self._input_data.biodiv_contr_ag_man[am][j_idx][ind]
-                    * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
-                )  # Irrigated alt. ag. management contributions
-                for am, am_j_list in self._input_data.am2j.items()
-                for j_idx in range(len(am_j_list))
-            )
-
-            non_ag_contr = gp.quicksum(
-                gp.quicksum(
-                    GBF3_IBRA_raw_area_r
-                    * self._input_data.biodiv_contr_non_ag_k[k]
-                    * self.X_non_ag_vars_kr[k, ind]
-                )  # Non-agricultural contribution
-                for k in range(self._input_data.n_non_ag_lus)
-            )
-
-
-            self.bio_GBF3_IBRA_exprs[v] = ag_contr + ag_man_contr + non_ag_contr
-
-            self.bio_GBF3_IBRA_constrs[v] = self.gurobi_model.addConstr(
-                self.bio_GBF3_IBRA_exprs[v] >= v_area_lb_rescale,
-                name=f"bio_GBF3_IBRA_limit_{v_names[v]}".replace(" ", "_")
-            )
+        # IBRA constraints now flow through _add_GBF3_NVIS_constraints (GBF3_NVIS_NRM_REGION_MODE='IBRA')
+        return
 
 
     def _add_GBF4_SNES_constraints(self) -> None:
         if settings.BIODIVERSITY_TARGET_GBF_4_SNES != "on":
             print('│   │   ├── TURNING OFF constraints for biodiversity GBF 4 SNES...')
             return
-        
-        x_limits = self._input_data.limits["GBF4_SNES_rescale"]
-        x_names = self._input_data.GBF4_SNES_names
 
-        print(f"│   │   ├── Adding constraints for biodiversity GBF 4 SNES...")
-        
-        for x, x_area_lb_rescale in enumerate(x_limits):
-            x_area_lb_raw = x_area_lb_rescale * self._input_data.scale_factors['GBF4_SNES'][x]
+        region_species  = self._input_data.GBF4_SNES_region_species      # list[(region, species)]
+        v_limits        = self._input_data.limits["GBF4_SNES"]            # xr.DataArray[layer=(region,species)]
+        scale_factors   = self._input_data.scale_factors['GBF4_SNES']     # xr.DataArray[species]
+        val_matrix      = self._input_data.GBF4_SNES_pre_1750_area_sr     # xr.DataArray[species, cell]
+        reg_matrix      = self._input_data.region_NRM_names_r             # np.ndarray[cell]
 
-            if x_area_lb_raw <= 0:
-                print(
-                    f"│   │   │   ├── target is {x_area_lb_raw:15,.0f}  (skipped because of negative target) for {x_names[x]}")
+        print("│   │   ├── Adding constraints for biodiversity GBF 4 SNES...")
+
+        for region, species in region_species:
+            lb_raw      = v_limits.sel(dict(layer=(region, species))).item()
+            lb_rescale  = lb_raw / scale_factors.sel(species=species).item()
+            val_vector  = val_matrix.sel(species=species, drop=True).data
+
+            if region == "Australia":
+                ind = np.where(val_vector > 0)[0]
+            else:
+                reg_vector = reg_matrix == region
+                ind = np.intersect1d(np.where(val_vector > 0)[0], np.where(reg_vector)[0])
+
+            if lb_raw <= 0:
+                print(f"│   │   │   ├── target is {lb_raw:15,.0f}  (skipped — negative) for {species} [{region}]")
                 continue
 
-            ind = np.where(self._input_data.GBF4_SNES_pre_1750_area_sr[x] > 0)[0]
-
             if ind.size == 0:
-                print(
-                    f"│   │   │   ├── WARNING: SNES species NOT added because of empty layer for {x_names[x]}")
+                print(f"│   │   │   ├── WARNING: SNES empty layer for {species} [{region}]")
                 continue
 
             ag_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.GBF4_SNES_pre_1750_area_sr[x, ind]
-                    * self._input_data.biodiv_contr_ag_j[j]
-                    * self.X_ag_dry_vars_jr[j, ind]
-                )  # Dryland agriculture contribution
-                + gp.quicksum(
-                    self._input_data.GBF4_SNES_pre_1750_area_sr[x, ind]
-                    * self._input_data.biodiv_contr_ag_j[j]
-                    * self.X_ag_irr_vars_jr[j, ind]
-                )  # Irrigated agriculture contribution
+                    val_vector[ind] * self._input_data.biodiv_contr_ag_j[j] * self.X_ag_dry_vars_jr[j, ind]
+                ) + gp.quicksum(
+                    val_vector[ind] * self._input_data.biodiv_contr_ag_j[j] * self.X_ag_irr_vars_jr[j, ind]
+                )
                 for j in range(self._input_data.n_ag_lus)
             )
-
             ag_man_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.GBF4_SNES_pre_1750_area_sr[x, ind]
-                    * self._input_data.biodiv_contr_ag_man[am][j_idx][ind]
-                    * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
-                )  # Dryland alt. ag. management contributions
-                + gp.quicksum(
-                    self._input_data.GBF4_SNES_pre_1750_area_sr[x, ind]
-                    * self._input_data.biodiv_contr_ag_man[am][j_idx][ind]
-                    * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
-                )  # Irrigated alt. ag. management contributions
+                    val_vector[ind] * self._input_data.biodiv_contr_ag_man[am][j_idx][ind] * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
+                ) + gp.quicksum(
+                    val_vector[ind] * self._input_data.biodiv_contr_ag_man[am][j_idx][ind] * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
+                )
                 for am, am_j_list in self._input_data.am2j.items()
                 for j_idx in range(len(am_j_list))
             )
-
             non_ag_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.GBF4_SNES_pre_1750_area_sr[x, ind]
-                    * self._input_data.biodiv_contr_non_ag_k[k]
-                    * self.X_non_ag_vars_kr[k, ind]
-                )  # Non-agricultural contribution
+                    val_vector[ind] * self._input_data.biodiv_contr_non_ag_k[k] * self.X_non_ag_vars_kr[k, ind]
+                )
                 for k in range(self._input_data.n_non_ag_lus)
             )
 
-            self.bio_GBF4_SNES_exprs[x] = ag_contr + ag_man_contr + non_ag_contr
-
-            print(f"│   │   │   ├── target is {x_area_lb_raw:15,.0f} for {x_names[x]}")
-            self.bio_GBF4_SNES_constrs[x] = self.gurobi_model.addConstr(
-                self.bio_GBF4_SNES_exprs[x] >= x_area_lb_rescale,
-                name=f"bio_GBF4_SNES_limit_{x_names[x]}".replace(" ", "_"),
+            print(f"│   │   │   ├── target is {lb_raw:15,.0f} for {species} [{region}]")
+            self.bio_GBF4_SNES_exprs[(region, species)] = ag_contr + ag_man_contr + non_ag_contr
+            self.bio_GBF4_SNES_constrs[(region, species)] = self.gurobi_model.addConstr(
+                self.bio_GBF4_SNES_exprs[(region, species)] >= lb_rescale,
+                name=f"bio_GBF4_SNES_limit_{region}_{species}".replace(" ", "_"),
             )
 
     def _add_GBF4_ECNES_constraints(self) -> None:
         if settings.BIODIVERSITY_TARGET_GBF_4_ECNES != "on":
             print('│   │   ├── TURNING OFF constraints for biodiversity GBF 4 ECNES...')
             return
-        
-        x_limits = self._input_data.limits["GBF4_ECNES_rescale"]
-        x_names = self._input_data.GBF4_ECNES_names
 
-        print(f"│   │   ├── Adding constraints for biodiversity GBF 4 ECNES...")
-        
-        for x, x_area_lb_rescale in enumerate(x_limits):
-            x_area_lb_raw = x_area_lb_rescale * self._input_data.scale_factors['GBF4_ECNES'][x]
+        region_species  = self._input_data.GBF4_ECNES_region_species      # list[(region, species)]
+        v_limits        = self._input_data.limits["GBF4_ECNES"]            # xr.DataArray[layer=(region,species)]
+        scale_factors   = self._input_data.scale_factors['GBF4_ECNES']     # xr.DataArray[species]
+        val_matrix      = self._input_data.GBF4_ECNES_pre_1750_area_sr     # xr.DataArray[species, cell]
+        reg_matrix      = self._input_data.region_NRM_names_r             # np.ndarray[cell]
 
-            if x_area_lb_raw <= 0:
-                print(
-                    f"│   │   │   ├── target is {x_area_lb_raw:15,.0f}  (skipped because of negative target) for {x_names[x]}")
+        print("│   │   ├── Adding constraints for biodiversity GBF 4 ECNES...")
+
+        for region, species in region_species:
+            lb_raw      = v_limits.sel(dict(layer=(region, species))).item()
+            lb_rescale  = lb_raw / scale_factors.sel(species=species).item()
+            val_vector  = val_matrix.sel(species=species, drop=True).data
+
+            if region == "Australia":
+                ind = np.where(val_vector > 0)[0]
+            else:
+                reg_vector = reg_matrix == region
+                ind = np.intersect1d(np.where(val_vector > 0)[0], np.where(reg_vector)[0])
+
+            if lb_raw <= 0:
+                print(f"│   │   │   ├── target is {lb_raw:15,.0f}  (skipped — negative) for {species} [{region}]")
                 continue
 
-            ind = np.where(self._input_data.GBF4_ECNES_pre_1750_area_sr[x] > 0)[0]
-
             if ind.size == 0:
-                print(
-                    f"│   │   │   ├── WARNING: ECNES species was NOT added because of empty layer for {x_names[x]}")
+                print(f"│   │   │   ├── WARNING: ECNES empty layer for {species} [{region}]")
                 continue
 
             ag_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.GBF4_ECNES_pre_1750_area_sr[x, ind]
-                    * self._input_data.biodiv_contr_ag_j[j]
-                    * self.X_ag_dry_vars_jr[j, ind]
-                )  # Dryland agriculture contribution
-                + gp.quicksum(
-                    self._input_data.GBF4_ECNES_pre_1750_area_sr[x, ind]
-                    * self._input_data.biodiv_contr_ag_j[j]
-                    * self.X_ag_irr_vars_jr[j, ind]
-                )  # Irrigated agriculture contribution
+                    val_vector[ind] * self._input_data.biodiv_contr_ag_j[j] * self.X_ag_dry_vars_jr[j, ind]
+                ) + gp.quicksum(
+                    val_vector[ind] * self._input_data.biodiv_contr_ag_j[j] * self.X_ag_irr_vars_jr[j, ind]
+                )
                 for j in range(self._input_data.n_ag_lus)
             )
-
             ag_man_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.GBF4_ECNES_pre_1750_area_sr[x, ind]
-                    * self._input_data.biodiv_contr_ag_man[am][j_idx][ind]
-                    * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
-                )  # Dryland alt. ag. management contributions
-                + gp.quicksum(
-                    self._input_data.GBF4_ECNES_pre_1750_area_sr[x, ind]
-                    * self._input_data.biodiv_contr_ag_man[am][j_idx][ind]
-                    * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
-                )  # Irrigated alt. ag. management contributions
+                    val_vector[ind] * self._input_data.biodiv_contr_ag_man[am][j_idx][ind] * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
+                ) + gp.quicksum(
+                    val_vector[ind] * self._input_data.biodiv_contr_ag_man[am][j_idx][ind] * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
+                )
                 for am, am_j_list in self._input_data.am2j.items()
                 for j_idx in range(len(am_j_list))
             )
-
             non_ag_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.GBF4_ECNES_pre_1750_area_sr[x, ind]
-                    * self._input_data.biodiv_contr_non_ag_k[k]
-                    * self.X_non_ag_vars_kr[k, ind]
-                )  # Non-agricultural contribution
+                    val_vector[ind] * self._input_data.biodiv_contr_non_ag_k[k] * self.X_non_ag_vars_kr[k, ind]
+                )
                 for k in range(self._input_data.n_non_ag_lus)
             )
 
-            self.bio_GBF4_ECNES_exprs[x] = ag_contr + ag_man_contr + non_ag_contr
-
-
-            print(f"│   │   │   ├── target is {x_area_lb_raw:15,.0f} for {x_names[x]} ")
-            self.bio_GBF4_ECNES_constrs[x] = self.gurobi_model.addConstr(
-                self.bio_GBF4_ECNES_exprs[x] >= x_area_lb_rescale,
-                name=f"bio_GBF4_ECNES_limit_{x_names[x]}".replace(" ", "_")
+            print(f"│   │   │   ├── target is {lb_raw:15,.0f} for {species} [{region}]")
+            self.bio_GBF4_ECNES_exprs[(region, species)] = ag_contr + ag_man_contr + non_ag_contr
+            self.bio_GBF4_ECNES_constrs[(region, species)] = self.gurobi_model.addConstr(
+                self.bio_GBF4_ECNES_exprs[(region, species)] >= lb_rescale,
+                name=f"bio_GBF4_ECNES_limit_{region}_{species}".replace(" ", "_"),
             )
 
 
     def _add_GBF8_constraints(self) -> None:
-                
         if settings.BIODIVERSITY_TARGET_GBF_8 != "on":
             print('│   │   ├── TURNING OFF constraints for biodiversity GBF 8 ...')
             return
-        
-        s_limits = self._input_data.limits["GBF8_rescale"]
-        s_names = self._input_data.GBF8_species_names
-        s_ind = self._input_data.GBF8_species_indices
 
-        print(f"│   │   ├── Adding constraints for biodiversity GBF 8...")
-        
-        for s, s_area_lb_rescale in enumerate(s_limits):
+        region_species  = self._input_data.GBF8_region_species            # list[(region, species)]
+        v_limits        = self._input_data.limits["GBF8"]                 # xr.DataArray[layer=(region,species)]
+        scale_factors   = self._input_data.scale_factors['GBF8']          # xr.DataArray[species]
+        val_matrix      = self._input_data.GBF8_pre_1750_area_sr          # xr.DataArray[species, cell]
+        reg_matrix      = self._input_data.region_NRM_names_r             # np.ndarray[cell]
 
-            ind = s_ind[s]
-            s_area_lb_raw = s_area_lb_rescale * self._input_data.scale_factors['GBF8'][s]
+        print("│   │   ├── Adding constraints for biodiversity GBF 8...")
 
-            if s_area_lb_raw <= 0:
-                print(
-                    f"│   │   │   ├── target is {s_area_lb_raw:15,.0f}  (skipped because of negative target) for {s_names[s]}")
+        for region, species in region_species:
+            lb_raw      = v_limits.sel(dict(layer=(region, species))).item()
+            lb_rescale  = lb_raw / scale_factors.sel(species=species).item()
+            val_vector  = val_matrix.sel(species=species, drop=True).data
+
+            if region == "Australia":
+                ind = np.where(val_vector > 0)[0]
+            else:
+                reg_vector = reg_matrix == region
+                ind = np.intersect1d(np.where(val_vector > 0)[0], np.where(reg_vector)[0])
+
+            if lb_raw <= 0:
+                print(f"│   │   │   ├── target is {lb_raw:15,.0f}  (skipped — negative) for {species} [{region}]")
                 continue
 
-            GBF8_raw_area_r = self._input_data.GBF8_pre_1750_area_sr[s, ind]
+            if ind.size == 0:
+                print(f"│   │   │   ├── WARNING: GBF8 empty layer for {species} [{region}]")
+                continue
 
             ag_contr = gp.quicksum(
                 gp.quicksum(
-                    GBF8_raw_area_r
-                    * self._input_data.biodiv_contr_ag_j[j]
-                    * self.X_ag_dry_vars_jr[j, ind]
-                )  # Dryland agriculture contribution
-                + gp.quicksum(
-                    GBF8_raw_area_r
-                    * self._input_data.biodiv_contr_ag_j[j]
-                    * self.X_ag_irr_vars_jr[j, ind]
-                )  # Irrigated agriculture contribution
+                    val_vector[ind] * self._input_data.biodiv_contr_ag_j[j] * self.X_ag_dry_vars_jr[j, ind]
+                ) + gp.quicksum(
+                    val_vector[ind] * self._input_data.biodiv_contr_ag_j[j] * self.X_ag_irr_vars_jr[j, ind]
+                )
                 for j in range(self._input_data.n_ag_lus)
             )
-
             ag_man_contr = gp.quicksum(
                 gp.quicksum(
-                    GBF8_raw_area_r
-                    * self._input_data.biodiv_contr_ag_man[am][j_idx][ind]
-                    * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
-                )  # Dryland alt. ag. management contributions
-                + gp.quicksum(
-                    GBF8_raw_area_r
-                    * self._input_data.biodiv_contr_ag_man[am][j_idx][ind]
-                    * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
-                )  # Irrigated alt. ag. management contributions
+                    val_vector[ind] * self._input_data.biodiv_contr_ag_man[am][j_idx][ind] * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
+                ) + gp.quicksum(
+                    val_vector[ind] * self._input_data.biodiv_contr_ag_man[am][j_idx][ind] * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
+                )
                 for am, am_j_list in self._input_data.am2j.items()
                 for j_idx in range(len(am_j_list))
             )
-
             non_ag_contr = gp.quicksum(
                 gp.quicksum(
-                    GBF8_raw_area_r
-                    * self._input_data.biodiv_contr_non_ag_k[k]
-                    * self.X_non_ag_vars_kr[k, ind]
-                )  # Non-agricultural contribution
+                    val_vector[ind] * self._input_data.biodiv_contr_non_ag_k[k] * self.X_non_ag_vars_kr[k, ind]
+                )
                 for k in range(self._input_data.n_non_ag_lus)
             )
 
-            # Divide by constant to reduce strain on the constraint matrix range
-            self.bio_GBF8_exprs[s] = ag_contr + ag_man_contr + non_ag_contr
-    
-            print(f"│   │   │   ├── target is {s_area_lb_raw:15,.0f} for {s_names[s]}")
-            self.bio_GBF8_constrs[s] = self.gurobi_model.addConstr(
-                self.bio_GBF8_exprs[s] >= s_area_lb_rescale,
-                name=f"bio_GBF8_limit_{s_names[s]}".replace(" ", "_"),
+            print(f"│   │   │   ├── target is {lb_raw:15,.0f} for {species} [{region}]")
+            self.bio_GBF8_exprs[(region, species)] = ag_contr + ag_man_contr + non_ag_contr
+            self.bio_GBF8_constrs[(region, species)] = self.gurobi_model.addConstr(
+                self.bio_GBF8_exprs[(region, species)] >= lb_rescale,
+                name=f"bio_GBF8_limit_{region}_{species}".replace(" ", "_"),
             )
 
 
@@ -1539,30 +1461,26 @@ class LutoSolver:
             0
             if settings.BIODIVERSITY_TARGET_GBF_3_NVIS == "off"
             else {
-                k: v.getValue() * self._input_data.scale_factors['GBF3_NVIS']
+                k: v.getValue() * self._input_data.scale_factors['GBF3_NVIS'].sel(group=k[1]).item()
                 for k,v in self.bio_GBF3_NVIS_exprs.items()
             }
         )
-        prod_data["BIO (GBF3) IBRA value (ha)"]=(
-            0
-            if settings.BIODIVERSITY_TARGET_GBF_3_IBRA == "off"
-            else {
-                k: v.getValue() * self._input_data.scale_factors['GBF3_IBRA']
-                for k,v in self.bio_GBF3_IBRA_exprs.items()
-            }
-        )
+        prod_data["BIO (GBF3) IBRA value (ha)"] = 0  # IBRA flows through GBF3 NVIS path
         prod_data["BIO (GBF4) SNES value (ha)"] = (
-            {k: v.getValue() * self._input_data.scale_factors['GBF4_SNES'][k] for k,v in self.bio_GBF4_SNES_exprs.items()}
+            {k: v.getValue() * self._input_data.scale_factors['GBF4_SNES'].sel(species=k[1]).item()
+             for k, v in self.bio_GBF4_SNES_exprs.items()}
             if settings.BIODIVERSITY_TARGET_GBF_4_SNES == "on"
             else 0
         )
         prod_data["BIO (GBF4) ECNES value (ha)"] = (
-            {k: v.getValue() * self._input_data.scale_factors['GBF4_ECNES'][k] for k,v in self.bio_GBF4_ECNES_exprs.items()}
+            {k: v.getValue() * self._input_data.scale_factors['GBF4_ECNES'].sel(species=k[1]).item()
+             for k, v in self.bio_GBF4_ECNES_exprs.items()}
             if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == "on"
             else 0
         )
         prod_data["BIO (GBF8) value (ha)"] = (
-            {k: v.getValue() * self._input_data.scale_factors['GBF8'][k] for k,v in self.bio_GBF8_exprs.items()}
+            {k: v.getValue() * self._input_data.scale_factors['GBF8'].sel(species=k[1]).item()
+             for k, v in self.bio_GBF8_exprs.items()}
             if settings.BIODIVERSITY_TARGET_GBF_8 == "on"
             else 0
         )
@@ -1623,21 +1541,14 @@ class LutoSolver:
                     0                                                                               
                     if settings.BIODIVERSITY_TARGET_GBF_3_NVIS == "off"         
                     else [
-                        v - self._input_data.limits['GBF3_NVIS'][k]
+                        v - self._input_data.limits['GBF3_NVIS'].sel(dict(layer=k)).item()
                         for k,v in prod_data["BIO (GBF3) NVIS value (ha)"].items()
                     ]
                 ),
-                "Deviation BIO (GBF3) IBRA value (ha)":(
-                    0                                                                               
-                    if settings.BIODIVERSITY_TARGET_GBF_3_IBRA == "off"         
-                    else [
-                        v - self._input_data.limits['GBF3_IBRA'][k]
-                        for k,v in prod_data["BIO (GBF3) IBRA value (ha)"].items()
-                    ]
-                ),
+                "Deviation BIO (GBF3) IBRA value (ha)": 0,  # IBRA flows through GBF3 NVIS path
                 "Deviation BIO (GBF4) SNES value (ha)":(
                     [
-                        v - self._input_data.limits['GBF4_SNES'][k]
+                        v - self._input_data.limits['GBF4_SNES'].sel(dict(layer=k)).item()
                         for k,v in prod_data["BIO (GBF4) SNES value (ha)"].items() 
                     ]                  
                     if settings.BIODIVERSITY_TARGET_GBF_4_SNES == "on"     
@@ -1645,7 +1556,7 @@ class LutoSolver:
                 ),
                 "Deviation BIO (GBF4) ECNES value (ha)":(
                     [
-                        v - self._input_data.limits['GBF4_ECNES'][k]
+                        v - self._input_data.limits['GBF4_ECNES'].sel(dict(layer=k)).item()
                         for k,v in prod_data["BIO (GBF4) ECNES value (ha)"].items()
                     ]
                     if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == "on"    
@@ -1653,7 +1564,7 @@ class LutoSolver:
                 ),
                 "Deviation BIO (GBF8) value (ha)":(
                     [
-                        v - self._input_data.limits['GBF8'][k]
+                        v - self._input_data.limits['GBF8'].sel(dict(layer=k)).item()
                         for k,v in prod_data["BIO (GBF8) value (ha)"].items()   
                     ]
                     if settings.BIODIVERSITY_TARGET_GBF_8 == "on"          

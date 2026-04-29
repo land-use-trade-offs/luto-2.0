@@ -68,16 +68,16 @@ window.ProductionView = {
       let mapData = JSON.parse(JSON.stringify(rawData));
 
       if (cat === "Sum") {
-        return mapData[water][commodity][year];
+        return mapData[water]?.[commodity]?.[year] ?? {};
       }
       else if (cat === "Ag") {
-        return mapData[water][commodity][year];
+        return mapData[water]?.[commodity]?.[year] ?? {};
       }
       else if (cat === "Ag Mgt") {
-        return mapData[agMgt][water][commodity][year];
+        return mapData[agMgt]?.[water]?.[commodity]?.[year] ?? {};
       }
       else if (cat === "Non-Ag") {
-        return mapData[commodity][year];
+        return mapData[commodity]?.[year] ?? {};
       }
       return {};
     });

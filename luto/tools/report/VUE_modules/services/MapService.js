@@ -22,11 +22,6 @@ window.MapService = {
         'Ag Mgt': { 'path': 'data/map_layers/map_bio_GBF3_NVIS_Am.js', 'name': 'map_bio_GBF3_NVIS_Am' },
         'Non-Ag': { 'path': 'data/map_layers/map_bio_GBF3_NVIS_NonAg.js', 'name': 'map_bio_GBF3_NVIS_NonAg' },
       },
-      'GBF3_IBRA': {
-        'Ag': { 'path': 'data/map_layers/map_bio_GBF3_IBRA_Ag.js', 'name': 'map_bio_GBF3_IBRA_Ag' },
-        'Ag Mgt': { 'path': 'data/map_layers/map_bio_GBF3_IBRA_Am.js', 'name': 'map_bio_GBF3_IBRA_Am' },
-        'Non-Ag': { 'path': 'data/map_layers/map_bio_GBF3_IBRA_NonAg.js', 'name': 'map_bio_GBF3_IBRA_NonAg' },
-      },
       'GBF4_ECNES': {
         'Ag': { 'path': 'data/map_layers/map_bio_GBF4_ECNES_Ag.js', 'name': 'map_bio_GBF4_ECNES_Ag' },
         'Ag Mgt': { 'path': 'data/map_layers/map_bio_GBF4_ECNES_Am.js', 'name': 'map_bio_GBF4_ECNES_Am' },

@@ -70,13 +70,13 @@ window.AreaView = {
       let mapData = JSON.parse(JSON.stringify(rawData));
 
       if (cat === "Ag") {
-        return mapData[water][landuse][year];
+        return mapData[water]?.[landuse]?.[year] ?? {};
       }
       else if (cat === "Ag Mgt") {
-        return mapData?.[agMgt][water][landuse][year];
+        return mapData?.[agMgt]?.[water]?.[landuse]?.[year] ?? {};
       }
       else if (cat === "Non-Ag") {
-        return mapData[landuse][year];
+        return mapData[landuse]?.[year] ?? {};
       }
       return {};
     });

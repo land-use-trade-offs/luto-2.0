@@ -48,7 +48,7 @@ window.RegionsMap = {
   props: {
     mapData: {
       type: Object,
-      required: true
+      default: () => ({})
     },
     overlayGeoJSON: {
       type: Object,

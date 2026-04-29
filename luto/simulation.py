@@ -111,7 +111,7 @@ def run(
         
         try:
             print('\n')
-            print(f"Running LUTO {settings.VERSION} between {years[0]} - {years[-1]} at RES-{settings.RESFACTOR}, total {len(years)} runs!\n", flush=True)
+            print(f"Running LUTO {settings.VERSION} between {years[0]} - {years[-1]} at RES-{settings.RESFACTOR}, total {len(years) - 1} runs!\n", flush=True)
             # Insert the base year at the beginning of the years list if not already present
             if data.YR_CAL_BASE not in years: 
                 years.insert(0, data.YR_CAL_BASE)
@@ -145,19 +145,10 @@ def solve_timeseries(data: Data, years_to_run: list[int], do_analyze_iis: bool) 
         input_data = get_input_data(data, base_year, target_year)
         data.last_year = target_year
 
-        for nf in settings.NUMERIC_FOCUS:
-            print(f"Trying NumericFocus={nf} for year {target_year}...")
-
-            luto_solver = LutoSolver(input_data)
-            luto_solver.gurobi_model.Params.NumericFocus = nf
-            luto_solver.formulate()
-            solution = luto_solver.solve()
-
-            status = luto_solver.gurobi_model.Status
-            if status == GRB.OPTIMAL:
-                print(f"Feasible solution found with NumericFocus={nf}")
-                break
-
+        luto_solver = LutoSolver(input_data)
+        luto_solver.formulate()
+        solution = luto_solver.solve()
+        status = luto_solver.gurobi_model.Status
 
         data.add_lumap(target_year, solution.lumap)
         data.add_lmmap(target_year, solution.lmmap)

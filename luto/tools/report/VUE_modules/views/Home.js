@@ -150,7 +150,7 @@ window.HomeView = {
       const chartOverview_bio_quality = chartRegister['Biodiversity']['quality']['overview']['sum'];
       const chartOverview_bio_GBF2 = chartRegister['Biodiversity']['GBF2']['overview']['sum'];
       const chartOverview_bio_GBF3_NVIS = chartRegister['Biodiversity']['GBF3_NVIS']['overview']['sum'];
-      const chartOverview_bio_GBF3_IBRA = chartRegister['Biodiversity']['GBF3_IBRA']['overview']['sum'];
+      const gbf3Mode = window['Supporting_info']['GBF3_NVIS_REGION_MODE'] || 'NRM';
       const chartOverview_bio_GBF4_SNES = chartRegister['Biodiversity']['GBF4_SNES']['overview']['sum'];
       const chartOverview_bio_GBF4_ECNES = chartRegister['Biodiversity']['GBF4_ECNES']['overview']['sum'];
       const chartOverview_bio_GBF8_SPECIES = chartRegister['Biodiversity']['GBF8_SPECIES']['overview']['sum'];
@@ -192,9 +192,6 @@ window.HomeView = {
       }
       if (runScenario.value['BIODIVERSITY_TARGET_GBF_3_NVIS'] !== 'off') {
         await loadScript(chartOverview_bio_GBF3_NVIS['path'], chartOverview_bio_GBF3_NVIS['name'], VIEW_NAME);
-      }
-      if (runScenario.value['BIODIVERSITY_TARGET_GBF_3_IBRA'] !== 'off') {
-        await loadScript(chartOverview_bio_GBF3_IBRA['path'], chartOverview_bio_GBF3_IBRA['name'], VIEW_NAME);
       }
       if (runScenario.value['BIODIVERSITY_TARGET_GBF_4_SNES'] !== 'off') {
         await loadScript(chartOverview_bio_GBF4_SNES['path'], chartOverview_bio_GBF4_SNES['name'], VIEW_NAME);
@@ -290,10 +287,7 @@ window.HomeView = {
         ChartData.value['Biodiversity']['GBF2'] = window[chartOverview_bio_GBF2['name']];
       }
       if (runScenario.value['BIODIVERSITY_TARGET_GBF_3_NVIS'] !== 'off') {
-        ChartData.value['Biodiversity']['GBF3 (NVIS)'] = window[chartOverview_bio_GBF3_NVIS['name']];
-      }
-      if (runScenario.value['BIODIVERSITY_TARGET_GBF_3_IBRA'] !== 'off') {
-        ChartData.value['Biodiversity']['GBF3 (IBRA)'] = window[chartOverview_bio_GBF3_IBRA['name']];
+        ChartData.value['Biodiversity'][`GBF3 (${gbf3Mode})`] = window[chartOverview_bio_GBF3_NVIS['name']];
       }
       if (runScenario.value['BIODIVERSITY_TARGET_GBF_4_SNES'] !== 'off') {
         ChartData.value['Biodiversity']['GBF4 (SNES)'] = window[chartOverview_bio_GBF4_SNES['name']];
