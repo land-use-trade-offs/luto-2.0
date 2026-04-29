@@ -746,6 +746,29 @@ def rescale_per_species_data(arr: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     scaled_np = (arr_np / scale_factors_np[:, np.newaxis]).astype(np.float32)
     scaled_np[np.abs(scaled_np) < settings.RESCALE_ZERO_THRESHOLD] = 0.0
 
+    # Heavy-tail pruning: rows with extreme dynamic range (p97/p3 > 1e5) are still
+    # numerically problematic for barrier even after per-row rescaling, because the
+    # bottom 3% spans many orders of magnitude. For those rows only, zero out entries
+    # below the row's own p3 to compress the dynamic range without altering the bulk.
+    HEAVY_TAIL_RATIO = 1e5
+    abs_scaled = np.abs(scaled_np)
+    row_p97 = np.percentile(abs_scaled, 97, axis=1)  # ≈ RESCALE_FACTOR by construction
+    # p3 must be computed over non-zero entries — sparse rows otherwise have p3 == 0.
+    row_p3 = np.zeros(scaled_np.shape[0], dtype=np.float32)
+    for s in range(scaled_np.shape[0]):
+        nz = abs_scaled[s][abs_scaled[s] > 0]
+        if nz.size > 0:
+            row_p3[s] = np.percentile(nz, 3)
+    safe_p3 = np.where(row_p3 > 0, row_p3, 1.0)
+    heavy_tail_rows = np.where((row_p97 / safe_p3) > HEAVY_TAIL_RATIO)[0]
+    if heavy_tail_rows.size > 0:
+        print(
+            f"  rescale_per_species_data: heavy-tail pruning {heavy_tail_rows.size}/"
+            f"{scaled_np.shape[0]} rows (p97/p3 > {HEAVY_TAIL_RATIO:.0e})"
+        )
+    for s in heavy_tail_rows:
+        scaled_np[s, abs_scaled[s] < row_p3[s]] = 0.0
+
     # Preserve the xarray wrapper (dims + coords) when the input is an xr.DataArray, so the
     # solver can still do scaled_arr.sel(group=...) and scale_factors.sel(species=...).
     if isinstance(arr, xr.DataArray):

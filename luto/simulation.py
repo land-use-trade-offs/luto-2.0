@@ -157,14 +157,15 @@ def solve_timeseries(data: Data, years_to_run: list[int], do_analyze_iis: bool) 
         nf_attempts = list(settings.RETRY_PARAMS)
         suboptimal_accept_tol = 10 * settings.FEASIBILITY_TOLERANCE
         accepted = False
-        for attempt_idx, (nf, method) in enumerate(nf_attempts):
+        luto_solver = LutoSolver(input_data)
+        luto_solver.formulate()
+        
+        for attempt_idx, (nf, method, crossover) in enumerate(nf_attempts):
+            print(f"Trying NumericFocus={nf}, Method={method}, Crossover={crossover} for year {target_year}...")
             is_last_attempt = (attempt_idx == len(nf_attempts) - 1)
-            print(f"Trying NumericFocus={nf}, Method={method} for year {target_year}...")
-            luto_solver = LutoSolver(input_data)
             luto_solver.gurobi_model.Params.NumericFocus = nf
             luto_solver.gurobi_model.Params.Method = method
-            luto_solver.formulate()
-
+            luto_solver.gurobi_model.Params.Crossover = crossover
             solution = luto_solver.solve()
             status = luto_solver.gurobi_model.Status
 

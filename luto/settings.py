@@ -254,22 +254,28 @@ max-norm 1), 2: geometric scaling, 3: multi-pass equilibrium scaling. Testing re
 that 1 tripled solve time, 3 led to numerical problems.
 '''
 
-RETRY_PARAMS = [(0, 2), (3, 2), (0, 5)]      
+RETRY_PARAMS = [
+    (0, 2,  0),   # NF, Method, Crossover
+    (3, 2,  0),
+    (3, 2, -1),   # last resort: barrier + crossover, slower but produces clean basis + optimum
+]
 '''
 List of solve attempts to try in order, per year. Each entry MUST be a 
-(NumericFocus, Method) tuple. simulation.py loops this list and retries the 
-solve with the next entry whenever Gurobi returns a non-OPTIMAL status 
-(e.g. NUMERIC, SUBOPTIMAL, or false-INFEASIBLE).
+(NumericFocus, Method, Crossover) tuple. simulation.py loops this list and 
+retries the solve with the next entry whenever Gurobi returns a non-OPTIMAL 
+status (e.g. NUMERIC, SUBOPTIMAL, or false-INFEASIBLE).
 
-The Method value overrides settings.SOLVE_METHOD for that attempt:
+The Method/Crossover values override settings.SOLVE_METHOD/CROSSOVER for that
+attempt. Method values:
   -1 = automatic, 0 = primal simplex, 1 = dual simplex, 2 = barrier,
    3 = concurrent, 4 = deterministic concurrent, 5 = deterministic concurrent simplex.
+Crossover values: -1 = automatic, 0 = off, 1/2/3 = forced variants.
 
 Default sequence:
-  (0, 2)  NF=0 barrier, fast first pass
-  (3, 2)  NF=3 barrier, very careful (slower) for stubborn numerical cases
-  (0, 5)  NF=0 deterministic concurrent simplex, simplex fallback that bypasses
-          barrier numerical issues at the cost of longer solve time.
+  (0, 2,  0)  NF=0 barrier, no crossover, fast first pass
+  (3, 2,  0)  NF=3 barrier, no crossover, careful for stubborn numerical cases
+  (3, 2, -1)  NF=3 barrier with crossover (auto). Last resort: slower but
+              cleans up SUBOPTIMAL barrier terminations into certified OPTIMAL.
 '''
 
 BARHOMOGENOUS = 1                   
