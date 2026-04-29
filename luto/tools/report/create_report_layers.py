@@ -68,16 +68,34 @@ def map2base64(
             'legend': legend['legend'],
         }
     else:
-        # Rescale layers using the provided magnitude: positives → red (51–100), negatives → blue (1–50)
+        # Rescale layers using the provided magnitude: positives → red (51–100), negatives → blue (1–50).
+        # If the DataArray carries an `is_selected` coord on `cell` (used by region-targeted GBF
+        # layers, e.g. NRM-mode NVIS / SNES / ECNES), nonzero values in unselected cells are
+        # remapped to greyscale (151–200) so they remain visible but visually de-emphasised.
         global_min, global_max = layer_magnitude
         vals = arr_sel.values.copy()
-        codes = np.full(vals.shape, 0, dtype=np.int8)   # default: no-data grey
+        codes = np.full(vals.shape, 0, dtype=np.int16)   # default: no-data grey; int16 to fit 1–200
 
         if global_max > 0:
             codes[vals > 0] = np.clip(51 + (vals[vals > 0] / global_max) * 50, 51, 100)
         if global_min < 0:
             codes[vals < 0] = np.clip(50 + (vals[vals < 0] / abs(global_min)) * 50, 1, 49)
-        
+
+        if 'is_selected' in arr_sel.coords:
+            sel_mask = np.asarray(arr_sel['is_selected'].values, dtype=bool)
+            unsel_nonzero = (~sel_mask) & (vals != 0)
+            if unsel_nonzero.any():
+                intensity = np.zeros_like(vals, dtype=np.float32)
+                if global_max > 0:
+                    pos = unsel_nonzero & (vals > 0)
+                    intensity[pos] = vals[pos] / global_max
+                if global_min < 0:
+                    neg = unsel_nonzero & (vals < 0)
+                    intensity[neg] = np.abs(vals[neg]) / abs(global_min)
+                codes[unsel_nonzero] = np.clip(
+                    151 + intensity[unsel_nonzero] * 49, 151, 200
+                ).astype(np.int16)
+
         arr_sel.values = codes
         min_max = (
             round(global_min / settings.RESFACTOR ** 2 / 121, 2),  
@@ -321,7 +339,7 @@ def save_report_layer(raw_data_dir:str):
     # Now just use the quality magnitude, which could be incorrect for specific GBFs.
 
     # GBF3-NVIS (NRM aggregation mode)
-    if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off' and settings.GBF3_NVIS_REGION_MODE != 'IBRA':
+    if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off' and getattr(settings, 'GBF3_NVIS_REGION_MODE', 'NRM') != 'IBRA':
         bio_GBF3_NVIS_ag = files_bio.query('base_name == "xr_biodiversity_GBF3_NVIS_ag"')
         get_map2json(bio_GBF3_NVIS_ag, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_Ag.js')
         print('│   ├── Biodiversity GBF3_NVIS Ag layer saved.')
@@ -335,7 +353,7 @@ def save_report_layer(raw_data_dir:str):
         print('│   ├── Biodiversity GBF3_NVIS Non-Ag layer saved.')
 
     # GBF3-IBRA aggregation mode — writes to GBF3_NVIS map filenames
-    if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off' and settings.GBF3_NVIS_REGION_MODE == 'IBRA':
+    if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off' and getattr(settings, 'GBF3_NVIS_REGION_MODE', 'NRM') == 'IBRA':
         bio_GBF3_IBRA_ag = files_bio.query('base_name == "xr_biodiversity_GBF3_IBRA_ag"')
         get_map2json(bio_GBF3_IBRA_ag, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_Ag.js')
         print('│   ├── Biodiversity GBF3_IBRA Ag layer saved.')

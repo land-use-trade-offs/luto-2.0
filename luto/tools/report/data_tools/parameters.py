@@ -659,6 +659,20 @@ COLORS_FLOAT = {
     98: '#A60026FF',
     99: '#960026FF',
    100: '#800026FF',
+
+    # 151-200: Greyscale ramp for cells OUTSIDE selected target regions (e.g. unselected NRMs).
+    # Used to visually de-emphasise off-target contributions while still showing magnitude.
+    # Light grey (low magnitude) → dark grey (high magnitude).
+   151: '#DCDCDCFF', 152: '#D8D8D8FF', 153: '#D5D5D5FF', 154: '#D1D1D1FF', 155: '#CECECEFF',
+   156: '#CACACAFF', 157: '#C7C7C7FF', 158: '#C3C3C3FF', 159: '#C0C0C0FF', 160: '#BCBCBCFF',
+   161: '#B9B9B9FF', 162: '#B5B5B5FF', 163: '#B2B2B2FF', 164: '#AEAEAEFF', 165: '#ABABABFF',
+   166: '#A7A7A7FF', 167: '#A4A4A4FF', 168: '#A0A0A0FF', 169: '#9D9D9DFF', 170: '#999999FF',
+   171: '#969696FF', 172: '#929292FF', 173: '#8F8F8FFF', 174: '#8B8B8BFF', 175: '#888888FF',
+   176: '#848484FF', 177: '#818181FF', 178: '#7D7D7DFF', 179: '#7A7A7AFF', 180: '#767676FF',
+   181: '#737373FF', 182: '#6F6F6FFF', 183: '#6C6C6CFF', 184: '#686868FF', 185: '#656565FF',
+   186: '#616161FF', 187: '#5E5E5EFF', 188: '#5A5A5AFF', 189: '#575757FF', 190: '#535353FF',
+   191: '#505050FF', 192: '#4C4C4CFF', 193: '#494949FF', 194: '#454545FF', 195: '#424242FF',
+   196: '#3E3E3EFF', 197: '#3B3B3BFF', 198: '#373737FF', 199: '#343434FF', 200: '#3C3C3CFF',
 }
  
  

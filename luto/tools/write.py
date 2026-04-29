@@ -3465,6 +3465,17 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
     else:
         valid_layers_stack_am = xr_gbf3_am.stack(layer=['group', 'am', 'lm', 'lu']).sel(layer=valid_am_layers).drop_vars('region').compute()
 
+    # Tag cells with `is_selected` so the report layer renderer can grey-out cells outside the
+    # selected NRMs (only meaningful in NRM mode; for Australia/IBRA all cells stay 'selected').
+    if settings.GBF3_NVIS_REGION_MODE == 'NRM':
+        sel_regions = sorted({r for r, _ in data.BIO_GBF3_NVIS_SEL})
+        sel_mask = np.isin(np.asarray(data.REGION_NRM_NAME), sel_regions)
+    else:
+        sel_mask = np.ones(data.NCELLS, dtype=bool)
+    valid_layers_stack_ag     = valid_layers_stack_ag.assign_coords(is_selected=('cell', sel_mask))
+    valid_layers_stack_non_ag = valid_layers_stack_non_ag.assign_coords(is_selected=('cell', sel_mask))
+    valid_layers_stack_am     = valid_layers_stack_am.assign_coords(is_selected=('cell', sel_mask))
+
     # min/max should calculated using array without appending mosaic layers
     save2nc(valid_layers_stack_ag, os.path.join(path, f'xr_biodiversity_GBF3_NVIS_ag_{yr_cal}.nc'))
     save2nc(valid_layers_stack_non_ag, os.path.join(path, f'xr_biodiversity_GBF3_NVIS_non_ag_{yr_cal}.nc'))
@@ -3476,7 +3487,7 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
 
 def write_biodiversity_GBF3_IBRA_scores(data: Data, yr_cal: int, path) -> None:
     ''' IBRA constraints now flow through the GBF3 NVIS path (GBF3_NVIS_REGION_MODE='IBRA'). '''
-    if settings.GBF3_NVIS_REGION_MODE != 'IBRA':
+    if getattr(settings, 'GBF3_NVIS_REGION_MODE', 'NRM') != 'IBRA':
         return "Skipped: GBF3_NVIS_REGION_MODE is not 'IBRA'"
 
 
@@ -3863,6 +3874,17 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
     else:
         valid_layers_stack_am = xr_gbf4_snes_am.stack(layer=['species', 'am', 'lm', 'lu']).sel(layer=valid_am_layers).drop_vars('region').compute()
 
+    # Tag cells with `is_selected` so the report layer renderer can grey-out cells outside the
+    # selected NRMs (only meaningful in NRM mode; for Australia mode all cells stay 'selected').
+    if getattr(settings, 'GBF4_SNES_REGION_MODE', 'Australia') == 'NRM':
+        sel_regions = sorted({r for r, _ in getattr(data, 'BIO_GBF4_SNES_SEL', []) if r != 'Australia'})
+        sel_mask = np.isin(np.asarray(data.REGION_NRM_NAME), sel_regions) if sel_regions else np.ones(data.NCELLS, dtype=bool)
+    else:
+        sel_mask = np.ones(data.NCELLS, dtype=bool)
+    valid_layers_stack_ag     = valid_layers_stack_ag.assign_coords(is_selected=('cell', sel_mask))
+    valid_layers_stack_non_ag = valid_layers_stack_non_ag.assign_coords(is_selected=('cell', sel_mask))
+    valid_layers_stack_am     = valid_layers_stack_am.assign_coords(is_selected=('cell', sel_mask))
+
     # min/max should calculated using array without appending mosaic layers
     save2nc(valid_layers_stack_ag, os.path.join(path, f'xr_biodiversity_GBF4_SNES_ag_{yr_cal}.nc'))
     save2nc(valid_layers_stack_non_ag, os.path.join(path, f'xr_biodiversity_GBF4_SNES_non_ag_{yr_cal}.nc'))
@@ -4062,6 +4084,17 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
 
     else:
         valid_layers_stack_am = xr_gbf4_ecnes_am.stack(layer=['species', 'am', 'lm', 'lu']).sel(layer=valid_am_layers).drop_vars('region').compute()
+
+    # Tag cells with `is_selected` so the report layer renderer can grey-out cells outside the
+    # selected NRMs (only meaningful in NRM mode; for Australia mode all cells stay 'selected').
+    if getattr(settings, 'GBF4_ECNES_REGION_MODE', 'Australia') == 'NRM':
+        sel_regions = sorted({r for r, _ in getattr(data, 'BIO_GBF4_ECNES_SEL', []) if r != 'Australia'})
+        sel_mask = np.isin(np.asarray(data.REGION_NRM_NAME), sel_regions) if sel_regions else np.ones(data.NCELLS, dtype=bool)
+    else:
+        sel_mask = np.ones(data.NCELLS, dtype=bool)
+    valid_layers_stack_ag     = valid_layers_stack_ag.assign_coords(is_selected=('cell', sel_mask))
+    valid_layers_stack_non_ag = valid_layers_stack_non_ag.assign_coords(is_selected=('cell', sel_mask))
+    valid_layers_stack_am     = valid_layers_stack_am.assign_coords(is_selected=('cell', sel_mask))
 
     # min/max should calculated using array without appending mosaic layers
     save2nc(valid_layers_stack_ag, os.path.join(path, f'xr_biodiversity_GBF4_ECNES_ag_{yr_cal}.nc'))
