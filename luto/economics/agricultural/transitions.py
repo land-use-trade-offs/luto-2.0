@@ -524,7 +524,11 @@ def get_lower_bound_agricultural_management_matrices(data: Data, base_year) -> d
     cell_area_mr = data.AG_MASK_PROPORTION_R[np.newaxis, :]  # (1, NCELLS)
     overflow = ag_lb_sum_mr > cell_area_mr
     if overflow.any():
-        scale = np.where(overflow, cell_area_mr / ag_lb_sum_mr, 1.0)  # (NLMS, NCELLS)
+        # Guard divisor: np.where evaluates both branches, so zeros in ag_lb_sum_mr
+        # would emit a divide-by-zero RuntimeWarning even though those entries are
+        # discarded by the False mask. Replace zeros with 1.0 only for the division.
+        safe_sum = np.where(ag_lb_sum_mr > 0, ag_lb_sum_mr, 1.0)
+        scale = np.where(overflow, cell_area_mr / safe_sum, 1.0)  # (NLMS, NCELLS)
         ag_lb = ag_lb * scale[:, :, np.newaxis]
         print(
             f"  └── Ag lb sum-overflow scaled: {overflow.sum()} (m,cell) entries rescaled"

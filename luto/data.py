@@ -39,7 +39,7 @@ from affine import Affine
 from scipy.interpolate import interp1d
 from math import ceil
 from dataclasses import dataclass
-from scipy.ndimage import distance_transform_edt, maximum_filter
+from scipy.ndimage import distance_transform_edt
 
 
 
@@ -159,11 +159,13 @@ class Data:
             
             # Get 2D coarsed array, where True means the res*res neighbourhood having >=1 land-use cells
             rf_mask = self.NLUM_MASK.copy()
-            have_lu_cells = maximum_filter(self.LUMASK_2D_FULLRES, size=settings.RESFACTOR)
+            have_lu_cells = xr.DataArray(self.LUMASK_2D_FULLRES, dims=['y', 'x']).coarsen(y=settings.RESFACTOR, x=settings.RESFACTOR, boundary='pad').sum()
+            have_lu_cells = np.repeat(np.repeat(have_lu_cells.data, settings.RESFACTOR, axis=0), settings.RESFACTOR, axis=1)
+            have_lu_cells = have_lu_cells[:self.LUMASK_2D_FULLRES.shape[0], :self.LUMASK_2D_FULLRES.shape[1]]
             have_lu_cell_downsampled = have_lu_cells[settings.RESFACTOR//2::settings.RESFACTOR, settings.RESFACTOR//2::settings.RESFACTOR]
 
             # Get 2D fullres array, where True means 
-            #   - the cell is the center of a res*res neighbourhood ABD
+            #   - the cell is the center of a res*res neighbourhood AND
             #   - having >=1 land-use cells
             lu_mask_fullres = np.zeros_like(rf_mask, dtype=bool)
             lu_mask_fullres[settings.RESFACTOR//2::settings.RESFACTOR, settings.RESFACTOR//2::settings.RESFACTOR] = have_lu_cell_downsampled

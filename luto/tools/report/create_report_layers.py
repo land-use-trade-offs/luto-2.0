@@ -169,13 +169,33 @@ def get_map2json(
             print(f'│   ├── No valid layers found in {row["base_name"]}_{row["Year"]}, skipping.')
             continue
 
+        # Pre-extract the (optional) is_selected mask once per file — it is shared
+        # across all layers and avoids carrying the full stacked MultiIndex into
+        # each task (deep-copying that MultiIndex per layer was O(N²) and caused
+        # the parent process to stall on big files, e.g. AUS-scope NVIS-Am or
+        # GBF4 ECNES, surfacing as a joblib KeyboardInterrupt during retrieve).
+        is_selected_arr = (
+            np.asarray(xr_arr['is_selected'].values, dtype=bool)
+            if 'is_selected' in xr_arr.coords else None
+        )
+
         # Batch to avoid OOM on large layer counts (e.g. GBF4 ECNES: ~2700 layers)
         for batch in (valid_layers[i:i+workers] for i in range(0, len(valid_layers), workers)):
             tasks = []
             for sel in batch:
                 isInt, legend, magnitude = get_legend_params(sel)
                 hierarchy_tp = tuple(list(rename_reorder_hierarchy(sel).values()) + [row['Year']])
-                tasks.append(delayed(map2base64)(ds_template, xr_arr.sel(**sel).copy(), isInt, legend, hierarchy_tp, magnitude))
+                # Build a lightweight DataArray without the stacked 'layer' MultiIndex.
+                vals = xr_arr.sel(**sel).values.copy()
+                # Some files leave a residual size-1 dim after sel (e.g. transition
+                # layers where one level of the layer MultiIndex isn't fully reduced);
+                # squeeze so the result is strictly 1-D over 'cell'.
+                vals = np.asarray(vals).squeeze()
+                if vals.ndim != 1:
+                    vals = vals.reshape(-1)
+                coords = {'is_selected': ('cell', is_selected_arr)} if is_selected_arr is not None else None
+                arr_lite = xr.DataArray(vals, dims=('cell',), coords=coords)
+                tasks.append(delayed(map2base64)(ds_template, arr_lite, isInt, legend, hierarchy_tp, magnitude))
 
             for hierarchy_tp, val_dict in Parallel(n_jobs=workers, return_as='generator', max_nbytes=None)(tasks):
                 output[hierarchy_tp] = val_dict
