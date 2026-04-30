@@ -87,10 +87,20 @@ def load_data() -> Data:
 
 def run(
     data: Data, 
-    do_analyze_iis:bool=False
+    do_analyze_iis: bool = False
 ) -> None:
     """
     Run the simulation.
+
+    Parameters
+    ----------
+    data : Data
+        Loaded simulation data.
+    do_analyze_iis : bool, default False
+        If True, infeasible per-year solves trigger ``computeIIS()`` +
+        ``analyze_iis()`` and write a debug .ilp file alongside the run output.
+        Task runs typically pass ``settings.DO_IIS`` so this can be controlled
+        as a grid_search parameter.
     """
     
     # Generate new timestamp each time and apply decorator dynamically

@@ -41,15 +41,17 @@ grid_search = {
     'NCPUS':[32],
     'TIME': ['24:00:00'],
     'QUEUE': ['normalsr'],                                                  # normalsr for CPU, hugemembw for memory intensive jobs
-    
- 
+
+
     ###############################################################
     # Working settings for the model run
     ###############################################################
     'OBJECTIVE': ['maxprofit'],                                             # 'maxprofit' or 'mincost'
     'RESFACTOR': [1],
-    'SIM_YEARS': [range(2010,2051,40)],                                      # 2010-2060 (2010 is base year)
+    'SIM_YEARS': [[2020, 2025, 2030, 2035, 2050]],                          # base year 2010 implicit; explicit step years
+    'WRITE_PARALLEL': [True],
     'WRITE_THREADS': [4],
+    'DO_IIS': [False],                                                      # Set True to compute IIS (.ilp) on infeasible solves; expensive on large models
     
  
     ###############################################################
@@ -76,7 +78,7 @@ grid_search = {
     'CARBON_PRICE_COSTANT': [0],                                            # $0/tonne; LUTO does not consider cost/revenue for pure carbon emission/sequestration
     'BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR': [100],                     # AUD/ha/year; $100/ha/year full maintenance cost
     'SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR':[100],                     # AUD/ha/year; $100/ha/year full maintenance cost
-    'HIR_CEILING_PERCENTAGE': [0.9],                                        # HIR achieves 90% of bio/GHG benefits of Destocked - natural land
+    'HIR_CEILING_PERCENTAGE': [0.8],                                        # HIR achieves 80% of bio/GHG benefits of Destocked - natural land
 
     # --------------- Target deviation weight ---------------
     'SOLVER_WEIGHT_DEMAND': [1], 
@@ -87,7 +89,8 @@ grid_search = {
     # --------------- Social license ---------------
     'EXCLUDE_NO_GO_LU': [False],                                            # True or False
     'REGIONAL_ADOPTION_CONSTRAINTS': ['off'],                               # 'off' = core (LUF Report 2026); 'NON_AG_CAP' = lower-priority sensitivity
-    'REGIONAL_ADOPTION_NON_AG_CAP': [5],                                # Default value (not active when REGIONAL_ADOPTION_CONSTRAINTS='off')
+    'REGIONAL_ADOPTION_NON_AG_CAP': [15],                                   # Default value (not active when REGIONAL_ADOPTION_CONSTRAINTS='off')
+    'REGIONAL_ADOPTION_NON_AG_REGION': ['NRM'],                             # 'NRM' or 'IBRA' — region scope for the cap
     'REGIONAL_ADOPTION_ZONE': ['NRM_CODE'],                                 # One of 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
 
 
@@ -114,7 +117,7 @@ grid_search = {
     'CONNECTIVITY_LB': [0.7],                                               # Connectivity score importance: 0.7 per LUF Report 2026
 
     # --------------- Biodiversity contribution parameters ---------------
-    'BIO_CONTRIBUTION_LDS': [0.8],                              # Late dry season savanna fire regime; test [0.15,0.2,0.25] per Third iteration
+    'BIO_CONTRIBUTION_LDS': [0.75],                                         # Late dry season savanna fire regime
     'BIO_CONTRIBUTION_ENV_PLANTING': [0.7],                                 # Environmental plantings (doc=0.7, default=0.8)
     'BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK': [0.12],                       # Carbon plantings block (doc=0.12, default=0.1)
     'BIO_CONTRIBUTION_CARBON_PLANTING_BELT': [0.12],                        # Carbon plantings belt (doc=0.12, default=0.1)
@@ -125,24 +128,23 @@ grid_search = {
     
     # --------------- Biodiversity settings - GBF 2 ---------------
     'BIODIVERSITY_TARGET_GBF_2': ['high'],                                  # 'off', 'low', 'medium', 'high'
-    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [15],            # Core: 20% central; test [15,30] alongside (Third iteration)
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [15],                    # Core: 20% central; test [15,30] alongside (Third iteration)
     'GBF2_CONSTRAINT_TYPE': ['hard'],                                       # 'hard' or 'soft'
 
     # --------------- Biodiversity settings - GBF 3 ---------------
-    'BIODIVERSITY_TARGET_GBF_3_NVIS': ['off'],                              # 'off', 'medium', 'high', 'USER_DEFINED'
-    'GBF3_NVIS_REGION_MODE': ['Australia'],                             # 'Australia', 'NRM', 'IBRA'
+    'BIODIVERSITY_TARGET_GBF_3_NVIS': ['high'],                             # 'off', 'medium', 'high', 'USER_DEFINED'
+    'GBF3_NVIS_TARGET_CLASS': ['MVS'],                                      # 'MVG' or 'MVS' NVIS class
+    'GBF3_NVIS_REGION_MODE': ['Australia'],                                 # 'Australia' or 'NRM'
+    'GBF3_NVIS_SELECTED_REGIONS': [['North East', 'Goulburn Broken']],      # Only used when mode = 'NRM'
+    'BIODIVERSITY_TARGET_GBF_3_IBRA': ['off'],                              # 'off', 'medium', 'high', 'USER_DEFINED'
 
     # --------------- Biodiversity settings - GBF 4 ---------------
-    'BIODIVERSITY_TARGET_GBF_4_SNES': ['off'],                              # 'on' or 'off'.
-    'BIODIVERSITY_TARGET_GBF_4_ECNES': ['off'],                             # 'off'=core (LUF Report 2026); 'on'=MNES biodiversity sensitivity (lower priority)
-
-    # --------------- NRM region mode for GBF3/GBF4 ---------------
-    'GBF3_NVIS_REGION_MODE': ['Australia'],                             # 'Australia' or 'NRM'
-    'GBF3_NVIS_SELECTED_REGIONS': [['North East', 'Goulburn Broken']],  # Only used when mode = 'NRM'
-    'GBF4_SNES_REGION_MODE': ['Australia'],                             # 'Australia' or 'NRM'
-    'GBF4_SNES_SELECTED_REGIONS': [['North East', 'Goulburn Broken']],  # Only used when mode = 'NRM'
-    'GBF4_ECNES_REGION_MODE': ['Australia'],                            # 'Australia' or 'NRM'
-    'GBF4_ECNES_SELECTED_REGIONS': [['North East', 'Goulburn Broken']], # Only used when mode = 'NRM'
+    'BIODIVERSITY_TARGET_GBF_4_SNES': ['on'],                               # 'on' or 'off'
+    'GBF4_SNES_REGION_MODE': ['Australia'],                                 # 'Australia' or 'NRM'
+    'GBF4_SNES_SELECTED_REGIONS': [['North East', 'Goulburn Broken']],      # Only used when mode = 'NRM'
+    'BIODIVERSITY_TARGET_GBF_4_ECNES': ['on'],                              # 'on' or 'off'
+    'GBF4_ECNES_REGION_MODE': ['Australia'],                                # 'Australia' or 'NRM'
+    'GBF4_ECNES_SELECTED_REGIONS': [['North East', 'Goulburn Broken']],     # Only used when mode = 'NRM'
 
     # --------------- Biodiversity settings - GBF 8 ---------------
     'BIODIVERSITY_TARGET_GBF_8': ['off'],                                   # 'on' or 'off'
@@ -154,14 +156,14 @@ grid_search = {
         'Utility Solar PV': False,                                          # OFF for core; ON for REN1-REN4
         'Onshore Wind': False,                                              # OFF for core; ON for REN1-REN4
     }],
-    'RENEWABLE_TARGET_SCENARIO_TARGETS': ['Gladstone - Core'],             # 'Gladstone - Core', 'Gladstone - BESS Sensitivity', 'AEMO 2026 ISP - Step Change', etc.
-    'RENEWABLE_TARGET_SCENARIO_INPUT_LAYERS': ['step_change'],             # 'step_change', 'accelerated_transition', 'ANU_transmission_T3/T5/T10'
-    'EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS': [True],                    # True: exclude renewables from GBF2 high-biodiversity cells
-    'RENEWABLE_GBF2_CUT_SOLAR': [20],                                     # % coverage threshold for GBF2 exclusion mask (solar)
-    'RENEWABLE_GBF2_CUT_WIND': [20],                                      # % coverage threshold for GBF2 exclusion mask (wind)
-    'EXCLUDE_RENEWABLES_IN_EPBC_MNES_MASK': [True],                       # True: exclude renewables from EPBC MNES high-priority cells
-    'RENEWABLE_EPBC_MNES_CUT_SOLAR': [10],                                # % MNES coverage threshold for exclusion mask (solar)
-    'RENEWABLE_EPBC_MNES_CUT_WIND': [10],                                 # % MNES coverage threshold for exclusion mask (wind)
+    'RENEWABLE_TARGET_SCENARIO_TARGETS': ['Gladstone - Core'],              # 'Gladstone - Core', 'Gladstone - BESS Sensitivity', 'AEMO 2026 ISP - Step Change', etc.
+    'RENEWABLE_TARGET_SCENARIO_INPUT_LAYERS': ['step_change'],              # 'step_change', 'accelerated_transition', 'ANU_transmission_T3/T5/T10'
+    'EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS': [True],                      # True: exclude renewables from GBF2 high-biodiversity cells
+    'RENEWABLE_GBF2_CUT_SOLAR': [20],                                       # % coverage threshold for GBF2 exclusion mask (solar)
+    'RENEWABLE_GBF2_CUT_WIND': [20],                                        # % coverage threshold for GBF2 exclusion mask (wind)
+    'EXCLUDE_RENEWABLES_IN_EPBC_MNES_MASK': [True],                         # True: exclude renewables from EPBC MNES high-priority cells
+    'RENEWABLE_EPBC_MNES_CUT_SOLAR': [10],                                  # % MNES coverage threshold for exclusion mask (solar)
+    'RENEWABLE_EPBC_MNES_CUT_WIND': [10],                                   # % MNES coverage threshold for exclusion mask (wind)
 
 
     # --------------- Objective function weights ---------------

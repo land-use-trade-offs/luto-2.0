@@ -185,6 +185,15 @@ Gurobi's recommended band; the per-year retry loop in simulation.py escalates
 RETRY_PARAMS if the first solve still terminates non-optimally.
 '''
 
+DO_IIS = False
+'''
+If True, when a per-year solve terminates infeasible the run will compute and write
+the Irreducible Infeasible Subsystem (.ilp) and call analyze_iis() for diagnostics.
+Off by default because computeIIS() can be expensive on large LUTO models; turn on
+for debugging infeasibility (e.g. as a grid_search parameter).
+'''
+
+
 RESCALE_PERCENTILE = 97
 '''
 The percentile of |values| used as the rescaling reference (mapped to RESCALE_FACTOR after 

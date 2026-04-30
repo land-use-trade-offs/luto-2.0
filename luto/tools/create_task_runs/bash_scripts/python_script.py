@@ -53,12 +53,12 @@ if __name__ == '__main__':
         patch_input_dir(args.input_dir)
 
 import luto.simulation as sim
-
+import luto.settings as settings
 
 
 # Run the simulation
 data = sim.load_data()
-sim.run(data=data, do_analyze_iis=True)
+sim.run(data=data, do_analyze_iis=settings.DO_IIS)
 
 
 # Set up report directory and archive path
