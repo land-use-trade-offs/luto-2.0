@@ -18,16 +18,19 @@ window.MapService = {
         'mask': { 'path': 'data/geo/biodiversity_GBF2_mask.js', 'name': 'BIO_GBF2_MASK' },
       },
       'GBF3_NVIS': {
+        'Sum': { 'path': 'data/map_layers/map_bio_GBF3_NVIS_Sum.js', 'name': 'map_bio_GBF3_NVIS_Sum' },
         'Ag': { 'path': 'data/map_layers/map_bio_GBF3_NVIS_Ag.js', 'name': 'map_bio_GBF3_NVIS_Ag' },
         'Ag Mgt': { 'path': 'data/map_layers/map_bio_GBF3_NVIS_Am.js', 'name': 'map_bio_GBF3_NVIS_Am' },
         'Non-Ag': { 'path': 'data/map_layers/map_bio_GBF3_NVIS_NonAg.js', 'name': 'map_bio_GBF3_NVIS_NonAg' },
       },
       'GBF4_ECNES': {
+        'Sum': { 'path': 'data/map_layers/map_bio_GBF4_ECNES_Sum.js', 'name': 'map_bio_GBF4_ECNES_Sum' },
         'Ag': { 'path': 'data/map_layers/map_bio_GBF4_ECNES_Ag.js', 'name': 'map_bio_GBF4_ECNES_Ag' },
         'Ag Mgt': { 'path': 'data/map_layers/map_bio_GBF4_ECNES_Am.js', 'name': 'map_bio_GBF4_ECNES_Am' },
         'Non-Ag': { 'path': 'data/map_layers/map_bio_GBF4_ECNES_NonAg.js', 'name': 'map_bio_GBF4_ECNES_NonAg' },
       },
       'GBF4_SNES': {
+        'Sum': { 'path': 'data/map_layers/map_bio_GBF4_SNES_Sum.js', 'name': 'map_bio_GBF4_SNES_Sum' },
         'Ag': { 'path': 'data/map_layers/map_bio_GBF4_SNES_Ag.js', 'name': 'map_bio_GBF4_SNES_Ag' },
         'Ag Mgt': { 'path': 'data/map_layers/map_bio_GBF4_SNES_Am.js', 'name': 'map_bio_GBF4_SNES_Am' },
         'Non-Ag': { 'path': 'data/map_layers/map_bio_GBF4_SNES_NonAg.js', 'name': 'map_bio_GBF4_SNES_NonAg' },
@@ -102,11 +105,11 @@ window.MapService = {
     },
     'Transition': {
       'Area': {
-        'Ag2Ag':    { 'path': 'data/map_layers/map_transition_area_ag2ag.js',    'name': 'map_transition_area_ag2ag' },
+        'Ag2Ag': { 'path': 'data/map_layers/map_transition_area_ag2ag.js', 'name': 'map_transition_area_ag2ag' },
         'Ag2NonAg': { 'path': 'data/map_layers/map_transition_area_ag2nonag.js', 'name': 'map_transition_area_ag2nonag' },
       },
       'Cost': {
-        'Ag2Ag':    { 'path': 'data/map_layers/map_transition_cost_ag2ag.js',    'name': 'map_transition_cost_ag2ag' },
+        'Ag2Ag': { 'path': 'data/map_layers/map_transition_cost_ag2ag.js', 'name': 'map_transition_cost_ag2ag' },
         'Ag2NonAg': { 'path': 'data/map_layers/map_transition_cost_ag2nonag.js', 'name': 'map_transition_cost_ag2nonag' },
       },
     },

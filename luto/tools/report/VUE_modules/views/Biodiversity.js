@@ -138,6 +138,9 @@ window.BiodiversityView = {
       if (category === "Sum") {
         availableAgMgt.value = [];
         availableWater.value = [];
+        // Sum has no species/VegGroup dimension — clear it even for species-aware metrics
+        availableSpecies.value = [];
+        selectSpecies.value = '';
         availableLanduse.value = Object.keys(sumData || {});
         const prevLU = previousSelections.value["Sum"].landuse || curLanduse;
         selectLanduse.value = (prevLU && availableLanduse.value.includes(prevLU)) ? prevLU : (availableLanduse.value[0] || '');

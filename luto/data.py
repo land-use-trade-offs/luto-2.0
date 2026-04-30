@@ -1603,6 +1603,13 @@ class Data:
                 # ---- Australia mode ----
                 BIO_GBF4_SNES_score = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF4_TARGET_SNES.csv').sort_values(by='SCIENTIFIC_NAME', ascending=True)
 
+                # Drop trouble-maker species (rule_out_trouble_maker_speceis workflow)
+                if getattr(settings, 'GBF4_SNES_EXCLUDE_SPECIES', None):
+                    _excl = list(settings.GBF4_SNES_EXCLUDE_SPECIES)
+                    _before = len(BIO_GBF4_SNES_score)
+                    BIO_GBF4_SNES_score = BIO_GBF4_SNES_score[~BIO_GBF4_SNES_score['SCIENTIFIC_NAME'].isin(_excl)].reset_index(drop=True)
+                    print(f"│   │   │   └── Excluded {_before - len(BIO_GBF4_SNES_score)} SNES species via GBF4_SNES_EXCLUDE_SPECIES", flush=True)
+
                 nc_species_index = set(BIO_GBF4_SPECIES_raw.coords['species'].values.tolist())
 
                 likely_sel_raw = [row['SCIENTIFIC_NAME'] for _, row in BIO_GBF4_SNES_score.iterrows()
@@ -1665,6 +1672,13 @@ class Data:
                     & (snes_nrm_df['TARGET_LEVEL_2030_LIKELY'] > 0)
                 ].reset_index(drop=True)
 
+                # Drop trouble-maker species (rule_out_trouble_maker_speceis workflow)
+                if getattr(settings, 'GBF4_SNES_EXCLUDE_SPECIES', None):
+                    _excl = list(settings.GBF4_SNES_EXCLUDE_SPECIES)
+                    _before = len(snes_nrm_df)
+                    snes_nrm_df = snes_nrm_df[~snes_nrm_df['SCIENTIFIC_NAME'].isin(_excl)].reset_index(drop=True)
+                    print(f"│   │   │   └── Excluded {_before - len(snes_nrm_df)} SNES (species,region) targets via GBF4_SNES_EXCLUDE_SPECIES", flush=True)
+
                 if len(snes_nrm_df) == 0:
                     raise ValueError(
                         f"No valid GBF4 SNES NRM targets found for regions {settings.GBF4_SNES_SELECTED_REGIONS}. "
@@ -1723,6 +1737,13 @@ class Data:
                 BIO_GBF4_ECNES_score = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF4_TARGET_ECNES.csv').sort_values(by='COMMUNITY', ascending=True)
                 BIO_GBF4_ECNES_score.columns = BIO_GBF4_ECNES_score.columns.str.strip()
 
+                # Drop trouble-maker communities (rule_out_trouble_maker_speceis workflow)
+                if getattr(settings, 'GBF4_ECNES_EXCLUDE_COMMUNITIES', None):
+                    _excl = list(settings.GBF4_ECNES_EXCLUDE_COMMUNITIES)
+                    _before = len(BIO_GBF4_ECNES_score)
+                    BIO_GBF4_ECNES_score = BIO_GBF4_ECNES_score[~BIO_GBF4_ECNES_score['COMMUNITY'].isin(_excl)].reset_index(drop=True)
+                    print(f"│   │   │   └── Excluded {_before - len(BIO_GBF4_ECNES_score)} ECNES communities via GBF4_ECNES_EXCLUDE_COMMUNITIES", flush=True)
+
                 self.BIO_GBF4_ECNES_LIKELY_SEL = [row['COMMUNITY'] for _, row in BIO_GBF4_ECNES_score.iterrows()
                                                    if all([row.get('TARGET_LEVEL_2030_LIKELY', 0) > 0,
                                                            row.get('TARGET_LEVEL_2050_LIKELY', 0) > 0,
@@ -1770,6 +1791,13 @@ class Data:
                     ecnes_nrm_df['region'].isin(settings.GBF4_ECNES_SELECTED_REGIONS)
                     & (ecnes_nrm_df['TARGET_LEVEL_2030_LIKELY'] > 0)
                 ].reset_index(drop=True)
+
+                # Drop trouble-maker communities (rule_out_trouble_maker_speceis workflow)
+                if getattr(settings, 'GBF4_ECNES_EXCLUDE_COMMUNITIES', None):
+                    _excl = list(settings.GBF4_ECNES_EXCLUDE_COMMUNITIES)
+                    _before = len(ecnes_nrm_df)
+                    ecnes_nrm_df = ecnes_nrm_df[~ecnes_nrm_df['COMMUNITY'].isin(_excl)].reset_index(drop=True)
+                    print(f"│   │   │   └── Excluded {_before - len(ecnes_nrm_df)} ECNES (community,region) targets via GBF4_ECNES_EXCLUDE_COMMUNITIES", flush=True)
 
                 if len(ecnes_nrm_df) == 0:
                     raise ValueError(

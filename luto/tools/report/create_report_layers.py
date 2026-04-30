@@ -372,6 +372,10 @@ def save_report_layer(raw_data_dir:str):
         get_map2json(bio_GBF3_NVIS_nonag, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_NonAg.js')
         print('│   ├── Biodiversity GBF3_NVIS Non-Ag layer saved.')
 
+        bio_GBF3_NVIS_sum = files_bio.query('base_name == "xr_biodiversity_GBF3_NVIS_sum"')
+        get_map2json(bio_GBF3_NVIS_sum, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_Sum.js')
+        print('│   ├── Biodiversity GBF3_NVIS Sum layer saved.')
+
     # GBF3-IBRA aggregation mode — writes to GBF3_NVIS map filenames
     if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off' and getattr(settings, 'GBF3_NVIS_REGION_MODE', 'NRM') == 'IBRA':
         bio_GBF3_IBRA_ag = files_bio.query('base_name == "xr_biodiversity_GBF3_IBRA_ag"')
@@ -400,6 +404,10 @@ def save_report_layer(raw_data_dir:str):
         get_map2json(bio_GBF4_SNES_nonag, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_NonAg.js')
         print('│   ├── Biodiversity GBF4_SNES Non-Ag layer saved.')
 
+        bio_GBF4_SNES_sum = files_bio.query('base_name == "xr_biodiversity_GBF4_SNES_sum"')
+        get_map2json(bio_GBF4_SNES_sum, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF4_SNES_Sum.js')
+        print('│   ├── Biodiversity GBF4_SNES Sum layer saved.')
+
     # GBF4_ECNES
     if settings.BIODIVERSITY_TARGET_GBF_4_ECNES != 'off':
         bio_GBF4_ECNES_ag = files_bio.query('base_name == "xr_biodiversity_GBF4_ECNES_ag"')
@@ -413,6 +421,10 @@ def save_report_layer(raw_data_dir:str):
         bio_GBF4_ECNES_nonag = files_bio.query('base_name == "xr_biodiversity_GBF4_ECNES_non_ag"')
         get_map2json(bio_GBF4_ECNES_nonag, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_NonAg.js')
         print('│   ├── Biodiversity GBF4_ECNES Non-Ag layer saved.')
+
+        bio_GBF4_ECNES_sum = files_bio.query('base_name == "xr_biodiversity_GBF4_ECNES_sum"')
+        get_map2json(bio_GBF4_ECNES_sum, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF4_ECNES_Sum.js')
+        print('│   ├── Biodiversity GBF4_ECNES Sum layer saved.')
 
     # GBF8
     if settings.BIODIVERSITY_TARGET_GBF_8 != 'off':

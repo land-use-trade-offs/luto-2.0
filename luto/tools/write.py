@@ -3317,8 +3317,12 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
     # The NVIS layer covers all of Australia, but the constraint/baseline table
     # (BIO_GBF3_NVIS_BASELINE_AND_TARGETS) is only defined for selected (NRM, group)
     # pairs. To make `inside_score / BASE_TOTAL_SCORE * 100` (a percentage of the
-    # constrained-spatial-extent baseline) meaningful, mask the veg layer so each
-    # group only contributes from cells in the NRMs where that group is constrained.
+    # constrained-spatial-extent baseline) meaningful, build a per-(group, cell) mask
+    # so each group only contributes from cells in the NRMs where it is constrained.
+    # NOTE: this mask is applied ONLY when computing region/AUS DataFrames (csv path).
+    # The map (.nc) outputs keep the unmasked product so cells outside constrained
+    # NRMs retain their values and can be greyed-out in the renderer via `is_selected`
+    # (otherwise they would be zero and the greyscale ramp would never trigger).
     constraint_pairs = data.BIO_GBF3_NVIS_BASELINE_AND_TARGETS[['region', 'group']].drop_duplicates()
     group_to_regions = {g: set(sub['region']) for g, sub in constraint_pairs.groupby('group')}
     group_coord = vegetation_score_vr.coords['group'].values
@@ -3332,7 +3336,17 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
         dims=('group', 'cell'),
         coords={'group': group_coord, 'cell': vegetation_score_vr.coords['cell'].values},
     ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS), 'group': 1})
-    vegetation_score_vr = vegetation_score_vr * mask_gr
+
+    # `is_selected` cell mask — union of all selected NRMs in the constraint table.
+    # Used to restrict the AUSTRALIA-level aggregation to cells the solver actually
+    # constrains, so the report reflects the selected NRMs (e.g. NECMA + GEBCMA)
+    # summed up as AUSTRALIA, not the whole country.
+    if settings.GBF3_NVIS_REGION_MODE == 'NRM':
+        sel_regions = sorted({r for r, _ in data.BIO_GBF3_NVIS_SEL})
+        sel_mask = np.isin(np.asarray(data.REGION_NRM_NAME), sel_regions)
+    else:
+        sel_mask = np.ones(data.NCELLS, dtype=bool)
+    is_selected_da = xr.DataArray(sel_mask, dims=['cell'], coords={'cell': np.arange(data.NCELLS)})
 
     # Get the impacts of each ag/non-ag/am to vegetation matrices
     ag_impact_j = xr.DataArray(
@@ -3387,18 +3401,43 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
         / veg_base_score_score['BASE_TOTAL_SCORE'] * 100
     )
 
-    # Calculate xarray biodiversity GBF3 scores
+    # Calculate xarray biodiversity GBF3 scores (UNMASKED — full Australia).
+    # The unmasked products are saved as map layers; masked variants below feed CSV/AUS
+    # DataFrames and the Sum tab.
     xr_gbf3_ag = vegetation_score_vr * ag_impact_j * ag_dvar_mrj
     xr_gbf3_am = vegetation_score_vr * am_impact_amr * am_dvar_amrj
     xr_gbf3_non_ag = vegetation_score_vr * non_ag_impact_k * non_ag_dvar_rk
 
-    # Expand dimension (has to be after multiplication to avoid double counting)
+    # Masked variants: zero out cells outside each group's constrained NRMs.
+    # Used for CSV / region / AUS aggregations and the Sum tab so percentages and
+    # per-region contributions only reflect cells where the group is constrained.
+    xr_gbf3_ag_msk     = xr_gbf3_ag * mask_gr
+    xr_gbf3_am_msk     = xr_gbf3_am * mask_gr
+    xr_gbf3_non_ag_msk = xr_gbf3_non_ag * mask_gr
+
+    # Sum (Ag + Am + NonAg) — Type dimension matches Quality / GBF2 Sum pattern.
+    # Computed BEFORE add_all so the per-source sums don't double-count 'ALL' coords.
+    # Use the UNMASKED products so the Sum tab map preserves cells outside selected NRMs;
+    # the renderer greys them out via the `is_selected` cell coord.
+    xr_gbf3_all = xr.concat(
+        [   xr_gbf3_ag.sum(dim=['group', 'lm', 'lu']).expand_dims({'Type': ['ag']}),
+            xr_gbf3_non_ag.sum(dim=['group', 'lu']).expand_dims({'Type': ['non-ag']}),
+            xr_gbf3_am.sum(dim=['group', 'am', 'lm', 'lu']).expand_dims({'Type': ['ag-man']}),
+        ], dim='Type'
+    )
+
+    # Expand dimension (has to be after multiplication to avoid double counting).
+    # Build masked variants (CSV/AUS path) and unmasked variants (map-save path).
+    xr_gbf3_ag_msk     = add_all(xr_gbf3_ag_msk,     ['lm', 'lu'])
+    xr_gbf3_non_ag_msk = add_all(xr_gbf3_non_ag_msk, ['lu'])
+    xr_gbf3_am_msk     = add_all(xr_gbf3_am_msk,     ['lm', 'lu', 'am'])
+
     xr_gbf3_ag     = add_all(xr_gbf3_ag,     ['lm', 'lu'])
     xr_gbf3_non_ag = add_all(xr_gbf3_non_ag, ['lu'])
     xr_gbf3_am     = add_all(xr_gbf3_am,     ['lm', 'lu', 'am'])
 
-    # Regional level aggregation
-    GBF3_score_ag_region = xr_gbf3_ag.groupby('region'
+    # Regional level aggregation (uses masked arrays — per-group constrained cells only)
+    GBF3_score_ag_region = xr_gbf3_ag_msk.groupby('region'
         ).sum('cell'
         ).to_dataframe('Area Weighted Score (ha)'
         ).reset_index(
@@ -3406,7 +3445,7 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
         ).assign(Type='Agricultural Land-use', Year=yr_cal)
 
-    GBF3_score_am_region = xr_gbf3_am.groupby('region'
+    GBF3_score_am_region = xr_gbf3_am_msk.groupby('region'
         ).sum('cell'
         ).to_dataframe('Area Weighted Score (ha)'
         ).reset_index(allow_duplicates=True
@@ -3415,7 +3454,7 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
         ).assign(Type='Agricultural Management', Year=yr_cal)
 
-    GBF3_score_non_ag_region = xr_gbf3_non_ag.groupby('region'
+    GBF3_score_non_ag_region = xr_gbf3_non_ag_msk.groupby('region'
         ).sum(['cell']
         ).to_dataframe('Area Weighted Score (ha)'
         ).reset_index(
@@ -3423,15 +3462,18 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
         ).assign(Type='Non-Agricultural Land-use', Year=yr_cal)
 
-    # Australia level aggregation
-    GBF3_score_ag_AUS = xr_gbf3_ag.sum('cell'
+    # Australia level aggregation — restricted to `is_selected` cells (selected NRMs only).
+    # Uses masked arrays so each group only sums over its constrained NRMs.
+    GBF3_score_ag_AUS = xr_gbf3_ag_msk.where(is_selected_da, 0
+        ).sum('cell'
         ).to_dataframe('Area Weighted Score (ha)'
         ).reset_index(
         ).merge(veg_base_score_score
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
         ).assign(Type='Agricultural Land-use', Year=yr_cal, region='AUSTRALIA')
 
-    GBF3_score_am_AUS = xr_gbf3_am.sum('cell'
+    GBF3_score_am_AUS = xr_gbf3_am_msk.where(is_selected_da, 0
+        ).sum('cell'
         ).to_dataframe('Area Weighted Score (ha)'
         ).reset_index(allow_duplicates=True
         ).merge(veg_base_score_score,
@@ -3439,7 +3481,8 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
         ).assign(Type='Agricultural Management', Year=yr_cal, region='AUSTRALIA')
 
-    GBF3_score_non_ag_AUS = xr_gbf3_non_ag.sum(['cell']
+    GBF3_score_non_ag_AUS = xr_gbf3_non_ag_msk.where(is_selected_da, 0
+        ).sum(['cell']
         ).to_dataframe('Area Weighted Score (ha)'
         ).reset_index(
         ).merge(veg_base_score_score,
@@ -3496,60 +3539,53 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
         ).to_csv(os.path.join(path, f'biodiversity_GBF3_NVIS_scores_{yr_cal}.csv'), index=False)
 
     # ------------------------- Stack array, get valid layers -------------------------
+    # Valid-layer detection uses FULL Australia-wide cell sums (not restricted to selected
+    # NRMs) so that layers with non-zero values outside selected NRMs are still saved.
+    # Cells outside the selection are then greyed-out in the renderer via `is_selected`,
+    # rather than being eliminated from the output entirely.
+    GBF3_score_ag_AUS_full     = xr_gbf3_ag.sum('cell').to_dataframe('Area Weighted Score (ha)').reset_index()
+    GBF3_score_non_ag_AUS_full = xr_gbf3_non_ag.sum('cell').to_dataframe('Area Weighted Score (ha)').reset_index()
+    GBF3_score_am_AUS_full     = xr_gbf3_am.sum('cell').to_dataframe('Area Weighted Score (ha)').reset_index(allow_duplicates=True)
+
+    # If a source has no non-trivial layers for this year (e.g. base year 2010
+    # where non-ag dvars are zero), skip writing that NetCDF entirely. Writing
+    # a placeholder with `group='ALL'` previously surfaced as a phantom
+    # 'ALL' veg-group entry in the map JSON, with empty maps for other years.
+    # The Vue map dropdown only lists groups present in the per-year file, so
+    # skipping the file means the year is simply absent (correct behaviour).
 
     # ---- Ag valid layers (include group in layer so each parallel task gets 1D cell data) ----
-    if GBF3_score_ag_AUS['Area Weighted Score (ha)'].abs().sum() < 1e-3:
-        valid_layers_stack_ag = xr.DataArray(
-            np.zeros((1, 1, 1, data.NCELLS), dtype=np.float32),
-            dims=['group', 'lm', 'lu', 'cell'],
-            coords={'group': ['ALL'], 'lm': ['ALL'], 'lu': ['ALL'], 'cell': range(data.NCELLS)}
-        ).stack(layer=['group', 'lm', 'lu'])
-
-    else:
-        valid_ag_layers = pd.MultiIndex.from_frame(GBF3_score_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['group', 'lm', 'lu']]).sort_values()
-        valid_layers_stack_ag = xr_gbf3_ag.stack(layer=['group', 'lm', 'lu']).sel(layer=valid_ag_layers).drop_vars('region').compute()
+    if GBF3_score_ag_AUS_full['Area Weighted Score (ha)'].abs().sum() >= 1e-3:
+        valid_ag_layers = pd.MultiIndex.from_frame(GBF3_score_ag_AUS_full.query('abs(`Area Weighted Score (ha)`) > 1')[['group', 'lm', 'lu']]).sort_values()
+        valid_layers_stack_ag = (
+            xr_gbf3_ag.stack(layer=['group', 'lm', 'lu']).sel(layer=valid_ag_layers).drop_vars('region').compute()
+            .assign_coords(is_selected=('cell', sel_mask))
+        )
+        save2nc(valid_layers_stack_ag, os.path.join(path, f'xr_biodiversity_GBF3_NVIS_ag_{yr_cal}.nc'))
 
     # ---- Non-ag valid layers ----
-    valid_non_ag_layers = pd.MultiIndex.from_frame(GBF3_score_non_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['group', 'lu']]).sort_values()
-
-    if GBF3_score_non_ag_AUS['Area Weighted Score (ha)'].abs().sum() < 1e-3:
-        valid_layers_stack_non_ag = xr.DataArray(
-            np.zeros((1, 1, data.NCELLS), dtype=np.float32),
-            dims=['group', 'lu', 'cell'],
-            coords={'group': ['ALL'], 'lu': ['ALL'], 'cell': range(data.NCELLS)}
-        ).stack(layer=['group', 'lu'])
-
-    else:
-        valid_layers_stack_non_ag = xr_gbf3_non_ag.stack(layer=['group', 'lu']).sel(layer=valid_non_ag_layers).drop_vars('region').compute()
+    if GBF3_score_non_ag_AUS_full['Area Weighted Score (ha)'].abs().sum() >= 1e-3:
+        valid_non_ag_layers = pd.MultiIndex.from_frame(GBF3_score_non_ag_AUS_full.query('abs(`Area Weighted Score (ha)`) > 1')[['group', 'lu']]).sort_values()
+        valid_layers_stack_non_ag = (
+            xr_gbf3_non_ag.stack(layer=['group', 'lu']).sel(layer=valid_non_ag_layers).drop_vars('region').compute()
+            .assign_coords(is_selected=('cell', sel_mask))
+        )
+        save2nc(valid_layers_stack_non_ag, os.path.join(path, f'xr_biodiversity_GBF3_NVIS_non_ag_{yr_cal}.nc'))
 
     # ---- Ag management valid layers ----
-    valid_am_layers = pd.MultiIndex.from_frame(GBF3_score_am_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['group', 'am', 'lm', 'lu']]).sort_values()
+    if GBF3_score_am_AUS_full['Area Weighted Score (ha)'].abs().sum() >= 1e-3:
+        valid_am_layers = pd.MultiIndex.from_frame(GBF3_score_am_AUS_full.query('abs(`Area Weighted Score (ha)`) > 1')[['group', 'am', 'lm', 'lu']]).sort_values()
+        valid_layers_stack_am = (
+            xr_gbf3_am.stack(layer=['group', 'am', 'lm', 'lu']).sel(layer=valid_am_layers).drop_vars('region').compute()
+            .assign_coords(is_selected=('cell', sel_mask))
+        )
+        save2nc(valid_layers_stack_am, os.path.join(path, f'xr_biodiversity_GBF3_NVIS_ag_management_{yr_cal}.nc'))
 
-    if GBF3_score_am_AUS['Area Weighted Score (ha)'].abs().sum() < 1e-3:
-        valid_layers_stack_am = xr.DataArray(
-            np.zeros((1, 1, 1, 1, data.NCELLS), dtype=np.float32),
-            dims=['group', 'am', 'lm', 'lu', 'cell'],
-            coords={'group': ['ALL'], 'am': ['ALL'], 'lm': ['ALL'], 'lu': ['ALL'], 'cell': range(data.NCELLS)}
-        ).stack(layer=['group', 'am', 'lm', 'lu'])
-
-    else:
-        valid_layers_stack_am = xr_gbf3_am.stack(layer=['group', 'am', 'lm', 'lu']).sel(layer=valid_am_layers).drop_vars('region').compute()
-
-    # Tag cells with `is_selected` so the report layer renderer can grey-out cells outside the
-    # selected NRMs (only meaningful in NRM mode; for Australia/IBRA all cells stay 'selected').
-    if settings.GBF3_NVIS_REGION_MODE == 'NRM':
-        sel_regions = sorted({r for r, _ in data.BIO_GBF3_NVIS_SEL})
-        sel_mask = np.isin(np.asarray(data.REGION_NRM_NAME), sel_regions)
-    else:
-        sel_mask = np.ones(data.NCELLS, dtype=bool)
-    valid_layers_stack_ag     = valid_layers_stack_ag.assign_coords(is_selected=('cell', sel_mask))
-    valid_layers_stack_non_ag = valid_layers_stack_non_ag.assign_coords(is_selected=('cell', sel_mask))
-    valid_layers_stack_am     = valid_layers_stack_am.assign_coords(is_selected=('cell', sel_mask))
-
-    # min/max should calculated using array without appending mosaic layers
-    save2nc(valid_layers_stack_ag, os.path.join(path, f'xr_biodiversity_GBF3_NVIS_ag_{yr_cal}.nc'))
-    save2nc(valid_layers_stack_non_ag, os.path.join(path, f'xr_biodiversity_GBF3_NVIS_non_ag_{yr_cal}.nc'))
-    save2nc(valid_layers_stack_am, os.path.join(path, f'xr_biodiversity_GBF3_NVIS_ag_management_{yr_cal}.nc'))
+    # --- Sum GBF3 NVIS (Ag + Am + NonAg) — Type dimension matches Quality / GBF2 Sum pattern ---
+    xr_gbf3_all = add_all(xr_gbf3_all, dims=['Type'])
+    xr_sum_gbf3_cat = xr_gbf3_all.stack(layer=['Type']).drop_vars('region').compute()
+    xr_sum_gbf3_cat = xr_sum_gbf3_cat.assign_coords(is_selected=('cell', sel_mask))
+    save2nc(xr_sum_gbf3_cat, os.path.join(path, f'xr_biodiversity_GBF3_NVIS_sum_{yr_cal}.nc'))
 
     return f"Biodiversity GBF3 scores written for year {yr_cal}"
 
@@ -3699,48 +3735,26 @@ def write_biodiversity_GBF3_IBRA_scores(data: Data, yr_cal: int, path) -> None:
 
     # ------------------------- Stack array, get valid layers -------------------------
 
-    # ---- Ag valid layers (include group in layer so each parallel task gets 1D cell data) ----
-    if GBF3_IBRA_score_ag_AUS['Area Weighted Score (ha)'].abs().sum() < 1e-3:
-        valid_layers_stack_ag = xr.DataArray(
-            np.zeros((1, 1, 1, data.NCELLS), dtype=np.float32),
-            dims=['group', 'lm', 'lu', 'cell'],
-            coords={'group': ['ALL'], 'lm': ['ALL'], 'lu': ['ALL'], 'cell': range(data.NCELLS)}
-        ).stack(layer=['group', 'lm', 'lu'])
+    # If a source has no non-trivial layers for this year, skip writing that NetCDF
+    # entirely (avoids surfacing a phantom 'ALL' bioregion in the map JSON).
 
-    else:
+    # ---- Ag valid layers (include group in layer so each parallel task gets 1D cell data) ----
+    if GBF3_IBRA_score_ag_AUS['Area Weighted Score (ha)'].abs().sum() >= 1e-3:
         valid_ag_layers = pd.MultiIndex.from_frame(GBF3_IBRA_score_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['group', 'lm', 'lu']]).sort_values()
         valid_layers_stack_ag = xr_gbf3_ibra_ag.stack(layer=['group', 'lm', 'lu']).sel(layer=valid_ag_layers).drop_vars('region').compute()
+        save2nc(valid_layers_stack_ag, os.path.join(path, f'xr_biodiversity_GBF3_IBRA_ag_{yr_cal}.nc'))
 
     # ---- Non-ag valid layers ----
-    valid_non_ag_layers = pd.MultiIndex.from_frame(GBF3_IBRA_score_non_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['group', 'lu']]).sort_values()
-
-    if GBF3_IBRA_score_non_ag_AUS['Area Weighted Score (ha)'].abs().sum() < 1e-3:
-        valid_layers_stack_non_ag = xr.DataArray(
-            np.zeros((1, 1, data.NCELLS), dtype=np.float32),
-            dims=['group', 'lu', 'cell'],
-            coords={'group': ['ALL'], 'lu': ['ALL'], 'cell': range(data.NCELLS)}
-        ).stack(layer=['group', 'lu'])
-
-    else:
+    if GBF3_IBRA_score_non_ag_AUS['Area Weighted Score (ha)'].abs().sum() >= 1e-3:
+        valid_non_ag_layers = pd.MultiIndex.from_frame(GBF3_IBRA_score_non_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['group', 'lu']]).sort_values()
         valid_layers_stack_non_ag = xr_gbf3_ibra_non_ag.stack(layer=['group', 'lu']).sel(layer=valid_non_ag_layers).drop_vars('region').compute()
+        save2nc(valid_layers_stack_non_ag, os.path.join(path, f'xr_biodiversity_GBF3_IBRA_non_ag_{yr_cal}.nc'))
 
     # ---- Ag management valid layers ----
-    valid_am_layers = pd.MultiIndex.from_frame(GBF3_IBRA_score_am_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['group', 'am', 'lm', 'lu']]).sort_values()
-
-    if GBF3_IBRA_score_am_AUS['Area Weighted Score (ha)'].abs().sum() < 1e-3:
-        valid_layers_stack_am = xr.DataArray(
-            np.zeros((1, 1, 1, 1, data.NCELLS), dtype=np.float32),
-            dims=['group', 'am', 'lm', 'lu', 'cell'],
-            coords={'group': ['ALL'], 'am': ['ALL'], 'lm': ['ALL'], 'lu': ['ALL'], 'cell': range(data.NCELLS)}
-        ).stack(layer=['group', 'am', 'lm', 'lu'])
-
-    else:
+    if GBF3_IBRA_score_am_AUS['Area Weighted Score (ha)'].abs().sum() >= 1e-3:
+        valid_am_layers = pd.MultiIndex.from_frame(GBF3_IBRA_score_am_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['group', 'am', 'lm', 'lu']]).sort_values()
         valid_layers_stack_am = xr_gbf3_ibra_am.stack(layer=['group', 'am', 'lm', 'lu']).sel(layer=valid_am_layers).drop_vars('region').compute()
-
-    # min/max should calculated using array without appending mosaic layers
-    save2nc(valid_layers_stack_ag, os.path.join(path, f'xr_biodiversity_GBF3_IBRA_ag_{yr_cal}.nc'))
-    save2nc(valid_layers_stack_non_ag, os.path.join(path, f'xr_biodiversity_GBF3_IBRA_non_ag_{yr_cal}.nc'))
-    save2nc(valid_layers_stack_am, os.path.join(path, f'xr_biodiversity_GBF3_IBRA_ag_management_{yr_cal}.nc'))
+        save2nc(valid_layers_stack_am, os.path.join(path, f'xr_biodiversity_GBF3_IBRA_ag_management_{yr_cal}.nc'))
 
     return f"Biodiversity GBF3 IBRA scores written for year {yr_cal}"
 
@@ -3776,9 +3790,12 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
     )
 
     # In NRM mode the SNES layer covers all of Australia but the constraint/baseline is per
-    # (NRM, species). Mask each species' contribution to cells in the NRMs where it is
-    # constrained, so `inside_score / BASE_TOTAL_SCORE * 100` (a percentage of the
-    # constrained-spatial-extent baseline) is meaningful.
+    # (NRM, species). Build a per-(species, cell) mask so each species only contributes from
+    # cells in the NRMs where it is constrained, making `inside_score / BASE_TOTAL_SCORE * 100`
+    # (a percentage of the constrained-spatial-extent baseline) meaningful.
+    # NOTE: the mask is applied ONLY when computing region/AUS DataFrames (csv path) and the
+    # Sum tab. Map (.nc) outputs keep the unmasked product so cells outside constrained NRMs
+    # retain their values and can be greyed-out in the renderer via `is_selected`.
     snes_region_mode = getattr(settings, 'GBF4_SNES_REGION_MODE', 'Australia')
     if snes_region_mode == 'NRM':
         snes_pairs_df = pd.DataFrame(data.BIO_GBF4_SNES_SEL, columns=['region', 'species'])
@@ -3794,7 +3811,17 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
             dims=('species', 'cell'),
             coords={'species': species_coord, 'cell': bio_snes_sr.coords['cell'].values},
         ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS), 'species': 1})
-        bio_snes_sr = bio_snes_sr * mask_sr
+    else:
+        mask_sr = None
+
+    # `is_selected` cell mask — union of all selected NRMs for SNES. Used to restrict
+    # the AUSTRALIA-level aggregation to cells the solver actually constrains.
+    if snes_region_mode == 'NRM':
+        sel_regions = sorted({r for r, _ in getattr(data, 'BIO_GBF4_SNES_SEL', []) if r != 'Australia'})
+        sel_mask = np.isin(np.asarray(data.REGION_NRM_NAME), sel_regions) if sel_regions else np.ones(data.NCELLS, dtype=bool)
+    else:
+        sel_mask = np.ones(data.NCELLS, dtype=bool)
+    is_selected_da = xr.DataArray(sel_mask, dims=['cell'], coords={'cell': np.arange(data.NCELLS)})
 
     # Apply habitat contribution from ag/am/non-ag land-use to biodiversity scores
     ag_impact_j = xr.DataArray(
@@ -3884,12 +3911,39 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
         base_per_region = None  # not used in Australia mode
 
     # Calculate the biodiversity scores
-    # Calculate xarray biodiversity GBF4 SNES scores
+    # Calculate xarray biodiversity GBF4 SNES scores (UNMASKED — full Australia).
+    # Map outputs use these; CSV/AUS use the masked variants below.
     xr_gbf4_snes_ag = bio_snes_sr * ag_impact_j * ag_dvar_mrj
     xr_gbf4_snes_am = bio_snes_sr * am_impact_amr * am_dvar_amrj
     xr_gbf4_snes_non_ag = bio_snes_sr * non_ag_impact_k * non_ag_dvar_rk
 
+    # Masked variants for CSV / region / AUS / Sum tab. In Australia mode `mask_sr` is None
+    # so masked == unmasked.
+    if mask_sr is not None:
+        xr_gbf4_snes_ag_msk     = xr_gbf4_snes_ag * mask_sr
+        xr_gbf4_snes_am_msk     = xr_gbf4_snes_am * mask_sr
+        xr_gbf4_snes_non_ag_msk = xr_gbf4_snes_non_ag * mask_sr
+    else:
+        xr_gbf4_snes_ag_msk     = xr_gbf4_snes_ag
+        xr_gbf4_snes_am_msk     = xr_gbf4_snes_am
+        xr_gbf4_snes_non_ag_msk = xr_gbf4_snes_non_ag
+
+    # Sum (Ag + Am + NonAg) — Type dimension matches Quality / GBF2 Sum pattern.
+    # Computed BEFORE add_all so the per-source sums don't double-count 'ALL' coords.
+    # Use the UNMASKED products so the Sum tab map preserves cells outside selected NRMs;
+    # the renderer greys them out via the `is_selected` cell coord.
+    xr_gbf4_snes_all = xr.concat(
+        [   xr_gbf4_snes_ag.sum(dim=['species', 'lm', 'lu']).expand_dims({'Type': ['ag']}),
+            xr_gbf4_snes_non_ag.sum(dim=['species', 'lu']).expand_dims({'Type': ['non-ag']}),
+            xr_gbf4_snes_am.sum(dim=['species', 'am', 'lm', 'lu']).expand_dims({'Type': ['ag-man']}),
+        ], dim='Type'
+    )
+
     # Expand dimension (has to be after multiplication to avoid double counting)
+    xr_gbf4_snes_ag_msk     = add_all(xr_gbf4_snes_ag_msk,     ['lm', 'lu'])
+    xr_gbf4_snes_non_ag_msk = add_all(xr_gbf4_snes_non_ag_msk, ['lu'])
+    xr_gbf4_snes_am_msk     = add_all(xr_gbf4_snes_am_msk,     ['lm', 'lu', 'am'])
+
     xr_gbf4_snes_ag     = add_all(xr_gbf4_snes_ag,     ['lm', 'lu'])
     xr_gbf4_snes_non_ag = add_all(xr_gbf4_snes_non_ag, ['lu'])
     xr_gbf4_snes_am     = add_all(xr_gbf4_snes_am,     ['lm', 'lu', 'am'])
@@ -3903,7 +3957,7 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
         else {'right': base_yr_score, 'on': 'species', 'how': 'inner'}
     )
 
-    GBF4_score_ag_region = xr_gbf4_snes_ag.groupby('region'
+    GBF4_score_ag_region = xr_gbf4_snes_ag_msk.groupby('region'
         ).sum('cell'
         ).to_dataframe('Area Weighted Score (ha)'
         ).reset_index(
@@ -3911,7 +3965,7 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
         ).assign(Type='Agricultural Land-use', Year=yr_cal)
 
-    GBF4_score_am_region = xr_gbf4_snes_am.groupby('region'
+    GBF4_score_am_region = xr_gbf4_snes_am_msk.groupby('region'
         ).sum('cell').to_dataframe('Area Weighted Score (ha)'
         ).reset_index(allow_duplicates=True
         ).merge(**region_merge_kwargs
@@ -3919,7 +3973,7 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
         ).assign(Type='Agricultural Management', Year=yr_cal)
 
-    GBF4_score_non_ag_region = xr_gbf4_snes_non_ag.groupby('region'
+    GBF4_score_non_ag_region = xr_gbf4_snes_non_ag_msk.groupby('region'
         ).sum(['cell']
         ).to_dataframe('Area Weighted Score (ha)'
         ).reset_index(
@@ -3927,22 +3981,27 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
         ).assign(Type='Non-Agricultural Land-use', Year=yr_cal)
 
-    # Australia level aggregation
-    GBF4_score_ag_AUS = xr_gbf4_snes_ag.sum('cell'
+    # Australia level aggregation — restricted to `is_selected` cells (selected NRMs only).
+    # Uses masked arrays so each species only sums over its constrained NRMs.
+    GBF4_score_ag_AUS = xr_gbf4_snes_ag_msk.where(is_selected_da, 0
+        ).sum('cell'
         ).to_dataframe('Area Weighted Score (ha)'
         ).reset_index(
         ).merge(base_yr_score
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
         ).assign(Type='Agricultural Land-use', Year=yr_cal, region='AUSTRALIA')
 
-    GBF4_score_am_AUS = xr_gbf4_snes_am.sum('cell').to_dataframe('Area Weighted Score (ha)'
+    GBF4_score_am_AUS = xr_gbf4_snes_am_msk.where(is_selected_da, 0
+        ).sum('cell'
+        ).to_dataframe('Area Weighted Score (ha)'
         ).reset_index(allow_duplicates=True
         ).merge(base_yr_score,
         ).astype({'Area Weighted Score (ha)': 'float', 'BASE_TOTAL_SCORE': 'float'}
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
         ).assign(Type='Agricultural Management', Year=yr_cal, region='AUSTRALIA')
 
-    GBF4_score_non_ag_AUS = xr_gbf4_snes_non_ag.sum(['cell']
+    GBF4_score_non_ag_AUS = xr_gbf4_snes_non_ag_msk.where(is_selected_da, 0
+        ).sum(['cell']
         ).to_dataframe('Area Weighted Score (ha)'
         ).reset_index(
         ).merge(base_yr_score,
@@ -4007,59 +4066,49 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
 
     # ------------------------- Stack array, get valid layers -------------------------
 
-    # ---- Ag valid layers (include species in layer so each parallel task gets 1D cell data) ----
-    if GBF4_score_ag_AUS['Area Weighted Score (ha)'].abs().sum() < 1e-3:
-        valid_layers_stack_ag = xr.DataArray(
-            np.zeros((1, 1, 1, data.NCELLS), dtype=np.float32),
-            dims=['species', 'lm', 'lu', 'cell'],
-            coords={'species': ['ALL'], 'lm': ['ALL'], 'lu': ['ALL'], 'cell': range(data.NCELLS)}
-        ).stack(layer=['species', 'lm', 'lu'])
+    # Valid-layer detection uses FULL Australia-wide cell sums (not restricted to selected
+    # NRMs) so that layers with non-zero values outside selected NRMs are still saved.
+    # Cells outside the selection are then greyed-out in the renderer via `is_selected`.
+    GBF4_score_ag_AUS_full     = xr_gbf4_snes_ag.sum('cell').to_dataframe('Area Weighted Score (ha)').reset_index()
+    GBF4_score_non_ag_AUS_full = xr_gbf4_snes_non_ag.sum('cell').to_dataframe('Area Weighted Score (ha)').reset_index()
+    GBF4_score_am_AUS_full     = xr_gbf4_snes_am.sum('cell').to_dataframe('Area Weighted Score (ha)').reset_index(allow_duplicates=True)
 
-    else:
-        valid_ag_layers = pd.MultiIndex.from_frame(GBF4_score_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['species', 'lm', 'lu']]).sort_values()
-        valid_layers_stack_ag = xr_gbf4_snes_ag.stack(layer=['species', 'lm', 'lu']).sel(layer=valid_ag_layers).drop_vars('region').compute()
+    # If a source has no non-trivial layers for this year, skip writing that NetCDF
+    # entirely. Writing a placeholder with `species='ALL'` previously surfaced as a
+    # phantom 'ALL' species entry in the map JSON with empty maps for other years.
+
+    # ---- Ag valid layers (include species in layer so each parallel task gets 1D cell data) ----
+    if GBF4_score_ag_AUS_full['Area Weighted Score (ha)'].abs().sum() >= 1e-3:
+        valid_ag_layers = pd.MultiIndex.from_frame(GBF4_score_ag_AUS_full.query('abs(`Area Weighted Score (ha)`) > 1')[['species', 'lm', 'lu']]).sort_values()
+        valid_layers_stack_ag = (
+            xr_gbf4_snes_ag.stack(layer=['species', 'lm', 'lu']).sel(layer=valid_ag_layers).drop_vars('region').compute()
+            .assign_coords(is_selected=('cell', sel_mask))
+        )
+        save2nc(valid_layers_stack_ag, os.path.join(path, f'xr_biodiversity_GBF4_SNES_ag_{yr_cal}.nc'))
 
     # ---- Non-ag valid layers ----
-    valid_non_ag_layers = pd.MultiIndex.from_frame(GBF4_score_non_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['species', 'lu']]).sort_values()
-
-    if GBF4_score_non_ag_AUS['Area Weighted Score (ha)'].abs().sum() < 1e-3:
-        valid_layers_stack_non_ag = xr.DataArray(
-            np.zeros((1, 1, data.NCELLS), dtype=np.float32),
-            dims=['species', 'lu', 'cell'],
-            coords={'species': ['ALL'], 'lu': ['ALL'], 'cell': range(data.NCELLS)}
-        ).stack(layer=['species', 'lu'])
-
-    else:
-        valid_layers_stack_non_ag = xr_gbf4_snes_non_ag.stack(layer=['species', 'lu']).sel(layer=valid_non_ag_layers).drop_vars('region').compute()
+    if GBF4_score_non_ag_AUS_full['Area Weighted Score (ha)'].abs().sum() >= 1e-3:
+        valid_non_ag_layers = pd.MultiIndex.from_frame(GBF4_score_non_ag_AUS_full.query('abs(`Area Weighted Score (ha)`) > 1')[['species', 'lu']]).sort_values()
+        valid_layers_stack_non_ag = (
+            xr_gbf4_snes_non_ag.stack(layer=['species', 'lu']).sel(layer=valid_non_ag_layers).drop_vars('region').compute()
+            .assign_coords(is_selected=('cell', sel_mask))
+        )
+        save2nc(valid_layers_stack_non_ag, os.path.join(path, f'xr_biodiversity_GBF4_SNES_non_ag_{yr_cal}.nc'))
 
     # ---- Ag management valid layers ----
-    valid_am_layers = pd.MultiIndex.from_frame(GBF4_score_am_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['species', 'am', 'lm', 'lu']]).sort_values()
+    if GBF4_score_am_AUS_full['Area Weighted Score (ha)'].abs().sum() >= 1e-3:
+        valid_am_layers = pd.MultiIndex.from_frame(GBF4_score_am_AUS_full.query('abs(`Area Weighted Score (ha)`) > 1')[['species', 'am', 'lm', 'lu']]).sort_values()
+        valid_layers_stack_am = (
+            xr_gbf4_snes_am.stack(layer=['species', 'am', 'lm', 'lu']).sel(layer=valid_am_layers).drop_vars('region').compute()
+            .assign_coords(is_selected=('cell', sel_mask))
+        )
+        save2nc(valid_layers_stack_am, os.path.join(path, f'xr_biodiversity_GBF4_SNES_ag_management_{yr_cal}.nc'))
 
-    if GBF4_score_am_AUS['Area Weighted Score (ha)'].abs().sum() < 1e-3:
-        valid_layers_stack_am = xr.DataArray(
-            np.zeros((1, 1, 1, 1, data.NCELLS), dtype=np.float32),
-            dims=['species', 'am', 'lm', 'lu', 'cell'],
-            coords={'species': ['ALL'], 'am': ['ALL'], 'lm': ['ALL'], 'lu': ['ALL'], 'cell': range(data.NCELLS)}
-        ).stack(layer=['species', 'am', 'lm', 'lu'])
-
-    else:
-        valid_layers_stack_am = xr_gbf4_snes_am.stack(layer=['species', 'am', 'lm', 'lu']).sel(layer=valid_am_layers).drop_vars('region').compute()
-
-    # Tag cells with `is_selected` so the report layer renderer can grey-out cells outside the
-    # selected NRMs (only meaningful in NRM mode; for Australia mode all cells stay 'selected').
-    if getattr(settings, 'GBF4_SNES_REGION_MODE', 'Australia') == 'NRM':
-        sel_regions = sorted({r for r, _ in getattr(data, 'BIO_GBF4_SNES_SEL', []) if r != 'Australia'})
-        sel_mask = np.isin(np.asarray(data.REGION_NRM_NAME), sel_regions) if sel_regions else np.ones(data.NCELLS, dtype=bool)
-    else:
-        sel_mask = np.ones(data.NCELLS, dtype=bool)
-    valid_layers_stack_ag     = valid_layers_stack_ag.assign_coords(is_selected=('cell', sel_mask))
-    valid_layers_stack_non_ag = valid_layers_stack_non_ag.assign_coords(is_selected=('cell', sel_mask))
-    valid_layers_stack_am     = valid_layers_stack_am.assign_coords(is_selected=('cell', sel_mask))
-
-    # min/max should calculated using array without appending mosaic layers
-    save2nc(valid_layers_stack_ag, os.path.join(path, f'xr_biodiversity_GBF4_SNES_ag_{yr_cal}.nc'))
-    save2nc(valid_layers_stack_non_ag, os.path.join(path, f'xr_biodiversity_GBF4_SNES_non_ag_{yr_cal}.nc'))
-    save2nc(valid_layers_stack_am, os.path.join(path, f'xr_biodiversity_GBF4_SNES_ag_management_{yr_cal}.nc'))
+    # --- Sum GBF4 SNES (Ag + Am + NonAg) — Type dimension matches Quality / GBF2 Sum pattern ---
+    xr_gbf4_snes_all = add_all(xr_gbf4_snes_all, dims=['Type'])
+    xr_sum_gbf4_snes_cat = xr_gbf4_snes_all.stack(layer=['Type']).drop_vars('region').compute()
+    xr_sum_gbf4_snes_cat = xr_sum_gbf4_snes_cat.assign_coords(is_selected=('cell', sel_mask))
+    save2nc(xr_sum_gbf4_snes_cat, os.path.join(path, f'xr_biodiversity_GBF4_SNES_sum_{yr_cal}.nc'))
 
     return f"Biodiversity GBF4 SNES scores written for year {yr_cal}"
 
@@ -4095,8 +4144,12 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
         .chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS), 'species': 1})
     )
 
-    # In NRM mode mask each community's score to cells in the NRMs where it is constrained,
-    # so percentages are taken against the same constrained spatial extent as the baseline.
+    # In NRM mode build a per-(species, cell) mask so each community only contributes from
+    # cells in the NRMs where it is constrained, making percentages against the constrained
+    # spatial extent meaningful.
+    # NOTE: applied ONLY to CSV/region/AUS DataFrames and the Sum tab. Map (.nc) outputs use
+    # the unmasked product so cells outside constrained NRMs can be greyed-out in the renderer
+    # via `is_selected`.
     ecnes_region_mode = getattr(settings, 'GBF4_ECNES_REGION_MODE', 'Australia')
     if ecnes_region_mode == 'NRM':
         ecnes_pairs_df = pd.DataFrame(data.BIO_GBF4_ECNES_SEL, columns=['region', 'species'])
@@ -4112,7 +4165,17 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
             dims=('species', 'cell'),
             coords={'species': species_coord, 'cell': bio_ecnes_sr.coords['cell'].values},
         ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS), 'species': 1})
-        bio_ecnes_sr = bio_ecnes_sr * mask_sr
+    else:
+        mask_sr = None
+
+    # `is_selected` cell mask — union of all selected NRMs for ECNES. Used to restrict
+    # the AUSTRALIA-level aggregation to cells the solver actually constrains.
+    if ecnes_region_mode == 'NRM':
+        sel_regions = sorted({r for r, _ in getattr(data, 'BIO_GBF4_ECNES_SEL', []) if r != 'Australia'})
+        sel_mask = np.isin(np.asarray(data.REGION_NRM_NAME), sel_regions) if sel_regions else np.ones(data.NCELLS, dtype=bool)
+    else:
+        sel_mask = np.ones(data.NCELLS, dtype=bool)
+    is_selected_da = xr.DataArray(sel_mask, dims=['cell'], coords={'cell': np.arange(data.NCELLS)})
 
     # Apply habitat contribution from ag/am/non-ag land-use to biodiversity scores
     ag_impact_j = xr.DataArray(
@@ -4201,10 +4264,37 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
         base_per_region = None
 
     # Calculate the biodiversity scores
-    # Calculate xarray biodiversity GBF4 ECNES scores
+    # Calculate xarray biodiversity GBF4 ECNES scores (UNMASKED — full Australia).
+    # Map outputs use these; CSV/AUS use the masked variants below.
     xr_gbf4_ecnes_ag = bio_ecnes_sr * ag_impact_j * ag_dvar_mrj
     xr_gbf4_ecnes_am = bio_ecnes_sr * am_impact_amr * am_dvar_amrj
     xr_gbf4_ecnes_non_ag = bio_ecnes_sr * non_ag_impact_k * non_ag_dvar_rk
+
+    # Masked variants for CSV / region / AUS / Sum tab. In Australia mode `mask_sr` is None
+    # so masked == unmasked.
+    if mask_sr is not None:
+        xr_gbf4_ecnes_ag_msk     = xr_gbf4_ecnes_ag * mask_sr
+        xr_gbf4_ecnes_am_msk     = xr_gbf4_ecnes_am * mask_sr
+        xr_gbf4_ecnes_non_ag_msk = xr_gbf4_ecnes_non_ag * mask_sr
+    else:
+        xr_gbf4_ecnes_ag_msk     = xr_gbf4_ecnes_ag
+        xr_gbf4_ecnes_am_msk     = xr_gbf4_ecnes_am
+        xr_gbf4_ecnes_non_ag_msk = xr_gbf4_ecnes_non_ag
+
+    # Sum (Ag + Am + NonAg) — Type dimension matches Quality / GBF2 Sum pattern.
+    # Computed BEFORE add_all so the per-source sums don't double-count 'ALL' coords.
+    # Use the UNMASKED products so the Sum tab map preserves cells outside selected NRMs;
+    # the renderer greys them out via the `is_selected` cell coord.
+    xr_gbf4_ecnes_all = xr.concat(
+        [   xr_gbf4_ecnes_ag.sum(dim=['species', 'lm', 'lu']).expand_dims({'Type': ['ag']}),
+            xr_gbf4_ecnes_non_ag.sum(dim=['species', 'lu']).expand_dims({'Type': ['non-ag']}),
+            xr_gbf4_ecnes_am.sum(dim=['species', 'am', 'lm', 'lu']).expand_dims({'Type': ['ag-man']}),
+        ], dim='Type'
+    )
+
+    xr_gbf4_ecnes_ag_msk     = add_all(xr_gbf4_ecnes_ag_msk,     ['lm', 'lu'])
+    xr_gbf4_ecnes_non_ag_msk = add_all(xr_gbf4_ecnes_non_ag_msk, ['lu'])
+    xr_gbf4_ecnes_am_msk     = add_all(xr_gbf4_ecnes_am_msk,     ['lm', 'lu', 'am'])
 
     xr_gbf4_ecnes_ag     = add_all(xr_gbf4_ecnes_ag,     ['lm', 'lu'])
     xr_gbf4_ecnes_non_ag = add_all(xr_gbf4_ecnes_non_ag, ['lu'])
@@ -4218,7 +4308,7 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
         else {'right': base_yr_score, 'on': 'species', 'how': 'inner'}
     )
 
-    GBF4_score_ag_region = xr_gbf4_ecnes_ag.groupby('region'
+    GBF4_score_ag_region = xr_gbf4_ecnes_ag_msk.groupby('region'
         ).sum('cell'
         ).to_dataframe('Area Weighted Score (ha)'
         ).reset_index(
@@ -4226,7 +4316,7 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
         ).assign(Type='Agricultural Land-use', Year=yr_cal)
 
-    GBF4_score_am_region = xr_gbf4_ecnes_am.groupby('region'
+    GBF4_score_am_region = xr_gbf4_ecnes_am_msk.groupby('region'
         ).sum('cell').to_dataframe('Area Weighted Score (ha)'
         ).reset_index(allow_duplicates=True
         ).merge(**region_merge_kwargs
@@ -4234,27 +4324,35 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
         ).assign(Type='Agricultural Management', Year=yr_cal)
 
-    GBF4_score_non_ag_region = xr_gbf4_ecnes_non_ag.groupby('region'
+    GBF4_score_non_ag_region = xr_gbf4_ecnes_non_ag_msk.groupby('region'
         ).sum(['cell']).to_dataframe('Area Weighted Score (ha)').reset_index(
         ).merge(**region_merge_kwargs
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
         ).assign(Type='Non-Agricultural Land-use', Year=yr_cal)
 
-    GBF4_score_ag_AUS = xr_gbf4_ecnes_ag.sum('cell'
+    # Australia level aggregation — restricted to `is_selected` cells (selected NRMs only).
+    # Uses masked arrays so each species only sums over its constrained NRMs.
+    GBF4_score_ag_AUS = xr_gbf4_ecnes_ag_msk.where(is_selected_da, 0
+        ).sum('cell'
         ).to_dataframe('Area Weighted Score (ha)'
         ).reset_index(
         ).merge(base_yr_score
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
         ).assign(Type='Agricultural Land-use', Year=yr_cal, region='AUSTRALIA')
 
-    GBF4_score_am_AUS = xr_gbf4_ecnes_am.sum('cell').to_dataframe('Area Weighted Score (ha)'
+    GBF4_score_am_AUS = xr_gbf4_ecnes_am_msk.where(is_selected_da, 0
+        ).sum('cell'
+        ).to_dataframe('Area Weighted Score (ha)'
         ).reset_index(allow_duplicates=True
         ).merge(base_yr_score,
         ).astype({'Area Weighted Score (ha)': 'float', 'BASE_TOTAL_SCORE': 'float'}
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
         ).assign(Type='Agricultural Management', Year=yr_cal, region='AUSTRALIA')
 
-    GBF4_score_non_ag_AUS = xr_gbf4_ecnes_non_ag.sum(['cell']).to_dataframe('Area Weighted Score (ha)').reset_index(
+    GBF4_score_non_ag_AUS = xr_gbf4_ecnes_non_ag_msk.where(is_selected_da, 0
+        ).sum(['cell']
+        ).to_dataframe('Area Weighted Score (ha)'
+        ).reset_index(
         ).merge(base_yr_score,
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
         ).assign(Type='Non-Agricultural Land-use', Year=yr_cal, region='AUSTRALIA')
@@ -4316,60 +4414,50 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
 
     
 
-    # ==================== Ag Valid Layers ====================
-    if GBF4_score_ag_AUS['Area Weighted Score (ha)'].abs().sum() < 1e-3:
-        valid_layers_stack_ag = xr.DataArray(
-            np.zeros((1, 1, 1, data.NCELLS), dtype=np.float32),
-            dims=['species', 'lm', 'lu', 'cell'],
-            coords={'species': ['ALL'], 'lm': ['ALL'], 'lu': ['ALL'], 'cell': range(data.NCELLS)}
-        ).stack(layer=['species', 'lm', 'lu'])
+    # Valid-layer detection uses FULL Australia-wide cell sums (not restricted to selected
+    # NRMs) so that layers with non-zero values outside selected NRMs are still saved.
+    # Cells outside the selection are then greyed-out in the renderer via `is_selected`.
+    GBF4_score_ag_AUS_full     = xr_gbf4_ecnes_ag.sum('cell').to_dataframe('Area Weighted Score (ha)').reset_index()
+    GBF4_score_non_ag_AUS_full = xr_gbf4_ecnes_non_ag.sum('cell').to_dataframe('Area Weighted Score (ha)').reset_index()
+    GBF4_score_am_AUS_full     = xr_gbf4_ecnes_am.sum('cell').to_dataframe('Area Weighted Score (ha)').reset_index(allow_duplicates=True)
 
-    else:
-        valid_ag_layers = pd.MultiIndex.from_frame(GBF4_score_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['species', 'lm', 'lu']]).sort_values()
-        valid_layers_stack_ag = xr_gbf4_ecnes_ag.stack(layer=['species', 'lm', 'lu']).sel(layer=valid_ag_layers).drop_vars('region').compute()
+    # If a source has no non-trivial layers for this year, skip writing that NetCDF
+    # entirely. Writing a placeholder with `species='ALL'` previously surfaced as a
+    # phantom 'ALL' community entry in the map JSON with empty maps for other years.
+
+    # ==================== Ag Valid Layers ====================
+    if GBF4_score_ag_AUS_full['Area Weighted Score (ha)'].abs().sum() >= 1e-3:
+        valid_ag_layers = pd.MultiIndex.from_frame(GBF4_score_ag_AUS_full.query('abs(`Area Weighted Score (ha)`) > 1')[['species', 'lm', 'lu']]).sort_values()
+        valid_layers_stack_ag = (
+            xr_gbf4_ecnes_ag.stack(layer=['species', 'lm', 'lu']).sel(layer=valid_ag_layers).drop_vars('region').compute()
+            .assign_coords(is_selected=('cell', sel_mask))
+        )
+        save2nc(valid_layers_stack_ag, os.path.join(path, f'xr_biodiversity_GBF4_ECNES_ag_{yr_cal}.nc'))
 
     # ==================== Non-Ag Valid Layers ====================
-    valid_non_ag_layers = pd.MultiIndex.from_frame(GBF4_score_non_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['species', 'lu']]).sort_values()
-
-    if GBF4_score_non_ag_AUS['Area Weighted Score (ha)'].abs().sum() < 1e-3:
-        valid_layers_stack_non_ag = xr.DataArray(
-            np.zeros((1, 1, data.NCELLS), dtype=np.float32),
-            dims=['species', 'lu', 'cell'],
-            coords={'species': ['ALL'], 'lu': ['ALL'], 'cell': range(data.NCELLS)}
-        ).stack(layer=['species', 'lu'])
-
-    else:
-        valid_layers_stack_non_ag = xr_gbf4_ecnes_non_ag.stack(layer=['species', 'lu']).sel(layer=valid_non_ag_layers).drop_vars('region').compute()
+    if GBF4_score_non_ag_AUS_full['Area Weighted Score (ha)'].abs().sum() >= 1e-3:
+        valid_non_ag_layers = pd.MultiIndex.from_frame(GBF4_score_non_ag_AUS_full.query('abs(`Area Weighted Score (ha)`) > 1')[['species', 'lu']]).sort_values()
+        valid_layers_stack_non_ag = (
+            xr_gbf4_ecnes_non_ag.stack(layer=['species', 'lu']).sel(layer=valid_non_ag_layers).drop_vars('region').compute()
+            .assign_coords(is_selected=('cell', sel_mask))
+        )
+        save2nc(valid_layers_stack_non_ag, os.path.join(path, f'xr_biodiversity_GBF4_ECNES_non_ag_{yr_cal}.nc'))
 
     # ==================== Ag Management Valid Layers ====================
-    valid_am_layers = pd.MultiIndex.from_frame(GBF4_score_am_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['species', 'am', 'lm', 'lu']]).sort_values()
-
-    if GBF4_score_am_AUS['Area Weighted Score (ha)'].abs().sum() < 1e-3:
-        valid_layers_stack_am = xr.DataArray(
-            np.zeros((1, 1, 1, 1, data.NCELLS), dtype=np.float32),
-            dims=['species', 'am', 'lm', 'lu', 'cell'],
-            coords={'species': ['ALL'], 'am': ['ALL'], 'lm': ['ALL'], 'lu': ['ALL'], 'cell': range(data.NCELLS)}
-        ).stack(layer=['species', 'am', 'lm', 'lu'])
-
-    else:
-        valid_layers_stack_am = xr_gbf4_ecnes_am.stack(layer=['species', 'am', 'lm', 'lu']).sel(layer=valid_am_layers).drop_vars('region').compute()
-
-    # Tag cells with `is_selected` so the report layer renderer can grey-out cells outside the
-    # selected NRMs (only meaningful in NRM mode; for Australia mode all cells stay 'selected').
-    if getattr(settings, 'GBF4_ECNES_REGION_MODE', 'Australia') == 'NRM':
-        sel_regions = sorted({r for r, _ in getattr(data, 'BIO_GBF4_ECNES_SEL', []) if r != 'Australia'})
-        sel_mask = np.isin(np.asarray(data.REGION_NRM_NAME), sel_regions) if sel_regions else np.ones(data.NCELLS, dtype=bool)
-    else:
-        sel_mask = np.ones(data.NCELLS, dtype=bool)
-    valid_layers_stack_ag     = valid_layers_stack_ag.assign_coords(is_selected=('cell', sel_mask))
-    valid_layers_stack_non_ag = valid_layers_stack_non_ag.assign_coords(is_selected=('cell', sel_mask))
-    valid_layers_stack_am     = valid_layers_stack_am.assign_coords(is_selected=('cell', sel_mask))
-
-    # min/max should calculated using array without appending mosaic layers
-    save2nc(valid_layers_stack_ag, os.path.join(path, f'xr_biodiversity_GBF4_ECNES_ag_{yr_cal}.nc'))
-    save2nc(valid_layers_stack_non_ag, os.path.join(path, f'xr_biodiversity_GBF4_ECNES_non_ag_{yr_cal}.nc'))
-    save2nc(valid_layers_stack_am, os.path.join(path, f'xr_biodiversity_GBF4_ECNES_ag_management_{yr_cal}.nc'))
+    if GBF4_score_am_AUS_full['Area Weighted Score (ha)'].abs().sum() >= 1e-3:
+        valid_am_layers = pd.MultiIndex.from_frame(GBF4_score_am_AUS_full.query('abs(`Area Weighted Score (ha)`) > 1')[['species', 'am', 'lm', 'lu']]).sort_values()
+        valid_layers_stack_am = (
+            xr_gbf4_ecnes_am.stack(layer=['species', 'am', 'lm', 'lu']).sel(layer=valid_am_layers).drop_vars('region').compute()
+            .assign_coords(is_selected=('cell', sel_mask))
+        )
+        save2nc(valid_layers_stack_am, os.path.join(path, f'xr_biodiversity_GBF4_ECNES_ag_management_{yr_cal}.nc'))
     
+    # --- Sum GBF4 ECNES (Ag + Am + NonAg) — Type dimension matches Quality / GBF2 Sum pattern ---
+    xr_gbf4_ecnes_all = add_all(xr_gbf4_ecnes_all, dims=['Type'])
+    xr_sum_gbf4_ecnes_cat = xr_gbf4_ecnes_all.stack(layer=['Type']).drop_vars('region').compute()
+    xr_sum_gbf4_ecnes_cat = xr_sum_gbf4_ecnes_cat.assign_coords(is_selected=('cell', sel_mask))
+    save2nc(xr_sum_gbf4_ecnes_cat, os.path.join(path, f'xr_biodiversity_GBF4_ECNES_sum_{yr_cal}.nc'))
+
     return f"Biodiversity GBF4 ECNES scores written for year {yr_cal}"
 
 
@@ -4516,48 +4604,26 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
 
     
 
-    # ==================== Ag Valid Layers ====================
-    if GBF8_scores_groups_ag_AUS['Area Weighted Score (ha)'].abs().sum() < 1e-3:
-        valid_layers_stack_ag = xr.DataArray(
-            np.zeros((1, 1, 1, data.NCELLS), dtype=np.float32),
-            dims=['group', 'lm', 'lu', 'cell'],
-            coords={'group': ['ALL'], 'lm': ['ALL'], 'lu': ['ALL'], 'cell': range(data.NCELLS)}
-        ).stack(layer=['group', 'lm', 'lu'])
+    # If a source has no non-trivial layers for this year, skip writing that NetCDF
+    # entirely (avoids surfacing a phantom 'ALL' group in the map JSON).
 
-    else:
+    # ==================== Ag Valid Layers ====================
+    if GBF8_scores_groups_ag_AUS['Area Weighted Score (ha)'].abs().sum() >= 1e-3:
         valid_ag_layers = pd.MultiIndex.from_frame(GBF8_scores_groups_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['group', 'lm', 'lu']]).sort_values()
         valid_layers_stack_ag = xr_gbf8_groups_ag.stack(layer=['group', 'lm', 'lu']).sel(layer=valid_ag_layers).drop_vars('region').compute()
+        save2nc(valid_layers_stack_ag, os.path.join(path, f'xr_biodiversity_GBF8_groups_ag_{yr_cal}.nc'))
 
     # ==================== Non-Ag Valid Layers ====================
-    valid_non_ag_layers = pd.MultiIndex.from_frame(GBF8_scores_groups_non_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['group', 'lu']]).sort_values()
-
-    if GBF8_scores_groups_non_ag_AUS['Area Weighted Score (ha)'].abs().sum() < 1e-3:
-        valid_layers_stack_non_ag = xr.DataArray(
-            np.zeros((1, 1, data.NCELLS), dtype=np.float32),
-            dims=['group', 'lu', 'cell'],
-            coords={'group': ['ALL'], 'lu': ['ALL'], 'cell': range(data.NCELLS)}
-        ).stack(layer=['group', 'lu'])
-
-    else:
+    if GBF8_scores_groups_non_ag_AUS['Area Weighted Score (ha)'].abs().sum() >= 1e-3:
+        valid_non_ag_layers = pd.MultiIndex.from_frame(GBF8_scores_groups_non_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['group', 'lu']]).sort_values()
         valid_layers_stack_non_ag = xr_gbf8_groups_non_ag.stack(layer=['group', 'lu']).sel(layer=valid_non_ag_layers).drop_vars('region').compute()
+        save2nc(valid_layers_stack_non_ag, os.path.join(path, f'xr_biodiversity_GBF8_groups_non_ag_{yr_cal}.nc'))
 
     # ==================== Ag Management Valid Layers ====================
-    valid_am_layers = pd.MultiIndex.from_frame(GBF8_scores_groups_am_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['group', 'am', 'lm', 'lu']]).sort_values()
-
-    if GBF8_scores_groups_am_AUS['Area Weighted Score (ha)'].abs().sum() < 1e-3:
-        valid_layers_stack_am = xr.DataArray(
-            np.zeros((1, 1, 1, 1, data.NCELLS), dtype=np.float32),
-            dims=['group', 'am', 'lm', 'lu', 'cell'],
-            coords={'group': ['ALL'], 'am': ['ALL'], 'lm': ['ALL'], 'lu': ['ALL'], 'cell': range(data.NCELLS)}
-        ).stack(layer=['group', 'am', 'lm', 'lu'])
-
-    else:
+    if GBF8_scores_groups_am_AUS['Area Weighted Score (ha)'].abs().sum() >= 1e-3:
+        valid_am_layers = pd.MultiIndex.from_frame(GBF8_scores_groups_am_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['group', 'am', 'lm', 'lu']]).sort_values()
         valid_layers_stack_am = xr_gbf8_groups_am.stack(layer=['group', 'am', 'lm', 'lu']).sel(layer=valid_am_layers).drop_vars('region').compute()
-
-    # min/max should calculated using array without appending mosaic layers
-    save2nc(valid_layers_stack_ag, os.path.join(path, f'xr_biodiversity_GBF8_groups_ag_{yr_cal}.nc'))
-    save2nc(valid_layers_stack_non_ag, os.path.join(path, f'xr_biodiversity_GBF8_groups_non_ag_{yr_cal}.nc'))
-    save2nc(valid_layers_stack_am, os.path.join(path, f'xr_biodiversity_GBF8_groups_ag_management_{yr_cal}.nc'))
+        save2nc(valid_layers_stack_am, os.path.join(path, f'xr_biodiversity_GBF8_groups_ag_management_{yr_cal}.nc'))
     
     return f"Biodiversity GBF8 groups scores written for year {yr_cal}"
 
@@ -4715,48 +4781,26 @@ def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
 
     
 
-    # ==================== Ag Valid Layers ====================
-    if GBF8_scores_species_ag_AUS['Area Weighted Score (ha)'].abs().sum() < 1e-3:
-        valid_layers_stack_ag = xr.DataArray(
-            np.zeros((1, 1, 1, data.NCELLS), dtype=np.float32),
-            dims=['species', 'lm', 'lu', 'cell'],
-            coords={'species': ['ALL'], 'lm': ['ALL'], 'lu': ['ALL'], 'cell': range(data.NCELLS)}
-        ).stack(layer=['species', 'lm', 'lu'])
+    # If a source has no non-trivial layers for this year, skip writing that NetCDF
+    # entirely (avoids surfacing a phantom 'ALL' species in the map JSON).
 
-    else:
+    # ==================== Ag Valid Layers ====================
+    if GBF8_scores_species_ag_AUS['Area Weighted Score (ha)'].abs().sum() >= 1e-3:
         valid_ag_layers = pd.MultiIndex.from_frame(GBF8_scores_species_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['species', 'lm', 'lu']]).sort_values()
         valid_layers_stack_ag = xr_gbf8_species_ag.stack(layer=['species', 'lm', 'lu']).sel(layer=valid_ag_layers).drop_vars('region').compute()
+        save2nc(valid_layers_stack_ag, os.path.join(path, f'xr_biodiversity_GBF8_species_ag_{yr_cal}.nc'))
 
     # ==================== Non-Ag Valid Layers ====================
-    valid_non_ag_layers = pd.MultiIndex.from_frame(GBF8_scores_species_non_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['species', 'lu']]).sort_values()
-
-    if GBF8_scores_species_non_ag_AUS['Area Weighted Score (ha)'].abs().sum() < 1e-3:
-        valid_layers_stack_non_ag = xr.DataArray(
-            np.zeros((1, 1, data.NCELLS), dtype=np.float32),
-            dims=['species', 'lu', 'cell'],
-            coords={'species': ['ALL'], 'lu': ['ALL'], 'cell': range(data.NCELLS)}
-        ).stack(layer=['species', 'lu'])
-
-    else:
+    if GBF8_scores_species_non_ag_AUS['Area Weighted Score (ha)'].abs().sum() >= 1e-3:
+        valid_non_ag_layers = pd.MultiIndex.from_frame(GBF8_scores_species_non_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['species', 'lu']]).sort_values()
         valid_layers_stack_non_ag = xr_gbf8_species_non_ag.stack(layer=['species', 'lu']).sel(layer=valid_non_ag_layers).drop_vars('region').compute()
+        save2nc(valid_layers_stack_non_ag, os.path.join(path, f'xr_biodiversity_GBF8_species_non_ag_{yr_cal}.nc'))
 
     # ==================== Ag Management Valid Layers ====================
-    valid_am_layers = pd.MultiIndex.from_frame(GBF8_scores_species_am_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['species', 'am', 'lm', 'lu']]).sort_values()
-
-    if GBF8_scores_species_am_AUS['Area Weighted Score (ha)'].abs().sum() < 1e-3:
-        valid_layers_stack_am = xr.DataArray(
-            np.zeros((1, 1, 1, 1, data.NCELLS), dtype=np.float32),
-            dims=['species', 'am', 'lm', 'lu', 'cell'],
-            coords={'species': ['ALL'], 'am': ['ALL'], 'lm': ['ALL'], 'lu': ['ALL'], 'cell': range(data.NCELLS)}
-        ).stack(layer=['species', 'am', 'lm', 'lu'])
-
-    else:
+    if GBF8_scores_species_am_AUS['Area Weighted Score (ha)'].abs().sum() >= 1e-3:
+        valid_am_layers = pd.MultiIndex.from_frame(GBF8_scores_species_am_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['species', 'am', 'lm', 'lu']]).sort_values()
         valid_layers_stack_am = xr_gbf8_species_am.stack(layer=['species', 'am', 'lm', 'lu']).sel(layer=valid_am_layers).drop_vars('region').compute()
-
-    # min/max should calculated using array without appending mosaic layers
-    save2nc(valid_layers_stack_ag, os.path.join(path, f'xr_biodiversity_GBF8_species_ag_{yr_cal}.nc'))
-    save2nc(valid_layers_stack_non_ag, os.path.join(path, f'xr_biodiversity_GBF8_species_non_ag_{yr_cal}.nc'))
-    save2nc(valid_layers_stack_am, os.path.join(path, f'xr_biodiversity_GBF8_species_ag_management_{yr_cal}.nc'))
+        save2nc(valid_layers_stack_am, os.path.join(path, f'xr_biodiversity_GBF8_species_ag_management_{yr_cal}.nc'))
     
     return f"Biodiversity GBF8 species scores written for year {yr_cal}"
 

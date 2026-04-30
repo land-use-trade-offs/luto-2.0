@@ -265,8 +265,7 @@ that 1 tripled solve time, 3 led to numerical problems.
 
 RETRY_PARAMS = [
     (0, 2,  0),   # NF, Method, Crossover
-    (3, 2,  0),
-    (3, 2, -1),   # last resort: barrier + crossover, slower but produces clean basis + optimum
+    (2, 2,  0),
 ]
 '''
 List of solve attempts to try in order, per year. Each entry MUST be a 
@@ -282,9 +281,7 @@ Crossover values: -1 = automatic, 0 = off, 1/2/3 = forced variants.
 
 Default sequence:
   (0, 2,  0)  NF=0 barrier, no crossover, fast first pass
-  (3, 2,  0)  NF=3 barrier, no crossover, careful for stubborn numerical cases
-  (3, 2, -1)  NF=3 barrier with crossover (auto). Last resort: slower but
-              cleans up SUBOPTIMAL barrier terminations into certified OPTIMAL.
+  (2, 2,  0)  NF=2 barrier, no crossover, careful for stubborn numerical cases
 '''
 
 BARHOMOGENOUS = 1                   
@@ -957,7 +954,7 @@ GBF3_TARGETS_DICT = {
 
 
 # ------------------------------- Species parameters -------------------------------
-BIODIVERSITY_TARGET_GBF_4_SNES =  'on'           # 'on' or 'on'.
+BIODIVERSITY_TARGET_GBF_4_SNES =  'on'           # 'on' or 'off'.
 BIODIVERSITY_TARGET_GBF_4_ECNES = 'on'           # 'on' or 'off'.
 
 '''
@@ -1002,6 +999,13 @@ Controls the spatial resolution of GBF4 ECNES constraints.
  - 'NRM'       → per-NRM-region targets from NRM target files
 GBF4_ECNES_SELECTED_REGIONS: list of NRM region names. Only used when mode = 'NRM'.
 '''
+
+# -- Trouble-maker exclusions used by the rule_out_trouble_maker_speceis workflow.
+# Names listed here are dropped from GBF4 ECNES/SNES targets (both Australia and
+# NRM modes) before constraints are built. Match exactly the COMMUNITY /
+# SCIENTIFIC_NAME values in BIODIVERSITY_GBF4_TARGET_*[_NRM].csv.
+GBF4_ECNES_EXCLUDE_COMMUNITIES = []
+GBF4_SNES_EXCLUDE_SPECIES = []
 
 
 # -------------------------------- Climate change impacts on biodiversity -------------------------------
