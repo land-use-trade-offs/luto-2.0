@@ -355,7 +355,6 @@ def write_output_single_year(data: Data, yr_cal, path_yr):
         delayed(write_biodiversity_quality_scores)(data, yr_cal, path_yr),
         delayed(write_biodiversity_GBF2_scores)(data, yr_cal, path_yr),
         delayed(write_biodiversity_GBF3_NVIS_scores)(data, yr_cal, path_yr),
-        delayed(write_biodiversity_GBF3_IBRA_scores)(data, yr_cal, path_yr),
         delayed(write_biodiversity_GBF4_SNES_scores)(data, yr_cal, path_yr),
         delayed(write_biodiversity_GBF4_ECNES_scores)(data, yr_cal, path_yr),
         delayed(write_biodiversity_GBF8_scores_groups)(data, yr_cal, path_yr),
@@ -3591,172 +3590,6 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
 
 
 
-def write_biodiversity_GBF3_IBRA_scores(data: Data, yr_cal: int, path) -> None:
-    ''' IBRA constraints now flow through the GBF3 NVIS path (GBF3_NVIS_REGION_MODE='IBRA'). '''
-    if getattr(settings, 'GBF3_NVIS_REGION_MODE', 'NRM') != 'IBRA':
-        return "Skipped: GBF3_NVIS_REGION_MODE is not 'IBRA'"
-
-
-    # Unpack the agricultural management land-use
-    am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]
-
-    # Get decision variables for the year
-    ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
-        ).assign_coords(region=('cell', data.REGION_NRM_NAME))
-    non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
-        ).assign_coords(region=('cell', data.REGION_NRM_NAME))
-    am_dvar_amrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
-        ).assign_coords(region=('cell', data.REGION_NRM_NAME))
-
-    # Get IBRA bioregion matrices for the year
-    bioregion_score_vr = xr.DataArray(
-        ag_biodiversity.get_GBF3_IBRA_matrices_vr(data).astype(np.float32),
-        dims=['group','cell'],
-        coords={'group':list(data.BIO_GBF3_IBRA_ID2DESC.values()),  'cell':range(data.NCELLS)}
-    ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS), 'group': 1})
-
-    # Get the impacts of each ag/non-ag/am to bioregion matrices
-    ag_impact_j = xr.DataArray(
-        ag_biodiversity.get_ag_biodiversity_contribution(data).astype(np.float32),
-        dims=['lu'],
-        coords={'lu':data.AGRICULTURAL_LANDUSES}
-    )
-    non_ag_impact_k = xr.DataArray(
-        np.array(list(non_ag_biodiversity.get_non_ag_lu_biodiv_contribution(data).values()), dtype=np.float32),
-        dims=['lu'],
-        coords={'lu':data.NON_AGRICULTURAL_LANDUSES}
-    )
-    am_impact_amr = xr.DataArray(
-        np.stack([arr for _, v in ag_biodiversity.get_ag_management_biodiversity_contribution(data, yr_cal).items() for arr in v.values()]).astype(np.float32),
-        dims=['idx', 'cell'],
-        coords={
-            'idx': pd.MultiIndex.from_tuples(am_lu_unpack, names=['am', 'lu']),
-            'cell': range(data.NCELLS)}
-    ).unstack()
-
-    # Get the base year biodiversity scores
-    bioregion_base_score = pd.DataFrame({
-            'group': data.BIO_GBF3_IBRA_ID2DESC.values(),
-            'BASE_OUTSIDE_SCORE': data.BIO_GBF3_IBRA_BASELINE_OUTSIDE_LUTO,
-            'BASE_TOTAL_SCORE': data.BIO_GBF3_IBRA_BASELINE_AUSTRALIA,
-            'TARGET_INSIDE_SCORE': data.get_GBF3_IBRA_limit_score_inside_LUTO_by_yr(yr_cal)}
-        ).eval('Target_by_Percent = (TARGET_INSIDE_SCORE + BASE_OUTSIDE_SCORE) / BASE_TOTAL_SCORE * 100')
-
-    # Calculate xarray biodiversity GBF3 IBRA scores
-    xr_gbf3_ibra_ag = bioregion_score_vr * ag_impact_j * ag_dvar_mrj
-    xr_gbf3_ibra_am = bioregion_score_vr * am_impact_amr * am_dvar_amrj
-    xr_gbf3_ibra_non_ag = bioregion_score_vr * non_ag_impact_k * non_ag_dvar_rk
-
-    # Expand dimension (has to be after multiplication to avoid double counting)
-    xr_gbf3_ibra_ag     = add_all(xr_gbf3_ibra_ag,     ['lm', 'lu'])
-    xr_gbf3_ibra_non_ag = add_all(xr_gbf3_ibra_non_ag, ['lu'])
-    xr_gbf3_ibra_am     = add_all(xr_gbf3_ibra_am,     ['lm', 'lu', 'am'])
-
-    # Regional level aggregation
-    GBF3_IBRA_score_ag_region = xr_gbf3_ibra_ag.groupby('region'
-        ).sum('cell'
-        ).to_dataframe('Area Weighted Score (ha)'
-        ).reset_index(
-        ).merge(bioregion_base_score
-        ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
-        ).assign(Type='Agricultural Land-use', Year=yr_cal)
-
-    GBF3_IBRA_score_am_region = xr_gbf3_ibra_am.groupby('region'
-        ).sum('cell'
-        ).to_dataframe('Area Weighted Score (ha)'
-        ).reset_index(allow_duplicates=True
-        ).merge(bioregion_base_score,
-        ).astype({'Area Weighted Score (ha)': 'float', 'BASE_TOTAL_SCORE': 'float'}
-        ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
-        ).assign(Type='Agricultural Management', Year=yr_cal)
-
-    GBF3_IBRA_score_non_ag_region = xr_gbf3_ibra_non_ag.groupby('region'
-        ).sum(['cell']
-        ).to_dataframe('Area Weighted Score (ha)'
-        ).reset_index(
-        ).merge(bioregion_base_score,
-        ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
-        ).assign(Type='Non-Agricultural Land-use', Year=yr_cal)
-
-    # Australia level aggregation
-    GBF3_IBRA_score_ag_AUS = xr_gbf3_ibra_ag.sum('cell'
-        ).to_dataframe('Area Weighted Score (ha)'
-        ).reset_index(
-        ).merge(bioregion_base_score
-        ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
-        ).assign(Type='Agricultural Land-use', Year=yr_cal, region='AUSTRALIA')
-
-    GBF3_IBRA_score_am_AUS = xr_gbf3_ibra_am.sum('cell'
-        ).to_dataframe('Area Weighted Score (ha)'
-        ).reset_index(allow_duplicates=True
-        ).merge(bioregion_base_score,
-        ).astype({'Area Weighted Score (ha)': 'float', 'BASE_TOTAL_SCORE': 'float'}
-        ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
-        ).assign(Type='Agricultural Management', Year=yr_cal, region='AUSTRALIA')
-
-    GBF3_IBRA_score_non_ag_AUS = xr_gbf3_ibra_non_ag.sum(['cell']
-        ).to_dataframe('Area Weighted Score (ha)'
-        ).reset_index(
-        ).merge(bioregion_base_score,
-        ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
-        ).assign(Type='Non-Agricultural Land-use', Year=yr_cal, region='AUSTRALIA')
-
-    # Combine regional and Australia level data
-    GBF3_IBRA_score_ag = pd.concat([GBF3_IBRA_score_ag_region, GBF3_IBRA_score_ag_AUS], axis=0)
-    GBF3_IBRA_score_am = pd.concat([GBF3_IBRA_score_am_region, GBF3_IBRA_score_am_AUS], axis=0)
-    GBF3_IBRA_score_non_ag = pd.concat([GBF3_IBRA_score_non_ag_region, GBF3_IBRA_score_non_ag_AUS], axis=0)
-
-    # Concatenate the dataframes, rename the columns, and reset the index, then save to a csv file
-    bioregion_base_score = bioregion_base_score.assign(
-            Type='Outside LUTO study area',
-            Year=yr_cal,
-            lu='Outside LUTO study area',
-        ).eval('Relative_Contribution_Percentage = BASE_OUTSIDE_SCORE / BASE_TOTAL_SCORE * 100')
-
-    pd.concat([
-        GBF3_IBRA_score_ag,
-        GBF3_IBRA_score_am,
-        GBF3_IBRA_score_non_ag,
-        bioregion_base_score],axis=0
-        ).rename(columns={
-            'lu':'Landuse',
-            'lm':'Water_supply',
-            'am':'Agricultural Management',
-            'group':'IBRA Bioregion',
-            'Relative_Contribution_Percentage':'Contribution Relative to Pre-1750 Level (%)'}
-        ).reset_index(drop=True
-        ).infer_objects(copy=False
-        ).replace({'dry':'Dryland', 'irr':'Irrigated'}
-        ).query('abs(`Area Weighted Score (ha)`) > 0'
-        ).to_csv(os.path.join(path, f'biodiversity_GBF3_IBRA_scores_{yr_cal}.csv'), index=False)
-
-    # ------------------------- Stack array, get valid layers -------------------------
-
-    # If a source has no non-trivial layers for this year, skip writing that NetCDF
-    # entirely (avoids surfacing a phantom 'ALL' bioregion in the map JSON).
-
-    # ---- Ag valid layers (include group in layer so each parallel task gets 1D cell data) ----
-    if GBF3_IBRA_score_ag_AUS['Area Weighted Score (ha)'].abs().sum() >= 1e-3:
-        valid_ag_layers = pd.MultiIndex.from_frame(GBF3_IBRA_score_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['group', 'lm', 'lu']]).sort_values()
-        valid_layers_stack_ag = xr_gbf3_ibra_ag.stack(layer=['group', 'lm', 'lu']).sel(layer=valid_ag_layers).drop_vars('region').compute()
-        save2nc(valid_layers_stack_ag, os.path.join(path, f'xr_biodiversity_GBF3_IBRA_ag_{yr_cal}.nc'))
-
-    # ---- Non-ag valid layers ----
-    if GBF3_IBRA_score_non_ag_AUS['Area Weighted Score (ha)'].abs().sum() >= 1e-3:
-        valid_non_ag_layers = pd.MultiIndex.from_frame(GBF3_IBRA_score_non_ag_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['group', 'lu']]).sort_values()
-        valid_layers_stack_non_ag = xr_gbf3_ibra_non_ag.stack(layer=['group', 'lu']).sel(layer=valid_non_ag_layers).drop_vars('region').compute()
-        save2nc(valid_layers_stack_non_ag, os.path.join(path, f'xr_biodiversity_GBF3_IBRA_non_ag_{yr_cal}.nc'))
-
-    # ---- Ag management valid layers ----
-    if GBF3_IBRA_score_am_AUS['Area Weighted Score (ha)'].abs().sum() >= 1e-3:
-        valid_am_layers = pd.MultiIndex.from_frame(GBF3_IBRA_score_am_AUS.query('abs(`Area Weighted Score (ha)`) > 1')[['group', 'am', 'lm', 'lu']]).sort_values()
-        valid_layers_stack_am = xr_gbf3_ibra_am.stack(layer=['group', 'am', 'lm', 'lu']).sel(layer=valid_am_layers).drop_vars('region').compute()
-        save2nc(valid_layers_stack_am, os.path.join(path, f'xr_biodiversity_GBF3_IBRA_ag_management_{yr_cal}.nc'))
-
-    return f"Biodiversity GBF3 IBRA scores written for year {yr_cal}"
 
 
 
@@ -3781,38 +3614,21 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
 
     # Get the biodiversity scores for the year.
-    # get_GBF4_SNES_matrix_sr returns xr.DataArray(species, cell) keyed by BIO_GBF4_SNES_SPECIES_COORD
-    # (unique species names).  In NRM mode BIO_GBF4_SNES_SEL_ALL holds "sp [region]" strings (N_pairs),
-    # so we must not re-wrap with SEL_ALL.
+    # get_GBF4_SNES_matrix_sr returns xr.DataArray[layer=(region,species), cell] with a
+    # MultiIndex on layer. Region masking is already baked in at full resolution before
+    # resfactoring. Collapse to [species, cell] by assigning a flat species coord on the
+    # layer dimension and groupby-summing — in NRM mode the same species may appear across
+    # multiple (region, species) rows; summing merges them into one row per unique species.
+    snes_region_mode = settings.GBF4_SNES_REGION_MODE
+    _bio_snes_raw = ag_biodiversity.get_GBF4_SNES_matrix_sr(data)  # [layer=(region,species), cell]
     bio_snes_sr = (
-        ag_biodiversity.get_GBF4_SNES_matrix_sr(data)
+        _bio_snes_raw
+        .assign_coords(sp_grp=('layer', _bio_snes_raw.indexes['layer'].get_level_values('species').tolist()))
+        .groupby('sp_grp').sum()
+        .rename({'sp_grp': 'species'})
         .chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS), 'species': 1})
     )
-
-    # In NRM mode the SNES layer covers all of Australia but the constraint/baseline is per
-    # (NRM, species). Build a per-(species, cell) mask so each species only contributes from
-    # cells in the NRMs where it is constrained, making `inside_score / BASE_TOTAL_SCORE * 100`
-    # (a percentage of the constrained-spatial-extent baseline) meaningful.
-    # NOTE: the mask is applied ONLY when computing region/AUS DataFrames (csv path) and the
-    # Sum tab. Map (.nc) outputs keep the unmasked product so cells outside constrained NRMs
-    # retain their values and can be greyed-out in the renderer via `is_selected`.
-    snes_region_mode = getattr(settings, 'GBF4_SNES_REGION_MODE', 'Australia')
-    if snes_region_mode == 'NRM':
-        snes_pairs_df = pd.DataFrame(data.BIO_GBF4_SNES_SEL, columns=['region', 'species'])
-        species_to_regions = {sp: set(sub['region']) for sp, sub in snes_pairs_df.groupby('species')}
-        species_coord = bio_snes_sr.coords['species'].values
-        region_per_cell = np.asarray(data.REGION_NRM_NAME)
-        mask_np = np.stack([
-            np.isin(region_per_cell, list(species_to_regions.get(str(sp), set())))
-            for sp in species_coord
-        ]).astype(np.float32)
-        mask_sr = xr.DataArray(
-            mask_np,
-            dims=('species', 'cell'),
-            coords={'species': species_coord, 'cell': bio_snes_sr.coords['cell'].values},
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS), 'species': 1})
-    else:
-        mask_sr = None
+    mask_sr = None  # region mask already baked into each layer row at full-res before resfactoring
 
     # `is_selected` cell mask — union of all selected NRMs for SNES. Used to restrict
     # the AUSTRALIA-level aggregation to cells the solver actually constrains.
@@ -4137,36 +3953,21 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
     
     # Get the biodiversity scores for the year.
-    # Same pattern as SNES: get_GBF4_ECNES_matrix_sr returns xr.DataArray keyed by
-    # BIO_GBF4_ECNES_SPECIES_COORD (unique community names); do not re-wrap with SEL_ALL.
+    # get_GBF4_ECNES_matrix_sr returns xr.DataArray[layer=(region,species), cell] with a
+    # MultiIndex on layer. Region masking is already baked in at full resolution before
+    # resfactoring. Collapse to [species, cell] by assigning a flat species coord on the
+    # layer dimension and groupby-summing — in NRM mode the same community may appear across
+    # multiple (region, community) rows; summing merges them into one row per unique community.
+    ecnes_region_mode = settings.GBF4_ECNES_REGION_MODE
+    _bio_ecnes_raw = ag_biodiversity.get_GBF4_ECNES_matrix_sr(data)  # [layer=(region,species), cell]
     bio_ecnes_sr = (
-        ag_biodiversity.get_GBF4_ECNES_matrix_sr(data)
+        _bio_ecnes_raw
+        .assign_coords(sp_grp=('layer', _bio_ecnes_raw.indexes['layer'].get_level_values('species').tolist()))
+        .groupby('sp_grp').sum()
+        .rename({'sp_grp': 'species'})
         .chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS), 'species': 1})
     )
-
-    # In NRM mode build a per-(species, cell) mask so each community only contributes from
-    # cells in the NRMs where it is constrained, making percentages against the constrained
-    # spatial extent meaningful.
-    # NOTE: applied ONLY to CSV/region/AUS DataFrames and the Sum tab. Map (.nc) outputs use
-    # the unmasked product so cells outside constrained NRMs can be greyed-out in the renderer
-    # via `is_selected`.
-    ecnes_region_mode = getattr(settings, 'GBF4_ECNES_REGION_MODE', 'Australia')
-    if ecnes_region_mode == 'NRM':
-        ecnes_pairs_df = pd.DataFrame(data.BIO_GBF4_ECNES_SEL, columns=['region', 'species'])
-        species_to_regions = {sp: set(sub['region']) for sp, sub in ecnes_pairs_df.groupby('species')}
-        species_coord = bio_ecnes_sr.coords['species'].values
-        region_per_cell = np.asarray(data.REGION_NRM_NAME)
-        mask_np = np.stack([
-            np.isin(region_per_cell, list(species_to_regions.get(str(sp), set())))
-            for sp in species_coord
-        ]).astype(np.float32)
-        mask_sr = xr.DataArray(
-            mask_np,
-            dims=('species', 'cell'),
-            coords={'species': species_coord, 'cell': bio_ecnes_sr.coords['cell'].values},
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS), 'species': 1})
-    else:
-        mask_sr = None
+    mask_sr = None  # region mask already baked into each layer row at full-res before resfactoring
 
     # `is_selected` cell mask — union of all selected NRMs for ECNES. Used to restrict
     # the AUSTRALIA-level aggregation to cells the solver actually constrains.

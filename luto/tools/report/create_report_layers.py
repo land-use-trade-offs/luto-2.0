@@ -359,7 +359,7 @@ def save_report_layer(raw_data_dir:str):
     # Now just use the quality magnitude, which could be incorrect for specific GBFs.
 
     # GBF3-NVIS (NRM aggregation mode)
-    if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off' and getattr(settings, 'GBF3_NVIS_REGION_MODE', 'NRM') != 'IBRA':
+    if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off' and settings.GBF3_NVIS_REGION_MODE != 'IBRA':
         bio_GBF3_NVIS_ag = files_bio.query('base_name == "xr_biodiversity_GBF3_NVIS_ag"')
         get_map2json(bio_GBF3_NVIS_ag, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_Ag.js')
         print('│   ├── Biodiversity GBF3_NVIS Ag layer saved.')
@@ -377,7 +377,7 @@ def save_report_layer(raw_data_dir:str):
         print('│   ├── Biodiversity GBF3_NVIS Sum layer saved.')
 
     # GBF3-IBRA aggregation mode — writes to GBF3_NVIS map filenames
-    if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off' and getattr(settings, 'GBF3_NVIS_REGION_MODE', 'NRM') == 'IBRA':
+    if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off' and settings.GBF3_NVIS_REGION_MODE == 'IBRA':
         bio_GBF3_IBRA_ag = files_bio.query('base_name == "xr_biodiversity_GBF3_IBRA_ag"')
         get_map2json(bio_GBF3_IBRA_ag, None, None, legend_float, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_GBF3_NVIS_Ag.js')
         print('│   ├── Biodiversity GBF3_IBRA Ag layer saved.')

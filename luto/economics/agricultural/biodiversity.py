@@ -393,19 +393,15 @@ def get_GBF4_SNES_matrix_sr(data: Data) -> xr.DataArray:
     Returns
     -------
     xr.DataArray
-        dims ['species', 'cell'] — species coord holds unique species name strings.
-        Region masking is done in the solver, not here.
+        dims ['layer', 'cell'] — layer coord is a MultiIndex of (region, species).
+        Region masking is already baked into each layer row.
     """
-    base = np.where(
+    layers = data.BIO_GBF4_SPECIES_LAYERS  # xr.DataArray[layer, cell]
+    return xr.where(
         data.SAVBURN_ELIGIBLE,
-        data.BIO_GBF4_SPECIES_LAYERS * data.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
-        data.BIO_GBF4_SPECIES_LAYERS * data.REAL_AREA,
+        layers * data.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
+        layers * data.REAL_AREA,
     ).astype(np.float32)
-    return xr.DataArray(
-        base,
-        dims=['species', 'cell'],
-        coords={'species': data.BIO_GBF4_SNES_SPECIES_COORD, 'cell': np.arange(data.NCELLS)},
-    )
 
 
 def get_GBF4_ECNES_matrix_sr(data: Data) -> xr.DataArray:
@@ -415,20 +411,15 @@ def get_GBF4_ECNES_matrix_sr(data: Data) -> xr.DataArray:
     Returns
     -------
     xr.DataArray
-        dims ['species', 'cell'] — species coord holds unique community name strings.
-        Region masking is done in the solver; the NRM expansion into (n_pairs, n_cells)
-        is no longer performed here.
+        dims ['layer', 'cell'] — layer coord is a MultiIndex of (region, species).
+        Region masking is already baked into each layer row.
     """
-    base = np.where(
+    layers = data.BIO_GBF4_COMUNITY_LAYERS  # xr.DataArray[layer, cell]
+    return xr.where(
         data.SAVBURN_ELIGIBLE,
-        data.BIO_GBF4_COMUNITY_LAYERS * data.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
-        data.BIO_GBF4_COMUNITY_LAYERS * data.REAL_AREA,
+        layers * data.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
+        layers * data.REAL_AREA,
     ).astype(np.float32)
-    return xr.DataArray(
-        base,
-        dims=['species', 'cell'],
-        coords={'species': data.BIO_GBF4_ECNES_SPECIES_COORD, 'cell': np.arange(data.NCELLS)},
-    )
 
 
 def get_GBF8_matrix_sr(data: Data, target_year: int) -> xr.DataArray:

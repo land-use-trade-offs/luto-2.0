@@ -28,6 +28,7 @@ import zipfile
 # Always run relative to the script's own directory so that relative paths
 # in settings.py (OUTPUT_DIR, etc.) resolve correctly regardless of cwd.
 os.chdir(pathlib.Path(__file__).parent)
+os.environ["GRB_LICENSE_FILE"] = r"F:/jinzhu/license/gurobi.lic"
 
 # Force UTF-8 on Windows consoles (default cp1252 can't handle box-drawing chars).
 sys.stdout.reconfigure(encoding='utf-8')

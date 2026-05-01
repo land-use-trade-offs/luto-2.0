@@ -1001,11 +1001,23 @@ GBF4_ECNES_SELECTED_REGIONS: list of NRM region names. Only used when mode = 'NR
 '''
 
 # -- Trouble-maker exclusions used by the rule_out_trouble_maker_speceis workflow.
-# Names listed here are dropped from GBF4 ECNES/SNES targets (both Australia and
-# NRM modes) before constraints are built. Match exactly the COMMUNITY /
-# SCIENTIFIC_NAME values in BIODIVERSITY_GBF4_TARGET_*[_NRM].csv.
+# GBF4_ECNES_EXCLUDE_COMMUNITIES: flat list of COMMUNITY names to drop (all modes).
+# GBF4_SNES_EXCLUDE_REGION_SPECIES: list of (region, SCIENTIFIC_NAME) tuples to drop.
+#   NRM mode  — matches on (region, SCIENTIFIC_NAME) pair exactly.
+#   Australia mode — only the SCIENTIFIC_NAME part is used (region is ignored).
+# Match exactly the values in BIODIVERSITY_GBF4_TARGET_*[_NRM].csv.
 GBF4_ECNES_EXCLUDE_COMMUNITIES = []
-GBF4_SNES_EXCLUDE_SPECIES = []
+GBF4_SNES_EXCLUDE_REGION_SPECIES = [
+    # Burramys parvus has zero LUTO habitat in Goulburn Broken and the outside-LUTO
+    # component alone (19.6%) cannot meet the 50% target → structurally infeasible.
+    ('Goulburn Broken', 'Burramys parvus'),
+]
+
+# -- Whitelist filters: if non-empty, KEEP ONLY the listed communities/species
+# (applied AFTER the EXCLUDE filter above). Empty list = keep all (default).
+# Used to enable single-target SNES/ECNES task runs.
+GBF4_ECNES_INCLUDE_COMMUNITIES = []
+GBF4_SNES_INCLUDE_SPECIES = []
 
 
 # -------------------------------- Climate change impacts on biodiversity -------------------------------

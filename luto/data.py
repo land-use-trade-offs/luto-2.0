@@ -192,6 +192,9 @@ class Data:
         else:
             raise KeyError("Resfactor setting invalid")
         
+        # Get the 2D MASK
+        self.MASK_2D = np.nan_to_num(arr_to_xr(self, self.MASK))
+        
         
         # Get the lon/lat coordinates.
         self.COORD_LON_LAT_2D_FULLRES = self.get_coord(np.nonzero(self.NLUM_MASK), self.GEO_META_FULLRES['transform'])     # 2D array([lon, ...], [lat, ...]);  lon/lat coordinates for each cell in Australia (land only)
@@ -1553,23 +1556,6 @@ class Data:
                 nvis_layers_arr
             ).astype(np.float32)
 
-            # Recompute targets at current RESFACTOR so the constraint LHS and RHS
-            # use the same spatial representation (RF1 CSV scores become inconsistent
-            # with RF>1 averaged layers, causing infeasibility).
-            if settings.RESFACTOR > 1 and settings.GBF3_NVIS_REGION_MODE in ('NRM', 'Australia'):
-                _nrm_full = (
-                    np.asarray(
-                        pd.read_hdf(os.path.join(settings.INPUT_DIR, 'REGION_NRM_r.h5'), columns=['NRM_NAME'])['NRM_NAME'].values,
-                        dtype=object
-                    )
-                    if settings.GBF3_NVIS_REGION_MODE == 'NRM' else None
-                )
-                nvis_targets_df = self._recompute_nvis_targets_at_rf(
-                    nvis_targets_df, nvis_layers_sel, nvis_layers_arr, _nrm_full
-                )
-                self.BIO_GBF3_NVIS_BASELINE_AND_TARGETS = nvis_targets_df
-                print(f"│   │   ├── Recomputed NVIS targets at RESFACTOR={settings.RESFACTOR}", flush=True)
-
             if settings.GBF3_NVIS_REGION_MODE == 'NRM':
                 # NRM: one name per (group, region) constraint pair
                 self.BIO_GBF3_NVIS_ID2DESC = {
@@ -1604,11 +1590,19 @@ class Data:
                 BIO_GBF4_SNES_score = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF4_TARGET_SNES.csv').sort_values(by='SCIENTIFIC_NAME', ascending=True)
 
                 # Drop trouble-maker species (rule_out_trouble_maker_speceis workflow)
-                if getattr(settings, 'GBF4_SNES_EXCLUDE_SPECIES', None):
-                    _excl = list(settings.GBF4_SNES_EXCLUDE_SPECIES)
+                if settings.GBF4_SNES_EXCLUDE_REGION_SPECIES:
+                    # Australia mode: no region, so match on species name only
+                    _excl_sp = {sp for _, sp in settings.GBF4_SNES_EXCLUDE_REGION_SPECIES}
                     _before = len(BIO_GBF4_SNES_score)
-                    BIO_GBF4_SNES_score = BIO_GBF4_SNES_score[~BIO_GBF4_SNES_score['SCIENTIFIC_NAME'].isin(_excl)].reset_index(drop=True)
-                    print(f"│   │   │   └── Excluded {_before - len(BIO_GBF4_SNES_score)} SNES species via GBF4_SNES_EXCLUDE_SPECIES", flush=True)
+                    BIO_GBF4_SNES_score = BIO_GBF4_SNES_score[~BIO_GBF4_SNES_score['SCIENTIFIC_NAME'].isin(_excl_sp)].reset_index(drop=True)
+                    print(f"│   │   │   └── Excluded {_before - len(BIO_GBF4_SNES_score)} SNES species via GBF4_SNES_EXCLUDE_REGION_SPECIES", flush=True)
+
+                # Whitelist: keep only listed species (applied after EXCLUDE)
+                if settings.GBF4_SNES_INCLUDE_SPECIES:
+                    _incl = list(settings.GBF4_SNES_INCLUDE_SPECIES)
+                    _before = len(BIO_GBF4_SNES_score)
+                    BIO_GBF4_SNES_score = BIO_GBF4_SNES_score[BIO_GBF4_SNES_score['SCIENTIFIC_NAME'].isin(_incl)].reset_index(drop=True)
+                    print(f"│   │   │   └── Whitelist GBF4_SNES_INCLUDE_SPECIES kept {len(BIO_GBF4_SNES_score)}/{_before} SNES rows", flush=True)
 
                 nc_species_index = set(BIO_GBF4_SPECIES_raw.coords['species'].values.tolist())
 
@@ -1658,7 +1652,16 @@ class Data:
                 if self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL:
                     snes_parts.append(BIO_GBF4_SPECIES_raw.sel(species=self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL, presence='LIKELY_AND_MAYBE'))
                 snes_arr = xr.concat(snes_parts, dim='species') if snes_parts else BIO_GBF4_SPECIES_raw.isel(species=[], cell=slice(None))
-                self.BIO_GBF4_SPECIES_LAYERS = np.array([self.get_resfactored_average_fraction(arr) for arr in snes_arr])
+
+                # Build per-(region=Australia, species) layers — no region mask applied
+                snes_layers = xr.DataArray(
+                    np.zeros((len(self.BIO_GBF4_SNES_SEL), self.NCELLS), dtype=np.float32),
+                    dims=['layer', 'cell'],
+                    coords={'layer': pd.MultiIndex.from_tuples(self.BIO_GBF4_SNES_SEL, names=['region', 'species'])}
+                )
+                for i, (region, sp) in enumerate(self.BIO_GBF4_SNES_SEL):
+                    snes_layers.values[i] = self.get_resfactored_average_fraction(snes_arr.sel(species=sp).values)
+                self.BIO_GBF4_SPECIES_LAYERS = snes_layers
 
             else:
                 # ---- NRM mode ----
@@ -1672,12 +1675,21 @@ class Data:
                     & (snes_nrm_df['TARGET_LEVEL_2030_LIKELY'] > 0)
                 ].reset_index(drop=True)
 
-                # Drop trouble-maker species (rule_out_trouble_maker_speceis workflow)
-                if getattr(settings, 'GBF4_SNES_EXCLUDE_SPECIES', None):
-                    _excl = list(settings.GBF4_SNES_EXCLUDE_SPECIES)
+                # Drop trouble-maker (region, species) pairs — NRM mode matches on both
+                if settings.GBF4_SNES_EXCLUDE_REGION_SPECIES:
+                    _excl_set = set(settings.GBF4_SNES_EXCLUDE_REGION_SPECIES)
                     _before = len(snes_nrm_df)
-                    snes_nrm_df = snes_nrm_df[~snes_nrm_df['SCIENTIFIC_NAME'].isin(_excl)].reset_index(drop=True)
-                    print(f"│   │   │   └── Excluded {_before - len(snes_nrm_df)} SNES (species,region) targets via GBF4_SNES_EXCLUDE_SPECIES", flush=True)
+                    snes_nrm_df = snes_nrm_df[
+                        ~snes_nrm_df.apply(lambda r: (r['region'], r['SCIENTIFIC_NAME']) in _excl_set, axis=1)
+                    ].reset_index(drop=True)
+                    print(f"│   │   │   └── Excluded {_before - len(snes_nrm_df)} SNES (region,species) pairs via GBF4_SNES_EXCLUDE_REGION_SPECIES", flush=True)
+
+                # Whitelist: keep only listed species (applied after EXCLUDE)
+                if settings.GBF4_SNES_INCLUDE_SPECIES:
+                    _incl = list(settings.GBF4_SNES_INCLUDE_SPECIES)
+                    _before = len(snes_nrm_df)
+                    snes_nrm_df = snes_nrm_df[snes_nrm_df['SCIENTIFIC_NAME'].isin(_incl)].reset_index(drop=True)
+                    print(f"│   │   │   └── Whitelist GBF4_SNES_INCLUDE_SPECIES kept {len(snes_nrm_df)}/{_before} SNES (species,region) rows", flush=True)
 
                 if len(snes_nrm_df) == 0:
                     raise ValueError(
@@ -1707,21 +1719,25 @@ class Data:
                 self.BIO_GBF4_SNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY = snes_nrm_df
                 self.BIO_GBF4_SNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY_AND_MAYBE = pd.DataFrame()
 
-                # Australia-wide unique-species layers — region masking applied in biodiversity.py
-                snes_arr = BIO_GBF4_SPECIES_raw.sel(species=unique_species, presence='LIKELY')
-                self.BIO_GBF4_SPECIES_LAYERS = np.array([self.get_resfactored_average_fraction(arr) for arr in snes_arr])
+                # Load NRM full-res region array for per-(region, species) masking before resfactoring
+                _nrm_full = np.asarray(
+                    pd.read_hdf(os.path.join(settings.INPUT_DIR, 'REGION_NRM_r.h5'), columns=['NRM_NAME'])['NRM_NAME'].values,
+                    dtype=object
+                )
 
-                if settings.RESFACTOR > 1:
-                    _nrm_full = np.asarray(
-                        pd.read_hdf(os.path.join(settings.INPUT_DIR, 'REGION_NRM_r.h5'), columns=['NRM_NAME'])['NRM_NAME'].values,
-                        dtype=object
-                    )
-                    snes_nrm_df = self._recompute_snes_ecnes_targets_at_rf(
-                        snes_nrm_df, 'SCIENTIFIC_NAME', unique_species,
-                        snes_arr, self.BIO_GBF4_SPECIES_LAYERS, _nrm_full
-                    )
-                    self.BIO_GBF4_SNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY = snes_nrm_df
-                    print(f"│   │   ├── Recomputed SNES targets at RESFACTOR={settings.RESFACTOR}", flush=True)
+                snes_arr = BIO_GBF4_SPECIES_raw.sel(species=unique_species, presence='LIKELY')
+
+                # Build per-(region, species) layers: region mask applied at full-res before resfactoring
+                snes_layers = xr.DataArray(
+                    np.zeros((len(self.BIO_GBF4_SNES_SEL), self.NCELLS), dtype=np.float32),
+                    dims=['layer', 'cell'],
+                    coords={'layer': pd.MultiIndex.from_tuples(self.BIO_GBF4_SNES_SEL, names=['region', 'species'])}
+                )
+                for i, (region, sp) in enumerate(self.BIO_GBF4_SNES_SEL):
+                    sp_arr = snes_arr.sel(species=sp).values
+                    region_mask = (_nrm_full == region).astype(np.float32)
+                    snes_layers.values[i] = self.get_resfactored_average_fraction(sp_arr * region_mask)
+                self.BIO_GBF4_SPECIES_LAYERS = snes_layers
 
                 print(f"│   │   └── {len(snes_nrm_df)} (species, region) constraints from {len(unique_species)} species", flush=True)
         
@@ -1738,11 +1754,18 @@ class Data:
                 BIO_GBF4_ECNES_score.columns = BIO_GBF4_ECNES_score.columns.str.strip()
 
                 # Drop trouble-maker communities (rule_out_trouble_maker_speceis workflow)
-                if getattr(settings, 'GBF4_ECNES_EXCLUDE_COMMUNITIES', None):
+                if settings.GBF4_ECNES_EXCLUDE_COMMUNITIES:
                     _excl = list(settings.GBF4_ECNES_EXCLUDE_COMMUNITIES)
                     _before = len(BIO_GBF4_ECNES_score)
                     BIO_GBF4_ECNES_score = BIO_GBF4_ECNES_score[~BIO_GBF4_ECNES_score['COMMUNITY'].isin(_excl)].reset_index(drop=True)
                     print(f"│   │   │   └── Excluded {_before - len(BIO_GBF4_ECNES_score)} ECNES communities via GBF4_ECNES_EXCLUDE_COMMUNITIES", flush=True)
+
+                # Whitelist: keep only listed communities (applied after EXCLUDE)
+                if settings.GBF4_ECNES_INCLUDE_COMMUNITIES:
+                    _incl = list(settings.GBF4_ECNES_INCLUDE_COMMUNITIES)
+                    _before = len(BIO_GBF4_ECNES_score)
+                    BIO_GBF4_ECNES_score = BIO_GBF4_ECNES_score[BIO_GBF4_ECNES_score['COMMUNITY'].isin(_incl)].reset_index(drop=True)
+                    print(f"│   │   │   └── Whitelist GBF4_ECNES_INCLUDE_COMMUNITIES kept {len(BIO_GBF4_ECNES_score)}/{_before} ECNES rows", flush=True)
 
                 self.BIO_GBF4_ECNES_LIKELY_SEL = [row['COMMUNITY'] for _, row in BIO_GBF4_ECNES_score.iterrows()
                                                    if all([row.get('TARGET_LEVEL_2030_LIKELY', 0) > 0,
@@ -1766,8 +1789,10 @@ class Data:
                 self.BIO_GBF4_ECNES_SEL_ALL = self.BIO_GBF4_ECNES_LIKELY_SEL + self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL
                 self.BIO_GBF4_ECNES_SPECIES_COORD = self.BIO_GBF4_ECNES_SEL_ALL         # community names for xarray coord
                 self.BIO_GBF4_ECNES_SEL = [('Australia', c) for c in self.BIO_GBF4_ECNES_SEL_ALL]
-                self.BIO_GBF4_PRESENCE_ECNES_SEL = (['LIKELY'] * len(self.BIO_GBF4_ECNES_LIKELY_SEL)
-                                                     + ['LIKELY_MAYBE'] * len(self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL))
+                self.BIO_GBF4_PRESENCE_ECNES_SEL = (
+                    ['LIKELY'] * len(self.BIO_GBF4_ECNES_LIKELY_SEL)
+                    + ['LIKELY_MAYBE'] * len(self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL)
+                )
                 self.BIO_GBF4_ECNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY = BIO_GBF4_ECNES_score.query(f'COMMUNITY in {self.BIO_GBF4_ECNES_LIKELY_SEL}')
                 self.BIO_GBF4_ECNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY_AND_MAYBE = BIO_GBF4_ECNES_score.query(f'COMMUNITY in {self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL}')
 
@@ -1777,7 +1802,16 @@ class Data:
                 if self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL:
                     ecnes_parts.append(BIO_GBF4_COMUNITY_raw.sel(species=self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL, presence='LIKELY_AND_MAYBE').compute())
                 ecnes_arr = xr.concat(ecnes_parts, dim='species') if ecnes_parts else BIO_GBF4_COMUNITY_raw.isel(species=[], cell=slice(None))
-                self.BIO_GBF4_COMUNITY_LAYERS = np.array([self.get_resfactored_average_fraction(arr) for arr in ecnes_arr])
+
+                # Build per-(region=Australia, community) layers — no region mask applied
+                ecnes_layers = xr.DataArray(
+                    np.zeros((len(self.BIO_GBF4_ECNES_SEL), self.NCELLS), dtype=np.float32),
+                    dims=['layer', 'cell'],
+                    coords={'layer': pd.MultiIndex.from_tuples(self.BIO_GBF4_ECNES_SEL, names=['region', 'species'])}
+                )
+                for i, (region, comm) in enumerate(self.BIO_GBF4_ECNES_SEL):
+                    ecnes_layers.values[i] = self.get_resfactored_average_fraction(ecnes_arr.sel(species=comm).values)
+                self.BIO_GBF4_COMUNITY_LAYERS = ecnes_layers
 
             else:
                 # ---- NRM mode ----
@@ -1793,11 +1827,18 @@ class Data:
                 ].reset_index(drop=True)
 
                 # Drop trouble-maker communities (rule_out_trouble_maker_speceis workflow)
-                if getattr(settings, 'GBF4_ECNES_EXCLUDE_COMMUNITIES', None):
+                if settings.GBF4_ECNES_EXCLUDE_COMMUNITIES:
                     _excl = list(settings.GBF4_ECNES_EXCLUDE_COMMUNITIES)
                     _before = len(ecnes_nrm_df)
                     ecnes_nrm_df = ecnes_nrm_df[~ecnes_nrm_df['COMMUNITY'].isin(_excl)].reset_index(drop=True)
                     print(f"│   │   │   └── Excluded {_before - len(ecnes_nrm_df)} ECNES (community,region) targets via GBF4_ECNES_EXCLUDE_COMMUNITIES", flush=True)
+
+                # Whitelist: keep only listed communities (applied after EXCLUDE)
+                if settings.GBF4_ECNES_INCLUDE_COMMUNITIES:
+                    _incl = list(settings.GBF4_ECNES_INCLUDE_COMMUNITIES)
+                    _before = len(ecnes_nrm_df)
+                    ecnes_nrm_df = ecnes_nrm_df[ecnes_nrm_df['COMMUNITY'].isin(_incl)].reset_index(drop=True)
+                    print(f"│   │   │   └── Whitelist GBF4_ECNES_INCLUDE_COMMUNITIES kept {len(ecnes_nrm_df)}/{_before} ECNES (community,region) rows", flush=True)
 
                 if len(ecnes_nrm_df) == 0:
                     raise ValueError(
@@ -1827,21 +1868,25 @@ class Data:
                 self.BIO_GBF4_ECNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY = ecnes_nrm_df
                 self.BIO_GBF4_ECNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY_AND_MAYBE = pd.DataFrame()
 
-                # Australia-wide unique-community layers — region masking applied in biodiversity.py
-                ecnes_arr = BIO_GBF4_COMUNITY_raw.sel(species=unique_communities, presence='LIKELY').compute()
-                self.BIO_GBF4_COMUNITY_LAYERS = np.array([self.get_resfactored_average_fraction(arr) for arr in ecnes_arr])
+                # Load NRM full-res region array for per-(region, community) masking before resfactoring
+                _nrm_full = np.asarray(
+                    pd.read_hdf(os.path.join(settings.INPUT_DIR, 'REGION_NRM_r.h5'), columns=['NRM_NAME'])['NRM_NAME'].values,
+                    dtype=object
+                )
 
-                if settings.RESFACTOR > 1:
-                    _nrm_full = np.asarray(
-                        pd.read_hdf(os.path.join(settings.INPUT_DIR, 'REGION_NRM_r.h5'), columns=['NRM_NAME'])['NRM_NAME'].values,
-                        dtype=object
-                    )
-                    ecnes_nrm_df = self._recompute_snes_ecnes_targets_at_rf(
-                        ecnes_nrm_df, 'COMMUNITY', unique_communities,
-                        ecnes_arr, self.BIO_GBF4_COMUNITY_LAYERS, _nrm_full
-                    )
-                    self.BIO_GBF4_ECNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY = ecnes_nrm_df
-                    print(f"│   │   ├── Recomputed ECNES targets at RESFACTOR={settings.RESFACTOR}", flush=True)
+                ecnes_arr = BIO_GBF4_COMUNITY_raw.sel(species=unique_communities, presence='LIKELY').compute()
+
+                # Build per-(region, community) layers: region mask applied at full-res before resfactoring
+                ecnes_layers = xr.DataArray(
+                    np.zeros((len(self.BIO_GBF4_ECNES_SEL), self.NCELLS), dtype=np.float32),
+                    dims=['layer', 'cell'],
+                    coords={'layer': pd.MultiIndex.from_tuples(self.BIO_GBF4_ECNES_SEL, names=['region', 'species'])}
+                )
+                for i, (region, comm) in enumerate(self.BIO_GBF4_ECNES_SEL):
+                    comm_arr = ecnes_arr.sel(species=comm).values
+                    region_mask = (_nrm_full == region).astype(np.float32)
+                    ecnes_layers.values[i] = self.get_resfactored_average_fraction(comm_arr * region_mask)
+                self.BIO_GBF4_COMUNITY_LAYERS = ecnes_layers
 
                 print(f"│   │   └── {len(ecnes_nrm_df)} (community, region) constraints from {len(unique_communities)} communities", flush=True)
         
@@ -1997,159 +2042,7 @@ class Data:
         return lumap_mrj
     
     
-    def _compute_luto_biodiv_component_by_region(
-        self,
-        arr_rf1_all: xr.DataArray,
-        arr_rf: np.ndarray,
-        nrm_full: np.ndarray | None,
-        regions: list,
-    ) -> dict:
-        """
-        For each region, compute the LUTO-cell habitat contribution at RF1 and at the
-        current RESFACTOR, using the same hard NRM region membership that the solver uses.
-
-        Parameters
-        ----------
-        arr_rf1_all : xr.DataArray (n_items, n_all_cells), lazy, values 0-1
-            Full-resolution biodiversity layers (all 6956407 NLUM cells).
-        arr_rf : np.ndarray (n_items, NCELLS)
-            RF-resampled layers (LUTO cells only at current RESFACTOR).
-        nrm_full : np.ndarray (n_all_cells,) of str, or None for 'Australia' mode
-            NRM region name for every NLUM cell.
-        regions : list of str
-            Region names to compute; use ['Australia'] for whole-LUTO (no mask).
-
-        Returns
-        -------
-        dict  {region: {'luto_rf1': np.ndarray[n_items], 'luto_rf': np.ndarray[n_items]}}
-            luto_rf1[i] = sum_{r∈LUTO ∩ region}(arr_rf1[i,r] × area_rf1[r])
-            luto_rf [i] = sum_{r∈LUTO ∩ region}(arr_rf [i,r] × REAL_AREA_rf[r])
-        """
-        area_rf1_in_luto = self.REAL_AREA_NO_RESFACTOR[self.LUMASK]
-
-        # NRM names for LUTO cells at full-res (RF1 ordering)
-        nrm_in_luto = nrm_full[self.LUMASK] if nrm_full is not None else None
-
-        result = {}
-        for region in regions:
-            if region == 'Australia':
-                mask_rf1 = slice(None)        # all LUTO cells
-                mask_rf  = slice(None)
-            else:
-                mask_rf1 = (nrm_in_luto == region)
-                mask_rf  = (self.REGION_NRM_NAME == region)
-
-            # RF1 LUTO component: iterate lazily over items to stay memory-efficient
-            # At RF1 each LUMASK cell is fully ag (AG_MASK_PROPORTION_R == 1), so no cap needed.
-            luto_rf1 = np.array([
-                float(np.dot(arr.values[self.LUMASK][mask_rf1], area_rf1_in_luto[mask_rf1]))
-                for arr in arr_rf1_all
-            ], dtype=np.float64)
-
-            # RF LUTO component: arr_rf is already in memory (n_items, NCELLS).
-            # Cap by AG_MASK_PROPORTION_R because the solver's const_cell_usage limits the
-            # total dvar mass in a coarse cell to that fraction (see _add_cell_usage_constraints).
-            # Without this cap, recomputed targets demand more habitat than the solver can ever allocate.
-            ag_prop_rf = self.AG_MASK_PROPORTION_R[mask_rf]
-            luto_rf = (arr_rf[:, mask_rf] * self.REAL_AREA[mask_rf] * ag_prop_rf).sum(axis=1).astype(np.float64)
-
-            result[region] = {'luto_rf1': luto_rf1, 'luto_rf': luto_rf}
-
-        return result
-
-    def _recompute_nvis_targets_at_rf(
-        self,
-        nvis_targets_df: 'pd.DataFrame',
-        nvis_layers_sel: 'xr.DataArray',
-        nvis_layers_arr: 'xr.DataArray',
-        nrm_full: np.ndarray | None,
-    ) -> 'pd.DataFrame':
-        """
-        Replace ALL_HA, IN_LUTO_HA, and BASEYEAR_LEVEL in nvis_targets_df with
-        values consistent with the current RESFACTOR.
-
-        NATURAL_OUT_LUTO_HA and target levels are kept from the CSV (outside-LUTO
-        habitat does not change with RESFACTOR).
-        """
-        regions = (
-            ['Australia'] if 'region' not in nvis_targets_df.columns or
-            (nvis_targets_df['region'] == 'Australia').all()
-            else nvis_targets_df['region'].unique().tolist()
-        )
-        group_order = list(nvis_layers_sel.group.values)
-
-        luto_comps = self._compute_luto_biodiv_component_by_region(
-            nvis_layers_sel, nvis_layers_arr.values, nrm_full, regions
-        )
-
-        df = nvis_targets_df.copy()
-        for i, row in df.iterrows():
-            region = row.get('region', 'Australia')
-            g_idx  = group_order.index(row['group'])
-
-            luto_rf1 = luto_comps[region]['luto_rf1'][g_idx]
-            luto_rf  = luto_comps[region]['luto_rf'][g_idx]
-            delta    = luto_rf - luto_rf1
-
-            all_ha_rf   = row['ALL_HA'] + delta
-            nat_out     = row['NATURAL_OUT_LUTO_HA']          # unchanged
-            baseyear_rf = (luto_rf + nat_out) / all_ha_rf * 100 if all_ha_rf > 0 else 0.0
-
-            df.at[i, 'ALL_HA']         = all_ha_rf
-            df.at[i, 'IN_LUTO_HA']     = luto_rf
-            df.at[i, 'BASEYEAR_LEVEL'] = baseyear_rf
-
-        return df
-
-    def _recompute_snes_ecnes_targets_at_rf(
-        self,
-        df: 'pd.DataFrame',
-        key_col: str,
-        item_names: list,
-        arr_rf1_all: 'xr.DataArray',
-        arr_rf: np.ndarray,
-        nrm_full: np.ndarray | None,
-    ) -> 'pd.DataFrame':
-        """
-        Replace BASELINE_LEVEL_ALL_AUSTRALIA_LIKELY, ATTAINABLE_LEVEL_LIKELY, and
-        BASEYEAR_LEVEL_LIKELY with values consistent with the current RESFACTOR.
-
-        BASEYEAR_SCORE_OUT_LUTO_NATURAL_LIKELY and target levels are kept from the CSV.
-        """
-        regions = (
-            ['Australia'] if (df['region'] == 'Australia').all()
-            else df['region'].unique().tolist()
-        )
-
-        luto_comps = self._compute_luto_biodiv_component_by_region(
-            arr_rf1_all, arr_rf, nrm_full, regions
-        )
-
-        df = df.copy()
-        for i, row in df.iterrows():
-            region   = row['region']
-            item_idx = item_names.index(row[key_col])
-
-            luto_rf1   = luto_comps[region]['luto_rf1'][item_idx]
-            luto_rf    = luto_comps[region]['luto_rf'][item_idx]
-            delta      = luto_rf - luto_rf1
-
-            all_ha_rf1 = row['BASELINE_LEVEL_ALL_AUSTRALIA_LIKELY']
-            all_ha_rf  = all_ha_rf1 + delta
-            nat_out    = row['BASEYEAR_SCORE_OUT_LUTO_NATURAL_LIKELY']   # unchanged
-            # NON_NATURAL_OUT_LUTO stays fixed (outside LUTO, doesn't change with RF)
-            non_nat_out = all_ha_rf1 * (1.0 - row['ATTAINABLE_LEVEL_LIKELY'] / 100.0)
-
-            attainable_rf  = (1.0 - non_nat_out / all_ha_rf) * 100.0 if all_ha_rf > 0 else 0.0
-            baseyear_rf    = (luto_rf + nat_out) / all_ha_rf * 100.0   if all_ha_rf > 0 else 0.0
-
-            df.at[i, 'BASELINE_LEVEL_ALL_AUSTRALIA_LIKELY'] = all_ha_rf
-            df.at[i, 'ATTAINABLE_LEVEL_LIKELY']             = attainable_rf
-            df.at[i, 'BASEYEAR_LEVEL_LIKELY']               = baseyear_rf
-
-        return df
-
-    def get_resfactored_average_fraction(self, arr: np.ndarray, use_valid_cell_count: bool = True) -> np.ndarray:
+    def get_resfactored_average_fraction(self, arr: np.ndarray, use_valid_cell_count: bool = False) -> np.ndarray:
         '''
         Calculate the average value for each resfactored cell, given the input arr is masked by the land-use mask
         (has a length of the number of cells in the full-resolution 1D array, i.e., 6956407).
@@ -2183,11 +2076,10 @@ class Data:
             # Divide by RESFACTOR² — fraction relative to full coarse cell (required for lumap dvars)
             denom = settings.RESFACTOR ** 2
 
-        arr_2d_xr_resfactored = (arr_sum / denom).values[0:self.LUMAP_2D_RESFACTORED.shape[0], 0:self.LUMAP_2D_RESFACTORED.shape[1]]
+        arr_2d_xr_fullres = np.repeat(np.repeat((arr_sum / denom).values, settings.RESFACTOR, axis=1), settings.RESFACTOR, axis=0)
+        arr_2d_xr_fullres = arr_2d_xr_fullres[:arr_2d.shape[0], :arr_2d.shape[1]]
 
-        result = arr_2d_xr_resfactored[self.COORD_ROW_COL_RESFACTORED[0], self.COORD_ROW_COL_RESFACTORED[1]]
-        # At RF1, COORD_ROW_COL_RESFACTORED spans all NLUM cells (6956407); apply MASK to return only LUTO cells
-        return result[self.MASK] if settings.RESFACTOR == 1 else result
+        return arr_2d_xr_fullres[np.where(self.MASK_2D)]
     
     
     def get_resfactored_sum(self, arr: np.ndarray) -> np.ndarray:

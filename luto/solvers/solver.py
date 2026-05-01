@@ -1102,22 +1102,17 @@ class LutoSolver:
 
         region_species  = self._input_data.GBF4_SNES_region_species      # list[(region, species)]
         v_limits        = self._input_data.limits["GBF4_SNES"]            # xr.DataArray[layer=(region,species)]
-        scale_factors   = self._input_data.scale_factors['GBF4_SNES']     # xr.DataArray[species]
-        val_matrix      = self._input_data.GBF4_SNES_pre_1750_area_sr     # xr.DataArray[species, cell]
-        reg_matrix      = self._input_data.region_NRM_names_r             # np.ndarray[cell]
+        scale_factors   = self._input_data.scale_factors['GBF4_SNES']     # xr.DataArray[layer=(region,species)]
+        val_matrix      = self._input_data.GBF4_SNES_pre_1750_area_sr     # xr.DataArray[layer, cell]
 
         print("│   │   ├── Adding constraints for biodiversity GBF 4 SNES...")
 
         for region, species in region_species:
             lb_raw      = v_limits.sel(dict(layer=(region, species))).item()
-            lb_rescale  = lb_raw / scale_factors.sel(species=species).item()
-            val_vector  = val_matrix.sel(species=species, drop=True).data
+            lb_rescale  = lb_raw / scale_factors.sel(dict(layer=(region, species))).item()
+            val_vector  = val_matrix.sel(dict(layer=(region, species)), drop=True).values
 
-            if region == "Australia":
-                ind = np.where(val_vector > 0)[0]
-            else:
-                reg_vector = reg_matrix == region
-                ind = np.intersect1d(np.where(val_vector > 0)[0], np.where(reg_vector)[0])
+            ind = np.where(val_vector > 0)[0]
 
             if lb_raw <= 0:
                 print(f"│   │   │   ├── target is {lb_raw:15,.0f}  (skipped — negative) for {species} [{region}]")
@@ -1165,22 +1160,17 @@ class LutoSolver:
 
         region_species  = self._input_data.GBF4_ECNES_region_species      # list[(region, species)]
         v_limits        = self._input_data.limits["GBF4_ECNES"]            # xr.DataArray[layer=(region,species)]
-        scale_factors   = self._input_data.scale_factors['GBF4_ECNES']     # xr.DataArray[species]
-        val_matrix      = self._input_data.GBF4_ECNES_pre_1750_area_sr     # xr.DataArray[species, cell]
-        reg_matrix      = self._input_data.region_NRM_names_r             # np.ndarray[cell]
+        scale_factors   = self._input_data.scale_factors['GBF4_ECNES']     # xr.DataArray[layer=(region,species)]
+        val_matrix      = self._input_data.GBF4_ECNES_pre_1750_area_sr     # xr.DataArray[layer, cell]
 
         print("│   │   ├── Adding constraints for biodiversity GBF 4 ECNES...")
 
         for region, species in region_species:
             lb_raw      = v_limits.sel(dict(layer=(region, species))).item()
-            lb_rescale  = lb_raw / scale_factors.sel(species=species).item()
-            val_vector  = val_matrix.sel(species=species, drop=True).data
+            lb_rescale  = lb_raw / scale_factors.sel(dict(layer=(region, species))).item()
+            val_vector  = val_matrix.sel(dict(layer=(region, species)), drop=True).values
 
-            if region == "Australia":
-                ind = np.where(val_vector > 0)[0]
-            else:
-                reg_vector = reg_matrix == region
-                ind = np.intersect1d(np.where(val_vector > 0)[0], np.where(reg_vector)[0])
+            ind = np.where(val_vector > 0)[0]
 
             if lb_raw <= 0:
                 print(f"│   │   │   ├── target is {lb_raw:15,.0f}  (skipped — negative) for {species} [{region}]")
@@ -1482,13 +1472,13 @@ class LutoSolver:
         )
         prod_data["BIO (GBF3) IBRA value (ha)"] = 0  # IBRA flows through GBF3 NVIS path
         prod_data["BIO (GBF4) SNES value (ha)"] = (
-            {k: v.getValue() * self._input_data.scale_factors['GBF4_SNES'].sel(species=k[1]).item()
+            {k: v.getValue() * self._input_data.scale_factors['GBF4_SNES'].sel(dict(layer=k)).item()
              for k, v in self.bio_GBF4_SNES_exprs.items()}
             if settings.BIODIVERSITY_TARGET_GBF_4_SNES == "on"
             else 0
         )
         prod_data["BIO (GBF4) ECNES value (ha)"] = (
-            {k: v.getValue() * self._input_data.scale_factors['GBF4_ECNES'].sel(species=k[1]).item()
+            {k: v.getValue() * self._input_data.scale_factors['GBF4_ECNES'].sel(dict(layer=k)).item()
              for k, v in self.bio_GBF4_ECNES_exprs.items()}
             if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == "on"
             else 0

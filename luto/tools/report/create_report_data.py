@@ -3226,7 +3226,7 @@ def process_biodiversity_data(files, SAVE_DIR):
             
             
             
-    if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off' and getattr(settings, 'GBF3_NVIS_REGION_MODE', 'NRM') != 'IBRA':
+    if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off' and settings.GBF3_NVIS_REGION_MODE != 'IBRA':
         filter_str = '''
             category == "biodiversity"
             and base_name.str.contains("biodiversity_GBF3_NVIS")
@@ -4310,7 +4310,7 @@ def process_supporting_info_data(SAVE_DIR, years, raw_data_dir):
         'COLORSing': COLORS,
         'mem_logs': mem_logs_obj,
         'renewables_enabled': any(settings.RENEWABLES_OPTIONS.values()),
-        'GBF3_NVIS_REGION_MODE': getattr(settings, 'GBF3_NVIS_REGION_MODE', 'NRM'),
+        'GBF3_NVIS_REGION_MODE': settings.GBF3_NVIS_REGION_MODE,
     }
     
     filename = 'Supporting_info'

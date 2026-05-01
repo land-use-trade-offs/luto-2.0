@@ -96,9 +96,9 @@ class SolverInputData:
     GBF2_mask_area_r: np.ndarray                                        # Raw areas (GBF2) from priority degrade areas - indexed by cell (r).
     GBF3_NVIS_pre_1750_area_vr: np.ndarray                              # Raw areas (GBF3) from NVIS vegetation - indexed by group (v) and cell (r)
     GBF3_NVIS_region_group: dict[int, str]                                     # GBF3 NVIS vegetation group names - indexed by group (v).
-    GBF4_SNES_pre_1750_area_sr: xr.DataArray                            # Areas (GBF4) SNES - xr.DataArray[species, cell], species coord = unique species names.
+    GBF4_SNES_pre_1750_area_sr: xr.DataArray                            # Areas (GBF4) SNES - xr.DataArray[layer, cell], layer coord is MultiIndex(region, species).
     GBF4_SNES_region_species: list                                      # GBF4 SNES constraint pairs - list[(region, species)].
-    GBF4_ECNES_pre_1750_area_sr: xr.DataArray                          # Areas (GBF4) ECNES - xr.DataArray[species, cell], species coord = unique community names.
+    GBF4_ECNES_pre_1750_area_sr: xr.DataArray                          # Areas (GBF4) ECNES - xr.DataArray[layer, cell], layer coord is MultiIndex(region, species).
     GBF4_ECNES_region_species: list                                     # GBF4 ECNES constraint pairs - list[(region, species)].
     GBF8_pre_1750_area_sr: xr.DataArray                                 # Areas (GBF8) - xr.DataArray[species, cell], species coord = species name strings.
     GBF8_region_species: list                                           # GBF8 constraint pairs - list[(region, species)].
