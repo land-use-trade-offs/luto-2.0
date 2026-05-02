@@ -1285,6 +1285,9 @@ class LutoSolver:
         # Add adoption constraints for agricultural land uses
         reg_adopt_limits = self._input_data.limits["ag_regional_adoption"]
         for reg_id, j, lu_name, reg_ind, reg_area_limit in reg_adopt_limits:
+            if len(reg_ind) == 0:
+                print(f"│   │   │   ├── SKIPPING {lu_name} in {settings.REGIONAL_ADOPTION_ZONE} region {reg_id} (no cells at this resolution)")
+                continue
             print(f"│   │   │   ├── Adding constraints for {lu_name} in {settings.REGIONAL_ADOPTION_ZONE} region {reg_id} <= {reg_area_limit:,.0f} HA...")
             reg_expr = (
                   gp.quicksum(self._input_data.real_area[reg_ind] * self.X_ag_dry_vars_jr[j, reg_ind])
@@ -1295,6 +1298,9 @@ class LutoSolver:
         # Add per-(region, non-ag-landuse) caps from the xlsx ('on' mode)
         reg_adopt_non_ag_limits = self._input_data.limits.get("non_ag_regional_adoption") or []
         for reg_id, k, lu_name, reg_ind, reg_area_limit in reg_adopt_non_ag_limits:
+            if len(reg_ind) == 0:
+                print(f"│   │   │   ├── SKIPPING {lu_name} in {settings.REGIONAL_ADOPTION_ZONE} region {reg_id} (no cells at this resolution)")
+                continue
             print(f"│   │   │   ├── Adding constraints for {lu_name} in {settings.REGIONAL_ADOPTION_ZONE} region {reg_id} <= {reg_area_limit:,.0f} HA...")
             reg_expr = gp.quicksum(self._input_data.real_area[reg_ind] * self.X_non_ag_vars_kr[k, reg_ind])
             self.regional_adoption_constrs.append(
@@ -1305,6 +1311,9 @@ class LutoSolver:
         # the combined area of all non-ag land uses in each region cannot exceed the uniform percentage cap.
         reg_adopt_sum_limits = self._input_data.limits.get("non_ag_regional_adoption_sum") or []
         for reg_id, reg_ind, reg_area_limit in reg_adopt_sum_limits:
+            if len(reg_ind) == 0:
+                print(f"│   │   │   ├── SKIPPING SUM-of-non-ag constraint for {settings.REGIONAL_ADOPTION_NON_AG_REGION} region {reg_id} (no cells at this resolution)")
+                continue
             print(f"│   │   │   ├── Adding SUM-of-non-ag constraint for {settings.REGIONAL_ADOPTION_NON_AG_REGION} region {reg_id} <= {reg_area_limit:,.0f} HA...")
             reg_expr = gp.quicksum(
                 self._input_data.real_area[reg_ind] * self.X_non_ag_vars_kr[k, reg_ind]

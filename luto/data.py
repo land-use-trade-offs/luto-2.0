@@ -1685,6 +1685,13 @@ class Data:
                 for i, (region, sp) in enumerate(self.BIO_GBF4_SNES_SEL):
                     snes_layers.values[i] = self.get_resfactored_average_fraction(snes_arr.sel(species=sp).values)
                 self.BIO_GBF4_SPECIES_LAYERS = snes_layers
+                # Full-Australia per-unique-species layers — same values as snes_layers but
+                # with a plain ['species', 'cell'] shape instead of a MultiIndex layer dim.
+                self.BIO_GBF4_SPECIES_LAYERS_FULL = xr.DataArray(
+                    snes_layers.values,
+                    dims=['species', 'cell'],
+                    coords={'species': self.BIO_GBF4_SNES_SPECIES_COORD, 'cell': np.arange(self.NCELLS)}
+                )
 
             else:
                 # ---- NRM mode ----
@@ -1762,6 +1769,18 @@ class Data:
                     region_mask = (_nrm_full == region).astype(np.float32)
                     snes_layers.values[i] = self.get_resfactored_average_fraction(sp_arr * region_mask * self.LUMASK)
                 self.BIO_GBF4_SPECIES_LAYERS = snes_layers
+
+                # Full-Australia unmasked layers (per unique species) — used by write.py for
+                # grey-ramp rendering of cells outside selected NRMs in map outputs.
+                _snes_vis = np.zeros((len(unique_species), self.NCELLS), dtype=np.float32)
+                for i, sp in enumerate(unique_species):
+                    _snes_vis[i] = self.get_resfactored_average_fraction(
+                        snes_arr.sel(species=sp).values * self.LUMASK
+                    )
+                self.BIO_GBF4_SPECIES_LAYERS_FULL = xr.DataArray(
+                    _snes_vis, dims=['species', 'cell'],
+                    coords={'species': unique_species, 'cell': np.arange(self.NCELLS)}
+                )
 
                 # At RESFACTOR > 1, recompute SNES target scores from the resfactored
                 # region-masked layers so constraint LHS and RHS are consistent.
@@ -1846,6 +1865,13 @@ class Data:
                 for i, (region, comm) in enumerate(self.BIO_GBF4_ECNES_SEL):
                     ecnes_layers.values[i] = self.get_resfactored_average_fraction(ecnes_arr.sel(species=comm).values)
                 self.BIO_GBF4_COMUNITY_LAYERS = ecnes_layers
+                # Full-Australia per-unique-community layers — same values as ecnes_layers but
+                # with a plain ['species', 'cell'] shape instead of a MultiIndex layer dim.
+                self.BIO_GBF4_COMUNITY_LAYERS_FULL = xr.DataArray(
+                    ecnes_layers.values,
+                    dims=['species', 'cell'],
+                    coords={'species': self.BIO_GBF4_ECNES_SPECIES_COORD, 'cell': np.arange(self.NCELLS)}
+                )
 
             else:
                 # ---- NRM mode ----
@@ -1924,6 +1950,18 @@ class Data:
                     region_mask = (_nrm_full == region).astype(np.float32)
                     ecnes_layers.values[i] = self.get_resfactored_average_fraction(comm_arr * region_mask * self.LUMASK)
                 self.BIO_GBF4_COMUNITY_LAYERS = ecnes_layers
+
+                # Full-Australia unmasked layers (per unique community) — used by write.py for
+                # grey-ramp rendering of cells outside selected NRMs in map outputs.
+                _ecnes_vis = np.zeros((len(unique_communities), self.NCELLS), dtype=np.float32)
+                for i, comm in enumerate(unique_communities):
+                    _ecnes_vis[i] = self.get_resfactored_average_fraction(
+                        ecnes_arr.sel(species=comm).values * self.LUMASK
+                    )
+                self.BIO_GBF4_COMUNITY_LAYERS_FULL = xr.DataArray(
+                    _ecnes_vis, dims=['species', 'cell'],
+                    coords={'species': unique_communities, 'cell': np.arange(self.NCELLS)}
+                )
 
                 # At RESFACTOR > 1, recompute ECNES target scores from the resfactored
                 # region-masked layers so constraint LHS and RHS are consistent.
