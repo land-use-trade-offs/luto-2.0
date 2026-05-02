@@ -42,7 +42,7 @@ window.GHGView = {
 
     // Previous selections memory
     const previousSelections = ref({
-      "Sum": { water: "", landuse: "" },
+      "Sum": { landuse: "" },
       "Ag": { water: "", source: "", landuse: "" },
       "Ag Mgt": { agMgt: "", water: "", landuse: "" },
       "Non-Ag": { landuse: "" }
@@ -55,8 +55,15 @@ window.GHGView = {
     const isDrawerOpen = ref(false);
 
     // Reactive data
+    // Sum-tab: Type key → display label and series name
+    const SUM_TYPE_LABELS = { 'ALL': 'ALL', 'ag': 'Ag', 'non-ag': 'Non-Ag', 'ag-man': 'Ag Mgt' };
+    const SUM_TYPE_TO_SERIES = { 'ag': 'Agricultural Land-use', 'ag-man': 'Agricultural Management', 'non-ag': 'Non-Agricultural Land-use' };
+    function formatLanduse(val) {
+      return selectCategory.value === 'Sum' ? (SUM_TYPE_LABELS[val] || val) : val;
+    }
+
     // map_GHG_Sum:   Water → LU → Year
-    // map_GHG_Ag:    Water → Source → LU → Year
+    // map_GHG_Ag:    Water → LU → Source → Year  (rename_reorder_hierarchy puts lu before leftover keys)
     // map_GHG_Am:    AgMgt → Water → LU → Year
     // map_GHG_NonAg: LU → Year
     const selectMapData = computed(() => {
@@ -70,9 +77,9 @@ window.GHGView = {
       if (!dataLoaded.value) return {};
       const mapData = window[mapRegister[cat]["name"]];
       if (cat === "Sum") {
-        return mapData?.[water]?.[landuse]?.[year] || {};
+        return mapData?.[landuse]?.[year] || {};
       } else if (cat === "Ag") {
-        return mapData?.[water]?.[source]?.[landuse]?.[year] || {};
+        return mapData?.[water]?.[landuse]?.[source]?.[year] || {};
       } else if (cat === "Ag Mgt") {
         return mapData?.[agMgt]?.[water]?.[landuse]?.[year] || {};
       } else if (cat === "Non-Ag") {
@@ -81,7 +88,7 @@ window.GHGView = {
       return {};
     });
 
-    // GHG_Sum chart:   Region → Water → [series(name=LU)]
+    // GHG_Sum chart:   Region → [series(name=TypeDisplayLabel)]
     // GHG_Ag chart:    Region → Water → Source → [series(name=LU)]
     // GHG_Am chart:    Region → Water → LU → [series(name=AgMgt)]
     // GHG_NonAg chart: Region → [series(name=LU)]
@@ -98,7 +105,11 @@ window.GHGView = {
       let seriesData;
 
       if (cat === "Sum") {
-        seriesData = (chartData?.[water] || []).filter(s => landuse === "ALL" || s.name === landuse);
+        // Sum: region → [series(name=TypeDisplayLabel)]
+        const items = chartData || [];
+        const seriesName = SUM_TYPE_TO_SERIES[landuse];
+        seriesData = (landuse === "ALL" || !landuse)
+          ? items : items.filter(s => s.name === seriesName);
       } else if (cat === "Ag") {
         seriesData = chartData?.[water]?.[source] || [];
         seriesData = seriesData.filter(s => landuse === "ALL" || s.name === landuse);
@@ -153,11 +164,10 @@ window.GHGView = {
       const initCat = availableCategories[0]; // "Sum"
       await Promise.all([ensureDataLoaded(initCat), loadAllCharts()]);
 
-      // Cascade initial selections synchronously (Sum: Water → LU)
-      const initData = window[mapRegister[initCat]["name"]];
-      availableWater.value = Object.keys(initData || {});
-      selectWater.value = availableWater.value[0] || '';
-      availableLanduse.value = Object.keys(initData?.[selectWater.value] || {});
+      // Cascade initial selections synchronously (Sum: Type only)
+      const initData = window[mapRegister["Sum"]["name"]];
+      availableWater.value = [];
+      availableLanduse.value = Object.keys(initData || {});
       selectLanduse.value = availableLanduse.value[0] || '';
 
       selectCategory.value = initCat;
@@ -177,7 +187,7 @@ window.GHGView = {
     watch(selectCategory, async (newCategory, oldCategory) => {
       // Save previous selections before switching
       if (oldCategory === "Sum") {
-        previousSelections.value["Sum"] = { water: selectWater.value, landuse: selectLanduse.value };
+        previousSelections.value["Sum"] = { landuse: selectLanduse.value };
       } else if (oldCategory === "Ag") {
         previousSelections.value["Ag"] = { water: selectWater.value, source: selectSource.value, landuse: selectLanduse.value };
       } else if (oldCategory === "Ag Mgt") {
@@ -204,28 +214,25 @@ window.GHGView = {
       const nonAgData = window[mapRegister["Non-Ag"]["name"]];
 
       if (newCategory === "Sum") {
-        // Cascade: Water → LU
-        availableWater.value = Object.keys(sumData || {});
-        const prevWater = previousSelections.value["Sum"].water || curWater;
-        selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
-
-        availableLanduse.value = Object.keys(sumData?.[selectWater.value] || {});
+        // Cascade: Type only
+        availableWater.value = [];
+        availableLanduse.value = Object.keys(sumData || {});
         const prevLanduse = previousSelections.value["Sum"].landuse || curLanduse;
         selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
 
       } else if (newCategory === "Ag") {
-        // Cascade: Water → Source → LU
+        // Cascade: Water → LU → Source  (map data is Water → LU → Source → Year)
         availableWater.value = Object.keys(agData || {});
         const prevWater = previousSelections.value["Ag"].water || curWater;
         selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
 
-        availableSource.value = Object.keys(agData?.[selectWater.value] || {});
-        const prevSource = previousSelections.value["Ag"].source || curSource;
-        selectSource.value = (prevSource && availableSource.value.includes(prevSource)) ? prevSource : (availableSource.value[0] || '');
-
-        availableLanduse.value = Object.keys(agData?.[selectWater.value]?.[selectSource.value] || {});
+        availableLanduse.value = Object.keys(agData?.[selectWater.value] || {});
         const prevLanduse = previousSelections.value["Ag"].landuse || curLanduse;
         selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
+
+        availableSource.value = Object.keys(agData?.[selectWater.value]?.[selectLanduse.value] || {});
+        const prevSource = previousSelections.value["Ag"].source || curSource;
+        selectSource.value = (prevSource && availableSource.value.includes(prevSource)) ? prevSource : (availableSource.value[0] || '');
 
       } else if (newCategory === "Ag Mgt") {
         // Cascade: AgMgt → Water → LU
@@ -265,25 +272,17 @@ window.GHGView = {
     });
 
     watch(selectWater, (newWater) => {
-      if (selectCategory.value === "Sum") {
-        previousSelections.value["Sum"].water = newWater;
-        const sumData = window[mapRegister["Sum"]["name"]];
-
-        availableLanduse.value = Object.keys(sumData?.[newWater] || {});
-        const prevLanduse = previousSelections.value["Sum"].landuse;
-        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
-
-      } else if (selectCategory.value === "Ag") {
+      if (selectCategory.value === "Ag") {
         previousSelections.value["Ag"].water = newWater;
         const agData = window[mapRegister["Ag"]["name"]];
 
-        availableSource.value = Object.keys(agData?.[newWater] || {});
-        const prevSource = previousSelections.value["Ag"].source;
-        selectSource.value = (prevSource && availableSource.value.includes(prevSource)) ? prevSource : (availableSource.value[0] || '');
-
-        availableLanduse.value = Object.keys(agData?.[newWater]?.[selectSource.value] || {});
+        availableLanduse.value = Object.keys(agData?.[newWater] || {});
         const prevLanduse = previousSelections.value["Ag"].landuse;
         selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
+
+        availableSource.value = Object.keys(agData?.[newWater]?.[selectLanduse.value] || {});
+        const prevSource = previousSelections.value["Ag"].source;
+        selectSource.value = (prevSource && availableSource.value.includes(prevSource)) ? prevSource : (availableSource.value[0] || '');
 
       } else if (selectCategory.value === "Ag Mgt") {
         previousSelections.value["Ag Mgt"].water = newWater;
@@ -298,11 +297,7 @@ window.GHGView = {
     watch(selectSource, (newSource) => {
       if (selectCategory.value !== "Ag") return;
       previousSelections.value["Ag"].source = newSource;
-      const agData = window[mapRegister["Ag"]["name"]];
-
-      availableLanduse.value = Object.keys(agData?.[selectWater.value]?.[newSource] || {});
-      const prevLanduse = previousSelections.value["Ag"].landuse;
-      selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
+      // Source is the leaf level in Ag map data (Water → LU → Source); no further cascade needed
     });
 
     watch(selectLanduse, (newLanduse) => {
@@ -310,6 +305,11 @@ window.GHGView = {
         previousSelections.value["Sum"].landuse = newLanduse;
       } else if (selectCategory.value === "Ag") {
         previousSelections.value["Ag"].landuse = newLanduse;
+        // Landuse is the intermediate level; cascade to update available sources
+        const agData = window[mapRegister["Ag"]["name"]];
+        availableSource.value = Object.keys(agData?.[selectWater.value]?.[newLanduse] || {});
+        const prevSource = previousSelections.value["Ag"].source;
+        selectSource.value = (prevSource && availableSource.value.includes(prevSource)) ? prevSource : (availableSource.value[0] || '');
       } else if (selectCategory.value === "Ag Mgt") {
         previousSelections.value["Ag Mgt"].landuse = newLanduse;
       } else if (selectCategory.value === "Non-Ag") {
@@ -337,6 +337,7 @@ window.GHGView = {
 
       selectMapData,
       selectChartData,
+      formatLanduse,
 
       dataLoaded, isLoadingData,
       isDrawerOpen,
@@ -395,7 +396,7 @@ window.GHGView = {
         </div>
 
         <!-- Water options (Ag and Ag Mgt) -->
-        <div v-if="selectCategory !== 'Non-Ag' && dataLoaded && availableWater.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
+        <div v-if="selectCategory !== 'Non-Ag' && selectCategory !== 'Sum' && dataLoaded && availableWater.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
           <span class="text-[0.8rem] mr-1 font-medium">Water:</span>
           <button v-for="(val, key) in availableWater" :key="key"
             @click="selectWater = val"
@@ -405,24 +406,24 @@ window.GHGView = {
           </button>
         </div>
 
-        <!-- Source options (Ag only: emission type) -->
+        <!-- Landuse options -->
+        <div v-if="dataLoaded" class="flex flex-wrap gap-1 max-w-[300px]">
+          <span class="text-[0.8rem] mr-1 font-medium">{{ selectCategory === 'Sum' ? 'Type:' : 'Landuse:' }}</span>
+          <button v-for="(val, key) in availableLanduse" :key="key"
+            @click="selectLanduse = val"
+            class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
+            :class="{'bg-sky-500 text-white': selectLanduse === val}">
+            {{ formatLanduse(val) }}
+          </button>
+        </div>
+
+        <!-- Source options (Ag only: emission type — leaf level after Landuse) -->
         <div v-if="selectCategory === 'Ag' && dataLoaded && availableSource.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
           <span class="text-[0.8rem] mr-1 font-medium">Source:</span>
           <button v-for="(val, key) in availableSource" :key="key"
             @click="selectSource = val"
             class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
             :class="{'bg-sky-500 text-white': selectSource === val}">
-            {{ val }}
-          </button>
-        </div>
-
-        <!-- Landuse options -->
-        <div v-if="dataLoaded" class="flex flex-wrap gap-1 max-w-[300px]">
-          <span class="text-[0.8rem] mr-1 font-medium">Landuse:</span>
-          <button v-for="(val, key) in availableLanduse" :key="key"
-            @click="selectLanduse = val"
-            class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
-            :class="{'bg-sky-500 text-white': selectLanduse === val}">
             {{ val }}
           </button>
         </div>

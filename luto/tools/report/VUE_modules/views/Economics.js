@@ -38,11 +38,18 @@ window.EconomicsView = {
 
     // Previous selection memory per category
     const previousSelections = ref({
-      "Sum": { mapType: "", water: "", landuse: "" },
+      "Sum": { mapType: "", landuse: "" },
       "Ag": { mapType: "", water: "", source: "", landuse: "" },
       "Ag Mgt": { mapType: "", agMgt: "", water: "", landuse: "" },
       "Non-Ag": { mapType: "", landuse: "" },
     });
+
+    // Sum-tab: Type key → display label and series name
+    const SUM_TYPE_LABELS = { 'ALL': 'ALL', 'ag': 'Ag', 'non-ag': 'Non-Ag', 'ag-man': 'Ag Mgt' };
+    const SUM_TYPE_TO_SERIES = { 'ag': 'Agricultural Land-use', 'ag-man': 'Agricultural Management', 'non-ag': 'Non-Agricultural Land-use' };
+    function formatLanduse(val) {
+      return selectCategory.value === 'Sum' ? (SUM_TYPE_LABELS[val] || val) : val;
+    }
 
     // UI state
     const dataLoaded = ref(false);
@@ -78,7 +85,7 @@ window.EconomicsView = {
       if (!mapData) return {};
 
       if (cat === "Sum") {
-        return mapData?.[water]?.[landuse]?.[yr] || {};
+        return mapData?.[landuse]?.[yr] || {};
       } else if (cat === "Ag") {
         if (hasSrc) {
           return mapData?.[water]?.[source]?.[landuse]?.[yr] || {};
@@ -120,11 +127,12 @@ window.EconomicsView = {
 
       let seriesData;
       if (cat === "Sum") {
-        // Sum: region → water → [series by landuse]
-        const items = chartData?.[water];
+        // Sum: region → [series(name=TypeDisplayLabel)]
+        const items = chartData;
         if (items) {
+          const seriesName = SUM_TYPE_TO_SERIES[landuse];
           seriesData = (landuse === "ALL" || !landuse)
-            ? items : items.filter(s => s.name === landuse);
+            ? items : items.filter(s => s.name === seriesName);
         }
       } else if (cat === "Ag") {
         // Revenue/Cost: region → source → water → [series by LU]
@@ -166,7 +174,6 @@ window.EconomicsView = {
       if (cat === "Sum") {
         previousSelections.value["Sum"] = {
           mapType: selectMapType.value,
-          water: selectWater.value,
           landuse: selectLanduse.value,
         };
       } else if (cat === "Ag") {
@@ -220,13 +227,12 @@ window.EconomicsView = {
       const curSource = selectSource.value;
 
       if (cat === "Sum") {
-        // Sum: Water → Landuse (same structure as Ag Profit)
-        availableWater.value = Object.keys(mapData);
-        const prevW = previousSelections.value["Sum"].water || curWater;
-        selectWater.value = (prevW && availableWater.value.includes(prevW)) ? prevW : (availableWater.value[0] || '');
+        // Sum: Type only (Type → year)
+        availableWater.value = [];
+        selectWater.value = '';
         availableSource.value = [];
         selectSource.value = '';
-        availableLanduse.value = Object.keys(mapData[selectWater.value] || {});
+        availableLanduse.value = Object.keys(mapData);
         const prevL = previousSelections.value["Sum"].landuse || curLanduse;
         selectLanduse.value = (prevL && availableLanduse.value.includes(prevL)) ? prevL : (availableLanduse.value[0] || '');
 
@@ -365,13 +371,7 @@ window.EconomicsView = {
     // Water → Source → Landuse
     watch(selectWater, (newWater) => {
       const cat = selectCategory.value;
-      if (cat === "Sum") {
-        previousSelections.value["Sum"].water = newWater;
-        const mapData = window[mapRegister["Sum"][selectMapType.value]?.name];
-        availableLanduse.value = Object.keys(mapData?.[newWater] || {});
-        const prev = previousSelections.value["Sum"].landuse;
-        selectLanduse.value = (prev && availableLanduse.value.includes(prev)) ? prev : (availableLanduse.value[0] || '');
-      } else if (cat === "Ag") {
+      if (cat === "Ag") {
         if (selectMapType.value === "Transition (Ag2Ag)") return;
         previousSelections.value["Ag"].water = newWater;
         const mapData = window[mapRegister["Ag"][selectMapType.value]?.name];
@@ -411,6 +411,7 @@ window.EconomicsView = {
       selectCategory, selectMapType, selectAgMgt, selectWater, selectSource, selectLanduse,
       hasSourceLevel, isTransition,
       selectMapData, selectChartData,
+      formatLanduse,
       dataLoaded, isLoadingData, isDrawerOpen, toggleDrawer,
     };
     window._debug[VIEW_NAME] = _state;
@@ -477,8 +478,8 @@ window.EconomicsView = {
           </button>
         </div>
 
-        <!-- 4. Water (Sum, Ag, and Ag Mgt, not Transition or Non-Ag) -->
-        <div v-if="!isTransition && selectCategory !== 'Non-Ag' && dataLoaded && availableWater.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
+        <!-- 4. Water (Ag and Ag Mgt, not Transition or Non-Ag or Sum) -->
+        <div v-if="!isTransition && selectCategory !== 'Non-Ag' && selectCategory !== 'Sum' && dataLoaded && availableWater.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
           <span class="text-[0.8rem] mr-1 font-medium">Water:</span>
           <button v-for="(val, key) in availableWater" :key="key"
             @click="selectWater = val"
@@ -501,12 +502,12 @@ window.EconomicsView = {
 
         <!-- 6. Landuse -->
         <div v-if="dataLoaded && availableLanduse.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
-          <span class="text-[0.8rem] mr-1 font-medium">Landuse:</span>
+          <span class="text-[0.8rem] mr-1 font-medium">{{ selectCategory === 'Sum' ? 'Type:' : 'Landuse:' }}</span>
           <button v-for="(val, key) in availableLanduse" :key="key"
             @click="selectLanduse = val"
             class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
             :class="{'bg-sky-500 text-white': selectLanduse === val}">
-            {{ val }}
+            {{ formatLanduse(val) }}
           </button>
         </div>
       </div>

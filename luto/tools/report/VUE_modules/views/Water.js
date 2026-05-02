@@ -40,7 +40,7 @@ window.WaterView = {
 
     // Previous selections memory
     const previousSelections = ref({
-      "Sum": { water: "", landuse: "" },
+      "Sum": { landuse: "" },
       "Ag": { water: "", landuse: "" },
       "Ag Mgt": { agMgt: "", water: "", landuse: "" },
       "Non-Ag": { landuse: "" }
@@ -52,8 +52,15 @@ window.WaterView = {
     const triggerVersion = ref(0);
     const isDrawerOpen = ref(false);
 
+    // Sum-tab: Type key → display label and series name
+    const SUM_TYPE_LABELS = { 'ALL': 'ALL', 'ag': 'Ag', 'non-ag': 'Non-Ag', 'ag-man': 'Ag Mgt' };
+    const SUM_TYPE_TO_SERIES = { 'ag': 'Agricultural Land-use', 'ag-man': 'Agricultural Management', 'non-ag': 'Non-Agricultural Land-use' };
+    function formatLanduse(val) {
+      return selectCategory.value === 'Sum' ? (SUM_TYPE_LABELS[val] || val) : val;
+    }
+
     // Reactive data
-    // map_water_yield_Sum:   Water → LU → Year
+    // map_water_yield_Sum:   Type → Year
     // map_water_yield_Ag:    Water → LU → Year
     // map_water_yield_Am:    AgMgt → Water → LU → Year
     // map_water_yield_NonAg: LU → Year
@@ -67,7 +74,7 @@ window.WaterView = {
       if (!dataLoaded.value) return {};
       const mapData = window[mapRegister[cat]["name"]];
       if (cat === "Sum") {
-        return mapData?.[water]?.[landuse]?.[year] || {};
+        return mapData?.[landuse]?.[year] || {};
       } else if (cat === "Ag") {
         return mapData?.[water]?.[landuse]?.[year] || {};
       } else if (cat === "Ag Mgt") {
@@ -78,7 +85,7 @@ window.WaterView = {
       return {};
     });
 
-    // Water_Sum_NRM chart:   Region → Water → [series(name=LU)]
+    // Water_Sum_NRM chart:   Region → [series(name=TypeDisplayLabel)]
     // Water_Ag_NRM chart:    Region → Water → [series(name=LU)]
     // Water_Am_NRM chart:    Region → Water → LU → [series(name=AgMgt)]
     // Water_NonAg_NRM chart: Region → [series(name=LU)]
@@ -94,8 +101,11 @@ window.WaterView = {
       let seriesData;
 
       if (cat === "Sum") {
-        seriesData = chartData?.[water] || [];
-        seriesData = seriesData.filter(s => landuse === "ALL" || s.name === landuse);
+        // Sum: region → [series(name=TypeDisplayLabel)]
+        const items = chartData || [];
+        const seriesName = SUM_TYPE_TO_SERIES[landuse];
+        seriesData = (landuse === "ALL" || !landuse)
+          ? items : items.filter(s => s.name === seriesName);
       } else if (cat === "Ag") {
         seriesData = chartData?.[water] || [];
         seriesData = seriesData.filter(s => landuse === "ALL" || s.name === landuse);
@@ -152,11 +162,11 @@ window.WaterView = {
       const initCat = availableCategories[0]; // "Sum"
       await Promise.all([ensureDataLoaded(initCat), loadAllCharts()]);
 
-      // Cascade initial selections synchronously (Sum: Water → LU)
+      // Cascade initial selections synchronously (Sum: Type only)
+      // Cascade initial selections synchronously (Sum: Type only)
       const initData = window[mapRegister[initCat]["name"]];
-      availableWater.value = Object.keys(initData || {});
-      selectWater.value = availableWater.value[0] || '';
-      availableLanduse.value = Object.keys(initData?.[selectWater.value] || {});
+      availableWater.value = [];
+      availableLanduse.value = Object.keys(initData || {});
       selectLanduse.value = availableLanduse.value[0] || '';
 
       selectCategory.value = initCat;
@@ -176,7 +186,7 @@ window.WaterView = {
     watch(selectCategory, async (newCategory, oldCategory) => {
       // Save previous selections before switching
       if (oldCategory === "Sum") {
-        previousSelections.value["Sum"] = { water: selectWater.value, landuse: selectLanduse.value };
+        previousSelections.value["Sum"] = { landuse: selectLanduse.value };
       } else if (oldCategory === "Ag") {
         previousSelections.value["Ag"] = { water: selectWater.value, landuse: selectLanduse.value };
       } else if (oldCategory === "Ag Mgt") {
@@ -202,12 +212,9 @@ window.WaterView = {
       const nonAgData = window[mapRegister["Non-Ag"]["name"]];
 
       if (newCategory === "Sum") {
-        // Cascade: Water → LU
-        availableWater.value = Object.keys(sumData || {});
-        const prevWater = previousSelections.value["Sum"].water || curWater;
-        selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
-
-        availableLanduse.value = Object.keys(sumData?.[selectWater.value] || {});
+        // Cascade: Type only
+        availableWater.value = [];
+        availableLanduse.value = Object.keys(sumData || {});
         const prevLanduse = previousSelections.value["Sum"].landuse || curLanduse;
         selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
 
@@ -259,15 +266,7 @@ window.WaterView = {
     });
 
     watch(selectWater, (newWater) => {
-      if (selectCategory.value === "Sum") {
-        previousSelections.value["Sum"].water = newWater;
-        const sumData = window[mapRegister["Sum"]["name"]];
-
-        availableLanduse.value = Object.keys(sumData?.[newWater] || {});
-        const prevLanduse = previousSelections.value["Sum"].landuse;
-        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
-
-      } else if (selectCategory.value === "Ag") {
+      if (selectCategory.value === "Ag") {
         previousSelections.value["Ag"].water = newWater;
         const agData = window[mapRegister["Ag"]["name"]];
 
@@ -315,6 +314,7 @@ window.WaterView = {
 
       selectMapData,
       selectChartData,
+      formatLanduse,
 
       dataLoaded, isLoadingData,
       isDrawerOpen,
@@ -373,7 +373,7 @@ window.WaterView = {
         </div>
 
         <!-- Water options (Ag and Ag Mgt) -->
-        <div v-if="selectCategory !== 'Non-Ag' && dataLoaded && availableWater.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
+        <div v-if="selectCategory !== 'Non-Ag' && selectCategory !== 'Sum' && dataLoaded && availableWater.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
           <span class="text-[0.8rem] mr-1 font-medium">Water:</span>
           <button v-for="(val, key) in availableWater" :key="key"
             @click="selectWater = val"
@@ -385,12 +385,12 @@ window.WaterView = {
 
         <!-- Landuse options -->
         <div v-if="dataLoaded" class="flex flex-wrap gap-1 max-w-[300px]">
-          <span class="text-[0.8rem] mr-1 font-medium">Landuse:</span>
+          <span class="text-[0.8rem] mr-1 font-medium">{{ selectCategory === 'Sum' ? 'Type:' : 'Landuse:' }}</span>
           <button v-for="(val, key) in availableLanduse" :key="key"
             @click="selectLanduse = val"
             class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
             :class="{'bg-sky-500 text-white': selectLanduse === val}">
-            {{ val }}
+            {{ formatLanduse(val) }}
           </button>
         </div>
       </div>

@@ -85,7 +85,7 @@ window.BiodiversityView = {
 
     // Previous selections memory (per category)
     const previousSelections = ref({
-      "Sum": { landuse: "" },
+      "Sum": { species: "", landuse: "" },
       "Ag": { water: "", landuse: "" },
       "Ag Mgt": { agMgt: "", water: "", landuse: "" },
       "Non-Ag": { landuse: "" }
@@ -138,10 +138,17 @@ window.BiodiversityView = {
       if (category === "Sum") {
         availableAgMgt.value = [];
         availableWater.value = [];
-        // Sum has no species/VegGroup dimension — clear it even for species-aware metrics
-        availableSpecies.value = [];
-        selectSpecies.value = '';
-        availableLanduse.value = Object.keys(sumData || {});
+        // For species-aware metrics the Sum map has a species/group dim (group/species → Type → year)
+        if (withSpecies && sumData) {
+          availableSpecies.value = Object.keys(sumData);
+          const prevSp = previousSelections.value["Sum"].species || curSpecies;
+          selectSpecies.value = (prevSp && availableSpecies.value.includes(prevSp)) ? prevSp : (availableSpecies.value[0] || '');
+          availableLanduse.value = Object.keys(sumData[selectSpecies.value] || {});
+        } else {
+          availableSpecies.value = [];
+          selectSpecies.value = '';
+          availableLanduse.value = Object.keys(sumData || {});
+        }
         const prevLU = previousSelections.value["Sum"].landuse || curLanduse;
         selectLanduse.value = (prevLU && availableLanduse.value.includes(prevLU)) ? prevLU : (availableLanduse.value[0] || '');
 
@@ -193,10 +200,11 @@ window.BiodiversityView = {
     }
 
     // Reactive data
-    // map_bio_*_All:   Type → Year  (Sum category)
-    // map_bio_*_Ag:    Water → LU → Year
-    // map_bio_*_Am:    AgMgt → Water → LU → Year
-    // map_bio_*_NonAg: LU → Year
+    // map_bio_*_Sum (non-species metrics): Type → Year
+    // map_bio_*_Sum (species-aware metrics): group/species → Type → Year
+    // map_bio_*_Ag:    Water → LU → Year  (Water → species → LU → Year for species-aware)
+    // map_bio_*_Am:    AgMgt → Water → LU → Year  (... → species → LU → Year)
+    // map_bio_*_NonAg: LU → Year  (species → LU → Year for species-aware)
     const selectMapData = computed(() => {
       const metric = selectMetric.value;
       const cat = selectCategory.value;
@@ -211,7 +219,10 @@ window.BiodiversityView = {
       const mapData = window[mr?.[cat]?.["name"]];
       const withSpecies = METRICS_WITH_SPECIES.includes(metric);
       if (cat === "Sum") {
-        return mapData?.[landuse]?.[year] || {};
+        // species-aware: group/species → Type → year; non-species: Type → year
+        return withSpecies
+          ? (mapData?.[species]?.[landuse]?.[year] || {})
+          : (mapData?.[landuse]?.[year] || {});
       } else if (cat === "Ag") {
         return withSpecies
           ? (mapData?.[water]?.[species]?.[landuse]?.[year] || {})
@@ -461,24 +472,40 @@ window.BiodiversityView = {
       }
     });
 
-    // Species change: only re-derive landuse list (year stays). Does nothing for metrics without species.
+    // Species change: re-derive landuse list (year stays). Does nothing for metrics without species.
     watch(selectSpecies, (newSpecies) => {
       if (!hasSpecies.value || !newSpecies) return;
       const cat = selectCategory.value;
       const mr = mapRegister[selectMetric.value] || {};
       let baseNode;
-      if (cat === "Ag") {
+      if (cat === "Sum") {
+        // Sum: group/species → Type → year; newSpecies changes the Type list
+        const sumData = window[mr["Sum"]?.name];
+        availableLanduse.value = Object.keys(sumData?.[newSpecies] || {});
+        if (!availableLanduse.value.includes(selectLanduse.value)) {
+          selectLanduse.value = availableLanduse.value[0] || '';
+        }
+        previousSelections.value["Sum"].species = newSpecies;
+      } else if (cat === "Ag") {
         baseNode = window[mr["Ag"]?.name]?.[selectWater.value]?.[newSpecies];
+        availableLanduse.value = Object.keys(baseNode || {});
+        if (!availableLanduse.value.includes(selectLanduse.value)) {
+          selectLanduse.value = availableLanduse.value[0] || '';
+        }
       } else if (cat === "Ag Mgt") {
         baseNode = window[mr["Ag Mgt"]?.name]?.[selectAgMgt.value]?.[selectWater.value]?.[newSpecies];
+        availableLanduse.value = Object.keys(baseNode || {});
+        if (!availableLanduse.value.includes(selectLanduse.value)) {
+          selectLanduse.value = availableLanduse.value[0] || '';
+        }
       } else if (cat === "Non-Ag") {
         baseNode = window[mr["Non-Ag"]?.name]?.[newSpecies];
+        availableLanduse.value = Object.keys(baseNode || {});
+        if (!availableLanduse.value.includes(selectLanduse.value)) {
+          selectLanduse.value = availableLanduse.value[0] || '';
+        }
       } else {
         return;
-      }
-      availableLanduse.value = Object.keys(baseNode || {});
-      if (!availableLanduse.value.includes(selectLanduse.value)) {
-        selectLanduse.value = availableLanduse.value[0] || '';
       }
       triggerVersion.value++;
     });
@@ -486,6 +513,7 @@ window.BiodiversityView = {
     watch(selectLanduse, (newLanduse) => {
       if (selectCategory.value === "Sum") {
         previousSelections.value["Sum"].landuse = newLanduse;
+        previousSelections.value["Sum"].species = selectSpecies.value;
       } else if (selectCategory.value === "Ag") {
         previousSelections.value["Ag"].landuse = newLanduse;
       } else if (selectCategory.value === "Ag Mgt") {
@@ -616,8 +644,8 @@ window.BiodiversityView = {
       <!-- Map container with slide-out chart drawer -->
       <div style="position: relative; width: 100%; height: 100%; overflow: hidden;">
 
-        <!-- Species / VegGroup / Community options (GBF3/GBF4/GBF8 only) — floating bottom-right scroll panel -->
-        <div v-if="dataLoaded && hasSpecies && availableSpecies.length > 0"
+        <!-- Species / VegGroup / Community options (GBF3/GBF4/GBF8 only, including Sum category) — floating bottom-right scroll panel -->
+        <div v-if="dataLoaded && availableSpecies.length > 0"
           class="absolute bottom-[20px] right-[20px] z-[1001] w-[280px] max-h-[260px] bg-white/85 rounded-lg shadow-md p-2 flex flex-col"
           :class="{ 'right-[440px]': isDrawerOpen }"
           style="transition: right 0.3s ease;">
