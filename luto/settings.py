@@ -309,7 +309,7 @@ Land-use and vector file pairs to exclude land-use from being utilised in that a
 - The value is the path to the ESRI shapefile.
 '''
 
-REGIONAL_ADOPTION_CONSTRAINTS = 'off'            
+REGIONAL_ADOPTION_CONSTRAINTS = 'NON_AG_CAP'            
 '''
 Adoption mode for non-ag land uses.
 - 'off': no regional adoption constraints

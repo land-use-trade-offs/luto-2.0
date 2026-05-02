@@ -1316,8 +1316,9 @@ class LutoSolver:
                 continue
             print(f"│   │   │   ├── Adding SUM-of-non-ag constraint for {settings.REGIONAL_ADOPTION_NON_AG_REGION} region {reg_id} <= {reg_area_limit:,.0f} HA...")
             reg_expr = gp.quicksum(
-                self._input_data.real_area[reg_ind] * self.X_non_ag_vars_kr[k, reg_ind]
+                self._input_data.real_area[r] * self.X_non_ag_vars_kr[k, r]
                 for k in range(self.X_non_ag_vars_kr.shape[0])
+                for r in reg_ind
             )
             self.regional_adoption_constrs.append(
                 self.gurobi_model.addConstr(reg_expr <= reg_area_limit, name=f"reg_adopt_limit_non_ag_sum_{reg_id}")
