@@ -11,6 +11,7 @@ Usage:
 """
 
 import argparse
+import os
 import subprocess
 import sys
 import time
@@ -53,6 +54,7 @@ def run_all(run_dirs: list[Path], max_concurrent: int, input_dir: str | None):
                 cwd=run_dir,
                 stdout=log_file,
                 stderr=subprocess.STDOUT,
+                env={**os.environ, 'PYTHONUTF8': '1'},
             )
             active[name] = (proc, log_file, log_path)
             print(f"[start]  {name}  (pid {proc.pid})  → {log_path}")

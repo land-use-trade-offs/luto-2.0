@@ -46,13 +46,13 @@ grid_search = {
     ###############################################################
     # Working settings for the model run
     ###############################################################
-    'OBJECTIVE': ['maxprofit'],                                             # 'maxprofit' or 'mincost'
-    'RESFACTOR': [1],
-    'SIM_YEARS': [[2020, 2025, 2030, 2035, 2050]],                          # base year 2010 implicit; explicit step years
-    'WRITE_PARALLEL': [True],
-    'WRITE_THREADS': [4],
-    'DO_IIS': [False],                                                      # Set True to compute IIS (.ilp) on infeasible solves; expensive on large models
-    
+    'OBJECTIVE':        ['maxprofit'],                                             # 'maxprofit' or 'mincost'
+    'RESFACTOR':        [1],
+    'SIM_YEARS':        [[2020, 2025, 2030, 2035, 2050]],                          # base year 2010 implicit; explicit step years
+    'WRITE_PARALLEL':   [True],
+    'WRITE_THREADS':    [4],
+    'DO_IIS':           [False],  
+    'WRITE_OUTPUTS':    [True],
  
     ###############################################################
     # Model run settings
