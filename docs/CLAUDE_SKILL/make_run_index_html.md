@@ -53,7 +53,7 @@ Wide-format: rows = setting names, columns = `Name` + one column per `Run_G####`
 Used only for the detail panel (right side) — shows **all** 154 settings for the selected run,
 with rows that vary across runs highlighted in yellow.
 
-### PBS log files
+### PBS log files (cluster)
 
 Located at `<task_root_dir>/Run_G####/run_####.o<jobid>`.
 The script parses three log patterns to classify solver outcomes per year:
@@ -66,6 +66,58 @@ used `NumericFocus > 0` — this applies to **both** recovered years (which also
 still-infeasible years (which failed even after retry). The `retried_years` dict records
 `{year: max_NumericFocus_used}` in both cases, so the Retries column shows retry effort even
 for ultimately infeasible runs.
+
+### `run.log` files (Windows / local runs)
+
+Located at `<task_root_dir>/Run_G####/run.log` — produced by `run_all.py` on Windows.
+Parse these patterns (in priority order):
+
+| Pattern | Outcome |
+|---------|--------|
+| `ValueError:` or `Traceback (most recent call last)` | **ERROR** — data loading crash before solver |
+| `Solver status for year YYYY: INFEASIBLE` | **INFEASIBLE** — collect all matching years |
+| `Optimal solution found` or `OPTIMAL` | **OPTIMAL** |
+| none of the above | **UNKNOWN** (run incomplete / still running) |
+
+ERROR runs fail during `Data()` construction — common cause for ECNES/SNES species runs:
+`ValueError: No valid GBF4 SNES NRM targets found for regions ['North East']` means that
+species has no entry in `BIODIVERSITY_GBF4_TARGET_SNES_NRM.csv` for that NRM region.
+These must be re-run after fixing the target CSV, not debugged as infeasibility.
+
+Sample `scan_feasibility` for Windows `run.log`:
+```python
+def scan_feasibility(task_root):
+    """
+    Returns dict: run_id -> {'status': 'OPTIMAL'|'INFEASIBLE'|'ERROR'|'UNKNOWN',
+                              'infeasible_years': list[int],
+                              'error_msg': str or None}
+    """
+    import os, re, glob
+    results = {}
+    for rd in sorted(glob.glob(os.path.join(task_root, "Run_G*"))):
+        run_id = os.path.basename(rd)
+        log_path = os.path.join(rd, "run.log")
+        if not os.path.exists(log_path):
+            results[run_id] = {'status': 'NO_LOG', 'infeasible_years': [], 'error_msg': None}
+            continue
+        content = open(log_path, encoding='utf-8', errors='replace').read()
+        # 1. Crash / data loading error
+        if 'ValueError' in content or 'Traceback (most recent call last)' in content:
+            m = re.search(r'ValueError: (.+)', content)
+            results[run_id] = {'status': 'ERROR', 'infeasible_years': [],
+                               'error_msg': m.group(1).strip() if m else 'Unknown error'}
+            continue
+        # 2. Infeasible solver
+        inf_years = sorted(set(int(m.group(1)) for m in re.finditer(
+            r'Solver status for year (\d{4}):\s*INFEASIBLE', content)))
+        if inf_years:
+            results[run_id] = {'status': 'INFEASIBLE', 'infeasible_years': inf_years, 'error_msg': None}
+        elif 'Optimal solution found' in content or 'OPTIMAL' in content:
+            results[run_id] = {'status': 'OPTIMAL', 'infeasible_years': [], 'error_msg': None}
+        else:
+            results[run_id] = {'status': 'UNKNOWN', 'infeasible_years': [], 'error_msg': None}
+    return results
+```
 
 ---
 
@@ -771,3 +823,49 @@ Opens `<task_root_dir>/index.html` in a browser.
 - **Scenario group colours** are auto-assigned from an 8-colour palette in order of first appearance. Up to 8 groups get distinct colours; beyond that colours cycle.
 - **Filter dropdowns** are hardcoded for the standard LUTO2 GEP columns. If your run uses different column names, edit the `filter-bar` HTML section and the `applyFilters()` JS function accordingly.
 - The script is self-contained: copy `make_run_index.py` to `jinzhu_inspect_code/` — no extra dependencies beyond the Python standard library.
+
+---
+
+## Windows / Local Run Adaptations
+
+### Colocated output directory
+For Windows local runs (`run_all.py`), the run directories are inside the task root itself —
+`TASK_ROOT` and `OUT_DIR` are the **same path**. Place `make_index.py` inside the task root
+and set both constants to the same directory:
+```python
+TASK_ROOT = r"F:\path\to\Custom_runs\MyRun"
+OUT_DIR   = TASK_ROOT  # index.html written alongside Run_G#### folders
+```
+
+### ECNES/SNES species-per-run CSV schema
+The standard GEP columns (`PRODUCTIVITY_TREND`, `BIO_CONTRIBUTION_*`, etc.) **do not exist**
+in ECNES/SNES species-isolation runs. The `merged_grid_search_parameters_unique.csv` has a
+different schema:
+
+| Column | Description |
+|--------|-------------|
+| `scenario_group` | `ECNES` or `SNES` |
+| `global_run_idx` | Maps to `Run_G####` |
+| `local_run_idx` | Index within ECNES or SNES group |
+| `label` | Filesystem-safe slug of species/community name |
+| `BIODIVERSITY_TARGET_GBF_4_ECNES` | `on` / `off` |
+| `BIODIVERSITY_TARGET_GBF_4_SNES` | `on` / `off` |
+| `GBF4_ECNES_INCLUDE_COMMUNITIES` | Python list literal, e.g. `['Alpine Sphagnum Bogs...']` |
+| `GBF4_SNES_INCLUDE_SPECIES` | Python list literal, e.g. `['Acacia phasmoides']` |
+| `GBF4_ECNES_SELECTED_REGIONS` | Python list literal of NRM region names |
+| `GBF4_SNES_SELECTED_REGIONS` | Python list literal of NRM region names |
+| `GBF3_NVIS_SELECTED_REGIONS` | Python list literal (same regions as target species) |
+
+For this schema, write a **custom** `make_index.py` placed in `OUT_DIR`. The table columns
+should be: Run, Type (ECNES/SNES badge), Local #, Species/Community (italic), NRM Regions
+(tag chips), Status. Filter bar: Type dropdown, Status dropdown, free-text species search input.
+
+Key differences from the standard script:
+- Use `ast.literal_eval()` to parse the Python list columns
+- Add an **ERROR** status badge (orange) for runs that crashed in `Data.__init__`
+- The detail panel branches on `scenario_group`: show communities + ECNES regions for ECNES
+  runs, show species + SNES regions for SNES runs
+- No `merged_grid_search_template.csv` detail panel needed (all runs share the same baseline)
+
+See `F:\Users\jinzhu\Documents\Custom_runs\NECMA_ECNES_SNES_20260502_RR\make_index.py`
+for a working example of this pattern.

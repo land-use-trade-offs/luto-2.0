@@ -87,7 +87,8 @@ def load_data() -> Data:
 
 def run(
     data: Data, 
-    do_analyze_iis: bool = False
+    do_analyze_iis: bool = settings.DO_IIS,
+    do_report: bool = settings.WRITE_OUTPUTS,
 ) -> None:
     """
     Run the simulation.
@@ -101,6 +102,9 @@ def run(
         ``analyze_iis()`` and write a debug .ilp file alongside the run output.
         Task runs typically pass ``settings.DO_IIS`` so this can be controlled
         as a grid_search parameter.
+    do_report : bool, default True
+        If True, write outputs at the end of the run. Set to False to skip output
+        writing (e.g. when doing a quick test run or debugging IIS infeasibility).
     """
     
     # Generate new timestamp each time and apply decorator dynamically
@@ -129,7 +133,8 @@ def run(
             solve_timeseries(data, years, do_analyze_iis)
             # Save and write outputs
             save_data_to_disk(data, f"{save_dir}/Data_RES{settings.RESFACTOR}.lz4")
-            write_outputs(data)
+            if do_report:
+                write_outputs(data)
         except Exception as e:
             print(f"An error occurred during the simulation: {e}")
             raise e

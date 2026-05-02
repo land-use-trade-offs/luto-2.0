@@ -20,6 +20,7 @@
 
 
 import numpy as np
+import pandas as pd
 import xarray as xr
 
 from collections import defaultdict
@@ -705,84 +706,70 @@ def get_renewable_MNES_mask_wind_idx(data: Data) -> np.ndarray:
     return np.where(data.RENEWABLE_MNES_MASK_WIND)[0]
 
 
-# Coefficients smaller than `settings.RESCALE_ZERO_THRESHOLD` (after rescaling to
-# max == RESCALE_FACTOR == 1e3 by default) are zeroed out before being shipped to Gurobi.
-# They contribute nothing to constraint sums dominated by O(RESCALE_FACTOR) entries, but
-# they wreck barrier numerics by stretching the matrix coefficient range below Gurobi's
-# recommended [1e-3, 1e6] band — the symptom is "Numerical trouble encountered" with a
-# Matrix range like [5e-08, 1e+03].
-
-
-def rescale_per_species_data(arr: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def rescale_region_species_data(
+    arr: xr.DataArray,
+    region_species_list: list[tuple[str, str]],
+    region_NRM_names_r: np.ndarray,
+) -> tuple[xr.DataArray, xr.DataArray]:
     """
-    Rescale a 2D species×cell matrix per-species (per-row) independently.
+    Rescale a biodiversity matrix per (region, species/group) pair.
 
-    Each row is scaled so its `settings.RESCALE_PERCENTILE`-th percentile of |values| equals
-    `settings.RESCALE_FACTOR` (default 1e3). Using a percentile (rather than the absolute max)
-    is robust to outlier cells — a single cell with extreme presence no longer compresses the
-    typical bulk of cells into a tiny range. Entries above the percentile end up above
-    RESCALE_FACTOR after scaling (still within Gurobi's recommended [1e-3, 1e6] band).
+    Used for GBF3 NVIS, GBF4 SNES/ECNES, and GBF8.  The scale factor for each
+    (region, species) pair is the maximum |value| of cells in that NRM region for
+    that row, so a small NRM region is never compressed by values from other regions.
+    'Australia' as region uses all cells.
 
-    After rescaling, entries with |value| < `settings.RESCALE_ZERO_THRESHOLD` are zeroed out to
-    keep the matrix coefficient range inside Gurobi's recommended band.
+    Supports two matrix layouts:
+    - ``row_coord = 'layer'`` (GBF4 SNES/ECNES): rows are already (region, species) tuples;
+      the row lookup key is the full tuple ``(region, species)``.
+    - ``row_coord = 'group'`` or ``'species'`` (GBF3 NVIS, GBF8): rows are indexed by
+      species/group name; the row lookup key is the species/group string alone.
+
+    In both cases the output ``scale_factors`` has ``layer=[(region, species)]`` coords so
+    callers can uniformly use ``scale_factors.sel(layer=(region, species))``.
 
     Returns:
-        scaled_arr: The rescaled 2D array (float32).
-        scale_factors: 1D array of per-species scale factors. If `arr` is an xr.DataArray,
-                       the returned `scale_factors` is an xr.DataArray that retains the row
-                       coord (e.g. 'species' or 'group') so callers can do `.sel(...)`.
-                       Multiply rescaled values by scale_factors[s] to recover original values.
+        scaled_arr: xr.DataArray, same shape as arr.
+        scale_factors: xr.DataArray[layer=(region, species)], one scale factor per pair.
     """
-    arr_np = np.asarray(arr)
-    abs_arr = np.abs(arr_np)
-    row_refs = np.percentile(abs_arr, settings.RESCALE_PERCENTILE, axis=1)  # per-species reference
-    # Avoid division by zero for rows whose percentile reference is 0 (e.g. very sparse rows).
-    # Fall back to the row max; if that is also 0 use RESCALE_FACTOR (no-op scaling).
-    zero_ref = row_refs == 0
-    if zero_ref.any():
-        row_max = abs_arr.max(axis=1)
-        row_refs = np.where(zero_ref, np.where(row_max == 0, settings.RESCALE_FACTOR, row_max), row_refs)
-    scale_factors_np = (row_refs / settings.RESCALE_FACTOR).astype(np.float32)
-    scaled_np = (arr_np / scale_factors_np[:, np.newaxis]).astype(np.float32)
-    scaled_np[np.abs(scaled_np) < settings.RESCALE_ZERO_THRESHOLD] = 0.0
+    arr_np = arr.values.copy().astype(np.float32)
+    row_coord = arr.dims[0]              # 'layer' for GBF4; 'group'/'species' for GBF3/GBF8
+    row_names = arr.coords[row_coord].values
+    row_name_to_idx = {name: i for i, name in enumerate(row_names)}
+    # GBF4: each row is already keyed by (region, species) tuple stored in 'layer' coord.
+    # GBF3/GBF8: each row is keyed by the species/group string alone.
+    use_tuple_key = (row_coord == 'layer')
 
-    # Heavy-tail pruning: rows with extreme dynamic range (p97/p3 > 1e5) are still
-    # numerically problematic for barrier even after per-row rescaling, because the
-    # bottom 3% spans many orders of magnitude. For those rows only, zero out entries
-    # below the row's own p3 to compress the dynamic range without altering the bulk.
-    HEAVY_TAIL_RATIO = 1e5
-    abs_scaled = np.abs(scaled_np)
-    row_p97 = np.percentile(abs_scaled, 97, axis=1)  # ≈ RESCALE_FACTOR by construction
-    # p3 must be computed over non-zero entries — sparse rows otherwise have p3 == 0.
-    row_p3 = np.zeros(scaled_np.shape[0], dtype=np.float32)
-    for s in range(scaled_np.shape[0]):
-        nz = abs_scaled[s][abs_scaled[s] > 0]
-        if nz.size > 0:
-            row_p3[s] = np.percentile(nz, 3)
-    safe_p3 = np.where(row_p3 > 0, row_p3, 1.0)
-    heavy_tail_rows = np.where((row_p97 / safe_p3) > HEAVY_TAIL_RATIO)[0]
-    if heavy_tail_rows.size > 0:
-        print(
-            f"  rescale_per_species_data: heavy-tail pruning {heavy_tail_rows.size}/"
-            f"{scaled_np.shape[0]} rows (p97/p3 > {HEAVY_TAIL_RATIO:.0e})"
-        )
-    for s in heavy_tail_rows:
-        scaled_np[s, abs_scaled[s] < row_p3[s]] = 0.0
+    layers: list[tuple] = []
+    sf_values: list[float] = []
 
-    # Preserve the xarray wrapper (dims + coords) when the input is an xr.DataArray, so the
-    # solver can still do scaled_arr.sel(group=...) and scale_factors.sel(species=...).
-    if isinstance(arr, xr.DataArray):
-        row_dim = arr.dims[0]
-        scaled_arr = xr.DataArray(scaled_np, dims=arr.dims, coords=arr.coords, name=arr.name)
-        scale_factors = xr.DataArray(
-            scale_factors_np,
-            dims=[row_dim],
-            coords={row_dim: arr.coords[row_dim]} if row_dim in arr.coords else None,
-        )
-    else:
-        scaled_arr = scaled_np
-        scale_factors = scale_factors_np
+    for region, species in region_species_list:
+        row_key = (region, species) if use_tuple_key else species
+        row_idx = row_name_to_idx[row_key]
 
+        if region == "Australia":
+            cell_mask = np.ones(arr_np.shape[1], dtype=bool)
+        else:
+            cell_mask = region_NRM_names_r == region
+
+        region_max = np.abs(arr_np[row_idx, cell_mask]).max() if cell_mask.any() else 0.0
+        # All-zero region → no-op scaling.
+        ref = region_max if region_max > 0 else settings.RESCALE_FACTOR
+        scale_factor = np.float32(ref / settings.RESCALE_FACTOR)
+
+        new_vals = arr_np[row_idx, cell_mask] / scale_factor
+        new_vals[np.abs(new_vals) < settings.RESCALE_ZERO_THRESHOLD] = 0.0
+        arr_np[row_idx, cell_mask] = new_vals
+
+        layers.append((region, species))
+        sf_values.append(scale_factor)
+
+    scaled_arr = xr.DataArray(arr_np, dims=arr.dims, coords=arr.coords, name=arr.name)
+    scale_factors = xr.DataArray(
+        np.array(sf_values, dtype=np.float32),
+        dims=["layer"],
+        coords={"layer": pd.MultiIndex.from_tuples(layers, names=["region", "species"])},
+    )
     return scaled_arr, scale_factors
 
 
@@ -791,35 +778,26 @@ def rescale_solver_input_data(arries: list) -> tuple[list, float]:
     Rescale the solver input data based on `settings.RESCALE_FACTOR`.
     Returns scaled copies (non-in-place) and the scale factor used.
 
-    The scale factor is derived from the `settings.RESCALE_PERCENTILE`-th percentile of |values|
-    pooled across all input arrays (rather than the absolute max), making it robust to outlier
-    entries. Entries with |value| < `settings.RESCALE_ZERO_THRESHOLD` after rescaling are zeroed
+    The scale factor is the max |value| pooled across all input arrays so every array
+    in this group shares one scale factor (preserves relative magnitudes between e.g. ag,
+    non-ag, and ag-management variants of the same quantity).
+    Entries with |value| < `settings.RESCALE_ZERO_THRESHOLD` after rescaling are zeroed
     out to keep the matrix coefficient range inside Gurobi's recommended [1e-3, 1e6] band.
     To recover original values, multiply the scaled arrays by the returned scale factor.
     """
 
-    # Pool all |values| across the inputs and take a single global percentile so every array
-    # in this group shares one scale factor (preserves relative magnitudes between e.g. ag,
-    # non-ag, and ag-management variants of the same quantity).
-    flat_pieces = []
+    ref = 0.0
     for arr in arries:
         if isinstance(arr, np.ndarray):
-            flat_pieces.append(np.abs(arr).ravel())
+            ref = max(ref, np.abs(arr).max())
         elif isinstance(arr, dict):
-            flat_pieces.extend(np.abs(v).ravel() for v in arr.values())
+            for v in arr.values():
+                ref = max(ref, np.abs(v).max())
 
-    if flat_pieces:
-        all_abs = np.concatenate(flat_pieces)
-        # Drop exact zeros so the percentile reflects the active coefficient distribution
-        nonzero = all_abs[all_abs > 0]
-        if nonzero.size > 0:
-            ref = np.percentile(nonzero, settings.RESCALE_PERCENTILE)
-        else:
-            ref = settings.RESCALE_FACTOR  # all-zero input → no-op scaling
-    else:
-        ref = settings.RESCALE_FACTOR
+    if ref == 0.0:
+        ref = settings.RESCALE_FACTOR  # all-zero input → no-op scaling
 
-    scale = (ref / settings.RESCALE_FACTOR).astype(np.float32)
+    scale = np.float32(ref / settings.RESCALE_FACTOR)
 
     def _scale_and_threshold(v: np.ndarray) -> np.ndarray:
         out = (v / scale).astype(np.float32)
@@ -1027,23 +1005,23 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         gbf2_scale = 1.0
 
     if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != "off":
-        GBF3_NVIS_pre_1750_area_vr, gbf3_nvis_scale = rescale_per_species_data(GBF3_NVIS_pre_1750_area_vr)
+        GBF3_NVIS_pre_1750_area_vr, gbf3_nvis_scale = rescale_region_species_data(GBF3_NVIS_pre_1750_area_vr, GBF3_NVIS_region_group, region_NRM_names_r)
     else:
         gbf3_nvis_scale = 1.0
 
 
     if settings.BIODIVERSITY_TARGET_GBF_4_SNES == "on":
-        GBF4_SNES_pre_1750_area_sr, gbf4_snes_scale = rescale_per_species_data(GBF4_SNES_pre_1750_area_sr)
+        GBF4_SNES_pre_1750_area_sr, gbf4_snes_scale = rescale_region_species_data(GBF4_SNES_pre_1750_area_sr, GBF4_SNES_region_species, region_NRM_names_r)
     else:
         gbf4_snes_scale = 1.0
 
     if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == "on":
-        GBF4_ECNES_pre_1750_area_sr, gbf4_ecnes_scale = rescale_per_species_data(GBF4_ECNES_pre_1750_area_sr)
+        GBF4_ECNES_pre_1750_area_sr, gbf4_ecnes_scale = rescale_region_species_data(GBF4_ECNES_pre_1750_area_sr, GBF4_ECNES_region_species, region_NRM_names_r)
     else:
         gbf4_ecnes_scale = 1.0
 
     if settings.BIODIVERSITY_TARGET_GBF_8 == "on":
-        GBF8_pre_1750_area_sr, gbf8_scale = rescale_per_species_data(GBF8_pre_1750_area_sr)
+        GBF8_pre_1750_area_sr, gbf8_scale = rescale_region_species_data(GBF8_pre_1750_area_sr, GBF8_region_species, region_NRM_names_r)
     else:
         gbf8_scale = 1.0
 

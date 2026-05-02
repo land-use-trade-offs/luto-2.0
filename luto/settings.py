@@ -170,7 +170,7 @@ E.g., the water yield for some cells is 10t but the Biodiversity-score is 1e-7, 
 the model sensitive to variations in input data. 
 '''
 
-RESCALE_ZERO_THRESHOLD = 1e-3
+RESCALE_ZERO_THRESHOLD = 1e-4
 '''
 After rescaling, any coefficient with |value| < RESCALE_ZERO_THRESHOLD is zeroed out before 
 being shipped to Gurobi. Such tiny entries contribute nothing to constraint sums dominated 
@@ -180,7 +180,7 @@ coefficient range below Gurobi's recommended [1e-3, 1e6] band — the symptom is
 
 Note: 1e-4 was found to occasionally produce false-infeasibility on barrier (model is
 actually feasible — IIS subsequently fails with "Cannot compute IIS on a feasible model").
-Keeping the threshold at 1e-3 keeps the matrix coefficient range comfortably inside
+Keeping the threshold at 1e-4 keeps the matrix coefficient range comfortably inside
 Gurobi's recommended band; the per-year retry loop in simulation.py escalates
 RETRY_PARAMS if the first solve still terminates non-optimally.
 '''
@@ -194,20 +194,12 @@ for debugging infeasibility (e.g. as a grid_search parameter).
 '''
 
 
-RESCALE_PERCENTILE = 97
-'''
-The percentile of |values| used as the rescaling reference (mapped to RESCALE_FACTOR after 
-scaling). Set to 100 to scale by the absolute max (legacy behaviour). Lower values are more 
-robust to outlier cells: a single extreme cell no longer compresses the typical 97% of cells 
-into a tiny range. Entries above the percentile end up above RESCALE_FACTOR after scaling 
-(still within Gurobi's recommended [1e-3, 1e6] band as long as max/p_pctile is moderate).
-'''
-
 
 
 # ---------------------------------------------------------------------------- #
 # Geographical raster writing parameters
 # ---------------------------------------------------------------------------- #
+WRITE_OUTPUTS = True                        # Whether to write outputs (e.g., GeoTIFFs) at the end of the run. Set to False to skip output writing (e.g. when doing a quick test run or debugging IIS infeasibility).
 WRITE_PARALLEL = True                       # If to use parallel processing to write GeoTiffs: True or False
 WRITE_THREADS = min(16, os.cpu_count())     # The Threads to use for map making, only work with WRITE_PARALLEL = True
 
@@ -982,6 +974,77 @@ List of NRM region names to enforce GBF3 NVIS constraints for.
 Must match region names in REGION_NRM_NAME. Only used when GBF3_NVIS_REGION_MODE = 'NRM'.
 '''
 
+# -- GBF3 NVIS explicit (region, group) exclusions, keyed by GBF3_NVIS_TARGET_CLASS.
+# data.py automatically drops any group where IN_LUTO_HA <= 100 ha (structurally
+# infeasible: constraint LHS ≈ 0). The entries below document those groups for both
+# MVG and MVS target classes, confirmed from
+# BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS_NRM.xlsx on 2026-05-02.
+# To add IIS-diagnosed exclusions beyond the auto filter, append tuples here.
+GBF3_NVIS_EXCLUDE_REGION_GROUPS = {
+    'MVG': [
+        # IN_LUTO_HA = 78.4 ha
+        ('Goulburn Broken', 'Acacia Open Woodlands'),
+        # IN_LUTO_HA = 24.8 ha
+        ('North East',      'Callitris Forests and Woodlands'),
+        # IN_LUTO_HA = 0.0 ha
+        ('Goulburn Broken', 'Chenopod Shrublands, Samphire Shrublands and Forblands'),
+        # IN_LUTO_HA = 0.2 ha
+        ('North East',      'Eucalypt Tall Open Forests'),
+        # IN_LUTO_HA = 0.0 ha
+        ('Goulburn Broken', 'Heathlands'),
+        # IN_LUTO_HA = 44.5 ha
+        ('North East',      'Heathlands'),
+        # IN_LUTO_HA = 4.9 ha
+        ('Goulburn Broken', 'Naturally bare - sand, rock, claypan, mudflat'),
+        # IN_LUTO_HA = 0.0 ha
+        ('North East',      'Naturally bare - sand, rock, claypan, mudflat'),
+        # IN_LUTO_HA = 78.8 ha
+        ('Goulburn Broken', 'Other Forests and Woodlands'),
+        # IN_LUTO_HA = 45.5 ha
+        ('North East',      'Other Forests and Woodlands'),
+        # IN_LUTO_HA = 0.0 ha
+        ('Goulburn Broken', 'Other Open Woodlands'),
+        # IN_LUTO_HA = 15.1 ha
+        ('Goulburn Broken', 'Rainforests and Vine Thickets'),
+        # IN_LUTO_HA = 0.0 ha
+        ('North East',      'Tussock Grasslands'),
+        # IN_LUTO_HA = 0.0 ha
+        ('Goulburn Broken', 'Unclassified native vegetation'),
+    ],
+    'MVS': [
+        # IN_LUTO_HA = 0.0 ha
+        ('Goulburn Broken', 'Boulders/rock with algae, lichen or scattered plants, or alpine fjaeldmarks'),
+        # IN_LUTO_HA = 0.0 ha
+        ('North East',      'Boulders/rock with algae, lichen or scattered plants, or alpine fjaeldmarks'),
+        # IN_LUTO_HA = 24.8 ha
+        ('North East',      'Callitris forests and woodlands'),
+        # IN_LUTO_HA = 0.0 ha
+        ('Goulburn Broken', 'Callitris open woodlands'),
+        # IN_LUTO_HA = 15.1 ha
+        ('Goulburn Broken', 'Cool temperate rainforest'),
+        # IN_LUTO_HA = 0.0 ha
+        ('Goulburn Broken', 'Heathlands'),
+        # IN_LUTO_HA = 44.5 ha
+        ('North East',      'Heathlands'),
+        # IN_LUTO_HA = 78.8 ha
+        ('Goulburn Broken', 'Leptospermum forests and woodlands'),
+        # IN_LUTO_HA = 45.5 ha
+        ('North East',      'Leptospermum forests and woodlands'),
+        # IN_LUTO_HA = 4.9 ha
+        ('Goulburn Broken', 'Naturally bare, sand, rock, claypan, mudflat'),
+        # IN_LUTO_HA = 0.0 ha
+        ('North East',      'Naturally bare, sand, rock, claypan, mudflat'),
+        # IN_LUTO_HA = 0.0 ha
+        ('North East',      'Other grasslands'),
+        # IN_LUTO_HA = 0.9 ha
+        ('Goulburn Broken', 'Other tussock grasslands'),
+        # IN_LUTO_HA = 38.5 ha
+        ('North East',      'Other tussock grasslands'),
+        # IN_LUTO_HA = 2.0 ha
+        ('Goulburn Broken', 'Unclassified native vegetation'),
+    ],
+}
+
 GBF4_SNES_REGION_MODE = 'NRM'                    # 'Australia' or 'NRM'
 GBF4_SNES_SELECTED_REGIONS = ['North East', 'Goulburn Broken']
 '''
@@ -1001,16 +1064,58 @@ GBF4_ECNES_SELECTED_REGIONS: list of NRM region names. Only used when mode = 'NR
 '''
 
 # -- Trouble-maker exclusions used by the rule_out_trouble_maker_speceis workflow.
-# GBF4_ECNES_EXCLUDE_COMMUNITIES: flat list of COMMUNITY names to drop (all modes).
-# GBF4_SNES_EXCLUDE_REGION_SPECIES: list of (region, SCIENTIFIC_NAME) tuples to drop.
-#   NRM mode  — matches on (region, SCIENTIFIC_NAME) pair exactly.
-#   Australia mode — only the SCIENTIFIC_NAME part is used (region is ignored).
+# GBF4_ECNES_EXCLUDE_REGION_COMMUNITIES: list of (region, COMMUNITY) tuples to drop.
+# GBF4_SNES_EXCLUDE_REGION_SPECIES:      list of (region, SCIENTIFIC_NAME) tuples to drop.
+#   NRM mode       — matches on the (region, name) pair exactly.
+#   Australia mode — only the name part is used (region is ignored).
 # Match exactly the values in BIODIVERSITY_GBF4_TARGET_*[_NRM].csv.
-GBF4_ECNES_EXCLUDE_COMMUNITIES = []
+GBF4_ECNES_EXCLUDE_REGION_COMMUNITIES = [
+    # IIS source: output/2026_05_01__19_58_59_RF10_2010-2050/iis_analysis_summary.txt
+    # Community: "White Box-Yellow Box-Blakely's Red Gum Grassy Woodland and Derived
+    # Native Grassland" (EPBC Critically Endangered).
+
+    # North East — flagged in IIS at RF=10 (2026-05-01).
+    #   BASELINE_AUS = 353 132.5 ; OUT_LUTO = 34 248.4 ; INSIDE_LUTO = 71 554.4
+    #   out_pct = 9.7 % vs target_2030 = 50 %. The 1 595 free decision variables at
+    #   RF=10 cannot deliver enough INSIDE_LUTO restoration to close the ~40 % gap.
+    ('North East',      "White Box-Yellow Box-Blakely's Red Gum Grassy Woodland and Derived Native Grassland"),
+
+    # Goulburn Broken — same deficit shape as North East, excluded pre-emptively.
+    #   BASELINE_AUS = 559 541.9 ; OUT_LUTO = 28 770.0 ; INSIDE_LUTO = 120 881.0
+    #   out_pct = 5.1 % vs target_2030 = 50 %. Even larger gap than North East;
+    #   would surface as the next IIS once North East is dropped.
+    ('Goulburn Broken', "White Box-Yellow Box-Blakely's Red Gum Grassy Woodland and Derived Native Grassland"),
+
+    # North East — BASEYEAR_SCORE_INSIDE_LUTO_NATURAL_LIKELY = 6.2 ha (≤ 100 ha threshold).
+    # data.py NRM mode drops this community automatically; listed here for explicitness.
+    # Confirmed via check on 2026-05-02.
+    ('North East', 'Buloke Woodlands of the Riverina and Murray-Darling Depression Bioregions'),
+]
 GBF4_SNES_EXCLUDE_REGION_SPECIES = [
     # Burramys parvus has zero LUTO habitat in Goulburn Broken and the outside-LUTO
     # component alone (19.6%) cannot meet the 50% target → structurally infeasible.
     ('Goulburn Broken', 'Burramys parvus'),
+
+    # North East — 8 species with BASEYEAR_SCORE_INSIDE_LUTO_NATURAL_LIKELY ≤ 100 ha.
+    # data.py drops these in NRM mode (threshold = 100 ha) because the constraint LHS
+    # is effectively zero and the target can never be met → ValueError at Data() init.
+    # Confirmed via check_snes_nrm.py on 2026-05-02.
+    #   INSIDE_LUTO_ha = 0.0  (no LUTO-managed habitat in North East)
+    ('North East', 'Argyrotegium nitidulum'),
+    #   INSIDE_LUTO_ha = 0.0
+    ('North East', 'Burramys parvus'),
+    #   INSIDE_LUTO_ha = 0.0
+    ('North East', 'Euphrasia crassiuscula subsp. glandulifera'),
+    #   INSIDE_LUTO_ha = 82.6  (present but below 100 ha threshold)
+    ('North East', 'Euphrasia eichleri'),
+    #   INSIDE_LUTO_ha = 0.0
+    ('North East', 'Grevillea burrowa'),
+    #   INSIDE_LUTO_ha = 0.0
+    ('North East', 'Kelleria bogongensis'),
+    #   INSIDE_LUTO_ha = 0.0
+    ('North East', 'Lobelia gelida'),
+    #   INSIDE_LUTO_ha = 24.7  (present but below 100 ha threshold)
+    ('North East', 'Zieria citriodora'),
 ]
 
 # -- Whitelist filters: if non-empty, KEEP ONLY the listed communities/species

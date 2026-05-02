@@ -1491,12 +1491,28 @@ class Data:
 
             elif settings.GBF3_NVIS_REGION_MODE == 'NRM':
                 print(f"│   │   ├── NRM region mode: {settings.GBF3_NVIS_SELECTED_REGIONS}", flush=True)
-                nvis_targets_df = pd.read_excel(
+                _nvis_raw = pd.read_excel(
                     settings.INPUT_DIR + "/BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS_NRM.xlsx",
                     sheet_name=f'NVIS_{settings.GBF3_NVIS_TARGET_CLASS}'
-                ).sort_values(by=['group', 'region'], ascending=True
-                ).query("region in @settings.GBF3_NVIS_SELECTED_REGIONS and TARGET_LEVEL_2050 > 0"
+                ).sort_values(by=['group', 'region'], ascending=True)
+                nvis_targets_df = _nvis_raw.query(
+                    "region in @settings.GBF3_NVIS_SELECTED_REGIONS and TARGET_LEVEL_2050 > 0"
                 ).reset_index(drop=True)
+
+                # Drop explicit trouble-maker (region, group) pairs from settings
+                _nvis_excl_explicit = settings.GBF3_NVIS_EXCLUDE_REGION_GROUPS.get(
+                    settings.GBF3_NVIS_TARGET_CLASS, []
+                )
+                if _nvis_excl_explicit:
+                    _excl_set = set(_nvis_excl_explicit)
+                    _before = len(nvis_targets_df)
+                    nvis_targets_df = nvis_targets_df[
+                        ~nvis_targets_df.apply(
+                            lambda r: (r['region'], r['group']) in _excl_set, axis=1
+                        )
+                    ].reset_index(drop=True)
+                    if _before != len(nvis_targets_df):
+                        print(f"│   │   │   ├── Excluded {_before - len(nvis_targets_df)} NVIS groups via GBF3_NVIS_EXCLUDE_REGION_GROUPS", flush=True)
 
             elif settings.GBF3_NVIS_REGION_MODE == 'IBRA':
                 print(f"│   │   ├── NRM region mode: {settings.GBF3_NVIS_REGION_MODE}", flush=True)
@@ -1555,6 +1571,13 @@ class Data:
                 nvis_layers_arr * settings.BIO_CONTRIBUTION_LDS,
                 nvis_layers_arr
             ).astype(np.float32)
+
+            # At RESFACTOR > 1 the CSV scores were computed at full-res; recompute them
+            # from the resfactored layers so the constraint LHS and RHS are consistent.
+            if settings.RESFACTOR > 1:
+                nvis_targets_df = self._recompute_nvis_targets_at_rf(nvis_targets_df, nvis_layers_arr)
+                self.BIO_GBF3_NVIS_BASELINE_AND_TARGETS = nvis_targets_df
+                print(f"│   │   ├── Recomputed NVIS targets at RESFACTOR={settings.RESFACTOR}", flush=True)
 
             if settings.GBF3_NVIS_REGION_MODE == 'NRM':
                 # NRM: one name per (group, region) constraint pair
@@ -1682,7 +1705,8 @@ class Data:
                     snes_nrm_df = snes_nrm_df[
                         ~snes_nrm_df.apply(lambda r: (r['region'], r['SCIENTIFIC_NAME']) in _excl_set, axis=1)
                     ].reset_index(drop=True)
-                    print(f"│   │   │   └── Excluded {_before - len(snes_nrm_df)} SNES (region,species) pairs via GBF4_SNES_EXCLUDE_REGION_SPECIES", flush=True)
+                    if _before != len(snes_nrm_df):
+                        print(f"│   │   │   ├── Excluded {_before - len(snes_nrm_df)} SNES (region,species) pairs via GBF4_SNES_EXCLUDE_REGION_SPECIES", flush=True)
 
                 # Whitelist: keep only listed species (applied after EXCLUDE)
                 if settings.GBF4_SNES_INCLUDE_SPECIES:
@@ -1701,11 +1725,11 @@ class Data:
                 available_in_nc = set(BIO_GBF4_SPECIES_raw.coords['species'].values.tolist())
                 missing_in_nc = [sp for sp in snes_nrm_df['SCIENTIFIC_NAME'].unique() if sp not in available_in_nc]
                 if missing_in_nc:
-                    print(f"│   │   ⚠ WARNING: {len(missing_in_nc)} NRM target species not found in spatial layers, skipping:", flush=True)
+                    print(f"│   │   │   ⚠  {len(missing_in_nc)} NRM target species not found in spatial layers, skipping:", flush=True)
                     for sp in missing_in_nc[:5]:
-                        print(f"│   │       ├── {sp}", flush=True)
+                        print(f"│   │   │   ├── {sp}", flush=True)
                     if len(missing_in_nc) > 5:
-                        print(f"│   │       └── ... and {len(missing_in_nc) - 5} more", flush=True)
+                        print(f"│   │   │   └── ... and {len(missing_in_nc) - 5} more", flush=True)
                     snes_nrm_df = snes_nrm_df[snes_nrm_df['SCIENTIFIC_NAME'].isin(available_in_nc)].reset_index(drop=True)
 
                 unique_species = snes_nrm_df['SCIENTIFIC_NAME'].unique().tolist()
@@ -1736,8 +1760,17 @@ class Data:
                 for i, (region, sp) in enumerate(self.BIO_GBF4_SNES_SEL):
                     sp_arr = snes_arr.sel(species=sp).values
                     region_mask = (_nrm_full == region).astype(np.float32)
-                    snes_layers.values[i] = self.get_resfactored_average_fraction(sp_arr * region_mask)
+                    snes_layers.values[i] = self.get_resfactored_average_fraction(sp_arr * region_mask * self.LUMASK)
                 self.BIO_GBF4_SPECIES_LAYERS = snes_layers
+
+                # At RESFACTOR > 1, recompute SNES target scores from the resfactored
+                # region-masked layers so constraint LHS and RHS are consistent.
+                if settings.RESFACTOR > 1:
+                    snes_nrm_df = self._recompute_snes_ecnes_targets_at_rf(
+                        snes_nrm_df, 'SCIENTIFIC_NAME', snes_layers
+                    )
+                    self.BIO_GBF4_SNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY = snes_nrm_df
+                    print(f"│   │   ├── Recomputed SNES targets at RESFACTOR={settings.RESFACTOR}", flush=True)
 
                 print(f"│   │   └── {len(snes_nrm_df)} (species, region) constraints from {len(unique_species)} species", flush=True)
         
@@ -1754,11 +1787,12 @@ class Data:
                 BIO_GBF4_ECNES_score.columns = BIO_GBF4_ECNES_score.columns.str.strip()
 
                 # Drop trouble-maker communities (rule_out_trouble_maker_speceis workflow)
-                if settings.GBF4_ECNES_EXCLUDE_COMMUNITIES:
-                    _excl = list(settings.GBF4_ECNES_EXCLUDE_COMMUNITIES)
+                if settings.GBF4_ECNES_EXCLUDE_REGION_COMMUNITIES:
+                    # Australia mode: no region, so match on community name only
+                    _excl_comm = {c for _, c in settings.GBF4_ECNES_EXCLUDE_REGION_COMMUNITIES}
                     _before = len(BIO_GBF4_ECNES_score)
-                    BIO_GBF4_ECNES_score = BIO_GBF4_ECNES_score[~BIO_GBF4_ECNES_score['COMMUNITY'].isin(_excl)].reset_index(drop=True)
-                    print(f"│   │   │   └── Excluded {_before - len(BIO_GBF4_ECNES_score)} ECNES communities via GBF4_ECNES_EXCLUDE_COMMUNITIES", flush=True)
+                    BIO_GBF4_ECNES_score = BIO_GBF4_ECNES_score[~BIO_GBF4_ECNES_score['COMMUNITY'].isin(_excl_comm)].reset_index(drop=True)
+                    print(f"│   │   │   └── Excluded {_before - len(BIO_GBF4_ECNES_score)} ECNES communities via GBF4_ECNES_EXCLUDE_REGION_COMMUNITIES", flush=True)
 
                 # Whitelist: keep only listed communities (applied after EXCLUDE)
                 if settings.GBF4_ECNES_INCLUDE_COMMUNITIES:
@@ -1826,12 +1860,15 @@ class Data:
                     & (ecnes_nrm_df['TARGET_LEVEL_2030_LIKELY'] > 0)
                 ].reset_index(drop=True)
 
-                # Drop trouble-maker communities (rule_out_trouble_maker_speceis workflow)
-                if settings.GBF4_ECNES_EXCLUDE_COMMUNITIES:
-                    _excl = list(settings.GBF4_ECNES_EXCLUDE_COMMUNITIES)
+                # Drop trouble-maker (region, community) pairs — NRM mode matches on both
+                if settings.GBF4_ECNES_EXCLUDE_REGION_COMMUNITIES:
+                    _excl_set = set(settings.GBF4_ECNES_EXCLUDE_REGION_COMMUNITIES)
                     _before = len(ecnes_nrm_df)
-                    ecnes_nrm_df = ecnes_nrm_df[~ecnes_nrm_df['COMMUNITY'].isin(_excl)].reset_index(drop=True)
-                    print(f"│   │   │   └── Excluded {_before - len(ecnes_nrm_df)} ECNES (community,region) targets via GBF4_ECNES_EXCLUDE_COMMUNITIES", flush=True)
+                    ecnes_nrm_df = ecnes_nrm_df[
+                        ~ecnes_nrm_df.apply(lambda r: (r['region'], r['COMMUNITY']) in _excl_set, axis=1)
+                    ].reset_index(drop=True)
+                    if _before != len(ecnes_nrm_df):
+                        print(f"│   │   │   ├── Excluded {_before - len(ecnes_nrm_df)} ECNES (region,community) pairs via GBF4_ECNES_EXCLUDE_REGION_COMMUNITIES", flush=True)
 
                 # Whitelist: keep only listed communities (applied after EXCLUDE)
                 if settings.GBF4_ECNES_INCLUDE_COMMUNITIES:
@@ -1850,11 +1887,11 @@ class Data:
                 available_in_nc = set(BIO_GBF4_COMUNITY_raw.coords['species'].values.tolist())
                 missing_in_nc = [c for c in ecnes_nrm_df['COMMUNITY'].unique() if c not in available_in_nc]
                 if missing_in_nc:
-                    print(f"│   │   ⚠ WARNING: {len(missing_in_nc)} NRM target communities not found in spatial layers, skipping:", flush=True)
+                    print(f"│   │   │   ⚠  {len(missing_in_nc)} NRM target communities not found in spatial layers, skipping:", flush=True)
                     for c in missing_in_nc[:5]:
-                        print(f"│   │       ├── {c}", flush=True)
+                        print(f"│   │   │   ├── {c}", flush=True)
                     if len(missing_in_nc) > 5:
-                        print(f"│   │       └── ... and {len(missing_in_nc) - 5} more", flush=True)
+                        print(f"│   │   │   └── ... and {len(missing_in_nc) - 5} more", flush=True)
                     ecnes_nrm_df = ecnes_nrm_df[ecnes_nrm_df['COMMUNITY'].isin(available_in_nc)].reset_index(drop=True)
 
                 unique_communities = ecnes_nrm_df['COMMUNITY'].unique().tolist()
@@ -1885,8 +1922,17 @@ class Data:
                 for i, (region, comm) in enumerate(self.BIO_GBF4_ECNES_SEL):
                     comm_arr = ecnes_arr.sel(species=comm).values
                     region_mask = (_nrm_full == region).astype(np.float32)
-                    ecnes_layers.values[i] = self.get_resfactored_average_fraction(comm_arr * region_mask)
+                    ecnes_layers.values[i] = self.get_resfactored_average_fraction(comm_arr * region_mask * self.LUMASK)
                 self.BIO_GBF4_COMUNITY_LAYERS = ecnes_layers
+
+                # At RESFACTOR > 1, recompute ECNES target scores from the resfactored
+                # region-masked layers so constraint LHS and RHS are consistent.
+                if settings.RESFACTOR > 1:
+                    ecnes_nrm_df = self._recompute_snes_ecnes_targets_at_rf(
+                        ecnes_nrm_df, 'COMMUNITY', ecnes_layers
+                    )
+                    self.BIO_GBF4_ECNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY = ecnes_nrm_df
+                    print(f"│   │   ├── Recomputed ECNES targets at RESFACTOR={settings.RESFACTOR}", flush=True)
 
                 print(f"│   │   └── {len(ecnes_nrm_df)} (community, region) constraints from {len(unique_communities)} communities", flush=True)
         
@@ -1943,6 +1989,128 @@ class Data:
         self.BECCS_MWH_HA_YR = beccs_df['BECCS_MWH_HA_YR'].to_numpy()
 
  
+
+    def _recompute_nvis_targets_at_rf(
+        self,
+        nvis_targets_df: 'pd.DataFrame',
+        nvis_layers_arr: 'xr.DataArray',
+    ) -> 'pd.DataFrame':
+        """
+        Replace ALL_HA, IN_LUTO_HA, BASEYEAR_LEVEL, and ATTAINABLE_LEVEL in
+        nvis_targets_df with values consistent with the current RESFACTOR.
+
+        Follows the same logic as script_5_2_get_NVIS_SNES_ECNES_targets_by_regions.py:
+          IN_LUTO_HA  = sum_{r in region}(layer[group,r] * REAL_AREA[r] * degrade[r])
+          where degrade[r] = BIO_HABITAT_CONTRIBUTION_LOOK_UP[LUMAP[r]] (base year)
+
+        NATURAL_OUT_LUTO_HA and TARGET_LEVEL_* are kept from the CSV.
+        NON_NATURAL_OUT_LUTO_HA is fixed (outside LUTO, doesn't change with RF):
+          derived as ALL_HA_csv * (1 - ATTAINABLE_LEVEL_csv / 100).
+        """
+        from luto import tools as _tools
+        df = nvis_targets_df.copy()
+
+        # Base-year degrade factor per LUTO cell — fractional weighted average
+        # over land-use mix at the current RESFACTOR (matches script_5_2 logic).
+        _degred_dict = xr.DataArray(
+            list(self.BIO_HABITAT_CONTRIBUTION_LOOK_UP.values()),
+            dims=['lu'], coords={'lu': self.AGRICULTURAL_LANDUSES}
+        )
+        degrade_r = (
+            _tools.ag_mrj_to_xr(self, self.AG_L_MRJ).sum('lm') * _degred_dict
+        ).fillna(0.0).sum('lu').values.astype(np.float32)  # (NCELLS,)
+
+        has_region_col = 'region' in df.columns
+        has_attainable_col = 'ATTAINABLE_LEVEL' in df.columns
+
+        for df_i, row in df.iterrows():
+            group  = row['group']
+            region = row['region'] if has_region_col else 'Australia'
+
+            g_arr = nvis_layers_arr.sel(group=group).values  # (NCELLS,)
+
+            if region == 'Australia':
+                in_luto_ha_rf = float((g_arr * self.REAL_AREA * degrade_r).sum())
+            else:
+                region_mask = (self.REGION_NRM_NAME == region)
+                in_luto_ha_rf = float((g_arr[region_mask] * self.REAL_AREA[region_mask] * degrade_r[region_mask]).sum())
+
+            nat_out = float(row['NATURAL_OUT_LUTO_HA'])
+            if has_attainable_col:
+                non_nat_out = float(row['ALL_HA']) * (1.0 - float(row['ATTAINABLE_LEVEL']) / 100.0)
+            else:
+                # Fallback: derive from balance
+                non_nat_out = float(row['ALL_HA']) - float(row['IN_LUTO_HA']) - nat_out
+
+            all_ha_rf = in_luto_ha_rf + nat_out + non_nat_out
+            if all_ha_rf > 0:
+                baseyear_rf   = (in_luto_ha_rf + nat_out) / all_ha_rf * 100.0
+                attainable_rf = (1.0 - non_nat_out / all_ha_rf) * 100.0
+            else:
+                baseyear_rf = attainable_rf = 0.0
+
+            df.at[df_i, 'ALL_HA']         = all_ha_rf
+            df.at[df_i, 'IN_LUTO_HA']     = in_luto_ha_rf
+            df.at[df_i, 'BASEYEAR_LEVEL'] = baseyear_rf
+            if has_attainable_col:
+                df.at[df_i, 'ATTAINABLE_LEVEL'] = attainable_rf
+
+        return df
+
+    def _recompute_snes_ecnes_targets_at_rf(
+        self,
+        df: 'pd.DataFrame',
+        key_col: str,
+        layers_xr: 'xr.DataArray',
+    ) -> 'pd.DataFrame':
+        """
+        Replace BASELINE_LEVEL_ALL_AUSTRALIA_LIKELY, BASEYEAR_SCORE_INSIDE_LUTO_NATURAL_LIKELY,
+        BASEYEAR_LEVEL_LIKELY, and ATTAINABLE_LEVEL_LIKELY with values consistent with
+        the current RESFACTOR.
+
+        Follows the same logic as script_5_2_get_NVIS_SNES_ECNES_targets_by_regions.py.
+        layers_xr must have dims ['layer', 'cell'] with layer as MultiIndex (region, species)
+        and rows in the same order as df.
+
+        BASEYEAR_SCORE_OUT_LUTO_NATURAL_LIKELY and TARGET_LEVEL_* are kept from the CSV.
+        NON_NATURAL_OUT_LUTO_HA is fixed:
+          derived as BASELINE_LEVEL_ALL_AUSTRALIA_LIKELY * (1 - ATTAINABLE_LEVEL_LIKELY / 100).
+        """
+        from luto import tools as _tools
+        df = df.copy()
+
+        # Fractional weighted-average degrade — matches script_5_2 and step_1 validation.
+        _degred_dict = xr.DataArray(
+            list(self.BIO_HABITAT_CONTRIBUTION_LOOK_UP.values()),
+            dims=['lu'], coords={'lu': self.AGRICULTURAL_LANDUSES}
+        )
+        degrade_r = (
+            _tools.ag_mrj_to_xr(self, self.AG_L_MRJ).sum('lm') * _degred_dict
+        ).fillna(0.0).sum('lu').values.astype(np.float32)  # (NCELLS,)
+
+        for enum_i, (df_i, row) in enumerate(df.iterrows()):
+            layer_r = layers_xr.values[enum_i]  # (NCELLS,) — region mask already baked in
+
+            in_luto_ha_rf = float((layer_r * self.REAL_AREA * degrade_r).sum())
+
+            nat_out     = float(row['BASEYEAR_SCORE_OUT_LUTO_NATURAL_LIKELY'])
+            all_ha_csv  = float(row['BASELINE_LEVEL_ALL_AUSTRALIA_LIKELY'])
+            attain_csv  = float(row['ATTAINABLE_LEVEL_LIKELY'])
+            non_nat_out = all_ha_csv * (1.0 - attain_csv / 100.0)
+
+            all_ha_rf = in_luto_ha_rf + nat_out + non_nat_out
+            if all_ha_rf > 0:
+                baseyear_rf   = (in_luto_ha_rf + nat_out) / all_ha_rf * 100.0
+                attainable_rf = (1.0 - non_nat_out / all_ha_rf) * 100.0
+            else:
+                baseyear_rf = attainable_rf = 0.0
+
+            df.at[df_i, 'BASELINE_LEVEL_ALL_AUSTRALIA_LIKELY']      = all_ha_rf
+            df.at[df_i, 'BASEYEAR_SCORE_INSIDE_LUTO_NATURAL_LIKELY'] = in_luto_ha_rf
+            df.at[df_i, 'BASEYEAR_LEVEL_LIKELY']                    = baseyear_rf
+            df.at[df_i, 'ATTAINABLE_LEVEL_LIKELY']                  = attainable_rf
+
+        return df
 
     def get_coord(self, index_ij: np.ndarray, trans):
         """
@@ -2447,36 +2615,7 @@ class Data:
 
         return GBF3_NVIS_target_percents
     
-    def get_GBF3_IBRA_limit_score_inside_LUTO_by_yr(self, yr: int) -> np.ndarray:
-        '''
-        Interpolate GBF3 IBRA bioregion targets for the given year.
 
-        Args:
-            yr: Target year
-
-        Returns:
-            Array of IBRA bioregion target scores inside LUTO area
-        '''
-        GBF3_IBRA_target_percents = []
-        for _, row in self.GBF3_IBRA_BASELINE_AND_TARGETS.iterrows():
-            f = interp1d(
-                [2010, 2030, 2050, 2100],
-                [min(row['BASEYEAR_LEVEL'], row['TARGET_LEVEL_2030']),
-                 row['TARGET_LEVEL_2030'],
-                 row['TARGET_LEVEL_2050'],
-                 row['TARGET_LEVEL_2100']
-                ],
-                kind="linear",
-                fill_value="extrapolate",
-            )
-            GBF3_IBRA_target_percents.append(f(yr).item())
-
-        limit_score_all_AUS = self.BIO_GBF3_IBRA_BASELINE_AUSTRALIA * (np.array(GBF3_IBRA_target_percents) / 100)  # Convert percentage to proportion
-        limit_score_inside_LUTO = limit_score_all_AUS - self.BIO_GBF3_IBRA_BASELINE_OUTSIDE_LUTO
-
-        return np.where(limit_score_inside_LUTO < 0, 0, limit_score_inside_LUTO)
-
-    
     def get_GBF4_SNES_target_inside_LUTO_by_year(self, yr: int) -> xr.DataArray:
         snes_df = pd.concat([
             self.BIO_GBF4_SNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY,

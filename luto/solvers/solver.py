@@ -1018,7 +1018,7 @@ class LutoSolver:
 
         region_group = self._input_data.GBF3_NVIS_region_group          # list of (region, group) tuples
         v_limits = self._input_data.limits["GBF3_NVIS"]                 # xarray of (layer), where layer is region-group combination
-        scale_factors = self._input_data.scale_factors['GBF3_NVIS']     # xarray of (group) 
+        scale_factors = self._input_data.scale_factors['GBF3_NVIS']     # xr.DataArray[layer=(region, group)]
         val_matrix = self._input_data.GBF3_NVIS_pre_1750_area_vr        # xarray of (group, cell)
         reg_matrix = self._input_data.region_NRM_names_r                # np.array of strings (cell)
 
@@ -1032,7 +1032,7 @@ class LutoSolver:
                 print(f"│   │   │   ├── SKIPPING negative target {lb_raw_vector:15,.0f} for {region} [{group}]")
                 continue
 
-            lb_rescale_vector = lb_raw_vector / scale_factors.sel(group=group).item()               
+            lb_rescale_vector = lb_raw_vector / scale_factors.sel(layer=(region, group)).item()
             val_vector = val_matrix.sel(group=group, drop=True).data
             # Australia mode: no NRM cell is named 'Australia', so bypass region mask
             if region == "Australia":
@@ -1219,7 +1219,7 @@ class LutoSolver:
 
         region_species  = self._input_data.GBF8_region_species            # list[(region, species)]
         v_limits        = self._input_data.limits["GBF8"]                 # xr.DataArray[layer=(region,species)]
-        scale_factors   = self._input_data.scale_factors['GBF8']          # xr.DataArray[species]
+        scale_factors   = self._input_data.scale_factors['GBF8']          # xr.DataArray[layer=(region, species)]
         val_matrix      = self._input_data.GBF8_pre_1750_area_sr          # xr.DataArray[species, cell]
         reg_matrix      = self._input_data.region_NRM_names_r             # np.ndarray[cell]
 
@@ -1227,7 +1227,7 @@ class LutoSolver:
 
         for region, species in region_species:
             lb_raw      = v_limits.sel(dict(layer=(region, species))).item()
-            lb_rescale  = lb_raw / scale_factors.sel(species=species).item()
+            lb_rescale  = lb_raw / scale_factors.sel(layer=(region, species)).item()
             val_vector  = val_matrix.sel(species=species, drop=True).data
 
             if region == "Australia":
@@ -1466,7 +1466,7 @@ class LutoSolver:
             0
             if settings.BIODIVERSITY_TARGET_GBF_3_NVIS == "off"
             else {
-                k: v.getValue() * self._input_data.scale_factors['GBF3_NVIS'].sel(group=k[1]).item()
+                k: v.getValue() * self._input_data.scale_factors['GBF3_NVIS'].sel(layer=k).item()
                 for k,v in self.bio_GBF3_NVIS_exprs.items()
             }
         )
@@ -1484,7 +1484,7 @@ class LutoSolver:
             else 0
         )
         prod_data["BIO (GBF8) value (ha)"] = (
-            {k: v.getValue() * self._input_data.scale_factors['GBF8'].sel(species=k[1]).item()
+            {k: v.getValue() * self._input_data.scale_factors['GBF8'].sel(layer=k).item()
              for k, v in self.bio_GBF8_exprs.items()}
             if settings.BIODIVERSITY_TARGET_GBF_8 == "on"
             else 0
