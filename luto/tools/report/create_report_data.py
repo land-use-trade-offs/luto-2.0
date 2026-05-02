@@ -875,31 +875,21 @@ def process_economics_data(files, SAVE_DIR):
     # Assign nonag to Dryland to avoid double counting
     profit_na_sum_df['Water_supply'] = 'Dryland'
 
-    # Combine all three
-    econ_sum = pd.concat([
-        profit_ag_sum_df[['region', 'Water_supply', 'Land-use', 'Year', 'Value ($)']],
-        profit_am_sum_df[['region', 'Water_supply', 'Land-use', 'Year', 'Value ($)']],
-        profit_na_sum_df[['region', 'Water_supply', 'Land-use', 'Year', 'Value ($)']],
-    ], ignore_index=True)
+    # Aggregate each to Type level (sum over all land uses, water supplies, management types)
+    econ_sum_ag = profit_ag_sum_df.groupby(['region', 'Year'])[['Value ($)']].sum().reset_index().assign(Type='Agricultural Land-use')
+    econ_sum_am = profit_am_sum_df.groupby(['region', 'Year'])[['Value ($)']].sum().reset_index().assign(Type='Agricultural Management')
+    econ_sum_nonag = profit_na_sum_df.groupby(['region', 'Year'])[['Value ($)']].sum().reset_index().assign(Type='Non-Agricultural Land-use')
 
-    # Group to sum ag+am for same land uses, then add ALL water aggregate
-    econ_sum = econ_sum.groupby(['region', 'Water_supply', 'Land-use', 'Year'])[['Value ($)']].sum().reset_index()
+    econ_sum_type = pd.concat([econ_sum_ag, econ_sum_am, econ_sum_nonag], ignore_index=True)
 
-    econ_sum_all_water = econ_sum.groupby(['region', 'Land-use', 'Year'])[['Value ($)']].sum().reset_index().assign(Water_supply='ALL')
-    econ_sum = pd.concat([econ_sum_all_water, econ_sum], ignore_index=True)
-
-    df_wide = _groupby_to_records(econ_sum, ['region', 'Water_supply', 'Land-use'], ['region', 'water', 'name', 'data'], value_cols=('Year', 'Value ($)'))
+    df_wide = _groupby_to_records(econ_sum_type, ['region', 'Type'], ['region', 'name', 'data'], value_cols=('Year', 'Value ($)'))
     df_wide['type'] = 'column'
     df_wide['color'] = df_wide['name'].apply(lambda x: COLORS[x])
-    df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x) if x in LANDUSE_ALL_RENAMED else 999)
-    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
 
     out_dict = {}
-    for (region, water), df in df_wide.groupby(['region', 'water']):
-        df = df.drop(['region', 'water'], axis=1)
-        if region not in out_dict:
-            out_dict[region] = {}
-        out_dict[region][water] = df.to_dict(orient='records')
+    for region, df in df_wide.groupby('region'):
+        df = df.drop(['region'], axis=1)
+        out_dict[region] = df.to_dict(orient='records')
 
     filename = 'Economics_Sum'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
@@ -1695,76 +1685,47 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
     
 
 
-    # -------------------- GHG Sum (Ag + Am + NonAg + Transition + Off-land) --------------------
+    # -------------------- GHG Sum (Ag + Am + NonAg + Transition) --------------------
+    # Aggregate each component to Type level (sum over all land uses, water, sources)
+    ghg_sum_ag_base = GHG_ag.query('Water_supply != "ALL" and Source != "ALL" and `Land-use` != "ALL"')\
+        .groupby(['region', 'Year'])[['Value (t CO2e)']].sum().reset_index()
+    ghg_sum_trans = GHG_transition.groupby(['region', 'Year'])[['Value (t CO2e)']].sum().reset_index()
+    ghg_sum_ag = pd.concat([ghg_sum_ag_base, ghg_sum_trans], ignore_index=True)\
+        .groupby(['region', 'Year'])[['Value (t CO2e)']].sum().reset_index()\
+        .assign(Type='Agricultural Land-use')
 
-    # Ag: sum over source, keep water/lu/year
-    ghg_ag_sum = GHG_ag.query('Water_supply != "ALL" and Source != "ALL" and `Land-use` != "ALL"')\
-        .groupby(['region', 'Water_supply', 'Land-use', 'Year'])[['Value (t CO2e)']]\
-        .sum(numeric_only=True).reset_index()
+    ghg_sum_am = GHG_ag_man.query('Water_supply != "ALL" and `Land-use` != "ALL" and `Agricultural Management Type` != "ALL"')\
+        .groupby(['region', 'Year'])[['Value (t CO2e)']].sum().reset_index()\
+        .assign(Type='Agricultural Management')
 
-    # Am: sum over management type, keep water/lu/year
-    ghg_am_sum = GHG_ag_man.query('Water_supply != "ALL" and `Land-use` != "ALL" and `Agricultural Management Type` != "ALL"')\
-        .groupby(['region', 'Water_supply', 'Land-use', 'Year'])[['Value (t CO2e)']]\
-        .sum(numeric_only=True).reset_index()
+    ghg_sum_nonag = GHG_non_ag.query('`Land-use` != "ALL"')\
+        .groupby(['region', 'Year'])[['Value (t CO2e)']].sum().reset_index()\
+        .assign(Type='Non-Agricultural Land-use')
 
-    # NonAg: assign to Dryland water supply
-    ghg_non_ag_sum = GHG_non_ag.query('`Land-use` != "ALL"').reset_index(drop=True)[['region', 'Land-use', 'Year', 'Value (t CO2e)']].copy()
-    ghg_non_ag_sum['Water_supply'] = 'Dryland'
+    ghg_sum_type = pd.concat([ghg_sum_ag, ghg_sum_am, ghg_sum_nonag], ignore_index=True)
+    ghg_sum_type = ghg_sum_type.query('abs(`Value (t CO2e)`) > 1').reset_index(drop=True)
 
-    # Transition: sum over Land-use per transition type; use Type as the series name
-    ghg_transition_sum = GHG_transition\
-        .groupby(['region', 'Water_supply', 'Type', 'Year'])[['Value (t CO2e)']]\
-        .sum(numeric_only=True).reset_index()\
-        .rename(columns={'Type': 'Land-use'})
-
-    # Combine Ag + Am + NonAg + Transition
-    ghg_sum = pd.concat([ghg_ag_sum, ghg_am_sum, ghg_non_ag_sum, ghg_transition_sum], ignore_index=True)
-    ghg_sum = ghg_sum.query('abs(`Value (t CO2e)`) > 1').reset_index(drop=True)
-
-    # Add ALL water aggregate (computed before off_land to avoid double-counting)
-    ghg_sum_all_water = ghg_sum\
-        .groupby(['region', 'Land-use', 'Year'])[['Value (t CO2e)']]\
-        .sum(numeric_only=True).reset_index().assign(Water_supply='ALL')
-    ghg_sum = pd.concat([ghg_sum_all_water, ghg_sum], ignore_index=True)
-
-    # Off-land: replicate across ALL/Dryland/Irrigated so it appears on every water tab
     ghg_off_land_by_year = GHG_off_land.groupby('Year')[['Value (t CO2e)']].sum(numeric_only=True).reset_index()
-    ghg_off_land_rows = pd.concat([
-        ghg_off_land_by_year.assign(Water_supply=w, **{'Land-use': 'Off-land emissions', 'region': 'AUSTRALIA'})
-        for w in ['ALL', 'Dryland', 'Irrigated']
-    ], ignore_index=True).query('abs(`Value (t CO2e)`) > 1')
-    ghg_sum = pd.concat([ghg_sum, ghg_off_land_rows], ignore_index=True)
 
-    df_wide = _groupby_to_records(ghg_sum, ['region', 'Water_supply', 'Land-use'], ['region', 'water', 'name', 'data'], value_cols=('Year', 'Value (t CO2e)'))
+    df_wide = _groupby_to_records(ghg_sum_type, ['region', 'Type'], ['region', 'name', 'data'], value_cols=('Year', 'Value (t CO2e)'))
     df_wide['type'] = 'column'
     df_wide['color'] = df_wide['name'].apply(lambda x: COLORS[x])
-    _ghg_sum_order = LANDUSE_ALL_RENAMED + [
-        'Unallocated natural to modified',
-        'Unallocated natural to livestock natural',
-        'Livestock natural to modified',
-        'Off-land emissions',
-    ]
-    df_wide['name_order'] = df_wide['name'].apply(lambda x: _ghg_sum_order.index(x) if x in _ghg_sum_order else 999)
-    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
 
     out_dict = {}
-    for (region, water), df in df_wide.groupby(['region', 'water']):
-        df = df.drop(['region', 'water'], axis=1)
-        if region not in out_dict:
-            out_dict[region] = {}
-        out_dict[region][water] = df.to_dict(orient='records')
+    for region, df in df_wide.groupby('region'):
+        df = df.drop(['region'], axis=1)
+        out_dict[region] = df.to_dict(orient='records')
 
-    # Add Net emissions and GHG emission limit lines for AUSTRALIA across all water tabs
+    # Add Net emissions and GHG emission limit lines for AUSTRALIA
     if 'AUSTRALIA' in out_dict:
         net_values = (
-            ghg_sum_all_water.query('region == "AUSTRALIA"')
+            ghg_sum_type.query('region == "AUSTRALIA"')
             .groupby('Year')['Value (t CO2e)'].sum()
             + ghg_off_land_by_year.set_index('Year')['Value (t CO2e)']
         )
-        net_australia_wide = [[y, v] for y, v in zip(net_values.index.tolist(), net_values.values)]
-        for water in out_dict['AUSTRALIA']:
-            out_dict['AUSTRALIA'][water].append({'name': 'Net emissions',    'data': net_australia_wide, 'type': 'line', 'color': COLORS['Net emissions']})
-            out_dict['AUSTRALIA'][water].append({'name': 'GHG emission limit', 'data': GHG_limit_wide,      'type': 'line', 'color': COLORS['GHG emission limit']})
+        net_australia_wide = [[y, v] for y, v in zip(net_values.index.tolist(), net_values.values.tolist())]
+        out_dict['AUSTRALIA'].append({'name': 'Net emissions',    'data': net_australia_wide, 'type': 'line', 'color': COLORS['Net emissions']})
+        out_dict['AUSTRALIA'].append({'name': 'GHG emission limit', 'data': GHG_limit_wide,      'type': 'line', 'color': COLORS['GHG emission limit']})
 
     filename = 'GHG_Sum'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
@@ -2366,37 +2327,28 @@ def process_water_data(files, SAVE_DIR):
 
     water_sum_nrm = pd.concat([water_ag_nrm, water_am_nrm, water_nonag_nrm], ignore_index=True)
 
-    # AUS aggregate: sum over all NRM regions
-    water_sum_AUS = water_sum_nrm\
-        .groupby(['Water Supply', 'Landuse', 'Year'])[['Value (ML)']]\
-        .sum(numeric_only=True).reset_index().assign(region='AUSTRALIA')
+    # Aggregate each NRM component to Type level, then build AUS total
+    water_ag_type_nrm = water_ag_nrm.groupby(['region_NRM', 'Year'])[['Value (ML)']].sum().reset_index().rename(columns={'region_NRM': 'region'}).assign(Type='Agricultural Land-use')
+    water_am_type_nrm = water_am_nrm.groupby(['region_NRM', 'Year'])[['Value (ML)']].sum().reset_index().rename(columns={'region_NRM': 'region'}).assign(Type='Agricultural Management')
+    water_nonag_type_nrm = water_nonag_nrm.groupby(['region_NRM', 'Year'])[['Value (ML)']].sum().reset_index().rename(columns={'region_NRM': 'region'}).assign(Type='Non-Agricultural Land-use')
 
-    water_sum = pd.concat([
-        water_sum_AUS,
-        water_sum_nrm.rename(columns={'region_NRM': 'region'})
+    water_ag_type_aus = water_ag_nrm.groupby('Year')[['Value (ML)']].sum().reset_index().assign(region='AUSTRALIA', Type='Agricultural Land-use')
+    water_am_type_aus = water_am_nrm.groupby('Year')[['Value (ML)']].sum().reset_index().assign(region='AUSTRALIA', Type='Agricultural Management')
+    water_nonag_type_aus = water_nonag_nrm.groupby('Year')[['Value (ML)']].sum().reset_index().assign(region='AUSTRALIA', Type='Non-Agricultural Land-use')
+
+    water_sum_type = pd.concat([
+        water_ag_type_nrm, water_am_type_nrm, water_nonag_type_nrm,
+        water_ag_type_aus, water_am_type_aus, water_nonag_type_aus,
     ], ignore_index=True)
 
-    # Add ALL water aggregate
-    water_sum_all_water = water_sum\
-        .groupby(['region', 'Landuse', 'Year'])[['Value (ML)']]\
-        .sum(numeric_only=True).reset_index().assign(**{'Water Supply': 'ALL'})
-    water_sum = pd.concat([water_sum_all_water, water_sum], ignore_index=True)
-
-    df_region_wide = water_sum.groupby(['region', 'Water Supply', 'Landuse'])[['Year', 'Value (ML)']]\
-        .apply(lambda x: [[int(r[0]), r[1]] for r in x[['Year', 'Value (ML)']].values.tolist()])\
-        .reset_index()
-    df_region_wide.columns = ['region', 'water', 'name', 'data']
+    df_region_wide = _groupby_to_records(water_sum_type, ['region', 'Type'], ['region', 'name', 'data'], value_cols=('Year', 'Value (ML)'))
     df_region_wide['type'] = 'column'
     df_region_wide['color'] = df_region_wide['name'].map(COLORS)
-    df_region_wide['name_order'] = df_region_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
-    df_region_wide = df_region_wide.sort_values('name_order').drop(columns=['name_order'])
 
     out_dict = {}
-    for (region, water), df in df_region_wide.groupby(['region', 'water']):
+    for region, df in df_region_wide.groupby('region'):
         df = df.drop(['region'], axis=1)
-        if region not in out_dict:
-            out_dict[region] = {}
-        out_dict[region][water] = df.to_dict(orient='records')
+        out_dict[region] = df.to_dict(orient='records')
 
     filename = 'Water_Sum_NRM'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
@@ -3269,11 +3221,26 @@ def process_biodiversity_data(files, SAVE_DIR):
         # sum (contribution percentage; species == 'ALL' excluded)
         bio_df_target = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').groupby(['Year', 'species'])[['Target_by_Percent']].agg('first').reset_index()
 
-        df_region = bio_df.query('species != "ALL" and Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
-            .groupby(['Year', 'region', 'Type'])\
-            .sum(numeric_only=True)\
+        # Sum-tab: normalise by ALL_HA (total pre-1750 baseline across all veg groups) so
+        # the stacked bar shows sum(area)/ALL_HA*100, not a meaningless sum of per-group %.
+        # Inside rows: exclude 'ALL' aggregates (keep leaf lm × lu combinations only).
+        # Outside rows: use only the am='ALL', lm='ALL' aggregate row to avoid cross-join
+        # inflation (each group's outside area is replicated across every am×lm combo).
+        _inside = bio_df.query(
+            'Type != "Outside LUTO study area" and species != "ALL" '
+            'and Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"'
+        )
+        _outside = bio_df.query(
+            'Type == "Outside LUTO study area" and Water_supply == "ALL" and `Agricultural Management` == "ALL"'
+        )
+        df_region = (
+            pd.concat([_inside, _outside])
+            .groupby(['Year', 'region', 'Type'])
+            .agg({'Area Weighted Score (ha)': 'sum', 'ALL_HA': 'first'})
             .reset_index()
-        df_wide = _groupby_to_records(df_region, ['Type', 'region'], ['name', 'region', 'data'], value_cols=('Year', 'Value (%)'))
+            .assign(**{'Sum_Pct (%)': lambda d: d['Area Weighted Score (ha)'] / d['ALL_HA'] * 100})
+        )
+        df_wide = _groupby_to_records(df_region, ['Type', 'region'], ['name', 'region', 'data'], value_cols=('Year', 'Sum_Pct (%)'))
         df_wide['type'] = 'column'
         df_wide['color'] = df_wide['name'].apply(lambda x: COLORS[x])
 
@@ -3487,12 +3454,22 @@ def process_biodiversity_data(files, SAVE_DIR):
 
         # ---------------- (GBF4 SNES) Overview  ----------------
 
-        # sum (contribution percentage; species == 'ALL' excluded)
-        df_region = bio_df.query('species != "ALL" and Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
-            .groupby(['Year', 'region', 'Type'])\
-            .sum(numeric_only=True)\
+        # sum: normalise by ALL_HA so the chart shows sum(area)/ALL_HA*100 not sum of per-species %.
+        _inside = bio_df.query(
+            'Type != "Outside LUTO study area" and species != "ALL" '
+            'and Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"'
+        )
+        _outside = bio_df.query(
+            'Type == "Outside LUTO study area" and Water_supply == "ALL" and `Agricultural Management` == "ALL"'
+        )
+        df_region = (
+            pd.concat([_inside, _outside])
+            .groupby(['Year', 'region', 'Type'])
+            .agg({'Area Weighted Score (ha)': 'sum', 'ALL_HA': 'first'})
             .reset_index()
-        df_wide = _groupby_to_records(df_region, ['Type', 'region'], ['name', 'region', 'data'], value_cols=('Year', 'Value (%)'))
+            .assign(**{'Sum_Pct (%)': lambda d: d['Area Weighted Score (ha)'] / d['ALL_HA'] * 100})
+        )
+        df_wide = _groupby_to_records(df_region, ['Type', 'region'], ['name', 'region', 'data'], value_cols=('Year', 'Sum_Pct (%)'))
         df_wide['type'] = 'column'
         df_wide['color'] = df_wide['name'].apply(lambda x: COLORS[x])
 
@@ -3694,12 +3671,22 @@ def process_biodiversity_data(files, SAVE_DIR):
 
         # ---------------- (GBF4 ECNES) Overview  ----------------
 
-        # sum (contribution percentage; species == 'ALL' excluded)
-        df_region = bio_df.query('species != "ALL" and Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
-            .groupby(['Year', 'region', 'Type'])\
-            .sum(numeric_only=True)\
+        # sum: normalise by ALL_HA so the chart shows sum(area)/ALL_HA*100 not sum of per-community %.
+        _inside = bio_df.query(
+            'Type != "Outside LUTO study area" and species != "ALL" '
+            'and Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"'
+        )
+        _outside = bio_df.query(
+            'Type == "Outside LUTO study area" and Water_supply == "ALL" and `Agricultural Management` == "ALL"'
+        )
+        df_region = (
+            pd.concat([_inside, _outside])
+            .groupby(['Year', 'region', 'Type'])
+            .agg({'Area Weighted Score (ha)': 'sum', 'ALL_HA': 'first'})
             .reset_index()
-        df_wide = _groupby_to_records(df_region, ['Type', 'region'], ['name', 'region', 'data'], value_cols=('Year', 'Value (%)'))
+            .assign(**{'Sum_Pct (%)': lambda d: d['Area Weighted Score (ha)'] / d['ALL_HA'] * 100})
+        )
+        df_wide = _groupby_to_records(df_region, ['Type', 'region'], ['name', 'region', 'data'], value_cols=('Year', 'Sum_Pct (%)'))
         df_wide['type'] = 'column'
         df_wide['color'] = df_wide['name'].apply(lambda x: COLORS[x])
 
