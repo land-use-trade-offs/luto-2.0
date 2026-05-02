@@ -11,7 +11,9 @@ LUTO2 is the Land-Use Trade-Offs Model Version 2, an integrated land systems opt
 The LUTO2 documentation is split into themed files for better memory efficiency. **Read the relevant documentation file based on your current task**:
 
 ### 📁 [docs/CLAUDE_SETUP.md](docs/CLAUDE_SETUP.md)
+
 **Read this when working on:**
+
 - Environment setup and dependencies
 - Running tests or simulations
 - Configuring model parameters (settings.py)
@@ -21,7 +23,9 @@ The LUTO2 documentation is split into themed files for better memory efficiency.
 - **xr.dot() optimization** (CRITICAL: use `xr.dot()` instead of broadcasting for memory efficiency)
 
 ### 📁 [docs/CLAUDE_ARCHITECTURE.md](docs/CLAUDE_ARCHITECTURE.md)
+
 **Read this when working on:**
+
 - Core simulation engine (simulation.py, data.py)
 - Economic modules (agricultural, non-agricultural, off-land)
 - Solver integration (GUROBI, optimization)
@@ -30,7 +34,9 @@ The LUTO2 documentation is split into themed files for better memory efficiency.
 - Dynamic pricing and demand elasticity
 
 ### 📁 [docs/CLAUDE_OUTPUT.md](docs/CLAUDE_OUTPUT.md)
+
 **Read this when working on:**
+
 - NetCDF output format and structure
 - Mosaic layer generation (write.py)
 - **Valid layers implementation pattern** (memory/disk optimization)
@@ -41,7 +47,9 @@ The LUTO2 documentation is split into themed files for better memory efficiency.
 - Dimension hierarchies (Ag, Am, NonAg, GHG, Economics)
 
 ### 📁 [docs/CLAUDE_VUE_REPORTING.md](docs/CLAUDE_VUE_REPORTING.md)
+
 **Read this when working on:**
+
 - Vue.js 3 reporting interface
 - Progressive selection pattern
 - Cascade watcher implementation
@@ -51,7 +59,9 @@ The LUTO2 documentation is split into themed files for better memory efficiency.
 - File structure (views, data, services, routes)
 
 ### 📁 [docs/CLAUDE_SKILL/](docs/CLAUDE_SKILL/)
+
 **Step-by-step skill guides for common tasks:**
+
 - [adding_sum_tab.md](docs/CLAUDE_SKILL/adding_sum_tab.md): Adding a "Sum" tab (Ag + Am + NonAg) — covers write.py, report data/layers, Vue services, and view wiring
 - [debug_ecnes_infeasibility.md](docs/CLAUDE_SKILL/debug_ecnes_infeasibility.md): Debug ECNES infeasibility — run simulation, detect infeasible constraints, submit PBS jobs
 - [debug_iis_from_zip.md](docs/CLAUDE_SKILL/debug_iis_from_zip.md): Debug IIS from Run_Archive.zip — extract MPS + lz4, compute IIS with Gurobi, analyze via PBS jobs
@@ -86,6 +96,7 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 ## Architecture Overview
 
 ### Core Modules
+
 - **`luto/simulation.py`**: Main simulation engine and state management singleton
 - **`luto/data.py`**: Core data management, loading, and spatial data structures
 - **`luto/settings.py`**: Configuration parameters for all model aspects
@@ -98,6 +109,7 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
     - `rescale_solver_input_data()`: **In-place** rescaling of arrays to magnitude 0-1e3 for numerical stability
 
 ### Economic Modules
+
 - **`luto/economics/agricultural/`**: Agricultural land use economics
   - Revenue, cost, quantity, water, biodiversity, GHG calculations
   - Transition costs between agricultural land uses
@@ -117,6 +129,7 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 - **`luto/economics/off_land_commodity/`**: Off-land commodity economics
 
 ### Data Processing
+
 - **`luto/dataprep.py`**: Data preprocessing utilities
   - **Carbon sequestration data**: Migrated from HDF5/pandas to NetCDF/xarray format
   - Saves tree planting carbon data at specific ages (50, 60, 70, 80, 90 years)
@@ -126,6 +139,7 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 - **`luto/tools/write.py`**: Output writing and file generation
 
 ### Utilities
+
 - **`luto/tools/create_task_runs/`**: Batch processing and grid search utilities
 - **`luto/tools/report/`**: Report generation and visualization
   - `data_tools/`: Data processing for reports
@@ -135,6 +149,7 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 ## Key Configuration Parameters
 
 ### Core Settings (`luto/settings.py`)
+
 - `VERSION`: Model version identifier (current: '2.3')
 - `SSP`: Shared Socioeconomic Pathway code (e.g., '245' for SSP2-RCP4.5)
 - `SCENARIO`: Auto-derived from SSP (e.g., 'SSP2')
@@ -144,6 +159,7 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 - `OBJECTIVE`: Optimization objective ('maxprofit' or 'mincost')
 
 ### Scenario Settings
+
 - `DIET_DOM`: Domestic diet option ('BAU', 'FLX', 'VEG', 'VGN')
 - `DIET_GLOB`: Global diet option (varies by year)
 - `CONVERGENCE`: Dietary transformation target year (2050 or 2100)
@@ -155,12 +171,14 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 - `CO2_FERT`: CO2 fertilization effects ('on' or 'off')
 
 ### Economic Settings
+
 - `DYNAMIC_PRICE`: Enable demand elasticity-based dynamic pricing (default: False)
 - `AMORTISE_UPFRONT_COSTS`: Whether to amortize establishment costs (default: False)
 - `DISCOUNT_RATE`: Discount rate for economic calculations (default: 0.07)
 - `AMORTISATION_PERIOD`: Period for cost amortization in years (default: 30)
 
 ### Environmental Constraints
+
 - `GHG_EMISSIONS_LIMITS`: Greenhouse gas targets ('off', 'low', 'medium', 'high')
 - `GHG_CONSTRAINT_TYPE`: Hard or soft GHG constraint ('hard' or 'soft')
 - `WATER_LIMITS`: Water yield constraints ('on' or 'off')
@@ -179,6 +197,7 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
   - `BIODIVERSITY_TARGET_GBF_8`: Species conservation targets ('on' or 'off')
 
 ### Renewable Energy Settings
+
 - `RENEWABLES_OPTIONS`: Dict controlling which renewable energy types are enabled, e.g. `{'Utility Solar PV': True, 'Onshore Wind': True}`. Set values to `False` to disable individual types. Also drives the corresponding `AG_MANAGEMENTS` entries.
 - `RENEWABLE_TARGET_SCENARIO_TARGETS`: Generation target scenario (one of: 'AEMO 2026 ISP - Accelerated Transition', 'AEMO 2026 ISP - Slower Growth', 'AEMO 2026 ISP - Step Change', 'Gladstone - BESS Sensitivity', 'Gladstone - Core')
 - `RENEWABLE_TARGET_SCENARIO_INPUT_LAYERS`: Spatial layer scenario (one of: 'step_change', 'accelerated_transition', 'ANU_transmission_T3', 'ANU_transmission_T5', 'ANU_transmission_T10')
@@ -191,6 +210,7 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 - Compatible land uses differ: Solar PV excludes Hay; Wind includes Hay and horticulture crops
 
 ### Solver Configuration
+
 - `SOLVE_METHOD`: GUROBI algorithm (default: 2 for barrier method)
 - `THREADS`: Parallel threads for optimization (default: min(32, cpu_count))
 - `FEASIBILITY_TOLERANCE`: Solver tolerance (default: 1e-2, relaxed from 1e-6)
@@ -202,6 +222,7 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 - `SOLVER_WEIGHT_WATER`: Water deviation weight in objective (default: 1)
 
 ### Output Writing Configuration
+
 - `WRITE_PARALLEL`: Enable parallel output writing (default: True)
 - `WRITE_THREADS`: Number of parallel write threads (default: min(6, cpu_count))
 - `WRITE_REPORT_MAX_MEM_GB`: Max memory for report generation (default: 64)
@@ -234,6 +255,7 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 ## Output Structure
 
 Results saved in `/output/<timestamp>/`:
+
 - `DATA_REPORT/REPORT_HTML/index.html`: Interactive dashboard
 - NetCDF files: Spatial outputs (xarray format)
 - CSV files: Data tables
@@ -260,11 +282,13 @@ total_co2 = (
 ```
 
 ### Risk Discounting
+
 - **Aboveground carbon** (Trees + Debris): Discounted by fire risk and reversal risk
 - **Belowground carbon** (Soil): No risk discounting applied
 - Formula: `(AG_carbon × fire_risk% × (1 - RISK_OF_REVERSAL)) + BG_carbon`
 
 ### Migration Notes
+
 - **Old format**: HDF5 files with pandas DataFrames, separate AG/BG columns
 - **New format**: NetCDF files with xarray Datasets, separate component variables
 - **Advantages**: Better compression, faster subsetting, age dimension flexibility, xarray integration
@@ -275,21 +299,25 @@ total_co2 = (
 The biodiversity module follows consistent naming conventions for GBF (Global Biodiversity Framework) variables:
 
 ### Variable Naming Pattern
+
 - **Pre-1750 baseline areas**: Use `*_pre_1750_area_*` suffix
   - Examples: `GBF3_NVIS_pre_1750_area_vr`, `GBF4_SNES_pre_1750_area_sr`, `GBF8_pre_1750_area_sr`
   - These represent baseline biodiversity area matrices before land use changes
 
 ### Function Naming Pattern
+
 - **GBF constraint methods**: Use `_add_GBF{N}_{TYPE}_constraints()` format
   - Examples: `_add_GBF2_constraints()`, `_add_GBF3_NVIS_constraints()`, `_add_GBF3_IBRA_constraints()`, `_add_GBF4_SNES_constraints()`
   - Maintain consistency between method names and GBF target types
 
 ### Data Structure Indices
+
 - `v, r`: Vegetation group / bioregion (v) × cell (r) - used for GBF3 NVIS and IBRA data
 - `s, r`: Species/community (s) × cell (r) - used for GBF4 and GBF8 data
 - `r`: Cell only - used for GBF2 mask data
 
 ### Key GBF Modules
+
 1. **GBF2**: Priority degraded areas restoration
    - Function: `get_GBF2_MASK_area(data)` returns mask × real area
 2. **GBF3 NVIS**: NVIS major vegetation group targets
@@ -320,6 +348,7 @@ Renewable energy types (Utility Solar PV, Onshore Wind) are implemented as agric
 ### Solver Constraints
 
 `_add_renewable_energy_constraints()` in `solver.py` enforces state-level generation targets:
+
 - Separate constraints for solar and wind per state
 - Uses `renewable_solar_r` / `renewable_wind_r` yield arrays from `input_data.py`
 - Targets from `RENEWABLE_TARGETS` CSV, filtered by year and scenario
@@ -383,11 +412,13 @@ The LUTO reporting system uses Vue.js 3 with a progressive selection pattern for
 Map and Chart JSON files have different dimension hierarchies. See [CLAUDE_VUE_REPORTING.md](docs/CLAUDE_VUE_REPORTING.md) for the full per-module table.
 
 **Map JSON (Spatial Layers)** — ends at `year → {img_str, bounds, min_max}`:
+
 - **Ag**: `lm → lu → year` (standard); `lm → source → lu → year` (GHG/Economics)
 - **Am**: `am → lm → lu → year` (standard); no source in Am for GHG
 - **NonAg**: `lu → year`
 
 **Chart JSON (Time Series)** — ends at `[series array]`:
+
 - **Ag**: `region → lm → lu` (standard); `region → lm → source → [series(name=LU)]` (GHG)
 - **Am**: `region → lm → lu → [series(name=AgMgt)]`; source removed from Am in GHG/Water
 - **NonAg**: `region → [series(name=LU)]`
@@ -395,10 +426,11 @@ Map and Chart JSON files have different dimension hierarchies. See [CLAUDE_VUE_R
 **`source` dimension** appears only in **Ag** for GHG (emission type) and Economics (cost/revenue type). Am no longer has a source level.
 
 **Valid Layers Pattern** — two approaches:
+
 - **Economics** (revenue/cost/profit/transitions): `ALL` = dvar mosaic (categorical) — load dvar, filter, concat
 - **GHG / Biodiversity / Water / Production**: `ALL` = sum aggregate — `xr.concat([data.sum('dim'), data], 'dim')` before stacking
 
-**Greyscale ramp for unselected NRMs** — biodiversity write functions for GBF3 NVIS / GBF4 SNES / GBF4 ECNES attach an `is_selected` cell coord (boolean) before `save2nc`. The render-side `map2base64` maps unselected non-zero cells through palette codes 151-200 (grey ramp) so cells outside the selected NRMs appear desaturated while preserving the colour ramp inside the selection. GBF2 (mask-based) and GBF8 (climate-driven) are excluded — no spatial restriction to grey out.
+**Greyscale ramp for unselected NRMs** — biodiversity write functions for GBF3 NVIS / GBF4 SNES / GBF4 ECNES attach an `is_selected` cell coord (boolean) to the **source** xarray (e.g. `vegetation_score_vr`, `bio_snes_sr`, `bio_ecnes_sr`) so it propagates automatically through all downstream arithmetic. Always attached — all-ones in Australia mode, NRM-union mask in NRM mode. The render-side `map2base64` maps unselected non-zero cells through palette codes 151-200 (grey ramp). CSV/AUS aggregation applies `.where(is_selected_da)` on the fly (no separate masked-variant arrays). GBF2 (mask-based) and GBF8 (climate-driven) are excluded — no spatial restriction to grey out.
 
 See [CLAUDE_OUTPUT.md](docs/CLAUDE_OUTPUT.md) for detailed examples.
 

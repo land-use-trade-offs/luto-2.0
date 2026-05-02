@@ -5,6 +5,7 @@ This document describes the output file structure, NetCDF format specifications,
 ## Output Directory Structure
 
 Results are saved in `/output/<timestamp>_RF<resfactor>_<year_range>/`:
+
 - `DATA_REPORT/`: Vue.js reporting interface
   - `VUE_modules/`: Vue.js frontend (views, data, services, routes)
   - `index.html`: Main entry point
@@ -142,6 +143,7 @@ non_ag_map_cat = xr.concat([nonag_mosaic, non_ag_map], dim='lu')
 ```
 
 The `ALL` dimensions serve dual purposes:
+
 1. **Aggregated data**: For data matrices, `ALL` contains summed/averaged values across the dimension
 2. **Mosaic maps**: For decision variables, `ALL` contains the categorical dominant land use/management map (integer codes)
 
@@ -160,6 +162,7 @@ There are two patterns depending on whether the `ALL` entry is a **categorical m
 Used for Economics outputs where `ALL` shows the dominant land-use color map from the dvar file.
 
 **Ag (Revenue/Cost):**
+
 ```python
 # 1. Get valid data layers
 valid_layers = pd.MultiIndex.from_frame(df[['lm', 'source', 'lu']]).sort_values()
@@ -217,6 +220,7 @@ This pattern is used in: `write_ghg_*`, `write_biodiversity_*`, `write_water_*`,
 ### Critical Rules (Both Patterns)
 
 1. **Valid layers must be a sorted MultiIndex**:
+
    ```python
    valid_layers = pd.MultiIndex.from_frame(df[['lm', 'source', 'lu']]).sort_values()
    ```
@@ -299,10 +303,10 @@ the viewer about where the constraint actually applied.
 
 ### Write-Side Pattern
 
-Write functions attach a boolean `is_selected` coord (along the `cell` dim) to each
-`valid_layers_stack_*` **before** `save2nc`. The mask is `True` for cells inside the
-selected regions and `False` otherwise. In `Australia` mode (no spatial restriction) the
-mask is all-`True` and the renderer behaves exactly as before.
+`is_selected` is a boolean non-dimension coordinate on the `cell` dim. It is attached to
+the **source** xarray at the top of each write function and **propagates automatically**
+through all downstream xarray arithmetic. Never attached manually at individual save sites.
+Always computed — all-`True` in `Australia` mode, NRM-union mask in `NRM` mode.
 
 ```python
 # In write.py: applied to GBF3 NVIS, GBF4 SNES, GBF4 ECNES write functions
@@ -313,16 +317,43 @@ if getattr(settings, '<MODE_SETTING>', 'Australia') == 'NRM':
         if sel_regions else np.ones(data.NCELLS, dtype=bool)
     )
 else:
-    sel_mask = np.ones(data.NCELLS, dtype=bool)
+    sel_mask = np.ones(data.NCELLS, dtype=bool)  # all-True even in Australia mode
+is_selected_da = xr.DataArray(sel_mask, dims=['cell'], coords={'cell': np.arange(data.NCELLS)})
 
-valid_layers_stack_ag     = valid_layers_stack_ag.assign_coords(is_selected=('cell', sel_mask))
-valid_layers_stack_non_ag = valid_layers_stack_non_ag.assign_coords(is_selected=('cell', sel_mask))
-valid_layers_stack_am     = valid_layers_stack_am.assign_coords(is_selected=('cell', sel_mask))
+# Attach to the source array — propagates to xr_gbf4_snes_ag, _am, _non_ag automatically:
+bio_snes_sr = bio_snes_sr.assign_coords(is_selected=('cell', sel_mask))
 
+# ... compute products and add_all ...
+
+# No .assign_coords needed at save sites — already present:
 save2nc(valid_layers_stack_ag,     os.path.join(path, f'xr_biodiversity_<METRIC>_ag_{yr_cal}.nc'))
 save2nc(valid_layers_stack_non_ag, os.path.join(path, f'xr_biodiversity_<METRIC>_non_ag_{yr_cal}.nc'))
 save2nc(valid_layers_stack_am,     os.path.join(path, f'xr_biodiversity_<METRIC>_ag_management_{yr_cal}.nc'))
 ```
+
+CSV / region / AUS aggregations use `.where(is_selected_da)` on the fly — no separate
+"masked variant" arrays (the old `_msk` / `mask_sr` / `mask_gr` pattern is gone):
+
+```python
+# Regional aggregation:
+GBF4_score_ag_region = xr_gbf4_snes_ag.where(is_selected_da).groupby('region').sum('cell')...
+# AUS aggregation:
+GBF4_score_ag_AUS = xr_gbf4_snes_ag.where(is_selected_da).sum('cell')...
+```
+
+### Source Arrays and `_FULL` Attrs
+
+For SNES and ECNES, the source bio array must cover all of Australia (not just selected
+NRMs) so non-selected cells have non-zero values to grey out. `data.py` always builds:
+
+- `data.BIO_GBF4_SPECIES_LAYERS_FULL` — `[species, cell]` full-Australia SNES layers
+- `data.BIO_GBF4_COMUNITY_LAYERS_FULL` — `[species, cell]` full-Australia ECNES layers
+
+Both are available in **Australia mode and NRM mode**. In Australia mode they mirror
+`BIO_GBF4_SPECIES_LAYERS` (reshaped to drop the MultiIndex). In NRM mode they are built
+without the per-region mask so every cell retains its habitat value. `write.py` reads
+these attrs directly — `get_GBF4_SNES_matrix_sr(data)` (the solver-facing function)
+is no longer called from write.py.
 
 | Metric | `<MODE_SETTING>` | `<SEL_ATTR>` | Region name attr |
 |---|---|---|---|
@@ -360,11 +391,14 @@ For unselected non-zero cells, intensity is computed against the global magnitud
 The LUTO2 reporting system generates two types of JSON files with **different dimension hierarchies**:
 
 ### Map JSON Files (Spatial Layers)
+
 Map JSON files contain base64-encoded PNG images for spatial visualization. The dimension hierarchy is:
 
 **For Agricultural (Ag):**
+
 - **Hierarchy**: `lm` → `lu` → `source` (if applicable) → `year`
 - **Example**: `map_GHG_Ag.js`
+
   ```javascript
   {
     "ALL": {
@@ -384,8 +418,10 @@ Map JSON files contain base64-encoded PNG images for spatial visualization. The 
   ```
 
 **For Agricultural Management (Am):**
+
 - **Hierarchy**: `am` → `lm` → `lu` → `source` (if applicable) → `year`
 - **Example**: `map_GHG_Am.js`
+
   ```javascript
   {
     "ALL": {
@@ -406,8 +442,10 @@ Map JSON files contain base64-encoded PNG images for spatial visualization. The 
   ```
 
 **For Non-Agricultural (NonAg):**
+
 - **Hierarchy**: `lu` → `year`
 - **Example**: `map_area_NonAg.js`
+
   ```javascript
   {
     "ALL": { "2020": {...}, "2030": {...} },
@@ -419,11 +457,14 @@ Map JSON files contain base64-encoded PNG images for spatial visualization. The 
 **Note**: The `source` dimension appears in map JSON for GHG emissions (emission sources like "Enteric Fermentation", "Manure") and Economics (cost/revenue types like "Labour cost", "Area cost").
 
 ### Chart JSON Files (Time Series Data)
+
 Chart JSON files contain Highcharts series data for plotting. The dimension hierarchy is:
 
 **For Agricultural (Ag):**
+
 - **Hierarchy**: `region` → `lm` → `lu` (array of series)
 - **Example**: `GHG_Ag.js`
+
   ```javascript
   {
     "AUSTRALIA": {
@@ -441,8 +482,10 @@ Chart JSON files contain Highcharts series data for plotting. The dimension hier
   ```
 
 **For Agricultural Management (Am):**
+
 - **Hierarchy**: `region` → `lm` → `lu` → `source` (if applicable) → `am` (array of series)
 - **Example**: `GHG_Am.js`
+
   ```javascript
   {
     "AUSTRALIA": {
@@ -462,8 +505,10 @@ Chart JSON files contain Highcharts series data for plotting. The dimension hier
   ```
 
 **For Non-Agricultural (NonAg):**
+
 - **Hierarchy**: `region` → `lu` (array of series)
 - **Example**: `GHG_NonAg.js`
+
   ```javascript
   {
     "AUSTRALIA": [
@@ -486,6 +531,7 @@ Chart JSON files contain Highcharts series data for plotting. The dimension hier
 | **Source position** | Before `year` (for GHG/Economics) | Before final series array (Am only) |
 
 **Critical Implementation Note**: The chart JSON for Am places `source` **before the final series array** (where series are indexed by `am`), while map JSON places `source` **before year**. This reflects how the data is consumed:
+
 - **Map**: User selects specific source to view spatial distribution
 - **Chart**: User views all `am` types, optionally filtered by source in the Vue.js component
 
@@ -604,6 +650,7 @@ with open('map_ag_dvar.json', 'w') as f:
 ### Why 'lu' Must Be Last Dimension
 
 The Vue.js reporting interface aggregates chart data at the land use (`lu`) level. By ensuring `lu` is the terminal dimension in the hierarchy, users can:
+
 1. Select upstream dimensions (category, water, agmgt)
 2. See all available land uses for that selection
 3. Filter both map layers AND chart data by the same `lu` value
@@ -619,6 +666,7 @@ Each map layer in the report needs a consistent `min_max` colorbar range that sp
 1. **`get_mag(arr)`** — called once per output xarray per year. Returns `[MIN_P-quantile, MAX_P-quantile]` (currently `[0.5%, 99.5%]`) of non-zero cell values. Using quantiles avoids extreme outliers distorting the colorbar.
 
 2. **`MAX_CELL_MAGNITUDE`** — a plain pre-initialized 2-level dict (`write.py:71`). Each leaf is a list that accumulates `[min_q, max_q]` pairs from every year's parallel job:
+
    ```python
    MAX_CELL_MAGNITUDE = {
        'area':        {'ag': [], 'non_ag': [], 'am': []},
@@ -628,9 +676,11 @@ Each map layer in the report needs a consistent `min_max` colorbar range that sp
        ...
    }
    ```
+
    Two-level keys (e.g. `area → ag`) use a nested dict. Single-level keys (renewables) use a bare list. `production` uses `defaultdict(list)` because commodity names are not known at module load time.
 
 3. **Merge loop** — after each parallel job returns `(msg, mag)`, the driver checks the *target* type to dispatch:
+
    ```python
    target = MAX_CELL_MAGNITUDE[top_key]
    if isinstance(target, list):
@@ -641,6 +691,7 @@ Each map layer in the report needs a consistent `min_max` colorbar range that sp
    ```
 
 4. **Serialization** — after all years complete, lists are NaN-cleaned and written to `max_cell_magnitudes.json`:
+
    ```python
    clean = lambda lst: [0.0 if np.isnan(v) else float(v) for v in lst]
    json.dump(
@@ -653,6 +704,7 @@ Each map layer in the report needs a consistent `min_max` colorbar range that sp
 5. **`create_report_layers.py`** loads `max_cell_magnitudes.json` and takes `(min(vals), max(vals))` across the accumulated list to get the cross-year colorbar range, which is embedded as `min_max` in each map layer's JSON entry.
 
 ### Key invariants
+
 - `get_mag` always returns a 2-element list `[float, float]` — never a scalar.
 - Water yield is the exception: it returns raw `(min, max)` tuples via `.min().item()` / `.max().item()` rather than quantiles, because water yield can legitimately be zero over large areas.
 - Do **not** add a new output type without adding its key to `MAX_CELL_MAGNITUDE` — missing keys will raise `KeyError` at merge time.
@@ -671,6 +723,7 @@ The carbon sequestration data has been migrated from HDF5/pandas format to NetCD
 ### Carbon Components
 
 Each NetCDF file contains three data variables representing different carbon pools:
+
 1. **Trees**: Aboveground biomass in trees (`*_TREES_T_CO2_HA` or `*_TREES_TOT_T_CO2_HA`)
 2. **Debris**: Aboveground debris/litter (`*_DEBRIS_T_CO2_HA` or `*_DEBRIS_TOT_T_CO2_HA`)
 3. **Soil**: Belowground soil carbon (`*_SOIL_T_CO2_HA` or `*_SOIL_TOT_T_CO2_HA`)
