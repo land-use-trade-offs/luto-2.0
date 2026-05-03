@@ -1,56 +1,42 @@
 window.RenewableView = {
   name: 'RenewableView',
   setup() {
-    const { ref, onMounted, onUnmounted, inject, computed, watch, nextTick } = Vue;
+    const { ref, onMounted, onUnmounted, inject, computed, watch } = Vue;
 
-    // Data|Map service
     const chartRegister = window.ChartService.chartCategories["Renewable"];
     const mapRegister = window.MapService.mapCategories["Renewable"];
     const loadScript = window.loadScriptWithTracking;
-
-    // View identification for memory management
     const VIEW_NAME = "Renewable";
 
-    // Global selection state
     const yearIndex = ref(0);
     const selectYear = ref(2020);
     const selectRegion = inject("globalSelectedRegion");
 
-    // Available variables
     const availableYears = ref([]);
-
-    // Available selections — Am only: AgMgt → Water → LU
     const availableAgMgt = ref([]);
     const availableWater = ref([]);
     const availableLanduse = ref([]);
 
-    // Map selection state
     const selectAgMgt = ref("");
     const selectWater = ref("");
     const selectLanduse = ref("");
 
-    // Previous selections memory
     const previousSelections = ref({ agMgt: "", water: "", landuse: "" });
 
-    // UI state
     const dataLoaded = ref(false);
     const isLoadingData = ref(false);
     const isDrawerOpen = ref(false);
 
-    // map_renewable_energy_Am: AgMgt → Water → LU → Year
-    const selectMapData = computed(() => {
-      if (!dataLoaded.value) return {};
-      const mapData = window[mapRegister["Ag Mgt"]["name"]];
-      return mapData?.[selectAgMgt.value]?.[selectWater.value]?.[selectLanduse.value]?.[selectYear.value] || {};
-    });
+    // ── Per-combo map layer loader ──────────────────────────────────────────
+    const { currentLayerData, ensureComboLayer } = window.createMapLayerLoader(VIEW_NAME);
 
-    // Renewable_energy_Am chart: Region → AgMgt → Water → [series(name=LU)]
+    const selectMapData = computed(() => currentLayerData.value?.[selectYear.value] ?? {});
+
     const selectChartData = computed(() => {
       if (!dataLoaded.value) return {};
-      const chartData = window[chartRegister["Ag Mgt"]["name"]]?.[selectRegion.value];
-      let seriesData = chartData?.[selectAgMgt.value]?.[selectWater.value] || [];
-      seriesData = seriesData.filter(s => selectLanduse.value === "ALL" || s.name === selectLanduse.value);
-
+      const chartData = window[chartRegister["Ag Mgt"]?.["name"]]?.[selectRegion.value];
+      let seriesData = (chartData?.[selectAgMgt.value]?.[selectWater.value] || [])
+        .filter(s => selectLanduse.value === "ALL" || s.name === selectLanduse.value);
       return {
         ...window["Chart_default_options"],
         chart: { height: 440 },
@@ -59,97 +45,74 @@ window.RenewableView = {
       };
     });
 
-    // Memory cleanup on component unmount
-    onUnmounted(() => {
-      window.MemoryService.cleanupViewData(VIEW_NAME);
-    });
+    onUnmounted(() => { window.MemoryService.cleanupViewData(VIEW_NAME); });
+
+    function getTree() {
+      return window[mapRegister["Ag Mgt"]?.indexName]?.tree ?? {};
+    }
 
     onMounted(async () => {
       await loadScript("./data/Supporting_info.js", "Supporting_info", VIEW_NAME);
       await loadScript("./data/chart_option/Chart_default_options.js", "Chart_default_options", VIEW_NAME);
 
-      // Load map and chart data in parallel
       isLoadingData.value = true;
       await Promise.all([
-        loadScript(mapRegister["Ag Mgt"]["path"], mapRegister["Ag Mgt"]["name"], VIEW_NAME),
-        loadScript(chartRegister["Ag Mgt"]["path"], chartRegister["Ag Mgt"]["name"], VIEW_NAME),
+        loadScript(mapRegister["Ag Mgt"].indexPath, mapRegister["Ag Mgt"].indexName, VIEW_NAME),
+        loadScript(chartRegister["Ag Mgt"].path, chartRegister["Ag Mgt"].name, VIEW_NAME),
       ]);
       isLoadingData.value = false;
 
-      // Initial selections
       availableYears.value = window.Supporting_info.years;
       selectYear.value = availableYears.value[0] || 2020;
 
-      const amData = window[mapRegister["Ag Mgt"]["name"]];
-      availableAgMgt.value = Object.keys(amData || {});
+      // Tree: { am: { lm: [lu] } }
+      const tree = getTree();
+      availableAgMgt.value = Object.keys(tree);
       selectAgMgt.value = availableAgMgt.value[0] || '';
-
-      availableWater.value = Object.keys(amData?.[selectAgMgt.value] || {});
+      availableWater.value = Object.keys(tree[selectAgMgt.value] || {});
       selectWater.value = availableWater.value[0] || '';
-
-      availableLanduse.value = Object.keys(amData?.[selectAgMgt.value]?.[selectWater.value] || {});
+      availableLanduse.value = tree[selectAgMgt.value]?.[selectWater.value] || [];
       selectLanduse.value = availableLanduse.value[0] || '';
 
-      await nextTick(() => {
-        dataLoaded.value = true;
-      });
+      await ensureComboLayer(mapRegister["Ag Mgt"].layerPrefix, [selectAgMgt.value, selectWater.value, selectLanduse.value]);
+      dataLoaded.value = true;
     });
 
-    // Watchers
-    const toggleDrawer = () => {
-      isDrawerOpen.value = !isDrawerOpen.value;
-    };
+    const toggleDrawer = () => { isDrawerOpen.value = !isDrawerOpen.value; };
+    watch(yearIndex, (i) => { selectYear.value = availableYears.value[i]; });
 
-    watch(yearIndex, (newIndex) => {
-      selectYear.value = availableYears.value[newIndex];
-    });
-
-    watch(selectAgMgt, (newAgMgt) => {
+    watch(selectAgMgt, async (newAgMgt) => {
       previousSelections.value.agMgt = newAgMgt;
-      const amData = window[mapRegister["Ag Mgt"]["name"]];
-
-      availableWater.value = Object.keys(amData?.[newAgMgt] || {});
+      const tree = getTree();
+      availableWater.value = Object.keys(tree[newAgMgt] || {});
       const prevWater = previousSelections.value.water;
       selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
-
-      availableLanduse.value = Object.keys(amData?.[newAgMgt]?.[selectWater.value] || {});
+      availableLanduse.value = tree[newAgMgt]?.[selectWater.value] || [];
       const prevLanduse = previousSelections.value.landuse;
       selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
+      await ensureComboLayer(mapRegister["Ag Mgt"].layerPrefix, [newAgMgt, selectWater.value, selectLanduse.value]);
     });
 
-    watch(selectWater, (newWater) => {
+    watch(selectWater, async (newWater) => {
       previousSelections.value.water = newWater;
-      const amData = window[mapRegister["Ag Mgt"]["name"]];
-
-      availableLanduse.value = Object.keys(amData?.[selectAgMgt.value]?.[newWater] || {});
+      const tree = getTree();
+      availableLanduse.value = tree[selectAgMgt.value]?.[newWater] || [];
       const prevLanduse = previousSelections.value.landuse;
       selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
+      await ensureComboLayer(mapRegister["Ag Mgt"].layerPrefix, [selectAgMgt.value, newWater, selectLanduse.value]);
     });
 
-    watch(selectLanduse, (newLanduse) => {
+    watch(selectLanduse, async (newLanduse) => {
       previousSelections.value.landuse = newLanduse;
+      await ensureComboLayer(mapRegister["Ag Mgt"].layerPrefix, [selectAgMgt.value, selectWater.value, newLanduse]);
     });
 
     const _state = {
-      yearIndex,
-      selectYear,
-      selectRegion,
-
-      availableYears,
-      availableAgMgt,
-      availableWater,
-      availableLanduse,
-
-      selectAgMgt,
-      selectWater,
-      selectLanduse,
-
-      selectMapData,
-      selectChartData,
-
-      dataLoaded, isLoadingData,
-      isDrawerOpen,
-      toggleDrawer,
+      yearIndex, selectYear, selectRegion,
+      availableYears, availableAgMgt, availableWater, availableLanduse,
+      selectAgMgt, selectWater, selectLanduse,
+      selectMapData, selectChartData,
+      dataLoaded, isLoadingData, isDrawerOpen, toggleDrawer,
     };
     window._debug[VIEW_NAME] = _state;
     return _state;

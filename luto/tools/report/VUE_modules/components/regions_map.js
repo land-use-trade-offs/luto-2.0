@@ -242,6 +242,7 @@ window.RegionsMap = {
       try {
         // Load region data
         await loadScript("services/MapService.js", 'MapService');
+        await loadScript('data/map_layers/legend_registry.js', 'legend_registry');
         if (props.regionType === 'STATE') {
           await loadScript('data/geo/AUS_STATE_centroid_bbox.js', 'AUS_STATE_centroid_bbox');
           await loadScript('data/geo/AUS_STATE.js', 'AUS_STATE');
@@ -402,11 +403,13 @@ window.RegionsMap = {
       return { minVal, maxVal, gradient, displayZeroFrac, fmtMin: fmt(minVal), fmtMax: fmt(maxVal) };
     });
 
-    // Categorical legend for integer map layers — {label: hexColor} dict from mapData.legend
+    // Categorical legend for integer map layers — look up by legendKey in the shared registry
     const intLegend = computed(() => {
       const data = props.mapData;
       if (!data || data.intOrFloat !== 'int') return null;
-      const legend = data.legend;
+      const legendKey = data.legendKey;
+      if (!legendKey) return null;
+      const legend = window.legend_registry?.[legendKey];
       if (!legend || Object.keys(legend).length === 0) return null;
       return legend;
     });

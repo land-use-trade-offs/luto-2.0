@@ -1,57 +1,46 @@
 window.TransitionView = {
   name: 'TransitionView',
   setup() {
-    const { ref, computed, onMounted, onUnmounted, inject, watch, nextTick } = Vue;
+    const { ref, computed, onMounted, onUnmounted, inject, watch } = Vue;
 
-    // Data|Map service
     const chartRegister = window.ChartService.chartCategories["Transition"];
     const mapRegister = window.MapService.mapCategories["Transition"];
     const loadScript = window.loadScriptWithTracking;
-
-    // View identification for memory management
     const VIEW_NAME = "Transition";
 
-    // Global region state
     const selectRegion = inject("globalSelectedRegion");
 
-    // ── Category ─────────────────────────────────────────────────────────────
-    // "Area" SubCats use: region → from_water → to_water → year
-    // "Cost" SubCats use: region → cost_type  → year
     const availableCategories = Object.keys(mapRegister);
     const selectCategory = ref(availableCategories[0] || "Area");
 
-    // SubCat is scoped by category
     const availableSubCats = computed(() => Object.keys(mapRegister[selectCategory.value] || {}));
-    const selectSubCat = ref(""); // Will be initialized in onMounted
+    const selectSubCat = ref("");
 
-    // ── Year slider ───────────────────────────────────────────────────────────
     const yearIndex = ref(0);
     const selectYear = ref("");
     const availableYears = ref([]);
 
-    // ── Area: From/To water selection ─────────────────────────────────────────
     const availableFromWater = ref([]);
     const availableToWater = ref([]);
     const selectFromWater = ref("ALL");
     const selectToWater = ref("ALL");
 
-    // ── Cost: Cost-type selection ──────────────────────────────────────────────
     const availableCostTypes = ref([]);
     const selectCostType = ref("ALL");
 
-    // ── UI state ──────────────────────────────────────────────────────────────
     const dataLoaded = ref(false);
     const isLoadingData = ref(false);
     const isDrawerOpen = ref(false);
 
-    // Cell selection for heatmap-driven map filter
     const selectedCell = ref(null);
 
-    // ── Computed ──────────────────────────────────────────────────────────────
     const isAreaMode = computed(() => selectCategory.value === "Area");
-
-    const currentMapName = computed(() => mapRegister[selectCategory.value]?.[selectSubCat.value]?.["name"] || "");
     const currentChartName = computed(() => chartRegister[selectCategory.value]?.[selectSubCat.value]?.["name"] || "");
+
+    // ── Per-combo map layer loader ──────────────────────────────────────────
+    const { currentLayerData, ensureComboLayer } = window.createMapLayerLoader(VIEW_NAME);
+
+    const selectMapData = computed(() => currentLayerData.value?.[selectYear.value] ?? {});
 
     // Chart leaf — area mode: region→from_water→to_water→year
     //              cost mode: region→cost_type→year
@@ -65,28 +54,6 @@ window.TransitionView = {
       }
     });
 
-    // Map leaf — area mode: From-water→To-water→from_lu→to_lu→year
-    //            cost mode: from_lu→to_lu→Cost-type→year (no water dims)
-    const selectMapData = computed(() => {
-      if (!dataLoaded.value || !currentMapName.value) return {};
-      const mapData = window[currentMapName.value];
-      const cell = selectedCell.value;
-      const leaf = selectChartLeaf.value;
-      const fromLu = (cell && leaf) ? (leaf.y_categories[cell.yi] || 'ALL') : 'ALL';
-      const toLu   = (cell && leaf) ? (leaf.x_categories[cell.xi] || 'ALL').replace(/<br>/g, ' ') : 'ALL';
-
-      if (isAreaMode.value) {
-        return mapData?.[selectFromWater.value]?.[selectToWater.value]?.[fromLu]?.[toLu]?.[selectYear.value]
-          || mapData?.[selectFromWater.value]?.[selectToWater.value]?.['ALL']?.['ALL']?.[selectYear.value]
-          || {};
-      } else {
-        return mapData?.[fromLu]?.[toLu]?.[selectCostType.value]?.[selectYear.value]
-          || mapData?.['ALL']?.['ALL']?.[selectCostType.value]?.[selectYear.value]
-          || {};
-      }
-    });
-
-    // Preview heatmap data with cell dimming
     const DIM_COLOR = 'rgba(210,210,210,0.45)';
     const previewChartData = computed(() => {
       const leaf = selectChartLeaf.value;
@@ -94,82 +61,74 @@ window.TransitionView = {
       const cell = selectedCell.value;
       if (!cell) return leaf.data;
       return leaf.data.map(p => {
-        const xi  = Array.isArray(p) ? p[0] : p.x;
-        const yi  = Array.isArray(p) ? p[1] : p.y;
+        const xi = Array.isArray(p) ? p[0] : p.x;
+        const yi = Array.isArray(p) ? p[1] : p.y;
         const val = Array.isArray(p) ? p[2] : p.value;
-        if (xi === cell.xi && yi === cell.yi) {
-          return Array.isArray(p) ? p : [xi, yi, val];
-        }
+        if (xi === cell.xi && yi === cell.yi) return Array.isArray(p) ? p : [xi, yi, val];
         return { x: xi, y: yi, value: val, color: DIM_COLOR };
       });
     });
 
-    // ── Load data for current SubCat ──────────────────────────────────────────
-    const loadSubCatData = async (subCat) => {
-      const mapEntry   = mapRegister[selectCategory.value]?.[subCat];
-      const chartEntry = chartRegister[selectCategory.value]?.[subCat];
+    function _getCombo(cat, fromWater, toWater, costType, fromLu, toLu) {
+      if (cat === "Area") return [fromWater, toWater, fromLu, toLu];
+      return [costType, fromLu, toLu];
+    }
+
+    const _loadSubCatData = async (cat, subCat) => {
+      const mapEntry = mapRegister[cat]?.[subCat];
+      const chartEntry = chartRegister[cat]?.[subCat];
       if (!mapEntry || !chartEntry) return;
 
       isLoadingData.value = true;
       dataLoaded.value = false;
-
-      // Clean up previous SubCat data to prevent memory growth
       window.MemoryService.cleanupViewData(VIEW_NAME);
 
       await Promise.all([
-        loadScript(mapEntry["path"],   mapEntry["name"],   VIEW_NAME),
-        loadScript(chartEntry["path"], chartEntry["name"], VIEW_NAME),
+        loadScript(mapEntry.indexPath, mapEntry.indexName, VIEW_NAME),
+        loadScript(chartEntry.path, chartEntry.name, VIEW_NAME),
       ]);
       isLoadingData.value = false;
 
-      const chartData = window[chartEntry["name"]];
+      const chartData = window[chartEntry.name];
       const refRegion = 'AUSTRALIA';
+      let defaultCombo;
 
-      if (isAreaMode.value) {
-        // Area: derive From/To water options
+      if (cat === "Area") {
         availableFromWater.value = Object.keys(chartData?.[refRegion] || {});
         selectFromWater.value = availableFromWater.value.includes("ALL") ? "ALL" : (availableFromWater.value[0] || "ALL");
-
         availableToWater.value = Object.keys(chartData?.[refRegion]?.[selectFromWater.value] || {});
         selectToWater.value = availableToWater.value.includes("ALL") ? "ALL" : (availableToWater.value[0] || "ALL");
-
-        const twBranch = chartData?.[refRegion]?.[selectFromWater.value]?.[selectToWater.value] || {};
-        availableYears.value = Object.keys(twBranch).sort();
+        availableYears.value = Object.keys(chartData?.[refRegion]?.[selectFromWater.value]?.[selectToWater.value] || {}).sort();
+        defaultCombo = [selectFromWater.value, selectToWater.value, 'ALL', 'ALL'];
       } else {
-        // Cost: derive Cost-type options (first level under region)
         availableCostTypes.value = Object.keys(chartData?.[refRegion] || {});
         selectCostType.value = availableCostTypes.value.includes("ALL") ? "ALL" : (availableCostTypes.value[0] || "ALL");
-
-        const ctBranch = chartData?.[refRegion]?.[selectCostType.value] || {};
-        availableYears.value = Object.keys(ctBranch).sort();
+        availableYears.value = Object.keys(chartData?.[refRegion]?.[selectCostType.value] || {}).sort();
+        defaultCombo = [selectCostType.value, 'ALL', 'ALL'];
       }
 
       yearIndex.value = 0;
       selectYear.value = availableYears.value[0] || "";
+      selectedCell.value = null;
 
-      await nextTick(() => { dataLoaded.value = true; });
+      await ensureComboLayer(mapEntry.layerPrefix, defaultCombo);
+      dataLoaded.value = true;
     };
 
-    // ── Memory cleanup ────────────────────────────────────────────────────────
-    onUnmounted(() => {
-      window.MemoryService.cleanupViewData(VIEW_NAME);
-    });
+    onUnmounted(() => { window.MemoryService.cleanupViewData(VIEW_NAME); });
 
-    // ── Mount ─────────────────────────────────────────────────────────────────
     onMounted(async () => {
       selectSubCat.value = availableSubCats.value[0];
       if (selectSubCat.value) {
-        await loadSubCatData(selectSubCat.value);
+        await _loadSubCatData(selectCategory.value, selectSubCat.value);
       }
     });
 
-    // ── Watchers ──────────────────────────────────────────────────────────────
     const toggleDrawer = () => { isDrawerOpen.value = !isDrawerOpen.value; };
 
-    // Cell click handler
     const nullMessage = ref(null);
     let _nullMsgTimer = null;
-    const handlePreviewClick = ({ xi, yi, value }) => {
+    const handlePreviewClick = async ({ xi, yi, value }) => {
       if (value === null || value === undefined || (typeof value === 'number' && isNaN(value))) {
         if (_nullMsgTimer) clearTimeout(_nullMsgTimer);
         nullMessage.value = 'This transition does not exist';
@@ -178,44 +137,54 @@ window.TransitionView = {
       }
       nullMessage.value = null;
       const cell = selectedCell.value;
-      if (cell && cell.xi === xi && cell.yi === yi) {
-        selectedCell.value = null;
-      } else {
-        selectedCell.value = { xi, yi };
-      }
+      const newCell = (cell && cell.xi === xi && cell.yi === yi) ? null : { xi, yi };
+      selectedCell.value = newCell;
+
+      const leaf = selectChartLeaf.value;
+      const fromLu = (newCell && leaf) ? (leaf.y_categories[newCell.yi] || 'ALL') : 'ALL';
+      const toLu = (newCell && leaf) ? ((leaf.x_categories[newCell.xi] || 'ALL').replace(/<br>/g, ' ')) : 'ALL';
+
+      const mapEntry = mapRegister[selectCategory.value]?.[selectSubCat.value];
+      if (!mapEntry) return;
+      await ensureComboLayer(mapEntry.layerPrefix, _getCombo(selectCategory.value, selectFromWater.value, selectToWater.value, selectCostType.value, fromLu, toLu));
     };
 
-    // Clear selection on filter/year/subcat change
-    watch([selectFromWater, selectToWater, selectCostType, selectSubCat, yearIndex], () => {
-      selectedCell.value = null;
-    });
+    watch(yearIndex, (i) => { selectYear.value = availableYears.value[i]; });
 
-    watch(yearIndex, (newIdx) => {
-      selectYear.value = availableYears.value[newIdx];
-    });
-
-    // When category changes, switch SubCat to first of new category and reload
     watch(selectCategory, (newCat) => {
       const subs = Object.keys(mapRegister[newCat] || {});
       selectSubCat.value = subs[0];
-      if (subs[0]) {
-        loadSubCatData(subs[0]);
-      }
+      if (subs[0]) _loadSubCatData(newCat, subs[0]);
     });
 
     watch(selectSubCat, (newSubCat) => {
-      loadSubCatData(newSubCat);
+      _loadSubCatData(selectCategory.value, newSubCat);
     });
 
-    // Area: when From-water changes, cascade To-water options
-    watch(selectFromWater, (newFW) => {
-      if (!isAreaMode.value) return;
+    watch(selectFromWater, async (newFW) => {
+      if (!isAreaMode.value || !selectSubCat.value || !dataLoaded.value) return;
       const chartData = window[currentChartName.value];
-      const refRegion = 'AUSTRALIA';
-      availableToWater.value = Object.keys(chartData?.[refRegion]?.[newFW] || {});
+      availableToWater.value = Object.keys(chartData?.['AUSTRALIA']?.[newFW] || {});
       if (!availableToWater.value.includes(selectToWater.value)) {
         selectToWater.value = availableToWater.value.includes("ALL") ? "ALL" : (availableToWater.value[0] || "ALL");
       }
+      selectedCell.value = null;
+      const mapEntry = mapRegister["Area"]?.[selectSubCat.value];
+      if (mapEntry) await ensureComboLayer(mapEntry.layerPrefix, [newFW, selectToWater.value, 'ALL', 'ALL']);
+    });
+
+    watch(selectToWater, async (newTW) => {
+      if (!isAreaMode.value || !selectSubCat.value || !dataLoaded.value) return;
+      selectedCell.value = null;
+      const mapEntry = mapRegister["Area"]?.[selectSubCat.value];
+      if (mapEntry) await ensureComboLayer(mapEntry.layerPrefix, [selectFromWater.value, newTW, 'ALL', 'ALL']);
+    });
+
+    watch(selectCostType, async (ct) => {
+      if (isAreaMode.value || !selectSubCat.value || !dataLoaded.value) return;
+      selectedCell.value = null;
+      const mapEntry = mapRegister["Cost"]?.[selectSubCat.value];
+      if (mapEntry) await ensureComboLayer(mapEntry.layerPrefix, [ct, 'ALL', 'ALL']);
     });
 
     const _state = {
@@ -228,14 +197,12 @@ window.TransitionView = {
       availableCostTypes, selectCostType,
       selectMapData, selectChartLeaf, previewChartData,
       selectedCell, handlePreviewClick, nullMessage,
-      dataLoaded, isLoadingData,
-      isDrawerOpen, toggleDrawer,
+      dataLoaded, isLoadingData, isDrawerOpen, toggleDrawer,
     };
     window._debug = window._debug || {};
     window._debug[VIEW_NAME] = _state;
     return _state;
   },
-
   template: /*html*/`
     <div class="relative w-full h-screen">
 

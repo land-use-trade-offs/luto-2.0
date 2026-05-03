@@ -1,44 +1,33 @@
 window.WaterView = {
   name: 'WaterView',
   setup() {
-    const { ref, onMounted, onUnmounted, inject, computed, watch, nextTick } = Vue;
+    const { ref, onMounted, onUnmounted, inject, computed, watch } = Vue;
 
-    // Data|Map service
     const chartRegister = window.ChartService.chartCategories["Water"];
     const mapRegister = window.MapService.mapCategories["Water"];
     const loadScript = window.loadScriptWithTracking;
-
-    // View identification for memory management
     const VIEW_NAME = "Water";
 
-    // Global selection state
     const yearIndex = ref(0);
     const selectYear = ref(2020);
     const selectRegion = inject("globalSelectedRegion");
 
-    // Available variables
     const availableYears = ref([]);
     const availableUnit = {
-      Area: "Hectares",
-      Economics: "AUD",
-      GHG: "Mt CO2e",
-      Water: "ML",
-      Biodiversity: "Relative Percentage (Pre-1750 = 100%)",
+      Area: "Hectares", Economics: "AUD", GHG: "Mt CO2e",
+      Water: "ML", Biodiversity: "Relative Percentage (Pre-1750 = 100%)",
     };
 
-    // Available selections
     const availableCategories = ["Sum", "Ag", "Ag Mgt", "Non-Ag"];
     const availableAgMgt = ref([]);
     const availableWater = ref([]);
     const availableLanduse = ref([]);
 
-    // Map selection state
     const selectCategory = ref("");
     const selectAgMgt = ref("");
     const selectWater = ref("");
     const selectLanduse = ref("");
 
-    // Previous selections memory
     const previousSelections = ref({
       "Sum": { landuse: "" },
       "Ag": { water: "", landuse: "" },
@@ -46,72 +35,39 @@ window.WaterView = {
       "Non-Ag": { landuse: "" }
     });
 
-    // UI state
     const dataLoaded = ref(false);
     const isLoadingData = ref(false);
-    const triggerVersion = ref(0);
     const isDrawerOpen = ref(false);
 
-    // Sum-tab: Type key → display label and series name
     const SUM_TYPE_LABELS = { 'ALL': 'ALL', 'ag': 'Ag', 'non-ag': 'Non-Ag', 'ag-man': 'Ag Mgt' };
     const SUM_TYPE_TO_SERIES = { 'ag': 'Agricultural Land-use', 'ag-man': 'Agricultural Management', 'non-ag': 'Non-Agricultural Land-use' };
     function formatLanduse(val) {
       return selectCategory.value === 'Sum' ? (SUM_TYPE_LABELS[val] || val) : val;
     }
 
-    // Reactive data
-    // map_water_yield_Sum:   Type → Year
-    // map_water_yield_Ag:    Water → LU → Year
-    // map_water_yield_Am:    AgMgt → Water → LU → Year
-    // map_water_yield_NonAg: LU → Year
-    const selectMapData = computed(() => {
-      const cat = selectCategory.value;
-      const agMgt = selectAgMgt.value;
-      const water = selectWater.value;
-      const landuse = selectLanduse.value;
-      const year = selectYear.value;
-      void triggerVersion.value;
-      if (!dataLoaded.value) return {};
-      const mapData = window[mapRegister[cat]["name"]];
-      if (cat === "Sum") {
-        return mapData?.[landuse]?.[year] || {};
-      } else if (cat === "Ag") {
-        return mapData?.[water]?.[landuse]?.[year] || {};
-      } else if (cat === "Ag Mgt") {
-        return mapData?.[agMgt]?.[water]?.[landuse]?.[year] || {};
-      } else if (cat === "Non-Ag") {
-        return mapData?.[landuse]?.[year] || {};
-      }
-      return {};
-    });
+    // ── Per-combo map layer loader ──────────────────────────────────────────
+    const { currentLayerData, ensureComboLayer } = window.createMapLayerLoader(VIEW_NAME);
 
-    // Water_Sum_NRM chart:   Region → [series(name=TypeDisplayLabel)]
-    // Water_Ag_NRM chart:    Region → Water → [series(name=LU)]
-    // Water_Am_NRM chart:    Region → Water → LU → [series(name=AgMgt)]
-    // Water_NonAg_NRM chart: Region → [series(name=LU)]
+    const selectMapData = computed(() => currentLayerData.value?.[selectYear.value] ?? {});
+
     const selectChartData = computed(() => {
       const cat = selectCategory.value;
       const agMgt = selectAgMgt.value;
       const water = selectWater.value;
       const landuse = selectLanduse.value;
       const region = selectRegion.value;
-      void triggerVersion.value;
       if (!dataLoaded.value) return {};
-      const chartData = window[chartRegister["NRM"][cat]["name"]]?.[region];
+      const chartData = window[chartRegister["NRM"]?.[cat]?.["name"]]?.[region];
       let seriesData;
 
       if (cat === "Sum") {
-        // Sum: region → [series(name=TypeDisplayLabel)]
         const items = chartData || [];
         const seriesName = SUM_TYPE_TO_SERIES[landuse];
-        seriesData = (landuse === "ALL" || !landuse)
-          ? items : items.filter(s => s.name === seriesName);
+        seriesData = (landuse === "ALL" || !landuse) ? items : items.filter(s => s.name === seriesName);
       } else if (cat === "Ag") {
-        seriesData = chartData?.[water] || [];
-        seriesData = seriesData.filter(s => landuse === "ALL" || s.name === landuse);
+        seriesData = (chartData?.[water] || []).filter(s => landuse === "ALL" || s.name === landuse);
       } else if (cat === "Ag Mgt") {
-        seriesData = chartData?.[water]?.[landuse] || [];
-        seriesData = seriesData.filter(s => agMgt === "ALL" || s.name === agMgt);
+        seriesData = (chartData?.[water]?.[landuse] || []).filter(s => agMgt === "ALL" || s.name === agMgt);
       } else if (cat === "Non-Ag") {
         seriesData = (chartData || []).filter(s => landuse === "ALL" || s.name === landuse);
       }
@@ -124,22 +80,23 @@ window.WaterView = {
       };
     });
 
-    // Memory cleanup on component unmount
-    onUnmounted(() => {
-      window.MemoryService.cleanupViewData(VIEW_NAME);
-    });
+    onUnmounted(() => { window.MemoryService.cleanupViewData(VIEW_NAME); });
 
-    // ── Lazy loader (maps only) ──────────────────────────────────────────────
-    async function ensureDataLoaded(cat) {
+    function getTree(cat) {
+      const t = window[mapRegister[cat]?.indexName]?.tree;
+      if (t !== undefined) return t;
+      return (cat === "Non-Ag" || cat === "Sum") ? [] : {};
+    }
+
+    async function ensureIndexLoaded(cat) {
       const mapEntry = mapRegister[cat];
-      if (mapEntry && !window[mapEntry.name]) {
+      if (mapEntry && !window[mapEntry.indexName]) {
         isLoadingData.value = true;
-        await loadScript(mapEntry.path, mapEntry.name, VIEW_NAME);
+        await loadScript(mapEntry.indexPath, mapEntry.indexName, VIEW_NAME);
         isLoadingData.value = false;
       }
     }
 
-    // Pre-load ALL chart files on mount (they are small)
     async function loadAllCharts() {
       const pending = [];
       for (const regionDict of Object.values(chartRegister)) {
@@ -158,167 +115,116 @@ window.WaterView = {
       availableYears.value = window.Supporting_info.years;
       selectYear.value = availableYears.value[0] || 2020;
 
-      // Load initial map + ALL charts in parallel
-      const initCat = availableCategories[0]; // "Sum"
-      await Promise.all([ensureDataLoaded(initCat), loadAllCharts()]);
+      const initCat = "Sum";
+      await Promise.all([ensureIndexLoaded(initCat), loadAllCharts()]);
 
-      // Cascade initial selections synchronously (Sum: Type only)
-      // Cascade initial selections synchronously (Sum: Type only)
-      const initData = window[mapRegister[initCat]["name"]];
+      const tree = getTree(initCat);
       availableWater.value = [];
-      availableLanduse.value = Object.keys(initData || {});
+      availableLanduse.value = Array.isArray(tree) ? tree : Object.keys(tree);
       selectLanduse.value = availableLanduse.value[0] || '';
 
+      await ensureComboLayer(mapRegister[initCat].layerPrefix, [selectLanduse.value]);
       selectCategory.value = initCat;
       dataLoaded.value = true;
     });
 
-    // Watchers and methods
-    const toggleDrawer = () => {
-      isDrawerOpen.value = !isDrawerOpen.value;
-    };
+    const toggleDrawer = () => { isDrawerOpen.value = !isDrawerOpen.value; };
+    watch(yearIndex, (i) => { selectYear.value = availableYears.value[i]; });
 
-    watch(yearIndex, (newIndex) => {
-      selectYear.value = availableYears.value[newIndex];
-    });
+    watch(selectCategory, async (newCat, oldCat) => {
+      if (oldCat === "Sum") previousSelections.value["Sum"] = { landuse: selectLanduse.value };
+      if (oldCat === "Ag") previousSelections.value["Ag"] = { water: selectWater.value, landuse: selectLanduse.value };
+      if (oldCat === "Ag Mgt") previousSelections.value["Ag Mgt"] = { agMgt: selectAgMgt.value, water: selectWater.value, landuse: selectLanduse.value };
+      if (oldCat === "Non-Ag") previousSelections.value["Non-Ag"] = { landuse: selectLanduse.value };
 
-    // Progressive selection chain watchers
-    watch(selectCategory, async (newCategory, oldCategory) => {
-      // Save previous selections before switching
-      if (oldCategory === "Sum") {
-        previousSelections.value["Sum"] = { landuse: selectLanduse.value };
-      } else if (oldCategory === "Ag") {
-        previousSelections.value["Ag"] = { water: selectWater.value, landuse: selectLanduse.value };
-      } else if (oldCategory === "Ag Mgt") {
-        previousSelections.value["Ag Mgt"] = { agMgt: selectAgMgt.value, water: selectWater.value, landuse: selectLanduse.value };
-      } else if (oldCategory === "Non-Ag") {
-        previousSelections.value["Non-Ag"] = { landuse: selectLanduse.value };
-      }
+      const curWater = selectWater.value, curLanduse = selectLanduse.value, curAgMgt = selectAgMgt.value;
+      await ensureIndexLoaded(newCat);
+      const tree = getTree(newCat);
 
-      // Remember current selections for cross-category restore
-      const curWater = selectWater.value;
-      const curLanduse = selectLanduse.value;
-      const curAgMgt = selectAgMgt.value;
-
-      // Only fetch if not already loaded (avoid unnecessary microtask yield)
-      const _me = mapRegister[newCategory];
-      if (_me && !window[_me.name]) {
-        await ensureDataLoaded(newCategory);
-      }
-
-      const sumData = window[mapRegister["Sum"]["name"]];
-      const agData = window[mapRegister["Ag"]["name"]];
-      const amData = window[mapRegister["Ag Mgt"]["name"]];
-      const nonAgData = window[mapRegister["Non-Ag"]["name"]];
-
-      if (newCategory === "Sum") {
-        // Cascade: Type only
+      if (newCat === "Sum" || newCat === "Non-Ag") {
         availableWater.value = [];
-        availableLanduse.value = Object.keys(sumData || {});
-        const prevLanduse = previousSelections.value["Sum"].landuse || curLanduse;
-        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
-
-      } else if (newCategory === "Ag") {
-        // Cascade: Water → LU
-        availableWater.value = Object.keys(agData || {});
+        availableLanduse.value = Array.isArray(tree) ? tree : Object.keys(tree);
+        const prev = previousSelections.value[newCat]?.landuse || curLanduse;
+        selectLanduse.value = (prev && availableLanduse.value.includes(prev)) ? prev : (availableLanduse.value[0] || '');
+        await ensureComboLayer(mapRegister[newCat].layerPrefix, [selectLanduse.value]);
+      } else if (newCat === "Ag") {
+        availableWater.value = Object.keys(tree);
         const prevWater = previousSelections.value["Ag"].water || curWater;
         selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
-
-        availableLanduse.value = Object.keys(agData?.[selectWater.value] || {});
+        availableLanduse.value = tree[selectWater.value] || [];
         const prevLanduse = previousSelections.value["Ag"].landuse || curLanduse;
         selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
-
-      } else if (newCategory === "Ag Mgt") {
-        // Cascade: AgMgt → Water → LU
-        availableAgMgt.value = Object.keys(amData || {});
+        await ensureComboLayer(mapRegister["Ag"].layerPrefix, [selectWater.value, selectLanduse.value]);
+      } else if (newCat === "Ag Mgt") {
+        availableAgMgt.value = Object.keys(tree);
         const prevAgMgt = previousSelections.value["Ag Mgt"].agMgt || curAgMgt;
         selectAgMgt.value = (prevAgMgt && availableAgMgt.value.includes(prevAgMgt)) ? prevAgMgt : (availableAgMgt.value[0] || '');
-
-        availableWater.value = Object.keys(amData?.[selectAgMgt.value] || {});
+        availableWater.value = Object.keys(tree[selectAgMgt.value] || {});
         const prevWater = previousSelections.value["Ag Mgt"].water || curWater;
         selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
-
-        availableLanduse.value = Object.keys(amData?.[selectAgMgt.value]?.[selectWater.value] || {});
+        availableLanduse.value = tree[selectAgMgt.value]?.[selectWater.value] || [];
         const prevLanduse = previousSelections.value["Ag Mgt"].landuse || curLanduse;
         selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
-
-      } else if (newCategory === "Non-Ag") {
-        // Cascade: LU only
-        availableLanduse.value = Object.keys(nonAgData || {});
-        const prevLanduse = previousSelections.value["Non-Ag"].landuse || curLanduse;
-        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
+        await ensureComboLayer(mapRegister["Ag Mgt"].layerPrefix, [selectAgMgt.value, selectWater.value, selectLanduse.value]);
       }
-      triggerVersion.value++;
     });
 
-    watch(selectAgMgt, (newAgMgt) => {
+    watch(selectAgMgt, async (newAgMgt) => {
       if (selectCategory.value !== "Ag Mgt") return;
       previousSelections.value["Ag Mgt"].agMgt = newAgMgt;
-      const amData = window[mapRegister["Ag Mgt"]["name"]];
-
-      availableWater.value = Object.keys(amData?.[newAgMgt] || {});
+      const tree = getTree("Ag Mgt");
+      availableWater.value = Object.keys(tree[newAgMgt] || {});
       const prevWater = previousSelections.value["Ag Mgt"].water;
       selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
-
-      availableLanduse.value = Object.keys(amData?.[newAgMgt]?.[selectWater.value] || {});
+      availableLanduse.value = tree[newAgMgt]?.[selectWater.value] || [];
       const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
       selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
+      await ensureComboLayer(mapRegister["Ag Mgt"].layerPrefix, [newAgMgt, selectWater.value, selectLanduse.value]);
     });
 
-    watch(selectWater, (newWater) => {
-      if (selectCategory.value === "Ag") {
+    watch(selectWater, async (newWater) => {
+      const cat = selectCategory.value;
+      if (cat === "Ag") {
         previousSelections.value["Ag"].water = newWater;
-        const agData = window[mapRegister["Ag"]["name"]];
-
-        availableLanduse.value = Object.keys(agData?.[newWater] || {});
+        const tree = getTree("Ag");
+        availableLanduse.value = tree[newWater] || [];
         const prevLanduse = previousSelections.value["Ag"].landuse;
         selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
-
-      } else if (selectCategory.value === "Ag Mgt") {
+        await ensureComboLayer(mapRegister["Ag"].layerPrefix, [newWater, selectLanduse.value]);
+      } else if (cat === "Ag Mgt") {
         previousSelections.value["Ag Mgt"].water = newWater;
-        const amData = window[mapRegister["Ag Mgt"]["name"]];
-
-        availableLanduse.value = Object.keys(amData?.[selectAgMgt.value]?.[newWater] || {});
+        const tree = getTree("Ag Mgt");
+        availableLanduse.value = tree[selectAgMgt.value]?.[newWater] || [];
         const prevLanduse = previousSelections.value["Ag Mgt"].landuse;
         selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
+        await ensureComboLayer(mapRegister["Ag Mgt"].layerPrefix, [selectAgMgt.value, newWater, selectLanduse.value]);
       }
     });
 
-    watch(selectLanduse, (newLanduse) => {
-      if (selectCategory.value === "Sum") {
+    watch(selectLanduse, async (newLanduse) => {
+      const cat = selectCategory.value;
+      if (cat === "Sum") {
         previousSelections.value["Sum"].landuse = newLanduse;
-      } else if (selectCategory.value === "Ag") {
+        await ensureComboLayer(mapRegister["Sum"].layerPrefix, [newLanduse]);
+      } else if (cat === "Ag") {
         previousSelections.value["Ag"].landuse = newLanduse;
-      } else if (selectCategory.value === "Ag Mgt") {
+        await ensureComboLayer(mapRegister["Ag"].layerPrefix, [selectWater.value, newLanduse]);
+      } else if (cat === "Ag Mgt") {
         previousSelections.value["Ag Mgt"].landuse = newLanduse;
-      } else if (selectCategory.value === "Non-Ag") {
+        await ensureComboLayer(mapRegister["Ag Mgt"].layerPrefix, [selectAgMgt.value, selectWater.value, newLanduse]);
+      } else if (cat === "Non-Ag") {
         previousSelections.value["Non-Ag"].landuse = newLanduse;
+        await ensureComboLayer(mapRegister["Non-Ag"].layerPrefix, [newLanduse]);
       }
     });
 
     const _state = {
-      yearIndex,
-      selectYear,
-      selectRegion,
-
-      availableYears,
-      availableCategories,
-      availableAgMgt,
-      availableWater,
-      availableLanduse,
-
-      selectCategory,
-      selectAgMgt,
-      selectWater,
-      selectLanduse,
-
-      selectMapData,
-      selectChartData,
-      formatLanduse,
-
-      dataLoaded, isLoadingData,
-      isDrawerOpen,
-      toggleDrawer,
+      yearIndex, selectYear, selectRegion,
+      availableYears, availableCategories,
+      availableAgMgt, availableWater, availableLanduse,
+      selectCategory, selectAgMgt, selectWater, selectLanduse,
+      selectMapData, selectChartData, formatLanduse,
+      dataLoaded, isLoadingData, isDrawerOpen, toggleDrawer,
     };
     window._debug[VIEW_NAME] = _state;
     return _state;

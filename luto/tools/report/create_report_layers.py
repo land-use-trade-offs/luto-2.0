@@ -19,6 +19,7 @@
 
 
 import os
+import re
 import json
 import numpy as np
 import pandas as pd
@@ -33,7 +34,6 @@ from luto.tools.report.data_tools import (
     build_map_legend,
     hex_color_to_numeric,
     rename_reorder_hierarchy,
-    tuple_dict_to_nested,
 )
 
 from luto.tools.report.data_tools.parameters import (
@@ -46,6 +46,67 @@ from luto.tools.report.data_tools.parameters import (
 
 
 
+def safe_key(s: str) -> str:
+    """Convert arbitrary string to a safe filename/JS-variable suffix."""
+    return re.sub(r'[^a-zA-Z0-9]+', '_', str(s)).strip('_')
+
+
+def _build_tree(combos: list) -> list | dict:
+    """Recursively build a nested tree from combo tuples; the last level becomes a list."""
+    if not combos:
+        return []
+    if len(combos[0]) == 1:
+        seen = dict.fromkeys(c[0] for c in combos)   # unique, ordered
+        return list(seen)
+    groups: dict = {}
+    for combo in combos:
+        groups.setdefault(combo[0], []).append(combo[1:])
+    return {k: _build_tree(v) for k, v in groups.items()}
+
+
+def _write_split_by_combo(flat_output: dict, dim_names: list, save_path: str) -> None:
+    """
+    Write one JS file per unique dimension-combo (all dims except year) and an
+    index file listing all valid combos for cascade selection.
+
+    flat_output : { (dim1, ..., dimN, year): layer_data }
+    dim_names   : display names for dim1 … dimN (excluding year)
+    save_path   : base path such as ``.../map_area_Ag.js``
+
+    Writes:
+      <prefix>__index.js                     — window["…__index"] = { dims, tree }
+      <prefix>__<safe1>__…__<safeN>.js       — window["…__…"] = { year: layer_data }
+    """
+    prefix = save_path.removesuffix('.js')
+    base_name = os.path.basename(prefix)
+    os.makedirs(os.path.dirname(prefix), exist_ok=True)
+
+    # Group flat tuples by combo = everything except the last element (year)
+    combos: dict = {}
+    for tp, data in flat_output.items():
+        combo, year = tp[:-1], tp[-1]
+        combos.setdefault(combo, {})[year] = data
+
+    # Write per-combo files
+    for combo, year_data in combos.items():
+        safe_parts = [safe_key(v) for v in combo]
+        var_suffix = '__'.join(safe_parts)
+        var_name = f'{base_name}__{var_suffix}'
+        with open(f'{prefix}__{var_suffix}.js', 'w') as f:
+            f.write(f'window["{var_name}"] = ')
+            json.dump(year_data, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
+
+    # Build and write index
+    tree = _build_tree(list(combos.keys()))
+    index = {'dims': dim_names, 'tree': tree}
+    index_name = f'{base_name}__index'
+    with open(f'{prefix}__index.js', 'w') as f:
+        f.write(f'window["{index_name}"] = ')
+        json.dump(index, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
+
+
 def map2base64(
     ds_template:str, 
     arr_sel:xr.DataArray, 
@@ -53,6 +114,7 @@ def map2base64(
     legend:dict, 
     hierarchy_tp:tuple,
     layer_magnitude:int,
+    legend_key:str|None = None,
 ) -> tuple:
 
     # Get an template rio-xarray, it will be used to convert 1D array to its 2D map format
@@ -65,7 +127,7 @@ def map2base64(
         # layer_magnitude is None in this case
         img_attrs = {
             'intOrFloat': 'int',
-            'legend': legend['legend'],
+            'legendKey': legend_key,
         }
     else:
         # Rescale layers using the provided magnitude: positives → red (51–100), negatives → blue (1–50).
@@ -105,7 +167,6 @@ def map2base64(
         arr_sel = arr_sel.astype(np.float32)
         img_attrs = {
             'intOrFloat': 'float',
-            'legend': legend['legend'],
             'min_max': min_max,
         }
 
@@ -131,13 +192,22 @@ def map2base64(
     
 
 def get_map2json(
-    files_df:pd.DataFrame, 
-    legend_int:dict, 
-    legend_int_level:dict|str, 
-    legend_float:dict, 
+    files_df:pd.DataFrame,
+    legend_int:dict,
+    legend_int_level:dict|str,
+    legend_float:dict,
     float_magnitude:tuple|dict,
-    save_path:str, 
+    save_path:str,
+    legend_key_int:str|None = None,
     ) -> None:
+    """
+    Render all layers from *files_df* to base64 map images and write split JS files.
+
+    Writes one file per unique dimension-combo (all dims except year) plus an
+    index file listing valid combos for Vue cascade selection:
+      - ``<save_path_without_js>__index.js``        — { dims, tree }
+      - ``<save_path_without_js>__<combo>.js``       — { year: layer_data }
+    """
     
     # Determine number of workers from memory budget.
     ncells = 5_000_000 // (settings.RESFACTOR ** 2)    # Number of cells in resfactored layer.
@@ -154,12 +224,13 @@ def get_map2json(
         else:
             raise ValueError('legend_int_level must be None, a dict, or a str')
         if isInt:
-            return True, legend_int, None
+            return True, legend_int, None, legend_key_int
         magnitude = float_magnitude[sel['Commodity']] if isinstance(float_magnitude, dict) else float_magnitude
-        return False, legend_float, magnitude
+        return False, legend_float, magnitude, None
 
     # Process one file at a time so only one file's arrays are in memory at once
-    output = {}
+    flat_output = {}
+    dim_names: list | None = None
     for _, row in files_df.iterrows():
         xr_arr = cfxr.decode_compress_to_multi_index(xr.open_dataset(row['path']), 'layer')['data']
         ds_template = f'{os.path.dirname(row["path"])}/xr_map_template_{row["Year"]}.nc'
@@ -183,8 +254,11 @@ def get_map2json(
         for batch in (valid_layers[i:i+workers] for i in range(0, len(valid_layers), workers)):
             tasks = []
             for sel in batch:
-                isInt, legend, magnitude = get_legend_params(sel)
-                hierarchy_tp = tuple(list(rename_reorder_hierarchy(sel).values()) + [row['Year']])
+                isInt, legend, magnitude, legend_key = get_legend_params(sel)
+                renamed = rename_reorder_hierarchy(sel)
+                if dim_names is None:
+                    dim_names = list(renamed.keys())
+                hierarchy_tp = tuple(list(renamed.values()) + [row['Year']])
                 # Build a lightweight DataArray without the stacked 'layer' MultiIndex.
                 vals = xr_arr.sel(**sel).values.copy()
                 # Some files leave a residual size-1 dim after sel (e.g. transition
@@ -195,24 +269,16 @@ def get_map2json(
                     vals = vals.reshape(-1)
                 coords = {'is_selected': ('cell', is_selected_arr)} if is_selected_arr is not None else None
                 arr_lite = xr.DataArray(vals, dims=('cell',), coords=coords)
-                tasks.append(delayed(map2base64)(ds_template, arr_lite, isInt, legend, hierarchy_tp, magnitude))
+                tasks.append(delayed(map2base64)(ds_template, arr_lite, isInt, legend, hierarchy_tp, magnitude, legend_key))
 
             for hierarchy_tp, val_dict in Parallel(n_jobs=workers, return_as='generator', max_nbytes=None)(tasks):
-                output[hierarchy_tp] = val_dict
+                flat_output[hierarchy_tp] = val_dict
 
         xr_arr.close()
-        
-    # To nested dict
-    output = tuple_dict_to_nested(output)
 
-    if not os.path.exists(os.path.dirname(save_path)):
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-
-    with open(save_path, 'w') as f:
-        filename = os.path.basename(save_path).replace('.js', '')
-        f.write(f'window["{filename}"] = ')
-        json.dump(output, f, separators=(',', ':'), indent=2)
-        f.write(';\n')
+    if not flat_output:
+        return
+    _write_split_by_combo(flat_output, dim_names or [], save_path)
         
 
 
@@ -243,12 +309,27 @@ def save_report_layer(raw_data_dir:str):
         'code_colors': {code: hex_color_to_numeric(hex_c) for code, hex_c in COLORS_FLOAT.items()}
     }
 
+    # Save shared legend registry — one small JS file loaded once by the Vue UI.
+    # Each combo-layer file stores only a 'legendKey' string instead of the full
+    # legend dict, which eliminates massive redundancy across per-year entries.
+    _legend_registry = {
+        'ag':     legend_ag['legend'],
+        'am':     legend_am['legend'],
+        'non_ag': legend_non_ag['legend'],
+        'lumap':  legend_lumap['legend'],
+    }
+    with open(f'{SAVE_DIR}/map_layers/legend_registry.js', 'w') as _f:
+        _f.write('window["legend_registry"] = ')
+        json.dump(_legend_registry, _f, separators=(',', ':'))
+        _f.write(';\n')
+    print('│   ├── Legend registry saved.')
+
     
     ####################################################
     #                   1) LUMAP Layer                 #
     ####################################################
     lumap_ly = files.query('base_name == "xr_map_lumap"')
-    get_map2json(lumap_ly, legend_lumap, 'lm', None, None, f'{SAVE_DIR}/map_layers/map_dvar_lumap.js')
+    get_map2json(lumap_ly, legend_lumap, 'lm', None, None, f'{SAVE_DIR}/map_layers/map_dvar_lumap.js', legend_key_int='lumap')
     print('│   ├── LUMAP layer saved.')
 
 
@@ -260,15 +341,15 @@ def save_report_layer(raw_data_dir:str):
     dvar_min_max = (0, 1)
 
     dvar_ag = files.query('base_name == "xr_dvar_ag"')
-    get_map2json(dvar_ag, legend_ag, {'lu':'ALL'}, legend_float, dvar_min_max, f'{SAVE_DIR}/map_layers/map_dvar_Ag.js')
+    get_map2json(dvar_ag, legend_ag, {'lu':'ALL'}, legend_float, dvar_min_max, f'{SAVE_DIR}/map_layers/map_dvar_Ag.js', legend_key_int='ag')
     print('│   ├── Dvar Ag layer saved.')
 
     dvar_am = files.query('base_name == "xr_dvar_am"')
-    get_map2json(dvar_am, legend_am, {'am':'ALL'}, legend_float, dvar_min_max, f'{SAVE_DIR}/map_layers/map_dvar_Am.js')
+    get_map2json(dvar_am, legend_am, {'am':'ALL'}, legend_float, dvar_min_max, f'{SAVE_DIR}/map_layers/map_dvar_Am.js', legend_key_int='am')
     print('│   ├── Dvar Am layer saved.')
 
     dvar_nonag = files.query('base_name == "xr_dvar_non_ag"')
-    get_map2json(dvar_nonag, legend_non_ag, {'lu':'ALL'}, legend_float, dvar_min_max, f'{SAVE_DIR}/map_layers/map_dvar_NonAg.js')
+    get_map2json(dvar_nonag, legend_non_ag, {'lu':'ALL'}, legend_float, dvar_min_max, f'{SAVE_DIR}/map_layers/map_dvar_NonAg.js', legend_key_int='non_ag')
     print('│   ├── Dvar Non-Ag layer saved.')
     
     
@@ -289,17 +370,17 @@ def save_report_layer(raw_data_dir:str):
     
 
     area_ag = files_area.query('base_name == "xr_area_agricultural_landuse"')
-    get_map2json(area_ag, legend_ag, {'lu':'ALL'}, legend_float, area_min_max, f'{SAVE_DIR}/map_layers/map_area_Ag.js')
+    get_map2json(area_ag, legend_ag, {'lu':'ALL'}, legend_float, area_min_max, f'{SAVE_DIR}/map_layers/map_area_Ag.js', legend_key_int='ag')
     print('│   ├── Area Ag layer saved.')
     
     # files_df,legend_int,legend_int_level,legend_float,float_magnitude,save_path = area_ag, legend_ag, {'lu':'ALL'}, legend_float, area_min_max, f'{SAVE_DIR}/map_layers/map_area_Ag.js'
     
     area_nonag = files_area.query('base_name == "xr_area_non_agricultural_landuse"')
-    get_map2json(area_nonag, legend_non_ag, {'lu':'ALL'}, legend_float, area_min_max, f'{SAVE_DIR}/map_layers/map_area_NonAg.js')
+    get_map2json(area_nonag, legend_non_ag, {'lu':'ALL'}, legend_float, area_min_max, f'{SAVE_DIR}/map_layers/map_area_NonAg.js', legend_key_int='non_ag')
     print('│   ├── Area Non-Ag layer saved.')
 
     area_am = files_area.query('base_name == "xr_area_agricultural_management"')
-    get_map2json(area_am, legend_am, {'am':'ALL'}, legend_float, area_min_max, f'{SAVE_DIR}/map_layers/map_area_Am.js')
+    get_map2json(area_am, legend_am, {'am':'ALL'}, legend_float, area_min_max, f'{SAVE_DIR}/map_layers/map_area_Am.js', legend_key_int='am')
     print('│   ├── Area Am layer saved.')
 
 
@@ -606,19 +687,19 @@ def save_report_layer(raw_data_dir:str):
     prod_min_max = {k: (min(v), max(v)) for k, v in prod_magnitudes.items()}
 
     quantities_ag = files_quantities.query('base_name == "xr_quantities_agricultural"')
-    get_map2json(quantities_ag, legend_ag, {'Commodity':'ALL'}, legend_float, prod_min_max, f'{SAVE_DIR}/map_layers/map_quantities_Ag.js')
+    get_map2json(quantities_ag, legend_ag, {'Commodity':'ALL'}, legend_float, prod_min_max, f'{SAVE_DIR}/map_layers/map_quantities_Ag.js', legend_key_int='ag')
     print('│   ├── Quantities Ag layer saved.')
 
     quantities_am = files_quantities.query('base_name == "xr_quantities_agricultural_management"')
-    get_map2json(quantities_am, legend_am, {'Commodity':'ALL'}, legend_float, prod_min_max, f'{SAVE_DIR}/map_layers/map_quantities_Am.js')
+    get_map2json(quantities_am, legend_am, {'Commodity':'ALL'}, legend_float, prod_min_max, f'{SAVE_DIR}/map_layers/map_quantities_Am.js', legend_key_int='am')
     print('│   ├── Quantities Am layer saved.')
 
     quantities_nonag = files_quantities.query('base_name == "xr_quantities_non_agricultural"')
-    get_map2json(quantities_nonag, legend_non_ag, {'Commodity':'ALL'}, legend_float, prod_min_max, f'{SAVE_DIR}/map_layers/map_quantities_NonAg.js')
+    get_map2json(quantities_nonag, legend_non_ag, {'Commodity':'ALL'}, legend_float, prod_min_max, f'{SAVE_DIR}/map_layers/map_quantities_NonAg.js', legend_key_int='non_ag')
     print('│   ├── Quantities Non-Ag layer saved.')
 
     quantities_sum = files_quantities.query('base_name == "xr_quantities_sum"')
-    get_map2json(quantities_sum, legend_ag, {'Commodity':'ALL'}, legend_float, prod_min_max, f'{SAVE_DIR}/map_layers/map_quantities_Sum.js')
+    get_map2json(quantities_sum, legend_ag, {'Commodity':'ALL'}, legend_float, prod_min_max, f'{SAVE_DIR}/map_layers/map_quantities_Sum.js', legend_key_int='ag')
     print('│   ├── Quantities Sum layer saved.')
 
 
