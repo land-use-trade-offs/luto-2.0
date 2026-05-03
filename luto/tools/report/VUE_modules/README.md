@@ -49,7 +49,7 @@ VUE_modules/
 │   ├── sidebar.js                      # <side-bar>          — Navigation sidebar
 │   ├── ranking_cards.js                # <ranking-cards>     — Top-N land-use ranking cards
 │   ├── filterable_dropdown.js          # <filterable-dropdown> — Searchable dropdown
-│   └── helpers.js                      # loadScriptWithTracking() — on-demand JS loader
+│   └── helpers.js                      # loadScriptWithTracking() + createMapLayerLoader() — on-demand JS loaders
 │
 ├── views/                              # Route-level page components
 │   ├── Home.js                         # / — overview charts, transition heatmap, ranking cards, run settings
@@ -81,28 +81,23 @@ VUE_modules/
 │   ├── geo/
 │   │   ├── NRM_AUS.js                  # GeoJSON — Australian NRM boundaries
 │   │   └── biodiversity_GBF2_mask.js   # GBF2 priority-area mask polygon
-│   ├── map_layers/                     # Base64 spatial raster tiles (one JS file per layer × year)
-│   │   ├── map_area_Ag/Am/NonAg.js
-│   │   ├── map_GHG_Sum/Ag/Am/NonAg.js
-│   │   ├── map_water_yield_Sum/Ag/Am/NonAg.js
-│   │   ├── map_quantities_Sum/Ag/Am/NonAg.js
-│   │   ├── map_economics_Sum_profit.js
-│   │   ├── map_economics_Ag_profit/revenue/cost.js
-│   │   ├── map_economics_Ag_transition_ag2ag/nonag2ag.js
-│   │   ├── map_economics_Am_profit/revenue/cost.js
-│   │   ├── map_economics_NonAg_profit/revenue/cost.js
-│   │   ├── map_economics_NonAg_transition_ag2non_ag/nonag2nonag.js
-│   │   ├── map_bio_GBF2_Sum/Ag/Am/NonAg.js
-│   │   ├── map_bio_GBF3_NVIS_Ag/Am/NonAg.js
-│   │   ├── map_bio_GBF3_IBRA_Ag/Am/NonAg.js
-│   │   ├── map_bio_GBF4_ECNES_Ag/Am/NonAg.js
-│   │   ├── map_bio_GBF4_SNES_Ag/Am/NonAg.js
-│   │   ├── map_bio_GBF8_groups_Ag/Am/NonAg.js
-│   │   ├── map_bio_GBF8_Ag/Am/NonAg.js
-│   │   ├── map_bio_overall_All/Ag/Am/NonAg.js
-│   │   ├── map_dvar_Ag/Am/NonAg/lumap.js
-│   │   ├── map_renewable_energy_Am.js
-│   │   └── map_transition_area_ag2ag.js
+│   ├── map_layers/                     # Base64 spatial raster tiles — split-file pattern
+│   │   │                               #   <prefix>__index.js          — dim tree + valid combos
+│   │   │                               #   <prefix>__<d1>__<d2>….js    — all years for that combo
+│   │   ├── map_area_Ag__index.js  +  map_area_Ag__<lm>__<lu>.js  (×N combos)
+│   │   ├── map_area_Am__index.js  +  map_area_Am__<am>__<lm>__<lu>.js
+│   │   ├── map_area_NonAg__index.js  +  map_area_NonAg__<lu>.js
+│   │   ├── map_GHG_*/map_water_yield_*/map_quantities_* — same split pattern
+│   │   ├── map_economics_Ag_profit/revenue/cost/transition_* — split per combo
+│   │   ├── map_economics_Am_profit/revenue/cost — split per combo
+│   │   ├── map_economics_NonAg_profit/revenue/cost — split per combo
+│   │   ├── map_bio_GBF2_Sum/Ag/Am/NonAg — split per combo
+│   │   ├── map_bio_GBF3_NVIS/GBF4_SNES/GBF4_ECNES/GBF8_* — split per combo
+│   │   ├── map_bio_overall_* — split per combo
+│   │   ├── map_dvar_Ag/Am/NonAg/lumap — split per combo
+│   │   ├── map_renewable_energy_Am__index.js + per-combo files
+│   │   ├── map_transition_area_ag2ag__index.js + per-combo files
+│   │   └── biodiversity_GBF2_mask.js   # GeoJSON overlay — NOT split (mask entry)
 │   ├── Area_Ag/Am/NonAg.js             # Chart: region → lm → lu → [series]
 │   ├── Area_overview_*.js
 │   ├── Area_ranking.js
@@ -174,8 +169,17 @@ VUE_modules/
 ## Service Layer
 
 ### MapService (`services/MapService.js`)
-Registry of all spatial-layer JS files, keyed by `mapCategories[module][category][subcategory]`.  
-Each leaf is `{ path: "data/map_layers/...", windowName: "window_Xxx" }`.
+Registry of all spatial-layer JS files, keyed by `mapCategories[module][category][subcategory]`.
+
+Each leaf uses the **split-file pattern**:
+
+```js
+{ indexPath: "data/map_layers/<prefix>__index.js", indexName: "<prefix>__index", layerPrefix: "<prefix>" }
+```
+
+Exception: `mask` entries (Biodiversity GBF2 GeoJSON overlay) remain `{ path, name }`.
+
+The index file (`window["<prefix>__index"]`) holds `{ dims: [...], tree: {…} }` where `tree` is the nested dimension hierarchy (all valid combos). Per-combo files are named `<prefix>__<safe(d1)>__…__<safe(dN)>.js`.
 
 | Module | Category | Sub-categories (map types) |
 |--------|----------|---------------------------|
@@ -367,15 +371,23 @@ This wraps each JSON file as a `window.XxxName = {...}` assignment and writes it
 
 **No build step**: views are plain `window.XxxView = { name, setup() {...} }` objects registered in `index.js` via `app.component(...)`. No SFC, no Vite, no webpack.
 
+**Split-file map loading**: map layer data is split into one JS file per dimension-combo plus an `__index.js` that lists valid combos. Views use `createMapLayerLoader(VIEW_NAME)` (from `helpers.js`) to get `{ currentLayerData, ensureComboLayer }`. On every selection change a watcher calls `await ensureComboLayer(layerPrefix, [dim1, …, dimN])`, which loads only the file for the chosen combo and releases the previous one for GC. `selectMapData` is always `computed(() => currentLayerData.value?.[selectYear.value] ?? {})`.
+
+**Index-driven option lists**: on category switch, views call `ensureIndexLoaded(cat)` to lazy-load `<prefix>__index.js`, then `getTree(cat)` reads `window[indexName].tree` to get the available dimension values.
+
 **MemoryService lifecycle**: every view follows:
+
 ```js
-onMounted(() => {
-  loadScript(src, "window_name", VIEW_NAME).then(data => { ... });
+onMounted(async () => {
+  await ensureIndexLoaded(initCat);
+  const tree = getTree(initCat);
+  // populate available* from tree, then:
+  await ensureComboLayer(mapRegister[initCat].layerPrefix, [/* initial combo */]);
 });
 onUnmounted(() => window.MemoryService.cleanupViewData(VIEW_NAME));
 ```
 
-**Cascade watchers**: each view has a chain of `watch([...upstreamRefs], () => { ... })` blocks that repopulate downstream option arrays when an upstream selection changes. Previous selections are stored in a `previousSelections` ref keyed by category.
+**Cascade watchers**: each view has a chain of `watch` blocks that repopulate downstream option arrays when an upstream selection changes, always ending with `ensureComboLayer`. Previous selections are stored in a `previousSelections` ref keyed by category.
 
 **Safe property access**: all data reads use optional chaining (`data?.[a]?.[b]?.[c]`) and fall back to `[]` or `null` to prevent white-screen errors on missing data.
 

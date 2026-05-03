@@ -7,9 +7,9 @@ Vue.js 3 dashboard (`DATA_REPORT/REPORT_HTML/index.html`) that renders LUTO simu
 | Path | Purpose |
 |------|---------|
 | `VUE_modules/views/` | View components (one per module) |
-| `VUE_modules/services/MapService.js` | Map file registry: `module → category → mapType → {path, name}` |
+| `VUE_modules/services/MapService.js` | Map file registry: `module → category → mapType → {indexPath, indexName, layerPrefix}` |
 | `VUE_modules/services/ChartService.js` | Chart file registry: `module → category → {path, name}` |
-| `VUE_modules/data/map_layers/` | Pre-rendered base64 PNG map tiles (`.js` files) |
+| `VUE_modules/data/map_layers/` | Pre-rendered base64 PNG map tiles — split into per-combo `.js` files + one `__index.js` per variable |
 | `VUE_modules/data/` | Chart time-series data (`.js` files) |
 | `VUE_modules/routes/route.js` | Vue Router configuration |
 
@@ -105,23 +105,30 @@ img_str = 'data:image/png;base64,' + base64.b64encode(
 ).decode()
 ```
 
-### Step 8 — Write `.js` file
+### Step 8 — Write split `.js` files
 
 ```python
-output = tuple_dict_to_nested(output)   # flat tuple keys → nested dict
-# writes: window["map_economics_Ag_cost"] = { "ALL": { "Area cost": { "Apples": { "2020": {...} } } } };
+_write_split_by_combo(flat_output, dim_names, save_path)
+# For each unique (dim1, …, dimN) combo, writes:
+#   map_area_Ag__Dryland__Apples.js  → window["map_area_Ag__Dryland__Apples"] = { "2020": {...}, "2025": {...} }
+# Plus one index file:
+#   map_area_Ag__index.js            → window["map_area_Ag__index"] = { dims: ["lm","lu"], tree: { "Dryland": ["Apples",...], ... } }
 ```
 
-Loaded as a `<script>` tag — no server or bundler needed, works from `file://`.
+- `safe_key(s)` converts any string to a safe filename token: `re.sub(r'[^a-zA-Z0-9]+', '_', s).strip('_')`
+- `_build_tree(combos)` recursively nests the combo list; the leaf level becomes a plain array
+- Each combo file contains **all years** for that combo — lazy-loaded only when the user selects that combo
+- Loaded as `<script>` tags — no server or bundler needed, works from `file://`
 
 ---
 
 ## Module Data Structures
 
 **General rules:**
-- **Map files**: end at `Year → {img_str, bounds, intOrFloat, legend, min_max}`. Max hierarchy: `am → lm → [source] → lu → year` (`source` only in Ag for GHG/Economics; absent from Am).
+
+- **Map files (split pattern)**: each combo `(dim1, …, dimN)` is a separate JS file containing `{ year: {img_str, bounds, intOrFloat, legend, min_max}, … }`. An index file lists all valid combos.
 - **Chart files**: end at `[series array]` where each series is `{name, data, type, color}`.
-- **MapService**: `module → Category → MapType → {path, name}` (Economics); simpler `module → Category → {path, name}` for other modules.
+- **MapService**: every non-mask entry is `{ indexPath, indexName, layerPrefix }`. Exception: `mask` entries in Biodiversity GBF2 remain `{ path, name }` (GeoJSON overlay, not a split map tile).
 
 ### Area
 
@@ -298,140 +305,210 @@ All views use the same pattern: cascading reactive selections drive `selectMapDa
 
 ### Standard cascade watchers (Area, Production, Water)
 
+All views use three helpers provided by the split-file pattern:
+
+```javascript
+// helpers.js factory — creates per-view lazy loader
+const { currentLayerData, ensureComboLayer } = window.createMapLayerLoader(VIEW_NAME);
+const selectMapData = computed(() => currentLayerData.value?.[selectYear.value] ?? {});
+
+// getTree(cat) — reads the dim tree from the already-loaded index
+function getTree(cat) {
+  return window[mapRegister[cat]?.indexName]?.tree ?? (cat === "Non-Ag" ? [] : {});
+}
+
+// ensureIndexLoaded(cat) — lazy-loads the __index.js for a category on first use
+async function ensureIndexLoaded(cat) {
+  const entry = mapRegister[cat];
+  if (entry && !window[entry.indexName]) {
+    isLoadingData.value = true;
+    await loadScript(entry.indexPath, entry.indexName, VIEW_NAME);
+    isLoadingData.value = false;
+  }
+}
+```
+
 Four watchers in fixed order — each handles all its downstream options:
 
 ```javascript
-// 1. Category → saves previous, populates AgMgt/Water/LU
-watch(selectCategory, (newCat, oldCat) => {
+// 1. Category → lazy-loads index, reads tree, populates AgMgt/Water/LU, triggers combo load
+watch(selectCategory, async (newCat, oldCat) => {
   if (oldCat) previousSelections.value[oldCat] = { agMgt: ..., water: ..., landuse: ... };
+  await ensureIndexLoaded(newCat);
+  const tree = getTree(newCat);
   if (newCat === "Ag Mgt") {
-    availableAgMgt.value   = Object.keys(window[mapRegister["Ag Mgt"]["name"]] || {});
+    availableAgMgt.value   = Object.keys(tree);
     selectAgMgt.value      = restore(prev.agMgt, availableAgMgt) || availableAgMgt.value[0];
-    availableWater.value   = Object.keys(amData?.[selectAgMgt.value] || {});
+    availableWater.value   = Object.keys(tree[selectAgMgt.value] || {});
     selectWater.value      = restore(prev.water, availableWater) || availableWater.value[0];
-    availableLanduse.value = Object.keys(amData?.[selectAgMgt.value]?.[selectWater.value] || {});
+    availableLanduse.value = tree[selectAgMgt.value]?.[selectWater.value] || [];
     selectLanduse.value    = restore(prev.landuse, availableLanduse) || availableLanduse.value[0];
-  } else if (newCat === "Ag") { /* water → lu */ }
-  else if (newCat === "Non-Ag") { /* lu only */ }
+    await ensureComboLayer(mapRegister["Ag Mgt"].layerPrefix, [selectAgMgt.value, selectWater.value, selectLanduse.value]);
+  } else if (newCat === "Ag") { /* similar: water → lu → ensureComboLayer([water, lu]) */ }
+  else if (newCat === "Non-Ag") { /* lu only → ensureComboLayer([lu]) */ }
 });
 
-// 2. AgMgt → Water → LU  (Ag Mgt only)
-watch(selectAgMgt, ...);
+// 2. AgMgt → Water → LU → ensureComboLayer  (Ag Mgt only)
+watch(selectAgMgt, async (newAgMgt) => { ... });
 
-// 3. Water → LU
-watch(selectWater, ...);
+// 3. Water → LU → ensureComboLayer
+watch(selectWater, async (newWater) => { ... });
 
-// 4. LU → save only
-watch(selectLanduse, ...);
+// 4. LU → ensureComboLayer + save
+watch(selectLanduse, async (newLanduse) => {
+  await ensureComboLayer(mapRegister[cat].layerPrefix, [/* dims for current cat */]);
+});
 ```
 
-**Rule**: Never manually clear `available*` arrays — always overwrite with new values. Each watcher handles ALL its downstream selections in one pass.
+**Rule**: Never manually clear `available*` arrays — always overwrite with new values. Each watcher handles ALL its downstream selections in one pass, ending with an `ensureComboLayer` call.
 
 ### GHG cascade
 
-GHG follows the standard pattern but **Ag adds `selectSource`** between Water and LU:
+GHG follows the standard pattern but **Ag adds `selectSource`** between Water and LU. The tree shape differs by category:
+
+- **Ag tree**: `{ water: { source: [lu] } }` — three-level
+- **Am tree**: `{ am: { lm: [lu] } }` — same as standard Am
 
 ```javascript
-// Ag category cascade: Water → Source → LU
-watch(selectWater, (newWater) => {
+// Ag category cascade: Water → Source → LU → ensureComboLayer
+watch(selectWater, async (newWater) => {
   if (selectCategory.value === "Ag") {
-    availableSource.value = Object.keys(agData?.[newWater] || {});
+    const tree = getTree("Ag");
+    availableSource.value = Object.keys(tree[newWater] || {});
     selectSource.value = restore(prev.source, availableSource) || availableSource.value[0];
-    availableLanduse.value = Object.keys(agData?.[newWater]?.[selectSource.value] || {});
+    availableLanduse.value = tree[newWater]?.[selectSource.value] || [];
     selectLanduse.value = restore(prev.landuse) || availableLanduse.value[0];
+    await ensureComboLayer(mapRegister["Ag"].layerPrefix, [newWater, selectSource.value, selectLanduse.value]);
   } // Am: standard Water → LU (no source)
 });
 
-watch(selectSource, (newSource) => {
+watch(selectSource, async (newSource) => {
   if (selectCategory.value !== "Ag") return;
-  availableLanduse.value = Object.keys(agData?.[selectWater.value]?.[newSource] || {});
+  const tree = getTree("Ag");
+  availableLanduse.value = tree[selectWater.value]?.[newSource] || [];
   selectLanduse.value = restore(prev.landuse) || availableLanduse.value[0];
+  await ensureComboLayer(mapRegister["Ag"].layerPrefix, [selectWater.value, newSource, selectLanduse.value]);
 });
 ```
 
 ### Biodiversity cascade
 
-Biodiversity wraps all cascade logic in a `doCascade(category)` helper to support the extra `selectMetric` dimension:
+Biodiversity wraps all cascade logic in a `doCascade(category)` helper to support the extra `selectMetric` dimension. It uses the same `getTree` / `ensureComboLayer` pattern but keyed on metric:
 
 ```javascript
-function doCascade(category) {
-  const mr = mapRegister[selectMetric.value];  // metric-level lookup
-  const agData   = window[mr?.["Ag"]?.["name"]];
-  const amData   = window[mr?.["Ag Mgt"]?.["name"]];
-  const nonAgData = window[mr?.["Non-Ag"]?.["name"]];
-  // ... same cascade logic as standard, but using metric-keyed data
+function getTree(metric, cat) {
+  return window[mapRegister[metric]?.[cat]?.indexName]?.tree ?? (cat === "Non-Ag" ? [] : {});
+}
+
+async function ensureIndexLoaded(metric, cat) {
+  const entry = mapRegister[metric]?.[cat];
+  if (entry && !window[entry.indexName]) {
+    isLoadingData.value = true;
+    await loadScript(entry.indexPath, entry.indexName, VIEW_NAME);
+    isLoadingData.value = false;
+  }
+}
+
+async function doCascade(cat) {
+  const metric = selectMetric.value;
+  await ensureIndexLoaded(metric, cat);
+  const tree = getTree(metric, cat);
+  // ... build combo arrays (including optional species dim), then:
+  await ensureComboLayer(mapRegister[metric][cat].layerPrefix, buildCombo(cat, tree, hasSpecies.value));
 }
 
 // Both category and metric changes call doCascade
-watch(selectCategory, (newCat, oldCat) => { /* save prev */ doCascade(newCat); });
-watch(selectMetric,   () => doCascade(selectCategory.value));
+watch(selectCategory, async (newCat, oldCat) => { /* save prev */ await doCascade(newCat); });
+watch(selectMetric,   async () => await doCascade(selectCategory.value));
 ```
+
+`buildCombo(cat, tree, withSpecies)` returns the ordered dim array for `ensureComboLayer`:
+
+- **Sum**: `[species, lu]` (with species) or `[lu]`
+- **Ag**: `[water, species, lu]` (with species) or `[water, lu]`
+- **Ag Mgt**: `[agMgt, water, species, lu]` (with species) or `[agMgt, water, lu]`
+- **Non-Ag**: `[species, lu]` (with species) or `[lu]`
 
 ### Economics cascade watchers
 
-Economics adds a `selectMapType` level and a conditional `selectSource` level:
+Economics adds a `selectMapType` level and a conditional `selectSource` level. Each unique `(category, mapType)` pair maps to a distinct `MapService` entry with its own `layerPrefix`.
 
 ```javascript
 // Combined watcher: category + mapType drive everything downstream
-watch([selectCategory, selectMapType], ([newCat, newMapType], [oldCat]) => {
+watch([selectCategory, selectMapType], async ([newCat, newMapType], [oldCat]) => {
   if (oldCat && oldCat !== newCat) saveSelections(oldCat);
 
   availableMapTypes.value = Object.keys(mapRegister[newCat] || {});
 
   // If mapType invalid for new category → restore previous or use first, then re-fire
   if (!availableMapTypes.value.includes(newMapType)) {
-    selectMapType.value = previousSelections.value[newCat]?.mapType
-      || availableMapTypes.value[0];
+    selectMapType.value = previousSelections.value[newCat]?.mapType || availableMapTypes.value[0];
     return;
   }
-  cascadeAll(newCat, newMapType);
+  // lazy-load index for (cat, mapType), read tree, populate selections
+  await ensureIndexLoaded(newCat, newMapType);
+  const tree = getTree(newCat, newMapType);
+  cascadeAll(newCat, newMapType, tree);
+  // end with ensureComboLayer for the resolved combo
 }, { immediate: true });
 
-// Source → LU  (Ag non-Profit only)
+// Source → LU → ensureComboLayer  (Ag non-Profit only)
 const hasSourceLevel = computed(() => selectCategory.value === "Ag" && selectMapType.value !== "Profit");
-watch(selectSource, (newSource) => {
+watch(selectSource, async (newSource) => {
   if (!hasSourceLevel.value) return;
-  availableLanduse.value = Object.keys(mapData[selectWater.value][newSource] || {});
+  const tree = getTree(selectCategory.value, selectMapType.value);
+  availableLanduse.value = tree[selectWater.value]?.[newSource] || [];
   selectLanduse.value = restore(prev.landuse) || availableLanduse.value[0];
+  await ensureComboLayer(mapRegister[selectCategory.value][selectMapType.value].layerPrefix,
+    [selectWater.value, newSource, selectLanduse.value]);
 });
 ```
 
 **Cascading flow**:
-`[category, mapType]` → AgMgt → Water → Source (if Ag non-Profit) → LU → save
+`[category, mapType]` → AgMgt → Water → Source (if Ag non-Profit) → LU → `ensureComboLayer`
 
 **`previousSelections` fields**:
+
 - `"Ag"`: `{ mapType, water, source, landuse }`
 - `"Ag Mgt"`: `{ mapType, agMgt, water, landuse }`
 - `"Non-Ag"`: `{ mapType, landuse }`
 
-### `selectMapData` access patterns
+### `selectMapData` access pattern
 
-Always use optional chaining: `mapData?.[a]?.[b]?.[c] || {}`.
+With the split-file pattern, **all views use the same single expression**:
 
 ```javascript
-// Standard Ag (Area, Production, Water, Biodiversity)
-mapData?.[selectWater]?.[selectLanduse]?.[year]
-// Standard Am
-mapData?.[selectAgMgt]?.[selectWater]?.[selectLanduse]?.[year]
-// Standard NonAg
-mapData?.[selectLanduse]?.[year]
+const selectMapData = computed(() => currentLayerData.value?.[selectYear.value] ?? {});
+```
+
+`currentLayerData` is a `ref` set by `ensureComboLayer` to the loaded combo's year-keyed object.
+The combo dimensions are passed explicitly when calling `ensureComboLayer`:
+
+```javascript
+// Area / Production / Water / GHG / Biodiversity — Ag
+await ensureComboLayer(layerPrefix, [selectWater.value, selectLanduse.value]);
+// Area / Production / Water / GHG / Biodiversity — Am
+await ensureComboLayer(layerPrefix, [selectAgMgt.value, selectWater.value, selectLanduse.value]);
+// Area / Production / Water / GHG / Biodiversity — NonAg
+await ensureComboLayer(layerPrefix, [selectLanduse.value]);
 
 // GHG Ag (has Source level between Water and LU)
-mapData?.[selectWater]?.[selectSource]?.[selectLanduse]?.[year]
-// GHG Am (no Source)
-mapData?.[selectAgMgt]?.[selectWater]?.[selectLanduse]?.[year]
+await ensureComboLayer(layerPrefix, [selectWater.value, selectSource.value, selectLanduse.value]);
 
-// Biodiversity: mapData = window[mapRegister[selectMetric][selectCategory]["name"]]
-//   Ag:    mapData?.[selectWater]?.[selectLanduse]?.[year]
-//   Am:    mapData?.[selectAgMgt]?.[selectWater]?.[selectLanduse]?.[year]
-//   NonAg: mapData?.[selectLanduse]?.[year]
+// Biodiversity with species (GBF3_NVIS, GBF4_SNES, GBF4_ECNES, GBF8) — Ag
+await ensureComboLayer(layerPrefix, [selectWater.value, selectSpecies.value, selectLanduse.value]);
+// Biodiversity with species — Am
+await ensureComboLayer(layerPrefix, [selectAgMgt.value, selectWater.value, selectSpecies.value, selectLanduse.value]);
 
 // Economics Ag Profit
-mapData?.[selectWater]?.[selectLanduse]?.[year]
-// Economics Ag Revenue/Cost/Transition (has Source level)
-mapData?.[selectWater]?.[selectSource]?.[selectLanduse]?.[year]
+await ensureComboLayer(layerPrefix, [selectWater.value, selectLanduse.value]);
+// Economics Ag Revenue/Cost/Transition (has Source)
+await ensureComboLayer(layerPrefix, [selectWater.value, selectSource.value, selectLanduse.value]);
 // Economics Am
-mapData?.[selectAgMgt]?.[selectWater]?.[selectLanduse]?.[year]
+await ensureComboLayer(layerPrefix, [selectAgMgt.value, selectWater.value, selectLanduse.value]);
 // Economics NonAg
-mapData?.[selectLanduse]?.[year]
+await ensureComboLayer(layerPrefix, [selectLanduse.value]);
 ```
+
+The loaded file name is derived as: `<layerPrefix>__<safe(dim1)>__…__<safe(dimN)>.js`
+where `safe(s) = s.replace(/[^a-zA-Z0-9]+/g, '_').trim('_')`.

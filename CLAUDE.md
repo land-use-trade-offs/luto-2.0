@@ -407,15 +407,23 @@ The LUTO reporting system uses Vue.js 3 with a progressive selection pattern for
 - **Am**: `am[ALL,...] → lm[ALL,dry,irr] → lu[ALL,...] → year → cell`
 - **NonAg**: `lu[ALL,...] → year → cell`
 
-### JSON Output Hierarchies (Map vs Chart)
+### Map Layer Split-File Pattern
 
-Map and Chart JSON files have different dimension hierarchies. See [CLAUDE_VUE_REPORTING.md](docs/CLAUDE_VUE_REPORTING.md) for the full per-module table.
+Map layers are split into per-combo files — **not** a single nested JS object. `create_report_layers.py` calls `_write_split_by_combo()` which writes:
 
-**Map JSON (Spatial Layers)** — ends at `year → {img_str, bounds, min_max}`:
+- `<prefix>__index.js` → `window["<prefix>__index"] = { dims: [...], tree: { dim1val: [dim2vals...], ... } }`
+- `<prefix>__<safe(d1)>__<safe(d2)>….js` → `window["..."] = { 2020: {leaf}, 2025: {leaf}, ... }`
 
-- **Ag**: `lm → lu → year` (standard); `lm → source → lu → year` (GHG/Economics)
-- **Am**: `am → lm → lu → year` (standard); no source in Am for GHG
-- **NonAg**: `lu → year`
+**MapService entries** use `{ indexPath, indexName, layerPrefix }` — not `{ path, name }`. Exception: `mask` GeoJSON overlays keep `{ path, name }`.
+
+Views load on demand via `createMapLayerLoader(VIEW_NAME)` from `helpers.js`:
+
+- `ensureComboLayer(layerPrefix, [dim1, …])` — loads the combo file, releases the previous for GC
+- `selectMapData = computed(() => currentLayerData.value?.[year] ?? {})` — same expression in every view
+
+### JSON Output Hierarchies (Chart)
+
+Chart JSON files end at `[series array]`. See [CLAUDE_VUE_REPORTING.md](docs/CLAUDE_VUE_REPORTING.md) for the full per-module table.
 
 **Chart JSON (Time Series)** — ends at `[series array]`:
 
