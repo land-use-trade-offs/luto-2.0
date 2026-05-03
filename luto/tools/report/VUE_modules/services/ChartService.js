@@ -69,6 +69,10 @@ window.ChartService = {
         },
       },
       GBF3_NVIS: {
+        Sum: {
+          path: "data/BIO_GBF3_NVIS_Sum.js",
+          name: "BIO_GBF3_NVIS_Sum",
+        },
         Ag: {
           path: "data/BIO_GBF3_NVIS_Ag.js",
           name: "BIO_GBF3_NVIS_Ag",
@@ -101,6 +105,10 @@ window.ChartService = {
         },
       },
       GBF4_SNES: {
+        Sum: {
+          path: "data/BIO_GBF4_SNES_Sum.js",
+          name: "BIO_GBF4_SNES_Sum",
+        },
         Ag: {
           path: "data/BIO_GBF4_SNES_Ag.js",
           name: "BIO_GBF4_SNES_Ag",
@@ -133,6 +141,10 @@ window.ChartService = {
         },
       },
       GBF4_ECNES: {
+        Sum: {
+          path: "data/BIO_GBF4_ECNES_Sum.js",
+          name: "BIO_GBF4_ECNES_Sum",
+        },
         Ag: {
           path: "data/BIO_GBF4_ECNES_Ag.js",
           name: "BIO_GBF4_ECNES_Ag",

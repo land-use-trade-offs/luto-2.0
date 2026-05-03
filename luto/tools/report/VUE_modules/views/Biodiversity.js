@@ -93,12 +93,6 @@ window.BiodiversityView = {
 
     // Display labels for the "Sum" category's Type dimension
     const SUM_TYPE_LABELS = { 'ALL': 'ALL', 'ag': 'Ag', 'non-ag': 'Non-Ag', 'ag-man': 'Ag Mgt' };
-    // Map Type key → series name in BIO_*_overview_sum chart data
-    const SUM_TYPE_TO_SERIES = {
-      'ag': 'Agricultural Land-use',
-      'ag-man': 'Agricultural Management',
-      'non-ag': 'Non-Agricultural Land-use',
-    };
     function formatLanduse(val) {
       return (selectCategory.value === 'Sum') ? (SUM_TYPE_LABELS[val] || val) : val;
     }
@@ -266,10 +260,11 @@ window.BiodiversityView = {
       let seriesData;
 
       if (cat === "Sum") {
-        const sumEntry = cr?.['overview']?.['sum'];
-        const sumData = window[sumEntry?.['name']]?.[region] || [];
-        const filterName = SUM_TYPE_TO_SERIES[landuse];
-        seriesData = filterName ? sumData.filter(s => s.name === filterName) : sumData;
+        // Sum chart always shows all series (ag + non-ag + ag-man + outside) stacked.
+        // The landuse/Type selector controls only the map; chart always shows full breakdown.
+        const sumEntry = cr?.['Sum'] ?? cr?.['overview']?.['sum'];
+        const rawSumData = window[sumEntry?.['name']]?.[region];
+        seriesData = (withSpecies ? rawSumData?.[species] : rawSumData) || [];
       } else if (cat === "Ag") {
         seriesData = chartData?.[water] || [];
         seriesData = seriesData.filter(s => landuse === "ALL" || s.name === landuse);
@@ -320,7 +315,7 @@ window.BiodiversityView = {
           }
         }
       }
-      if (pending.length > 0) await Promise.all(pending);
+      if (pending.length > 0) await Promise.allSettled(pending);
     }
 
     onMounted(async () => {

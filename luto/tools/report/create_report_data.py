@@ -3177,11 +3177,18 @@ def process_biodiversity_data(files, SAVE_DIR):
             
             
             
-            
+    # Shared Type → display-name mapping for biodiversity Sum charts (used by GBF3/4 blocks)
+    _SUM_TYPE_DISPLAY = {
+        'ag': 'Agricultural Land-use',
+        'non-ag': 'Non-Agricultural Land-use',
+        'ag-man': 'Agricultural Management',
+        'Outside LUTO study area': 'Outside LUTO study area',
+    }
+
     if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off' and settings.GBF3_NVIS_REGION_MODE != 'IBRA':
         filter_str = '''
             category == "biodiversity"
-            and base_name.str.contains("biodiversity_GBF3_NVIS")
+            and base_name.str.contains("biodiversity_GBF3_NVIS_scores")
         '''.strip().replace('\n','')
         
         bio_paths = files.query(filter_str).reset_index(drop=True)
@@ -3235,19 +3242,19 @@ def process_biodiversity_data(files, SAVE_DIR):
         )
         df_region = (
             pd.concat([_inside, _outside])
-            .groupby(['Year', 'region', 'Type'])
+            .groupby(['Year', 'region', 'species', 'Type'])
             .agg({'Area Weighted Score (ha)': 'sum', 'ALL_HA': 'first'})
             .reset_index()
             .assign(**{'Sum_Pct (%)': lambda d: d['Area Weighted Score (ha)'] / d['ALL_HA'] * 100})
         )
-        df_wide = _groupby_to_records(df_region, ['Type', 'region'], ['name', 'region', 'data'], value_cols=('Year', 'Sum_Pct (%)'))
+        df_wide = _groupby_to_records(df_region, ['Type', 'region', 'species'], ['name', 'region', 'species', 'data'], value_cols=('Year', 'Sum_Pct (%)'))
         df_wide['type'] = 'column'
         df_wide['color'] = df_wide['name'].apply(lambda x: COLORS[x])
 
         out_dict = {}
-        for region, df in df_wide.groupby('region'):
-            df = df.drop(['region'], axis=1)
-            out_dict[region] = df.to_dict(orient='records')
+        for (region, species_name), df in df_wide.groupby(['region', 'species']):
+            df = df.drop(['region', 'species'], axis=1)
+            out_dict.setdefault(region, {})[species_name] = df.to_dict(orient='records')
 
         filename = f'BIO_GBF3_NVIS_overview_sum'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
@@ -3255,6 +3262,37 @@ def process_biodiversity_data(files, SAVE_DIR):
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
 
+        # --- BIO_GBF3_NVIS_Sum: per-species Type breakdown from pre-computed sum CSV ---
+        sum_bio_paths = files.query(
+            'category == "biodiversity" and base_name.str.contains("biodiversity_GBF3_NVIS_sum_scores")'
+        )
+        if not sum_bio_paths.empty:
+            sum_bio_df = pd.concat(
+                [df for p in sum_bio_paths['path'] if not (df := pd.read_csv(p, low_memory=False)).empty],
+                ignore_index=True,
+            ).rename(columns={'Vegetation Group': 'species'})
+            sum_bio_df = sum_bio_df[sum_bio_df['Type'] != 'ALL'].copy()
+            sum_bio_df['name'] = sum_bio_df['Type'].map(_SUM_TYPE_DISPLAY).fillna(sum_bio_df['Type'])
+            sum_bio_df['Sum_Pct (%)'] = (
+                sum_bio_df['Area Weighted Score (ha)'] / sum_bio_df['BASE_TOTAL_SCORE'] * 100
+            )
+            df_wide_sum = _groupby_to_records(
+                sum_bio_df,
+                ['name', 'region', 'species'],
+                ['name', 'region', 'species', 'data'],
+                value_cols=('Year', 'Sum_Pct (%)'),
+            )
+            df_wide_sum['type'] = 'column'
+            df_wide_sum['color'] = df_wide_sum['name'].apply(lambda x: COLORS[x])
+            out_dict_sum = {}
+            for (region, species_name), df in df_wide_sum.groupby(['region', 'species']):
+                df = df.drop(['region', 'species'], axis=1)
+                out_dict_sum.setdefault(region, {})[species_name] = df.to_dict(orient='records')
+            filename = 'BIO_GBF3_NVIS_Sum'
+            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+                f.write(f'window["{filename}"] = ')
+                json.dump(out_dict_sum, f, separators=(',', ':'), indent=2)
+                f.write(';\n')
 
 
         # ag
@@ -3464,25 +3502,57 @@ def process_biodiversity_data(files, SAVE_DIR):
         )
         df_region = (
             pd.concat([_inside, _outside])
-            .groupby(['Year', 'region', 'Type'])
+            .groupby(['Year', 'region', 'species', 'Type'])
             .agg({'Area Weighted Score (ha)': 'sum', 'ALL_HA': 'first'})
             .reset_index()
             .assign(**{'Sum_Pct (%)': lambda d: d['Area Weighted Score (ha)'] / d['ALL_HA'] * 100})
         )
-        df_wide = _groupby_to_records(df_region, ['Type', 'region'], ['name', 'region', 'data'], value_cols=('Year', 'Sum_Pct (%)'))
+        df_wide = _groupby_to_records(df_region, ['Type', 'region', 'species'], ['name', 'region', 'species', 'data'], value_cols=('Year', 'Sum_Pct (%)'))
         df_wide['type'] = 'column'
         df_wide['color'] = df_wide['name'].apply(lambda x: COLORS[x])
 
         out_dict = {}
-        for region, df in df_wide.groupby('region'):
-            df = df.drop(['region'], axis=1)
-            out_dict[region] = df.to_dict(orient='records')
+        for (region, species_name), df in df_wide.groupby(['region', 'species']):
+            df = df.drop(['region', 'species'], axis=1)
+            out_dict.setdefault(region, {})[species_name] = df.to_dict(orient='records')
 
         filename = f'BIO_GBF4_SNES_overview_sum'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
+
+        # --- BIO_GBF4_SNES_Sum: per-species Type breakdown from pre-computed sum CSV ---
+        sum_bio_paths = files.query(
+            'category == "biodiversity" and base_name.str.contains("biodiversity_GBF4_SNES_sum_scores")'
+        )
+        if not sum_bio_paths.empty:
+            sum_bio_df = pd.concat(
+                [df for p in sum_bio_paths['path'] if not (df := pd.read_csv(p, low_memory=False)).empty],
+                ignore_index=True,
+            )
+            sum_bio_df = sum_bio_df[sum_bio_df['Type'] != 'ALL'].copy()
+            sum_bio_df['name'] = sum_bio_df['Type'].map(_SUM_TYPE_DISPLAY).fillna(sum_bio_df['Type'])
+            sum_bio_df['Sum_Pct (%)'] = (
+                sum_bio_df['Area Weighted Score (ha)'] / sum_bio_df['BASE_TOTAL_SCORE'] * 100
+            )
+            df_wide_sum = _groupby_to_records(
+                sum_bio_df,
+                ['name', 'region', 'species'],
+                ['name', 'region', 'species', 'data'],
+                value_cols=('Year', 'Sum_Pct (%)'),
+            )
+            df_wide_sum['type'] = 'column'
+            df_wide_sum['color'] = df_wide_sum['name'].apply(lambda x: COLORS[x])
+            out_dict_sum = {}
+            for (region, species_name), df in df_wide_sum.groupby(['region', 'species']):
+                df = df.drop(['region', 'species'], axis=1)
+                out_dict_sum.setdefault(region, {})[species_name] = df.to_dict(orient='records')
+            filename = 'BIO_GBF4_SNES_Sum'
+            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+                f.write(f'window["{filename}"] = ')
+                json.dump(out_dict_sum, f, separators=(',', ':'), indent=2)
+                f.write(';\n')
 
         # ag
         df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Agricultural Land-use"')\
@@ -3681,25 +3751,57 @@ def process_biodiversity_data(files, SAVE_DIR):
         )
         df_region = (
             pd.concat([_inside, _outside])
-            .groupby(['Year', 'region', 'Type'])
+            .groupby(['Year', 'region', 'species', 'Type'])
             .agg({'Area Weighted Score (ha)': 'sum', 'ALL_HA': 'first'})
             .reset_index()
             .assign(**{'Sum_Pct (%)': lambda d: d['Area Weighted Score (ha)'] / d['ALL_HA'] * 100})
         )
-        df_wide = _groupby_to_records(df_region, ['Type', 'region'], ['name', 'region', 'data'], value_cols=('Year', 'Sum_Pct (%)'))
+        df_wide = _groupby_to_records(df_region, ['Type', 'region', 'species'], ['name', 'region', 'species', 'data'], value_cols=('Year', 'Sum_Pct (%)'))
         df_wide['type'] = 'column'
         df_wide['color'] = df_wide['name'].apply(lambda x: COLORS[x])
 
         out_dict = {}
-        for region, df in df_wide.groupby('region'):
-            df = df.drop(['region'], axis=1)
-            out_dict[region] = df.to_dict(orient='records')
+        for (region, species_name), df in df_wide.groupby(['region', 'species']):
+            df = df.drop(['region', 'species'], axis=1)
+            out_dict.setdefault(region, {})[species_name] = df.to_dict(orient='records')
 
         filename = f'BIO_GBF4_ECNES_overview_sum'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
+
+        # --- BIO_GBF4_ECNES_Sum: per-species Type breakdown from pre-computed sum CSV ---
+        sum_bio_paths = files.query(
+            'category == "biodiversity" and base_name.str.contains("biodiversity_GBF4_ECNES_sum_scores")'
+        )
+        if not sum_bio_paths.empty:
+            sum_bio_df = pd.concat(
+                [df for p in sum_bio_paths['path'] if not (df := pd.read_csv(p, low_memory=False)).empty],
+                ignore_index=True,
+            )
+            sum_bio_df = sum_bio_df[sum_bio_df['Type'] != 'ALL'].copy()
+            sum_bio_df['name'] = sum_bio_df['Type'].map(_SUM_TYPE_DISPLAY).fillna(sum_bio_df['Type'])
+            sum_bio_df['Sum_Pct (%)'] = (
+                sum_bio_df['Area Weighted Score (ha)'] / sum_bio_df['BASE_TOTAL_SCORE'] * 100
+            )
+            df_wide_sum = _groupby_to_records(
+                sum_bio_df,
+                ['name', 'region', 'species'],
+                ['name', 'region', 'species', 'data'],
+                value_cols=('Year', 'Sum_Pct (%)'),
+            )
+            df_wide_sum['type'] = 'column'
+            df_wide_sum['color'] = df_wide_sum['name'].apply(lambda x: COLORS[x])
+            out_dict_sum = {}
+            for (region, species_name), df in df_wide_sum.groupby(['region', 'species']):
+                df = df.drop(['region', 'species'], axis=1)
+                out_dict_sum.setdefault(region, {})[species_name] = df.to_dict(orient='records')
+            filename = 'BIO_GBF4_ECNES_Sum'
+            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+                f.write(f'window["{filename}"] = ')
+                json.dump(out_dict_sum, f, separators=(',', ':'), indent=2)
+                f.write(';\n')
 
         # ag
         df_region = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Agricultural Land-use"')\
