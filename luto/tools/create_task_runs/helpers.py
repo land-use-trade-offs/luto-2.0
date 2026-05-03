@@ -97,8 +97,13 @@ def update_settings(settings_dict:dict, job_name:str):
     E.g. job name, input directory, raw data directory, and threads.
     '''
     settings_dict['JOB_NAME'] = job_name
-    settings_dict['INPUT_DIR'] = os.path.abspath(settings_dict['INPUT_DIR']).replace('\\','/')
-    settings_dict['RAW_DATA'] = os.path.abspath(settings_dict['RAW_DATA']).replace('\\','/')
+    # Resolve INPUT_DIR and RAW_DATA relative to LUTO_ROOT (not cwd) so that
+    # create_task_runs can be called from any working directory.
+    for key in ('INPUT_DIR', 'RAW_DATA'):
+        p = settings_dict[key]
+        if not os.path.isabs(p):
+            p = os.path.join(LUTO_ROOT, p)
+        settings_dict[key] = os.path.normpath(p).replace('\\', '/')
     settings_dict['THREADS'] = settings_dict['NCPUS']
 
     return settings_dict
@@ -165,7 +170,10 @@ def submit_task(task_root_dir:str, col:str, mode:Literal['single','cluster']='cl
     shutil.copyfile(os.path.join(_bash_scripts, 'task_cmd.sh'), f'{task_root_dir}/{col}/task_cmd.sh')
     shutil.copyfile(os.path.join(_bash_scripts, 'python_script.py'), f'{task_root_dir}/{col}/python_script.py')
 
-    # Wait until the number of running jobs is less than max_concurrent_tasks
+    import time
+    # Wait until the number of running jobs is less than max_concurrent_tasks.
+    # Cap the total wait at 24 h to avoid silent infinite hangs.
+    _wait_deadline = time.time() + 86400
     while True:
         try:
             running_jobs = int(subprocess.run('qselect | wc -l', shell=True, capture_output=True, text=True).stdout.strip())
@@ -174,12 +182,33 @@ def submit_task(task_root_dir:str, col:str, mode:Literal['single','cluster']='cl
             running_jobs = 0
         if running_jobs < max_concurrent_tasks:
             break
+        if time.time() > _wait_deadline:
+            raise TimeoutError(
+                f"Timed out waiting for a free slot after 24 h "
+                f"({running_jobs} jobs still running, limit {max_concurrent_tasks})"
+            )
         print(f"Max concurrent tasks reached ({running_jobs}/{max_concurrent_tasks}), waiting to submit {col}...")
-        import time; time.sleep(10)
+        time.sleep(10)
 
+    # task_cmd.sh sources setup_internet.sh (SSH to DM) then calls qsub and exits.
+    # 120 s is generous: SSH ConnectTimeout=5 × 6 DMs + qsub overhead << 60 s normally.
+    # If it exceeds 120 s something is badly wrong — fail loudly rather than hang forever.
+    TASK_CMD_TIMEOUT = 120
     with open(f'{task_root_dir}/{col}/run_std.log', 'w') as std_file, \
          open(f'{task_root_dir}/{col}/run_err.log', 'w') as err_file:
-        subprocess.run(['bash', 'task_cmd.sh'], cwd=f'{task_root_dir}/{col}', stdout=std_file, stderr=err_file, check=True)
+        try:
+            subprocess.run(
+                ['bash', 'task_cmd.sh'],
+                cwd=f'{task_root_dir}/{col}',
+                stdout=std_file, stderr=err_file,
+                check=True,
+                timeout=TASK_CMD_TIMEOUT,
+            )
+        except subprocess.TimeoutExpired:
+            raise TimeoutError(
+                f"task_cmd.sh for '{col}' did not finish within {TASK_CMD_TIMEOUT} s. "
+                f"Check {task_root_dir}/{col}/run_err.log for details."
+            )
 
     
 def write_settings(task_dir:str, settings_dict:dict):

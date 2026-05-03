@@ -257,7 +257,7 @@ that 1 tripled solve time, 3 led to numerical problems.
 
 RETRY_PARAMS = [
     (0, 2,  0),   # NF, Method, Crossover
-    (2, 2,  0),
+    (3, 2,  0),
 ]
 '''
 List of solve attempts to try in order, per year. Each entry MUST be a 
@@ -273,7 +273,7 @@ Crossover values: -1 = automatic, 0 = off, 1/2/3 = forced variants.
 
 Default sequence:
   (0, 2,  0)  NF=0 barrier, no crossover, fast first pass
-  (2, 2,  0)  NF=2 barrier, no crossover, careful for stubborn numerical cases
+  (3, 2,  0)  NF=3 barrier, no crossover, careful for stubborn numerical cases
 '''
 
 BARHOMOGENOUS = 1                   
