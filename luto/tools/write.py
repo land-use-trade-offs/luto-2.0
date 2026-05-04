@@ -111,8 +111,20 @@ def save2nc(in_xr: xr.DataArray, save_path: str):
     )
     ds.to_netcdf(
         save_path,
-        encoding={'data': {'dtype': 'float32', 'zlib': True, 'complevel': 4, 'chunksizes': list(chunks.values())}},
+        encoding={'data': {'dtype': 'float32', 'zlib': True, 'complevel': 1, 'chunksizes': list(chunks.values())}},
     )
+
+
+def chunk_unify_size(da: xr.DataArray, target_mb: float = 10.0) -> xr.DataArray:
+    """Re-chunk `da` so each chunk ≈ target_mb; all non-cell dims are kept whole.
+
+    Computes cell_chunk = target_bytes / (product of non-cell dim sizes × itemsize),
+    so intermediate chunks from multi-dim broadcasts (e.g. mrj × sr → smrj) stay
+    near target_mb regardless of how many extra dimensions the array carries.
+    """
+    other = max(1, int(np.prod([s for d, s in da.sizes.items() if d != 'cell'])))
+    n = max(1, int(target_mb * 1e6 / (other * np.dtype(da.dtype).itemsize)))
+    return da.chunk({d: (min(n, s) if d == 'cell' else s) for d, s in da.sizes.items()})
 
 
 def save_csv(df, rename_map, filepath):
@@ -1020,15 +1032,14 @@ def write_economics(data: Data, yr_cal, path):
     # ==================== Agricultural Management Economics ====================
 
     am_dvar_mrj = (
-        tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
-        .chunk(chunk)
+        chunk_unify_size(tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]))
         .assign_coords(region=('cell', data.REGION_NRM_NAME))
     )
 
     ag_rev_mrj  = ag_revenue.get_rev_matrices(data, yr_idx)
     ag_cost_mrj = ag_cost.get_cost_matrices(data, yr_idx)
-    am_revenue_mat = tools.am_mrj_to_xr(data, ag_revenue.get_agricultural_management_revenue_matrices(data, ag_rev_mrj, yr_idx))
-    am_cost_mat    = tools.am_mrj_to_xr(data, ag_cost.get_agricultural_management_cost_matrices(data, ag_cost_mrj, yr_cal))
+    am_revenue_mat = chunk_unify_size(tools.am_mrj_to_xr(data, ag_revenue.get_agricultural_management_revenue_matrices(data, ag_rev_mrj, yr_idx)))
+    am_cost_mat    = chunk_unify_size(tools.am_mrj_to_xr(data, ag_cost.get_agricultural_management_cost_matrices(data, ag_cost_mrj, yr_cal)))
 
     # Zero out wind/solar entries — the injection block below replaces these zeros with
     # gap-CAPEX corrected values after the dvar multiplication, before add_all.
@@ -3060,15 +3071,15 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
     am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]
 
     # Get decision variables for the year
-    ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
-        ).assign_coords(region=('cell', data.REGION_NRM_NAME))
-    non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
-        ).assign_coords(region=('cell', data.REGION_NRM_NAME))
-    am_dvar_amrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
-        ).assign_coords(region=('cell', data.REGION_NRM_NAME))
+    ag_dvar_mrj = chunk_unify_size(
+        tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
+    ).assign_coords(region=('cell', data.REGION_NRM_NAME))
+    non_ag_dvar_rk = chunk_unify_size(
+        tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
+    ).assign_coords(region=('cell', data.REGION_NRM_NAME))
+    am_dvar_amrj = chunk_unify_size(
+        tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
+    ).assign_coords(region=('cell', data.REGION_NRM_NAME))
 
     # Get the priority degraded areas 
     GBF2_MASK_area_ha = ag_biodiversity.get_GBF2_MASK_area(data)
@@ -3290,20 +3301,22 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
     am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]
 
     # Get decision variables for the year
-    ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
-        ).assign_coords(region=('cell', data.REGION_NRM_NAME))
-    non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
-        ).assign_coords(region=('cell', data.REGION_NRM_NAME))
-    am_dvar_amrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
-        ).assign_coords(region=('cell', data.REGION_NRM_NAME))
+    ag_dvar_mrj = chunk_unify_size(
+        tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
+    ).assign_coords(region=('cell', data.REGION_NRM_NAME))
+    non_ag_dvar_rk = chunk_unify_size(
+        tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
+    ).assign_coords(region=('cell', data.REGION_NRM_NAME))
+    am_dvar_amrj = chunk_unify_size(
+        tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
+    ).assign_coords(region=('cell', data.REGION_NRM_NAME))
 
     # Get vegetation matrices for the year.
+    # species/group dim pinned to 1 so result chunks (group=1 × m × r × j) stay ≈ 10 MB
+    # after broadcast; dask aligns the cell dim automatically during multiplication.
     vegetation_score_vr = (
         ag_biodiversity.get_GBF3_NVIS_matrices_vr(data)
-        .chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS), 'group': 1})
+        .chunk({'cell': data.NCELLS, 'group': 1})
     )
 
     # The NVIS layer covers all of Australia, but the constraint/baseline table
@@ -3334,13 +3347,13 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
         dims=['lu'],
         coords={'lu':data.NON_AGRICULTURAL_LANDUSES}
     )
-    am_impact_amr = xr.DataArray(
+    am_impact_amr = chunk_unify_size(xr.DataArray(
         np.stack([arr for _, v in ag_biodiversity.get_ag_management_biodiversity_contribution(data, yr_cal).items() for arr in v.values()]).astype(np.float32),
         dims=['idx', 'cell'],
         coords={
             'idx': pd.MultiIndex.from_tuples(am_lu_unpack, names=['am', 'lu']),
             'cell': range(data.NCELLS)}
-    ).unstack()
+    ).unstack())
 
     # Get the base year biodiversity scores.
     # Build per-(region, group) baseline so each NRM row uses its own ALL_HA / outside score,
@@ -3627,15 +3640,15 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
     am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]
 
     # Get decision variables for the year
-    ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
-        ).assign_coords(region=('cell', data.REGION_NRM_NAME))
-    non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
-        ).assign_coords(region=('cell', data.REGION_NRM_NAME))
-    am_dvar_amrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
-        ).assign_coords(region=('cell', data.REGION_NRM_NAME))
+    ag_dvar_mrj = chunk_unify_size(
+        tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
+    ).assign_coords(region=('cell', data.REGION_NRM_NAME))
+    non_ag_dvar_rk = chunk_unify_size(
+        tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
+    ).assign_coords(region=('cell', data.REGION_NRM_NAME))
+    am_dvar_amrj = chunk_unify_size(
+        tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
+    ).assign_coords(region=('cell', data.REGION_NRM_NAME))
 
     # Build the full-Australia species bio array from BIO_GBF4_SPECIES_LAYERS_FULL
     # (always available for both Australia and NRM modes after data.py loading).
@@ -3657,7 +3670,7 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
         data.SAVBURN_ELIGIBLE,
         _full_layers * data.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
         _full_layers * data.REAL_AREA,
-    ).astype(np.float32).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS), 'species': 1})
+    ).astype(np.float32).chunk({'cell': data.NCELLS, 'species': 1})
     bio_snes_sr = bio_snes_sr.assign_coords(is_selected=('cell', sel_mask))
 
     # Apply habitat contribution from ag/am/non-ag land-use to biodiversity scores
@@ -3671,13 +3684,13 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
         dims=['lu'],
         coords={'lu':data.NON_AGRICULTURAL_LANDUSES}
     )
-    am_impact_amr = xr.DataArray(
+    am_impact_amr = chunk_unify_size(xr.DataArray(
         np.stack([arr for _, v in ag_biodiversity.get_ag_management_biodiversity_contribution(data, yr_cal).items() for arr in v.values()]).astype(np.float32),
         dims=['idx', 'cell'],
         coords={
             'idx': pd.MultiIndex.from_tuples(am_lu_unpack, names=['am', 'lu']),
             'cell': np.arange(data.NCELLS)}
-    ).unstack()
+    ).unstack())
 
     # Get the base year biodiversity scores.
     # Use SPECIES_COORD (unique species names) for CSV lookup — in NRM mode SEL_ALL contains
@@ -4024,15 +4037,15 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
     am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]
 
     # Get decision variables for the year
-    ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
-        ).assign_coords(region=('cell', data.REGION_NRM_NAME))
-    non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
-        ).assign_coords(region=('cell', data.REGION_NRM_NAME))
-    am_dvar_amrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
-        ).assign_coords(region=('cell', data.REGION_NRM_NAME))
+    ag_dvar_mrj = chunk_unify_size(
+        tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
+    ).assign_coords(region=('cell', data.REGION_NRM_NAME))
+    non_ag_dvar_rk = chunk_unify_size(
+        tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
+    ).assign_coords(region=('cell', data.REGION_NRM_NAME))
+    am_dvar_amrj = chunk_unify_size(
+        tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
+    ).assign_coords(region=('cell', data.REGION_NRM_NAME))
     
     # Build the full-Australia community bio array from BIO_GBF4_COMUNITY_LAYERS_FULL
     # (always available for both Australia and NRM modes after data.py loading).
@@ -4050,7 +4063,7 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
         data.SAVBURN_ELIGIBLE,
         _full_layers * data.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
         _full_layers * data.REAL_AREA,
-    ).astype(np.float32).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS), 'species': 1})
+    ).astype(np.float32).chunk({'cell': data.NCELLS, 'species': 1})
     bio_ecnes_sr = bio_ecnes_sr.assign_coords(is_selected=('cell', sel_mask))
 
     # Apply habitat contribution from ag/am/non-ag land-use to biodiversity scores
@@ -4064,14 +4077,14 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
         dims=['lu'],
         coords={'lu': data.NON_AGRICULTURAL_LANDUSES}
     )
-    am_impact_amr = xr.DataArray(
+    am_impact_amr = chunk_unify_size(xr.DataArray(
         np.stack([arr for _, v in ag_biodiversity.get_ag_management_biodiversity_contribution(data, yr_cal).items() for arr in v.values()]).astype(np.float32),
         dims=['idx', 'cell'],
         coords={
             'idx': pd.MultiIndex.from_tuples(am_lu_unpack, names=['am', 'lu']),
             'cell': np.arange(data.NCELLS)
         }
-    ).unstack()
+    ).unstack())
 
     # Get the base year biodiversity scores.
     # Same pattern as SNES: use SPECIES_COORD (unique community names) so CSV query on
@@ -4415,15 +4428,15 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
     am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]
 
     # Get decision variables for the year
-    ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
-        ).assign_coords(region=('cell', data.REGION_NRM_NAME))
-    non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
-        ).assign_coords(region=('cell', data.REGION_NRM_NAME))
-    am_dvar_amrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
-        ).assign_coords(region=('cell', data.REGION_NRM_NAME))
+    ag_dvar_mrj = chunk_unify_size(
+        tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
+    ).assign_coords(region=('cell', data.REGION_NRM_NAME))
+    non_ag_dvar_rk = chunk_unify_size(
+        tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
+    ).assign_coords(region=('cell', data.REGION_NRM_NAME))
+    am_dvar_amrj = chunk_unify_size(
+        tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
+    ).assign_coords(region=('cell', data.REGION_NRM_NAME))
 
     # Get biodiversity scores for selected species
     bio_scores_sr = xr.DataArray(
@@ -4432,7 +4445,7 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
         coords={
             'group': data.BIO_GBF8_GROUPS_NAMES,
             'cell': np.arange(data.NCELLS)}
-    ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS), 'group': 1})  # Chunking to save mem use
+    ).chunk({'cell': data.NCELLS, 'group': 1})
 
     # Get the habitat contribution for ag/non-ag/am land-use to biodiversity scores
     ag_impact_j = xr.DataArray(
@@ -4589,15 +4602,15 @@ def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
     am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]
 
     # Get decision variables for the year
-    ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
-        ).assign_coords(region=('cell', data.REGION_NRM_NAME))
-    non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
-        ).assign_coords(region=('cell', data.REGION_NRM_NAME))
-    am_dvar_amrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
-        ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
-        ).assign_coords(region=('cell', data.REGION_NRM_NAME))
+    ag_dvar_mrj = chunk_unify_size(
+        tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
+    ).assign_coords(region=('cell', data.REGION_NRM_NAME))
+    non_ag_dvar_rk = chunk_unify_size(
+        tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
+    ).assign_coords(region=('cell', data.REGION_NRM_NAME))
+    am_dvar_amrj = chunk_unify_size(
+        tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
+    ).assign_coords(region=('cell', data.REGION_NRM_NAME))
     
     # Get biodiversity scores for selected species
     bio_scores_sr = xr.DataArray(
@@ -4606,7 +4619,7 @@ def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
         coords={
             'species': data.BIO_GBF8_SEL_SPECIES,
             'cell': np.arange(data.NCELLS)}
-    ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS), 'species': 1})  # Chunking to save mem use
+    ).chunk({'cell': data.NCELLS, 'species': 1})
 
     # Get the habitat contribution for ag/non-ag/am land-use to biodiversity scores
     ag_impact_j = xr.DataArray(
