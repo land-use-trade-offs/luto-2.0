@@ -1562,7 +1562,7 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
     GHG_land = pd.concat([GHG_ag, GHG_non_ag, GHG_ag_man, GHG_transition], axis=0)\
         .query('abs(`Value (t CO2e)`) > 1')\
         .reset_index(drop=True)
-    GHG_land_non_all = pd.concat([GHG_ag.query('Water_supply != "ALL" and Source != "ALL" and `Land-use` != "ALL"'), GHG_non_ag, GHG_ag_man.query('Water_supply != "ALL" and `Land-use` != "ALL" and `Agricultural Management Type` != "ALL"'), GHG_transition], axis=0)\
+    GHG_land_non_all = pd.concat([GHG_ag.query('Water_supply != "ALL" and Source != "ALL" and `Land-use` != "ALL"'), GHG_non_ag.query('`Land-use` != "ALL"'), GHG_ag_man.query('Water_supply != "ALL" and `Land-use` != "ALL" and `Agricultural Management Type` != "ALL"'), GHG_transition], axis=0)\
         .query('abs(`Value (t CO2e)`) > 1')\
         .reset_index(drop=True)
 
