@@ -108,27 +108,29 @@ def _write_split_by_combo(flat_output: dict, dim_names: list, save_path: str) ->
 
 
 def map2base64(
-    ds_template:str, 
-    arr_sel:xr.DataArray, 
-    isInt:bool, 
-    legend:dict, 
-    hierarchy_tp:tuple,
-    layer_magnitude:int,
-    legend_key:str|None = None,
+    index_merc: np.ndarray,   # shape (H, W) int32; ≥0 = cell index in 1D order, -1 = nodata
+    bbox: list,               # [[lat_min,lon_min],[lat_max,lon_max]] in EPSG:3857 (pre-computed)
+    arr_sel: xr.DataArray,    # 1D DataArray[cell] — values to render
+    isInt: bool,
+    legend: dict,
+    hierarchy_tp: tuple,
+    layer_magnitude,
+    legend_key: str | None = None,
 ) -> tuple:
+    """Render one map layer to a base64 RGBA PNG.
 
-    # Get an template rio-xarray, it will be used to convert 1D array to its 2D map format
-    with xr.load_dataset(ds_template) as rxr_ds:
-        rxr_arr = rxr_ds['layer'].astype('float32')         # Use float32 to allow NaN values
-        rxr_crs = rxr_ds['spatial_ref'].attrs['crs_wkt']
+    `index_merc` encodes the mapping from output EPSG:3857 pixel to 1D LUTO cell index.
+    It is pre-computed once per year in `get_map2json` and shared across all joblib workers
+    via automatic memmapping (Parallel max_nbytes=1e6) — no per-worker copy.
+    """
 
-    # Set legend and metadata based on type
+    # Compute per-cell integer colour codes.
     if isInt:
-        # layer_magnitude is None in this case
         img_attrs = {
             'intOrFloat': 'int',
             'legendKey': legend_key,
         }
+        codes_1d = arr_sel.values.astype(np.int16)
     else:
         # Rescale layers using the provided magnitude: positives → red (51–100), negatives → blue (1–50).
         # If the DataArray carries an `is_selected` coord on `cell` (used by region-targeted GBF
@@ -158,36 +160,29 @@ def map2base64(
                     151 + intensity[unsel_nonzero] * 49, 151, 200
                 ).astype(np.int16)
 
-        arr_sel.values = codes
+        codes_1d = codes
         min_max = (
-            round(global_min / settings.RESFACTOR ** 2 / 121, 2),  
+            round(global_min / settings.RESFACTOR ** 2 / 121, 2),
             round(global_max / settings.RESFACTOR ** 2 / 121, 2)
         )
-
-        arr_sel = arr_sel.astype(np.float32)
         img_attrs = {
             'intOrFloat': 'float',
             'min_max': min_max,
         }
 
-    # Convert the 1D array to a 2D array
-    np.place(rxr_arr.data, rxr_arr.data >= 0, arr_sel.values)     # Negative values in the template are outside LUTO area
-    rxr_arr = xr.where(rxr_arr < 0, np.nan, rxr_arr)              # Set negative values to NaN, which will be transparent in the final map
-    # Get the bounds
-    rxr_arr = rxr_arr.rio.write_crs(rxr_crs)
-    bbox = rxr_arr.rio.bounds()
-    bbox = [[bbox[1], bbox[0]],[bbox[3], bbox[2]]]
-    # Reproject to Web Mercator EPSG:3857; because Leaflet uses EPSG:3857 to display maps
-    rxr_arr = rxr_arr.rio.reproject('EPSG:3857')                # To Mercator with Nearest Neighbour
-    rxr_arr = np.nan_to_num(rxr_arr, nan=-1).astype('int16')    # Use -1 to flag nodata pixels
-    # Convert the 1D array to a RGBA array
-    color_dict = legend['code_colors']  # {lu_code: (R,G,B,A)}, -1 → transparent
-    # Render to 4-band RGBA array
-    arr_4band = np.zeros((rxr_arr.shape[0], rxr_arr.shape[1], 4), dtype='uint8')
-    for k, v in color_dict.items():
-        arr_4band[rxr_arr == k] = v
+    # Place per-cell colour codes onto the pre-reprojected 2D EPSG:3857 grid.
+    # index_merc[h, w] holds the 1D cell index whose value belongs at pixel (h, w).
+    valid = index_merc >= 0
+    out_2d = np.full(index_merc.shape, -1, dtype=np.int16)
+    out_2d[valid] = codes_1d[index_merc[valid]]
 
-    return hierarchy_tp, {**array_to_base64(arr_4band), 'bounds':bbox, **img_attrs}
+    # Render to 4-band RGBA.
+    color_dict = legend['code_colors']  # {code: (R,G,B,A)}, -1 → transparent
+    arr_4band = np.zeros((out_2d.shape[0], out_2d.shape[1], 4), dtype='uint8')
+    for k, v in color_dict.items():
+        arr_4band[out_2d == k] = v
+
+    return hierarchy_tp, {**array_to_base64(arr_4band), 'bounds': bbox, **img_attrs}
     
     
 
@@ -210,8 +205,11 @@ def get_map2json(
     """
     
     # Determine number of workers from memory budget.
-    ncells = 5_000_000 // (settings.RESFACTOR ** 2)    # Number of cells in resfactored layer.
-    mem_per_worker = 1000 * ncells * 4 / 1e9           # ~1000 layers × ncells × float32, in GB
+    # Per-worker memory: one 2D int16 output grid + one RGBA uint8 grid.
+    # The 2D EPSG:3857 raster is ~7× larger in pixels than the 1D cell count.
+    # index_merc is shared via memmap and not counted here.
+    ncells = 5_000_000 // (settings.RESFACTOR ** 2)
+    mem_per_worker = ncells * 7 * (2 + 4) / 1e9    # ~7× expansion × (int16 + uint8×4) bytes
     workers = min(60, max(1, int(settings.WRITE_REPORT_MAX_MEM_GB // mem_per_worker)))
     
     def get_legend_params(sel):
@@ -239,6 +237,29 @@ def get_map2json(
         if len(valid_layers) == 0:
             print(f'│   ├── No valid layers found in {row["base_name"]}_{row["Year"]}, skipping.')
             continue
+
+        # Pre-compute the reprojected cell-index map once per year.
+        # index_merc[h,w] = the 1D LUTO cell index whose value belongs at EPSG:3857 pixel (h,w),
+        # or -1 for nodata.  Passed to map2base64 as a plain numpy array; joblib's automatic
+        # memmapping (max_nbytes=1e6) writes it to a tmpfile once and gives all workers a
+        # read-only file-backed view — no per-worker copy of this large array.
+        with xr.load_dataset(ds_template) as _rxr_ds:
+            _rxr_2d = _rxr_ds['layer'].astype('float32')
+            _rxr_crs = _rxr_ds['spatial_ref'].attrs['crs_wkt']
+        _arr = _rxr_2d.values.copy()
+        _valid = _arr >= 0
+        _arr[_valid]  = np.arange(_valid.sum(), dtype=np.float32)   # assign cell indices 0,1,2,...
+        _arr[~_valid] = -1.0
+        _rxr_2d = _rxr_2d.copy(data=_arr).rio.write_nodata(-1.0).rio.write_crs(_rxr_crs)
+        # Capture bbox from the native-CRS array (degrees) BEFORE reprojecting,
+        # because Leaflet expects [[lat_min,lon_min],[lat_max,lon_max]] in WGS84.
+        _bb = _rxr_2d.rio.bounds()
+        bbox_year = [[_bb[1], _bb[0]], [_bb[3], _bb[2]]]
+        _rxr_merc = _rxr_2d.rio.reproject('EPSG:3857', nodata=-1.0)
+        # Round to nearest integer then cast; nearest-neighbour reproject keeps values exact.
+        index_merc = np.round(_rxr_merc.values).astype(np.int32)
+        index_merc[index_merc < 0] = -1   # unify all nodata representations to -1
+        del _rxr_2d, _rxr_merc
 
         # Pre-extract the (optional) is_selected mask once per file — it is shared
         # across all layers and avoids carrying the full stacked MultiIndex into
@@ -269,9 +290,9 @@ def get_map2json(
                     vals = vals.reshape(-1)
                 coords = {'is_selected': ('cell', is_selected_arr)} if is_selected_arr is not None else None
                 arr_lite = xr.DataArray(vals, dims=('cell',), coords=coords)
-                tasks.append(delayed(map2base64)(ds_template, arr_lite, isInt, legend, hierarchy_tp, magnitude, legend_key))
+                tasks.append(delayed(map2base64)(index_merc, bbox_year, arr_lite, isInt, legend, hierarchy_tp, magnitude, legend_key))
 
-            for hierarchy_tp, val_dict in Parallel(n_jobs=workers, return_as='generator', max_nbytes=None)(tasks):
+            for hierarchy_tp, val_dict in Parallel(n_jobs=workers, return_as='generator', max_nbytes=1_000_000)(tasks):
                 flat_output[hierarchy_tp] = val_dict
 
         xr_arr.close()

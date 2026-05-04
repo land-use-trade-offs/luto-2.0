@@ -26,7 +26,7 @@ write.py: xarray (1D cells) → stack dims → valid-layer filter → NetCDF
     ↓
 create_report_layers.py: decode MultiIndex → iterate layers → rename/reorder
     ↓ per layer
-map2base64(): 1D → 2D raster → reproject EPSG:3857 → RGBA render → PNG base64
+map2base64(): index_merc lookup → RGBA render → PNG base64 (reproject pre-computed once per year in get_map2json)
     ↓
 tuple_dict_to_nested(): flat tuple keys → nested dict
     ↓
@@ -69,20 +69,28 @@ Enforces a fixed nesting order and human-readable labels for all map files:
 
 `from_lu` (used in transition ag2nonag) is treated identically to `lu` — placed last.
 
-### Step 4 — 1D → 2D raster remap (`map2base64`)
+### Step 4 — Pre-compute cell-index map (once per year, in `get_map2json`)
 
 ```python
-# Template: 2D grid, each cell's position stored as its index value; negatives = outside LUTO area
-np.place(rxr_arr.data, rxr_arr.data >= 0, arr_sel.values)
-rxr_arr = xr.where(rxr_arr < 0, np.nan, rxr_arr)   # outside → transparent
+# index_merc[h, w] = 1D LUTO cell index whose value belongs at EPSG:3857 pixel (h, w), or -1.
+# Computed once per year; joblib auto-memmaps it (max_nbytes=1e6) so all workers share one copy.
+_rxr_2d = template_ds['layer'].astype('float32')
+_arr = _rxr_2d.values.copy()
+_valid = _arr >= 0
+_arr[_valid] = np.arange(_valid.sum(), dtype=np.float32)  # cell indices 0,1,2,...
+_arr[~_valid] = -1.0
+_rxr_merc = _rxr_2d.copy(data=_arr).rio.write_nodata(-1.0).rio.write_crs(crs).rio.reproject('EPSG:3857', nodata=-1.0)
+index_merc = np.round(_rxr_merc.values).astype(np.int32)
+index_merc[index_merc < 0] = -1
+bbox_year = ...  # from _rxr_merc.rio.bounds()
 ```
 
-### Step 5 — Reproject to Web Mercator
+### Step 5 — Place 1D cell values onto pre-projected grid (per layer, in `map2base64`)
 
 ```python
-rxr_arr = rxr_arr.rio.write_crs(rxr_crs)            # native CRS (GDA2020 / EPSG:7844)
-bbox    = rxr_arr.rio.bounds()                       # capture lat/lon bounds before reproject
-rxr_arr = rxr_arr.rio.reproject('EPSG:3857')         # Leaflet uses Web Mercator
+valid = index_merc >= 0
+out_2d = np.full(index_merc.shape, -1, dtype=np.int16)
+out_2d[valid] = codes_1d[index_merc[valid]]   # no per-layer reproject needed
 ```
 
 Bounds stored as `[[lat_min, lon_min], [lat_max, lon_max]]` for Leaflet `imageOverlay`.
