@@ -264,8 +264,7 @@ window.BiodiversityView = {
       const runScenario = {};
       (window.Supporting_info.model_run_settings || []).forEach(s => { runScenario[s.parameter] = s.val; });
 
-      const gbf3Mode = window.Supporting_info.GBF3_NVIS_REGION_MODE || 'NRM';
-      METRIC_LABELS['GBF3_NVIS'] = `GBF3 NVIS (${gbf3Mode})`;
+      METRIC_LABELS['GBF3_NVIS'] = 'GBF3 (NVIS)';
 
       const enabledMetrics = ['quality'];
       for (const [metric, settingKey] of Object.entries(METRIC_TO_SETTING)) {

@@ -110,8 +110,8 @@ window.FilterableDropdown = {
       // Emit change event for parent components
       this.$emit('change', item);
 
-      // Legacy support: update global region if available
-      if (this.globalSelectedRegion) {
+      // Legacy support: update global region only when used as region selector (no items prop)
+      if (this.globalSelectedRegion && (!this.$props.items || this.$props.items.length === 0)) {
         this.globalSelectedRegion = item;
       }
     },

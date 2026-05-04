@@ -14,6 +14,16 @@ window.HomeView = {
     const selectRegion = inject('globalSelectedRegion');
     const ChartData = ref({});
 
+    // Species selection state (for GBF3/4/8 charts that have region → species → [series] structure)
+    const selectSpecies = ref('');
+    const availableSpecies = computed(() => {
+      if (!dataLoaded.value) return [];
+      const data = ChartData.value?.[selectChartCategory.value]?.[selectChartSubCategory.value]?.[selectRegion.value];
+      if (!data || Array.isArray(data)) return [];
+      return Object.keys(data);
+    });
+    const hasSpeciesData = computed(() => availableSpecies.value.length > 0);
+
     // Transition heatmap state
     const transitionData = ref(null);
     const transitionFromWater = ref('ALL');
@@ -74,7 +84,11 @@ window.HomeView = {
     //  Reactive data
     const selectChartData = computed(() => {
       let seriesData, yAxisTitle = null;
-      const originalData = ChartData.value?.[selectChartCategory.value]?.[selectChartSubCategory.value]?.[selectRegion.value] || [];
+      let originalData = ChartData.value?.[selectChartCategory.value]?.[selectChartSubCategory.value]?.[selectRegion.value] || [];
+      // If species-level data (region → species → [series]), pick the selected species
+      if (hasSpeciesData.value && selectSpecies.value) {
+        originalData = originalData[selectSpecies.value] || [];
+      }
       seriesData = JSON.parse(JSON.stringify(originalData));
 
       if (selectChartSubCategory.value === 'Off-target achievement') {
@@ -90,6 +104,7 @@ window.HomeView = {
         chart: {
           height: 440,
         },
+        legend: { ...window['Chart_default_options'].legend },
         yAxis: {
           title: {
             text: yAxisTitle || availableUnit[selectChartCategory.value]
@@ -150,7 +165,6 @@ window.HomeView = {
       const chartOverview_bio_quality = chartRegister['Biodiversity']['quality']['overview']['sum'];
       const chartOverview_bio_GBF2 = chartRegister['Biodiversity']['GBF2']['overview']['sum'];
       const chartOverview_bio_GBF3_NVIS = chartRegister['Biodiversity']['GBF3_NVIS']['overview']['sum'];
-      const gbf3Mode = window['Supporting_info']['GBF3_NVIS_REGION_MODE'] || 'NRM';
       const chartOverview_bio_GBF4_SNES = chartRegister['Biodiversity']['GBF4_SNES']['overview']['sum'];
       const chartOverview_bio_GBF4_ECNES = chartRegister['Biodiversity']['GBF4_ECNES']['overview']['sum'];
       const chartOverview_bio_GBF8_SPECIES = chartRegister['Biodiversity']['GBF8_SPECIES']['overview']['sum'];
@@ -158,7 +172,7 @@ window.HomeView = {
       const chartOverview_economics_sum = chartRegister['Economics']['overview']['sum'];
       const chartOverview_economics_ag = chartRegister['Economics']['overview']['Ag'];
       const chartOverview_economics_agMgt = chartRegister['Economics']['overview']['Ag Mgt'];
-      const chartOverview_economics_Nonag = chartRegister['Economics']['overview']['Non-Ag'];
+      const chartOverview_economics_Nonag = chartRegister['Economics']['Non-Ag']['Profit'];
       const chartOverview_ghg_sum = chartRegister['GHG']['overview']['sum'];
       const chartOverview_ghg_ag = chartRegister['GHG']['overview']['Ag'];
       const chartOverview_ghg_agMgt = chartRegister['GHG']['overview']['Ag Mgt'];
@@ -287,7 +301,7 @@ window.HomeView = {
         ChartData.value['Biodiversity']['GBF2'] = window[chartOverview_bio_GBF2['name']];
       }
       if (runScenario.value['BIODIVERSITY_TARGET_GBF_3_NVIS'] !== 'off') {
-        ChartData.value['Biodiversity'][`GBF3 (${gbf3Mode})`] = window[chartOverview_bio_GBF3_NVIS['name']];
+        ChartData.value['Biodiversity']['GBF3 (NVIS)'] = window[chartOverview_bio_GBF3_NVIS['name']];
       }
       if (runScenario.value['BIODIVERSITY_TARGET_GBF_4_SNES'] !== 'off') {
         ChartData.value['Biodiversity']['GBF4 (SNES)'] = window[chartOverview_bio_GBF4_SNES['name']];
@@ -333,6 +347,13 @@ window.HomeView = {
       selectRankingSubCategory.value = availableRankSubcategories.value[0] || 'N/A';
     });
 
+    // Reset species selection when subcategory or category changes
+    watch(availableSpecies, (newSpecies) => {
+      if (!newSpecies.includes(selectSpecies.value)) {
+        selectSpecies.value = newSpecies[0] || '';
+      }
+    });
+
     // Memory cleanup on component unmount
     onUnmounted(() => { window.MemoryService.cleanupViewData(VIEW_NAME); });
 
@@ -350,15 +371,18 @@ window.HomeView = {
       availableChartCategories,
       availableChartSubCategories,
       availableRankSubcategories,
+      availableSpecies,
 
       selectYear,
       selectRegion,
       selectChartCategory,
       selectChartSubCategory,
       selectRankingSubCategory,
+      selectSpecies,
       selectChartData,
       selectRankingColors,
       selectRanking,
+      hasSpeciesData,
 
       // Transition heatmap
       transitionData,
@@ -507,6 +531,18 @@ window.HomeView = {
               >
                 {{ cat }}
               </button>
+            </div>
+
+            <!-- Species Selector (for GBF3/4/8 charts with region → species → [series] data) -->
+            <div v-if="hasSpeciesData" class="absolute top-[0px] right-[0px] w-[270px] z-10">
+              <filterable-dropdown
+                :items="availableSpecies"
+                :selectedValue="selectSpecies"
+                :useSearch="true"
+                placeholder="Select species..."
+                searchPlaceholder="Search species..."
+                @change="selectSpecies = $event"
+              />
             </div>
 
             <!-- Chart Component -->
