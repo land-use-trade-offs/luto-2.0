@@ -42,3 +42,4 @@ anthropic.yml
 *.log
 *.7z
 nul
+.github/copilot-instructions.md
