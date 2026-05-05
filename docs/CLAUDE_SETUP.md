@@ -113,6 +113,8 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 - `OPTIMALITY_TOLERANCE`: Optimality tolerance (default: 1e-2)
 - `BARRIER_CONVERGENCE_TOLERANCE`: Barrier method convergence (default: 1e-5)
 - `RESCALE_FACTOR`: Rescaling magnitude for numerical stability (default: 1e3)
+- `RESCALE_ZERO_THRESHOLD`: After rescaling, coefficients with `|value| < 1e-4` are zeroed. Applied to ALL input arrays (Economy, Demand, Biodiversity-quality, GHG, Water, GBF2/3/4/8, Renewable) via `rescale_lhs()` / `rescale_lhs_rhs()` in `input_data.py`.
+- `SOLVER_COEFF_MIN`: Cross-product threshold (default: 2e-3) applied inside constraint builders in `solver.py` for GHG, Water, Renewable, and GBF2/3/4/8. Prevents tiny `val_vector[r] × coeff[j]` products from entering Gurobi. **Never applied to Economy, Demand, or Biodiversity-quality** — those feed the objective function; zeroing them corrupts allocation decisions.
 
 ### Output Writing Configuration
 - `WRITE_PARALLEL`: Enable parallel output writing (default: True)

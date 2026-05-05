@@ -106,7 +106,8 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
     - Renewable energy constraint method: `_add_renewable_energy_constraints()` — enforces state-level solar and wind generation targets
   - `input_data.py`: Prepares optimization model input data
     - Biodiversity data attributes use `*_pre_1750_area_*` naming (e.g., `GBF3_NVIS_pre_1750_area_vr`, `GBF4_SNES_pre_1750_area_sr`)
-    - `rescale_solver_input_data()`: **In-place** rescaling of arrays to magnitude 0-1e3 for numerical stability
+    - `rescale_solver_input_data()`: Rescaling of arrays to magnitude 0–1e3 for numerical stability, then zeros entries with `|value| < RESCALE_ZERO_THRESHOLD` (1e-4) across **all** input arrays (Economy, Demand, Biodiversity-quality, GHG, Water, GBF2/3/4/8, Renewable).
+    - `SOLVER_COEFF_MIN` (2e-3): Applied as a cross-product threshold inside GBF2/3/4/8 (and GHG/Water/Renewable) constraint builders in `solver.py`. Needed because `val_vector[r] × coeff[j]` products can still be tiny (e.g. 1e-8) even after per-array zeroing. **Never applied to Economy, Demand, or Biodiversity-quality** — those feed the objective function.
 
 ### Economic Modules
 
@@ -217,6 +218,8 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 - `OPTIMALITY_TOLERANCE`: Optimality tolerance (default: 1e-2)
 - `BARRIER_CONVERGENCE_TOLERANCE`: Barrier method convergence (default: 1e-5)
 - `RESCALE_FACTOR`: Rescaling magnitude for numerical stability (default: 1e3)
+- `RESCALE_ZERO_THRESHOLD`: After rescaling, coefficients with `|value| < 1e-4` are zeroed. Applied to ALL input arrays (Economy, Demand, Biodiversity-quality, GHG, Water, GBF2/3/4/8, Renewable) via `rescale_lhs()` / `rescale_lhs_rhs()` in `input_data.py`.
+- `SOLVER_COEFF_MIN`: Cross-product threshold (default: 2e-3) applied inside constraint builders in `solver.py` for GHG, Water, Renewable, and GBF2/3/4/8. Prevents tiny `val_vector[r] × coeff[j]` products from entering Gurobi. **Never applied to Economy, Demand, or Biodiversity-quality** — those feed the objective function; zeroing them corrupts allocation decisions.
 - `SOLVER_WEIGHT_DEMAND`: Demand deviation weight in objective (default: 1)
 - `SOLVER_WEIGHT_GHG`: GHG deviation weight in objective (default: 1)
 - `SOLVER_WEIGHT_WATER`: Water deviation weight in objective (default: 1)
@@ -247,7 +250,7 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 4. **Solver Input**: `solvers/input_data.py` prepares optimization model data
    - Biodiversity matrices: GBF2 mask areas, GBF3 NVIS layers, GBF3 IBRA layers, GBF4 SNES/ECNES matrices, GBF8 species data
    - Renewable energy: Solar/wind yield arrays (`renewable_solar_r`, `renewable_wind_r`), state region mapping, rescaled targets
-   - Data rescaling: Arrays rescaled in-place to 0-1e3 magnitude for numerical stability
+   - Data rescaling: All arrays rescaled to 0–1e3 magnitude via `rescale_lhs`/`rescale_lhs_rhs`; entries below `RESCALE_ZERO_THRESHOLD` (1e-4) are zeroed. Inside constraint builders, cross-products below `SOLVER_COEFF_MIN` (2e-3) are also filtered for GHG/Water/Renewable/GBF2/3/4/8.
 5. **Optimization**: `solvers/solver.py` runs GUROBI optimization with biodiversity and renewable energy constraints
 6. **Output Generation**: `tools/write.py` writes results to `/output/`
    - Biodiversity outputs: GBF2/3/4/8 scores, species impacts, vegetation group restoration

@@ -172,11 +172,14 @@ the model sensitive to variations in input data.
 
 RESCALE_ZERO_THRESHOLD = 1e-4
 '''
-After rescaling, any coefficient with |value| < RESCALE_ZERO_THRESHOLD is zeroed out before 
-being shipped to Gurobi. Such tiny entries contribute nothing to constraint sums dominated 
-by O(RESCALE_FACTOR) terms, but they wreck barrier numerics by stretching the matrix 
-coefficient range below Gurobi's recommended [1e-3, 1e6] band — the symptom is 
+After rescaling, any coefficient with |value| < RESCALE_ZERO_THRESHOLD is zeroed out before
+being shipped to Gurobi. Such tiny entries contribute nothing to constraint sums dominated
+by O(RESCALE_FACTOR) terms, but they wreck barrier numerics by stretching the matrix
+coefficient range below Gurobi's recommended [1e-3, 1e6] band — the symptom is
 "Numerical trouble encountered" with a Matrix range like [5e-08, 1e+03].
+
+Applied to ALL input arrays (Economy, Demand, Biodiversity-quality, GHG, Water, Renewable,
+GBF2/3/4/8) via rescale_lhs() and rescale_lhs_rhs() in input_data.py.
 
 Note: 1e-4 was found to occasionally produce false-infeasibility on barrier (model is
 actually feasible — IIS subsequently fails with "Cannot compute IIS on a feasible model").
@@ -185,21 +188,21 @@ Gurobi's recommended band; the per-year retry loop in simulation.py escalates
 RETRY_PARAMS if the first solve still terminates non-optimally.
 '''
 
-GBF_BIODIV_COEFF_MIN = 2e-3
+SOLVER_COEFF_MIN = 2e-3
 '''
-Minimum effective matrix coefficient for GBF3/4/8 biodiversity constraints.
-Each term in these constraints is val_vector[r] * biodiv_contr[j], where
-biodiv_contr[j] can be as small as ~1e-3 for highly degraded land uses.
-RESCALE_ZERO_THRESHOLD only filters val_vector in isolation; the product
-val_vector (~1e-4 min) * biodiv_contr (~1e-3 min) ≈ 1e-7 falls far outside
-Gurobi's recommended [1e-3, 1e6] matrix coefficient band, causing barrier
-divergence (dual blowup at ~iter 44).
+Minimum absolute coefficient threshold for constraint-side Gurobi expressions.
 
-With max coefficient ≈ 2e3, Gurobi's 1e6 limit requires min ≥ 2e-3.
-_build_biodiv_contr_expr() in solver.py filters per-j: only includes cell r
-for land use j if |val_vector[r] * biodiv_contr[j]| >= GBF_BIODIV_COEFF_MIN.
-Terms below this threshold are ecologically negligible (< 0.2% of native
-vegetation quality) and their exclusion does not materially change the constraint.
+Applied to GHG, Water, Renewable, and GBF2/3/4/8 constraint builders.
+RESCALE_ZERO_THRESHOLD operates on individual arrays, but cross-products of two
+rescaled small values can still be tiny (e.g. val_vector[r]=1e-3 * coeff[j]=1e-5 = 1e-8),
+stretching the matrix coefficient range far below Gurobi's recommended [1e-3, 1e6] band
+and causing barrier divergence ("Numerical trouble encountered").
+
+IMPORTANT:
+  NEVER apply to economic (ag_obj_mrj), demand (ag_q_mrp), or biodiversity-quality
+  (ag_b_mrj) coefficients — those feed the objective function. Zeroing them makes
+  certain allocations appear artificially cheap; the solver over-allocates and
+  write.py charges the full true cost, producing incorrect results.
 '''
 
 DO_IIS = False

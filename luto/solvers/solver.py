@@ -1014,16 +1014,20 @@ class LutoSolver:
 
     def _build_biodiv_contr_expr(self, val_vector: np.ndarray, ind: np.ndarray) -> "gp.LinExpr":
         """
-        Build the biodiversity contribution expression for one region-species/group constraint.
+        Build the biodiversity contribution expression for one GBF2/3/4/8 constraint.
 
-        Filters per (r, factor) pairs where the product falls below GBF_BIODIV_COEFF_MIN to
-        keep the Gurobi matrix coefficient range within the recommended 1e6 band.
-        Without filtering, tiny biodiv_contr values (~1e-3 for degraded land uses) combined
-        with val_vector entries near RESCALE_ZERO_THRESHOLD produce ~1e-7 matrix coefficients
-        that cause barrier dual blowup (divergence starting ~iter 44).
+        Each Gurobi coefficient is the cross-product val_vector[r] * biodiv_contr[j].
+        RESCALE_ZERO_THRESHOLD operates on individual arrays, but their product can still
+        be tiny (e.g. 1e-3 * 1e-5 = 1e-8), stretching the Gurobi matrix range far below
+        the recommended [1e-3, 1e6] band and causing barrier divergence.
+        SOLVER_COEFF_MIN filters on this product before the term enters the model.
+
+        IMPORTANT: this filter applies ONLY to GBF2/3/4/8 constraint expressions.
+        NEVER apply to economic (ag_obj_mrj), demand (ag_q_mrp), or biodiversity-quality
+        (ag_b_mrj) coefficients — those feed the objective function, and zeroing them
+        corrupts allocation decisions (transitions appear cheap; write.py charges full cost).
         """
-        coeff_min = settings.GBF_BIODIV_COEFF_MIN
-        vv = val_vector[ind]
+        coeff_min = settings.SOLVER_COEFF_MIN
 
         # Agricultural contributions (biodiv_contr_ag_j[j] is a per-j scalar)
         ag_terms = []
@@ -1031,7 +1035,8 @@ class LutoSolver:
             c = self._input_data.biodiv_contr_ag_j[j]
             if c == 0:
                 continue
-            ind_j = ind[np.abs(vv * c) >= coeff_min]
+            vv = val_vector[ind] * c
+            ind_j = ind[np.abs(vv) >= coeff_min]
             if ind_j.size == 0:
                 continue
             ag_terms.append(
@@ -1044,7 +1049,8 @@ class LutoSolver:
         for am, am_j_list in self._input_data.am2j.items():
             for j_idx in range(len(am_j_list)):
                 c_arr = self._input_data.biodiv_contr_ag_man[am][j_idx]
-                ind_amj = ind[np.abs(vv * c_arr[ind]) >= coeff_min]
+                vv = val_vector[ind] * c_arr[ind]
+                ind_amj = ind[np.abs(vv) >= coeff_min]
                 if ind_amj.size == 0:
                     continue
                 ag_man_terms.append(
@@ -1058,7 +1064,8 @@ class LutoSolver:
             c = self._input_data.biodiv_contr_non_ag_k[k]
             if c == 0:
                 continue
-            ind_k = ind[np.abs(vv * c) >= coeff_min]
+            vv = val_vector[ind] * c
+            ind_k = ind[np.abs(vv) >= coeff_min]
             if ind_k.size == 0:
                 continue
             non_ag_terms.append(gp.quicksum(val_vector[ind_k] * c * self.X_non_ag_vars_kr[k, ind_k]))
