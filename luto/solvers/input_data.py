@@ -706,156 +706,43 @@ def get_renewable_MNES_mask_wind_idx(data: Data) -> np.ndarray:
     return np.where(data.RENEWABLE_MNES_MASK_WIND)[0]
 
 
-def rescale_region_species_data(
-    arr: xr.DataArray,
-    region_species_list: list[tuple[str, str]],
-    region_NRM_names_r: np.ndarray,
-) -> tuple[xr.DataArray, xr.DataArray]:
+def get_limits(data: Data, yr_cal: int) -> dict[str, Any]:
     """
-    Rescale a biodiversity matrix per (region, species/group) pair.
+    Return raw (unscaled) constraint targets for the given calendar year.
 
-    Used for GBF3 NVIS, GBF4 SNES/ECNES, and GBF8.  The scale factor for each
-    (region, species) pair is the maximum |value| of cells in that NRM region for
-    that row, so a small NRM region is never compressed by values from other regions.
-    'Australia' as region uses all cells.
+    Keys returned depend on active settings:
+      'demand', 'water', 'ghg',
+      'renewable_Utility Solar PV', 'renewable_Onshore Wind',
+      'renewable_Utility Solar PV_exist', 'renewable_Onshore Wind_exist',
+      'GBF2', 'GBF3_NVIS', 'GBF4_SNES', 'GBF4_ECNES', 'GBF8',
+      'ag_regional_adoption', 'non_ag_regional_adoption', 'non_ag_regional_adoption_sum'
 
-    Supports two matrix layouts:
-    - ``row_coord = 'layer'`` (GBF4 SNES/ECNES): rows are already (region, species) tuples;
-      the row lookup key is the full tuple ``(region, species)``.
-    - ``row_coord = 'group'`` or ``'species'`` (GBF3 NVIS, GBF8): rows are indexed by
-      species/group name; the row lookup key is the species/group string alone.
-
-    In both cases the output ``scale_factors`` has ``layer=[(region, species)]`` coords so
-    callers can uniformly use ``scale_factors.sel(layer=(region, species))``.
-
-    Returns:
-        scaled_arr: xr.DataArray, same shape as arr.
-        scale_factors: xr.DataArray[layer=(region, species)], one scale factor per pair.
-    """
-    arr_np = arr.values.copy().astype(np.float32)
-    row_coord = arr.dims[0]              # 'layer' for GBF4; 'group'/'species' for GBF3/GBF8
-    row_names = arr.coords[row_coord].values
-    row_name_to_idx = {name: i for i, name in enumerate(row_names)}
-    # GBF4: each row is already keyed by (region, species) tuple stored in 'layer' coord.
-    # GBF3/GBF8: each row is keyed by the species/group string alone.
-    use_tuple_key = (row_coord == 'layer')
-
-    layers: list[tuple] = []
-    sf_values: list[float] = []
-
-    for region, species in region_species_list:
-        row_key = (region, species) if use_tuple_key else species
-        row_idx = row_name_to_idx[row_key]
-
-        if region == "Australia":
-            cell_mask = np.ones(arr_np.shape[1], dtype=bool)
-        else:
-            cell_mask = region_NRM_names_r == region
-
-        region_max = np.abs(arr_np[row_idx, cell_mask]).max() if cell_mask.any() else 0.0
-        # All-zero region → no-op scaling.
-        ref = region_max if region_max > 0 else settings.RESCALE_FACTOR
-        scale_factor = np.float32(ref / settings.RESCALE_FACTOR)
-
-        new_vals = arr_np[row_idx, cell_mask] / scale_factor
-        new_vals[np.abs(new_vals) < settings.RESCALE_ZERO_THRESHOLD] = 0.0
-        arr_np[row_idx, cell_mask] = new_vals
-
-        layers.append((region, species))
-        sf_values.append(scale_factor)
-
-    scaled_arr = xr.DataArray(arr_np, dims=arr.dims, coords=arr.coords, name=arr.name)
-    scale_factors = xr.DataArray(
-        np.array(sf_values, dtype=np.float32),
-        dims=["layer"],
-        coords={"layer": pd.MultiIndex.from_tuples(layers, names=["region", "species"])},
-    )
-    return scaled_arr, scale_factors
-
-
-def rescale_solver_input_data(arries: list) -> tuple[list, float]:
-    """
-    Rescale the solver input data based on `settings.RESCALE_FACTOR`.
-    Returns scaled copies (non-in-place) and the scale factor used.
-
-    The scale factor is the max |value| pooled across all input arrays so every array
-    in this group shares one scale factor (preserves relative magnitudes between e.g. ag,
-    non-ag, and ag-management variants of the same quantity).
-    Entries with |value| < `settings.RESCALE_ZERO_THRESHOLD` after rescaling are zeroed
-    out to keep the matrix coefficient range inside Gurobi's recommended [1e-3, 1e6] band.
-    To recover original values, multiply the scaled arrays by the returned scale factor.
-    """
-
-    ref = 0.0
-    for arr in arries:
-        if isinstance(arr, np.ndarray):
-            ref = max(ref, np.abs(arr).max())
-        elif isinstance(arr, dict):
-            for v in arr.values():
-                ref = max(ref, np.abs(v).max())
-
-    if ref == 0.0:
-        ref = settings.RESCALE_FACTOR  # all-zero input → no-op scaling
-
-    scale = np.float32(ref / settings.RESCALE_FACTOR)
-
-    def _scale_and_threshold(v: np.ndarray) -> np.ndarray:
-        out = (v / scale).astype(np.float32)
-        out[np.abs(out) < settings.RESCALE_ZERO_THRESHOLD] = 0.0
-        return out
-
-    scaled = []
-    for arr in arries:
-        if isinstance(arr, np.ndarray):
-            scaled.append(_scale_and_threshold(arr))
-        elif isinstance(arr, dict):
-            scaled.append({k: _scale_and_threshold(v) for k, v in arr.items()})
-        else:
-            scaled.append(arr)
-
-    return scaled, scale
-
-def get_limits(data: Data, yr_cal: int, resale_factors) -> dict[str, Any]:
-    """
-    Gets the following limits for the solve:
-    - Water net yield limits
-    - GHG limits
-    - Biodiversity limits
-    - Regional adoption limits
+    All values are raw (unscaled); the solver divides each by the appropriate
+    ``scale_factors[key]`` entry inline when building constraints.
     """
     print('Getting environmental limits...', flush = True)
     
     limits = {}
     
-    if True:    # Always set demand limits
-        limits['demand'] = data.D_CY[yr_cal - data.YR_CAL_BASE]
-        limits['demand_rescale'] = limits['demand'] / resale_factors['Demand']
+    limits['demand'] = data.D_CY[yr_cal - data.YR_CAL_BASE]
     
     if settings.WATER_LIMITS == 'on':
         limits['water'] = data.WATER_YIELD_TARGETS
-        limits['water_rescale'] = {k: v / resale_factors['Water'] for k, v in limits['water'].items()}
         
     if settings.GHG_EMISSIONS_LIMITS != 'off':
         limits['ghg'] = data.GHG_TARGETS[yr_cal]
-        limits['ghg_rescale'] = limits['ghg'] / resale_factors['GHG']
         
     if any(settings.RENEWABLES_OPTIONS.values()):
-        
         renewable_targets = data.RENEWABLE_TARGETS.query('Year == @yr_cal').set_index('state')
         limits['renewable_Utility Solar PV'] = renewable_targets.query('tech == "Utility Solar"')['Renewable_Target_MWh'].to_dict()
         limits['renewable_Onshore Wind'] = renewable_targets.query('tech == "Wind"')['Renewable_Target_MWh'].to_dict()
-        limits['renewable_Utility Solar PV_rescale'] = {k: v / resale_factors['Renewable_Solar'] for k, v in limits['renewable_Utility Solar PV'].items()}
-        limits['renewable_Onshore Wind_rescale'] = {k: v / resale_factors['Renewable_Wind'] for k, v in limits['renewable_Onshore Wind'].items()}
         
         renewable_existing_capacity = get_exist_renewable_capacity_by_state_input(data, yr_cal)
         limits['renewable_Utility Solar PV_exist'] = {state: vals['Utility Solar PV'] for state, vals in renewable_existing_capacity.items()}
         limits['renewable_Onshore Wind_exist']     = {state: vals['Onshore Wind']     for state, vals in renewable_existing_capacity.items()}
-        limits['renewable_Utility Solar PV_exist_rescale'] = {k: v / resale_factors['Renewable_Solar'] for k, v in limits['renewable_Utility Solar PV_exist'].items()}
-        limits['renewable_Onshore Wind_exist_rescale'] = {k: v / resale_factors['Renewable_Wind'] for k, v in limits['renewable_Onshore Wind_exist'].items()}
 
     if settings.BIODIVERSITY_TARGET_GBF_2 != 'off':
         limits["GBF2"] = data.get_GBF2_target_for_yr_cal(yr_cal)
-        limits["GBF2_rescale"] = limits["GBF2"] / resale_factors['GBF2']
 
     if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off':
         limits["GBF3_NVIS"] = data.get_GBF3_NVIS_limit_score_inside_LUTO_by_yr(yr_cal)
@@ -876,6 +763,193 @@ def get_limits(data: Data, yr_cal: int, resale_factors) -> dict[str, Any]:
         limits["non_ag_regional_adoption_sum"] = non_ag_reg_adoption_sum
 
     return limits
+
+
+def calc_geomean_scale(lhs_max: float, rhs_max: float) -> float:
+    """
+    Compute a single scale factor as the geometric mean of LHS and RHS magnitudes,
+    normalised by ``settings.RESCALE_FACTOR`` (RF)::
+
+        scale = sqrt(lhs_max * rhs_max) / RF
+
+    After dividing both sides by this scale:
+      - LHS_max_scaled = RF * sqrt(lhs_max / rhs_max)
+      - RHS_scaled     = RF * sqrt(rhs_max / lhs_max)
+
+    Both land symmetrically around RF in log space.
+    Falls back to LHS-only (``lhs_max / RF``) when ``rhs_max`` is zero.
+    """
+    if lhs_max > 0.0 and rhs_max > 0.0:
+        return float(np.sqrt(lhs_max * rhs_max) / settings.RESCALE_FACTOR)
+    ref = lhs_max if lhs_max > 0.0 else settings.RESCALE_FACTOR
+    return float(ref / settings.RESCALE_FACTOR)
+
+
+def rescale_lhs(arrays: list) -> tuple[list, float]:
+    """
+    Rescale arrays using LHS-only scaling: ``scale = max(|LHS|) / RF``.
+
+    All arrays in the group share one scale factor to preserve their relative
+    magnitudes (e.g. ag, non-ag, and ag-management variants of the same quantity).
+    Entries with ``|value| < RESCALE_ZERO_THRESHOLD`` after rescaling are zeroed out.
+    Returns ``(scaled_arrays, scale_factor)``.
+    """
+    ref = 0.0
+    for arr in arrays:
+        if isinstance(arr, np.ndarray):
+            ref = max(ref, float(np.abs(arr).max()))
+        elif isinstance(arr, dict):
+            for v in arr.values():
+                ref = max(ref, float(np.abs(v).max()))
+
+    scale = np.float32(calc_geomean_scale(ref, 0.0))  # rhs_max=0 → LHS-only path
+
+    def _apply(v: np.ndarray) -> np.ndarray:
+        out = (v / scale).astype(np.float32)
+        out[np.abs(out) < settings.RESCALE_ZERO_THRESHOLD] = 0.0
+        return out
+
+    scaled = []
+    for arr in arrays:
+        if isinstance(arr, np.ndarray):
+            scaled.append(_apply(arr))
+        elif isinstance(arr, dict):
+            scaled.append({k: _apply(v) for k, v in arr.items()})
+        else:
+            scaled.append(arr)
+
+    return scaled, float(scale)
+
+
+def rescale_lhs_rhs(arrays: list, rhs_target) -> tuple[list, float]:
+    """
+    Rescale arrays using the geometric mean of max(|LHS|) and max(|RHS|)::
+
+        scale = sqrt(max_lhs * max_rhs) / RF
+
+    Both LHS coefficients and the RHS target land symmetrically around RF in log
+    space, keeping both sides within Gurobi's recommended [1e-3, 1e6] band as long
+    as ``max_rhs / max_lhs < 1e9`` (holds for all LUTO constraint types).
+
+    Use this for aggregate constraints (GHG, Water, GBF2, Demand, Renewable) where
+    per-cell LHS values and a national/regional RHS total would otherwise diverge.
+
+    Args:
+        arrays:     List of ``np.ndarray`` or ``dict[str, np.ndarray]``.
+        rhs_target: Scalar float, ``dict[key, float]``, or ``np.ndarray``.
+                    Representative magnitude is ``max(|rhs_target|)``.
+
+    Returns:
+        ``(scaled_arrays, scale_factor)``
+    """
+    lhs_max = 0.0
+    for arr in arrays:
+        if isinstance(arr, np.ndarray):
+            lhs_max = max(lhs_max, float(np.abs(arr).max()))
+        elif isinstance(arr, dict):
+            for v in arr.values():
+                lhs_max = max(lhs_max, float(np.abs(v).max()))
+
+    if isinstance(rhs_target, dict):
+        rhs_max = max((abs(v) for v in rhs_target.values()), default=0.0)
+    elif isinstance(rhs_target, np.ndarray):
+        rhs_max = float(np.abs(rhs_target).max()) if rhs_target.size else 0.0
+    else:
+        rhs_max = abs(float(rhs_target))
+
+    scale = np.float32(calc_geomean_scale(lhs_max, rhs_max))
+    if scale == 0.0:
+        scale = np.float32(1.0)
+
+    def _apply(v: np.ndarray) -> np.ndarray:
+        out = (v / scale).astype(np.float32)
+        out[np.abs(out) < settings.RESCALE_ZERO_THRESHOLD] = 0.0
+        return out
+
+    scaled = []
+    for arr in arrays:
+        if isinstance(arr, np.ndarray):
+            scaled.append(_apply(arr))
+        elif isinstance(arr, dict):
+            scaled.append({k: _apply(v) for k, v in arr.items()})
+        else:
+            scaled.append(arr)
+
+    return scaled, float(scale)
+
+
+def rescale_lhs_rhs_region_species(
+    arr: xr.DataArray,
+    region_species_list: list[tuple[str, str]],
+    region_NRM_names_r: np.ndarray,
+    targets: xr.DataArray | None = None,
+) -> tuple[xr.DataArray, xr.DataArray]:
+    """
+    Rescale a biodiversity matrix per (region, species/group) pair using the
+    geometric mean of max(|LHS|) and the pair's RHS target.
+
+    Calls :func:`calc_geomean_scale` for each pair::
+
+        scale = calc_geomean_scale(region_max, abs(target_val))
+
+    When ``targets`` is ``None``, falls back to LHS-only (``region_max / RF``).
+
+    'Australia' as region uses all cells.
+
+    Supports two matrix layouts:
+    - ``row_coord = 'layer'`` (GBF4 SNES/ECNES): rows are (region, species) tuples.
+    - ``row_coord = 'group'`` or ``'species'`` (GBF3 NVIS, GBF8): rows are the
+      species/group string.
+
+    The output ``scale_factors`` DataArray has ``layer=[(region, species)]`` coords
+    so callers can uniformly use ``scale_factors.sel(layer=(region, species))``.
+
+    Returns:
+        scaled_arr: xr.DataArray, same shape as ``arr``.
+        scale_factors: xr.DataArray[layer=(region, species)].
+    """
+    arr_np = arr.values.copy().astype(np.float32)
+    row_coord = arr.dims[0]
+    row_names = arr.coords[row_coord].values
+    row_name_to_idx = {name: i for i, name in enumerate(row_names)}
+    use_tuple_key = (row_coord == 'layer')  # GBF4: row key is (region, species) tuple
+
+    layers: list[tuple] = []
+    sf_values: list[float] = []
+
+    for region, species in region_species_list:
+        row_key = (region, species) if use_tuple_key else species
+        row_idx = row_name_to_idx[row_key]
+
+        cell_mask = (
+            np.ones(arr_np.shape[1], dtype=bool)
+            if region == "Australia"
+            else region_NRM_names_r == region
+        )
+
+        region_max = float(np.abs(arr_np[row_idx, cell_mask]).max()) if cell_mask.any() else 0.0
+
+        if targets is not None:
+            target_val = abs(float(targets.sel(layer=(region, species)).item()))
+        else:
+            target_val = 0.0
+
+        scale_factor = np.float32(calc_geomean_scale(region_max, target_val))
+
+        new_vals = arr_np[row_idx, cell_mask] / scale_factor
+        new_vals[np.abs(new_vals) < settings.RESCALE_ZERO_THRESHOLD] = 0.0
+        arr_np[row_idx, cell_mask] = new_vals
+
+        layers.append((region, species))
+        sf_values.append(float(scale_factor))
+
+    scaled_arr = xr.DataArray(arr_np, dims=arr.dims, coords=arr.coords, name=arr.name)
+    scale_factors = xr.DataArray(
+        np.array(sf_values, dtype=np.float32),
+        dims=["layer"],
+        coords={"layer": pd.MultiIndex.from_tuples(layers, names=["region", "species"])},
+    )
+    return scaled_arr, scale_factors
 
 
 
@@ -976,52 +1050,78 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     renewable_MNES_mask_solar_idx=get_renewable_MNES_mask_solar_idx(data)
     renewable_MNES_mask_wind_idx=get_renewable_MNES_mask_wind_idx(data)
 
+    # Fetch all raw limit targets once — reused in both rescaling and get_limits below.
+    limits = get_limits(data, target_year)
+
     # Rescale solver input data
-    [ag_obj_mrj, non_ag_obj_rk, ag_man_objs], economy_scale = rescale_solver_input_data([ag_obj_mrj, non_ag_obj_rk, ag_man_objs])
-    [ag_q_mrp, non_ag_q_crk, ag_man_q_mrp],   demand_scale  = rescale_solver_input_data([ag_q_mrp, non_ag_q_crk, ag_man_q_mrp])
-    [ag_b_mrj, non_ag_b_rk, ag_man_b_mrj],    biodiv_scale  = rescale_solver_input_data([ag_b_mrj, non_ag_b_rk, ag_man_b_mrj])
+    [ag_obj_mrj, non_ag_obj_rk, ag_man_objs], economy_scale = rescale_lhs([ag_obj_mrj, non_ag_obj_rk, ag_man_objs])
+    [ag_q_mrp, non_ag_q_crk, ag_man_q_mrp],   demand_scale  = rescale_lhs_rhs(
+        [ag_q_mrp, non_ag_q_crk, ag_man_q_mrp],
+        limits['demand'],
+    )
+    [ag_b_mrj, non_ag_b_rk, ag_man_b_mrj],    biodiv_scale  = rescale_lhs([ag_b_mrj, non_ag_b_rk, ag_man_b_mrj])
 
     # Get the scale factors
     if settings.GHG_EMISSIONS_LIMITS != 'off':
-        [ag_g_mrj, non_ag_g_rk, ag_man_g_mrj, ag_ghg_t_mrj], ghg_scale = rescale_solver_input_data([ag_g_mrj, non_ag_g_rk, ag_man_g_mrj, ag_ghg_t_mrj])
+        [ag_g_mrj, non_ag_g_rk, ag_man_g_mrj, ag_ghg_t_mrj], ghg_scale = rescale_lhs_rhs(
+            [ag_g_mrj, non_ag_g_rk, ag_man_g_mrj, ag_ghg_t_mrj],
+            limits['ghg'],
+        )
     else:
         ghg_scale = 1.0
-  
+
     if any(settings.RENEWABLES_OPTIONS.values()):
-            [renewable_solar_r], renewable_solar_scale = rescale_solver_input_data([renewable_solar_r])
-            [renewable_wind_r],  renewable_wind_scale  = rescale_solver_input_data([renewable_wind_r])
+        [renewable_solar_r], renewable_solar_scale = rescale_lhs_rhs([renewable_solar_r], limits['renewable_Utility Solar PV'])
+        [renewable_wind_r],  renewable_wind_scale  = rescale_lhs_rhs([renewable_wind_r],  limits['renewable_Onshore Wind'])
     else:
         renewable_solar_scale = 1.0
         renewable_wind_scale  = 1.0
 
     if settings.WATER_LIMITS == 'on':
-        [ag_w_mrj, non_ag_w_rk, ag_man_w_mrj], water_scale = rescale_solver_input_data([ag_w_mrj, non_ag_w_rk, ag_man_w_mrj])
+        [ag_w_mrj, non_ag_w_rk, ag_man_w_mrj], water_scale = rescale_lhs_rhs(
+            [ag_w_mrj, non_ag_w_rk, ag_man_w_mrj],
+            limits['water'],
+        )
     else:
         water_scale = 1.0
 
     if settings.BIODIVERSITY_TARGET_GBF_2 != "off":
-        [GBF2_mask_area_r], gbf2_scale = rescale_solver_input_data([GBF2_mask_area_r])
+        [GBF2_mask_area_r], gbf2_scale = rescale_lhs_rhs(
+            [GBF2_mask_area_r],
+            limits['GBF2'],
+        )
     else:
         gbf2_scale = 1.0
 
     if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != "off":
-        GBF3_NVIS_pre_1750_area_vr, gbf3_nvis_scale = rescale_region_species_data(GBF3_NVIS_pre_1750_area_vr, GBF3_NVIS_region_group, region_NRM_names_r)
+        GBF3_NVIS_pre_1750_area_vr, gbf3_nvis_scale = rescale_lhs_rhs_region_species(
+            GBF3_NVIS_pre_1750_area_vr, GBF3_NVIS_region_group, region_NRM_names_r,
+            targets=limits['GBF3_NVIS'],
+        )
     else:
         gbf3_nvis_scale = 1.0
 
-
     if settings.BIODIVERSITY_TARGET_GBF_4_SNES == "on":
-        GBF4_SNES_pre_1750_area_sr, gbf4_snes_scale = rescale_region_species_data(GBF4_SNES_pre_1750_area_sr, GBF4_SNES_region_species, region_NRM_names_r)
+        GBF4_SNES_pre_1750_area_sr, gbf4_snes_scale = rescale_lhs_rhs_region_species(
+            GBF4_SNES_pre_1750_area_sr, GBF4_SNES_region_species, region_NRM_names_r,
+            targets=limits['GBF4_SNES'],
+        )
     else:
         gbf4_snes_scale = 1.0
 
     if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == "on":
-        GBF4_ECNES_pre_1750_area_sr, gbf4_ecnes_scale = rescale_region_species_data(GBF4_ECNES_pre_1750_area_sr, GBF4_ECNES_region_species, region_NRM_names_r)
+        GBF4_ECNES_pre_1750_area_sr, gbf4_ecnes_scale = rescale_lhs_rhs_region_species(
+            GBF4_ECNES_pre_1750_area_sr, GBF4_ECNES_region_species, region_NRM_names_r,
+            targets=limits['GBF4_ECNES'],
+        )
     else:
         gbf4_ecnes_scale = 1.0
 
     if settings.BIODIVERSITY_TARGET_GBF_8 == "on":
-        GBF8_pre_1750_area_sr, gbf8_scale = rescale_region_species_data(GBF8_pre_1750_area_sr, GBF8_region_species, region_NRM_names_r)
+        GBF8_pre_1750_area_sr, gbf8_scale = rescale_lhs_rhs_region_species(
+            GBF8_pre_1750_area_sr, GBF8_region_species, region_NRM_names_r,
+            targets=limits['GBF8'],
+        )
     else:
         gbf8_scale = 1.0
 
@@ -1036,8 +1136,8 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         "GBF4_SNES":        gbf4_snes_scale,
         "GBF4_ECNES":       gbf4_ecnes_scale,
         "GBF8":             gbf8_scale,
-        "Renewable_Solar":  renewable_solar_scale,
-        "Renewable_Wind":   renewable_wind_scale,
+        "Utility Solar PV": renewable_solar_scale,
+        "Onshore Wind":     renewable_wind_scale,
     }
 
     base_yr_prod = {
@@ -1061,7 +1161,6 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
 
     lu2pr_pj=data.LU2PR
     pr2cm_cp=data.PR2CM
-    limits=get_limits(data, target_year, scale_factors)
     desc2aglu=data.DESC2AGLU
     real_area=data.REAL_AREA
     ag_mask_proportion_r=data.AG_MASK_PROPORTION_R

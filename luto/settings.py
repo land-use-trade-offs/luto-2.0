@@ -185,6 +185,23 @@ Gurobi's recommended band; the per-year retry loop in simulation.py escalates
 RETRY_PARAMS if the first solve still terminates non-optimally.
 '''
 
+GBF_BIODIV_COEFF_MIN = 2e-3
+'''
+Minimum effective matrix coefficient for GBF3/4/8 biodiversity constraints.
+Each term in these constraints is val_vector[r] * biodiv_contr[j], where
+biodiv_contr[j] can be as small as ~1e-3 for highly degraded land uses.
+RESCALE_ZERO_THRESHOLD only filters val_vector in isolation; the product
+val_vector (~1e-4 min) * biodiv_contr (~1e-3 min) ≈ 1e-7 falls far outside
+Gurobi's recommended [1e-3, 1e6] matrix coefficient band, causing barrier
+divergence (dual blowup at ~iter 44).
+
+With max coefficient ≈ 2e3, Gurobi's 1e6 limit requires min ≥ 2e-3.
+_build_biodiv_contr_expr() in solver.py filters per-j: only includes cell r
+for land use j if |val_vector[r] * biodiv_contr[j]| >= GBF_BIODIV_COEFF_MIN.
+Terms below this threshold are ecologically negligible (< 0.2% of native
+vegetation quality) and their exclusion does not materially change the constraint.
+'''
+
 DO_IIS = False
 '''
 If True, when a per-year solve terminates infeasible the run will compute and write

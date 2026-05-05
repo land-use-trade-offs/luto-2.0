@@ -655,9 +655,10 @@ class LutoSolver:
             for c in range(self._input_data.ncms)
         ]
 
+        demand_scale = self._input_data.scale_factors['Demand']
         lower_bound_constraints = self.gurobi_model.addConstrs(
             (
-                (self.total_q_exprs_c[c] - self._input_data.limits['demand_rescale'][c]) == self.V[c] 
+                (self.total_q_exprs_c[c] - self._input_data.limits['demand'][c] / demand_scale) == self.V[c]
                 for c in range(self._input_data.ncms)
             ),  name="demand_soft_bound_lower"
         )
@@ -725,9 +726,9 @@ class LutoSolver:
         print("│   └── Adding constraints for water usage limits...")
         
         # Ensure water use remains below limit for each region
-        for reg_idx, water_limit_rescale in self._input_data.limits["water_rescale"].items():
-            
-            w_limit_raw = water_limit_rescale * self._input_data.scale_factors['Water']
+        water_scale = self._input_data.scale_factors['Water']
+        for reg_idx, w_limit_raw in self._input_data.limits["water"].items():
+            water_limit_rescale = w_limit_raw / water_scale
             ind = self._input_data.water_region_indices[reg_idx]
             reg_name = self._input_data.water_region_names[reg_idx]
 
@@ -797,10 +798,10 @@ class LutoSolver:
                 mnes_mask_idx = re_data['mnes_mask_idx']
 
                 target_raw    = self._input_data.limits[f"renewable_{am}"][reg_name]
-                target_rescal = self._input_data.limits[f"renewable_{am}_rescale"][reg_name]
+                target_rescal = target_raw / self._input_data.scale_factors[am]
 
                 exist_power_mwh     = self._input_data.limits[f"renewable_{am}_exist"][reg_name]
-                exist_power_rescale = self._input_data.limits[f"renewable_{am}_exist_rescale"][reg_name]
+                exist_power_rescale = exist_power_mwh / self._input_data.scale_factors[am]
 
                 print(f"│   │   │   ├── target for {am} is {target_raw:5,.0f} MWh  (existing: {exist_power_mwh:5,.0f} MWh)")
 
@@ -904,7 +905,7 @@ class LutoSolver:
             return
 
         ghg_limit_raw = self._input_data.limits["ghg"]
-        ghg_limit_rescale = self._input_data.limits["ghg_rescale"]
+        ghg_limit_rescale = ghg_limit_raw / self._input_data.scale_factors['GHG']
         self.ghg_expr = self._get_total_ghg_expr()
 
         if settings.GHG_CONSTRAINT_TYPE == "hard":
@@ -1006,9 +1007,63 @@ class LutoSolver:
         print(f'│   │   ├── Adding constraints for biodiversity GBF 2: {self._input_data.limits["GBF2"]:15,.0f}')
         
         self.bio_GBF2_constrs = self.gurobi_model.addConstr(
-            self.bio_GBF2_expr >= self._input_data.limits["GBF2_rescale"], 
+            self.bio_GBF2_expr >= self._input_data.limits["GBF2"] / self._input_data.scale_factors['GBF2'], 
             name="bio_GBF2_priority_degraded_area_limit"
         )
+
+
+    def _build_biodiv_contr_expr(self, val_vector: np.ndarray, ind: np.ndarray) -> "gp.LinExpr":
+        """
+        Build the biodiversity contribution expression for one region-species/group constraint.
+
+        Filters per (r, factor) pairs where the product falls below GBF_BIODIV_COEFF_MIN to
+        keep the Gurobi matrix coefficient range within the recommended 1e6 band.
+        Without filtering, tiny biodiv_contr values (~1e-3 for degraded land uses) combined
+        with val_vector entries near RESCALE_ZERO_THRESHOLD produce ~1e-7 matrix coefficients
+        that cause barrier dual blowup (divergence starting ~iter 44).
+        """
+        coeff_min = settings.GBF_BIODIV_COEFF_MIN
+        vv = val_vector[ind]
+
+        # Agricultural contributions (biodiv_contr_ag_j[j] is a per-j scalar)
+        ag_terms = []
+        for j in range(self._input_data.n_ag_lus):
+            c = self._input_data.biodiv_contr_ag_j[j]
+            if c == 0:
+                continue
+            ind_j = ind[np.abs(vv * c) >= coeff_min]
+            if ind_j.size == 0:
+                continue
+            ag_terms.append(
+                gp.quicksum(val_vector[ind_j] * c * self.X_ag_dry_vars_jr[j, ind_j])
+                + gp.quicksum(val_vector[ind_j] * c * self.X_ag_irr_vars_jr[j, ind_j])
+            )
+
+        # Agricultural management contributions (biodiv_contr_ag_man[am][j_idx] is per-cell)
+        ag_man_terms = []
+        for am, am_j_list in self._input_data.am2j.items():
+            for j_idx in range(len(am_j_list)):
+                c_arr = self._input_data.biodiv_contr_ag_man[am][j_idx]
+                ind_amj = ind[np.abs(vv * c_arr[ind]) >= coeff_min]
+                if ind_amj.size == 0:
+                    continue
+                ag_man_terms.append(
+                    gp.quicksum(val_vector[ind_amj] * c_arr[ind_amj] * self.X_ag_man_dry_vars_jr[am][j_idx, ind_amj])
+                    + gp.quicksum(val_vector[ind_amj] * c_arr[ind_amj] * self.X_ag_man_irr_vars_jr[am][j_idx, ind_amj])
+                )
+
+        # Non-agricultural contributions (biodiv_contr_non_ag_k[k] is a per-k scalar)
+        non_ag_terms = []
+        for k in range(self._input_data.n_non_ag_lus):
+            c = self._input_data.biodiv_contr_non_ag_k[k]
+            if c == 0:
+                continue
+            ind_k = ind[np.abs(vv * c) >= coeff_min]
+            if ind_k.size == 0:
+                continue
+            non_ag_terms.append(gp.quicksum(val_vector[ind_k] * c * self.X_non_ag_vars_kr[k, ind_k]))
+
+        return gp.quicksum(ag_terms) + gp.quicksum(ag_man_terms) + gp.quicksum(non_ag_terms)
 
 
     def _add_GBF3_NVIS_constraints(self) -> None:
@@ -1043,46 +1098,7 @@ class LutoSolver:
             
             print(f"│   │   │   ├── target is {lb_raw_vector:15,.0f} for {region} [{group}]")
 
-            ag_contr = gp.quicksum(
-                gp.quicksum(
-                    val_vector[ind]
-                    * self._input_data.biodiv_contr_ag_j[j]
-                    * self.X_ag_dry_vars_jr[j, ind]
-                )  # Dryland agriculture contribution
-                + gp.quicksum(
-                    val_vector[ind]
-                    * self._input_data.biodiv_contr_ag_j[j]
-                    * self.X_ag_irr_vars_jr[j, ind]
-                )  # Irrigated agriculture contribution
-                for j in range(self._input_data.n_ag_lus)
-            )
-
-            ag_man_contr = gp.quicksum(
-                gp.quicksum(
-                    val_vector[ind]
-                    * self._input_data.biodiv_contr_ag_man[am][j_idx][ind]
-                    * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
-                )  # Dryland alt. ag. management contributions
-                + gp.quicksum(
-                    val_vector[ind]
-                    * self._input_data.biodiv_contr_ag_man[am][j_idx][ind]
-                    * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
-                )  # Irrigated alt. ag. management contributions
-                for am, am_j_list in self._input_data.am2j.items()
-                for j_idx in range(len(am_j_list))
-            )
-
-            non_ag_contr = gp.quicksum(
-                gp.quicksum(
-                    val_vector[ind]
-                    * self._input_data.biodiv_contr_non_ag_k[k]
-                    * self.X_non_ag_vars_kr[k, ind]
-                )  # Non-agricultural contribution
-                for k in range(self._input_data.n_non_ag_lus)
-            )
-
-
-            self.bio_GBF3_NVIS_exprs[(region, group)] = ag_contr + ag_man_contr + non_ag_contr
+            self.bio_GBF3_NVIS_exprs[(region, group)] = self._build_biodiv_contr_expr(val_vector, ind)
 
             self.bio_GBF3_NVIS_constrs[(region, group)] = self.gurobi_model.addConstr(
                 self.bio_GBF3_NVIS_exprs[(region, group)] >= lb_rescale_vector,
@@ -1122,32 +1138,8 @@ class LutoSolver:
                 print(f"│   │   │   ├── WARNING: SNES empty layer for {species} [{region}]")
                 continue
 
-            ag_contr = gp.quicksum(
-                gp.quicksum(
-                    val_vector[ind] * self._input_data.biodiv_contr_ag_j[j] * self.X_ag_dry_vars_jr[j, ind]
-                ) + gp.quicksum(
-                    val_vector[ind] * self._input_data.biodiv_contr_ag_j[j] * self.X_ag_irr_vars_jr[j, ind]
-                )
-                for j in range(self._input_data.n_ag_lus)
-            )
-            ag_man_contr = gp.quicksum(
-                gp.quicksum(
-                    val_vector[ind] * self._input_data.biodiv_contr_ag_man[am][j_idx][ind] * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
-                ) + gp.quicksum(
-                    val_vector[ind] * self._input_data.biodiv_contr_ag_man[am][j_idx][ind] * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
-                )
-                for am, am_j_list in self._input_data.am2j.items()
-                for j_idx in range(len(am_j_list))
-            )
-            non_ag_contr = gp.quicksum(
-                gp.quicksum(
-                    val_vector[ind] * self._input_data.biodiv_contr_non_ag_k[k] * self.X_non_ag_vars_kr[k, ind]
-                )
-                for k in range(self._input_data.n_non_ag_lus)
-            )
-
             print(f"│   │   │   ├── target is {lb_raw:15,.0f} for {species} [{region}]")
-            self.bio_GBF4_SNES_exprs[(region, species)] = ag_contr + ag_man_contr + non_ag_contr
+            self.bio_GBF4_SNES_exprs[(region, species)] = self._build_biodiv_contr_expr(val_vector, ind)
             self.bio_GBF4_SNES_constrs[(region, species)] = self.gurobi_model.addConstr(
                 self.bio_GBF4_SNES_exprs[(region, species)] >= lb_rescale,
                 name=f"bio_GBF4_SNES_limit_{region}_{species}".replace(" ", "_"),
@@ -1180,32 +1172,8 @@ class LutoSolver:
                 print(f"│   │   │   ├── WARNING: ECNES empty layer for {species} [{region}]")
                 continue
 
-            ag_contr = gp.quicksum(
-                gp.quicksum(
-                    val_vector[ind] * self._input_data.biodiv_contr_ag_j[j] * self.X_ag_dry_vars_jr[j, ind]
-                ) + gp.quicksum(
-                    val_vector[ind] * self._input_data.biodiv_contr_ag_j[j] * self.X_ag_irr_vars_jr[j, ind]
-                )
-                for j in range(self._input_data.n_ag_lus)
-            )
-            ag_man_contr = gp.quicksum(
-                gp.quicksum(
-                    val_vector[ind] * self._input_data.biodiv_contr_ag_man[am][j_idx][ind] * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
-                ) + gp.quicksum(
-                    val_vector[ind] * self._input_data.biodiv_contr_ag_man[am][j_idx][ind] * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
-                )
-                for am, am_j_list in self._input_data.am2j.items()
-                for j_idx in range(len(am_j_list))
-            )
-            non_ag_contr = gp.quicksum(
-                gp.quicksum(
-                    val_vector[ind] * self._input_data.biodiv_contr_non_ag_k[k] * self.X_non_ag_vars_kr[k, ind]
-                )
-                for k in range(self._input_data.n_non_ag_lus)
-            )
-
             print(f"│   │   │   ├── target is {lb_raw:15,.0f} for {species} [{region}]")
-            self.bio_GBF4_ECNES_exprs[(region, species)] = ag_contr + ag_man_contr + non_ag_contr
+            self.bio_GBF4_ECNES_exprs[(region, species)] = self._build_biodiv_contr_expr(val_vector, ind)
             self.bio_GBF4_ECNES_constrs[(region, species)] = self.gurobi_model.addConstr(
                 self.bio_GBF4_ECNES_exprs[(region, species)] >= lb_rescale,
                 name=f"bio_GBF4_ECNES_limit_{region}_{species}".replace(" ", "_"),
@@ -1244,32 +1212,8 @@ class LutoSolver:
                 print(f"│   │   │   ├── WARNING: GBF8 empty layer for {species} [{region}]")
                 continue
 
-            ag_contr = gp.quicksum(
-                gp.quicksum(
-                    val_vector[ind] * self._input_data.biodiv_contr_ag_j[j] * self.X_ag_dry_vars_jr[j, ind]
-                ) + gp.quicksum(
-                    val_vector[ind] * self._input_data.biodiv_contr_ag_j[j] * self.X_ag_irr_vars_jr[j, ind]
-                )
-                for j in range(self._input_data.n_ag_lus)
-            )
-            ag_man_contr = gp.quicksum(
-                gp.quicksum(
-                    val_vector[ind] * self._input_data.biodiv_contr_ag_man[am][j_idx][ind] * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
-                ) + gp.quicksum(
-                    val_vector[ind] * self._input_data.biodiv_contr_ag_man[am][j_idx][ind] * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
-                )
-                for am, am_j_list in self._input_data.am2j.items()
-                for j_idx in range(len(am_j_list))
-            )
-            non_ag_contr = gp.quicksum(
-                gp.quicksum(
-                    val_vector[ind] * self._input_data.biodiv_contr_non_ag_k[k] * self.X_non_ag_vars_kr[k, ind]
-                )
-                for k in range(self._input_data.n_non_ag_lus)
-            )
-
             print(f"│   │   │   ├── target is {lb_raw:15,.0f} for {species} [{region}]")
-            self.bio_GBF8_exprs[(region, species)] = ag_contr + ag_man_contr + non_ag_contr
+            self.bio_GBF8_exprs[(region, species)] = self._build_biodiv_contr_expr(val_vector, ind)
             self.bio_GBF8_constrs[(region, species)] = self.gurobi_model.addConstr(
                 self.bio_GBF8_exprs[(region, species)] >= lb_rescale,
                 name=f"bio_GBF8_limit_{region}_{species}".replace(" ", "_"),
