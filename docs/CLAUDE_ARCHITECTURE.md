@@ -15,8 +15,8 @@ This document describes the core architecture, modules, and data flow of LUTO2.
   - `input_data.py`: Prepares optimization model input data
     - Biodiversity data attributes use `*_pre_1750_area_*` naming (e.g., `GBF3_NVIS_pre_1750_area_vr`, `GBF3_IBRA_pre_1750_area_vr`, `GBF4_SNES_pre_1750_area_sr`)
     - Renewable energy data: `renewable_solar_r`, `renewable_wind_r` yield arrays; `region_state_r` mapping
-    - `rescale_solver_input_data()`: Rescaling of arrays to magnitude 0–1e3 for numerical stability, then zeros entries with `|value| < RESCALE_ZERO_THRESHOLD` (1e-4) across **all** input arrays (Economy, Demand, Biodiversity-quality, GHG, Water, GBF2/3/4/8, Renewable).
-    - `SOLVER_COEFF_MIN` (2e-3): Cross-product threshold applied inside constraint builders in `solver.py` for GHG, Water, Renewable, and GBF2/3/4/8. Needed because per-array zeroing cannot prevent tiny `val_vector[r] × coeff[j]` products. **Never applied to Economy, Demand, or Biodiversity-quality** — those feed the objective function.
+    - `rescale_solver_input_data()`: Rescales arrays in-place to magnitude 0–1e3 for numerical stability. Each category (Economy, Demand, Biodiversity-quality, GHG, Water, GBF2/3/4/8, Renewable) is rescaled separately. **No post-rescale zeroing** — tiny cross-products are handled by `_qsum` in `solver.py`.
+    - `SOLVER_COEFF_MIN` (1e-4): Universal minimum coefficient threshold. `_qsum(coeffs, gurobi_vars)` in `solver.py` is called by **all** constraint and objective builders; any term whose absolute coefficient falls below this value is dropped before entering Gurobi. Chosen empirically: 1e-3 caused ~3% economic loss; 1e-4 retains meaningful small coefficients while keeping the matrix ratio at 1e8.
     - Separate rescaling for: Economy, Demand, Biodiversity, GHG, Renewable_Solar, Renewable_Wind, Water, GBF2, GBF3_NVIS, GBF3_IBRA, GBF4_SNES, GBF4_ECNES, GBF8
 
 ## Economic Modules
