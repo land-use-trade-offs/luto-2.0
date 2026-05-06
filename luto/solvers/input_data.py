@@ -791,7 +791,6 @@ def rescale_lhs(arrays: list) -> tuple[list, float]:
 
     All arrays in the group share one scale factor to preserve their relative
     magnitudes (e.g. ag, non-ag, and ag-management variants of the same quantity).
-    Entries with ``|value| < RESCALE_ZERO_THRESHOLD`` after rescaling are zeroed out.
     Returns ``(scaled_arrays, scale_factor)``.
     """
     ref = 0.0
@@ -804,17 +803,12 @@ def rescale_lhs(arrays: list) -> tuple[list, float]:
 
     scale = np.float32(calc_geomean_scale(ref, 0.0))  # rhs_max=0 → LHS-only path
 
-    def _apply(v: np.ndarray) -> np.ndarray:
-        out = (v / scale).astype(np.float32)
-        out[np.abs(out) < settings.RESCALE_ZERO_THRESHOLD] = 0.0
-        return out
-
     scaled = []
     for arr in arrays:
         if isinstance(arr, np.ndarray):
-            scaled.append(_apply(arr))
+            scaled.append((arr / scale).astype(np.float32))
         elif isinstance(arr, dict):
-            scaled.append({k: _apply(v) for k, v in arr.items()})
+            scaled.append({k: (v / scale).astype(np.float32) for k, v in arr.items()})
         else:
             scaled.append(arr)
 
@@ -861,17 +855,12 @@ def rescale_lhs_rhs(arrays: list, rhs_target) -> tuple[list, float]:
     if scale == 0.0:
         scale = np.float32(1.0)
 
-    def _apply(v: np.ndarray) -> np.ndarray:
-        out = (v / scale).astype(np.float32)
-        out[np.abs(out) < settings.RESCALE_ZERO_THRESHOLD] = 0.0
-        return out
-
     scaled = []
     for arr in arrays:
         if isinstance(arr, np.ndarray):
-            scaled.append(_apply(arr))
+            scaled.append((arr / scale).astype(np.float32))
         elif isinstance(arr, dict):
-            scaled.append({k: _apply(v) for k, v in arr.items()})
+            scaled.append({k: (v / scale).astype(np.float32) for k, v in arr.items()})
         else:
             scaled.append(arr)
 
@@ -936,9 +925,7 @@ def rescale_lhs_rhs_region_species(
 
         scale_factor = np.float32(calc_geomean_scale(region_max, target_val))
 
-        new_vals = arr_np[row_idx, cell_mask] / scale_factor
-        new_vals[np.abs(new_vals) < settings.RESCALE_ZERO_THRESHOLD] = 0.0
-        arr_np[row_idx, cell_mask] = new_vals
+        arr_np[row_idx, cell_mask] = arr_np[row_idx, cell_mask] / scale_factor
 
         layers.append((region, species))
         sf_values.append(float(scale_factor))

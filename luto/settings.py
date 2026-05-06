@@ -170,39 +170,24 @@ E.g., the water yield for some cells is 10t but the Biodiversity-score is 1e-7, 
 the model sensitive to variations in input data. 
 '''
 
-RESCALE_ZERO_THRESHOLD = 1e-4
+SOLVER_COEFF_MIN = 1e-4
 '''
-After rescaling, any coefficient with |value| < RESCALE_ZERO_THRESHOLD is zeroed out before
-being shipped to Gurobi. Such tiny entries contribute nothing to constraint sums dominated
-by O(RESCALE_FACTOR) terms, but they wreck barrier numerics by stretching the matrix
-coefficient range below Gurobi's recommended [1e-3, 1e6] band — the symptom is
-"Numerical trouble encountered" with a Matrix range like [5e-08, 1e+03].
+Minimum absolute coefficient threshold applied by ``_qsum()`` in solver.py before
+adding a term to any Gurobi expression (constraints and objective alike).
 
-Applied to ALL input arrays (Economy, Demand, Biodiversity-quality, GHG, Water, Renewable,
-GBF2/3/4/8) via rescale_lhs() and rescale_lhs_rhs() in input_data.py.
+After rescaling, cross-products of two rescaled values can still be tiny (e.g.
+val_vector[r]=1e-3 × coeff[j]=1e-5 = 1e-8), stretching the matrix/objective
+coefficient range far below Gurobi's recommended [1e-3, 1e6] band and causing
+barrier divergence ("Numerical trouble encountered"). This threshold filters such
+terms before they enter Gurobi.
 
-Note: 1e-4 was found to occasionally produce false-infeasibility on barrier (model is
-actually feasible — IIS subsequently fails with "Cannot compute IIS on a feasible model").
-Keeping the threshold at 1e-4 keeps the matrix coefficient range comfortably inside
-Gurobi's recommended band; the per-year retry loop in simulation.py escalates
-RETRY_PARAMS if the first solve still terminates non-optimally.
-'''
+Applied to ALL constraint / objective builders:
+  Economy, Biodiversity-quality, GHG, Water, Renewable, GBF2/3/4/8,
+  Demand/Quantity, and Regional Adoption limits.
 
-SOLVER_COEFF_MIN = 2e-3
-'''
-Minimum absolute coefficient threshold for constraint-side Gurobi expressions.
-
-Applied to GHG, Water, Renewable, and GBF2/3/4/8 constraint builders.
-RESCALE_ZERO_THRESHOLD operates on individual arrays, but cross-products of two
-rescaled small values can still be tiny (e.g. val_vector[r]=1e-3 * coeff[j]=1e-5 = 1e-8),
-stretching the matrix coefficient range far below Gurobi's recommended [1e-3, 1e6] band
-and causing barrier divergence ("Numerical trouble encountered").
-
-IMPORTANT:
-  NEVER apply to economic (ag_obj_mrj), demand (ag_q_mrp), or biodiversity-quality
-  (ag_b_mrj) coefficients — those feed the objective function. Zeroing them makes
-  certain allocations appear artificially cheap; the solver over-allocates and
-  write.py charges the full true cost, producing incorrect results.
+1e-4 was chosen empirically: 1e-3 caused ~3% economic loss by filtering meaningful
+small production coefficients; 1e-4 retains those while keeping the matrix range
+ratio at 1e8 (well within Gurobi's safe zone).
 '''
 
 DO_IIS = False

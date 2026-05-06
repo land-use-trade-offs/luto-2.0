@@ -70,6 +70,25 @@ class SolverSolution:
     obj_val: dict[str, float]
 
 
+def _qsum(coeffs: np.ndarray, gurobi_vars: np.ndarray, coeff_min: float = None) -> "gp.LinExpr":
+    """
+    Return ``gp.quicksum(coeffs * gurobi_vars)`` filtered to ``|coeff| >= coeff_min``.
+
+    ``coeffs`` and ``gurobi_vars`` must be aligned (same length, same ordering).
+    The caller must pre-slice both arrays with the same index before calling, so
+    this function only needs a plain boolean mask — never a sub-index of a
+    potentially-boolean index array (which would produce a dimension mismatch).
+
+    ``coeff_min`` defaults to ``settings.SOLVER_COEFF_MIN``.
+    """
+    if coeff_min is None:
+        coeff_min = settings.SOLVER_COEFF_MIN
+    mask = np.abs(coeffs) >= coeff_min
+    if not mask.any():
+        return gp.LinExpr(0)
+    return gp.quicksum(coeffs[mask] * gurobi_vars[mask])
+
+
 class LutoSolver:
     """
     Class responsible for grouping the Gurobi model, relevant input data, and its variables.
@@ -339,11 +358,11 @@ class LutoSolver:
 
         ag_exprs = []
         for j in range(self._input_data.n_ag_lus):
+            dry_cells = self._input_data.ag_lu2cells[0, j]
+            irr_cells = self._input_data.ag_lu2cells[1, j]
             ag_exprs.append(
-                ag_obj_mrj[0, self._input_data.ag_lu2cells[0, j], j]
-                @ self.X_ag_dry_vars_jr[j, self._input_data.ag_lu2cells[0, j]]
-                + ag_obj_mrj[1, self._input_data.ag_lu2cells[1, j], j]
-                @ self.X_ag_irr_vars_jr[j, self._input_data.ag_lu2cells[1, j]]
+                _qsum(ag_obj_mrj[0, dry_cells, j], self.X_ag_dry_vars_jr[j, dry_cells])
+                + _qsum(ag_obj_mrj[1, irr_cells, j], self.X_ag_irr_vars_jr[j, irr_cells])
             )
 
         ag_mam_exprs = []
@@ -351,20 +370,20 @@ class LutoSolver:
             if not AG_MANAGEMENTS[am]:
                 continue
             for j_idx, j in enumerate(am_j_list):
+                dry_cells = self._input_data.ag_lu2cells[0, j]
+                irr_cells = self._input_data.ag_lu2cells[1, j]
                 ag_mam_exprs.append(
-                    ag_man_objs[am][0, self._input_data.ag_lu2cells[0, j], j_idx]
-                    @ self.X_ag_man_dry_vars_jr[am][j_idx, self._input_data.ag_lu2cells[0, j]]
-                    + ag_man_objs[am][1, self._input_data.ag_lu2cells[1, j], j_idx]
-                    @ self.X_ag_man_irr_vars_jr[am][j_idx, self._input_data.ag_lu2cells[1, j]]
+                    _qsum(ag_man_objs[am][0, dry_cells, j_idx], self.X_ag_man_dry_vars_jr[am][j_idx, dry_cells])
+                    + _qsum(ag_man_objs[am][1, irr_cells, j_idx], self.X_ag_man_irr_vars_jr[am][j_idx, irr_cells])
                 )
 
         non_ag_exprs = []
         for k, k_name in enumerate(NON_AG_LAND_USES):
             if not NON_AG_LAND_USES[k_name]:
                 continue
+            non_ag_cells = self._input_data.non_ag_lu2cells[k]
             non_ag_exprs.append(
-                non_ag_obj_rk[:, k][self._input_data.non_ag_lu2cells[k]]
-                @ self.X_non_ag_vars_kr[k, self._input_data.non_ag_lu2cells[k]]
+                _qsum(non_ag_obj_rk[non_ag_cells, k], self.X_non_ag_vars_kr[k, non_ag_cells])
             )
         
         self.economy_ag_contr = gp.quicksum(ag_exprs)
@@ -386,12 +405,8 @@ class LutoSolver:
             dry_cells = self._input_data.ag_lu2cells[0, j]
             irr_cells = self._input_data.ag_lu2cells[1, j]
             ag_exprs.append(
-                gp.quicksum(
-                    self._input_data.ag_b_mrj[0, dry_cells, j] * self.X_ag_dry_vars_jr[j, dry_cells]
-                )
-                + gp.quicksum(
-                    self._input_data.ag_b_mrj[1, irr_cells, j] * self.X_ag_irr_vars_jr[j, irr_cells]
-                )
+                _qsum(self._input_data.ag_b_mrj[0, dry_cells, j], self.X_ag_dry_vars_jr[j, dry_cells])
+                + _qsum(self._input_data.ag_b_mrj[1, irr_cells, j], self.X_ag_irr_vars_jr[j, irr_cells])
             )
 
         ag_mam_exprs = []
@@ -403,25 +418,17 @@ class LutoSolver:
                 dry_cells = self._input_data.ag_lu2cells[0, j]
                 irr_cells = self._input_data.ag_lu2cells[1, j]
                 ag_mam_exprs.append(
-                    gp.quicksum(
-                        self._input_data.ag_man_b_mrj[am][0, dry_cells, j_idx]
-                        * self.X_ag_man_dry_vars_jr[am][j_idx, dry_cells]
-                    )  # Dryland alt. ag. management contributions
-                    + gp.quicksum(
-                        self._input_data.ag_man_b_mrj[am][1, irr_cells, j_idx]
-                        * self.X_ag_man_irr_vars_jr[am][j_idx, irr_cells]
-                    )  # Irrigated alt. ag. management contributions
+                    _qsum(self._input_data.ag_man_b_mrj[am][0, dry_cells, j_idx], self.X_ag_man_dry_vars_jr[am][j_idx, dry_cells])
+                    + _qsum(self._input_data.ag_man_b_mrj[am][1, irr_cells, j_idx], self.X_ag_man_irr_vars_jr[am][j_idx, irr_cells])
                 )
-    
+
         non_ag_exprs = []
         for k, k_name in enumerate(NON_AG_LAND_USES):
             if not NON_AG_LAND_USES[k_name]:
                 continue
             non_ag_cells = self._input_data.non_ag_lu2cells[k]
             non_ag_exprs.append(
-                gp.quicksum(
-                    self._input_data.non_ag_b_rk[non_ag_cells, k] * self.X_non_ag_vars_kr[k, non_ag_cells]
-                )
+                _qsum(self._input_data.non_ag_b_rk[non_ag_cells, k], self.X_non_ag_vars_kr[k, non_ag_cells])
             )
         
         self.bio_ag_contr = gp.quicksum(ag_exprs)
@@ -580,7 +587,7 @@ class LutoSolver:
         Constraints to penalise under and over production compared to demand.
         """
         print("│   ├── Adding constraints for demand penalties...")
-        
+
         # Precompute j→c quantity coefficient arrays in numpy (bypasses p loop entirely).
         # jc_dry_coeff[j][c] = ag_q_mrp[0, dry_cells, :] @ pr2cm_cp[c, :] for active p only
         # Shape per j: (ncms, len(dry_cells)) — built once, reused in quicksum.
@@ -605,8 +612,8 @@ class LutoSolver:
             for c in range(self._input_data.ncms):
                 if jc_dry[c].any() or jc_irr[c].any():
                     self.ag_q_c[c] += (
-                        gp.quicksum(jc_dry[c] * X_ag_dry_r)
-                        + gp.quicksum(jc_irr[c] * X_ag_irr_r)
+                        _qsum(jc_dry[c], X_ag_dry_r)
+                        + _qsum(jc_irr[c], X_ag_irr_r)
                     )
 
 
@@ -631,8 +638,8 @@ class LutoSolver:
                 for c in range(self._input_data.ncms):
                     if jc_dry[c].any() or jc_irr[c].any():
                         self.ag_man_q_c[c] += (
-                            gp.quicksum(jc_dry[c] * X_ag_mam_dry_r)
-                            + gp.quicksum(jc_irr[c] * X_ag_mam_irr_r)
+                            _qsum(jc_dry[c], X_ag_mam_dry_r)
+                            + _qsum(jc_irr[c], X_ag_mam_irr_r)
                         )
 
 
@@ -642,8 +649,9 @@ class LutoSolver:
                 continue
             non_ag_cells = self._input_data.non_ag_lu2cells[k]
             for c in range(self._input_data.ncms):
-                self.non_ag_q_c[c] += gp.quicksum(
-                    self._input_data.non_ag_q_crk[c, non_ag_cells, k] * self.X_non_ag_vars_kr[k, non_ag_cells]
+                self.non_ag_q_c[c] += _qsum(
+                    self._input_data.non_ag_q_crk[c, non_ag_cells, k],
+                    self.X_non_ag_vars_kr[k, non_ag_cells],
                 )
             
 
@@ -674,47 +682,31 @@ class LutoSolver:
         """
         Get the Gurobi linear expression for the net water yield of a given region.
         """
-        
+
         ag_exprs = []
         for j in range(self._input_data.n_ag_lus):
             ag_exprs.append(
-                gp.quicksum(
-                    self._input_data.ag_w_mrj[0, ind, j] * self.X_ag_dry_vars_jr[j, ind]
-                )  # Dryland agriculture contribution
-                + gp.quicksum(
-                    self._input_data.ag_w_mrj[1, ind, j] * self.X_ag_irr_vars_jr[j, ind]
-                )  # Irrigated agriculture contribution
+                _qsum(self._input_data.ag_w_mrj[0, ind, j], self.X_ag_dry_vars_jr[j, ind])
+                + _qsum(self._input_data.ag_w_mrj[1, ind, j], self.X_ag_irr_vars_jr[j, ind])
             )
- 
+
         ag_mam_exprs = []
         for am, am_j_list in self._input_data.am2j.items():
             if not AG_MANAGEMENTS[am]:
                 continue
-            
             for j_idx in range(len(am_j_list)):
                 ag_mam_exprs.append(
-                    gp.quicksum(
-                        self._input_data.ag_man_w_mrj[am][0, ind, j_idx]
-                        * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
-                    )  # Dryland alt. ag. management contributions
-                    + gp.quicksum(
-                        self._input_data.ag_man_w_mrj[am][1, ind, j_idx]
-                        * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
-                    )  # Irrigated alt. ag. management contributions
+                    _qsum(self._input_data.ag_man_w_mrj[am][0, ind, j_idx], self.X_ag_man_dry_vars_jr[am][j_idx, ind])
+                    + _qsum(self._input_data.ag_man_w_mrj[am][1, ind, j_idx], self.X_ag_man_irr_vars_jr[am][j_idx, ind])
                 )
 
         non_ag_exprs = []
         for k in range(self._input_data.n_non_ag_lus):
             non_ag_exprs.append(
-                gp.quicksum(
-                    self._input_data.non_ag_w_rk[ind, k] * self.X_non_ag_vars_kr[k, ind]
-                )  # Non-agricultural contribution
+                _qsum(self._input_data.non_ag_w_rk[ind, k], self.X_non_ag_vars_kr[k, ind])
             )
-        
-        ag_contr = gp.quicksum(ag_exprs) 
-        ag_man_contr = gp.quicksum(ag_mam_exprs)
-        non_ag_contr = gp.quicksum(non_ag_exprs)
-        return ag_contr + ag_man_contr + non_ag_contr
+
+        return gp.quicksum(ag_exprs) + gp.quicksum(ag_mam_exprs) + gp.quicksum(non_ag_exprs)
 
 
     def _add_water_usage_limit_constraints(self) -> None:
@@ -820,11 +812,9 @@ class LutoSolver:
                     if not reg_AND_j_cells.size:
                         continue
 
-                    # Existing capacity cells have ub=0 so X_am=0; quicksum only covers new potential cells.
-                    # exist_power_rescale accounts for real-world existing generation separately.
                     am_exprs.append(
-                        gp.quicksum(self.X_ag_man_dry_vars_jr[am][j_idx, reg_AND_j_cells] * energy_r[reg_AND_j_cells])
-                        + gp.quicksum(self.X_ag_man_irr_vars_jr[am][j_idx, reg_AND_j_cells] * energy_r[reg_AND_j_cells])
+                        _qsum(energy_r[reg_AND_j_cells], self.X_ag_man_dry_vars_jr[am][j_idx, reg_AND_j_cells])
+                        + _qsum(energy_r[reg_AND_j_cells], self.X_ag_man_irr_vars_jr[am][j_idx, reg_AND_j_cells])
                     )
 
                 if am_exprs:
@@ -838,45 +828,28 @@ class LutoSolver:
 
 
     def _get_total_ghg_expr(self) -> gp.LinExpr:
-        # Pre-calculate the coefficients for each variable,
-        # both for regular culture and alternative agr. management options
-        g_dry_coeff = (
-            self._input_data.ag_g_mrj[0, :, :] + self._input_data.ag_ghg_t_mrj[0, :, :]
-        )
-        g_irr_coeff = (
-            self._input_data.ag_g_mrj[1, :, :] + self._input_data.ag_ghg_t_mrj[1, :, :]
-        )
+        g_dry_coeff = self._input_data.ag_g_mrj[0, :, :] + self._input_data.ag_ghg_t_mrj[0, :, :]
+        g_irr_coeff = self._input_data.ag_g_mrj[1, :, :] + self._input_data.ag_ghg_t_mrj[1, :, :]
 
         ghg_ag_exprs = []
         for j in range(self._input_data.n_ag_lus):
             dry_cells = self._input_data.ag_lu2cells[0, j]
             irr_cells = self._input_data.ag_lu2cells[1, j]
             ghg_ag_exprs.append(
-                gp.quicksum(
-                    g_dry_coeff[dry_cells, j] * self.X_ag_dry_vars_jr[j, dry_cells]
-                )
-                + gp.quicksum(
-                    g_irr_coeff[irr_cells, j] * self.X_ag_irr_vars_jr[j, irr_cells]
-                )
+                _qsum(g_dry_coeff[dry_cells, j], self.X_ag_dry_vars_jr[j, dry_cells])
+                + _qsum(g_irr_coeff[irr_cells, j], self.X_ag_irr_vars_jr[j, irr_cells])
             )
 
         ghg_ag_man_exprs = []
         for am, am_j_list in self._input_data.am2j.items():
             if not AG_MANAGEMENTS[am]:
                 continue
-
             for j_idx, j in enumerate(am_j_list):
                 dry_cells = self._input_data.ag_lu2cells[0, j]
                 irr_cells = self._input_data.ag_lu2cells[1, j]
                 ghg_ag_man_exprs.append(
-                    gp.quicksum(
-                        self._input_data.ag_man_g_mrj[am][0, dry_cells, j_idx]
-                        * self.X_ag_man_dry_vars_jr[am][j_idx, dry_cells]
-                    )
-                    + gp.quicksum(
-                        self._input_data.ag_man_g_mrj[am][1, irr_cells, j_idx]
-                        * self.X_ag_man_irr_vars_jr[am][j_idx, irr_cells]
-                    )
+                    _qsum(self._input_data.ag_man_g_mrj[am][0, dry_cells, j_idx], self.X_ag_man_dry_vars_jr[am][j_idx, dry_cells])
+                    + _qsum(self._input_data.ag_man_g_mrj[am][1, irr_cells, j_idx], self.X_ag_man_irr_vars_jr[am][j_idx, irr_cells])
                 )
 
         ghg_non_ag_exprs = []
@@ -885,9 +858,7 @@ class LutoSolver:
                 continue
             non_ag_cells = self._input_data.non_ag_lu2cells[k]
             ghg_non_ag_exprs.append(
-                gp.quicksum(
-                    self._input_data.non_ag_g_rk[non_ag_cells, k] * self.X_non_ag_vars_kr[k, non_ag_cells]
-                )
+                _qsum(self._input_data.non_ag_g_rk[non_ag_cells, k], self.X_non_ag_vars_kr[k, non_ag_cells])
             )
             
         self.ghg_ag_contr = gp.quicksum(ghg_ag_exprs)
@@ -953,48 +924,34 @@ class LutoSolver:
         bio_ag_exprs = []
         bio_ag_man_exprs = []
         bio_non_ag_exprs = []
-        
+
         for j in range(self._input_data.n_ag_lus):
+            c_ag = self._input_data.biodiv_contr_ag_j[j]
+            if c_ag == 0:
+                continue
             ind_dry = np.intersect1d(self._input_data.ag_lu2cells[0, j], self._input_data.GBF2_mask_idx)
             ind_irr = np.intersect1d(self._input_data.ag_lu2cells[1, j], self._input_data.GBF2_mask_idx)
             bio_ag_exprs.append(
-                gp.quicksum(
-                    self._input_data.GBF2_mask_area_r[ind_dry]
-                    * self._input_data.biodiv_contr_ag_j[j]
-                    * self.X_ag_dry_vars_jr[j, ind_dry]
-                )
-                + gp.quicksum(
-                    self._input_data.GBF2_mask_area_r[ind_irr]
-                    * self._input_data.biodiv_contr_ag_j[j]
-                    * self.X_ag_irr_vars_jr[j, ind_irr]
-                ) 
+                _qsum(self._input_data.GBF2_mask_area_r[ind_dry] * c_ag, self.X_ag_dry_vars_jr[j, ind_dry])
+                + _qsum(self._input_data.GBF2_mask_area_r[ind_irr] * c_ag, self.X_ag_irr_vars_jr[j, ind_irr])
             )
         for am, am_j_list in self._input_data.am2j.items():
             if not AG_MANAGEMENTS[am]:
                 continue
             for j_idx, j in enumerate(am_j_list):
-
                 ind_dry = np.intersect1d(self._input_data.ag_lu2cells[0, j], self._input_data.GBF2_mask_idx)
                 ind_irr = np.intersect1d(self._input_data.ag_lu2cells[1, j], self._input_data.GBF2_mask_idx)
                 bio_ag_man_exprs.append(
-                    gp.quicksum(
-                        self._input_data.GBF2_mask_area_r[ind_dry]
-                        * self._input_data.biodiv_contr_ag_man[am][j_idx][ind_dry]
-                        * self.X_ag_man_dry_vars_jr[am][j_idx, ind_dry])
-                    + gp.quicksum(
-                        self._input_data.GBF2_mask_area_r[ind_irr]
-                        * self._input_data.biodiv_contr_ag_man[am][j_idx][ind_irr]
-                        * self.X_ag_man_irr_vars_jr[am][j_idx, ind_irr]
-                    )
-                )  
+                    _qsum(self._input_data.GBF2_mask_area_r[ind_dry] * self._input_data.biodiv_contr_ag_man[am][j_idx][ind_dry], self.X_ag_man_dry_vars_jr[am][j_idx, ind_dry])
+                    + _qsum(self._input_data.GBF2_mask_area_r[ind_irr] * self._input_data.biodiv_contr_ag_man[am][j_idx][ind_irr], self.X_ag_man_irr_vars_jr[am][j_idx, ind_irr])
+                )
         for k in range(self._input_data.n_non_ag_lus):
+            c_non_ag = self._input_data.biodiv_contr_non_ag_k[k]
+            if c_non_ag == 0:
+                continue
             ind = np.intersect1d(self._input_data.non_ag_lu2cells[k], self._input_data.GBF2_mask_idx)
             bio_non_ag_exprs.append(
-                gp.quicksum(
-                    self._input_data.GBF2_mask_area_r[ind]
-                    * self._input_data.biodiv_contr_non_ag_k[k]
-                    * self.X_non_ag_vars_kr[k, ind]
-                )
+                _qsum(self._input_data.GBF2_mask_area_r[ind] * c_non_ag, self.X_non_ag_vars_kr[k, ind])
             )
 
         self.bio_GBF2_expr = (
@@ -1014,20 +971,13 @@ class LutoSolver:
 
     def _build_biodiv_contr_expr(self, val_vector: np.ndarray, ind: np.ndarray) -> "gp.LinExpr":
         """
-        Build the biodiversity contribution expression for one GBF2/3/4/8 constraint.
+        Build the biodiversity contribution expression for one GBF3/4/8 constraint.
 
         Each Gurobi coefficient is the cross-product val_vector[r] * biodiv_contr[j].
-        RESCALE_ZERO_THRESHOLD operates on individual arrays, but their product can still
-        be tiny (e.g. 1e-3 * 1e-5 = 1e-8), stretching the Gurobi matrix range far below
-        the recommended [1e-3, 1e6] band and causing barrier divergence.
-        SOLVER_COEFF_MIN filters on this product before the term enters the model.
-
-        IMPORTANT: this filter applies ONLY to GBF2/3/4/8 constraint expressions.
-        NEVER apply to economic (ag_obj_mrj), demand (ag_q_mrp), or biodiversity-quality
-        (ag_b_mrj) coefficients — those feed the objective function, and zeroing them
-        corrupts allocation decisions (transitions appear cheap; write.py charges full cost).
+        ``_qsum`` filters terms where ``|coeff| < SOLVER_COEFF_MIN`` before they enter
+        Gurobi, preventing tiny cross-products from stretching the matrix range below
+        Gurobi's recommended [1e-3, 1e6] band.
         """
-        coeff_min = settings.SOLVER_COEFF_MIN
 
         # Agricultural contributions (biodiv_contr_ag_j[j] is a per-j scalar)
         ag_terms = []
@@ -1035,13 +985,9 @@ class LutoSolver:
             c = self._input_data.biodiv_contr_ag_j[j]
             if c == 0:
                 continue
-            vv = val_vector[ind] * c
-            ind_j = ind[np.abs(vv) >= coeff_min]
-            if ind_j.size == 0:
-                continue
             ag_terms.append(
-                gp.quicksum(val_vector[ind_j] * c * self.X_ag_dry_vars_jr[j, ind_j])
-                + gp.quicksum(val_vector[ind_j] * c * self.X_ag_irr_vars_jr[j, ind_j])
+                _qsum(val_vector[ind] * c, self.X_ag_dry_vars_jr[j, ind])
+                + _qsum(val_vector[ind] * c, self.X_ag_irr_vars_jr[j, ind])
             )
 
         # Agricultural management contributions (biodiv_contr_ag_man[am][j_idx] is per-cell)
@@ -1049,13 +995,9 @@ class LutoSolver:
         for am, am_j_list in self._input_data.am2j.items():
             for j_idx in range(len(am_j_list)):
                 c_arr = self._input_data.biodiv_contr_ag_man[am][j_idx]
-                vv = val_vector[ind] * c_arr[ind]
-                ind_amj = ind[np.abs(vv) >= coeff_min]
-                if ind_amj.size == 0:
-                    continue
                 ag_man_terms.append(
-                    gp.quicksum(val_vector[ind_amj] * c_arr[ind_amj] * self.X_ag_man_dry_vars_jr[am][j_idx, ind_amj])
-                    + gp.quicksum(val_vector[ind_amj] * c_arr[ind_amj] * self.X_ag_man_irr_vars_jr[am][j_idx, ind_amj])
+                    _qsum(val_vector[ind] * c_arr[ind], self.X_ag_man_dry_vars_jr[am][j_idx, ind])
+                    + _qsum(val_vector[ind] * c_arr[ind], self.X_ag_man_irr_vars_jr[am][j_idx, ind])
                 )
 
         # Non-agricultural contributions (biodiv_contr_non_ag_k[k] is a per-k scalar)
@@ -1064,11 +1006,7 @@ class LutoSolver:
             c = self._input_data.biodiv_contr_non_ag_k[k]
             if c == 0:
                 continue
-            vv = val_vector[ind] * c
-            ind_k = ind[np.abs(vv) >= coeff_min]
-            if ind_k.size == 0:
-                continue
-            non_ag_terms.append(gp.quicksum(val_vector[ind_k] * c * self.X_non_ag_vars_kr[k, ind_k]))
+            non_ag_terms.append(_qsum(val_vector[ind] * c, self.X_non_ag_vars_kr[k, ind]))
 
         return gp.quicksum(ag_terms) + gp.quicksum(ag_man_terms) + gp.quicksum(non_ag_terms)
 
@@ -1241,8 +1179,8 @@ class LutoSolver:
                 continue
             print(f"│   │   │   ├── Adding constraints for {lu_name} in {settings.REGIONAL_ADOPTION_ZONE} region {reg_id} <= {reg_area_limit:,.0f} HA...")
             reg_expr = (
-                  gp.quicksum(self._input_data.real_area[reg_ind] * self.X_ag_dry_vars_jr[j, reg_ind])
-                + gp.quicksum(self._input_data.real_area[reg_ind] * self.X_ag_irr_vars_jr[j, reg_ind])
+                  _qsum(self._input_data.real_area[reg_ind], self.X_ag_dry_vars_jr[j, reg_ind])
+                + _qsum(self._input_data.real_area[reg_ind], self.X_ag_irr_vars_jr[j, reg_ind])
             )
             self.regional_adoption_constrs.append(self.gurobi_model.addConstr(reg_expr <= reg_area_limit, name=f"reg_adopt_limit_ag_{lu_name}_{reg_id}"))
 
@@ -1253,7 +1191,7 @@ class LutoSolver:
                 print(f"│   │   │   ├── SKIPPING {lu_name} in {settings.REGIONAL_ADOPTION_ZONE} region {reg_id} (no cells at this resolution)")
                 continue
             print(f"│   │   │   ├── Adding constraints for {lu_name} in {settings.REGIONAL_ADOPTION_ZONE} region {reg_id} <= {reg_area_limit:,.0f} HA...")
-            reg_expr = gp.quicksum(self._input_data.real_area[reg_ind] * self.X_non_ag_vars_kr[k, reg_ind])
+            reg_expr = _qsum(self._input_data.real_area[reg_ind], self.X_non_ag_vars_kr[k, reg_ind])
             self.regional_adoption_constrs.append(
                 self.gurobi_model.addConstr(reg_expr <= reg_area_limit, name=f"reg_adopt_limit_non_ag_{lu_name}_{reg_id}")
             )
@@ -1266,11 +1204,9 @@ class LutoSolver:
                 print(f"│   │   │   ├── SKIPPING SUM-of-non-ag constraint for {settings.REGIONAL_ADOPTION_NON_AG_REGION} region {reg_id} (no cells at this resolution)")
                 continue
             print(f"│   │   │   ├── Adding SUM-of-non-ag constraint for {settings.REGIONAL_ADOPTION_NON_AG_REGION} region {reg_id} <= {reg_area_limit:,.0f} HA...")
-            reg_expr = gp.quicksum(
-                self._input_data.real_area[r] * self.X_non_ag_vars_kr[k, r]
-                for k in range(self.X_non_ag_vars_kr.shape[0])
-                for r in reg_ind
-            )
+            reg_expr = gp.LinExpr(0)
+            for k in range(self.X_non_ag_vars_kr.shape[0]):
+                reg_expr += _qsum(self._input_data.real_area[reg_ind], self.X_non_ag_vars_kr[k, reg_ind])
             self.regional_adoption_constrs.append(
                 self.gurobi_model.addConstr(reg_expr <= reg_area_limit, name=f"reg_adopt_limit_non_ag_sum_{reg_id}")
             )
