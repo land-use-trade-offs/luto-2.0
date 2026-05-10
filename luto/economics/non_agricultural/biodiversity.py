@@ -196,7 +196,7 @@ def get_biodiv_destocked_land(data: Data, lumap: np.ndarray):
     to_lu = data.DESC2AGLU['Unallocated - natural land']
 
     for from_lu in data.LU_LVSTK_NATURAL:
-        if settings.BIO_CONTRIBUTION_DESTOCKING is not None:
+        if settings.BIO_CONTRIBUTION_DESTOCKING != 'GAP':
             contribution = float(settings.BIO_CONTRIBUTION_DESTOCKING)
         else:
             contribution = data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[to_lu] - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[from_lu]

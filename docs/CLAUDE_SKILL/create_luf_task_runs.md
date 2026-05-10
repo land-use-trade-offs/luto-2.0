@@ -1,6 +1,6 @@
 # Skill: Creating Task Runs for Multiple LUF Scenarios
 
-This skill documents the end-to-end workflow for creating, merging, and submitting a new batch of LUTO2 scenario runs for a LUF (Land Use Futures) iteration. It covers: writing per-group `create_tasks_*.py` task scripts (each with its own inline `GRID` dict), the orchestrating `merge_unique_parameters.py`, verifying settings alignment, and submitting to the cluster.
+This skill documents the end-to-end workflow for creating, merging, and submitting a new batch of LUTO2 scenario runs for a LUF (Land Use Futures) iteration. It covers: writing per-group `create_tasks_*.py` task scripts (each **fully standalone** with all settings baked in), the orchestrating `merge_unique_parameters.py` (which only merges and optionally patches cluster settings), verifying settings alignment, and submitting to the cluster.
 
 ---
 
@@ -11,18 +11,20 @@ Each LUF iteration lives in two places:
 | Location | Purpose |
 |---|---|
 | `jinzhu_inspect_code/<Iteration>/` | Script source — `create_tasks_*.py` + `merge_unique_parameters.py` |
-| `<Custom_runs>/<Iteration>/` | Output — generated CSVs, `_overrides.json`, and submitted run folders |
+| `<Custom_runs>/<Iteration>/` | Output — generated CSVs and submitted run folders |
 
-The current design has **two pieces**:
+The design has **two pieces**:
 
-1. **`create_tasks_*.py`** — one script per scenario group. Each contains its own plain `GRID = {...}` dict (single-element lists for the baseline) and exposes `build_<group>(task_root_dir, overrides=None)` plus a CLI `--task-dir / --overrides` so the merge script can drive it via subprocess. Variant scripts (e.g. sensitivity) define a list of variant overrides applied on top of `GRID`.
-2. **`merge_unique_parameters.py`** — single configuration entry point. You set `TASK_DIR` (one path), `OVERRIDES` (cluster + working settings shared by every group, including `DO_IIS`), and `TASK_SCRIPTS` (list of `(group_name, script_filename)`). The merge script orchestrates the per-group subprocesses, merges CSVs into globally unique runs, and (optionally) submits.
+1. **`create_tasks_*.py`** — one script per scenario group. Each is **fully self-contained**: its `GRID = {...}` holds *all* settings including cluster job settings (`MEM`, `NCPUS`, `TIME`, `QUEUE`, `RESFACTOR`, `SIM_YEARS`, `WRITE_*`, `DO_IIS`, `OBJECTIVE`). The script can be run standalone with just `--task-dir` and produces correct CSVs without any external input. Variant/sensitivity scripts extend this with a `SENSITIVITY_OVERRIDES` list and process each variant **independently** (no DataFrame concatenation across variants) to avoid NaN.
+2. **`merge_unique_parameters.py`** — single configuration entry point. You set `TASK_DIR` and `TASK_SCRIPTS`. The merge script runs each task script, merges CSVs into globally unique runs, and (optionally) applies `SYSTEM_OVERRIDES` — a small dict that patches cluster/system rows in the merged template after the fact (useful for batch switches like `RESFACTOR` or `DO_IIS` without editing each task script).
+
+**No `OVERRIDES` JSON injection** — cluster settings live in each task script's `GRID`. The merge script never passes `--overrides` to child scripts.
 
 **No shared `_common.py`** — keeping each `GRID` inline in its own script means `merged_grid_search_parameters_unique.csv` reflects exactly the dict the user wrote, with no hidden indirection. The trade-off is that scenario-baseline duplication across scripts must be kept in sync manually (or by copy-paste from the CORE script).
 
-The workflow has two steps:
-1. Write one `create_tasks_*.py` per scenario group, each with its own `GRID` dict (the variant scripts copy CORE's `GRID` and apply per-variant overrides on top)
-2. Configure `merge_unique_parameters.py` (paths, `OVERRIDES`, `TASK_SCRIPTS`); run with `SUBMIT=False` to inspect, then `SUBMIT=True` to submit
+The workflow:
+1. Write one `create_tasks_*.py` per scenario group, each with its own complete `GRID` (cluster settings + scenario settings). Variant scripts copy CORE's `GRID` and define per-variant overrides on top.
+2. Configure `merge_unique_parameters.py` (paths, `TASK_SCRIPTS`, optional `SYSTEM_OVERRIDES`); run with `SUBMIT=False` to inspect, then `SUBMIT=True` to submit.
 
 ---
 
@@ -30,17 +32,15 @@ The workflow has two steps:
 
 The CORE script holds the canonical baseline `GRID = {...}` dict and produces a single run. Other scripts copy this dict and layer variant overrides on top.
 
-**Cluster + working settings (`MEM`, `NCPUS`, `TIME`, `QUEUE`, `OBJECTIVE`, `RESFACTOR`, `SIM_YEARS`, `WRITE_PARALLEL`, `WRITE_THREADS`, `DO_IIS`) are intentionally NOT in `GRID`** — they live in `OVERRIDES` inside the merge script so they can be edited in one place without touching the scenario logic.
+**All settings live in `GRID`** — cluster job settings (`MEM`, `NCPUS`, `TIME`, `QUEUE`), working settings (`OBJECTIVE`, `RESFACTOR`, `SIM_YEARS`, `WRITE_*`, `DO_IIS`), and scenario settings. The script runs standalone.
 
 ```python
 """<Iteration> Core scenario — single run (baseline for sensitivity OAT).
 
-Plain ``GRID`` dict; cluster + working settings (MEM/NCPUS/TIME/QUEUE/RESFACTOR/
-SIM_YEARS/WRITE_*/OBJECTIVE/DO_IIS) are supplied by ``OVERRIDES`` in
-merge_unique_parameters.py and applied on top before generating CSVs.
+Standalone script: all settings (model + cluster) live in GRID below.
+Run directly with just --task-dir; no external overrides needed.
 """
 import argparse
-import json
 from pathlib import Path
 
 from luto.tools.create_task_runs.helpers import (
@@ -55,10 +55,26 @@ NECMA_GBCMA_NRMS = ['North East', 'Goulburn Broken']
 
 
 # ----------------------------------------------------------------------
-# CORE grid (single-element lists -> exactly 1 run with no variant overrides)
-# Cluster + working settings excluded — see OVERRIDES in merge_unique_parameters.py.
+# CORE grid (single-element lists -> exactly 1 run)
+# All cluster + working + scenario settings live here — fully self-contained.
 # ----------------------------------------------------------------------
 GRID = {
+        # --------------- Cluster job settings ---------------
+        'MEM':                     ['128GB'],
+        'WRITE_REPORT_MAX_MEM_GB': [80],
+        'NCPUS':                   [32],
+        'TIME':                    ['12:00:00'],
+        'QUEUE':                   ['normalsr'],
+
+        # --------------- Working settings ---------------
+        'OBJECTIVE':      ['maxprofit'],
+        'RESFACTOR':      [5],
+        'SIM_YEARS':      [[2020, 2025, 2030, 2035, 2040, 2045, 2050]],
+        'WRITE_PARALLEL': [True],
+        'WRITE_THREADS':  [4],
+        'DO_IIS':         [False],
+        'WRITE_OUTPUTS':  [True],
+
         # --------------- Scenarios ---------------
         'SSP': ['245'],
         'CARBON_EFFECTS_WINDOW': [60],
@@ -191,17 +207,13 @@ GRID = {
 }
 
 
-def build_core(task_root_dir, overrides=None):
+def build_core(task_root_dir):
     """Generate CORE grid_search CSVs under ``task_root_dir``."""
     task_root_dir = Path(task_root_dir)
     task_root_dir.mkdir(parents=True, exist_ok=True)
 
-    grid = dict(GRID)
-    if overrides:
-        grid.update(overrides)
-
     default_settings_df = get_settings_df(str(task_root_dir))
-    grid_search_param_df = get_grid_search_param_df(grid)
+    grid_search_param_df = get_grid_search_param_df(GRID)
     grid_search_param_df.to_csv(task_root_dir / 'grid_search_parameters.csv', index=False)
     print(f'  Core scenario: {len(grid_search_param_df)} run(s)  (expect 1)')
     get_grid_search_settings_df(str(task_root_dir), default_settings_df, grid_search_param_df)
@@ -210,12 +222,8 @@ def build_core(task_root_dir, overrides=None):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--task-dir', required=True)
-    parser.add_argument('--overrides', default=None,
-                        help='Path to JSON file with single-list overrides.')
     args = parser.parse_args()
-
-    overrides = json.loads(Path(args.overrides).read_text()) if args.overrides else None
-    build_core(args.task_dir, overrides=overrides)
+    build_core(args.task_dir)
 ```
 
 **CRITICAL:** `AG_MANAGEMENTS` Solar/Wind flags must mirror `RENEWABLES_OPTIONS` — `write_settings` writes flat literals and does NOT re-evaluate. Sync them manually whenever toggling renewables.
@@ -224,30 +232,31 @@ if __name__ == '__main__':
 
 ## Step 2: Write variant scripts (sensitivity, progressive, ...)
 
-Each variant script copies CORE's `GRID` verbatim at the top of the file (so each script's CSVs reflect exactly what's in that script — no hidden imports), then defines a list of variant overrides applied on top of `GRID`. The merge script invokes each via `conda run` with `--task-dir` + `--overrides`.
+Each variant script copies CORE's `GRID` verbatim at the top (including cluster settings), defines a list of variant overrides, and processes **each variant independently** using `update_settings`. This avoids the NaN-in-template bug that arises when different variants have different parameter keys and their DataFrames are concatenated before calling `get_grid_search_settings_df`.
 
 ### 2a. SENSITIVITY script (one-at-a-time variants)
 
-Each variant is a single-list override applied on top of `GRID` (and on top of the merge script's `OVERRIDES`):
-
 ```python
-"""<Iteration> Sensitivity (One-At-A-Time from CORE)."""
+"""<Iteration> Sensitivity (One-At-A-Time from CORE).
+
+Standalone script: all settings (model + cluster) live in GRID below.
+Run directly with just --task-dir; no external overrides needed.
+"""
 import argparse
-import json
 from pathlib import Path
 import pandas as pd
 
 from luto.tools.create_task_runs.helpers import (
     get_settings_df,
     get_grid_search_param_df,
-    get_grid_search_settings_df,
+    update_settings,
 )
 
 
 # --- Copy CORE GRID here verbatim from create_tasks_core.py ---
 NECMA_GBCMA_NRMS = ['North East', 'Goulburn Broken']
 GRID = {
-    # ... same body as create_tasks_core.GRID ...
+    # ... same body as create_tasks_core.GRID (including cluster settings) ...
 }
 
 
@@ -268,22 +277,27 @@ SENSITIVITY_OVERRIDES = [
 ]
 
 
-def build_sensitivity(task_root_dir, overrides=None):
-    """Generate SENSITIVITY grid_search CSVs.
+def build_sensitivity(task_root_dir):
+    """Generate SENSITIVITY grid_search CSVs under ``task_root_dir``.
 
-    ``overrides`` is applied on top of CORE for *every* variant before the
-    variant's own override (used for cluster/working settings).
+    Each variant is processed in isolation: settings start from settings.py
+    defaults, then only that variant's keys are updated.  This prevents NaN
+    from appearing in the template when different variants have different
+    parameter keys (e.g. variant A doesn't set BIODIVERSITY_GBF_4_TARGET_DICT_*
+    but variant B does — concatenating their DataFrames would insert NaN for A,
+    which eval() cannot handle).
     """
     task_root_dir = Path(task_root_dir)
     task_root_dir.mkdir(parents=True, exist_ok=True)
     default_settings_df = get_settings_df(str(task_root_dir))
+    defaults = default_settings_df.set_index('Name')['Default_run'].to_dict()
 
-    rows = []
-    for label, variant_overrides in SENSITIVITY_OVERRIDES:
-        grid = dict(GRID)
-        if overrides:
-            grid.update(overrides)
-        grid.update(variant_overrides)
+    all_param_rows = []
+    all_run_series = []
+
+    for run_idx, (label, variant_overrides) in enumerate(SENSITIVITY_OVERRIDES, start=1):
+        # Build a complete grid for this variant — every key is explicit, no NaN possible.
+        grid = {**GRID, **variant_overrides}
         df = get_grid_search_param_df(grid)
         if len(df) != 1:
             raise RuntimeError(
@@ -291,27 +305,42 @@ def build_sensitivity(task_root_dir, overrides=None):
                 "Each override must contain single-element lists only."
             )
         df.insert(0, 'sensitivity_label', label)
-        rows.append(df)
+        df['run_idx'] = run_idx
+        all_param_rows.append(df)
 
-    grid_search_param_df = pd.concat(rows, ignore_index=True)
-    grid_search_param_df['run_idx'] = range(1, len(grid_search_param_df) + 1)
-    grid_search_param_df.to_csv(task_root_dir / 'grid_search_parameters.csv', index=False)
+        # Build complete settings for this variant in isolation.
+        settings_dict = dict(defaults)
+        settings_dict.update(df.drop(columns=['sensitivity_label', 'run_idx']).iloc[0].to_dict())
+        settings_dict = update_settings(settings_dict, f'run_{run_idx:04}')
+        all_run_series.append(pd.Series(settings_dict, name=f'Run_{run_idx:04}'))
 
-    print(f'  Sensitivity runs: {len(grid_search_param_df)}  '
-          f'(expect {len(SENSITIVITY_OVERRIDES)})')
-    settings_param_df = grid_search_param_df.drop(columns=['sensitivity_label'])
-    get_grid_search_settings_df(str(task_root_dir), default_settings_df, settings_param_df)
+    # All series are complete — pd.concat produces a NaN-free template.
+    template = pd.concat(all_run_series, axis=1).reset_index(names='Name')
+    template.to_csv(task_root_dir / 'grid_search_template.csv', index=False)
+
+    params = pd.concat(all_param_rows, ignore_index=True)
+    params.to_csv(task_root_dir / 'grid_search_parameters.csv', index=False)
+
+    vary_cols = [c for c in params.columns if params[c].nunique(dropna=False) > 1]
+    params[vary_cols].to_csv(task_root_dir / 'grid_search_parameters_unique.csv', index=False)
+
+    print(f'  Sensitivity runs: {len(params)}  (expect {len(SENSITIVITY_OVERRIDES)})')
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--task-dir', required=True)
-    parser.add_argument('--overrides', default=None)
     args = parser.parse_args()
-
-    overrides = json.loads(Path(args.overrides).read_text()) if args.overrides else None
-    build_sensitivity(args.task_dir, overrides=overrides)
+    build_sensitivity(args.task_dir)
 ```
+
+### Why `update_settings` instead of `get_grid_search_settings_df`
+
+`get_grid_search_settings_df` takes the entire param DataFrame and calls `settings_dict.update(row.to_dict())` per row. When variants have different column sets, the concatenated DataFrame has NaN in rows not present in every variant. Those NaN values then **overwrite** the `settings.py` default, producing literal `nan` in the template CSV. `eval('nan')` → `NameError` at submission time.
+
+The fix: use `update_settings` per variant on a complete `{**GRID, **variant_overrides}` dict — NaN can never appear because every key is explicitly set.
+
+> **Rule:** use `get_grid_search_settings_df` only when all runs share an identical column set (e.g. a pure Cartesian grid). For OAT sensitivity with different keys per variant, always use the per-variant `update_settings` pattern above.
 
 ### 2b. PROGRESSIVE feasibility ladder (optional)
 
@@ -348,9 +377,9 @@ for wlbl, wdef in WATER_REGIONS:
             PROGRESSIVE_OVERRIDES.append((f'{wlbl}_{rlbl}_{blbl}', ov))
 ```
 
-The `build_progressive` function is structurally identical to `build_sensitivity` — iterate over `PROGRESSIVE_OVERRIDES`, copy `GRID`, apply variant override, concat. The final ladder run (e.g. `river_nrm_nvis_ecnes_snes`) equals CORE, so it doubles as a CORE smoke test.
+The `build_progressive` function is structurally identical to `build_sensitivity` above — use the same per-variant-independent `update_settings` pattern. The final ladder run (e.g. `river_nrm_nvis_ecnes_snes`) equals CORE, so it doubles as a CORE smoke test.
 
-To enable IIS diagnostics on every ladder run, set `'DO_IIS': [True]` in the merge script's `OVERRIDES` (applies globally) — or add `'DO_IIS': [True]` to a specific variant override (then `DO_IIS` will appear as a varying column in `merged_grid_search_parameters_unique.csv`).
+To enable IIS diagnostics on every ladder run, add `'DO_IIS': [True]` to a specific variant override (it then appears as a varying column in `merged_grid_search_parameters_unique.csv`), or put it in the CORE `GRID` and rely on `SYSTEM_OVERRIDES` in the merge script to flip it for the progressive group.
 
 ### 2c. Common sensitivity patterns
 
@@ -361,8 +390,10 @@ To enable IIS diagnostics on every ladder run, set `'DO_IIS': [True]` in the mer
 | **Climate** | `{'SSP': ['126' / '370']}` |
 | **GBF2 cut** | `{'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [0 / 10 / 20]}` |
 | **GBF4 Australia-wide** | `{'GBF4_SNES_REGION_MODE': ['Australia'], 'GBF4_ECNES_REGION_MODE': ['Australia']}` |
+| **GBF4 dict targets** | `{'BIODIVERSITY_GBF_4_TARGET_SOURCE_SNES': ['dict'], 'BIODIVERSITY_GBF_4_TARGET_DICT_SNES': [{'2030': 30, '2050': 50, '2100': 50}]}` |
 | **Social licence** | `{'REGIONAL_ADOPTION_CONSTRAINTS': ['NON_AG_CAP'], 'REGIONAL_ADOPTION_NON_AG_CAP': [5/10/20/30]}` |
 | **Renewables ON** | `{'RENEWABLES_OPTIONS': [{'Utility Solar PV': True, 'Onshore Wind': True}], 'AG_MANAGEMENTS': [{...solar/wind: True}]}` (must override both — see CRITICAL note above) |
+| **Bio contribution sharpened** | `{'BIO_CONTRIBUTION_DESTOCKING': ['GAP'], 'BIO_CONTRIBUTION_RIPARIAN_PLANTING': [1.2], ...}` — use `'GAP'` string sentinel (not `None`) for destocking to avoid CSV round-trip NaN |
 
 ### 2d. Removing redundant permutations
 
@@ -385,22 +416,23 @@ df = df[~df['run_idx'].isin(rm_idx)]
 
 ## Step 3: Write `merge_unique_parameters.py`
 
-One merge script per iteration. **All cluster + working settings live here in `OVERRIDES`** so you only edit one file to change MEM/NCPUS/SIM_YEARS/etc.
+One merge script per iteration. **Cluster + working settings already live in each task script's `GRID`** — the merge script's only job is to run the scripts, merge their CSVs, and optionally patch system settings in the merged template before submitting.
 
 ```python
 """<Iteration> merge script.
 
-Single entry point: sets paths + OVERRIDES, runs each create_tasks_*.py via
-conda subprocess (passing --task-dir + --overrides JSON), merges per-group
-CSVs into globally unique runs, and optionally submits.
+Single entry point:
+  1) Run each create_tasks_*.py via subprocess (just --task-dir; each script
+     is fully standalone with all settings in its own GRID).
+  2) Merge per-group CSVs into one global parameters/template pair.
+  3) Optionally apply SYSTEM_OVERRIDES to patch cluster/system rows in the
+     merged template (e.g. switch RESFACTOR for a test run, flip DO_IIS).
+  4) Optionally submit all merged runs.
 
-Cross-platform: works identically on Windows and NCI (Linux). Paths are
-auto-derived from this file's location; TASK_DIR picks a per-OS default
-and can be overridden via the LUTO_TASK_DIR env var.
+Cross-platform: works identically on Windows and NCI (Linux).
 """
 import os
 import sys
-import json
 import shutil
 import platform
 import subprocess
@@ -420,7 +452,7 @@ LUTO_ROOT   = SCRIPTS_DIR.parents[1]                # .../luto-2.0
 # TASK_DIR — output root. Override via LUTO_TASK_DIR env var; otherwise
 # pick a sensible per-OS default.
 _DEFAULT_TASK_DIRS = {
-    "Windows": Path("F:/Users/jinzhu/Documents/Custome_run/<Iteration>"),
+    "Windows": Path("F:/Users/jinzhu/Documents/Custom_runs/<Iteration>"),
     "Linux":   Path("/g/data/jk53/jinzhu/LUTO/Custom_runs/<Iteration>"),
     "Darwin":  Path.home() / "Custom_runs" / "<Iteration>",
 }
@@ -432,42 +464,29 @@ TASK_DIR = Path(os.environ.get(
 CONDA_ENV = os.environ.get("LUTO_CONDA_ENV", "luto")
 
 # Per-group task scripts. Output dir for each = TASK_DIR / GROUP_NAME.
+# Each script is standalone — all settings (model + cluster) live inside it.
 TASK_SCRIPTS = [
     ("CORE",        "create_tasks_core.py"),
     ("SENSITIVITY", "create_tasks_sensitivity.py"),
 ]
 
-# Cluster + working settings applied on top of every group's GRID.
-# Each value MUST be a single-element list.
-OVERRIDES = {
-    # --- Cluster job settings ---
-    'MEM':                     ['128GB'],
-    'WRITE_REPORT_MAX_MEM_GB': [80],
-    'NCPUS':                   [32],
-    'TIME':                    ['12:00:00'],
-    'QUEUE':                   ['normalsr'],
-
-    # --- Working settings ---
-    'OBJECTIVE':      ['maxprofit'],
-    'RESFACTOR':      [5],
-    'SIM_YEARS':      [[2020, 2025, 2030, 2035, 2040, 2045, 2050]],
-    'WRITE_PARALLEL': [True],
-    'WRITE_THREADS':  [4],
-    'DO_IIS':         [False],   # set True to enable IIS diagnostics for all runs
+# Optional: patch specific rows in the merged template after merge.
+# Use to override system/cluster settings across ALL runs without editing
+# each task script (e.g. quick test run, enabling IIS, changing queue).
+# Leave empty {} when each task script's GRID already has correct values.
+SYSTEM_OVERRIDES = {
+    # 'RESFACTOR':      10,      # uncomment for quick test run
+    # 'DO_IIS':         False,
+    # 'MEM':            '256GB',
 }
 
 
 # ============================================================
-# CELL 2 — Run each create_tasks_*.py via subprocess
+# CELL 2 — Run each create_tasks_*.py to generate per-group CSVs
 # ============================================================
 TASK_DIR.mkdir(parents=True, exist_ok=True)
 
-overrides_json = TASK_DIR / "_overrides.json"
-overrides_json.write_text(json.dumps(OVERRIDES, indent=2))
-
-# List-form subprocess args (no shell=True) -> identical on Windows + Linux.
-# Fall back to current Python if `conda` isn't on PATH.
-_use_conda = shutil.which("conda") is not None
+_use_conda = os.environ.get("LUTO_USE_CONDA", "0") == "1" and shutil.which("conda") is not None
 
 GROUPS = {}
 print(f"=== Step 1: Generating per-group CSVs ({platform.system()}) ===")
@@ -480,15 +499,15 @@ for group_name, script in TASK_SCRIPTS:
     if _use_conda:
         cmd = ["conda", "run", "-n", CONDA_ENV, "--no-capture-output",
                "python", str(script_path),
-               "--task-dir", str(group_dir),
-               "--overrides", str(overrides_json)]
+               "--task-dir", str(group_dir)]
+        use_shell = platform.system() == "Windows"
     else:
         cmd = [sys.executable, str(script_path),
-               "--task-dir", str(group_dir),
-               "--overrides", str(overrides_json)]
+               "--task-dir", str(group_dir)]
+        use_shell = False
 
     print(f"  Running {script} -> {group_dir}")
-    subprocess.run(cmd, check=True, cwd=str(SCRIPTS_DIR), env=env)
+    subprocess.run(cmd, check=True, cwd=str(SCRIPTS_DIR), env=env, shell=use_shell)
 
 
 # ============================================================
@@ -539,6 +558,17 @@ merged_template = template_dfs[0]
 for t in template_dfs[1:]:
     merged_template = merged_template.merge(t, on="Name", how="outer")
 
+# Apply SYSTEM_OVERRIDES — patches cluster/system rows across all runs.
+if SYSTEM_OVERRIDES:
+    run_cols = [c for c in merged_template.columns if c != 'Name']
+    for key, val in SYSTEM_OVERRIDES.items():
+        mask = merged_template['Name'] == key
+        if mask.any():
+            merged_template.loc[mask, run_cols] = str(val)
+        else:
+            print(f"  [WARNING] SYSTEM_OVERRIDES key '{key}' not found in template")
+    print(f"  Applied {len(SYSTEM_OVERRIDES)} SYSTEM_OVERRIDES to merged template")
+
 merged_unique.to_csv(OUT_UNIQUE, index=False)
 merged_template.to_csv(OUT_TEMPLATE, index=False)
 print(f"\nMerged {len(merged_params)} runs across {len(params_dfs)} groups")
@@ -569,13 +599,13 @@ If only one group exists (e.g. a one-off run): set `TASK_SCRIPTS = [("MyRun", "c
 
 ## Step 4: Verify settings alignment with `settings.py`
 
-Before generating CSVs, audit each `create_tasks_*.py`'s `GRID` dict against `luto/settings.py`. The most common stale items are **new settings added after the iteration was forked** — typically renewable energy keys, plus the `DO_IIS` flag.
+Before generating CSVs, audit each `create_tasks_*.py`'s `GRID` dict against `luto/settings.py`. The most common stale items are **new settings added after the iteration was forked** — typically renewable energy keys and new biodiversity keys.
 
 ```bash
 grep -E "RENEWABLE_EXISTING_END_YEAR|RENEWABLE_TARGET_SCENARIO_INPUT_LAYERS|RENEWABLE_TARGET_SCENARIO_TARGETS|INSTALL_CAPACITY_MW_HA|DO_IIS" jinzhu_inspect_code/<Iteration>/create_tasks_core.py
 ```
 
-If anything in `settings.py` is missing from the script's `GRID`, add it. Any setting expected to be the same across all runs (cluster, working, `DO_IIS`) goes into the merge script's `OVERRIDES` instead so it doesn't need to be repeated in every variant script.
+If anything in `settings.py` is missing from the script's `GRID`, add it to `GRID`. All settings — scenario, cluster, and working — belong in `GRID` in the task script.
 
 ### Settings that are intentionally different from `settings.py` defaults
 
@@ -591,7 +621,7 @@ These are scenario spec overrides — do NOT "fix" them to match the defaults:
 | `BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK/BELT` | `0.1` | `0.12` |
 | `BIO_CONTRIBUTION_RIPARIAN_PLANTING` | `1.2` | `1.0` |
 | `BIO_CONTRIBUTION_AGROFORESTRY` | `0.75` | `0.7` |
-| `BIO_CONTRIBUTION_DESTOCKING` | `None` | `0.75` |
+| `BIO_CONTRIBUTION_DESTOCKING` | `'GAP'` | `0.75` (use `'GAP'` sentinel when the sensitivity variant wants lookup-table difference) |
 
 ---
 
@@ -605,21 +635,24 @@ conda run -n luto python jinzhu_inspect_code/<Iteration>/merge_unique_parameters
 python jinzhu_inspect_code/<Iteration>/merge_unique_parameters.py
 ```
 
-This subprocess-runs every `create_tasks_*.py` (passing `--task-dir` + `--overrides _overrides.json`), then writes per-group:
+This subprocess-runs every `create_tasks_*.py` (passing only `--task-dir`), then writes per-group:
 - `grid_search_parameters.csv` — all permutations with `run_idx`
-- `grid_search_template.csv` — full settings, one column per run
+- `grid_search_template.csv` — full settings, one column per run (**NaN-free**)
 - `non_str_val.txt` — setting names needing `eval()` (non-string types)
 
 And to `TASK_DIR`:
-- `_overrides.json` — frozen snapshot of the merge script's `OVERRIDES`
 - `merged_grid_search_parameters_unique.csv` — varying columns + `scenario_group` + `global_run_idx`
 - `merged_grid_search_template.csv` — all runs with globally unique `Run_G0001`, `Run_G0002`, ...
 
 Inspect before submitting:
 ```python
 import pandas as pd
-df = pd.read_csv(r"F:\Users\jinzhu\Documents\Custome_run\<Iteration>\merged_grid_search_parameters_unique.csv")
+df = pd.read_csv(r"F:\Users\jinzhu\Documents\Custom_run\<Iteration>\merged_grid_search_parameters_unique.csv")
 print(df.head())
+
+# Verify NaN-free template
+tmpl = pd.read_csv(r"...\merged_grid_search_template.csv")
+assert tmpl.isnull().sum().sum() == 0, "Template has NaN — check variant key coverage"
 ```
 
 ---
@@ -642,12 +675,17 @@ Set `SUBMIT = True` and re-run the merge script.
 ## Checklist for a new iteration
 
 - [ ] Copy `create_tasks_core.py` from the previous iteration; update the docstring + `GRID` baseline + any region scope (e.g. `NECMA_GBCMA_NRMS`)
-- [ ] Verify the CORE `GRID` carries every scenario-relevant key in `luto/settings.py` (esp. new renewable energy keys); leave cluster / working / `DO_IIS` to `OVERRIDES`
-- [ ] Copy variant scripts (`create_tasks_sensitivity.py`, `create_tasks_progressive.py`, ...) — copy CORE's `GRID` body verbatim into each, adjust the `*_OVERRIDES` list of variants
+- [ ] Verify the CORE `GRID` carries every scenario-relevant key in `luto/settings.py` (esp. new biodiversity dict keys, renewable energy keys); cluster + working settings also live here
+- [ ] Copy variant scripts (`create_tasks_sensitivity.py`, `create_tasks_progressive.py`, ...) — copy CORE's `GRID` body verbatim into each, adjust the `*_OVERRIDES` list of variants; use the `update_settings` per-variant pattern (not `get_grid_search_settings_df` on a concatenated DataFrame)
 - [ ] Configure `merge_unique_parameters.py`:
   - [ ] `TASK_DIR` → new iteration output root
-  - [ ] `OVERRIDES` → cluster (MEM/NCPUS/TIME/QUEUE) + working (RESFACTOR/SIM_YEARS/`DO_IIS`/...) settings
   - [ ] `TASK_SCRIPTS` → list every `create_tasks_*.py`
+  - [ ] `SYSTEM_OVERRIDES` → leave `{}` for normal runs; populate only to batch-patch cluster settings without editing each script (e.g. `{'RESFACTOR': 10}` for a test run)
+  - [ ] `CONDA_ENV` → `luto` (or override)
+- [ ] Run merge with `SUBMIT=False` and inspect `merged_grid_search_parameters_unique.csv` — verify it contains the parameters you expect to vary, and *only* those
+- [ ] Assert zero NaN in `merged_grid_search_template.csv`
+- [ ] Set `SUBMIT=True` and re-run
+
   - [ ] `CONDA_ENV` → `luto` (or override)
 - [ ] Run merge with `SUBMIT=False` and inspect `merged_grid_search_parameters_unique.csv` — verify it contains the parameters you expect to vary, and *only* those
 - [ ] Set `SUBMIT=True` and re-run

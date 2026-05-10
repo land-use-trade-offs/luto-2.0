@@ -909,7 +909,7 @@ BIO_CONTRIBUTION_CARBON_PLANTING_BELT = 0.1
 BIO_CONTRIBUTION_RIPARIAN_PLANTING = 1.2
 BIO_CONTRIBUTION_AGROFORESTRY = 0.75       
 BIO_CONTRIBUTION_BECCS = 0
-BIO_CONTRIBUTION_DESTOCKING = None  # If None, uses BIO_HABITAT_CONTRIBUTION_LOOK_UP difference; if set (e.g. 0.75), overrides with a fixed scalar
+BIO_CONTRIBUTION_DESTOCKING = 'GAP'  # If 'GAP', uses BIO_HABITAT_CONTRIBUTION_LOOK_UP difference; if set to a number (e.g. 0.75), overrides with a fixed scalar
 '''
 The benefit of each non-agricultural land use to biodiversity is set as a proportion to the raw biodiversity priority value.
 For example, if the raw biodiversity priority value is 0.6 and the benefit is 0.8, then the biodiversity value
@@ -950,15 +950,35 @@ GBF3_TARGETS_DICT = {
 
 
 
-# ------------------------------- Species parameters -------------------------------
-BIODIVERSITY_TARGET_GBF_4_SNES =  'on'           # 'on' or 'off'.
-BIODIVERSITY_TARGET_GBF_4_ECNES = 'on'           # 'on' or 'off'.
-
+# ------------------------------- GBF4 Parameters -------------------------------
 '''
 Target 4 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 
 halt the extinction of known threatened species, protect genetic diversity, 
 and manage human-wildlife interactions
 '''
+
+
+BIODIVERSITY_TARGET_GBF_4_SNES =  'on'           # 'on' or 'off'.
+BIODIVERSITY_TARGET_GBF_4_ECNES = 'on'           # 'on' or 'off'.
+
+
+BIODIVERSITY_GBF_4_TARGET_SOURCE_SNES = 'USER_DEFINED'  # 'USER_DEFINED' or 'dict'
+BIODIVERSITY_GBF_4_TARGET_SOURCE_ECNES = 'USER_DEFINED'  # 'USER_DEFINED' or 'dict'
+'''
+If 'USER_DEFINED', read targets from input Excel file; 
+If 'dict', read targets from the GBF4_TARGETS_DICT below.
+'''
+
+BIODIVERSITY_GBF_4_TARGET_DICT_SNES = {
+    '2030' : 30,
+    '2050' : 50,
+    '2100' : 50
+}
+BIODIVERSITY_GBF_4_TARGET_DICT_ECNES = {
+    '2030' : 30,
+    '2050' : 50,
+    '2100' : 50
+}
 
 
 # -------------- NRM region mode for GBF3 and GBF4 ----------------------
@@ -1075,7 +1095,6 @@ GBF4_ECNES_SELECTED_REGIONS: list of NRM region names. Only used when mode = 'NR
 #   Australia mode — only the name part is used (region is ignored).
 # Match exactly the values in BIODIVERSITY_GBF4_TARGET_*[_NRM].csv.
 GBF4_ECNES_EXCLUDE_REGION_COMMUNITIES = [
-    # IIS source: output/2026_05_01__19_58_59_RF10_2010-2050/iis_analysis_summary.txt
     # Community: "White Box-Yellow Box-Blakely's Red Gum Grassy Woodland and Derived
     # Native Grassland" (EPBC Critically Endangered).
 

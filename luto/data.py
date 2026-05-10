@@ -1792,6 +1792,14 @@ class Data:
                     print(f"│   │   ├── Recomputed SNES targets at RESFACTOR={settings.RESFACTOR}", flush=True)
 
                 print(f"│   │   └── {len(snes_nrm_df)} (species, region) constraints from {len(unique_species)} species", flush=True)
+
+            if settings.BIODIVERSITY_GBF_4_TARGET_SOURCE_SNES == 'dict':
+                for year_str, pct in settings.BIODIVERSITY_GBF_4_TARGET_DICT_SNES.items():
+                    col = f'TARGET_LEVEL_{year_str}_LIKELY'
+                    if col in self.BIO_GBF4_SNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY.columns:
+                        self.BIO_GBF4_SNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY[col] = float(pct)
+                print(f"│   │   └── Dict targets applied to SNES LIKELY: {settings.BIODIVERSITY_GBF_4_TARGET_DICT_SNES}", flush=True)
+
         
         
         if settings.BIODIVERSITY_TARGET_GBF_4_ECNES != 'off':
@@ -1973,6 +1981,14 @@ class Data:
                     print(f"│   │   ├── Recomputed ECNES targets at RESFACTOR={settings.RESFACTOR}", flush=True)
 
                 print(f"│   │   └── {len(ecnes_nrm_df)} (community, region) constraints from {len(unique_communities)} communities", flush=True)
+
+            if settings.BIODIVERSITY_GBF_4_TARGET_SOURCE_ECNES == 'dict':
+                for year_str, pct in settings.BIODIVERSITY_GBF_4_TARGET_DICT_ECNES.items():
+                    col = f'TARGET_LEVEL_{year_str}_LIKELY'
+                    if col in self.BIO_GBF4_ECNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY.columns:
+                        self.BIO_GBF4_ECNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY[col] = float(pct)
+                print(f"│   │   └── Dict targets applied to ECNES LIKELY: {settings.BIODIVERSITY_GBF_4_TARGET_DICT_ECNES}", flush=True)
+
         
   
         
