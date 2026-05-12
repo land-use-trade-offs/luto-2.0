@@ -134,10 +134,10 @@ DYNAMIC_PRICE = False
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 10        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 5        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-SIM_YEARS =  [2010, 2050] # list(range(2010, 2051, 10))
+SIM_YEARS =  list(range(2010, 2051, 5))
 
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
@@ -314,7 +314,7 @@ Land-use and vector file pairs to exclude land-use from being utilised in that a
 - The value is the path to the ESRI shapefile.
 '''
 
-REGIONAL_ADOPTION_CONSTRAINTS = 'NON_AG_CAP'            
+REGIONAL_ADOPTION_CONSTRAINTS = 'off'            
 '''
 Adoption mode for non-ag land uses.
 - 'off': no regional adoption constraints
@@ -444,8 +444,8 @@ AF_FENCING_LENGTH_HA = 100 * no_belts_per_ha * 2 # Length of fencing required pe
 # Renewable energy parameters
 # ---------------------------------------------------------------------------- #
 RENEWABLES_OPTIONS = {
-    'Utility Solar PV': False,
-    'Onshore Wind': False,
+    'Utility Solar PV': True,
+    'Onshore Wind': True,
 }
 
 
@@ -839,7 +839,7 @@ If set to 100, all cells will be considered as priority degraded areas, equal to
 
 
 # Biodiversity quality options
-BIO_QUALITY_LAYER = 'Suitability' # 'Suitability', 'ECNES_likely_may', 'ECNES_likely', 'SNES_likely_may', 'SNES_likely', 'MNES_likely_may', 'MNES_likely'              
+BIO_QUALITY_LAYER = 'MNES_likely' # 'Suitability', 'ECNES_likely_may', 'ECNES_likely', 'SNES_likely_may', 'SNES_likely', 'MNES_likely_may', 'MNES_likely'              
 '''
 One of 'Suitability', 'ECNES_likely_may', 'ECNES_likely', 'SNES_likely_may', 'SNES_likely', 'MNES_likely_may', 'MNES_likely'.
     - 'Suitability': use the Zonation algorith to compute quanlity score over 10k species.
@@ -921,7 +921,7 @@ will be 0.6 * 0.8 = 0.48.
 
 # ---------------------- GBF3 parameters ----------------------
 
-BIODIVERSITY_TARGET_GBF_3_NVIS = 'USER_DEFINED'           # 'off', 'medium', 'high', or 'USER_DEFINED'
+BIODIVERSITY_TARGET_GBF_3_NVIS = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
 '''
 Target 3 of the Kunming-Montreal Global Biodiversity Framework (NVIS):
 protect and manage vegetation groups using the National Vegetation Information System.
@@ -958,8 +958,8 @@ and manage human-wildlife interactions
 '''
 
 
-BIODIVERSITY_TARGET_GBF_4_SNES =  'on'           # 'on' or 'off'.
-BIODIVERSITY_TARGET_GBF_4_ECNES = 'on'           # 'on' or 'off'.
+BIODIVERSITY_TARGET_GBF_4_SNES =  'off'           # 'on' or 'off'.
+BIODIVERSITY_TARGET_GBF_4_ECNES = 'off'           # 'on' or 'off'.
 
 
 BIODIVERSITY_GBF_4_TARGET_SOURCE_SNES = 'USER_DEFINED'  # 'USER_DEFINED' or 'dict'
