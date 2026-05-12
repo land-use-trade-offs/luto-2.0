@@ -199,6 +199,11 @@ window.TransitionView = {
       selectedCell, handlePreviewClick, nullMessage,
       dataLoaded, isLoadingData, isDrawerOpen, toggleDrawer,
     };
+    const _fn = v => String(v).trim().replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    _state.mapFileName = computed(() =>
+      [VIEW_NAME, selectCategory.value, selectSubCat.value, selectYear.value]
+        .filter(Boolean).map(_fn).filter(Boolean).join('__')
+    );
     window._debug = window._debug || {};
     window._debug[VIEW_NAME] = _state;
     return _state;
@@ -343,6 +348,7 @@ window.TransitionView = {
         <!-- Map -->
         <regions-map
           :mapData="selectMapData"
+          :file-name="mapFileName"
           region-type="STATE"
           style="width:100%; height:100%;">
         </regions-map>

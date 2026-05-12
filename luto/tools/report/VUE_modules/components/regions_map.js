@@ -134,6 +134,10 @@ window.RegionsMap = {
     showLegend: {
       type: Boolean,
       default: true
+    },
+    fileName: {
+      type: String,
+      default: ''
     }
   },
 
@@ -340,19 +344,27 @@ window.RegionsMap = {
     });
 
     let _currentRasterOverlay = null;
+    let _loadSeq = 0;
 
     const loadMapData = async () => {
-      if (_currentRasterOverlay) {
-        map.value.removeLayer(_currentRasterOverlay);
-        _currentRasterOverlay = null;
-      }
+      const mySeq = ++_loadSeq;
 
       const data = props.mapData;
-      if (!data?.tif_b64 || !data?.intOrFloat) return;
+      if (!data?.tif_b64 || !data?.intOrFloat) {
+        if (_currentRasterOverlay) {
+          map.value.removeLayer(_currentRasterOverlay);
+          _currentRasterOverlay = null;
+        }
+        return;
+      }
 
       // Decode base64 → parse GeoTIFF (already EPSG:3857, no reprojection needed)
       const bytes     = Uint8Array.from(atob(data.tif_b64), c => c.charCodeAt(0));
       const georaster = await parseGeoraster(bytes.buffer);
+
+      // Discard if a newer load was triggered while we were awaiting parseGeoraster
+      if (mySeq !== _loadSeq) return;
+
       const { width, height, values, xmin, xmax, ymin, ymax } = georaster;
 
       // Pre-render all pixels to a canvas once — zoom/pan is then instant (static image)
@@ -390,12 +402,22 @@ window.RegionsMap = {
       }
       ctx.putImageData(imageData, 0, 0);
 
+      // Discard if superseded during the pixel loop
+      if (mySeq !== _loadSeq) return;
+
       // Convert EPSG:3857 extent to LatLng for Leaflet imageOverlay
       const sw = L.CRS.EPSG3857.unproject(L.point(xmin, ymin));
       const ne = L.CRS.EPSG3857.unproject(L.point(xmax, ymax));
 
-      _currentRasterOverlay = L.imageOverlay(canvas.toDataURL(), [sw, ne])
-        .addTo(map.value);
+      // Build the new overlay before removing the old one — eliminates blank-map flash
+      const newOverlay = L.imageOverlay(canvas.toDataURL(), [sw, ne]);
+
+      // Atomic swap: old layer out, new layer in with no visible gap
+      if (_currentRasterOverlay) {
+        map.value.removeLayer(_currentRasterOverlay);
+      }
+      _currentRasterOverlay = newOverlay.addTo(map.value);
+
       const imgEl = _currentRasterOverlay.getElement();
       if (imgEl) {
         imgEl.style.imageRendering = 'pixelated';
@@ -519,18 +541,105 @@ window.RegionsMap = {
     async function exportLayer() {
       if (!props.mapData?.tif_b64) return;
       isExporting.value = true;
-      await new Promise(resolve => setTimeout(resolve, 50)); // let UI update before heavy atob
-      const bytes = Uint8Array.from(atob(props.mapData.tif_b64), c => c.charCodeAt(0));
-      const blob  = new Blob([bytes], { type: 'image/tiff' });
-      const url   = URL.createObjectURL(blob);
-      const a     = Object.assign(document.createElement('a'), {
-        href: url, download: `luto_layer_${Date.now()}.tif`
-      });
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      isExporting.value = false;
+      await new Promise(resolve => setTimeout(resolve, 50)); // let UI update before heavy work
+
+      try {
+        const data = props.mapData;
+        const bytes     = Uint8Array.from(atob(data.tif_b64), c => c.charCodeAt(0));
+        const georaster = await parseGeoraster(bytes.buffer);
+        const { width, height, values, xmin, xmax, ymin, ymax, noDataValue } = georaster;
+
+        const rawBand = values[0];
+        const is2D    = typeof rawBand[0] !== 'number';
+
+        // -----------------------------------------------------------------
+        // Reproject EPSG:3857 → GDA94 (EPSG:4283) using Mercator formulas.
+        // GDA94 ≈ WGS84 to < 1 m — no datum shift required at LUTO resolution.
+        //
+        // EPSG:3857 x → lng (°):  x / R * (180/π)
+        // EPSG:3857 y → lat (°):  (2·atan(exp(y/R)) - π/2) * (180/π)
+        // GDA94   lat → y_merc :  R · ln(tan(π/4 + lat_rad/2))   (forward Mercator)
+        // -----------------------------------------------------------------
+        const R       = 6378137;
+        const DEG2RAD = Math.PI / 180;
+
+        const westLng  = xmin / R / DEG2RAD;
+        const eastLng  = xmax / R / DEG2RAD;
+        const southLat = (2 * Math.atan(Math.exp(ymin / R)) - Math.PI / 2) / DEG2RAD;
+        const northLat = (2 * Math.atan(Math.exp(ymax / R)) - Math.PI / 2) / DEG2RAD;
+
+        const outWidth  = width;
+        const outHeight = height;
+        const lngPerPx  = (eastLng  - westLng)  / outWidth;
+        const latPerPx  = (northLat - southLat)  / outHeight;
+
+        // Precompute fractional source-column index for each output column (O(w) proj4 calls avoided)
+        const srcXfrac = new Float64Array(outWidth);
+        for (let col = 0; col < outWidth; col++) {
+          const lng   = westLng + (col + 0.5) * lngPerPx;
+          const xMerc = lng * DEG2RAD * R;
+          srcXfrac[col] = (xMerc - xmin) / (xmax - xmin) * (width - 1);
+        }
+
+        // Precompute source row index for each output row (O(h) instead of O(w·h))
+        const srcYrow = new Int32Array(outHeight);
+        for (let row = 0; row < outHeight; row++) {
+          const lat   = northLat - (row + 0.5) * latPerPx;
+          const yMerc = R * Math.log(Math.tan(Math.PI / 4 + lat * DEG2RAD / 2));
+          srcYrow[row] = Math.round((ymax - yMerc) / (ymax - ymin) * (height - 1));
+        }
+
+        // Nearest-neighbour resample into GDA94 output grid
+        const NODATA  = -9999;
+        const isInt   = data.intOrFloat === 'int';
+        const outData = isInt
+          ? new Int16Array(outWidth * outHeight).fill(NODATA)
+          : new Float32Array(outWidth * outHeight).fill(NODATA);
+
+        for (let row = 0; row < outHeight; row++) {
+          const srcRow = srcYrow[row];
+          if (srcRow < 0 || srcRow >= height) continue;
+          for (let col = 0; col < outWidth; col++) {
+            const srcCol = Math.round(srcXfrac[col]);
+            if (srcCol < 0 || srcCol >= width) continue;
+            const val = is2D ? rawBand[srcRow][srcCol] : rawBand[srcRow * width + srcCol];
+            if (val !== null && val !== NODATA && val !== noDataValue) {
+              outData[row * outWidth + col] = val;
+            }
+          }
+        }
+
+        // Write GeoTIFF with GDA94 (EPSG:4283) georeferencing.
+        // GeoTIFF.writeArrayBuffer is exposed by geotiff.browser.bundle.min.js.
+        // Pass the flat TypedArray directly (not wrapped in an array) so the
+        // function takes the "number" branch and reads width/height from metadata.
+        const ab = GeoTIFF.writeArrayBuffer(outData, {
+          width:                outWidth,
+          height:               outHeight,
+          SamplesPerPixel:      [1],
+          BitsPerSample:        [isInt ? 16 : 32],
+          SampleFormat:         [isInt ? 2  : 3],  // 2=signed int, 3=IEEE float
+          ModelPixelScale:      [lngPerPx, latPerPx, 0],
+          ModelTiepoint:        [0, 0, 0, westLng, northLat, 0],
+          GeographicTypeGeoKey: 4283,              // GDA94
+          GeogCitationGeoKey:   'GCS_GDA_1994',
+          GTModelTypeGeoKey:    2,                 // Geographic
+          GTRasterTypeGeoKey:   1,                 // PixelIsArea
+        });
+
+        const buf  = ab instanceof ArrayBuffer ? ab : await ab;
+        const blob = new Blob([buf], { type: 'image/tiff' });
+        const url  = URL.createObjectURL(blob);
+        const a    = Object.assign(document.createElement('a'), {
+          href: url, download: (() => { const n = props.fileName || 'luto_layer_gda94'; return (n.length > 100 ? n.slice(0, 97) + '...' : n) + '.tif'; })()
+        });
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } finally {
+        isExporting.value = false;
+      }
     }
 
     return {
@@ -584,7 +693,7 @@ window.RegionsMap = {
               <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0 0l-4-4m4 4l4-4"/>
               </svg>
-              Export GeoTIFF
+              Export GeoTIFF (GDA94)
             </span>
           </button>
         </div>

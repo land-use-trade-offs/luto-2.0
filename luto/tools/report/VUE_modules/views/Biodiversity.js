@@ -415,6 +415,11 @@ window.BiodiversityView = {
       selectMapData, selectChartData, gbf2MaskOverlay,
       dataLoaded, isLoadingData, isDrawerOpen, toggleDrawer,
     };
+    const _fn = v => String(v).trim().replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    _state.mapFileName = computed(() =>
+      [VIEW_NAME, selectMetric.value, selectCategory.value, selectAgMgt.value, selectWater.value, selectSpecies.value, selectLanduse.value, selectYear.value]
+        .filter(Boolean).map(_fn).filter(Boolean).join('__')
+    );
     window._debug[VIEW_NAME] = _state;
     return _state;
   },
@@ -535,6 +540,7 @@ window.BiodiversityView = {
         <!-- Map component takes full space -->
         <regions-map
           :mapData="selectMapData"
+          :file-name="mapFileName"
           :overlayGeoJSON="gbf2MaskOverlay"
           :show-legend="!isDrawerOpen"
           style="width: 100%; height: 100%;">
