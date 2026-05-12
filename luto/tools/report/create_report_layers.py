@@ -146,11 +146,13 @@ def map2geotiff(
     hierarchy_tp: tuple,
     layer_magnitude,           # (global_min, global_max) for float layers; None for int
     legend_key: str | None,
+    real_area_1d: np.ndarray | None = None,  # 1D float32[cell] — actual ha per cell
 ) -> tuple:
     """Convert a 1D cell array to GeoTIFF bytes in EPSG:3857.
 
-    Writes actual data values so the exported file issuitable for GIS analysis. 
-    ``index_merc`` is memmapped by joblib across workers.
+    For float layers, each cell value is divided by the cell's real area (ha) so
+    the GeoTIFF stores actual per-ha values.  ``index_merc`` is memmapped by
+    joblib across workers; ``real_area_1d`` is small enough to be pickled.
     """
     H, W = int(index_merc.shape[-2]), int(index_merc.shape[-1])
     nodata_val = geo_meta_merc['nodata']
@@ -159,13 +161,16 @@ def map2geotiff(
     arr_2d = np.full((H, W), nodata_val, dtype=dtype)
     valid = index_merc >= 0
     src_vals = arr_sel.values[index_merc[valid]]
-    
+
     if isInt:
         # Source is float32; NaN/inf can't cast to int16 — map them to nodata first.
         src_f = np.asarray(src_vals, dtype=np.float32)
         src_f[~np.isfinite(src_f)] = nodata_val
         arr_2d[valid] = src_f.astype(np.int16)
     else:
+        if real_area_1d is not None:
+            cell_area = real_area_1d[index_merc[valid]]
+            src_vals = src_vals / np.where(cell_area > 0, cell_area, np.nan)
         arr_2d[valid] = src_vals
 
     meta = {**geo_meta_merc, 'dtype': dtype}
@@ -178,14 +183,22 @@ def map2geotiff(
         attrs: dict = {'intOrFloat': 'int', 'legendKey': legend_key}
     else:
         global_min, global_max = layer_magnitude
-        min_max = (
-            round(global_min / settings.RESFACTOR ** 2 / 121, 2),
-            round(global_max / settings.RESFACTOR ** 2 / 121, 2),
-        )
-        # min_max is the display-scale range (for colorbar labels).
-        # raw_min_max is the actual GeoTIFF value range used for pixel normalisation.
-        attrs = {'intOrFloat': 'float', 'min_max': list(min_max),
-                 'raw_min_max': [global_min, global_max]}
+        if real_area_1d is not None:
+            # Divide the global raw range by the mean cell area to get per-ha bounds.
+            # Both raw_min_max and min_max are the same — stored values are already per-ha.
+            mean_area = float(np.nanmean(real_area_1d))
+            per_ha_min = round(global_min / mean_area, 4)
+            per_ha_max = round(global_max / mean_area, 4)
+            attrs = {'intOrFloat': 'float',
+                     'min_max':     [per_ha_min, per_ha_max],
+                     'raw_min_max': [per_ha_min, per_ha_max]}
+        else:
+            min_max = (
+                round(global_min / settings.RESFACTOR ** 2 / 121, 2),
+                round(global_max / settings.RESFACTOR ** 2 / 121, 2),
+            )
+            attrs = {'intOrFloat': 'float', 'min_max': list(min_max),
+                     'raw_min_max': [global_min, global_max]}
 
     return hierarchy_tp, tif_bytes, attrs
     
@@ -257,8 +270,19 @@ def get_map2json(
                 .rio.write_crs(crs)
                 .rio.reproject('EPSG:3857', nodata=-1.0)
             )
-            
+
         index_merc = np.round(rxr_merc.values).astype(np.int32)
+
+        # Load real cell area (ha) for per-ha normalisation of float layers.
+        real_area_path = os.path.join(
+            os.path.dirname(row['path']),
+            f'xr_area_real_area_ha_{row["Year"]}.nc'
+        )
+        if os.path.exists(real_area_path):
+            with xr.open_dataset(real_area_path) as ra_ds:
+                real_area_1d = ra_ds['data'].values.squeeze().astype(np.float32)
+        else:
+            real_area_1d = None
         geo_meta_merc = {
             'driver': 'GTiff', 'count': 1,
             'crs':       rxr_merc.rio.crs,
@@ -293,7 +317,8 @@ def get_map2json(
                     vals = vals.reshape(-1)
                 arr_sel = xr.DataArray(vals, dims=('cell',), coords=is_selected_coords)
                 tasks.append(delayed(map2geotiff)(
-                    index_merc, geo_meta_merc, arr_sel, isInt, hierarchy_tp, layer_magnitude, legend_key
+                    index_merc, geo_meta_merc, arr_sel, isInt, hierarchy_tp, layer_magnitude, legend_key,
+                    None if isInt else real_area_1d,
                 ))
 
             for hierarchy_tp, tif_bytes, attrs in Parallel(
