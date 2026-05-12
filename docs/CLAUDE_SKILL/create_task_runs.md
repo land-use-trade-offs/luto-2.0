@@ -31,16 +31,28 @@ jinzhu_inspect_code/<Iteration>/
 One script per batch. It has four parts:
 
 1. **Top-level constants** — `LUTO_DIR`, `TASK_DIR` hardcoded as `Path` objects
-2. **`BASE_GRID`** — settings common to all runs (cluster + working + scenario)
+2. **`BASE_GRID`** — **only** cluster params + intentional overrides from `settings.py`
 3. **`RUN_OVERRIDES`** — list of `(run_label, scenario_group, overrides_dict)` tuples, one per run
 4. **`build()` + `__main__`** — generates CSVs, creates `Run_G*` dirs, copies `run_all.py`
+
+### BASE_GRID rule: only overrides, never copies
+
+`build()` seeds every run's `settings_dict` from `get_settings_df()`, which reads the **live** `luto/settings.py`. So any key absent from BASE_GRID is automatically inherited from the source. **Only add a key to BASE_GRID when you deliberately want a different value.** Never copy settings.py values verbatim — that creates a sync hazard.
+
+```
+BASE_GRID contains:
+  ① Cluster params not in settings.py  (MEM, NCPUS, TIME, QUEUE)
+  ② Settings that intentionally differ  (CARBON_EFFECTS_WINDOW, DYNAMIC_PRICE, …)
+  ③ Per-axis params that are constant   across all runs but vary from defaults
+Everything else → inherited from get_settings_df() automatically
+```
 
 ### Full template
 
 ```python
 """<Batch description> — N-run grid.
 
-Runs vary <axes>. BIO_QUALITY_LAYER = '<value>'.
+Runs vary <axes>.
 
 Scenario groups:
   <GROUP_A>  — <description>  (Runs 01-XX)
@@ -62,169 +74,34 @@ TASK_DIR = Path(r'F:\Users\jinzhu\Documents\Custom_runs\<Iteration>')
 
 
 # ----------------------------------------------------------------------
-# BASE GRID — settings common to all runs.
+# BASE GRID — intentional overrides from settings.py defaults.
+# Everything not listed here is inherited from luto/settings.py via
+# get_settings_df(), so this list stays in sync automatically.
 # ----------------------------------------------------------------------
 BASE_GRID = {
-    # --------------- Cluster job settings ---------------
-    'MEM':                     ['128GB'],
-    'WRITE_REPORT_MAX_MEM_GB': [120],
-    'NCPUS':                   [32],
-    'TIME':                    ['12:00:00'],
-    'QUEUE':                   ['normalsr'],
+    # --- Cluster job settings (not in settings.py) ---
+    'MEM':   ['128GB'],
+    'NCPUS': [32],
+    'TIME':  ['12:00:00'],
+    'QUEUE': ['normalsr'],
 
-    # --------------- Working settings ---------------
-    'OBJECTIVE':      ['maxprofit'],
-    'RESFACTOR':      [5],
-    'SIM_YEARS':      [[2010, 2020, 2025, 2030, 2035, 2040, 2045, 2050]],
-    'WRITE_PARALLEL': [True],
-    'WRITE_THREADS':  [12],
-    'DO_IIS':         [False],
-    'WRITE_OUTPUTS':  [True],
+    # --- Intentional overrides (differ from settings.py) ---
+    'SIM_YEARS':               [[2010, 2020, 2025, 2030, 2035, 2040, 2045, 2050]],
+    'WRITE_THREADS':           [12],            # settings.py: min(16, cpu_count)
+    'WRITE_REPORT_MAX_MEM_GB': [120],           # settings.py: 64
+    'CARBON_EFFECTS_WINDOW':   [60],            # settings.py: 50
+    'DYNAMIC_PRICE':           [True],          # settings.py: False
 
-    # --------------- Scenarios ---------------
-    'SSP':                          ['245'],
-    'CARBON_EFFECTS_WINDOW':        [60],
-    'RISK_OF_REVERSAL':             [0],
-    'FIRE_RISK':                    ['med'],
-    'CONVERGENCE':                  [2050],
-    'CO2_FERT':                     ['off'],
-    'APPLY_DEMAND_MULTIPLIERS':     [True],
-    'PRODUCTIVITY_TREND':           ['BAU'],
+    # GHG target — set per batch (settings.py default: 'high')
+    'GHG_EMISSIONS_LIMITS': ['<low|high>'],
 
-    # --------------- Economics ---------------
-    'DYNAMIC_PRICE':                                 [True],
-    'AMORTISE_UPFRONT_COSTS':                        [False],
-    'DISCOUNT_RATE':                                 [0.07],
-    'AMORTISATION_PERIOD':                           [30],
-    'CARBON_PRICE_COSTANT':                          [0],
-    'BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR':     [100],
-    'SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR':    [100],
-    'HIR_CEILING_PERCENTAGE':                        [0.8],
+    # GBF4 — on/off and region mode as needed (settings.py: 'off' / 'NRM')
+    'BIODIVERSITY_TARGET_GBF_4_SNES':  ['on'],
+    'GBF4_SNES_REGION_MODE':           ['Australia'],
+    'BIODIVERSITY_TARGET_GBF_4_ECNES': ['on'],
+    'GBF4_ECNES_REGION_MODE':          ['Australia'],
 
-    # --------------- Target deviation weights ---------------
-    'SOLVER_WEIGHT_DEMAND':         [1],
-    'SOLVER_WEIGHT_GHG':            [1],
-    'SOLVER_WEIGHT_WATER':          [1],
-
-    # --------------- Social licence ---------------
-    'EXCLUDE_NO_GO_LU':                  [False],
-    'REGIONAL_ADOPTION_CONSTRAINTS':     ['off'],
-    'REGIONAL_ADOPTION_NON_AG_CAP':      [15],
-    'REGIONAL_ADOPTION_NON_AG_REGION':   ['NRM'],
-    'REGIONAL_ADOPTION_ZONE':            ['NRM_CODE'],
-
-    # --------------- GHG settings ---------------
-    'CARBON_PRICES_FIELD':          ['CONSTANT'],
-    'GHG_CONSTRAINT_TYPE':          ['hard'],
-    'USE_GHG_SCOPE_1':              [True],
-
-    # --------------- Water constraints ---------------
-    'WATER_REGION_DEF':             ['River Region'],
-    'WATER_LIMITS':                 ['on'],
-    'WATER_CONSTRAINT_TYPE':        ['hard'],
-    'WATER_STRESS':                 [0.6],
-    'WATER_CLIMATE_CHANGE_IMPACT':  ['on'],
-    'LIVESTOCK_DRINKING_WATER':     [1],
-    'INCLUDE_WATER_LICENSE_COSTS':  [1],
-
-    # --------------- Biodiversity overall ---------------
-    'BIO_QUALITY_LAYER':            ['MNES_likely'],
-    'CONTRIBUTION_PERCENTILE':      ['USER_DEFINED'],
-    'CONNECTIVITY_SOURCE':          ['NCI'],
-    'CONNECTIVITY_LB':              [0.7],
-
-    # --------------- Biodiversity contribution parameters ---------------
-    'BIO_CONTRIBUTION_LDS':                   [0.75],
-    'BIO_CONTRIBUTION_ENV_PLANTING':          [0.7],
-    'BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK': [0.12],
-    'BIO_CONTRIBUTION_CARBON_PLANTING_BELT':  [0.12],
-    'BIO_CONTRIBUTION_RIPARIAN_PLANTING':     [1.0],
-    'BIO_CONTRIBUTION_AGROFORESTRY':          [0.7],
-    'BIO_CONTRIBUTION_BECCS':                 [0],
-    'BIO_CONTRIBUTION_DESTOCKING':            [0.75],
-
-    # --------------- GBF 2 ---------------
-    'BIODIVERSITY_TARGET_GBF_2':    ['high'],
-    'GBF2_CONSTRAINT_TYPE':         ['hard'],
-
-    # --------------- GBF 3 ---------------
-    'BIODIVERSITY_TARGET_GBF_3_NVIS':    ['off'],
-    'BIODIVERSITY_TARGET_GBF_3_IBRA':    ['off'],
-
-    # --------------- GBF 4 ---------------
-    'BIODIVERSITY_TARGET_GBF_4_SNES':    ['on'],
-    'GBF4_SNES_REGION_MODE':             ['Australia'],
-    'BIODIVERSITY_TARGET_GBF_4_ECNES':   ['on'],
-    'GBF4_ECNES_REGION_MODE':            ['Australia'],
-
-    # --------------- GBF 8 ---------------
-    'BIODIVERSITY_TARGET_GBF_8':         ['off'],
-
-    # --------------- Renewable energy ---------------
-    'RENEWABLES_OPTIONS': [{'Utility Solar PV': True, 'Onshore Wind': True}],
-    'RENEWABLE_TARGET_SCENARIO_TARGETS':      ['Gladstone - Core'],
-    'RENEWABLE_TARGET_SCENARIO_INPUT_LAYERS': ['step_change'],
-
-    # --------------- Objective weights ---------------
-    'SOLVE_WEIGHT_ALPHA':   [1],
-    'SOLVE_WEIGHT_BETA':    [0.5],
-
-    # --------------- Ag management ---------------
-    'AG_MANAGEMENTS': [{
-        'Asparagopsis taxiformis': True,
-        'Precision Agriculture':   True,
-        'Ecological Grazing':      False,
-        'Savanna Burning':         True,
-        'AgTech EI':               True,
-        'Biochar':                 True,
-        'HIR - Beef':              True,
-        'HIR - Sheep':             True,
-        'Utility Solar PV':        True,
-        'Onshore Wind':            True,
-    }],
-    'AG_MANAGEMENTS_REVERSIBLE': [{
-        'Asparagopsis taxiformis': True,
-        'Precision Agriculture':   True,
-        'Ecological Grazing':      True,
-        'Savanna Burning':         True,
-        'AgTech EI':               True,
-        'Biochar':                 True,
-        'HIR - Beef':              False,
-        'HIR - Sheep':             False,
-        'Utility Solar PV':        False,
-        'Onshore Wind':            False,
-    }],
-
-    # --------------- Non-agricultural land uses ---------------
-    'NON_AG_LAND_USES': [{
-        'Environmental Plantings':       True,
-        'Riparian Plantings':            True,
-        'Sheep Agroforestry':            True,
-        'Beef Agroforestry':             True,
-        'Carbon Plantings (Block)':      True,
-        'Sheep Carbon Plantings (Belt)': True,
-        'Beef Carbon Plantings (Belt)':  True,
-        'BECCS':                         False,
-        'Destocked - natural land':      True,
-    }],
-    'NON_AG_LAND_USES_REVERSIBLE': [{
-        'Environmental Plantings':       False,
-        'Riparian Plantings':            False,
-        'Sheep Agroforestry':            False,
-        'Beef Agroforestry':             False,
-        'Carbon Plantings (Block)':      False,
-        'Sheep Carbon Plantings (Belt)': False,
-        'Beef Carbon Plantings (Belt)':  False,
-        'BECCS':                         False,
-        'Destocked - natural land':      True,
-    }],
-
-    # --------------- Dietary ---------------
-    'DIET_DOM':         ['BAU'],
-    'DIET_GLOB':        ['BAU'],
-    'WASTE':            [1],
-    'FEED_EFFICIENCY':  ['BAU'],
-    'IMPORT_TREND':     ['Trend'],
+    # Add further overrides only if this batch genuinely differs from settings.py
 }
 
 
@@ -369,24 +246,24 @@ For a true Cartesian product (every combination of N axes), use `get_grid_search
 
 ### Unspecified settings: fall back to source `luto/settings.py`
 
-**If a setting is not explicitly listed in `BASE_GRID` or `RUN_OVERRIDES`, do NOT invent a value — leave it out of the grid entirely.** The `build()` function seeds every run's `settings_dict` from `get_settings_df()`, which reads the live `luto/settings.py` defaults. Omitted keys therefore inherit the source LUTO value automatically.
+**If a setting is not explicitly listed in `BASE_GRID` or `RUN_OVERRIDES`, leave it out entirely.** `build()` seeds every run's `settings_dict` from `get_settings_df()`, which reads the live `luto/settings.py`. Omitted keys therefore inherit the source value automatically — no manual sync needed.
 
-Only add a key to `BASE_GRID` when you need to **override** the source default for this batch. The table below lists the known intentional overrides used in standard task runs:
+### Known intentional overrides (as of 2026-05-13)
 
-### Settings intentionally different from `settings.py` defaults
+These are the settings that task run scripts legitimately deviate from `settings.py` defaults. Only list a setting in BASE_GRID if it appears here or is documented by the batch spec.
 
-| Setting | `settings.py` default | Standard task value |
-|---|---|---|
-| `IMPORT_TREND` | `'Static'` | `'Trend'` |
-| `DYNAMIC_PRICE` | `False` | `True` |
-| `CARBON_EFFECTS_WINDOW` | `50` | `60` |
-| `GHG_EMISSIONS_LIMITS` | `'high'` | `'low'` (core) |
-| `BIO_CONTRIBUTION_ENV_PLANTING` | `0.8` | `0.7` |
-| `BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK/BELT` | `0.1` | `0.12` |
-| `BIO_CONTRIBUTION_RIPARIAN_PLANTING` | `1.2` | `1.0` |
-| `BIO_CONTRIBUTION_AGROFORESTRY` | `0.75` | `0.7` |
+| Setting | `settings.py` default | Task run value | Reason |
+|---|---|---|---|
+| `DYNAMIC_PRICE` | `False` | `True` | Enable demand elasticity pricing |
+| `CARBON_EFFECTS_WINDOW` | `50` | `60` | Longer carbon window per scenario spec |
+| `GHG_EMISSIONS_LIMITS` | `'high'` | `'low'` (core) / `'high'` (sensitivity) | Per batch GHG ambition level |
+| `SIM_YEARS` | `[2010…2050]` | batch-specific start year | Skip base year when running from 2020 |
+| `WRITE_THREADS` | `min(16, cpu_count)` | `12` | Cluster thread cap |
+| `WRITE_REPORT_MAX_MEM_GB` | `64` | `120` | Cluster memory allocation |
+| `BIODIVERSITY_TARGET_GBF_4_SNES/ECNES` | `'off'` | `'on'` | Enable GBF4 targets |
+| `GBF4_*_REGION_MODE` | `'NRM'` | `'Australia'` | Australia-wide run (not NRM-restricted) |
 
-Do NOT "fix" these to match defaults — they are scenario spec overrides.
+Everything else (`BIO_CONTRIBUTION_*`, `WATER_REGION_DEF`, `IMPORT_TREND`, `HIR_CEILING_PERCENTAGE`, etc.) matches `settings.py` and must **not** be listed in BASE_GRID.
 
 ### Common `RUN_OVERRIDES` patterns
 
@@ -404,9 +281,10 @@ Do NOT "fix" these to match defaults — they are scenario spec overrides.
 
 ## Checklist for a new batch
 
-- [ ] Copy `create_tasks.py` from a recent iteration; update docstring, `TASK_DIR`, `BASE_GRID` baseline — **only include settings that differ from source `luto/settings.py`; omit everything else so it inherits the live default**
-- [ ] Set `BIO_QUALITY_LAYER` in `BASE_GRID` to the correct value (`'Suitability'` or `'MNES_likely'`)
-- [ ] Verify `RENEWABLES_OPTIONS` and `AG_MANAGEMENTS` Solar/Wind flags are in sync
+- [ ] Copy `create_tasks.py` from a recent iteration; update docstring, `TASK_DIR`
+- [ ] **BASE_GRID: only list cluster params + intentional overrides** — do not copy settings.py values verbatim; everything else inherits automatically from `get_settings_df()`
+- [ ] Cross-check BASE_GRID against the "Known intentional overrides" table above; remove any key that matches its `settings.py` default
+- [ ] If renewables are ON: verify `RENEWABLES_OPTIONS` and `AG_MANAGEMENTS` Solar/Wind flags are in sync
 - [ ] Define `RUN_OVERRIDES` — one tuple per run, all override lists are single-element
 - [ ] Run `python create_tasks.py` — check console output for expected run count
 - [ ] Inspect `grid_search_parameters_unique.csv` — verify only the expected axes vary
