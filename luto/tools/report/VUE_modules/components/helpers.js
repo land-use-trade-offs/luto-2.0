@@ -86,18 +86,30 @@ window.createMapLayerLoader = function(viewName) {
     const currentLayerData = ref(null);
     const loadedComboKey   = ref(null);
 
+    async function ensureNameWarp() {
+        if (window['nameWarp'] !== undefined) return;
+        await window.loadScript('data/map_layers/nameWarp.js', 'nameWarp');
+    }
+
     async function ensureComboLayer(layerPrefix, comboValues) {
         const key = `${layerPrefix}||${comboValues.join('||')}`;
         if (loadedComboKey.value === key && currentLayerData.value) return;
 
-        const varName  = `${layerPrefix}__${comboValues.map(_safeKey).join('__')}`;
-        const filePath = `data/map_layers/${varName}.js`;
+        await ensureNameWarp();
 
-        // Release previous combo data before loading (allows GC)
+        const varName  = `${layerPrefix}__${comboValues.map(_safeKey).join('__')}`;
+        let   filename = `${varName}.js`;
+
+        // Resolve hashed filename if the combo key exceeded FILENAME_WRAP_THRESHOLD
+        const nameWarp = window['nameWarp'] ?? {};
+        const warpKey  = Object.keys(nameWarp).find(k => nameWarp[k] === filename);
+        if (warpKey) filename = warpKey;
+
+        const filePath = `data/map_layers/${filename}`;
         currentLayerData.value = null;
         await window.loadScriptWithTracking(filePath, varName, viewName);
         currentLayerData.value = window[varName] ?? null;
-        delete window[varName];   // Release global pin for GC
+        delete window[varName];
         loadedComboKey.value = key;
     }
 

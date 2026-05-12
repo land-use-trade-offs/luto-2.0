@@ -1,3 +1,76 @@
+// Linear interpolation between two [R,G,B] colours.
+function _lerpRGB(c1, c2, t) {
+    return [
+        Math.round(c1[0] + (c2[0] - c1[0]) * t),
+        Math.round(c1[1] + (c2[1] - c1[1]) * t),
+        Math.round(c1[2] + (c2[2] - c1[2]) * t),
+        255
+    ];
+}
+
+// Returns a function(pixelValue) → [R,G,B,A] (0-255) or null (transparent).
+// Float layers use the same ramp as the Python renderer and the colorbar:
+//   positive: #FFF6B0 (pale yellow) → #FD933E (orange) → #800026 (dark maroon)
+//   negative: #5D94DC (light blue)  → #104991 (mid blue) → #000E2B (dark navy)
+//   zero:     #E1E1E1 (grey, on-land cell with no value for this layer)
+//   nodata:   transparent
+function getColorFn(meta) {
+    const NODATA = -9999;
+
+    if (meta.intOrFloat === 'int') {
+        const codes = window.legend_registry?.[meta.legendKey]?.code_colors ?? {};
+        return (value) => {
+            if (value === null || value === NODATA) return null;
+            return codes[String(Math.round(value))] ?? null;
+        };
+    } else {
+        // raw_min_max: actual GeoTIFF value range for normalisation
+        // min_max:     display-scale range (colorbar labels only — divided by RESFACTOR²×121)
+        const [minVal, maxVal] = meta.raw_min_max ?? meta.min_max ?? [0, 1];
+        // Anchor colours matching the colorbar gradient in regions_map colorbarInfo
+        const POS = [[255,246,176], [253,147,62], [128,0,38]];   // yellow→orange→maroon
+        const NEG = [[93,148,220],  [16,73,145],  [0,14,43]];    // light→mid→dark blue
+
+        return (value) => {
+            if (value === null || value === NODATA) return null;
+            if (value === 0) return [225, 225, 225, 255];   // #E1E1E1
+
+            if (value > 0 && maxVal > 0) {
+                const t = Math.min(value / maxVal, 1);
+                // 3-stop ramp: t∈[0,0.5] → stops[0→1], t∈[0.5,1] → stops[1→2]
+                return t <= 0.5
+                    ? _lerpRGB(POS[0], POS[1], t * 2)
+                    : _lerpRGB(POS[1], POS[2], (t - 0.5) * 2);
+            }
+            if (value < 0 && minVal < 0) {
+                const t = Math.min(Math.abs(value) / Math.abs(minVal), 1);
+                // t=0 (near zero) → light blue, t=1 (most negative) → dark navy
+                return t <= 0.5
+                    ? _lerpRGB(NEG[0], NEG[1], t * 2)
+                    : _lerpRGB(NEG[1], NEG[2], (t - 0.5) * 2);
+            }
+            return null;
+        };
+    }
+}
+
+// Patch L.ImageOverlay to guard every method that touches this._map against the
+// remove-during-animation race:
+//   _animateZoom  — fires via 'zoomanim' RAF, reads this._map.getZoomScale
+//   _reset        — fires via 'zoomend' setTimeout(250ms), reads this._map.latLngToLayerPoint
+// After removeLayer() nulls _map, any in-flight RAF or timer still fires these
+// callbacks.  The null-guard makes removed overlays silently skip them.
+;(function() {
+    ['_animateZoom', '_reset'].forEach(function(method) {
+        const orig = L.ImageOverlay.prototype[method];
+        if (orig) {
+            L.ImageOverlay.prototype[method] = function() {
+                if (this._map) orig.apply(this, arguments);
+            };
+        }
+    });
+})();
+
 window.RegionsMap = {
   name: 'RegionsMap',
 
@@ -266,48 +339,73 @@ window.RegionsMap = {
       }
     });
 
+    let _currentRasterOverlay = null;
+
     const loadMapData = async () => {
-
-      // Always remove existing overlays first
-      map.value.eachLayer((layer) => {
-        if (layer instanceof L.ImageOverlay) {
-          map.value.removeLayer(layer);
-        }
-      });
-
-      const data = props.mapData;
-
-      if (!data.img_str || !data.bounds) {
-        // Only warn if data has content but is missing required fields (not just an empty loading guard)
-        if (Object.keys(data).length > 0) {
-          console.warn('Map data is missing required properties (img_str or bounds):', data);
-        }
-        // No overlay will be added - map shows base layer only
-        return;
+      if (_currentRasterOverlay) {
+        map.value.removeLayer(_currentRasterOverlay);
+        _currentRasterOverlay = null;
       }
 
-      // Add new image overlay only if data is valid
-      const imageOverlay = L.imageOverlay(
-        data.img_str,
-        data.bounds,
-        {
-          className: 'crisp-image'
-        }
-      ).addTo(map.value);
+      const data = props.mapData;
+      if (!data?.tif_b64 || !data?.intOrFloat) return;
 
-      // Apply CSS to disable image interpolation
-      setTimeout(() => {
-        const imgElement = imageOverlay.getElement();
-        if (imgElement) {
-          imgElement.style.imageRendering = 'pixelated';
-          imgElement.style.imageRendering = '-moz-crisp-edges';
-          imgElement.style.imageRendering = 'crisp-edges';
+      // Decode base64 → parse GeoTIFF (already EPSG:3857, no reprojection needed)
+      const bytes     = Uint8Array.from(atob(data.tif_b64), c => c.charCodeAt(0));
+      const georaster = await parseGeoraster(bytes.buffer);
+      const { width, height, values, xmin, xmax, ymin, ymax } = georaster;
+
+      // Pre-render all pixels to a canvas once — zoom/pan is then instant (static image)
+      const canvas  = document.createElement('canvas');
+      canvas.width  = width;
+      canvas.height = height;
+      const ctx       = canvas.getContext('2d');
+      const imageData = ctx.createImageData(width, height);
+      const px        = imageData.data;
+      const rawBand   = values[0];
+      const colorFn   = getColorFn(data);
+
+      // georaster returns rows as Int16Array/Float32Array (TypedArray, not plain Array)
+      // Array.isArray() misses TypedArrays — use typeof instead
+      const is2D = typeof rawBand[0] !== 'number';
+      if (is2D) {
+        for (let row = 0; row < height; row++) {
+          const rowData = rawBand[row];
+          for (let col = 0; col < width; col++) {
+            const rgba = colorFn(rowData[col]);
+            if (rgba) {
+              const j = (row * width + col) << 2;
+              px[j] = rgba[0]; px[j+1] = rgba[1]; px[j+2] = rgba[2]; px[j+3] = rgba[3];
+            }
+          }
         }
-      }, 100);
+      } else {
+        for (let i = 0; i < rawBand.length; i++) {
+          const rgba = colorFn(rawBand[i]);
+          if (rgba) {
+            const j = i << 2;
+            px[j] = rgba[0]; px[j+1] = rgba[1]; px[j+2] = rgba[2]; px[j+3] = rgba[3];
+          }
+        }
+      }
+      ctx.putImageData(imageData, 0, 0);
+
+      // Convert EPSG:3857 extent to LatLng for Leaflet imageOverlay
+      const sw = L.CRS.EPSG3857.unproject(L.point(xmin, ymin));
+      const ne = L.CRS.EPSG3857.unproject(L.point(xmax, ymax));
+
+      _currentRasterOverlay = L.imageOverlay(canvas.toDataURL(), [sw, ne])
+        .addTo(map.value);
+      const imgEl = _currentRasterOverlay.getElement();
+      if (imgEl) {
+        imgEl.style.imageRendering = 'pixelated';
+        imgEl.style.imageRendering = '-moz-crisp-edges';
+        imgEl.style.imageRendering = 'crisp-edges';
+      }
     };
 
-    Vue.watch(() => props.mapData, (newVal) => {
-      loadMapData();
+    Vue.watch(() => props.mapData, async (newVal) => {
+      await loadMapData();
     });
 
     Vue.watch(() => props.overlayGeoJSON, (geojson) => {
@@ -409,10 +507,31 @@ window.RegionsMap = {
       if (!data || data.intOrFloat !== 'int') return null;
       const legendKey = data.legendKey;
       if (!legendKey) return null;
-      const legend = window.legend_registry?.[legendKey];
+      const reg = window.legend_registry?.[legendKey];
+      if (!reg) return null;
+      const legend = reg.legend ?? reg;   // .legend sub-key (new format); fall back to flat (old)
       if (!legend || Object.keys(legend).length === 0) return null;
       return legend;
     });
+
+    const isExporting = ref(false);
+
+    async function exportLayer() {
+      if (!props.mapData?.tif_b64) return;
+      isExporting.value = true;
+      await new Promise(resolve => setTimeout(resolve, 50)); // let UI update before heavy atob
+      const bytes = Uint8Array.from(atob(props.mapData.tif_b64), c => c.charCodeAt(0));
+      const blob  = new Blob([bytes], { type: 'image/tiff' });
+      const url   = URL.createObjectURL(blob);
+      const a     = Object.assign(document.createElement('a'), {
+        href: url, download: `luto_layer_${Date.now()}.tif`
+      });
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      isExporting.value = false;
+    }
 
     return {
       selectedRegion,
@@ -423,6 +542,9 @@ window.RegionsMap = {
       handleBaseMapChange,
       colorbarInfo,
       intLegend,
+      isExporting,
+      exportLayer,
+      canExport: computed(() => !!props.mapData?.tif_b64),
     };
   },
   template: `
@@ -431,9 +553,9 @@ window.RegionsMap = {
       <!-- Map Container with Controls Overlay - Base map selector and map element -->
       <div class="bg-white shadow-lg flex-1 relative">
 
-        <!-- Base Map Selector - Dropdown to switch between map types -->
-        <div class="absolute top-[40px] left-[20px] z-50 bg-white/70 rounded-lg shadow-lg z-[9999]">
-          <div style="min-width: 150px;">
+        <!-- Base Map Selector + Export button row -->
+        <div class="absolute top-[40px] left-[20px] z-[9999] flex items-center gap-2">
+          <div class="bg-white/70 rounded-lg shadow-lg" style="min-width: 150px;">
             <filterable-dropdown
               :use-search="false"
               :items="baseMapOptions"
@@ -442,6 +564,29 @@ window.RegionsMap = {
               @change="handleBaseMapChange"
             />
           </div>
+
+          <!-- Export GeoTIFF button -->
+          <button
+            @click="exportLayer"
+            :disabled="!canExport || isExporting"
+            class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg shadow-lg text-[0.72rem] font-medium transition-all select-none"
+            :class="canExport && !isExporting
+              ? 'bg-sky-500 text-white hover:bg-sky-600 cursor-pointer'
+              : 'bg-white/70 text-gray-400 cursor-not-allowed'">
+            <span v-if="isExporting" class="flex items-center gap-1.5">
+              <svg class="animate-spin h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+              </svg>
+              Downloading…
+            </span>
+            <span v-else class="flex items-center gap-1">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0 0l-4-4m4 4l4-4"/>
+              </svg>
+              Export GeoTIFF
+            </span>
+          </button>
         </div>
 
         <!-- Map Container - Leaflet map will be initialized here -->

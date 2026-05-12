@@ -19,12 +19,8 @@
 
 import os
 import re
-import base64
 import numpy as np
 import pandas as pd
-
-from io import BytesIO
-from PIL import Image
 
 from luto import settings
 from luto.tools.report.data_tools.parameters import RENAME_AM_NON_AG
@@ -133,15 +129,6 @@ def get_all_files(data_root):
     
 
     return file_paths
-
-
-def array_to_base64(arr_4band: np.ndarray) -> dict:
-    image = Image.fromarray(arr_4band, 'RGBA')
-    buffered = BytesIO()
-    image.save(buffered, format="PNG")
-    img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
-    
-    return {'img_str': 'data:image/png;base64,' + img_str}
 
 
 def tuple_dict_to_nested(flat_dict):
