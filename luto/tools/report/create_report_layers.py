@@ -146,7 +146,7 @@ def map2geotiff(
     hierarchy_tp: tuple,
     layer_magnitude,           # (global_min, global_max) for float layers; None for int
     legend_key: str | None,
-    real_area_1d: np.ndarray | None = None,  # 1D float32[cell] — actual ha per cell
+    real_area_1d: np.ndarray,               # 1D float32[cell] — actual ha per cell
 ) -> tuple:
     """Convert a 1D cell array to GeoTIFF bytes in EPSG:3857.
 
@@ -168,9 +168,8 @@ def map2geotiff(
         src_f[~np.isfinite(src_f)] = nodata_val
         arr_2d[valid] = src_f.astype(np.int16)
     else:
-        if real_area_1d is not None:
-            cell_area = real_area_1d[index_merc[valid]]
-            src_vals = src_vals / np.where(cell_area > 0, cell_area, np.nan)
+        cell_area = real_area_1d[index_merc[valid]]
+        src_vals = src_vals / np.where(cell_area > 0, cell_area, np.nan)
         arr_2d[valid] = src_vals
 
     meta = {**geo_meta_merc, 'dtype': dtype}
@@ -183,22 +182,20 @@ def map2geotiff(
         attrs: dict = {'intOrFloat': 'int', 'legendKey': legend_key}
     else:
         global_min, global_max = layer_magnitude
-        if real_area_1d is not None:
-            # Divide the global raw range by the mean cell area to get per-ha bounds.
-            # Both raw_min_max and min_max are the same — stored values are already per-ha.
-            mean_area = float(np.nanmean(real_area_1d))
-            per_ha_min = round(global_min / mean_area, 4)
-            per_ha_max = round(global_max / mean_area, 4)
-            attrs = {'intOrFloat': 'float',
-                     'min_max':     [per_ha_min, per_ha_max],
-                     'raw_min_max': [per_ha_min, per_ha_max]}
-        else:
-            min_max = (
-                round(global_min / settings.RESFACTOR ** 2 / 121, 2),
-                round(global_max / settings.RESFACTOR ** 2 / 121, 2),
-            )
-            attrs = {'intOrFloat': 'float', 'min_max': list(min_max),
-                     'raw_min_max': [global_min, global_max]}
+        # min_max: colorbar labels — use RF²×121 (≈ max cell area) so bounded
+        # layers display ≤1 and the legend matches prior behaviour.
+        min_max = (
+            round(global_min / settings.RESFACTOR ** 2 / 121, 2),
+            round(global_max / settings.RESFACTOR ** 2 / 121, 2),
+        )
+        # raw_min_max: pixel normalisation — use mean real area to match the
+        # per-ha values actually stored in the GeoTIFF (raw / cell_real_area).
+        mean_area = float(np.nanmean(real_area_1d))
+        per_ha_min = round(global_min / mean_area, 4)
+        per_ha_max = round(global_max / mean_area, 4)
+        attrs = {'intOrFloat': 'float',
+                 'min_max':     list(min_max),
+                 'raw_min_max': [per_ha_min, per_ha_max]}
 
     return hierarchy_tp, tif_bytes, attrs
     
@@ -318,7 +315,7 @@ def get_map2json(
                 arr_sel = xr.DataArray(vals, dims=('cell',), coords=is_selected_coords)
                 tasks.append(delayed(map2geotiff)(
                     index_merc, geo_meta_merc, arr_sel, isInt, hierarchy_tp, layer_magnitude, legend_key,
-                    None if isInt else real_area_1d,
+                    real_area_1d,
                 ))
 
             for hierarchy_tp, tif_bytes, attrs in Parallel(

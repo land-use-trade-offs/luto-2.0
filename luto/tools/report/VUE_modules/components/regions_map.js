@@ -54,22 +54,125 @@ function getColorFn(meta) {
     }
 }
 
-// Patch L.ImageOverlay to guard every method that touches this._map against the
-// remove-during-animation race:
-//   _animateZoom  — fires via 'zoomanim' RAF, reads this._map.getZoomScale
-//   _reset        — fires via 'zoomend' setTimeout(250ms), reads this._map.latLngToLayerPoint
-// After removeLayer() nulls _map, any in-flight RAF or timer still fires these
-// callbacks.  The null-guard makes removed overlays silently skip them.
+// Patch Leaflet overlay/grid classes to guard _animateZoom and _reset against
+// the remove-during-animation race.  After removeLayer() nulls this._map,
+// in-flight RAFs and setTimeout callbacks still fire — the null-guard makes
+// them no-ops.  Covers: ImageOverlay, DivOverlay (Popup/Tooltip), GridLayer.
 ;(function() {
-    ['_animateZoom', '_reset'].forEach(function(method) {
-        const orig = L.ImageOverlay.prototype[method];
-        if (orig) {
-            L.ImageOverlay.prototype[method] = function() {
-                if (this._map) orig.apply(this, arguments);
-            };
-        }
+    // Patch every class whose prototype defines one of these methods, including
+    // subclasses that override the parent's implementation (e.g. Tooltip / Popup
+    // override DivOverlay._animateZoom; Marker overrides Layer; SVG / Canvas
+    // override Renderer). Patching a parent does NOT cover overridden methods
+    // on subclasses, so we walk the class list explicitly.
+    const classes = [
+        L.ImageOverlay, L.DivOverlay, L.Popup, L.Tooltip,
+        L.GridLayer, L.TileLayer,
+        L.Marker, L.Path, L.Polyline, L.Polygon, L.Circle, L.CircleMarker,
+        L.Renderer, L.SVG, L.Canvas,
+    ].filter(Boolean);
+    const methods = ['_animateZoom', '_reset', '_updateTransform', '_update', '_updatePath'];
+    classes.forEach(function(cls) {
+        methods.forEach(function(method) {
+            if (!Object.prototype.hasOwnProperty.call(cls.prototype, method)) return;
+            const orig = cls.prototype[method];
+            cls.prototype[method] = function() { if (this._map) return orig.apply(this, arguments); };
+        });
     });
 })();
+
+// Write a minimal Classic TIFF (Little-Endian) with correct raw-byte handling
+// for multi-byte sample types (Int16 / Float32). The bundled geotiff.js
+// writeArrayBuffer is broken for non-uint8 data — it does element-wise
+// new Uint8Array(typedArray) conversion (1 byte per element) instead of reading
+// the raw buffer, producing 4× horizontal tiling for Float32 and 2× for Int16.
+function buildGeoTiff({ width, height, bitsPerSample, sampleFormat,
+                        westLng, northLat, lngPerPx, latPerPx, rawData, nodata }) {
+    const LE = true;
+    // Layout: header(8) | image(W×H×BPS/8) | mpScale(24) | tiepoint(48) | geoKeys(32) | nodataStr | IFD
+    const imageOffset    = 8;
+    const imageByteCount = rawData.byteLength;
+    const mpScaleOffset  = imageOffset    + imageByteCount;
+    const tieOffset      = mpScaleOffset  + 24;   // 3 × float64
+    const geoKeyOffset   = tieOffset      + 48;   // 6 × float64
+    const nodataStr      = `${nodata}\0`;
+    const nodataOffset   = geoKeyOffset   + 32;   // 16 × uint16
+    const ifdOffset      = nodataOffset   + nodataStr.length;
+
+    // IFD entries sorted by tag number (TIFF spec requirement)
+    // Inline rule: count × typeSize ≤ 4 → value stored inline, else offset.
+    // Types: 2=ASCII(1B), 3=SHORT(2B), 4=LONG(4B), 12=DOUBLE(8B)
+    const tags = [
+        { tag: 256,   type: 4,  count: 1,                  inline: width },
+        { tag: 257,   type: 4,  count: 1,                  inline: height },
+        { tag: 258,   type: 3,  count: 1,                  inline: bitsPerSample },
+        { tag: 259,   type: 3,  count: 1,                  inline: 1 },              // no compression
+        { tag: 262,   type: 3,  count: 1,                  inline: 1 },              // BlackIsZero
+        { tag: 273,   type: 4,  count: 1,                  inline: imageOffset },    // StripOffsets
+        { tag: 277,   type: 3,  count: 1,                  inline: 1 },              // SamplesPerPixel
+        { tag: 278,   type: 4,  count: 1,                  inline: height },         // RowsPerStrip
+        { tag: 279,   type: 4,  count: 1,                  inline: imageByteCount }, // StripByteCounts
+        { tag: 284,   type: 3,  count: 1,                  inline: 1 },              // PlanarConfiguration
+        { tag: 339,   type: 3,  count: 1,                  inline: sampleFormat },   // SampleFormat
+        { tag: 33550, type: 12, count: 3,                  offset: mpScaleOffset },  // ModelPixelScale
+        { tag: 33922, type: 12, count: 6,                  offset: tieOffset },      // ModelTiepoint
+        { tag: 34735, type: 3,  count: 16,                 offset: geoKeyOffset },   // GeoKeyDirectory
+        { tag: 42113, type: 2,  count: nodataStr.length,   offset: nodataOffset },   // GDAL_NODATA
+    ];
+
+    const buf  = new ArrayBuffer(ifdOffset + 2 + tags.length * 12 + 4);
+    const view = new DataView(buf);
+
+    // TIFF header: 'II' + magic 42 + IFD offset
+    view.setUint8(0, 0x49); view.setUint8(1, 0x49);
+    view.setUint16(2, 42, LE);
+    view.setUint32(4, ifdOffset, LE);
+
+    // Image data — raw bytes preserve full precision for Int16 / Float32
+    new Uint8Array(buf, imageOffset, imageByteCount).set(rawData);
+
+    // ModelPixelScale: [lngPerPx, latPerPx, 0]
+    view.setFloat64(mpScaleOffset,      lngPerPx, LE);
+    view.setFloat64(mpScaleOffset +  8, latPerPx, LE);
+    view.setFloat64(mpScaleOffset + 16, 0,        LE);
+
+    // ModelTiepoint: [i=0, j=0, k=0, x=westLng, y=northLat, z=0]
+    view.setFloat64(tieOffset,      0,        LE);
+    view.setFloat64(tieOffset +  8, 0,        LE);
+    view.setFloat64(tieOffset + 16, 0,        LE);
+    view.setFloat64(tieOffset + 24, westLng,  LE);
+    view.setFloat64(tieOffset + 32, northLat, LE);
+    view.setFloat64(tieOffset + 40, 0,        LE);
+
+    // GeoKeyDirectory: GTModelType=2 (Geographic), GTRasterType=1 (PixelIsArea), GeographicType=4283 (GDA94)
+    new Uint16Array(buf, geoKeyOffset, 16).set([
+        1, 1, 0, 3,
+        1024, 0, 1, 2,
+        1025, 0, 1, 1,
+        2048, 0, 1, 4283,
+    ]);
+
+    // GDAL_NODATA ASCII string
+    const ndArr = new Uint8Array(buf, nodataOffset, nodataStr.length);
+    for (let i = 0; i < nodataStr.length; i++) ndArr[i] = nodataStr.charCodeAt(i);
+
+    // IFD
+    let p = ifdOffset;
+    view.setUint16(p, tags.length, LE); p += 2;
+    for (const { tag, type, count, inline, offset } of tags) {
+        view.setUint16(p, tag,   LE); p += 2;
+        view.setUint16(p, type,  LE); p += 2;
+        view.setUint32(p, count, LE); p += 4;
+        if (inline !== undefined) {
+            if (type === 3) { view.setUint16(p, inline, LE); view.setUint16(p + 2, 0, LE); }
+            else            { view.setUint32(p, inline, LE); }
+        } else {
+            view.setUint32(p, offset, LE);
+        }
+        p += 4;
+    }
+    view.setUint32(p, 0, LE); // next IFD = none
+    return buf;
+}
 
 window.RegionsMap = {
   name: 'RegionsMap',
@@ -168,6 +271,59 @@ window.RegionsMap = {
         globalMapViewpoint.value.zoom = map.value.getZoom();
       });
 
+      // Close any open popup before zoom animation starts — prevents the
+      // null-_map race where Popup._animateZoom fires after removeLayer().
+      map.value.on('zoomstart', () => map.value.closePopup());
+
+      // Zoom state machine: track animation in-flight and flush deferred layer swaps
+      // once the animation completes.  Raster layer remove/add during zoom causes
+      // _animateZoom to fire on a null-_map layer — deferring eliminates the race.
+      map.value.on('zoomanim', () => { _isZoomAnimating = true; });
+      map.value.on('zoomend',  () => {
+        _isZoomAnimating = false;
+        if (_pendingLayerSwap) {
+          const fn = _pendingLayerSwap;
+          _pendingLayerSwap = null;
+          fn();
+        }
+      });
+
+      // Click-to-inspect: show raw cell value at clicked location
+      map.value.on('click', (e) => {
+        if (!_currentRasterInfo) return;
+        const { rawBand, is2D, xmin, xmax, ymin, ymax, width, height, data } = _currentRasterInfo;
+
+        // Convert click lat/lng → EPSG:3857 metres → pixel col/row
+        const pt  = L.CRS.EPSG3857.project(e.latlng);
+        const col = Math.round((pt.x - xmin) / (xmax - xmin) * (width  - 1));
+        const row = Math.round((ymax - pt.y)  / (ymax - ymin) * (height - 1));
+
+        if (col < 0 || col >= width || row < 0 || row >= height) return;
+
+        const raw = is2D ? rawBand[row][col] : rawBand[row * width + col];
+        const NODATA = -9999;
+
+        let content;
+        if (raw === null || raw === NODATA) {
+          content = '<span style="color:#888">No data</span>';
+        } else if (data.intOrFloat === 'int') {
+          const label = window.legend_registry?.[data.legendKey]?.legend?.[Math.round(raw)];
+          content = label
+            ? `<b>${label}</b><br><span style="color:#888">code ${Math.round(raw)}</span>`
+            : `<b>${Math.round(raw)}</b>`;
+        } else {
+          const fmt = v => Math.abs(v) >= 1e4 ? v.toExponential(3)
+                         : Math.abs(v) >= 1    ? v.toPrecision(5)
+                         :                       v.toPrecision(4);
+          content = `<b>${fmt(raw)}</b>`;
+        }
+
+        L.popup({ closeButton: true, className: 'luto-value-popup' })
+          .setLatLng(e.latlng)
+          .setContent(content)
+          .openOn(map.value);
+      });
+
       // Create tile layers but don't add them yet
       tileLayers.value = {
         OSM: L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
@@ -202,16 +358,29 @@ window.RegionsMap = {
       // Update the last selected region
       globalMapViewpoint.value.lastSelectedRegion = selectedRegion.value;
 
+      // Cancel any pending region timeout from a previous rapid call
+      if (_pendingRegionTimeout !== null) {
+        clearTimeout(_pendingRegionTimeout);
+        _pendingRegionTimeout = null;
+      }
+      const mySeq = ++_updateSeq;
+
+      // Snapshot region now — selectedRegion.value may change before the callbacks fire
+      const regionSnapshot = selectedRegion.value;
+
       // Fade out existing elements first
       fadeOutExistingElements().then(() => {
+        if (mySeq !== _updateSeq) return;   // superseded by a newer updateMap call
+
         // Remove existing rectangles after fade out
         if (boundingBox.value) {
           map.value.removeLayer(boundingBox.value);
+          boundingBox.value = null;
         }
 
         // Calculate bounds for smooth transition
         const centroidBbox = props.regionType === 'STATE' ? window.AUS_STATE_centroid_bbox : window.NRM_AUS_centroid_bbox;
-        const bbox = centroidBbox?.[selectedRegion.value]?.bounding_box;
+        const bbox = centroidBbox?.[regionSnapshot]?.bounding_box;
         if (!bbox) return;
         const bounds = [
           [bbox[1], bbox[0]], // Southwest corner
@@ -226,7 +395,9 @@ window.RegionsMap = {
         });
 
         // Add new elements with a delay to allow map transition
-        setTimeout(() => {
+        _pendingRegionTimeout = setTimeout(() => {
+          _pendingRegionTimeout = null;
+          if (mySeq !== _updateSeq) return;   // superseded while waiting
           addRegionLayer();
         }, 500);
       });
@@ -254,9 +425,9 @@ window.RegionsMap = {
     };
 
     // Add new elements to the map
-    const addRegionLayer = () => {
+    const addRegionLayer = (region = selectedRegion.value) => {
       // Skip adding region overlay for AUSTRALIA
-      if (selectedRegion.value === 'AUSTRALIA') {
+      if (region === 'AUSTRALIA') {
         return;
       }
 
@@ -264,7 +435,7 @@ window.RegionsMap = {
       const geoJsonData = props.regionType === 'STATE' ? window.AUS_STATE : window.NRM_AUS;
       const regionProp = props.regionType === 'STATE' ? 'STATE_NAME' : 'NRM_REGION';
       const regionLayer = geoJsonData?.features.find(feature =>
-        feature.properties[regionProp] === selectedRegion.value
+        feature.properties[regionProp] === region
       );
 
       // Add the actual region polygon with initial opacity 0
@@ -344,7 +515,12 @@ window.RegionsMap = {
     });
 
     let _currentRasterOverlay = null;
+    let _currentRasterInfo   = null;  // { rawBand, is2D, xmin, xmax, ymin, ymax, width, height, data }
     let _loadSeq = 0;
+    let _updateSeq = 0;          // guards updateMap against rapid region changes
+    let _pendingRegionTimeout = null;
+    let _isZoomAnimating = false;  // true while Leaflet zoom animation is in flight
+    let _pendingLayerSwap = null;  // deferred raster swap queued during zoom animation
 
     const loadMapData = async () => {
       const mySeq = ++_loadSeq;
@@ -355,6 +531,7 @@ window.RegionsMap = {
           map.value.removeLayer(_currentRasterOverlay);
           _currentRasterOverlay = null;
         }
+        _currentRasterInfo = null;
         return;
       }
 
@@ -366,6 +543,9 @@ window.RegionsMap = {
       if (mySeq !== _loadSeq) return;
 
       const { width, height, values, xmin, xmax, ymin, ymax } = georaster;
+      const rawBand = values[0];
+      const is2D    = typeof rawBand[0] !== 'number';
+      _currentRasterInfo = { rawBand, is2D, xmin, xmax, ymin, ymax, width, height, data };
 
       // Pre-render all pixels to a canvas once — zoom/pan is then instant (static image)
       const canvas  = document.createElement('canvas');
@@ -374,12 +554,7 @@ window.RegionsMap = {
       const ctx       = canvas.getContext('2d');
       const imageData = ctx.createImageData(width, height);
       const px        = imageData.data;
-      const rawBand   = values[0];
       const colorFn   = getColorFn(data);
-
-      // georaster returns rows as Int16Array/Float32Array (TypedArray, not plain Array)
-      // Array.isArray() misses TypedArrays — use typeof instead
-      const is2D = typeof rawBand[0] !== 'number';
       if (is2D) {
         for (let row = 0; row < height; row++) {
           const rowData = rawBand[row];
@@ -409,20 +584,30 @@ window.RegionsMap = {
       const sw = L.CRS.EPSG3857.unproject(L.point(xmin, ymin));
       const ne = L.CRS.EPSG3857.unproject(L.point(xmax, ymax));
 
-      // Build the new overlay before removing the old one — eliminates blank-map flash
+      // Build the new overlay before swapping — eliminates blank-map flash
       const newOverlay = L.imageOverlay(canvas.toDataURL(), [sw, ne]);
 
-      // Atomic swap: old layer out, new layer in with no visible gap
-      if (_currentRasterOverlay) {
-        map.value.removeLayer(_currentRasterOverlay);
-      }
-      _currentRasterOverlay = newOverlay.addTo(map.value);
+      // Defer the actual layer swap if a Leaflet zoom animation is in flight.
+      // Removing a layer mid-animation leaves _animateZoom firing on a null-_map
+      // layer, causing the "Cannot read properties of null" crash.
+      const applySwap = () => {
+        if (_currentRasterOverlay) {
+          map.value.removeLayer(_currentRasterOverlay);
+        }
+        _currentRasterOverlay = newOverlay.addTo(map.value);
+        const imgEl = _currentRasterOverlay.getElement();
+        if (imgEl) {
+          imgEl.style.imageRendering = 'pixelated';
+          imgEl.style.imageRendering = '-moz-crisp-edges';
+          imgEl.style.imageRendering = 'crisp-edges';
+        }
+      };
 
-      const imgEl = _currentRasterOverlay.getElement();
-      if (imgEl) {
-        imgEl.style.imageRendering = 'pixelated';
-        imgEl.style.imageRendering = '-moz-crisp-edges';
-        imgEl.style.imageRendering = 'crisp-edges';
+      if (_isZoomAnimating) {
+        // Queue swap for after zoom ends; capture mySeq so a stale deferred call is dropped.
+        _pendingLayerSwap = () => { if (mySeq === _loadSeq) applySwap(); };
+      } else {
+        applySwap();
       }
     };
 
@@ -544,7 +729,7 @@ window.RegionsMap = {
       await new Promise(resolve => setTimeout(resolve, 50)); // let UI update before heavy work
 
       try {
-        const data = props.mapData;
+        const data      = props.mapData;
         const bytes     = Uint8Array.from(atob(data.tif_b64), c => c.charCodeAt(0));
         const georaster = await parseGeoraster(bytes.buffer);
         const { width, height, values, xmin, xmax, ymin, ymax, noDataValue } = georaster;
@@ -552,90 +737,73 @@ window.RegionsMap = {
         const rawBand = values[0];
         const is2D    = typeof rawBand[0] !== 'number';
 
-        // -----------------------------------------------------------------
-        // Reproject EPSG:3857 → GDA94 (EPSG:4283) using Mercator formulas.
-        // GDA94 ≈ WGS84 to < 1 m — no datum shift required at LUTO resolution.
-        //
-        // EPSG:3857 x → lng (°):  x / R * (180/π)
-        // EPSG:3857 y → lat (°):  (2·atan(exp(y/R)) - π/2) * (180/π)
-        // GDA94   lat → y_merc :  R · ln(tan(π/4 + lat_rad/2))   (forward Mercator)
-        // -----------------------------------------------------------------
-        const R       = 6378137;
-        const DEG2RAD = Math.PI / 180;
+        // EPSG:3857 ↔ GDA94 (EPSG:4283) share the same ellipsoid — no datum shift.
+        // Inverse Mercator: metres → degrees
+        const R          = 6378137;
+        const RAD        = Math.PI / 180;
+        const merc2lng   = x => x / R / RAD;
+        const merc2lat   = y => (2 * Math.atan(Math.exp(y / R)) - Math.PI / 2) / RAD;
+        // Forward Mercator: degrees → metres
+        const lng2merc   = lng => lng * RAD * R;
+        const lat2merc   = lat => R * Math.log(Math.tan(Math.PI / 4 + lat * RAD / 2));
 
-        const westLng  = xmin / R / DEG2RAD;
-        const eastLng  = xmax / R / DEG2RAD;
-        const southLat = (2 * Math.atan(Math.exp(ymin / R)) - Math.PI / 2) / DEG2RAD;
-        const northLat = (2 * Math.atan(Math.exp(ymax / R)) - Math.PI / 2) / DEG2RAD;
+        // Output grid corners in GDA94 degrees
+        const westLng  = merc2lng(xmin);
+        const eastLng  = merc2lng(xmax);
+        const southLat = merc2lat(ymin);
+        const northLat = merc2lat(ymax);
+        const lngPerPx = (eastLng - westLng)   / width;
+        const latPerPx = (northLat - southLat)  / height;
 
-        const outWidth  = width;
-        const outHeight = height;
-        const lngPerPx  = (eastLng  - westLng)  / outWidth;
-        const latPerPx  = (northLat - southLat)  / outHeight;
-
-        // Precompute fractional source-column index for each output column (O(w) proj4 calls avoided)
-        const srcXfrac = new Float64Array(outWidth);
-        for (let col = 0; col < outWidth; col++) {
-          const lng   = westLng + (col + 0.5) * lngPerPx;
-          const xMerc = lng * DEG2RAD * R;
+        // Precompute source column for each output column — O(w) forward-Mercator calls
+        const srcXfrac = new Float64Array(width);
+        for (let col = 0; col < width; col++) {
+          const xMerc   = lng2merc(westLng + (col + 0.5) * lngPerPx);
           srcXfrac[col] = (xMerc - xmin) / (xmax - xmin) * (width - 1);
         }
 
-        // Precompute source row index for each output row (O(h) instead of O(w·h))
-        const srcYrow = new Int32Array(outHeight);
-        for (let row = 0; row < outHeight; row++) {
-          const lat   = northLat - (row + 0.5) * latPerPx;
-          const yMerc = R * Math.log(Math.tan(Math.PI / 4 + lat * DEG2RAD / 2));
-          srcYrow[row] = Math.round((ymax - yMerc) / (ymax - ymin) * (height - 1));
+        // Precompute source row for each output row — O(h) forward-Mercator calls
+        const srcYrow = new Int32Array(height);
+        for (let row = 0; row < height; row++) {
+          const yMerc   = lat2merc(northLat - (row + 0.5) * latPerPx);
+          srcYrow[row]  = Math.round((ymax - yMerc) / (ymax - ymin) * (height - 1));
         }
 
-        // Nearest-neighbour resample into GDA94 output grid
+        // Nearest-neighbour resample into the GDA94 output grid
         const NODATA  = -9999;
         const isInt   = data.intOrFloat === 'int';
         const outData = isInt
-          ? new Int16Array(outWidth * outHeight).fill(NODATA)
-          : new Float32Array(outWidth * outHeight).fill(NODATA);
+          ? new Int16Array(width * height).fill(NODATA)
+          : new Float32Array(width * height).fill(NODATA);
 
-        for (let row = 0; row < outHeight; row++) {
+        for (let row = 0; row < height; row++) {
           const srcRow = srcYrow[row];
           if (srcRow < 0 || srcRow >= height) continue;
-          for (let col = 0; col < outWidth; col++) {
+          for (let col = 0; col < width; col++) {
             const srcCol = Math.round(srcXfrac[col]);
             if (srcCol < 0 || srcCol >= width) continue;
             const val = is2D ? rawBand[srcRow][srcCol] : rawBand[srcRow * width + srcCol];
-            if (val !== null && val !== NODATA && val !== noDataValue) {
-              outData[row * outWidth + col] = val;
-            }
+            if (val !== null && val !== NODATA && val !== noDataValue)
+              outData[row * width + col] = val;
           }
         }
 
-        // Write GeoTIFF with GDA94 (EPSG:4283) georeferencing.
-        // GeoTIFF.writeArrayBuffer is exposed by geotiff.browser.bundle.min.js.
-        // Pass the flat TypedArray directly (not wrapped in an array) so the
-        // function takes the "number" branch and reads width/height from metadata.
-        const ab = GeoTIFF.writeArrayBuffer(outData, {
-          width:                outWidth,
-          height:               outHeight,
-          SamplesPerPixel:      [1],
-          BitsPerSample:        [isInt ? 16 : 32],
-          SampleFormat:         [isInt ? 2  : 3],  // 2=signed int, 3=IEEE float
-          ModelPixelScale:      [lngPerPx, latPerPx, 0],
-          ModelTiepoint:        [0, 0, 0, westLng, northLat, 0],
-          GeographicTypeGeoKey: 4283,              // GDA94
-          GeogCitationGeoKey:   'GCS_GDA_1994',
-          GTModelTypeGeoKey:    2,                 // Geographic
-          GTRasterTypeGeoKey:   1,                 // PixelIsArea
+        const buf = buildGeoTiff({
+          width, height,
+          bitsPerSample: isInt ? 16 : 32,
+          sampleFormat:  isInt ? 2  : 3,   // 2=signed int, 3=IEEE float
+          westLng, northLat, lngPerPx, latPerPx,
+          rawData: new Uint8Array(outData.buffer, outData.byteOffset, outData.byteLength),
+          nodata: NODATA,
         });
 
-        const buf  = ab instanceof ArrayBuffer ? ab : await ab;
         const blob = new Blob([buf], { type: 'image/tiff' });
         const url  = URL.createObjectURL(blob);
+        const n    = props.fileName || 'luto_layer_gda94';
         const a    = Object.assign(document.createElement('a'), {
-          href: url, download: (() => { const n = props.fileName || 'luto_layer_gda94'; return (n.length > 100 ? n.slice(0, 97) + '...' : n) + '.tif'; })()
+          href: url, download: (n.length > 100 ? n.slice(0, 97) + '...' : n) + '.tif'
         });
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
         URL.revokeObjectURL(url);
       } finally {
         isExporting.value = false;
