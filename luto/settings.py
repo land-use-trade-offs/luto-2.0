@@ -162,6 +162,20 @@ SOLVER_WEIGHT_DEMAND = 1
 SOLVER_WEIGHT_GHG = 1
 SOLVER_WEIGHT_WATER = 1
 
+DEMAND_CONSTRAINT_TYPE = 'soft'   # 'soft': penalise under-production in objective (current behaviour)
+# DEMAND_CONSTRAINT_TYPE = 'hard'  # 'hard': enforce production >= demand (lower bound = 1.0x) and
+#                                  #         production <= DEMAND_UPPER_BOUND (upper bound per commodity)
+
+# Upper bound multipliers applied only when DEMAND_CONSTRAINT_TYPE == 'hard'.
+# Keys must match entries in data.COMMODITIES (lowercase). '__default__' applies to all others.
+DEMAND_UPPER_BOUND = {
+    'sheep meat':         1.15,
+    'sheep lexp':         1.10,
+    'sheep wool':         1.05,
+    'beef lexp':          1.05,
+    '__default__':        1.01,
+}
+
 RESCALE_FACTOR = 1e3
 '''
 All input data before feeding into the solver is rescaled in the range between 0 and this factor.

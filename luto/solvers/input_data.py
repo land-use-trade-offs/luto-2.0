@@ -114,6 +114,8 @@ class SolverInputData:
     base_yr_prod: dict[str, tuple]                                      # Base year production of each commodity.
     scale_factors: dict[float]                                          # Scale factors for each input layer.
 
+    commodity_names: list[str]                                          # Commodity names ordered by commodity index (matches pr2cm_cp rows).
+
     economic_contr_mrj: float                                           # base year economic contribution matrix.
     economic_prices: np.ndarray                                         # base year commodity prices.
     economic_target_yr_carbon_price: float                              # target year carbon price.
@@ -1214,7 +1216,8 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
 
         base_yr_prod,
         scale_factors,
-        
+        data.COMMODITIES,
+
         economic_contr_mrj,
         economic_prices,
         economic_target_yr_carbon_price,
