@@ -1,4 +1,5 @@
 window.HomeView = {
+  name: 'HomeView',
 
   setup() {
 
@@ -12,6 +13,22 @@ window.HomeView = {
     // Global variables
     const selectRegion = inject('globalSelectedRegion');
     const ChartData = ref({});
+
+    // Species selection state (for GBF3/4/8 charts that have region → species → [series] structure)
+    const selectSpecies = ref('');
+    const availableSpecies = computed(() => {
+      if (!dataLoaded.value) return [];
+      const data = ChartData.value?.[selectChartCategory.value]?.[selectChartSubCategory.value]?.[selectRegion.value];
+      if (!data || Array.isArray(data)) return [];
+      return Object.keys(data);
+    });
+    const hasSpeciesData = computed(() => availableSpecies.value.length > 0);
+
+    // Transition heatmap state
+    const transitionData = ref(null);
+    const transitionFromWater = ref('ALL');
+    const transitionToWater = ref('ALL');
+    const WATER_OPTIONS = ['ALL', 'Dryland', 'Irrigated'];
     const rankingData = ref({});
     const rankingColors = ref({});
     const runScenario = ref({});
@@ -30,10 +47,11 @@ window.HomeView = {
       'Production': 'Tonnes or KL',
     };
     const RankSubcategoriesRename = {
-      'Agricultural Landuse': 'Ag',
+      'Agricultural Land-use': 'Ag',
       'Agricultural Management': 'Ag Mgt',
       'Non-Agricultural Land-use': 'Non-Ag',
     };
+    const rankSubcategoryOrder = ['Agricultural Land-use', 'Agricultural Management', 'Non-Agricultural Land-use'];
     const availableRankSubcategories = ref([]);
 
     // Default selections
@@ -43,11 +61,34 @@ window.HomeView = {
     const selectChartSubCategory = ref('');
     const selectRankingSubCategory = ref('');
 
+    // Computed leaf for the transition heatmap
+    const transitionHeatmapLeaf = computed(() => {
+      if (!transitionData.value) return null;
+      const region = selectRegion.value || 'AUSTRALIA';
+      // Fall back to AUSTRALIA if the region doesn't exist in the data
+      const regionData = transitionData.value[region] || transitionData.value['AUSTRALIA'];
+      if (!regionData) return null;
+      const fromData = regionData[transitionFromWater.value];
+      if (!fromData) return null;
+      return fromData[transitionToWater.value] || null;
+    });
+
+    const transitionFormattedMax = computed(() => {
+      const v = transitionHeatmapLeaf.value?.max_val;
+      if (!v && v !== 0) return '0';
+      return v >= 1e6 ? (v / 1e6).toFixed(1) + 'M'
+        : v >= 1e3 ? (v / 1e3).toFixed(0) + 'k'
+          : String(Math.round(v));
+    });
+
     //  Reactive data
     const selectChartData = computed(() => {
-
       let seriesData, yAxisTitle = null;
-      const originalData = ChartData.value?.[selectChartCategory.value]?.[selectChartSubCategory.value]?.[selectRegion.value] || [];
+      let originalData = ChartData.value?.[selectChartCategory.value]?.[selectChartSubCategory.value]?.[selectRegion.value] || [];
+      // If species-level data (region → species → [series]), pick the selected species
+      if (hasSpeciesData.value && selectSpecies.value) {
+        originalData = originalData[selectSpecies.value] || [];
+      }
       seriesData = JSON.parse(JSON.stringify(originalData));
 
       if (selectChartSubCategory.value === 'Off-target achievement') {
@@ -63,6 +104,7 @@ window.HomeView = {
         chart: {
           height: 440,
         },
+        legend: { ...window['Chart_default_options'].legend },
         yAxis: {
           title: {
             text: yAxisTitle || availableUnit[selectChartCategory.value]
@@ -76,22 +118,22 @@ window.HomeView = {
 
     const selectRanking = computed(() => {
       return {
-        economicTotal: rankingData.value['Economics']?.[selectRegion.value]?.['Total']?.['value']?.[selectYear.value] || 'N/A',
+        economicTotal: rankingData.value['Economics']?.[selectRegion.value]?.['Profit']?.['value']?.[selectYear.value] || 'N/A',
         economicCost: rankingData.value['Economics']?.[selectRegion.value]?.['Cost']?.['value']?.[selectYear.value] || 'N/A',
         economicRevenue: rankingData.value['Economics']?.[selectRegion.value]?.['Revenue']?.['value']?.[selectYear.value] || 'N/A',
         areaTotal: rankingData.value['Area']?.[selectRegion.value]?.['Total']?.['value']?.[selectYear.value] || 'N/A',
-        areaAgLand: rankingData.value['Area']?.[selectRegion.value]?.['Agricultural Landuse']?.['value']?.[selectYear.value] || 'N/A',
+        areaAgLand: rankingData.value['Area']?.[selectRegion.value]?.['Agricultural Land-use']?.['value']?.[selectYear.value] || 'N/A',
         areaAgMgt: rankingData.value['Area']?.[selectRegion.value]?.['Agricultural Management']?.['value']?.[selectYear.value] || 'N/A',
         areaNonAg: rankingData.value['Area']?.[selectRegion.value]?.['Non-Agricultural Land-use']?.['value']?.[selectYear.value] || 'N/A',
         ghgTotal: rankingData.value['GHG']?.[selectRegion.value]?.['Total']?.['value']?.[selectYear.value] || 'N/A',
         ghgEmissions: rankingData.value['GHG']?.[selectRegion.value]?.['GHG emissions']?.['value']?.[selectYear.value] || 'N/A',
         ghgReduction: rankingData.value['GHG']?.[selectRegion.value]?.['GHG sequestrations']?.['value']?.[selectYear.value] || 'N/A',
         waterTotal: rankingData.value['Water']?.[selectRegion.value]?.['Total']?.['value']?.[selectYear.value] || 'N/A',
-        waterAgLand: rankingData.value['Water']?.[selectRegion.value]?.['Agricultural Landuse']?.['value']?.[selectYear.value] || 'N/A',
+        waterAgLand: rankingData.value['Water']?.[selectRegion.value]?.['Agricultural Land-use']?.['value']?.[selectYear.value] || 'N/A',
         waterAgMgt: rankingData.value['Water']?.[selectRegion.value]?.['Agricultural Management']?.['value']?.[selectYear.value] || 'N/A',
         waterNonAg: rankingData.value['Water']?.[selectRegion.value]?.['Non-Agricultural Land-use']?.['value']?.[selectYear.value] || 'N/A',
         biodiversityTotal: rankingData.value['Biodiversity (Quality)']?.[selectRegion.value]?.['Total']?.['value']?.[selectYear.value] || 'N/A',
-        biodiversityAgLand: rankingData.value['Biodiversity (Quality)']?.[selectRegion.value]?.['Agricultural Landuse']?.['value']?.[selectYear.value] || 'N/A',
+        biodiversityAgLand: rankingData.value['Biodiversity (Quality)']?.[selectRegion.value]?.['Agricultural Land-use']?.['value']?.[selectYear.value] || 'N/A',
         biodiversityAgMgt: rankingData.value['Biodiversity (Quality)']?.[selectRegion.value]?.['Agricultural Management']?.['value']?.[selectYear.value] || 'N/A',
         biodiversityNonAg: rankingData.value['Biodiversity (Quality)']?.[selectRegion.value]?.['Non-Agricultural Land-use']?.['value']?.[selectYear.value] || 'N/A'
       };
@@ -123,7 +165,6 @@ window.HomeView = {
       const chartOverview_bio_quality = chartRegister['Biodiversity']['quality']['overview']['sum'];
       const chartOverview_bio_GBF2 = chartRegister['Biodiversity']['GBF2']['overview']['sum'];
       const chartOverview_bio_GBF3_NVIS = chartRegister['Biodiversity']['GBF3_NVIS']['overview']['sum'];
-      const chartOverview_bio_GBF3_IBRA = chartRegister['Biodiversity']['GBF3_IBRA']['overview']['sum'];
       const chartOverview_bio_GBF4_SNES = chartRegister['Biodiversity']['GBF4_SNES']['overview']['sum'];
       const chartOverview_bio_GBF4_ECNES = chartRegister['Biodiversity']['GBF4_ECNES']['overview']['sum'];
       const chartOverview_bio_GBF8_SPECIES = chartRegister['Biodiversity']['GBF8_SPECIES']['overview']['sum'];
@@ -131,7 +172,7 @@ window.HomeView = {
       const chartOverview_economics_sum = chartRegister['Economics']['overview']['sum'];
       const chartOverview_economics_ag = chartRegister['Economics']['overview']['Ag'];
       const chartOverview_economics_agMgt = chartRegister['Economics']['overview']['Ag Mgt'];
-      const chartOverview_economics_Nonag = chartRegister['Economics']['overview']['Non-Ag'];
+      const chartOverview_economics_Nonag = chartRegister['Economics']['Non-Ag']['Profit'];
       const chartOverview_ghg_sum = chartRegister['GHG']['overview']['sum'];
       const chartOverview_ghg_ag = chartRegister['GHG']['overview']['Ag'];
       const chartOverview_ghg_agMgt = chartRegister['GHG']['overview']['Ag Mgt'];
@@ -165,9 +206,6 @@ window.HomeView = {
       }
       if (runScenario.value['BIODIVERSITY_TARGET_GBF_3_NVIS'] !== 'off') {
         await loadScript(chartOverview_bio_GBF3_NVIS['path'], chartOverview_bio_GBF3_NVIS['name'], VIEW_NAME);
-      }
-      if (runScenario.value['BIODIVERSITY_TARGET_GBF_3_IBRA'] !== 'off') {
-        await loadScript(chartOverview_bio_GBF3_IBRA['path'], chartOverview_bio_GBF3_IBRA['name'], VIEW_NAME);
       }
       if (runScenario.value['BIODIVERSITY_TARGET_GBF_4_SNES'] !== 'off') {
         await loadScript(chartOverview_bio_GBF4_SNES['path'], chartOverview_bio_GBF4_SNES['name'], VIEW_NAME);
@@ -243,12 +281,12 @@ window.HomeView = {
           'Non-Ag': window[chartOverview_ghg_Nonag['name']],
         },
         'Production': {
-          'Off-target achievement': window[chartOverview_prod_achieve['name']],
           'Overview': window[chartOverview_prod_overview['name']],
           'Domestic': window[chartOverview_prod_domestic['name']],
           'Exports': window[chartOverview_prod_export['name']],
           'Imports': window[chartOverview_prod_import['name']],
           'Feed': window[chartOverview_prod_feed['name']],
+          'Off-target achievement': window[chartOverview_prod_achieve['name']],
         },
         'Water': {
           'Overview': window[chartOverview_water_sum['name']],
@@ -264,9 +302,6 @@ window.HomeView = {
       }
       if (runScenario.value['BIODIVERSITY_TARGET_GBF_3_NVIS'] !== 'off') {
         ChartData.value['Biodiversity']['GBF3 (NVIS)'] = window[chartOverview_bio_GBF3_NVIS['name']];
-      }
-      if (runScenario.value['BIODIVERSITY_TARGET_GBF_3_IBRA'] !== 'off') {
-        ChartData.value['Biodiversity']['GBF3 (IBRA)'] = window[chartOverview_bio_GBF3_IBRA['name']];
       }
       if (runScenario.value['BIODIVERSITY_TARGET_GBF_4_SNES'] !== 'off') {
         ChartData.value['Biodiversity']['GBF4 (SNES)'] = window[chartOverview_bio_GBF4_SNES['name']];
@@ -291,6 +326,11 @@ window.HomeView = {
       selectRankingSubCategory.value = rankingKeys[0] || 'N/A';
       rankingColors.value = window.Supporting_info.colors_ranking;
 
+      // Load transition start-end heatmap data
+      const transitionStartEnd = chartRegister['Transition']['Area']['start_end'];
+      await loadScript(transitionStartEnd['path'], transitionStartEnd['name'], VIEW_NAME);
+      transitionData.value = window[transitionStartEnd['name']];
+
       await nextTick(() => { dataLoaded.value = true; });
 
     });
@@ -301,15 +341,23 @@ window.HomeView = {
 
     watch(selectChartCategory, (newCategory) => {
       availableChartSubCategories.value = Object.keys(ChartData.value[selectChartCategory.value])
-      availableRankSubcategories.value = Object.keys(rankingData.value?.[selectChartCategory.value]?.[selectRegion.value] || {}).filter(key => key !== "Total");
+      const rankKeys = Object.keys(rankingData.value?.[selectChartCategory.value]?.[selectRegion.value] || {}).filter(key => key !== "Total");
+      availableRankSubcategories.value = rankKeys.sort((a, b) => rankSubcategoryOrder.indexOf(a) - rankSubcategoryOrder.indexOf(b));
       selectChartSubCategory.value = availableChartSubCategories.value[0];
       selectRankingSubCategory.value = availableRankSubcategories.value[0] || 'N/A';
+    });
+
+    // Reset species selection when subcategory or category changes
+    watch(availableSpecies, (newSpecies) => {
+      if (!newSpecies.includes(selectSpecies.value)) {
+        selectSpecies.value = newSpecies[0] || '';
+      }
     });
 
     // Memory cleanup on component unmount
     onUnmounted(() => { window.MemoryService.cleanupViewData(VIEW_NAME); });
 
-    return {
+    const _state = {
       yearIndex,
       runScenario,
       dataLoaded,
@@ -323,20 +371,33 @@ window.HomeView = {
       availableChartCategories,
       availableChartSubCategories,
       availableRankSubcategories,
+      availableSpecies,
 
       selectYear,
       selectRegion,
       selectChartCategory,
       selectChartSubCategory,
       selectRankingSubCategory,
+      selectSpecies,
       selectChartData,
       selectRankingColors,
       selectRanking,
+      hasSpeciesData,
+
+      // Transition heatmap
+      transitionData,
+      transitionFromWater,
+      transitionToWater,
+      transitionHeatmapLeaf,
+      transitionFormattedMax,
+      WATER_OPTIONS,
     };
+    window._debug[VIEW_NAME] = _state;
+    return _state;
   },
 
   // This template is a fallback that will be replaced by the loaded template
-  template: `
+  template: /*html*/`
     <div v-if="dataLoaded">
       <div class="flex flex-col">
 
@@ -416,12 +477,11 @@ window.HomeView = {
                 class="flex-1 max-w-[150px] pt-2 pl-2"
                 v-model="yearIndex"
                 size="small"
-                :show-tooltip="false"
                 :min="0"
                 :max="availableYears.length - 1"
                 :step="1"
                 :format-tooltip="index => availableYears[index]"
-                :marks="availableYears.reduce((acc, year, index) => ({ ...acc, [index]: year }), {})"
+                :show-stops="true"
                 @input="(index) => { yearIndex = index; }"
               />
             </div>
@@ -473,6 +533,18 @@ window.HomeView = {
               </button>
             </div>
 
+            <!-- Species Selector (for GBF3/4/8 charts with region → species → [series] data) -->
+            <div v-if="hasSpeciesData" class="absolute top-[0px] right-[0px] w-[270px] z-10">
+              <filterable-dropdown
+                :items="availableSpecies"
+                :selectedValue="selectSpecies"
+                :useSearch="true"
+                placeholder="Select species..."
+                searchPlaceholder="Search species..."
+                @change="selectSpecies = $event"
+              />
+            </div>
+
             <!-- Chart Component -->
             <chart-container
               class="w-full h-full pt-[50px]"
@@ -480,6 +552,65 @@ window.HomeView = {
             />
           </div>
         </div>
+
+        <!-- ── Transition Heatmap Section ─────────────────────────────── -->
+        <div class="flex flex-col mb-8 mr-4 mt-8">
+
+          <p class="text-[#505051] font-bold p-1 mb-2">
+            Land-use Transition Area: {{ selectRegion }} (2010 → {{ availableYears[availableYears.length - 1] }})
+          </p>
+
+          <!-- Card: controls overlaid at top-left, heatmap fills the card -->
+          <div class="relative rounded-[10px] bg-white shadow-md overflow-x-auto">
+
+            <!-- Controls overlay top-left -->
+            <div class="absolute top-2 left-3 z-10 flex items-center gap-4 bg-white/80 rounded px-2 py-1">
+              <!-- From-Water buttons -->
+              <div class="flex items-center gap-1">
+                <span class="text-[0.75rem] text-[#505051] mr-1">From Water:</span>
+                <button
+                  v-for="opt in WATER_OPTIONS" :key="'fw-' + opt"
+                  @click="transitionFromWater = opt"
+                  class="bg-[#e8eaed] text-[#1f1f1f] text-[0.7rem] px-2 py-1 rounded"
+                  :class="{'bg-sky-500 text-white': transitionFromWater === opt}"
+                >{{ opt }}</button>
+              </div>
+              <!-- To-Water buttons -->
+              <div class="flex items-center gap-1">
+                <span class="text-[0.75rem] text-[#505051] mr-1">To Water:</span>
+                <button
+                  v-for="opt in WATER_OPTIONS" :key="'tw-' + opt"
+                  @click="transitionToWater = opt"
+                  class="bg-[#e8eaed] text-[#1f1f1f] text-[0.7rem] px-2 py-1 rounded"
+                  :class="{'bg-sky-500 text-white': transitionToWater === opt}"
+                >{{ opt }}</button>
+              </div>
+              <!-- Color legend -->
+              <div v-if="transitionHeatmapLeaf" class="flex items-center gap-1 ml-2">
+                <span style="font-size:0.72rem;color:#666;">0</span>
+                <div style="width:120px;height:10px;border-radius:3px;border:1px solid #ddd;background:linear-gradient(to right,#ffffb2,#fecc5c,#fd8d3c,#f03b20,#bd0026);"></div>
+                <span style="font-size:0.72rem;color:#666;">{{ transitionFormattedMax }} ha</span>
+              </div>
+            </div>
+
+            <!-- Heatmap or placeholder -->
+            <heatmap-container
+              v-if="transitionHeatmapLeaf"
+              :xCats="transitionHeatmapLeaf.x_categories"
+              :yCats="transitionHeatmapLeaf.y_categories"
+              :data="transitionHeatmapLeaf.data"
+              :maxVal="transitionHeatmapLeaf.max_val"
+              :exportable="true"
+            />
+            <div
+              v-else
+              class="flex items-center justify-center h-[200px] text-gray-400 text-sm"
+            >
+              No transition data for the selected combination.
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   `,

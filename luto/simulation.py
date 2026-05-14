@@ -28,6 +28,8 @@ model that has 'global' varying state.
 import time
 import threading
 
+import numpy as np
+
 from gurobipy import GRB
 import joblib
 from luto import settings
@@ -85,9 +87,24 @@ def load_data() -> Data:
 
 def run(
     data: Data, 
+    do_analyze_iis: bool = settings.DO_IIS,
+    do_report: bool = settings.WRITE_OUTPUTS,
 ) -> None:
     """
     Run the simulation.
+
+    Parameters
+    ----------
+    data : Data
+        Loaded simulation data.
+    do_analyze_iis : bool, default False
+        If True, infeasible per-year solves trigger ``computeIIS()`` +
+        ``analyze_iis()`` and write a debug .ilp file alongside the run output.
+        Task runs typically pass ``settings.DO_IIS`` so this can be controlled
+        as a grid_search parameter.
+    do_report : bool, default True
+        If True, write outputs at the end of the run. Set to False to skip output
+        writing (e.g. when doing a quick test run or debugging IIS infeasibility).
     """
     
     # Generate new timestamp each time and apply decorator dynamically
@@ -108,14 +125,16 @@ def run(
         
         try:
             print('\n')
-            print(f"Running LUTO {settings.VERSION} between {years[0]} - {years[-1]} at RES-{settings.RESFACTOR}, total {len(years)} runs!\n", flush=True)
+            print(f"Running LUTO {settings.VERSION} between {years[0]} - {years[-1]} at RES-{settings.RESFACTOR}, total {len(years) - 1} runs!\n", flush=True)
             # Insert the base year at the beginning of the years list if not already present
             if data.YR_CAL_BASE not in years: 
                 years.insert(0, data.YR_CAL_BASE)
             # Solve and write outputs
-            solve_timeseries(data, years)
+            solve_timeseries(data, years, do_analyze_iis)
+            # Save and write outputs
             save_data_to_disk(data, f"{save_dir}/Data_RES{settings.RESFACTOR}.lz4")
-            write_outputs(data)
+            if do_report:
+                write_outputs(data)
         except Exception as e:
             print(f"An error occurred during the simulation: {e}")
             raise e
@@ -127,7 +146,7 @@ def run(
     return _run()
 
 
-def solve_timeseries(data: Data, years_to_run: list[int]) -> None:
+def solve_timeseries(data: Data, years_to_run: list[int], do_analyze_iis: bool) -> None:
 
     for step in range(len(years_to_run) - 1):
         base_year = years_to_run[step]
@@ -139,37 +158,71 @@ def solve_timeseries(data: Data, years_to_run: list[int]) -> None:
         
         start_time = time.time()
         input_data = get_input_data(data, base_year, target_year)
+        data.last_year = target_year
 
-        # if step == 0:
-        #     luto_solver = LutoSolver(input_data, d_c)
-        #     luto_solver.formulate()
-
-        # if step > 0:
-        #     prev_base_year = years_to_run[step - 1]
-
-        #     old_ag_x_mrj = luto_solver._input_data.ag_x_mrj.copy()
-        #     old_ag_man_lb_mrj = luto_solver._input_data.ag_man_lb_mrj.copy()
-        #     old_non_ag_x_rk = luto_solver._input_data.non_ag_x_rk.copy()
-        #     old_non_ag_lb_rk = luto_solver._input_data.non_ag_lb_rk.copy()
-
-        #     luto_solver.update_formulation(
-        #         input_data=input_data,
-        #         d_c=d_c,
-        #         old_ag_x_mrj=old_ag_x_mrj,
-        #         old_ag_man_lb_mrj=old_ag_man_lb_mrj,
-        #         old_non_ag_x_rk=old_non_ag_x_rk,
-        #         old_non_ag_lb_rk=old_non_ag_lb_rk,
-        #         old_lumap=data.lumaps[prev_base_year],
-        #         current_lumap=data.lumaps[base_year],
-        #         old_lmmap=data.lmmaps[prev_base_year],
-        #         current_lmmap=data.lmmaps[base_year],
-        #     )
-
+        # Retry loop with escalating numerical settings. settings.RETRY_PARAMS is a list
+        # of (NumericFocus, Method) tuples; each attempt sets Params.NumericFocus and
+        # Params.Method (overriding settings.SOLVE_METHOD for that attempt).
+        # We try each in order and break on GRB.OPTIMAL. We also accept the result —
+        # at any attempt if status is SUBOPTIMAL, or unconditionally on the last
+        # attempt — provided MaxVio is within 10x FEASIBILITY_TOLERANCE. At
+        # FEAS_TOL = 1e-2 the duality gap Gurobi can't certify is far smaller than
+        # the input-data noise floor, so a feasible-enough solution is preferred
+        # over a hard failure.
+        nf_attempts = list(settings.RETRY_PARAMS)
+        suboptimal_accept_tol = 10 * settings.FEASIBILITY_TOLERANCE
+        accepted = False
         luto_solver = LutoSolver(input_data)
         luto_solver.formulate()
-        solution = luto_solver.solve()
         
-        data.last_year = target_year 
+        for attempt_idx, (nf, method, crossover) in enumerate(nf_attempts):
+            print(f"Trying NumericFocus={nf}, Method={method}, Crossover={crossover} for year {target_year}...")
+            is_last_attempt = (attempt_idx == len(nf_attempts) - 1)
+            luto_solver.gurobi_model.Params.NumericFocus = nf
+            luto_solver.gurobi_model.Params.Method = method
+            luto_solver.gurobi_model.Params.Crossover = crossover
+            solution = luto_solver.solve()
+            status = luto_solver.gurobi_model.Status
+
+            if status == GRB.OPTIMAL:
+                print(f"Optimal solution found with NumericFocus={nf}, Method={method}")
+                accepted = True
+                break
+
+            # SUBOPTIMAL: barrier converged but Gurobi can't certify optimality.
+            # MaxVio is always available here; accept if it's within our tolerance band.
+            if status == GRB.SUBOPTIMAL:
+                max_vio = luto_solver.gurobi_model.MaxVio
+                if max_vio < suboptimal_accept_tol:
+                    print(
+                        f"Accepting SUBOPTIMAL solution: MaxVio={max_vio:.2e} < "
+                        f"{suboptimal_accept_tol:.2e} (10x FEASIBILITY_TOLERANCE)."
+                    )
+                    accepted = True
+                    break
+                print(
+                    f"Rejecting SUBOPTIMAL: MaxVio={max_vio:.2e} >= "
+                    f"{suboptimal_accept_tol:.2e}; falling through to error path."
+                )
+
+            # Last-resort acceptance: on the final attempt, if a feasible solution
+            # exists at all (SolCount > 0) and MaxVio is within tolerance, take it
+            # rather than failing hard.
+            elif is_last_attempt and luto_solver.gurobi_model.SolCount > 0:
+                max_vio = luto_solver.gurobi_model.MaxVio
+                if max_vio < suboptimal_accept_tol:
+                    print(
+                        f"Accepting last-attempt solution (status={status}): "
+                        f"MaxVio={max_vio:.2e} < {suboptimal_accept_tol:.2e}."
+                    )
+                    accepted = True
+                    break
+                print(
+                    f"Rejecting last-attempt solution (status={status}): "
+                    f"MaxVio={max_vio:.2e} >= {suboptimal_accept_tol:.2e}."
+                )
+
+            print(f"Non-optimal status {status} with NumericFocus={nf}, Method={method}; retrying with next attempt if available.")
 
         data.add_lumap(target_year, solution.lumap)
         data.add_lmmap(target_year, solution.lmmap)
@@ -179,31 +232,43 @@ def solve_timeseries(data: Data, years_to_run: list[int]) -> None:
         data.add_ag_man_dvars(target_year, solution.ag_man_X_mrj)
         data.add_obj_vals(target_year, solution.obj_val)
 
+        # Floor-truncate dvars immediately so the next year's lb derivation uses
+        # consistent values (prevents raw float32 precision noise from making lb > ub).
+        _rd = 10 ** settings.ROUND_DECIMALS
+        data.ag_dvars[target_year]     = np.floor(data.ag_dvars[target_year]     * _rd) / _rd
+        data.non_ag_dvars[target_year] = np.floor(data.non_ag_dvars[target_year] * _rd) / _rd
+        data.ag_man_dvars[target_year] = {k: np.floor(v * _rd) / _rd for k, v in data.ag_man_dvars[target_year].items()}
+
         for data_type, prod_data in solution.prod_data.items():
             data.add_production_data(target_year, data_type, prod_data)
-            
 
         print(f'Processing for {target_year} completed in {round(time.time() - start_time)} seconds\n\n' )
-        
-        if luto_solver.gurobi_model.Status not in [GRB.OPTIMAL, GRB.SUBOPTIMAL]:
-            print('!' * 100)
-            print(f"Warning: Gurobi solver did not find an optimal/suboptimal solution for year {target_year}. Status: {luto_solver.gurobi_model.Status}")
-            print(f'Warning: The results are still written to disk, but will not be optimal.')
+
+        if not accepted:
             print('!' * 100)
 
-            # Save model and compute IIS for debugging
-            model_path = f"{data.path}/debug_model_{base_year}_{target_year}.mps"
-            luto_solver.gurobi_model.write(model_path)
-            print(f"Saved Gurobi model to {model_path}")
+            status_msgs = {
+                GRB.INFEASIBLE:  "INFEASIBLE",
+                GRB.INF_OR_UNBD: "INFEASIBLE OR UNBOUNDED — set `BARHOMOGENOUS`=1 to distinguish",
+                GRB.UNBOUNDED:   "UNBOUNDED — check objective coefficients and variable bounds",
+                GRB.NUMERIC:     "NUMERICAL ISSUES — consider adjusting tolerances or `NumericFocus`",
+                GRB.SUBOPTIMAL:  "SUBOPTIMAL — constraints may not be fully satisfied",
+            }
+            print(f"Solver status for year {target_year}: {status_msgs.get(status, f'unexpected status {status}')}")
 
-            if luto_solver.gurobi_model.Status == GRB.INFEASIBLE:
-                print("Computing IIS (Irreducible Inconsistent Subsystem)...")
-                luto_solver.gurobi_model.computeIIS()
-                iis_path = f"{data.path}/debug_model_{base_year}_{target_year}.ilp"
-                luto_solver.gurobi_model.write(iis_path)
-                print(f"Analyzed IIS and saved to {iis_path}")
-                analyze_iis(iis_path, data)
+            if status == GRB.INFEASIBLE:
+                model_path = f"{data.path}/debug_model_{base_year}_{target_year}.mps"
+                luto_solver.gurobi_model.write(model_path)
+                print(f"Saved model to {model_path}")
+                if do_analyze_iis:
+                    print("Computing IIS...")
+                    luto_solver.gurobi_model.computeIIS()
+                    iis_path = f"{data.path}/debug_model_{base_year}_{target_year}.ilp"
+                    luto_solver.gurobi_model.write(iis_path)
+                    print(f"IIS saved to {iis_path}")
+                    analyze_iis(iis_path, data)
 
+            print('!' * 100)
             print('\n')
             break
 

@@ -78,11 +78,9 @@ def arr_to_xr(data, arr:np.ndarray) -> xr.DataArray:
         arr_2d = np.full(data.NLUM_MASK.shape, data.NODATA).astype(np.float32) 
         np.place(arr_2d, data.NLUM_MASK, arr)
     elif arr.size == data.LUMASK.sum():
-        arr_fulllen = np.zeros(data.NCELLS, dtype=np.float32)
-        np.place(arr_fulllen, data.MASK, arr)
         geo_meta = data.GEO_META_FULLRES
-        arr_2d = np.full(data.NLUM_MASK.shape, data.NODATA).astype(np.float32) 
-        np.place(arr_2d, data.NLUM_MASK, arr_fulllen)
+        arr_2d = np.full(data.NLUM_MASK.shape, data.NODATA).astype(np.float32)
+        np.place(arr_2d, data.NLUM_MASK, arr)
     else:
         geo_meta = data.GEO_META
         arr_2d = data.LUMAP_2D_RESFACTORED.copy().astype(np.float32)

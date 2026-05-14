@@ -1,4 +1,5 @@
 window.FilterableDropdown = {
+  name: 'FilterableDropdown',
   props: {
     useSearch: {
       type: Boolean,
@@ -19,6 +20,10 @@ window.FilterableDropdown = {
     searchPlaceholder: {
       type: String,
       default: 'Search...'
+    },
+    regionType: {
+      type: String,
+      default: 'NRM'  // 'NRM' or 'STATE'
     }
   },
   setup(props, { emit }) {
@@ -35,13 +40,26 @@ window.FilterableDropdown = {
       if (props.items && props.items.length > 0) {
         items.value = [...props.items];
         selectedItem.value = props.selectedValue;
+      } else if (props.regionType === 'STATE') {
+        // State region mode
+        await window.loadScript("./data/geo/AUS_STATE.js", 'AUS_STATE');
+        const regions = window.AUS_STATE.features.map(feature => feature.properties.STATE_NAME);
+        const otherRegions = regions.filter(region => region !== 'AUSTRALIA').sort();
+        items.value = ['AUSTRALIA', ...otherRegions];
+        const currentRegion = globalSelectedRegion?.value || '';
+        const validRegion = items.value.includes(currentRegion) ? currentRegion : 'AUSTRALIA';
+        selectedItem.value = validRegion;
+        if (globalSelectedRegion && validRegion !== currentRegion) globalSelectedRegion.value = validRegion;
       } else {
-        // Legacy behavior for regions
+        // Default NRM region mode
         await window.loadScript("./data/geo/NRM_AUS.js", 'NRM_AUS');
         const regions = window.NRM_AUS.features.map(feature => feature.properties.NRM_REGION);
         const otherRegions = regions.filter(region => region !== 'AUSTRALIA').sort();
         items.value = ['AUSTRALIA', ...otherRegions];
-        selectedItem.value = globalSelectedRegion?.value || '';
+        const currentRegion = globalSelectedRegion?.value || '';
+        const validRegion = items.value.includes(currentRegion) ? currentRegion : 'AUSTRALIA';
+        selectedItem.value = validRegion;
+        if (globalSelectedRegion && validRegion !== currentRegion) globalSelectedRegion.value = validRegion;
       }
     });
 
@@ -92,8 +110,8 @@ window.FilterableDropdown = {
       // Emit change event for parent components
       this.$emit('change', item);
 
-      // Legacy support: update global region if available
-      if (this.globalSelectedRegion) {
+      // Legacy support: update global region only when used as region selector (no items prop)
+      if (this.globalSelectedRegion && (!this.$props.items || this.$props.items.length === 0)) {
         this.globalSelectedRegion = item;
       }
     },
@@ -131,11 +149,10 @@ window.FilterableDropdown = {
               <path d="m21 21-4.3-4.3"/>
             </svg>
             <input
-              class="text-[0.75rem]"
               type="text"
               :placeholder="searchPlaceholder"
               v-model="searchTerm"
-              class="pl-10 pr-1 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              class="text-[0.75rem] pl-10 pr-1 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
         </div>

@@ -33,7 +33,7 @@ from luto.settings import INPUT_DIR, RAW_DATA
 
 
 
-def create_new_dataset():
+def create_new_dataset(refresh=False):
     """Creates a new LUTO input dataset from source data"""
 
     # Set up a timer and print the time
@@ -60,22 +60,20 @@ def create_new_dataset():
     bio_HACS_inpath = 'N:/Data-Master/Habitat_condition_assessment_system/Data/Processed/'
     bio_GBF2_inpath = 'N:/Data-Master/Biodiversity/DCCEEW/SNES_ECNES/Processed/'
     bio_GBF3_NVIS_inpath = 'N:/Data-Master/NVIS/Processed'
-    bio_GBF3_IBRA_inpath = 'N:/Data-Master/Australian_administrative_boundaries/ibra7_2019_aus/processed'
     bio_GBF4_inpath = bio_GBF2_inpath
     bio_GBF8_inpath = 'N:/Data-Master/Biodiversity/Environmental-suitability/Annual-species-suitability_20-year_snapshots_5km_to_NetCDF/'
     bio_NES_Zonation_inpath = bio_GBF4_inpath
     renewable_energy_inpath = 'N:/Data-Master/Renewable Energy/processed'
+    ag_yield_trend = 'N:/Data-Master/AG 2050/'
     
 
     # Set data output paths
-    raw_data = RAW_DATA + '/' # '../raw_data/'
+    raw_data = RAW_DATA + '/'
     outpath = INPUT_DIR + '/'
 
 
-    # Delete the data folders' contents
-    for file in os.scandir(outpath):
-        if file.name != '.gitignore':
-            os.remove(file.path)
+    # Remove existing files in the output folder, except for .gitignore, if refresh is True
+    if refresh: [os.remove(f.path) for f in os.scandir(outpath) if f.name != '.gitignore']
 
 
     # Copy raw data files from their source into raw_data folder for further processing
@@ -93,23 +91,26 @@ def create_new_dataset():
     shutil.copyfile(luto_2D_inpath + 'SA2_crop_GHG_data.h5', raw_data + 'SA2_crop_GHG_data.h5')
     shutil.copyfile(luto_2D_inpath + 'cell_biophysical_df.h5', raw_data + 'cell_biophysical_df.h5')
     shutil.copyfile(luto_2D_inpath + 'SA2_climate_damage_mult.h5', raw_data + 'SA2_climate_damage_mult.h5')
+    
+    # Yiled trend data
+    shutil.copyfile(fdh_inpath + 'yieldincreases-bau2022.csv', outpath + 'yieldincreases_bau2022.csv')
+    shutil.copyfile(ag_yield_trend + 'yieldncreases_ABARES.xlsx', outpath + 'yieldincreases_ag_2050.xlsx')
 
     
     # Demand and elasticity data
     shutil.copyfile(f'{demand_scenarios_inpath}/All_LUTO_demand_scenarios_with_convergences.csv',  raw_data + 'All_LUTO_demand_scenarios_with_convergences.csv')
-    shutil.copyfile(f'{demand_elasticity_inpath}/Elasticities_Table.csv', outpath + 'demand_elasticity.csv')
-    shutil.copyfile(f'{luto_1D_inpath}/20251023_CNS25 Pathways AusTIMES data.xlsx', outpath + 'AusTIMES_demand_multiplier.xlsx')
+    shutil.copyfile(f'{demand_elasticity_inpath}/20260311_values for runs.csv', outpath + 'demand_elasticity.csv')
+    shutil.copyfile(f'{luto_1D_inpath}/20260220_CNS25 Pathways AusTIMES data.xlsx', outpath + 'AusTIMES_demand_multiplier.xlsx')
     
     # Read raw BECCS data from CSIRO and save as HDF5
     BECCS_raw = pd.read_pickle(BECCS_inpath + 'df_info_best_grid_20211116.pkl')
 
 
     # Copy data straight to LUTO input folder, no processing required
-    shutil.copyfile(fdh_inpath + 'yieldincreases-bau2022.csv', outpath + 'yieldincreases_bau2022.csv')
     shutil.copyfile(nlum_inpath + 'NLUM_2010-11_mask.tif', outpath + 'NLUM_2010-11_mask.tif')
     shutil.copyfile(nlum_inpath + 'ag_landuses.csv', outpath + 'ag_landuses.csv')
 
-    shutil.copyfile(luto_1D_inpath + 'GHG_targets_20251023.xlsx', outpath + 'GHG_targets.xlsx')
+    shutil.copyfile(luto_1D_inpath + 'GHG_targets_20260223.xlsx', outpath + 'GHG_targets.xlsx')
     shutil.copyfile(luto_1D_inpath + 'carbon_prices_20240612.xlsx', outpath + 'carbon_prices.xlsx')
     shutil.copyfile(luto_1D_inpath + 'ag_price_multipliers_20240612.xlsx', outpath + 'ag_price_multipliers.xlsx')
     shutil.copyfile(luto_1D_inpath + 'cost_multipliers_20240612.xlsx', outpath + 'cost_multipliers.xlsx')
@@ -162,30 +163,33 @@ def create_new_dataset():
   
 
     # Copy agricultural management datafiles
-    shutil.copyfile(luto_1D_inpath + '20250415_Bundle_MR.xlsx', outpath + '20250415_Bundle_MR.xlsx')
-    shutil.copyfile(luto_1D_inpath + '20231101_Bundle_AgTech_NE.xlsx', outpath + '20231101_Bundle_AgTech_NE.xlsx')
+    shutil.copyfile(luto_1D_inpath + '20260317_Bundle_MR.xlsx', outpath + '20260317_Bundle_MR.xlsx')
+    shutil.copyfile(luto_1D_inpath + '20260317_Bundle_AgTech_NE.xlsx', outpath + '20260317_Bundle_AgTech_NE.xlsx')
+    shutil.copyfile(luto_1D_inpath + '20260317_Bundle_AgTech_EI.xlsx', outpath + '20260317_Bundle_AgTech_EI.xlsx')
     shutil.copyfile(luto_1D_inpath + '20231107_ECOGRAZE_Bundle.xlsx', outpath + '20231107_ECOGRAZE_Bundle.xlsx')
-    shutil.copyfile(luto_1D_inpath + '20231107_Bundle_AgTech_EI.xlsx', outpath + '20231107_Bundle_AgTech_EI.xlsx')
-    shutil.copyfile(luto_1D_inpath + '20240918_Bundle_BC.xlsx', outpath + '20240918_Bundle_BC.xlsx')
+    shutil.copyfile(luto_1D_inpath + '20260401_Bundle_BC.xlsx', outpath + '20260401_Bundle_BC.xlsx')
     
     # Copy biodiversity HACS data from DCCEEW
     shutil.copyfile(bio_HACS_inpath + 'HABITAT_CONDITION.csv', outpath + 'bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv')
     
     # Copy biodiversity GBF-2 files
-    shutil.copyfile(bio_GBF2_inpath + 'GBF2_conserve_performance.xlsx', outpath + 'BIODIVERSITY_GBF2_conservation_performance.xlsx')
+    shutil.copyfile(bio_GBF2_inpath + 'Biodiversity_conserve_performance.xlsx', outpath + 'Biodiversity_conserve_performance.xlsx')
 
     # Copy biodiversity GBF-3 data
     shutil.copyfile(bio_GBF3_NVIS_inpath + '/NVIS7_0_AUST_PRE_MVS.nc', outpath + 'bio_GBF3_NVIS_MVS.nc')
     shutil.copyfile(bio_GBF3_NVIS_inpath + '/NVIS7_0_AUST_PRE_MVG.nc', outpath + 'bio_GBF3_NVIS_MVG.nc')
     shutil.copyfile(bio_GBF3_NVIS_inpath + '/BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS.xlsx', outpath + 'BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS.xlsx')
-    shutil.copyfile(bio_GBF3_IBRA_inpath + '/BIODIVERSITY_GBF3_IBRA_SCORES_AND_TARGETS.xlsx', outpath + 'BIODIVERSITY_GBF3_IBRA_SCORES_AND_TARGETS.xlsx')
+    shutil.copyfile(bio_GBF3_NVIS_inpath + '/BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS_NRM.xlsx', outpath + 'BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS_NRM.xlsx')
+    shutil.copyfile(bio_GBF3_NVIS_inpath + '/BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS_IBRA.xlsx', outpath + 'BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS_IBRA.xlsx')
 
     # Copy biodiversity GBF-4 files
     shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_SNES.nc', outpath + 'bio_GBF4_SNES.nc')
     shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_ECNES.nc', outpath + 'bio_GBF4_ECNES.nc')
-    
+
     shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_SNES_target.csv', outpath + 'BIODIVERSITY_GBF4_TARGET_SNES.csv')
+    shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_SNES_target_NRM.csv', outpath + 'BIODIVERSITY_GBF4_TARGET_SNES_NRM.csv')
     shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_ECNES_target.csv', outpath + 'BIODIVERSITY_GBF4_TARGET_ECNES.csv')
+    shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_ECNES_target_NRM.csv', outpath + 'BIODIVERSITY_GBF4_TARGET_ECNES_NRM.csv')
     
     # Copy biodiversity GBF-8 files
     shutil.copyfile(bio_GBF8_inpath + 'bio_ssp126_EnviroSuit.nc', outpath + 'bio_GBF8_ssp126_EnviroSuit.nc')
@@ -211,6 +215,10 @@ def create_new_dataset():
     shutil.copyfile(f'{renewable_energy_inpath}/renewable_energy_bundle.csv', outpath + 'renewable_energy_bundle.csv')
     shutil.copyfile(f'{renewable_energy_inpath}/renewable_price_AUD_MWh_solar.csv', outpath + 'renewable_price_AUD_MWh_solar.csv')
     shutil.copyfile(f'{renewable_energy_inpath}/renewable_price_AUD_MWh_wind.csv', outpath + 'renewable_price_AUD_MWh_wind.csv')
+    shutil.copyfile(f'{renewable_energy_inpath}/renewable_QLD_EPBC_MNES_prioritization.nc', outpath + 'renewable_QLD_EPBC_MNES_prioritization.nc')
+    shutil.copyfile(f'{renewable_energy_inpath}/renewable_QLD_EPBC_MNES_prioritization_performance.csv', outpath + 'renewable_QLD_EPBC_MNES_prioritization_performance.csv')
+    shutil.copyfile(f'{renewable_energy_inpath}/renewable_existing_capacity_MW_1D.nc', outpath + 'renewable_existing_capacity_MW_1D.nc')
+    shutil.copyfile(f'{renewable_energy_inpath}/renewable_existing_capacity_area_fraction_1D.nc', outpath + 'renewable_existing_capacity_area_fraction_1D.nc')
 
 
 
@@ -1033,7 +1041,11 @@ def create_new_dataset():
     agGHG_crops['LU_ID'] = agGHG_crops['LU_ID'].astype('Int64')
 
     # Create the MultiIndex structure
-    GHG_sources_crops = ['CO2E_KG_HA_FERT_PROD', 'CO2E_KG_HA_PEST_PROD', 'CO2E_KG_HA_IRRIG', 'CO2E_KG_HA_CHEM_APPL', 'CO2E_KG_HA_CROP_MGT', 'CO2E_KG_HA_CULTIV', 'CO2E_KG_HA_HARVEST', 'CO2E_KG_HA_SOWING', 'CO2E_KG_HA_SOIL']
+    GHG_sources_crops = [
+        'CO2E_KG_HA_FERT_PROD', 'CO2E_KG_HA_PEST_PROD', 'CO2E_KG_HA_IRRIG', 
+        'CO2E_KG_HA_CHEM_APPL', 'CO2E_KG_HA_CROP_MGT', 'CO2E_KG_HA_CULTIV', 
+        'CO2E_KG_HA_HARVEST', 'CO2E_KG_HA_SOWING', 'CO2E_KG_HA_SOIL'
+    ]
     agGHG_crops = agGHG_crops.pivot( index='CELL_ID',
                                      columns = ['IRRIGATION', 'LU_ID'],
                                      values = GHG_sources_crops

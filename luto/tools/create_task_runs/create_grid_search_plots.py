@@ -35,12 +35,12 @@ report_data = process_task_root_dirs(task_root_dir).query('region == "AUSTRALIA"
 print(report_data['Type'].unique())
 
 # if regional adoption constraints is off, set non-ag uniform to off as well
-report_data['REGIONAL_ADOPTION_NON_AG_UNIFORM'] = report_data.apply(
-    lambda x: 'off' if x['REGIONAL_ADOPTION_CONSTRAINTS'] =='off' else x['REGIONAL_ADOPTION_NON_AG_UNIFORM'],
+report_data['REGIONAL_ADOPTION_NON_AG_CAP'] = report_data.apply(
+    lambda x: 'off' if x['REGIONAL_ADOPTION_CONSTRAINTS'] =='off' else x['REGIONAL_ADOPTION_NON_AG_CAP'],
     axis=1
 )
 
-report_data['REGIONAL_ADOPTION_NON_AG_UNIFORM'] = report_data['REGIONAL_ADOPTION_NON_AG_UNIFORM'].astype('category')
+report_data['REGIONAL_ADOPTION_NON_AG_CAP'] = report_data['REGIONAL_ADOPTION_NON_AG_CAP'].astype('category')
 
 
 # Plot settings
@@ -51,7 +51,7 @@ p9.options.dpi = 100
 # Define grouping hierarchy
 warp_row = 'GHG_EMISSIONS_LIMITS'
 warp_col = 'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT'
-shift_col = 'REGIONAL_ADOPTION_NON_AG_UNIFORM'
+shift_col = 'REGIONAL_ADOPTION_NON_AG_CAP'
 
 # Define jitter and hatch mappings
 # Jitter is to offset bars so they are visible when overlapping

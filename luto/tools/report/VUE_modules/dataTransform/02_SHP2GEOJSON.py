@@ -34,7 +34,8 @@ with open('luto/tools/report/VUE_modules/data/geo/NRM_AUS_centroid_bbox.js', 'w'
 
 # Save AUSTRALIA STATE to JS object
 AUS_STATE = gpd.read_file('luto/tools/report/VUE_modules/assets/AUS_STATE_SIMPLIFIED/STE11aAust_mercator_simplified.shp')
-AUS_STATE = AUS_STATE.dissolve(by='STATE_NAME').reset_index()
+AUS_STATE = AUS_STATE.dissolve(by='STATE_NAME')[['geometry']].reset_index()
+AUS_STATE_crs = AUS_STATE.crs  # Save before reprojection
 
 # Reproject to EPSG:4326 (WGS84 lat/lng) for Leaflet compatibility
 if AUS_STATE.crs.to_epsg() != 4326:
@@ -47,3 +48,14 @@ with BytesIO() as geojson_bytes:
 
 with open('luto/tools/report/VUE_modules/data/geo/AUS_STATE.js', 'w', encoding='utf-8') as f:
     f.write(f'window.AUS_STATE = {json.dumps(geojson_str, indent=2)};\n')
+
+
+# Save centroids and bounding box of STATE to JS object
+AUS_STATE.loc[len(AUS_STATE)] = ['AUSTRALIA', unary_union(AUS_STATE.geometry.values)]
+AUS_STATE = AUS_STATE.set_crs(AUS_STATE_crs, allow_override=True)
+AUS_STATE['centroid'] = AUS_STATE.geometry.centroid.apply(lambda p: [p.y, p.x])
+AUS_STATE['bounding_box'] = AUS_STATE.geometry.bounds.values.tolist()
+centroid_bbox = AUS_STATE.drop_duplicates(subset='STATE_NAME').set_index('STATE_NAME')[['centroid', 'bounding_box']].to_dict(orient='index')
+
+with open('luto/tools/report/VUE_modules/data/geo/AUS_STATE_centroid_bbox.js', 'w', encoding='utf-8') as f:
+    f.write(f'window.AUS_STATE_centroid_bbox = {json.dumps(centroid_bbox, indent=2)};\n')

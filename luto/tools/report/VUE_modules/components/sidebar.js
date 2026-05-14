@@ -1,14 +1,15 @@
 window.Sidebar = {
+  name: 'Sidebar',
   emits: ['update:isCollapsed'],
   setup(props, { emit }) {
-    const { ref, computed } = Vue;
+    const { ref, computed, onMounted } = Vue;
     // Function to standardize SVG icons for consistent display
     const standardizeIcon = (icon) => {
       // Add a fixed viewBox to ensure consistent sizing
       return icon.replace('<svg', '<svg width="24" height="24"');
     };
 
-    const navItems = [
+    const allNavItems = [
       { id: "home", label: "Home", path: "/", icon: standardizeIcon(window.NavIcons.home) },
       { id: "area", label: "Area Analysis", path: "/area", icon: standardizeIcon(window.NavIcons.area) },
       { id: "production", label: "Production Analysis", path: "/production", icon: standardizeIcon(window.NavIcons.production) },
@@ -16,9 +17,24 @@ window.Sidebar = {
       { id: "GHG", label: "GHG Analysis", path: "/ghg", icon: standardizeIcon(window.NavIcons.GHG) },
       { id: "water", label: "Water Analysis", path: "/water", icon: standardizeIcon(window.NavIcons.water) },
       { id: "biodiversity", label: "Biodiversity", path: "/biodiversity", icon: standardizeIcon(window.NavIcons.biodiversity) },
+      { id: "renewable", label: "Renewable Energy", path: "/renewable", icon: standardizeIcon(window.NavIcons.renewable) },
+      { id: "transition", label: "Transitions", path: "/transition", icon: standardizeIcon(window.NavIcons.transition) },
       { id: "map", label: "Map View", path: "/map", icon: standardizeIcon(window.NavIcons.map) },
       { id: "settings", label: "Settings and Log", path: "/settings", icon: standardizeIcon(window.NavIcons.settings) },
     ];
+
+    // Filter renewable energy out if not enabled in Supporting_info
+    const renewablesEnabled = ref(true); // default true until Supporting_info loads
+    const navItems = computed(() =>
+      renewablesEnabled.value
+        ? allNavItems
+        : allNavItems.filter(item => item.id !== 'renewable')
+    );
+
+    onMounted(async () => {
+      await window.loadScript('./data/Supporting_info.js', 'Supporting_info');
+      renewablesEnabled.value = window.Supporting_info?.renewables_enabled ?? true;
+    });
 
     const CommonIcons = {
       Expand: standardizeIcon(window.CommonIcons.Expand),

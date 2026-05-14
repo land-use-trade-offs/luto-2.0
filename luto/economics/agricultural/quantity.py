@@ -136,8 +136,6 @@ def get_yield_pot(data, lvstype, vegtype, lm, yr_idx):
     lu = f'{lvstype.capitalize()} - {vegtype}'
     yield_pot *= get_ccimpact(data, lu, lm, yr_idx)
 
-    # Here we can add a productivity multiplier for sustainable intensification to increase pasture growth and yield potential (i.e., head/ha)
-    yield_pot *= settings.AG_YIELD_MULT  # ***Still to do***, now [20251027] only use a constant multiplier from settings
 
     return yield_pot
 
@@ -164,7 +162,7 @@ def get_quantity_lvstk(data, pr, lm, yr_idx):
     lvstype, vegtype = lvs_veg_types(pr)
 
     # Get the yield potential. Since [20251027], here uses a constant multiplier from settings for production intensification
-    yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx) * settings.AG_YIELD_MULT
+    yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
 
     # Determine base quantity case-by-case.
 
@@ -266,7 +264,7 @@ def get_quantity(data, pr, lm, yr_idx):
         raise KeyError(f"Land use '{pr}' not found in data.")
 
     # Apply productivity increase multiplier by product. 
-    q *= data.BAU_PROD_INCR[lm, pr][yr_idx]
+    q *= data.PRODUCTIVITY_MUL_xr.sel(lm=lm, product=pr, year=data.YR_CAL_BASE + yr_idx).item()
 
     return q
 
@@ -367,7 +365,7 @@ def get_precision_agriculture_effect_q_mrp(data, q_mrp, yr_idx):
 
     # Update values in the new matrix    
     for lu, j in zip(land_uses, lu_codes):
-        multiplier = data.PRECISION_AGRICULTURE_DATA[lu].loc[yr_cal, 'Productivity']
+        multiplier = data.PRECISION_AGRICULTURE_DATA[settings.LU2TYPE[lu]].loc[yr_cal, 'Productivity']
         if multiplier != 1:
             # Apply to all products associated with land use
             for p in range(data.NPRS):
@@ -454,7 +452,7 @@ def get_agtech_ei_effect_q_mrp(data, q_mrp, yr_idx):
 
     # Update values in the new matrix    
     for lu, j in zip(land_uses, lu_codes):
-        multiplier = data.AGTECH_EI_DATA[lu].loc[yr_cal, 'Productivity']
+        multiplier = data.AGTECH_EI_DATA[settings.LU2TYPE[lu]].loc[yr_cal, 'Productivity']
         if multiplier != 1:
             # Apply to all products associated with land use
             for p in range(data.NPRS):
@@ -489,7 +487,7 @@ def get_biochar_effect_q_mrp(data, q_mrp, yr_idx):
 
     # Update values in the new matrix    
     for lu, j in zip(land_uses, lu_codes):
-        multiplier = data.BIOCHAR_DATA[lu].loc[yr_cal, 'Productivity']
+        multiplier = data.BIOCHAR_DATA[settings.LU2TYPE[lu]].loc[yr_cal, 'Productivity']
         if multiplier != 1:
             # Apply to all products associated with land use
             for p in range(data.NPRS):
@@ -629,8 +627,103 @@ For agricultural products, the quantity is calculated as:
     quantity_am = quantity_ag * (re_productivity_multiplier - 1)    # If ag-man applied, an additional quantity is introduced (positive or negative) depending on the multiplier.
 
 For renewable products, the quantity is calculated as:
-    quantity = Natural_energy * re_nature_energy_capture_percent * (1 - re_remain_percent_after_distribution) * 365 * 24 * real_area
+    quantity = (
+        INSTALL_CAPACITY_MW_HA 
+        * capacity_factor_multiplier 
+        * (1 - re_remain_percent_after_distribution) 
+        * 365 * 24 
+        * real_area
+    )
 '''
+
+
+
+def get_exist_renewable_capacity(data, re_type: str, yr_cal: int):
+    """
+    Return per-cell actual delivered MWh for existing renewable capacity up to yr_cal (inclusive).
+
+    Applies capacity factor and distribution loss multipliers using yr=2030 as a proxy
+    (existing renewable is mostly commissioned 2010-2030).
+
+    Args:
+        data: Data object.
+        re_type (str): 'Utility Solar PV' or 'Onshore Wind'.
+        yr_cal (int): Upper bound calendar year (inclusive).
+
+    Returns:
+        xr.DataArray over 'cell' dimension [MWh/year].
+    """
+    layer = (
+        data.RENEWABLE_EXISTING_CAPACITY_LAYER_SOLAR_MWH_CELL
+        if re_type == 'Utility Solar PV'
+        else data.RENEWABLE_EXISTING_CAPACITY_LAYER_WIND_MWH_CELL
+    )
+    existing_yrs = layer['year'].values
+    valid_yrs    = existing_yrs[existing_yrs <= yr_cal]
+
+    if valid_yrs.size == 0:
+        return layer.isel(year=0).drop_vars('year') * 0.0
+
+    # Since existing RE are mostly between 2010-2030, use RENEWABLE_LAYERS 2030 (which is 2030 and onwards) as a proxy
+    re_lyr = data.RENEWABLE_LAYERS.sel(year=2030)
+    return (
+        layer.sel(year=valid_yrs).sum('year')
+        * re_lyr['capacity_factor_multiplier'].sel(tech_name=re_type)
+        * re_lyr['distribution_loss_factor_multiplier']
+    )
+
+
+def get_exist_renewable_capacity_by_state(data, yr_cal: int) -> dict:
+    """
+    Return existing renewable capacity (actual delivered MWh) by state and type.
+
+    Return format: {state: {'Utility Solar PV': MWh, 'Onshore Wind': MWh}}
+    """
+    if not any(settings.RENEWABLES_OPTIONS.values()):
+        return {}
+
+    solar_lyr = (
+        get_exist_renewable_capacity(data, 'Utility Solar PV', yr_cal)
+        .assign_coords({'state': ('cell', data.REGION_STATE_NAME)})
+    )
+    wind_lyr = (
+        get_exist_renewable_capacity(data, 'Onshore Wind', yr_cal)
+        .assign_coords({'state': ('cell', data.REGION_STATE_NAME)})
+    )
+
+    solar_dict = solar_lyr.groupby('state').sum('cell').to_dataframe('capacity_MWh').to_dict()['capacity_MWh']
+    wind_dict  = wind_lyr.groupby('state').sum('cell').to_dataframe('capacity_MWh').to_dict()['capacity_MWh']
+
+    return {
+        state: {'Utility Solar PV': solar_dict[state], 'Onshore Wind': wind_dict[state]}
+        for state in solar_dict.keys() | wind_dict.keys()
+    }
+
+
+def get_existing_renewable_dvar_fraction(data, re_type: str, yr_cal: int) -> np.ndarray:
+    """
+    Return the fraction of existing renewable capacity that is distributed.
+
+    Args:
+        data: Data object.
+        re_type (str): Renewable type ('Utility Solar PV' or 'Onshore Wind').
+        yr_cal (int): Calendar year.
+    """
+
+    if not any(settings.RENEWABLES_OPTIONS.values()):
+        return np.zeros(data.NCELLS, dtype=np.float32)
+
+    # Get the existing renewable capacity, which is the sum of all previous years' capacity
+    if re_type == 'Utility Solar PV':
+        exist_capacity_solar_yrs = data.RENEWABME_EXISTING_DVAR_FRACTION_SOLAR['year'].values
+        dvar_fraction = data.RENEWABME_EXISTING_DVAR_FRACTION_SOLAR.sel(year=(exist_capacity_solar_yrs <= yr_cal))
+    elif re_type == 'Onshore Wind':
+        exist_capacity_wind_yrs = data.RENEWABME_EXISTING_DVAR_FRACTION_WIND['year'].values
+        dvar_fraction = data.RENEWABME_EXISTING_DVAR_FRACTION_WIND.sel(year=(exist_capacity_wind_yrs <= yr_cal))
+    else:
+        raise KeyError(f"Renewable type '{re_type}' not found in existing dvar fraction data.")
+
+    return dvar_fraction.sum('year').clip(max=1).data
 
 
 def get_quantity_renewable(data, re_type: str, yr_idx: int):
@@ -643,23 +736,28 @@ def get_quantity_renewable(data, re_type: str, yr_idx: int):
         yr_idx (int): Number of years post base-year ('YR_CAL_BASE').
     """
 
+    if not settings.RENEWABLES_OPTIONS.get(re_type, False):
+        return np.zeros(data.NCELLS, dtype=np.float32)
+
     yr_cal = data.YR_CAL_BASE + yr_idx
-    
-    if not re_type in settings.RENEWABLES_OPTIONS:
+
+    if not re_type in settings.RENEWABLES_OPTIONS.keys():
         raise KeyError(f"Renewable re_typeoduct '{re_type}' not found in settings.RENEWABLES_OPTIONS.")
+
+    yr_lyr = max(yr_cal, int(data.RENEWABLE_LAYERS['year'].values[0]))  # RENEWABLE_LAYERS starts at 2030; clamp pre-2030 years
+    re_lyr = data.RENEWABLE_LAYERS.sel(tech_name=re_type, year=yr_lyr)
     
-    re_lyr = data.RENEWABLE_LAYERS.sel(Type=re_type, year=yr_cal)
-    
-    re_nature_energy_capture_percent = re_lyr['capacity_factor_multiplier']
-    re_percent_remain_after_distribution = re_lyr['distribution_loss_factor_multiplier']
+    capacity_factor_multiplier          = re_lyr['capacity_factor_multiplier']
+    distribution_loss_factor_multiplier = re_lyr['distribution_loss_factor_multiplier']
     yield_per_ha = (
         settings.INSTALL_CAPACITY_MW_HA[re_type] 
-        * re_nature_energy_capture_percent          
-        * re_percent_remain_after_distribution 
-        * 365 * 24
+        * capacity_factor_multiplier            # Range 0-1, indicates how much installed capacity is converted to electricity on average over the year.
+        * distribution_loss_factor_multiplier   # Range 0-1, indicates how much electricity was sent to customers.
+        * 365 
+        * 24
     )
 
     quantity = yield_per_ha * data.REAL_AREA
-    
+
     return quantity.data.astype(np.float32)
 

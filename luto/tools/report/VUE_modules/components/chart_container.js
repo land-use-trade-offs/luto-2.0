@@ -1,4 +1,5 @@
 window.Highchart = {
+  name: 'Highchart',
   props: {
     chartData: {
       type: Object,
@@ -11,7 +12,15 @@ window.Highchart = {
     zoomable: {
       type: Boolean,
       default: false,
-    }
+    },
+    multiInput: {
+      type: Object,
+      default: null,
+    },
+    multiYAxis: {
+      type: Object,
+      default: null,
+    },
   },
   setup(props) {
     const { ref, onMounted, onUnmounted, watch, inject, computed } = Vue
@@ -27,11 +36,37 @@ window.Highchart = {
     const scale = ref(1);
     const zoomStep = 0.1;
 
+    // Multi-input selector state
+    const selectedInput = ref(null);
+
+    watch(() => props.multiInput, (newVal) => {
+      if (newVal) {
+        const keys = Object.keys(newVal);
+        if (!selectedInput.value || !keys.includes(selectedInput.value)) {
+          selectedInput.value = keys[0] || null;
+        }
+      } else {
+        selectedInput.value = null;
+      }
+    }, { immediate: true });
+
+    const setInput = (key) => { selectedInput.value = key; };
+
+    // Effective chart data: merges base options with selected multi-input series/yAxis
+    const effectiveChartData = computed(() => {
+      if (!props.multiInput || !selectedInput.value) return props.chartData;
+      const yAxisTitle = props.multiYAxis?.[selectedInput.value] || '';
+      return {
+        ...props.chartData,
+        yAxis: { title: { text: yAxisTitle } },
+        series: props.multiInput[selectedInput.value] || [],
+      };
+    });
 
     // Function to handle dataset loading and chart creation
     const createChart = () => {
       isLoading.value = true;
-      
+
       // CRITICAL: Destroy existing chart before creating new one
       if (ChartInstance.value) {
         ChartInstance.value.destroy();
@@ -39,11 +74,12 @@ window.Highchart = {
       }
 
       // Create new chart with chart data
+      const data = effectiveChartData.value;
       ChartInstance.value = Highcharts.chart(
         chartElement.value,
         {
-          ...props.chartData,
-          chart: (props.chartData.chart || {}),
+          ...data,
+          chart: (data.chart || {}),
         }
       );
       isLoading.value = false;
@@ -158,30 +194,18 @@ window.Highchart = {
         ChartInstance.value.destroy();
         ChartInstance.value = null;
       }
-      
+
       // Remove event listeners
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('mousemove', onDrag);
       window.removeEventListener('mouseup', stopDrag);
     });
 
-    // Watch for changes in chart data with infinite loop prevention
-    let isUpdating = false;
-    watch(() => props.chartData, (newValue) => {
-      // Prevent infinite loops
-      if (isUpdating) {
-        return;
-      }
-
-      isUpdating = true;
-
-      // Then update the chart
+    // Watch for changes in chart data and update Highcharts.
+    // No loop-guard needed: updateChart only calls Highcharts APIs and never
+    // writes back to Vue reactive state, so the watcher cannot re-trigger itself.
+    watch(effectiveChartData, (newValue) => {
       updateChart(ChartInstance.value, newValue);
-
-      // Reset flag after a delay to ensure all reactive updates complete
-      setTimeout(() => {
-        isUpdating = false;
-      }, 100);
     }, { deep: true });
 
     // Watch for sidebar collapsed state changes via inject
@@ -201,15 +225,25 @@ window.Highchart = {
       scale,
       zoomIn,
       zoomOut,
-      handleWheel
+      handleWheel,
+      selectedInput,
+      setInput,
     };
   },
   template: `
-    <div class="m-2 relative" 
-      :style="{ transform: 'translate(' + position.x + 'px, ' + position.y + 'px) scale(' + scale + ')', cursor: draggable ? 'move' : 'default' }" 
+    <div class="m-2 relative"
+      :style="{ transform: 'translate(' + position.x + 'px, ' + position.y + 'px) scale(' + scale + ')', cursor: draggable ? 'move' : 'default' }"
       @mousedown="startDrag"
-      @wheel.prevent="handleWheel">
+      @wheel="handleWheel">
       <div v-if="isLoading" class="flex justify-center items-center text-lg">Loading data...</div>
+      <div v-if="multiInput" class="absolute top-2 left-20 z-10 flex gap-1" @mousedown.stop>
+        <button v-for="key in Object.keys(multiInput)" :key="key"
+          @click="setInput(key)"
+          class="text-xs px-2 py-1 rounded border font-medium shadow-sm"
+          :class="selectedInput === key ? 'bg-sky-500 text-white border-sky-500' : 'bg-white/80 text-gray-700 border-gray-300 hover:bg-white'">
+          {{ key }}
+        </button>
+      </div>
       <div ref="chartElement" id="chart-container"></div>
       <div v-if="zoomable" class="absolute top-[40px] right-2 flex flex-col space-y-1">
         <button @click="zoomIn" class="bg-white/80 hover:bg-white text-gray-800 w-8 h-8 rounded-full shadow flex items-center justify-center">+</button>

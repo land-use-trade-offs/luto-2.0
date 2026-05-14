@@ -67,19 +67,22 @@ def get_absolute_cost_mask(m, r, x_mrj_mask, costs_mrj):
 def apply_agricultural_land_use_culling(x_mrj, c_mrj, t_mrj, r_mrj):
     """
     Refine the exclude matrix to cull unprofitable land uses based on the settings.CULL_MODE setting.
-    This function modifies the x_mrj matrix in-place.
+    Returns a modified copy of x_mrj (non-in-place).
 
     Args:
-        x_mrj (np.ndarray): The 'exclude' matrix returned by `get_to_ag_exclude_matrices`. This will
-            be modified in-place by this function.
+        x_mrj (np.ndarray): The 'exclude' matrix returned by `get_to_ag_exclude_matrices`.
         c_mrj (np.ndarray): The 'cost' matrix.
         t_mrj (np.ndarray): The 'transition' matrix.
         r_mrj (np.ndarray): The 'revenue' matrix.
+
+    Returns:
+        np.ndarray: A copy of x_mrj with unprofitable land uses excluded.
     """
 
     if settings.CULL_MODE == "none":
-        return
+        return x_mrj
 
+    x_mrj = x_mrj.copy()
     x_mrj_mask = x_mrj.astype(bool)
     costs_mrj = (c_mrj + t_mrj) - r_mrj
     for r in range(costs_mrj.shape[1]):
@@ -103,3 +106,5 @@ def apply_agricultural_land_use_culling(x_mrj, c_mrj, t_mrj, r_mrj):
                 continue
 
             x_mrj[m, r, :] = x_mrj[m, r, :] & cost_include_mask
+
+    return x_mrj

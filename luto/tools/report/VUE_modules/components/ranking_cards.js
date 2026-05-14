@@ -2,6 +2,7 @@
 // This component displays ranking cards with progress indicators for various metrics
 
 window.RankingCards = {
+  name: 'RankingCards',
   props: {
     selectRankingData: {
       type: Object,

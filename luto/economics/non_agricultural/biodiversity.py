@@ -22,8 +22,9 @@ import numpy as np
 from luto import settings
 from luto.data import Data
 from luto import tools
+from functools import lru_cache
 from luto.settings import (
-    BIO_CONTRIBUTION_ENV_PLANTING, 
+    BIO_CONTRIBUTION_ENV_PLANTING,
     BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK, 
     BIO_CONTRIBUTION_CARBON_PLANTING_BELT, 
     BIO_CONTRIBUTION_RIPARIAN_PLANTING,
@@ -195,12 +196,16 @@ def get_biodiv_destocked_land(data: Data, lumap: np.ndarray):
     to_lu = data.DESC2AGLU['Unallocated - natural land']
 
     for from_lu in data.LU_LVSTK_NATURAL:
+        if settings.BIO_CONTRIBUTION_DESTOCKING != 'GAP':
+            contribution = float(settings.BIO_CONTRIBUTION_DESTOCKING)
+        else:
+            contribution = data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[to_lu] - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[from_lu]
         destock_b_contr[lumap == from_lu] = (
-            data.BIO_QUALITY_RAW[lumap == from_lu] 
-            * (data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[to_lu] - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[from_lu])
+            data.BIO_QUALITY_RAW[lumap == from_lu]
+            * contribution
             * data.REAL_AREA[lumap == from_lu]
         )
-        
+
     return destock_b_contr
 
 
@@ -239,6 +244,7 @@ def get_breq_matrix(data: Data, ag_b_mrj: np.ndarray, lumap: np.ndarray):
 
 
 
+@lru_cache(maxsize=1)
 def get_non_ag_lu_biodiv_contribution(data: Data) -> dict[int, float]:
     return {
         # Environmental plantings

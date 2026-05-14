@@ -13,7 +13,6 @@ Or standalone (loads data automatically):
     python -m luto.tools.inspect_iis <path_to_ilp_file>
 """
 
-import io
 import re
 import sys
 import os
@@ -23,7 +22,7 @@ import luto.settings as settings
 from collections import Counter
 from contextlib import redirect_stdout
 from pathlib import Path
-from luto.tools import am_name_snake_case
+from luto.tools import am_name_snake_case, _TeeIO
 
 
 # ──────────────────────────── lookup tables ───────────────────────────────
@@ -215,25 +214,6 @@ def _parse_bound_var(bline: str) -> str | None:
     return None
 
 
-# ──────────────────────────── output tee ──────────────────────────────────
-
-class _TeeIO:
-    """Write to both the real stdout and a StringIO buffer."""
-
-    def __init__(self, real_stdout):
-        self._real = real_stdout
-        self._buf = io.StringIO()
-
-    def write(self, s):
-        self._real.write(s)
-        self._buf.write(s)
-
-    def flush(self):
-        self._real.flush()
-
-    def getvalue(self):
-        return self._buf.getvalue()
-
 
 # ──────────────────────────── analysis ────────────────────────────────────
 
@@ -242,13 +222,12 @@ def analyze_iis(filepath: str, data):
 
     Output is also saved to ``iis_analysis_summary.txt`` next to the .ilp file.
     """
-    tee = _TeeIO(sys.stdout)
-    with redirect_stdout(tee):
-        _analyze_iis_inner(filepath, data)
-
     summary_path = os.path.join(os.path.dirname(filepath), "iis_analysis_summary.txt")
-    with open(summary_path, "w", encoding="utf-8") as f:
-        f.write(tee.getvalue())
+    with (
+        open(summary_path, "w", encoding="utf-8") as f,
+        redirect_stdout(_TeeIO(sys.stdout, f)),
+    ):
+        _analyze_iis_inner(filepath, data)
     print(f"Summary saved to: {summary_path}", flush=True)
 
 
@@ -359,7 +338,7 @@ def _analyze_iis_inner(filepath: str, data):
                     free_terms.append((var_name, coeff))
 
             prefix = f"  [{idx+1}/{n_global}] " if n_global > 1 else "  "
-            print(f"\n{prefix}Constraint: {label}", flush=True)
+            print(f"  {prefix}Constraint: {label}", flush=True)
             print(f"  Variables: {len(terms)} total, {len(locked_terms)} locked, {len(free_terms)} free", flush=True)
             print(flush=True)
 
@@ -390,7 +369,7 @@ def _analyze_iis_inner(filepath: str, data):
 
         # Summarize cell-level constraints
         if cell_constraints:
-            print(f"\n  Cell-level: {len(cell_constraints)} constraints", end="", flush=True)
+            print(f"  Cell-level: {len(cell_constraints)} constraints", end="", flush=True)
             n_cell_locked = sum(
                 1 for _, body in cell_constraints
                 for var in re.findall(r'(X_[A-Za-z0-9_]+)', body)
@@ -398,8 +377,6 @@ def _analyze_iis_inner(filepath: str, data):
             )
             if n_cell_locked:
                 print(f" ({n_cell_locked} variables locked by bounds)", flush=True)
-            else:
-                print(flush=True)
 
         # Standalone bounds not in any constraint
         all_body_vars = set()

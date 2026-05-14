@@ -24,10 +24,13 @@ Pure functions to calculate biodiversity by lm, lu.
 
 import itertools
 import numpy as np
+import pandas as pd
+import xarray as xr
 
 from luto import settings
 from luto import tools
 from luto.data import Data
+from functools import lru_cache
 
 
 ################################################################
@@ -175,7 +178,7 @@ def get_biochar_effect_b_mrj(data:Data, ag_b_mrj: np.ndarray, yr_idx):
         return b_mrj_effect
 
     for lu_idx, lu in enumerate(land_uses):
-        biodiv_impact = data.BIOCHAR_DATA[lu].loc[yr_cal, 'Biodiversity_impact']
+        biodiv_impact = data.BIOCHAR_DATA[settings.LU2TYPE[lu]].loc[yr_cal, 'Biodiversity_impact']
 
         if biodiv_impact != 1:
             j = lu_codes[lu_idx]
@@ -260,7 +263,7 @@ def get_utility_solar_pv_effect_b_mrj(data:Data, ag_b_mrj: np.ndarray, yr_idx: i
     lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
     yr_cal = data.YR_CAL_BASE + yr_idx
     # Set up the effects matrix
-    b_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)   
+    b_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
     if not settings.AG_MANAGEMENTS['Utility Solar PV']:
         return b_mrj_effect
     for lu_idx, lu in enumerate(land_uses):
@@ -284,7 +287,7 @@ def get_onshore_wind_effect_b_mrj(data:Data, ag_b_mrj: np.ndarray, yr_idx: int):
     lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
     yr_cal = data.YR_CAL_BASE + yr_idx
     # Set up the effects matrix
-    b_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)   
+    b_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
     if not settings.AG_MANAGEMENTS['Onshore Wind']:
         return b_mrj_effect
     for lu_idx, lu in enumerate(land_uses):
@@ -359,14 +362,14 @@ score by 20% (compared to 'pre-1750' land), thus the biodiversity contribution o
 def get_GBF2_MASK_area(data:Data) -> np.ndarray:
     return data.BIO_GBF2_MASK * data.REAL_AREA
 
-def get_GBF3_NVIS_matrices_vr(data:Data) -> np.ndarray:
+def get_GBF3_NVIS_matrices_vr(data:Data) -> xr.DataArray:
     """
     Gets the NVIS vegetation group matrices for GBF3 constraint.
 
     Returns
     -------
-    np.ndarray
-        indexed (v, r) where v is NVIS vegetation group and r is cell
+    xr.DataArray
+        dims (group, cell) — only the unique selected vegetation groups
     """
     return data.GBF3_NVIS_LAYERS_LDS * data.REAL_AREA
 
@@ -383,49 +386,67 @@ def get_GBF3_IBRA_matrices_vr(data:Data) -> np.ndarray:
     return data.GBF3_IBRA_LAYERS_LDS * data.REAL_AREA
 
 
-def get_GBF4_SNES_matrix_sr(data:Data) -> np.ndarray:
+def get_GBF4_SNES_matrix_sr(data: Data) -> xr.DataArray:
     """
-    Gets the SNES contributions  matrix.
-    
+    Gets the SNES pre-1750 area matrix.
+
     Returns
     -------
-    np.ndarray
-        indexed (s, r) where s is species (independent of species conversation limits) and r is cell
+    xr.DataArray
+        dims ['layer', 'cell'] — layer coord is a MultiIndex of (region, species).
+        Region masking is already baked into each layer row.
     """
-    return np.where(
+    layers = data.BIO_GBF4_SPECIES_LAYERS  # xr.DataArray[layer, cell]
+    return xr.where(
         data.SAVBURN_ELIGIBLE,
-        data.BIO_GBF4_SPECIES_LAYERS * data.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
-        data.BIO_GBF4_SPECIES_LAYERS * data.REAL_AREA
+        layers * data.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
+        layers * data.REAL_AREA,
     ).astype(np.float32)
-    
 
-def get_GBF4_ECNES_matrix_sr(data:Data) -> np.ndarray:
+
+def get_GBF4_ECNES_matrix_sr(data: Data) -> xr.DataArray:
     """
-    Gets the ECNES contributions  matrix.
-    
+    Gets the ECNES pre-1750 area matrix.
+
     Returns
     -------
-    np.ndarray
-        indexed (s, r) where s is species (independent of species conversation limits) and r is cell
+    xr.DataArray
+        dims ['layer', 'cell'] — layer coord is a MultiIndex of (region, species).
+        Region masking is already baked into each layer row.
     """
-    return np.where(
+    layers = data.BIO_GBF4_COMUNITY_LAYERS  # xr.DataArray[layer, cell]
+    return xr.where(
         data.SAVBURN_ELIGIBLE,
-        data.BIO_GBF4_COMUNITY_LAYERS * data.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
-        data.BIO_GBF4_COMUNITY_LAYERS * data.REAL_AREA
+        layers * data.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
+        layers * data.REAL_AREA,
     ).astype(np.float32)
-    
 
 
-def get_GBF8_matrix_sr(data:Data, target_year: int):
-    return np.where(
+def get_GBF8_matrix_sr(data: Data, target_year: int) -> xr.DataArray:
+    """
+    Gets the GBF8 species suitability area matrix for the given year.
+
+    Returns
+    -------
+    xr.DataArray
+        dims ['species', 'cell'] — species coord holds species name strings.
+    """
+    bio_layers = data.get_GBF8_bio_layers_by_yr(target_year)  # numpy (n_species, n_cells)
+    base = np.where(
         data.SAVBURN_ELIGIBLE,
-        data.get_GBF8_bio_layers_by_yr(target_year) * data.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
-        data.get_GBF8_bio_layers_by_yr(target_year) * data.REAL_AREA
+        bio_layers * data.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
+        bio_layers * data.REAL_AREA,
+    ).astype(np.float32)
+    return xr.DataArray(
+        base,
+        dims=['species', 'cell'],
+        coords={'species': data.BIO_GBF8_SEL_SPECIES, 'cell': np.arange(data.NCELLS)},
     )
 
 
 
 # Functions to calculate ag/ag-man biodiversity contributions
+@lru_cache(maxsize=1)
 def get_ag_biodiversity_contribution(data:Data) -> np.ndarray:
     """
     Return b_j biodiversity contribution matrices by land-use type.
@@ -436,9 +457,10 @@ def get_ag_biodiversity_contribution(data:Data) -> np.ndarray:
     Returns
     - np.ndarray.
     """
-    return np.array(list(data.BIO_HABITAT_CONTRIBUTION_LOOK_UP.values()))
+    return np.array(list(data.BIO_HABITAT_CONTRIBUTION_LOOK_UP.values())).astype(np.float32)
 
 
+@lru_cache(maxsize=1)
 def get_ag_management_biodiversity_contribution(
     data:Data,
     yr_cal: int,
@@ -447,7 +469,7 @@ def get_ag_management_biodiversity_contribution(
     Return the biodiversity contribution of each agricultural management practice by land-use type.
     
     - If settings.AG_MANAGEMENTS['Biochar'] is True, then the biodiversity contribution 
-      of Biochar for land-use j is calculated as (data.BIOCHAR_DATA[lu].loc[yr_cal, 'Biodiversity_impact'] - 1),
+      of Biochar for land-use j is calculated as (data.BIOCHAR_DATA[settings.LU2TYPE[lu]].loc[yr_cal, 'Biodiversity_impact'] - 1),
       where lu is the land-use corresponding to land-use code j. 
       
     - If settings.AG_MANAGEMENTS['Biochar'] is False, then the biodiversity contribution 
@@ -483,7 +505,7 @@ def get_ag_management_biodiversity_contribution(
         }
     if settings.AG_MANAGEMENTS['Biochar']:
         am_contr_dict['Biochar'] = {
-            j_idx: (data.BIOCHAR_DATA[lu].loc[yr_cal, 'Biodiversity_impact'] - 1) * np.ones(data.NCELLS).astype(np.float32)
+            j_idx: (data.BIOCHAR_DATA[settings.LU2TYPE[lu]].loc[yr_cal, 'Biodiversity_impact'] - 1) * np.ones(data.NCELLS).astype(np.float32)
             for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Biochar'])
         }
     if settings.AG_MANAGEMENTS['HIR - Beef']:

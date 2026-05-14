@@ -20,6 +20,8 @@
 
 
 import numpy as np
+import pandas as pd
+import xarray as xr
 
 from collections import defaultdict
 from dataclasses import dataclass
@@ -78,9 +80,12 @@ class SolverInputData:
     
     renewable_solar_r: np.ndarray                                       # Renewable energy - solar yield matrix.
     renewable_wind_r: np.ndarray                                        # Renewable energy - wind yield matrix.
+    exist_renewable_solar_r: np.ndarray                                 # Existing solar capacity converted to annual MWh per cell.
+    exist_renewable_wind_r: np.ndarray                                  # Existing wind capacity converted to annual MWh per cell.
     
     region_state_r: np.ndarray                                          # Region state index for each cell.
     region_state_name2idx: dict[str, int]                               # Map of region state names to indices.
+    region_NRM_names_r: np.ndarray                                      # Region NRM names for each cell.
     
     water_region_indices: dict[int, np.ndarray]                         # Water region indices -> dict. Key: region.
     water_region_names: dict[int, str]                                  # Water yield for the BASE_YR based on historical water yield layers.
@@ -91,19 +96,20 @@ class SolverInputData:
     
     GBF2_mask_area_r: np.ndarray                                        # Raw areas (GBF2) from priority degrade areas - indexed by cell (r).
     GBF3_NVIS_pre_1750_area_vr: np.ndarray                              # Raw areas (GBF3) from NVIS vegetation - indexed by group (v) and cell (r)
-    GBF3_NVIS_names: dict[int, str]                                     # GBF3 NVIS vegetation group names - indexed by group (v).
-    GBF3_IBRA_pre_1750_area_vr: np.ndarray                              # Raw areas (GBF3) from IBRA bioregions - indexed by region (v) and cell (r)
-    GBF3_IBRA_names: dict[int, str]                                     # GBF3 IBRA bioregion names - indexed by region (v).
-    GBF4_SNES_pre_1750_area_sr: np.ndarray                              # Raw areas (GBF4) Species NES contribution data - indexed by species/ecological community (x) and cell (r).
-    GBF4_SNES_names: dict[int, str]                                     # Species NES names - indexed by species/ecological community (x).
-    GBF4_ECNES_pre_1750_area_sr: np.ndarray                             # Raw areas (GBF4) Ecological community NES contribution data - indexed by species/ecological community (x) and cell (r).
-    GBF4_ECNES_names: dict[int, str]                                    # Ecological community NES names - indexed by species/ecological community (x).
-    GBF8_pre_1750_area_sr: np.ndarray                                   # Raw areas (GBF8) Species data - indexed by species (s) and cell (r).
-    GBF8_species_names: dict[int, str]                                  # Species names - indexed by species (s).
-    GBF8_species_indices: dict[int, float]                              # Species indices - indexed by species (s).
+    GBF3_NVIS_region_group: dict[int, str]                                     # GBF3 NVIS vegetation group names - indexed by group (v).
+    GBF4_SNES_pre_1750_area_sr: xr.DataArray                            # Areas (GBF4) SNES - xr.DataArray[layer, cell], layer coord is MultiIndex(region, species).
+    GBF4_SNES_region_species: list                                      # GBF4 SNES constraint pairs - list[(region, species)].
+    GBF4_ECNES_pre_1750_area_sr: xr.DataArray                          # Areas (GBF4) ECNES - xr.DataArray[layer, cell], layer coord is MultiIndex(region, species).
+    GBF4_ECNES_region_species: list                                     # GBF4 ECNES constraint pairs - list[(region, species)].
+    GBF8_pre_1750_area_sr: xr.DataArray                                 # Areas (GBF8) - xr.DataArray[species, cell], species coord = species name strings.
+    GBF8_region_species: list                                           # GBF8 constraint pairs - list[(region, species)].
 
     savanna_eligible_r: np.ndarray                                      # Cells that are eligible for savanna burnining land use.
     GBF2_mask_idx: np.ndarray                                           # Index of the mask of priority degraded areas.
+    renewable_GBF2_mask_solar_idx: np.ndarray                            # Index of GBF2 mask for solar renewable exclusion.
+    renewable_GBF2_mask_wind_idx: np.ndarray                             # Index of GBF2 mask for wind renewable exclusion.
+    renewable_MNES_mask_solar_idx: np.ndarray                           # Index of EPBC MNES mask for solar renewable exclusion.
+    renewable_MNES_mask_wind_idx: np.ndarray                            # Index of EPBC MNES mask for wind renewable exclusion.
 
     base_yr_prod: dict[str, tuple]                                      # Base year production of each commodity.
     scale_factors: dict[float]                                          # Scale factors for each input layer.
@@ -119,6 +125,7 @@ class SolverInputData:
     limits: dict                                                        # Targets to use.
     desc2aglu: dict                                                     # Map of agricultural land use descriptions to codes.
     real_area: np.ndarray                                               # Area of each cell, indexed by cell (r)
+    ag_mask_proportion_r: np.ndarray                                    # Initial (2010) total agricultural land proportion per cell (r).
                 
     @property
     def ncms(self):
@@ -137,7 +144,7 @@ class SolverInputData:
 
     @property
     def n_ag_lus(self):
-        # Number of agricultural landuses
+        # Number of Agricultural land-uses
         return self.ag_g_mrj.shape[2]
 
     @property
@@ -297,65 +304,48 @@ def get_GBF3_NVIS_pre_1750_area_vr(data: Data):
     output = ag_biodiversity.get_GBF3_NVIS_matrices_vr(data)
     return output
 
-def get_GBF3_NVIS_names(data: Data) -> dict[int,str]:
+def get_GBF3_NVIS_region_group(data: Data) -> dict[int,str]:
     if settings.BIODIVERSITY_TARGET_GBF_3_NVIS == "off":
         return {}
     print('Getting GBF3 NVIS vegetation group names...', flush = True)
-    return data.BIO_GBF3_NVIS_ID2DESC
+    return data.BIO_GBF3_NVIS_SEL
 
-def get_GBF3_IBRA_pre_1750_area_vr(data: Data):
-    if settings.BIODIVERSITY_TARGET_GBF_3_IBRA == "off":
-        return np.empty(0)
-    print('Getting GBF3 IBRA bioregion matrices...', flush = True)
-    output = ag_biodiversity.get_GBF3_IBRA_matrices_vr(data)
-    return output
 
-def get_GBF3_IBRA_names(data: Data) -> dict[int,str]:
-    if settings.BIODIVERSITY_TARGET_GBF_3_IBRA == "off":
-        return {}
-    print('Getting GBF3 IBRA bioregion names...', flush = True)
-    return data.BIO_GBF3_IBRA_ID2DESC
-
-def get_GBF4_SNES_pre_1750_area_sr(data: Data) -> np.ndarray:
+def get_GBF4_SNES_pre_1750_area_sr(data: Data) -> xr.DataArray:
     if settings.BIODIVERSITY_TARGET_GBF_4_SNES != "on":
         return np.empty(0)
+    print('Getting GBF4 SNES species area matrices...', flush=True)
     return ag_biodiversity.get_GBF4_SNES_matrix_sr(data)
 
-def get_GBF4_SNES_names(data: Data) -> dict[int,str]:
+def get_GBF4_SNES_region_species(data: Data) -> list:
     if settings.BIODIVERSITY_TARGET_GBF_4_SNES != "on":
-        return np.empty(0)
-    print('Getting agricultural species NES names...', flush = True)
-    return {x: name for x, name in enumerate(data.BIO_GBF4_SNES_SEL_ALL)}
+        return []
+    print('Getting GBF4 SNES (region, species) constraint pairs...', flush=True)
+    return data.BIO_GBF4_SNES_SEL
 
-def get_GBF4_ECNES_pre_1750_area_sr(data: Data) -> np.ndarray:
+def get_GBF4_ECNES_pre_1750_area_sr(data: Data) -> xr.DataArray:
     if settings.BIODIVERSITY_TARGET_GBF_4_ECNES != "on":
         return np.empty(0)
+    print('Getting GBF4 ECNES community area matrices...', flush=True)
     return ag_biodiversity.get_GBF4_ECNES_matrix_sr(data)
 
-def get_GBF4_ECNES_names(data: Data) -> dict[int,str]:
+def get_GBF4_ECNES_region_species(data: Data) -> list:
     if settings.BIODIVERSITY_TARGET_GBF_4_ECNES != "on":
-        return np.empty(0)
-    print('Getting agricultural ecological community NES names...', flush = True)
-    return {x: name for x, name in enumerate(data.BIO_GBF4_ECNES_SEL_ALL)}
+        return []
+    print('Getting GBF4 ECNES (region, species) constraint pairs...', flush=True)
+    return data.BIO_GBF4_ECNES_SEL
 
-def get_GBF8_pre_1750_area_sr(data: Data, target_year: int) -> np.ndarray:
+def get_GBF8_pre_1750_area_sr(data: Data, target_year: int) -> xr.DataArray:
     if settings.BIODIVERSITY_TARGET_GBF_8 != "on":
         return np.empty(0)
-    print('Getting species conservation cell data...', flush = True)
+    print('Getting GBF8 species conservation area matrices...', flush=True)
     return ag_biodiversity.get_GBF8_matrix_sr(data, target_year)
 
-def get_GBF8_species_names(data: Data) -> dict[int,str]:
+def get_GBF8_region_species(data: Data) -> list:
     if settings.BIODIVERSITY_TARGET_GBF_8 != "on":
-        return np.empty(0)
-    print('Getting species conservation names...', flush = True)
-    return {s: spec_name for s, spec_name in enumerate(data.BIO_GBF8_SEL_SPECIES)}
-
-def get_GBF8_indices(data: Data, yr_cal) -> dict[int, float]:
-    if settings.BIODIVERSITY_TARGET_GBF_8 != "on":
-        return np.empty(0)
-    print('Getting species conservation indices...', flush = True)
-    species_matrix = data.get_GBF8_bio_layers_by_yr(yr_cal)
-    return {s: np.where(species_matrix[s] > 0)[0] for s in range(data.N_GBF8_SPECIES)}
+        return []
+    print('Getting GBF8 (region, species) constraint pairs...', flush=True)
+    return data.BIO_GBF8_SEL
 
 
 def get_non_ag_w_rk(
@@ -436,7 +426,7 @@ def get_non_ag_to_ag_t_mrj(data: Data, base_year:int, target_index: int):
 
 def get_non_ag_t_rk(data: Data, base_year):
     print('Getting non-agricultural transition cost matrices...', flush = True)
-    output = non_ag_transition.get_non_ag_transition_matrix(data)
+    output = non_ag_transition.get_non_ag_to_non_ag_transition_matrix(data)
     return output
 
 
@@ -457,15 +447,27 @@ def get_ag_man_lb_mrj(data: Data, base_year):
     output = ag_transition.get_lower_bound_agricultural_management_matrices(data, base_year)
     return output
 
-def get_renewable_solar_r(data: Data, target_idx):
+def get_potential_renewable_solar_r(data: Data, target_idx):
     print('Getting renewable energy - solar yield matrix...', flush = True)
     output = ag_quantity.get_quantity_renewable(data, 'Utility Solar PV', target_idx)
     return output
 
-def get_renewable_wind_r(data: Data, target_idx):
+def get_potential_renewable_wind_r(data: Data, target_idx):
     print('Getting renewable energy - wind yield matrix...', flush = True)
     output = ag_quantity.get_quantity_renewable(data, 'Onshore Wind', target_idx)
     return output
+
+def get_exist_renewable_fraction_solar_r(data: Data, yr_cal: int):
+    print('Getting existing solar capacity (MWh/cell)...', flush=True)
+    return ag_quantity.get_existing_renewable_dvar_fraction(data, 'Utility Solar PV', yr_cal)
+
+def get_exist_renewable_fraction_wind_r(data: Data, yr_cal: int):
+    print('Getting existing wind capacity (MWh/cell)...', flush=True)
+    return ag_quantity.get_existing_renewable_dvar_fraction(data, 'Onshore Wind', yr_cal)
+
+def get_exist_renewable_capacity_by_state_input(data: Data, yr_cal: int):
+    print('Getting existing renewable capacity by state...', flush=True)
+    return ag_quantity.get_exist_renewable_capacity_by_state(data, yr_cal)
 
 def get_region_state_r(data: Data):
     print('Getting region state index for each cell...', flush = True)
@@ -475,15 +477,19 @@ def get_region_state_name2idx(data: Data):
     print('Getting map of region state names to indices...', flush = True)
     return data.REGION_STATE_NAME2CODE
 
+def get_region_NRM_names_r(data: Data):
+    print('Getting region NRM names for each cell...', flush = True)
+    return data.REGION_NRM_NAME
+
 def get_non_ag_lb_rk(data: Data, base_year):
     print('Getting non-agricultural lower bound matrices...', flush = True)
     output = non_ag_transition.get_lower_bound_non_agricultural_matrices(data, base_year)
     return output
 
 
-def get_ag_man_c_mrj(data: Data, target_index, ag_c_mrj: np.ndarray):
+def get_ag_man_c_mrj(data: Data, ag_c_mrj: np.ndarray, target_year):
     print('Getting agricultural management options\' cost effects...', flush = True)
-    output = ag_cost.get_agricultural_management_cost_matrices(data, ag_c_mrj, target_index)
+    output = ag_cost.get_agricultural_management_cost_matrices(data, ag_c_mrj, target_year)
     return output
 
 
@@ -676,110 +682,261 @@ def get_GBF2_mask_idx(data: Data) -> np.ndarray:
     return np.where(data.BIO_GBF2_MASK_LDS)[0]
 
 
-def rescale_solver_input_data(arries:list) -> None:
-    """
-    !!!!!`Inplace`!!!!!! rescale the solver input data based on `settings.RESCALE_FACTOR` .
-    To resume the data, just multiply the arrays by the returned scale factor.
-    
-    After rescaling, the arrays will be rescaled to the magnitude (regardless of signs) between 0 and `settings.RESCALE_FACTOR` (default to 1e3).
-    """
+def get_renewable_GBF2_mask_solar_idx(data: Data) -> np.ndarray:
+    if not any(settings.RENEWABLES_OPTIONS.values()) or not settings.EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS:
+        return np.empty(0, dtype=int)
+    return np.where(data.RENEWABLE_GBF2_MASK_SOLAR)[0]
 
-    max_vals = []
-    for arr in arries:
-        if isinstance(arr, np.ndarray):
-            arr = arr.astype(np.float32)
-            max_vals.append(max(arr.max(), abs(arr.min())))
-        elif isinstance(arr, dict):
-            # Assume all dictionaries are {str: np.ndarray}
-            max_vals.extend([max(v.max(), abs(v.min())) for v in arr.values()])
-    
-    scale = (np.max(max_vals) / settings.RESCALE_FACTOR).astype(np.float32)
-    
-    for arr in arries:
-        if isinstance(arr, dict):
-            # Update dictionary values in-place
-            for k in arr:
-                arr[k] /= scale
-        elif isinstance(arr, np.ndarray):
-            # Arrays are already updated in-place
-            arr /= scale
 
-    return scale
+def get_renewable_GBF2_mask_wind_idx(data: Data) -> np.ndarray:
+    if not any(settings.RENEWABLES_OPTIONS.values()) or not settings.EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS:
+        return np.empty(0, dtype=int)
+    return np.where(data.RENEWABLE_GBF2_MASK_WIND)[0]
 
-def get_limits(data: Data, yr_cal: int, resale_factors) -> dict[str, Any]:
+
+def get_renewable_MNES_mask_solar_idx(data: Data) -> np.ndarray:
+    if not any(settings.RENEWABLES_OPTIONS.values()) or not settings.EXCLUDE_RENEWABLES_IN_EPBC_MNES_MASK:
+        return np.empty(0, dtype=int)
+    return np.where(data.RENEWABLE_MNES_MASK_SOLAR)[0]
+
+
+def get_renewable_MNES_mask_wind_idx(data: Data) -> np.ndarray:
+    if not any(settings.RENEWABLES_OPTIONS.values()) or not settings.EXCLUDE_RENEWABLES_IN_EPBC_MNES_MASK:
+        return np.empty(0, dtype=int)
+    return np.where(data.RENEWABLE_MNES_MASK_WIND)[0]
+
+
+def get_limits(data: Data, yr_cal: int) -> dict[str, Any]:
     """
-    Gets the following limits for the solve:
-    - Water net yield limits
-    - GHG limits
-    - Biodiversity limits
-    - Regional adoption limits
+    Return raw (unscaled) constraint targets for the given calendar year.
+
+    Keys returned depend on active settings:
+      'demand', 'water', 'ghg',
+      'renewable_Utility Solar PV', 'renewable_Onshore Wind',
+      'renewable_Utility Solar PV_exist', 'renewable_Onshore Wind_exist',
+      'GBF2', 'GBF3_NVIS', 'GBF4_SNES', 'GBF4_ECNES', 'GBF8',
+      'ag_regional_adoption', 'non_ag_regional_adoption', 'non_ag_regional_adoption_sum'
+
+    All values are raw (unscaled); the solver divides each by the appropriate
+    ``scale_factors[key]`` entry inline when building constraints.
     """
     print('Getting environmental limits...', flush = True)
     
-    limits = {
-        'demand': None,
-        'water': None,
-        'ghg': None,
-        'renewable_solar': None,
-        'renewable_wind': None,
-        'GBF2': None,
-        'GBF3': None,
-        'GBF4_SNES': None,
-        'GBF4_ECNES': None,
-        'GBF8': None,
-        'ag_regional_adoption': None,
-        'non_ag_regional_adoption': None,
-    }
+    limits = {}
     
-    if True:    # Always set demand limits
-        limits['demand'] = data.D_CY[yr_cal - data.YR_CAL_BASE]
-        limits['demand_rescale'] = limits['demand'] / resale_factors['Demand']
+    limits['demand'] = data.D_CY[yr_cal - data.YR_CAL_BASE]
     
     if settings.WATER_LIMITS == 'on':
         limits['water'] = data.WATER_YIELD_TARGETS
-        limits['water_rescale'] = {k: v / resale_factors['Water'] for k, v in limits['water'].items()}
         
     if settings.GHG_EMISSIONS_LIMITS != 'off':
         limits['ghg'] = data.GHG_TARGETS[yr_cal]
-        limits['ghg_rescale'] = limits['ghg'] / resale_factors['GHG']
         
-    if settings.RENEWABLE_ENERGY_CONSTRAINTS == 'on':
-        renewable_targets = data.RENEWABLE_TARGETS.query('Year == @yr_cal and SCENARIO == @settings.RENEWABLE_TARGET_SCENARIO ')
-        limits['renewable_solar'] = renewable_targets.query('PRODUCT == "Electricity - Solar"')['Renewable_Target_MWh'].values
-        limits['renewable_wind'] = renewable_targets.query('PRODUCT == "Electricity - Wind"')['Renewable_Target_MWh'].values
-        limits['renewable_solar_rescale'] = limits['renewable_solar'] / resale_factors['Renewable_Solar']
-        limits['renewable_wind_rescale'] = limits['renewable_wind'] / resale_factors['Renewable_Wind']
+    if any(settings.RENEWABLES_OPTIONS.values()):
+        renewable_targets = data.RENEWABLE_TARGETS.query('Year == @yr_cal').set_index('state')
+        limits['renewable_Utility Solar PV'] = renewable_targets.query('tech == "Utility Solar"')['Renewable_Target_MWh'].to_dict()
+        limits['renewable_Onshore Wind'] = renewable_targets.query('tech == "Wind"')['Renewable_Target_MWh'].to_dict()
+        
+        renewable_existing_capacity = get_exist_renewable_capacity_by_state_input(data, yr_cal)
+        limits['renewable_Utility Solar PV_exist'] = {state: vals['Utility Solar PV'] for state, vals in renewable_existing_capacity.items()}
+        limits['renewable_Onshore Wind_exist']     = {state: vals['Onshore Wind']     for state, vals in renewable_existing_capacity.items()}
 
     if settings.BIODIVERSITY_TARGET_GBF_2 != 'off':
         limits["GBF2"] = data.get_GBF2_target_for_yr_cal(yr_cal)
-        limits["GBF2_rescale"] = limits["GBF2"] / resale_factors['GBF2']
 
     if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != 'off':
         limits["GBF3_NVIS"] = data.get_GBF3_NVIS_limit_score_inside_LUTO_by_yr(yr_cal)
-        limits["GBF3_NVIS_rescale"] = limits["GBF3_NVIS"] / resale_factors['GBF3_NVIS']
-
-    if settings.BIODIVERSITY_TARGET_GBF_3_IBRA != 'off':
-        limits["GBF3_IBRA"] = data.get_GBF3_IBRA_limit_score_inside_LUTO_by_yr(yr_cal)
-        limits["GBF3_IBRA_rescale"] = limits["GBF3_IBRA"] / resale_factors['GBF3_IBRA']
 
     if settings.BIODIVERSITY_TARGET_GBF_4_SNES == "on":
         limits["GBF4_SNES"] = data.get_GBF4_SNES_target_inside_LUTO_by_year(yr_cal)
-        limits["GBF4_SNES_rescale"] = limits["GBF4_SNES"] / resale_factors['GBF4_SNES']
-        
+
     if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == "on":
         limits["GBF4_ECNES"] = data.get_GBF4_ECNES_target_inside_LUTO_by_year(yr_cal)
-        limits["GBF4_ECNES_rescale"] = limits["GBF4_ECNES"] / resale_factors['GBF4_ECNES']
 
     if settings.BIODIVERSITY_TARGET_GBF_8 == "on":
         limits["GBF8"] = data.get_GBF8_target_inside_LUTO_by_yr(yr_cal)
-        limits["GBF8_rescale"] = limits["GBF8"] / resale_factors['GBF8']
 
     if settings.REGIONAL_ADOPTION_CONSTRAINTS != 'off':
-        ag_reg_adoption, non_ag_reg_adoption = ag_transition.get_regional_adoption_limits(data, yr_cal)
+        ag_reg_adoption, non_ag_reg_adoption, non_ag_reg_adoption_sum = ag_transition.get_regional_adoption_limits(data, yr_cal)
         limits["ag_regional_adoption"] = ag_reg_adoption
         limits["non_ag_regional_adoption"] = non_ag_reg_adoption
+        limits["non_ag_regional_adoption_sum"] = non_ag_reg_adoption_sum
 
     return limits
+
+
+def calc_geomean_scale(lhs_max: float, rhs_max: float) -> float:
+    """
+    Compute a single scale factor as the geometric mean of LHS and RHS magnitudes,
+    normalised by ``settings.RESCALE_FACTOR`` (RF)::
+
+        scale = sqrt(lhs_max * rhs_max) / RF
+
+    After dividing both sides by this scale:
+      - LHS_max_scaled = RF * sqrt(lhs_max / rhs_max)
+      - RHS_scaled     = RF * sqrt(rhs_max / lhs_max)
+
+    Both land symmetrically around RF in log space.
+    Falls back to LHS-only (``lhs_max / RF``) when ``rhs_max`` is zero.
+    """
+    if lhs_max > 0.0 and rhs_max > 0.0:
+        return float(np.sqrt(lhs_max * rhs_max) / settings.RESCALE_FACTOR)
+    ref = lhs_max if lhs_max > 0.0 else settings.RESCALE_FACTOR
+    return float(ref / settings.RESCALE_FACTOR)
+
+
+def rescale_lhs(arrays: list) -> tuple[list, float]:
+    """
+    Rescale arrays using LHS-only scaling: ``scale = max(|LHS|) / RF``.
+
+    All arrays in the group share one scale factor to preserve their relative
+    magnitudes (e.g. ag, non-ag, and ag-management variants of the same quantity).
+    Returns ``(scaled_arrays, scale_factor)``.
+    """
+    ref = 0.0
+    for arr in arrays:
+        if isinstance(arr, np.ndarray):
+            ref = max(ref, float(np.abs(arr).max()))
+        elif isinstance(arr, dict):
+            for v in arr.values():
+                ref = max(ref, float(np.abs(v).max()))
+
+    scale = np.float32(calc_geomean_scale(ref, 0.0))  # rhs_max=0 → LHS-only path
+
+    scaled = []
+    for arr in arrays:
+        if isinstance(arr, np.ndarray):
+            scaled.append((arr / scale).astype(np.float32))
+        elif isinstance(arr, dict):
+            scaled.append({k: (v / scale).astype(np.float32) for k, v in arr.items()})
+        else:
+            scaled.append(arr)
+
+    return scaled, float(scale)
+
+
+def rescale_lhs_rhs(arrays: list, rhs_target) -> tuple[list, float]:
+    """
+    Rescale arrays using the geometric mean of max(|LHS|) and max(|RHS|)::
+
+        scale = sqrt(max_lhs * max_rhs) / RF
+
+    Both LHS coefficients and the RHS target land symmetrically around RF in log
+    space, keeping both sides within Gurobi's recommended [1e-3, 1e6] band as long
+    as ``max_rhs / max_lhs < 1e9`` (holds for all LUTO constraint types).
+
+    Use this for aggregate constraints (GHG, Water, GBF2, Demand, Renewable) where
+    per-cell LHS values and a national/regional RHS total would otherwise diverge.
+
+    Args:
+        arrays:     List of ``np.ndarray`` or ``dict[str, np.ndarray]``.
+        rhs_target: Scalar float, ``dict[key, float]``, or ``np.ndarray``.
+                    Representative magnitude is ``max(|rhs_target|)``.
+
+    Returns:
+        ``(scaled_arrays, scale_factor)``
+    """
+    lhs_max = 0.0
+    for arr in arrays:
+        if isinstance(arr, np.ndarray):
+            lhs_max = max(lhs_max, float(np.abs(arr).max()))
+        elif isinstance(arr, dict):
+            for v in arr.values():
+                lhs_max = max(lhs_max, float(np.abs(v).max()))
+
+    if isinstance(rhs_target, dict):
+        rhs_max = max((abs(v) for v in rhs_target.values()), default=0.0)
+    elif isinstance(rhs_target, np.ndarray):
+        rhs_max = float(np.abs(rhs_target).max()) if rhs_target.size else 0.0
+    else:
+        rhs_max = abs(float(rhs_target))
+
+    scale = np.float32(calc_geomean_scale(lhs_max, rhs_max))
+    if scale == 0.0:
+        scale = np.float32(1.0)
+
+    scaled = []
+    for arr in arrays:
+        if isinstance(arr, np.ndarray):
+            scaled.append((arr / scale).astype(np.float32))
+        elif isinstance(arr, dict):
+            scaled.append({k: (v / scale).astype(np.float32) for k, v in arr.items()})
+        else:
+            scaled.append(arr)
+
+    return scaled, float(scale)
+
+
+def rescale_lhs_rhs_region_species(
+    arr: xr.DataArray,
+    region_species_list: list[tuple[str, str]],
+    region_NRM_names_r: np.ndarray,
+    targets: xr.DataArray | None = None,
+) -> tuple[xr.DataArray, xr.DataArray]:
+    """
+    Rescale a biodiversity matrix per (region, species/group) pair using the
+    geometric mean of max(|LHS|) and the pair's RHS target.
+
+    Calls :func:`calc_geomean_scale` for each pair::
+
+        scale = calc_geomean_scale(region_max, abs(target_val))
+
+    When ``targets`` is ``None``, falls back to LHS-only (``region_max / RF``).
+
+    'Australia' as region uses all cells.
+
+    Supports two matrix layouts:
+    - ``row_coord = 'layer'`` (GBF4 SNES/ECNES): rows are (region, species) tuples.
+    - ``row_coord = 'group'`` or ``'species'`` (GBF3 NVIS, GBF8): rows are the
+      species/group string.
+
+    The output ``scale_factors`` DataArray has ``layer=[(region, species)]`` coords
+    so callers can uniformly use ``scale_factors.sel(layer=(region, species))``.
+
+    Returns:
+        scaled_arr: xr.DataArray, same shape as ``arr``.
+        scale_factors: xr.DataArray[layer=(region, species)].
+    """
+    arr_np = arr.values.copy().astype(np.float32)
+    row_coord = arr.dims[0]
+    row_names = arr.coords[row_coord].values
+    row_name_to_idx = {name: i for i, name in enumerate(row_names)}
+    use_tuple_key = (row_coord == 'layer')  # GBF4: row key is (region, species) tuple
+
+    layers: list[tuple] = []
+    sf_values: list[float] = []
+
+    for region, species in region_species_list:
+        row_key = (region, species) if use_tuple_key else species
+        row_idx = row_name_to_idx[row_key]
+
+        cell_mask = (
+            np.ones(arr_np.shape[1], dtype=bool)
+            if region == "Australia"
+            else region_NRM_names_r == region
+        )
+
+        region_max = float(np.abs(arr_np[row_idx, cell_mask]).max()) if cell_mask.any() else 0.0
+
+        if targets is not None:
+            target_val = abs(float(targets.sel(layer=(region, species)).item()))
+        else:
+            target_val = 0.0
+
+        scale_factor = np.float32(calc_geomean_scale(region_max, target_val))
+
+        arr_np[row_idx, cell_mask] = arr_np[row_idx, cell_mask] / scale_factor
+
+        layers.append((region, species))
+        sf_values.append(float(scale_factor))
+
+    scaled_arr = xr.DataArray(arr_np, dims=arr.dims, coords=arr.coords, name=arr.name)
+    scale_factors = xr.DataArray(
+        np.array(sf_values, dtype=np.float32),
+        dims=["layer"],
+        coords={"layer": pd.MultiIndex.from_tuples(layers, names=["region", "species"])},
+    )
+    return scaled_arr, scale_factors
 
 
 
@@ -800,11 +957,11 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     non_ag_t_rk = get_non_ag_t_rk(data, base_year)
     non_ag_to_ag_t_mrj = get_non_ag_to_ag_t_mrj(data, base_year, target_index)
     
-    ag_man_c_mrj = get_ag_man_c_mrj(data, target_index, ag_c_mrj)
+    ag_man_c_mrj = get_ag_man_c_mrj(data, ag_c_mrj, target_year)
     ag_man_r_mrj = get_ag_man_r_mrj(data, target_index, ag_r_mrj)
     ag_man_t_mrj = get_ag_man_t_mrj(data, target_index)
     
-    ag_obj_mrj, non_ag_obj_rk,  ag_man_objs=get_economic_mrj(
+    ag_obj_mrj, non_ag_obj_rk,  ag_man_objs = get_economic_mrj(
         ag_c_mrj,
         ag_r_mrj,
         ag_t_mrj,
@@ -847,11 +1004,14 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     ag_man_limits=get_ag_man_limits(data, target_index)                            
     ag_man_lb_mrj=get_ag_man_lb_mrj(data, base_year)
     
-    renewable_solar_r=get_renewable_solar_r(data, target_index)
-    renewable_wind_r=get_renewable_wind_r(data, target_index)
-    
+    renewable_solar_r=get_potential_renewable_solar_r(data, target_index)
+    renewable_wind_r=get_potential_renewable_wind_r(data, target_index)
+    exist_renewable_solar_r=get_exist_renewable_fraction_solar_r(data, target_year)
+    exist_renewable_wind_r=get_exist_renewable_fraction_wind_r(data, target_year)
+
     region_state_r = get_region_state_r(data)
     region_state_name2idx = get_region_state_name2idx(data)
+    region_NRM_names_r=get_region_NRM_names_r(data)
     
     water_region_indices=get_w_region_indices(data)
     water_region_names=get_w_region_names(data)
@@ -862,73 +1022,109 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
 
     GBF2_mask_area_r = get_GBF2_mask_area_r(data)
     GBF3_NVIS_pre_1750_area_vr=get_GBF3_NVIS_pre_1750_area_vr(data)
-    GBF3_NVIS_names=get_GBF3_NVIS_names(data)
-    GBF3_IBRA_pre_1750_area_vr=get_GBF3_IBRA_pre_1750_area_vr(data)
-    GBF3_IBRA_names=get_GBF3_IBRA_names(data)
+    GBF3_NVIS_region_group=get_GBF3_NVIS_region_group(data)
     GBF4_SNES_pre_1750_area_sr=get_GBF4_SNES_pre_1750_area_sr(data)
-    GBF4_SNES_names=get_GBF4_SNES_names(data)
+    GBF4_SNES_region_species=get_GBF4_SNES_region_species(data)
     GBF4_ECNES_pre_1750_area_sr=get_GBF4_ECNES_pre_1750_area_sr(data)
-    GBF4_ECNES_names=get_GBF4_SNES_names(data)
+    GBF4_ECNES_region_species=get_GBF4_ECNES_region_species(data)
     GBF8_pre_1750_area_sr=get_GBF8_pre_1750_area_sr(data, target_year)
-    GBF8_species_names=get_GBF8_species_names(data)
-    GBF8_species_indices=get_GBF8_indices(data,target_year)
+    GBF8_region_species=get_GBF8_region_species(data)
 
     savanna_eligible_r=get_savanna_eligible_r(data)
     GBF2_mask_idx=get_GBF2_mask_idx(data)
+    renewable_GBF2_mask_solar_idx=get_renewable_GBF2_mask_solar_idx(data)
+    renewable_GBF2_mask_wind_idx=get_renewable_GBF2_mask_wind_idx(data)
+    renewable_MNES_mask_solar_idx=get_renewable_MNES_mask_solar_idx(data)
+    renewable_MNES_mask_wind_idx=get_renewable_MNES_mask_wind_idx(data)
+
+    # Fetch all raw limit targets once — reused in both rescaling and get_limits below.
+    limits = get_limits(data, target_year)
+
+    # Rescale solver input data
+    [ag_obj_mrj, non_ag_obj_rk, ag_man_objs], economy_scale = rescale_lhs([ag_obj_mrj, non_ag_obj_rk, ag_man_objs])
+    [ag_q_mrp, non_ag_q_crk, ag_man_q_mrp],   demand_scale  = rescale_lhs_rhs(
+        [ag_q_mrp, non_ag_q_crk, ag_man_q_mrp],
+        limits['demand'],
+    )
+    [ag_b_mrj, non_ag_b_rk, ag_man_b_mrj],    biodiv_scale  = rescale_lhs([ag_b_mrj, non_ag_b_rk, ag_man_b_mrj])
+
+    # Get the scale factors
+    if settings.GHG_EMISSIONS_LIMITS != 'off':
+        [ag_g_mrj, non_ag_g_rk, ag_man_g_mrj, ag_ghg_t_mrj], ghg_scale = rescale_lhs_rhs(
+            [ag_g_mrj, non_ag_g_rk, ag_man_g_mrj, ag_ghg_t_mrj],
+            limits['ghg'],
+        )
+    else:
+        ghg_scale = 1.0
+
+    if any(settings.RENEWABLES_OPTIONS.values()):
+        [renewable_solar_r], renewable_solar_scale = rescale_lhs_rhs([renewable_solar_r], limits['renewable_Utility Solar PV'])
+        [renewable_wind_r],  renewable_wind_scale  = rescale_lhs_rhs([renewable_wind_r],  limits['renewable_Onshore Wind'])
+    else:
+        renewable_solar_scale = 1.0
+        renewable_wind_scale  = 1.0
+
+    if settings.WATER_LIMITS == 'on':
+        [ag_w_mrj, non_ag_w_rk, ag_man_w_mrj], water_scale = rescale_lhs_rhs(
+            [ag_w_mrj, non_ag_w_rk, ag_man_w_mrj],
+            limits['water'],
+        )
+    else:
+        water_scale = 1.0
+
+    if settings.BIODIVERSITY_TARGET_GBF_2 != "off":
+        [GBF2_mask_area_r], gbf2_scale = rescale_lhs_rhs(
+            [GBF2_mask_area_r],
+            limits['GBF2'],
+        )
+    else:
+        gbf2_scale = 1.0
+
+    if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != "off":
+        GBF3_NVIS_pre_1750_area_vr, gbf3_nvis_scale = rescale_lhs_rhs_region_species(
+            GBF3_NVIS_pre_1750_area_vr, GBF3_NVIS_region_group, region_NRM_names_r,
+            targets=limits['GBF3_NVIS'],
+        )
+    else:
+        gbf3_nvis_scale = 1.0
+
+    if settings.BIODIVERSITY_TARGET_GBF_4_SNES == "on":
+        GBF4_SNES_pre_1750_area_sr, gbf4_snes_scale = rescale_lhs_rhs_region_species(
+            GBF4_SNES_pre_1750_area_sr, GBF4_SNES_region_species, region_NRM_names_r,
+            targets=limits['GBF4_SNES'],
+        )
+    else:
+        gbf4_snes_scale = 1.0
+
+    if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == "on":
+        GBF4_ECNES_pre_1750_area_sr, gbf4_ecnes_scale = rescale_lhs_rhs_region_species(
+            GBF4_ECNES_pre_1750_area_sr, GBF4_ECNES_region_species, region_NRM_names_r,
+            targets=limits['GBF4_ECNES'],
+        )
+    else:
+        gbf4_ecnes_scale = 1.0
+
+    if settings.BIODIVERSITY_TARGET_GBF_8 == "on":
+        GBF8_pre_1750_area_sr, gbf8_scale = rescale_lhs_rhs_region_species(
+            GBF8_pre_1750_area_sr, GBF8_region_species, region_NRM_names_r,
+            targets=limits['GBF8'],
+        )
+    else:
+        gbf8_scale = 1.0
 
     scale_factors = {
-        "Economy":       rescale_solver_input_data([ag_obj_mrj, non_ag_obj_rk, ag_man_objs]),
-        "Demand":        rescale_solver_input_data([ag_q_mrp, non_ag_q_crk, ag_man_q_mrp]),
-        "Biodiversity":  rescale_solver_input_data([ag_b_mrj, non_ag_b_rk, ag_man_b_mrj]),
-        "GHG":(
-            rescale_solver_input_data([ag_g_mrj, non_ag_g_rk, ag_man_g_mrj, ag_ghg_t_mrj])
-            if settings.GHG_EMISSIONS_LIMITS != 'off' 
-            else 1.0  
-        ),
-        'Renewable_Solar' : (
-            rescale_solver_input_data([renewable_solar_r])  
-            if settings.RENEWABLE_ENERGY_CONSTRAINTS == 'on' 
-            else 1.0
-        ),
-        'Renewable_Wind' : (
-            rescale_solver_input_data([renewable_wind_r])  
-            if settings.RENEWABLE_ENERGY_CONSTRAINTS == 'on' 
-            else 1.0
-        ),
-        "Water":(
-            rescale_solver_input_data([ag_w_mrj, non_ag_w_rk, ag_man_w_mrj])
-            if settings.WATER_LIMITS == 'on'
-            else 1.0
-        ),         
-        "GBF2":(
-            rescale_solver_input_data([GBF2_mask_area_r])
-            if settings.BIODIVERSITY_TARGET_GBF_2 != "off"
-            else 1.0),
-        "GBF3_NVIS":(
-            rescale_solver_input_data([GBF3_NVIS_pre_1750_area_vr])
-            if settings.BIODIVERSITY_TARGET_GBF_3_NVIS != "off"
-            else 1.0
-        ),
-        "GBF3_IBRA":(
-            rescale_solver_input_data([GBF3_IBRA_pre_1750_area_vr])
-            if settings.BIODIVERSITY_TARGET_GBF_3_IBRA != "off"
-            else 1.0
-        ),
-        "GBF4_SNES":(
-            rescale_solver_input_data([GBF4_SNES_pre_1750_area_sr])
-            if settings.BIODIVERSITY_TARGET_GBF_4_SNES == "on"
-            else 1.0
-        ),
-        "GBF4_ECNES":(
-            rescale_solver_input_data([GBF4_ECNES_pre_1750_area_sr])
-            if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == "on"
-            else 1.0
-        ),
-        "GBF8":(
-            rescale_solver_input_data([GBF8_pre_1750_area_sr])
-            if settings.BIODIVERSITY_TARGET_GBF_8 == "on"
-            else 1.0
-        ),
+        "Economy":          economy_scale,
+        "Demand":           demand_scale,
+        "Biodiversity":     biodiv_scale,
+        "GHG":              ghg_scale,
+        "Water":            water_scale,
+        "GBF2":             gbf2_scale,
+        "GBF3_NVIS":        gbf3_nvis_scale,
+        "GBF4_SNES":        gbf4_snes_scale,
+        "GBF4_ECNES":       gbf4_ecnes_scale,
+        "GBF8":             gbf8_scale,
+        "Utility Solar PV": renewable_solar_scale,
+        "Onshore Wind":     renewable_wind_scale,
     }
 
     base_yr_prod = {
@@ -952,13 +1148,11 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
 
     lu2pr_pj=data.LU2PR
     pr2cm_cp=data.PR2CM
-    limits=get_limits(data, target_year, scale_factors)
     desc2aglu=data.DESC2AGLU
     real_area=data.REAL_AREA
+    ag_mask_proportion_r=data.AG_MASK_PROPORTION_R
 
-    land_use_culling.apply_agricultural_land_use_culling(
-        ag_x_mrj, ag_c_mrj, ag_t_mrj, ag_r_mrj
-    )
+    ag_x_mrj = land_use_culling.apply_agricultural_land_use_culling(ag_x_mrj, ag_c_mrj, ag_t_mrj, ag_r_mrj)
  
     return SolverInputData(
         base_year,
@@ -987,9 +1181,12 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         
         renewable_solar_r,
         renewable_wind_r,
-        
+        exist_renewable_solar_r,
+        exist_renewable_wind_r,
+
         region_state_r,
         region_state_name2idx,
+        region_NRM_names_r,
         
         water_region_indices,
         water_region_names,
@@ -1000,19 +1197,20 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         
         GBF2_mask_area_r,
         GBF3_NVIS_pre_1750_area_vr,
-        GBF3_NVIS_names,
-        GBF3_IBRA_pre_1750_area_vr,
-        GBF3_IBRA_names,
+        GBF3_NVIS_region_group,
         GBF4_SNES_pre_1750_area_sr,
-        GBF4_SNES_names,
+        GBF4_SNES_region_species,
         GBF4_ECNES_pre_1750_area_sr,
-        GBF4_ECNES_names,
+        GBF4_ECNES_region_species,
         GBF8_pre_1750_area_sr,
-        GBF8_species_names,
-        GBF8_species_indices,
+        GBF8_region_species,
         
         savanna_eligible_r,
         GBF2_mask_idx,
+        renewable_GBF2_mask_solar_idx,
+        renewable_GBF2_mask_wind_idx,
+        renewable_MNES_mask_solar_idx,
+        renewable_MNES_mask_wind_idx,
 
         base_yr_prod,
         scale_factors,
@@ -1027,5 +1225,6 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         pr2cm_cp,
         limits,
         desc2aglu,
-        real_area
+        real_area,
+        ag_mask_proportion_r
     )

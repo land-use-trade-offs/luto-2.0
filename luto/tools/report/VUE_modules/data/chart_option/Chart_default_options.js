@@ -24,10 +24,8 @@ window.Chart_default_options = {
         width: 230,
     },
     tooltip: {
-        formatter: function () {
-            return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-                }:</b>${this.y.toFixed(2)}<br/>`;
-        },
+        headerFormat: '<b>Year:</b> {point.key}<br/>',
+        pointFormat: '<b>{series.name}:</b> {point.y:.2f}<br/>',
     },
     plotOptions: {
         column: {

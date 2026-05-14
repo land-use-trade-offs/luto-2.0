@@ -5,6 +5,7 @@ This document describes the output file structure, NetCDF format specifications,
 ## Output Directory Structure
 
 Results are saved in `/output/<timestamp>_RF<resfactor>_<year_range>/`:
+
 - `DATA_REPORT/`: Vue.js reporting interface
   - `VUE_modules/`: Vue.js frontend (views, data, services, routes)
   - `index.html`: Main entry point
@@ -142,6 +143,7 @@ non_ag_map_cat = xr.concat([nonag_mosaic, non_ag_map], dim='lu')
 ```
 
 The `ALL` dimensions serve dual purposes:
+
 1. **Aggregated data**: For data matrices, `ALL` contains summed/averaged values across the dimension
 2. **Mosaic maps**: For decision variables, `ALL` contains the categorical dominant land use/management map (integer codes)
 
@@ -149,210 +151,88 @@ The `ALL` dimensions serve dual purposes:
 
 ## Valid Layers Implementation Pattern
 
-The "valid layers" pattern is a **critical memory and disk optimization** that reduces redundant dimension combinations. Instead of saving all possible dimension combinations (most of which contain only zeros), we identify and save only layers with meaningful values (|value| > 1).
+The "valid layers" pattern **reduces redundant dimension combinations**: instead of saving all possible dim combos (most empty), only layers with meaningful values (`|sum| > 1e-3`) are saved.
 
-### Why Valid Layers Matter
+### Two Approaches: Mosaic vs Aggregate
 
-**Problem**: Without valid layer filtering, output files contain massive numbers of empty/zero layers:
-- Agricultural revenue with 3 lm × 5 sources × 28 land uses = **420 layers** per year
-- Most combinations have zero values (e.g., "Irrigated + Water cost + Apples" may not exist)
-- Storing all combinations wastes **memory during processing** and **disk space** in NetCDF files
+There are two patterns depending on whether the `ALL` entry is a **categorical mosaic** (from dvar) or a **sum aggregate** (computed inline):
 
-**Solution**: Extract valid layers from aggregated data, filter both data arrays and mosaic layers, then combine only meaningful layers.
+#### Pattern A — Mosaic `ALL` (Economics: Revenue/Cost/Profit/Transitions)
 
-### Implementation Pattern by Category
+Used for Economics outputs where `ALL` shows the dominant land-use color map from the dvar file.
 
-The pattern varies by data category based on dimension structure:
-
-#### 1. Agricultural (Ag) - Example: Revenue/Cost/GHG
+**Ag (Revenue/Cost):**
 
 ```python
-# Step 1: Get valid data layers from AUS-level aggregated dataframe
-# Use sorted MultiIndex for consistent ordering
-valid_rev_layers = pd.MultiIndex.from_frame(
-    ag_rev_jms_AUS[['lm', 'source', 'lu']]
-).sort_values()
+# 1. Get valid data layers
+valid_layers = pd.MultiIndex.from_frame(df[['lm', 'source', 'lu']]).sort_values()
+data_stack = xr_data.stack(layer=['lm', 'source', 'lu']).sel(layer=valid_layers)
 
-# Step 2: Stack and select valid data layers
-ag_rev_valid_layers = xr_ag_rev.stack(
-    layer=['lm', 'source', 'lu']
-).sel(layer=valid_rev_layers)
-
-# Step 3: Get mosaic and filter using where()
+# 2. Load dvar mosaic and filter where data exists
 ag_mosaic = cfxr.decode_compress_to_multi_index(
-    xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc')), 'layer'
+    xr.open_dataset(f'xr_dvar_ag_{yr_cal}.nc'), 'layer'
 )['data'].sel(lu='ALL', lm='ALL')
+mosaic_rev = ag_mosaic.where(xr_data.sum('lu').T).expand_dims(lu=['ALL'])
 
-# Filter mosaic where data exists, then expand dimensions
-ag_mosaic_rev = ag_mosaic.where(
-    xr_ag_rev.sum(dim='lu').transpose('cell', ...)
-).expand_dims(lu=['ALL'])  # Ag needs lu expansion
-
-# Step 4: Stack mosaic and filter by valid layer dimensions
-ag_mosaic_rev_stack = ag_mosaic_rev.stack(layer=['lm', 'source', 'lu'])
-ag_mosaic_rev_stack = ag_mosaic_rev_stack.sel(
-    layer=(
-        ag_mosaic_rev_stack['layer']['lm'].isin(valid_rev_layers.get_level_values('lm')) &
-        ag_mosaic_rev_stack['layer']['source'].isin(valid_rev_layers.get_level_values('source'))
-        # Note: 'lu' is not filtered because mosaic has lu='ALL' only
-    )
+# 3. Stack mosaic — filter by dims OTHER than the expanded one ('lu')
+mosaic_stack = mosaic_rev.stack(layer=['lm', 'source', 'lu']).sel(
+    layer=(mosaic_stack['layer']['lm'].isin(valid_layers.get_level_values('lm')) &
+           mosaic_stack['layer']['source'].isin(valid_layers.get_level_values('source')))
 )
 
-# Step 5: Combine valid data layers with filtered mosaic
-valid_layers_stack = xr.concat([ag_rev_valid_layers, ag_mosaic_rev_stack], dim='layer')
-save2nc(valid_layers_stack, os.path.join(path, f'xr_revenue_ag_{yr_cal}.nc'))
+# 4. Combine data + mosaic
+save2nc(xr.concat([data_stack, mosaic_stack], dim='layer'), f'xr_revenue_ag_{yr_cal}.nc')
 ```
 
-**Key points for Ag**:
-- Mosaic expansion: `.expand_dims(lu=['ALL'])` - adds `lu` dimension
-- Mosaic filter: Uses `lm` and `source` (NOT `lu` since mosaic only has `lu='ALL'`)
-- Dimension order: `['lm', 'source', 'lu']`
+**Am (Revenue/Cost):** Same pattern — expand `am`, filter by `lm` and `lu` (not `am`).
 
-#### 2. Agricultural Management (Am) - Example: Revenue/Cost
+**NonAg (Revenue/Cost):** Simpler — no `.where()` needed, just `.expand_dims('lu').stack()` then concat.
+
+**Quantity outputs:** Same as above but dimension is `'Commodity'` not `'lu'`.
+
+#### Pattern B — Aggregate `ALL` (GHG, Biodiversity, Water, Production)
+
+Used for float-value outputs where `ALL` is a **sum of all land uses**, not a categorical mosaic. The `ALL` coordinate is added **before stacking** using `xr.concat`:
 
 ```python
-# Step 1: Get valid data layers (sorted MultiIndex)
-valid_layers_revenue = pd.MultiIndex.from_frame(
-    revenue_am_df_AUS[['am', 'lm', 'lu']]
-).sort_values()
+# 1. Expand ALL into data array BEFORE stacking (after multiplication, not before)
+data = xr.concat([data.sum('lu', keepdims=True).assign_coords(lu=['ALL']), data], dim='lu')
+# For Am outputs, also expand am:
+data = xr.concat([data.sum('am', keepdims=True).assign_coords(am=['ALL']), data], dim='am')
 
-# Step 2: Stack and select valid data layers
-xr_revenue_am_stack = xr_revenue_am.stack(
-    layer=['am', 'lm', 'lu']
-).sel(layer=valid_layers_revenue)
+# 2. Get valid layers from AUS aggregated dataframe
+valid_layers = pd.MultiIndex.from_frame(df[['lm', 'GHG_source', 'lu']]).sort_values()
 
-# Step 3: Get mosaic and filter
-am_mosaic_ds = cfxr.decode_compress_to_multi_index(
-    xr.open_dataset(os.path.join(path, f'xr_dvar_am_{yr_cal}.nc')), 'layer'
-)['data'].sel(am='ALL', lm='ALL', lu='ALL')
-
-am_mosaic_rev = am_mosaic_ds.where(
-    xr_revenue_am.sum('am').transpose('cell', ...)
-).expand_dims('am')  # Am needs am expansion
-
-# Step 4: Stack mosaic and filter by lm and lu (NOT am)
-am_mosaic_rev_stack = am_mosaic_rev.stack(layer=['am', 'lm', 'lu'])
-am_mosaic_rev_stack = am_mosaic_rev_stack.sel(
-    layer=(
-        am_mosaic_rev_stack['layer']['lm'].isin(valid_layers_revenue.get_level_values('lm')) &
-        am_mosaic_rev_stack['layer']['lu'].isin(valid_layers_revenue.get_level_values('lu'))
-        # Note: 'am' is not filtered because mosaic has am='ALL' only
-    )
-)
-
-# Step 5: Combine
-valid_layers_stack = xr.concat([xr_revenue_am_stack, am_mosaic_rev_stack], dim='layer')
-save2nc(valid_layers_stack, os.path.join(path, f'xr_revenue_agricultural_management_{yr_cal}.nc'))
+# 3. Stack, select, compute — no separate mosaic needed
+result = data.stack(layer=['lm', 'GHG_source', 'lu']).sel(layer=valid_layers).drop_vars('region').compute()
+save2nc(result, f'xr_GHG_ag_{yr_cal}.nc')
 ```
 
-**Key points for Am**:
-- Mosaic expansion: `.expand_dims('am')` - adds `am` dimension
-- Mosaic filter: Uses `lm` and `lu` (NOT `am` since mosaic only has `am='ALL'`)
-- Dimension order: `['am', 'lm', 'lu']`
+This pattern is used in: `write_ghg_*`, `write_biodiversity_*`, `write_water_*`, `write_quantity_*`.
 
-#### 3. Non-Agricultural (NonAg) - Example: Revenue/Cost
+### Summary: Which Pattern per Output
 
-```python
-# Step 1: Get valid data layers (sorted MultiIndex)
-valid_rev_layers = pd.MultiIndex.from_frame(
-    rev_non_ag_df_AUS[['lu']]
-).sort_values()
+| Output type | `ALL` source | Pattern |
+|-------------|-------------|---------|
+| Economics (revenue/cost/profit/transition) | dvar mosaic (categorical) | A — load dvar, concat mosaic + data |
+| GHG, Biodiversity, Water, Production | sum aggregate (float) | B — expand `ALL` via `xr.concat`, then stack |
 
-# Step 2: Stack and select valid data layers
-non_ag_rev_valid_layers = xr_revenue_non_ag.stack(
-    layer=['lu']
-).sel(layer=valid_rev_layers)
+### Critical Rules (Both Patterns)
 
-# Step 3: Get mosaic - simply expand and stack (no filtering)
-non_ag_mosaic = cfxr.decode_compress_to_multi_index(
-    xr.open_dataset(os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc')), 'layer'
-)['data'].sel(lu='ALL').expand_dims('lu').stack(layer=['lu'])
+1. **Valid layers must be a sorted MultiIndex**:
 
-# Step 4: Combine and compute
-xr_revenue_non_ag_cat = xr.concat([non_ag_mosaic, non_ag_rev_valid_layers], dim='layer').compute()
-
-xr_revenue_non_ag_cat.attrs = {
-    'min': float(xr_revenue_non_ag_cat.min().values),
-    'max': float(xr_revenue_non_ag_cat.max().values)
-}
-
-save2nc(xr_revenue_non_ag_cat, os.path.join(path, f'xr_revenue_non_ag_{yr_cal}.nc'))
-```
-
-**Key points for NonAg**:
-- Mosaic handling: Simply `.expand_dims('lu').stack(layer=['lu'])` - no `.where()` or `.sel()` filtering needed
-- Unlike Ag/Am: NonAg mosaic doesn't require conditional filtering since it has only one dimension
-- Dimension order: `['lu']` (simplest hierarchy)
-
-#### 4. Quantity/Production Outputs - Special Case
-
-For commodity production outputs, the dimension is renamed from `'lu'` to `'Commodity'`:
-
-```python
-# Agricultural quantity
-valid_ag_layers = pd.MultiIndex.from_frame(
-    ag_q_mrc_df_AUS[['lm', 'Commodity']]  # Note: 'Commodity' not 'lu'
-).sort_values()
-
-ag_mosaic = cfxr.decode_compress_to_multi_index(
-    xr.open_dataset(os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc')), 'layer'
-)['data'].sel(lu='ALL', lm='ALL').rename({'lu': 'Commodity'})
-
-ag_mosaic_valid = ag_mosaic.where(
-    ag_q_mrc.sum('Commodity').transpose('cell', ...)
-).expand_dims('Commodity')  # Expand with 'Commodity' not 'lu'
-
-# Filter by 'lm' only (not 'Commodity' since mosaic has Commodity='ALL')
-ag_mosaic_stack = ag_mosaic_valid.stack(layer=['lm', 'Commodity'])
-ag_mosaic_stack = ag_mosaic_stack.sel(
-    layer=ag_mosaic_stack['layer']['lm'].isin(valid_ag_layers.get_level_values('lm'))
-)
-```
-
-### Summary Table: Dimension Handling by Category
-
-| Category | Mosaic Expansion | Mosaic Filter Dimensions | Data Stack Order |
-|----------|-----------------|-------------------------|------------------|
-| **Ag** (Revenue/Cost/GHG) | `.expand_dims(lu=['ALL'])` | `lm`, `source` | `['lm', 'source', 'lu']` |
-| **Ag** (Quantity) | `.expand_dims('Commodity')` | `lm` only | `['lm', 'Commodity']` |
-| **Am** (Revenue/Cost) | `.expand_dims('am')` | `lm`, `lu` | `['am', 'lm', 'lu']` |
-| **Am** (Quantity) | `.expand_dims('am')` | `lm`, `Commodity` | `['am', 'lm', 'Commodity']` |
-| **NonAg** (Revenue/Cost) | `.expand_dims('lu')` | **No filtering** | `['lu']` |
-| **NonAg** (Quantity) | `.expand_dims('Commodity')` | **No filtering** | `['Commodity']` |
-
-### Critical Implementation Rules
-
-1. **Valid layers MUST be a sorted MultiIndex**, not a DataFrame:
    ```python
-   # CORRECT
    valid_layers = pd.MultiIndex.from_frame(df[['lm', 'source', 'lu']]).sort_values()
-
-   # WRONG
-   valid_layers = df[['lm', 'source', 'lu']]  # This is a DataFrame, not MultiIndex
    ```
 
-2. **NO manual chunking** - rely on automatic dask chunking for memory efficiency
+2. **Pattern A mosaic filtering**: filter by all dims **except** the expanded one:
+   - Expanded `lu=['ALL']` → filter by `lm` and `source`, NOT `lu`
+   - Expanded `am` → filter by `lm` and `lu`, NOT `am`
+   - NonAg: **no filtering** needed (single-dimension, no ambiguity)
 
-3. **Filter mosaic by dimensions OTHER than the expanded dimension**:
-   - If you expand `lu=['ALL']`, filter by other dims (`lm`, `source`) but NOT `lu`
-   - If you expand `am`, filter by other dims (`lm`, `lu`) but NOT `am`
-   - **NonAg special case**: Expand with the dimension (`lu` or `Commodity`), but **do NOT filter** - simply `.expand_dims().stack()` and combine directly
+3. **Pattern B: expand `ALL` AFTER multiplication** to avoid double-counting the ALL aggregate.
 
-4. **The essence of valid layers**: Reduce redundant dimension combinations to save **both memory and disk space**
-
-### Memory Optimization Note
-
-The implementation avoids manual chunking because intermediate arrays are no larger than the source data matrices already in memory. The comment pattern in code explains:
-
-```python
-# ------------------------- Stack array, get valid layers -------------------------
-'''
-We do NOT manually loop through chunks to reduce memory usage.
-Because the intermediate array is no larger than the in-mem 'ag_cost_df_rjms' object.
-'''
-```
-
-This differs from other write functions (like `write_quantity_separate`) where manual chunking IS required because multiplication creates large intermediate arrays.
+4. **No manual chunking** — intermediate arrays are no larger than source matrices already in memory.
 
 ## save2nc() Function - Optimized NetCDF Export
 
@@ -413,16 +293,112 @@ in_xr.attrs['min_max'] = (float(in_xr.min().values), float(in_xr.max().values))
 in_xr.astype('float32').to_netcdf(save_path, encoding=encoding)
 ```
 
+## Greyscale Ramp for Unselected Cells (`is_selected` Coord)
+
+Some biodiversity outputs are computed nationally even when the underlying constraint is
+restricted to a subset of NRMs/IBRA bioregions (e.g. GBF3 NVIS, GBF4 SNES, GBF4 ECNES).
+The map renderer greys out cells outside the selected regions while keeping the colour
+ramp for cells inside the selection — this preserves national context without misleading
+the viewer about where the constraint actually applied.
+
+### Write-Side Pattern
+
+`is_selected` is a boolean non-dimension coordinate on the `cell` dim. It is attached to
+the **source** xarray at the top of each write function and **propagates automatically**
+through all downstream xarray arithmetic. Never attached manually at individual save sites.
+Always computed — all-`True` in `Australia` mode, NRM-union mask in `NRM` mode.
+
+```python
+# In write.py: applied to GBF3 NVIS, GBF4 SNES, GBF4 ECNES write functions
+if getattr(settings, '<MODE_SETTING>', 'Australia') == 'NRM':
+    sel_regions = sorted({r for r, _ in getattr(data, '<SEL_ATTR>', []) if r != 'Australia'})
+    sel_mask = (
+        np.isin(np.asarray(data.REGION_NRM_NAME), sel_regions)
+        if sel_regions else np.ones(data.NCELLS, dtype=bool)
+    )
+else:
+    sel_mask = np.ones(data.NCELLS, dtype=bool)  # all-True even in Australia mode
+is_selected_da = xr.DataArray(sel_mask, dims=['cell'], coords={'cell': np.arange(data.NCELLS)})
+
+# Attach to the source array — propagates to xr_gbf4_snes_ag, _am, _non_ag automatically:
+bio_snes_sr = bio_snes_sr.assign_coords(is_selected=('cell', sel_mask))
+
+# ... compute products and add_all ...
+
+# No .assign_coords needed at save sites — already present:
+save2nc(valid_layers_stack_ag,     os.path.join(path, f'xr_biodiversity_<METRIC>_ag_{yr_cal}.nc'))
+save2nc(valid_layers_stack_non_ag, os.path.join(path, f'xr_biodiversity_<METRIC>_non_ag_{yr_cal}.nc'))
+save2nc(valid_layers_stack_am,     os.path.join(path, f'xr_biodiversity_<METRIC>_ag_management_{yr_cal}.nc'))
+```
+
+CSV / region / AUS aggregations use `.where(is_selected_da)` on the fly — no separate
+"masked variant" arrays (the old `_msk` / `mask_sr` / `mask_gr` pattern is gone):
+
+```python
+# Regional aggregation:
+GBF4_score_ag_region = xr_gbf4_snes_ag.where(is_selected_da).groupby('region').sum('cell')...
+# AUS aggregation:
+GBF4_score_ag_AUS = xr_gbf4_snes_ag.where(is_selected_da).sum('cell')...
+```
+
+### Source Arrays and `_FULL` Attrs
+
+For SNES and ECNES, the source bio array must cover all of Australia (not just selected
+NRMs) so non-selected cells have non-zero values to grey out. `data.py` always builds:
+
+- `data.BIO_GBF4_SPECIES_LAYERS_FULL` — `[species, cell]` full-Australia SNES layers
+- `data.BIO_GBF4_COMUNITY_LAYERS_FULL` — `[species, cell]` full-Australia ECNES layers
+
+Both are available in **Australia mode and NRM mode**. In Australia mode they mirror
+`BIO_GBF4_SPECIES_LAYERS` (reshaped to drop the MultiIndex). In NRM mode they are built
+without the per-region mask so every cell retains its habitat value. `write.py` reads
+these attrs directly — `get_GBF4_SNES_matrix_sr(data)` (the solver-facing function)
+is no longer called from write.py.
+
+| Metric | `<MODE_SETTING>` | `<SEL_ATTR>` | Region name attr |
+|---|---|---|---|
+| GBF3 NVIS  | `GBF3_NVIS_REGION_MODE`  | `BIO_GBF3_NVIS_SEL`  | `REGION_NRM_NAME` (or `REGION_IBRA_NAME` when mode == `'IBRA'`) |
+| GBF4 SNES  | `GBF4_SNES_REGION_MODE`  | `BIO_GBF4_SNES_SEL`  | `REGION_NRM_NAME` |
+| GBF4 ECNES | `GBF4_ECNES_REGION_MODE` | `BIO_GBF4_ECNES_SEL` | `REGION_NRM_NAME` |
+
+`save2nc` round-trips arbitrary `cell` coords cleanly via `cfxr.encode_multi_index_as_compress`,
+so `is_selected` survives the NetCDF encode/decode.
+
+GBF2 (mask-based) and GBF8 (climate-driven) have no NRM/IBRA region restriction, so they
+intentionally do **not** carry an `is_selected` coord — there is nothing to grey out.
+
+### Render-Side Pattern (`create_report_layers.py::map2base64`)
+
+The renderer reads the optional `is_selected` cell coord and remaps unselected non-zero
+cells to a dedicated greyscale palette segment (codes **151-200** in `COLORS_FLOAT`,
+`#DCDCDCFF` → `#3C3C3CFF`). Existing palette segments are untouched:
+
+| Code range | Meaning |
+|---|---|
+| `-1`        | Transparent (cell outside study area) |
+| `0`         | Nodata grey |
+| `1-49`      | Negative values (blue ramp) — cells **inside** selection |
+| `51-100`    | Positive values (red ramp) — cells **inside** selection |
+| `151-200`   | Any non-zero value in cells **outside** selection (grey ramp) |
+
+The codes array dtype is `int16` (widened from `int8`) to fit the new range.
+For unselected non-zero cells, intensity is computed against the global magnitude
+(`vals/global_max` for positives, `|vals|/|global_min|` for negatives) and clipped to
+`[151, 200]`.
+
 ## JSON Output Format: Map vs Chart Data Hierarchies
 
 The LUTO2 reporting system generates two types of JSON files with **different dimension hierarchies**:
 
 ### Map JSON Files (Spatial Layers)
+
 Map JSON files contain base64-encoded PNG images for spatial visualization. The dimension hierarchy is:
 
 **For Agricultural (Ag):**
+
 - **Hierarchy**: `lm` → `lu` → `source` (if applicable) → `year`
 - **Example**: `map_GHG_Ag.js`
+
   ```javascript
   {
     "ALL": {
@@ -442,8 +418,10 @@ Map JSON files contain base64-encoded PNG images for spatial visualization. The 
   ```
 
 **For Agricultural Management (Am):**
+
 - **Hierarchy**: `am` → `lm` → `lu` → `source` (if applicable) → `year`
 - **Example**: `map_GHG_Am.js`
+
   ```javascript
   {
     "ALL": {
@@ -464,8 +442,10 @@ Map JSON files contain base64-encoded PNG images for spatial visualization. The 
   ```
 
 **For Non-Agricultural (NonAg):**
+
 - **Hierarchy**: `lu` → `year`
 - **Example**: `map_area_NonAg.js`
+
   ```javascript
   {
     "ALL": { "2020": {...}, "2030": {...} },
@@ -477,11 +457,14 @@ Map JSON files contain base64-encoded PNG images for spatial visualization. The 
 **Note**: The `source` dimension appears in map JSON for GHG emissions (emission sources like "Enteric Fermentation", "Manure") and Economics (cost/revenue types like "Labour cost", "Area cost").
 
 ### Chart JSON Files (Time Series Data)
+
 Chart JSON files contain Highcharts series data for plotting. The dimension hierarchy is:
 
 **For Agricultural (Ag):**
+
 - **Hierarchy**: `region` → `lm` → `lu` (array of series)
 - **Example**: `GHG_Ag.js`
+
   ```javascript
   {
     "AUSTRALIA": {
@@ -499,8 +482,10 @@ Chart JSON files contain Highcharts series data for plotting. The dimension hier
   ```
 
 **For Agricultural Management (Am):**
+
 - **Hierarchy**: `region` → `lm` → `lu` → `source` (if applicable) → `am` (array of series)
 - **Example**: `GHG_Am.js`
+
   ```javascript
   {
     "AUSTRALIA": {
@@ -520,8 +505,10 @@ Chart JSON files contain Highcharts series data for plotting. The dimension hier
   ```
 
 **For Non-Agricultural (NonAg):**
+
 - **Hierarchy**: `region` → `lu` (array of series)
 - **Example**: `GHG_NonAg.js`
+
   ```javascript
   {
     "AUSTRALIA": [
@@ -544,6 +531,7 @@ Chart JSON files contain Highcharts series data for plotting. The dimension hier
 | **Source position** | Before `year` (for GHG/Economics) | Before final series array (Am only) |
 
 **Critical Implementation Note**: The chart JSON for Am places `source` **before the final series array** (where series are indexed by `am`), while map JSON places `source` **before year**. This reflects how the data is consumed:
+
 - **Map**: User selects specific source to view spatial distribution
 - **Chart**: User views all `am` types, optionally filtered by source in the Vue.js component
 
@@ -591,9 +579,9 @@ reprojected_array, transform = reproject(
 
 ```python
 # Convert float values to RGBA color using legend mapping
-from luto.tools.report.data_tools import get_map_legend, hex_color_to_numeric
+from luto.tools.report.data_tools import build_map_legend, hex_color_to_numeric
 
-colors = get_map_legend()  # Returns color legend dictionary for all map types
+colors = build_map_legend()  # Returns color legend dictionary for all map types
 color_hex = colors['float']['legend']  # Get float value color mapping
 
 # Map float values to RGBA (Red, Green, Blue, Alpha)
@@ -662,11 +650,64 @@ with open('map_ag_dvar.json', 'w') as f:
 ### Why 'lu' Must Be Last Dimension
 
 The Vue.js reporting interface aggregates chart data at the land use (`lu`) level. By ensuring `lu` is the terminal dimension in the hierarchy, users can:
+
 1. Select upstream dimensions (category, water, agmgt)
 2. See all available land uses for that selection
 3. Filter both map layers AND chart data by the same `lu` value
 
 This maintains consistency between spatial maps and statistical charts, ensuring synchronized filtering throughout the interactive dashboard.
+
+## Colorbar Range: MAX_CELL_MAGNITUDE Design
+
+Each map layer in the report needs a consistent `min_max` colorbar range that spans **all simulated years**, not just a single year. This is achieved via `MAX_CELL_MAGNITUDE` in `write.py`.
+
+### Pipeline
+
+1. **`get_mag(arr)`** — called once per output xarray per year. Returns `[MIN_P-quantile, MAX_P-quantile]` (currently `[0.5%, 99.5%]`) of non-zero cell values. Using quantiles avoids extreme outliers distorting the colorbar.
+
+2. **`MAX_CELL_MAGNITUDE`** — a plain pre-initialized 2-level dict (`write.py:71`). Each leaf is a list that accumulates `[min_q, max_q]` pairs from every year's parallel job:
+
+   ```python
+   MAX_CELL_MAGNITUDE = {
+       'area':        {'ag': [], 'non_ag': [], 'am': []},
+       'ghg_emission': {'ag': [], 'non_ag': [], 'ag_man': [], 'transition': [], 'sum': []},
+       'production':  defaultdict(list),   # commodity names are dynamic
+       'renewable_energy': [],             # 1-level (no sub-key)
+       ...
+   }
+   ```
+
+   Two-level keys (e.g. `area → ag`) use a nested dict. Single-level keys (renewables) use a bare list. `production` uses `defaultdict(list)` because commodity names are not known at module load time.
+
+3. **Merge loop** — after each parallel job returns `(msg, mag)`, the driver checks the *target* type to dispatch:
+
+   ```python
+   target = MAX_CELL_MAGNITUDE[top_key]
+   if isinstance(target, list):
+       target.extend(sub)           # 1-level leaf
+   else:
+       for sub_key, vals in sub.items():
+           target[sub_key].extend(vals)  # 2-level leaf
+   ```
+
+4. **Serialization** — after all years complete, lists are NaN-cleaned and written to `max_cell_magnitudes.json`:
+
+   ```python
+   clean = lambda lst: [0.0 if np.isnan(v) else float(v) for v in lst]
+   json.dump(
+       {k: (clean(v) if isinstance(v, list) else {sk: clean(sv) for sk, sv in v.items()})
+        for k, v in MAX_CELL_MAGNITUDE.items()},
+       f, indent=2
+   )
+   ```
+
+5. **`create_report_layers.py`** loads `max_cell_magnitudes.json` and takes `(min(vals), max(vals))` across the accumulated list to get the cross-year colorbar range, which is embedded as `min_max` in each map layer's JSON entry.
+
+### Key invariants
+
+- `get_mag` always returns a 2-element list `[float, float]` — never a scalar.
+- Water yield is the exception: it returns raw `(min, max)` tuples via `.min().item()` / `.max().item()` rather than quantiles, because water yield can legitimately be zero over large areas.
+- Do **not** add a new output type without adding its key to `MAX_CELL_MAGNITUDE` — missing keys will raise `KeyError` at merge time.
 
 ## Carbon Sequestration Data Format
 
@@ -682,6 +723,7 @@ The carbon sequestration data has been migrated from HDF5/pandas format to NetCD
 ### Carbon Components
 
 Each NetCDF file contains three data variables representing different carbon pools:
+
 1. **Trees**: Aboveground biomass in trees (`*_TREES_T_CO2_HA` or `*_TREES_TOT_T_CO2_HA`)
 2. **Debris**: Aboveground debris/litter (`*_DEBRIS_T_CO2_HA` or `*_DEBRIS_TOT_T_CO2_HA`)
 3. **Soil**: Belowground soil carbon (`*_SOIL_T_CO2_HA` or `*_SOIL_TOT_T_CO2_HA`)

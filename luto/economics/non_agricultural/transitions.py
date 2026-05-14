@@ -540,6 +540,7 @@ def get_transition_matrix_ag2nonag(
 
 
 # TODO: Need to check the logic of transition cost, espcially the water cost.
+#   The REAL_AREA being multiplied twice for w_delta_mrj
 def get_env_plantings_to_ag(data: Data, yr_idx, lumap, lmmap, separate=False) -> np.ndarray|dict:
     """
     Get transition costs from environmental plantings to agricultural land uses for each cell.
@@ -1067,7 +1068,7 @@ def get_transition_matrix_nonag2ag(data: Data, yr_idx, lumap, lmmap, separate=Fa
     return np.add.reduce(non_ag_to_agr_t_matrices)
 
 
-def get_non_ag_transition_matrix(data: Data) -> np.ndarray:
+def get_non_ag_to_non_ag_transition_matrix(data: Data) -> np.ndarray:
     """
     Get the matrix that contains transition costs for non-agricultural land uses. 
     There are no transition costs for non-agricultural land uses, therefore the matrix is filled with zeros.
@@ -1144,10 +1145,36 @@ def get_lower_bound_non_agricultural_matrices(data: Data, base_year) -> np.ndarr
 
     if base_year == data.YR_CAL_BASE or base_year not in data.non_ag_dvars:
         return np.zeros((data.NCELLS, len(settings.NON_AG_LAND_USES))).astype(np.float32)
-        
-    # return np.divide(
-    #     np.floor(data.non_ag_dvars[base_year].astype(np.float32) * 10 ** settings.ROUND_DECMIALS),
-    #     10 ** settings.ROUND_DECMIALS,
-    # )
-    
-    return data.non_ag_dvars[base_year].astype(np.float32)
+
+    # Floor-truncate to ROUND_DECIMALS precision (prevents float32 upward rounding
+    # from inflating the lb above the stored dvar value).
+    lb_rk = np.divide(
+        np.floor(data.non_ag_dvars[base_year].astype(np.float32) * 10 ** settings.ROUND_DECIMALS),
+        10 ** settings.ROUND_DECIMALS,
+    )
+
+    # Cap each lb against the cell capacity (AG_MASK_PROPORTION_R) — the same float32
+    # value used as the const_cell_usage RHS.  This prevents a float32 rounding
+    # artefact (e.g. float32(0.92) = 0.9200000169) from exceeding a cell capacity
+    # stored as a slightly different float32 value (e.g. 0.9199999571), which would
+    # make the cell-usage equality constraint structurally infeasible.
+    lb_capped = np.minimum(lb_rk, data.AG_MASK_PROPORTION_R[:, np.newaxis]).astype(np.float32)
+
+    # Also cap each lb against the variable's own upper bound (non_ag_x_rk).
+    # For Riparian Plantings, ub = RP_PROPORTION which is an area value independent of
+    # AG_MASK_PROPORTION_R.  When RP_PROPORTION < AG_MASK_PROPORTION_R (common), the
+    # AG_MASK cap above does not prevent lb > RP_PROPORTION, causing a trivially
+    # infeasible variable (lb > ub) that Gurobi detects before any constraint is checked.
+    non_ag_x_rk = get_to_non_ag_exclude_matrices(data, data.lumaps[base_year]).astype(np.float32)
+    lb_capped = np.minimum(lb_capped, non_ag_x_rk)
+
+    lb_update = lb_capped < lb_rk
+
+    if lb_update.any():
+        gap = lb_rk[lb_update] - lb_capped[lb_update]
+        print(
+            f"  └── NonAg lb capped: {lb_update.sum()} cells updated,"
+            f" max gap={gap.max():.2e}, mean gap={gap.mean():.2e}"
+        )
+
+    return lb_capped

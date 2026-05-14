@@ -1,15 +1,21 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>LUTO 2 Report</title>
 
+    <!-- Enable Vue Devtools (must be set before Vue loads) -->
+    <script>
+      window.__VUE_PROD_DEVTOOLS__ = true;
+    </script>
+
     <!-- Resources -->
-    <script src="lib/vue.global.prod_3.5.18.js"></script>
+    <script src="lib/vue.global.dev_3.5.29.js"></script>
     <script src="lib/vue-router.global_4.5.1.js"></script>
     <script src="lib/tailwind_3.4.16.js"></script>
     <script src="lib/Highcharts-12.3.0/highcharts.js"></script>
+    <script src="lib/Highcharts-12.3.0/heatmap.js"></script>
     <script src="lib/Highcharts-12.3.0/drilldown.js"></script>
     <script src="lib/Highcharts-12.3.0/accessibility.js"></script>
     <script src="lib/Highcharts-12.3.0/data.js"></script>
@@ -22,11 +28,17 @@
     <link rel="stylesheet" href="lib/leaflet_1.9.4.css" />
     <script src="lib/leaflet_1.9.4.js"></script>
 
+    <!-- GeoTIFF rendering stack — must load before deferred components -->
+    <script src="lib/geotiff.browser.bundle.min.js"></script>
+    <script src="lib/georaster.browser.bundle.min.js"></script>
+    <script src="lib/georaster-layer-for-leaflet.bundle.min.js"></script>
+
     <!-- Load icons.js -->
     <script src="./resources/icons.js"></script>
 
     <!-- Components -->
     <script src="./components/helpers.js" defer></script>
+    <script src="./components/heatmap_container.js" defer></script>
     <script src="./components/map_geojson.js" defer></script>
     <script src="./components/sidebar.js" defer></script>
     <script src="./components/chart_container.js" defer></script>
@@ -45,6 +57,8 @@
     <script src="./views/Water.js" defer></script>
     <script src="./views/Production.js" defer></script>
     <script src="./views/Biodiversity.js" defer></script>
+    <script src="./views/Renewable.js" defer></script>
+    <script src="./views/Transition.js" defer></script>
     <script src="./views/Map.js" defer></script>
     <script src="./views/Settings.js" defer></script>
     <script src="./views/NotFound.js" defer></script>
