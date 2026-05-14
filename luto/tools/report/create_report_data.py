@@ -729,7 +729,7 @@ def process_economics_data(files, SAVE_DIR):
     # -------------------- Economics for ag-management (separate files per MapType) --------------------
 
     # Am Revenue: region → AgMgt → Water → [series by LU]  (matches map: AgMgt → Water → LU)
-    am_rev = revenue_am_df.query('`Management Type` != "ALL" and `Land-use` != "ALL"').round({'Value ($)': 2}).query('abs(`Value ($)`) > 1')
+    am_rev = revenue_am_df.query('`Land-use` != "ALL"').round({'Value ($)': 2}).query('abs(`Value ($)`) > 1')
     df_wide = _groupby_to_records(am_rev, ['region', 'Management Type', 'Water_supply', 'Land-use'], ['region', 'am', 'water', 'name', 'data'], value_cols=('Year', 'Value ($)'))
     df_wide['type'] = 'column'
     df_wide['color'] = df_wide['name'].apply(lambda x: COLORS.get(x, '#999999'))
@@ -743,7 +743,7 @@ def process_economics_data(files, SAVE_DIR):
     write_chart_js(out_dict, 'Economics_Am_revenue')
 
     # Am Cost: region → AgMgt → Water → [series by LU]
-    am_cost = cost_am_df.query('`Management Type` != "ALL" and `Land-use` != "ALL"').round({'Value ($)': 2}).query('abs(`Value ($)`) > 1')
+    am_cost = cost_am_df.query('`Land-use` != "ALL"').round({'Value ($)': 2}).query('abs(`Value ($)`) > 1')
     df_wide = _groupby_to_records(am_cost, ['region', 'Management Type', 'Water_supply', 'Land-use'], ['region', 'am', 'water', 'name', 'data'], value_cols=('Year', 'Value ($)'))
     df_wide['type'] = 'column'
     df_wide['color'] = df_wide['name'].apply(lambda x: COLORS.get(x, '#999999'))
@@ -760,7 +760,7 @@ def process_economics_data(files, SAVE_DIR):
     profit_am_files = files.query('base_name == "economics_am_profit"').reset_index(drop=True)
     profit_am_df = pd.concat([df for p in profit_am_files['path'] if not (df := pd.read_csv(p)).empty], ignore_index=True)
     profit_am_df = profit_am_df.replace(RENAME_AM_NON_AG).infer_objects(copy=False)
-    profit_am_df = profit_am_df.query('`Management Type` != "ALL" and `Land-use` != "ALL"').round({'Value ($)': 2})
+    profit_am_df = profit_am_df.query('`Land-use` != "ALL"').round({'Value ($)': 2})
 
     df_profit = _groupby_to_records(profit_am_df, ['region', 'Management Type', 'Water_supply', 'Land-use'], ['region', 'am', 'water', 'name', 'data'], value_cols=('Year', 'Value ($)'))
     df_profit['type'] = 'column'
