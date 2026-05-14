@@ -535,6 +535,7 @@ def get_ag_management_biodiversity_contribution(
             j_idx: (data.RENEWABLE_BUNDLE_SOLAR.query('Year == @yr_cal and Commodity == @lu')['Biodiversity_compatability'].item() - 1) * np.ones(data.NCELLS).astype(np.float32)
             for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Utility Solar PV'])
         }
+    if settings.AG_MANAGEMENTS['Onshore Wind']:
         am_contr_dict['Onshore Wind'] = {
             j_idx: (data.RENEWABLE_BUNDLE_WIND.query('Year == @yr_cal and Commodity == @lu')['Biodiversity_compatability'].item() - 1) * np.ones(data.NCELLS).astype(np.float32)
             for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Onshore Wind'])

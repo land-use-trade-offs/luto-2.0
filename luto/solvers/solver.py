@@ -289,6 +289,15 @@ class LutoSolver:
                         if am == "Utility Solar PV"
                         else self._input_data.exist_renewable_wind_r
                     )
+                    gbf2_excl_idx = (
+                        self._input_data.renewable_GBF2_mask_solar_idx
+                        if am == "Utility Solar PV"
+                        else self._input_data.renewable_GBF2_mask_wind_idx
+                    )
+                    # Hard-exclude renewables from GBF2 priority cells (ub=0 via no variable creation)
+                    if gbf2_excl_idx.size:
+                        dry_lu_cells = np.setdiff1d(dry_lu_cells, gbf2_excl_idx)
+                        irr_lu_cells = np.setdiff1d(irr_lu_cells, gbf2_excl_idx)
                     for r in dry_lu_cells:
                         model_lb = 0 if AG_MANAGEMENTS_REVERSIBLE[am] else self._input_data.ag_man_lb_mrj[am][0, r, j]
                         self.X_ag_man_dry_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
