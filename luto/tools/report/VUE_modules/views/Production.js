@@ -182,6 +182,7 @@ window.ProductionView = {
 
     watch(selectWater, async (newWater) => {
       const cat = selectCategory.value;
+      if (!cat || !mapRegister[cat]) return;   // guard: fires before selectCategory is set during onMounted
       if (cat === "Non-Ag") return;
       previousSelections.value[cat] = { ...(previousSelections.value[cat] || {}), water: newWater };
       const tree = getTree(cat);
