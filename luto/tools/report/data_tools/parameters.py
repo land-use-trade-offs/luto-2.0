@@ -300,6 +300,8 @@ COLORS_PLOT = {
     # --- Generic summary ---
     'Total':                                    "#888888",
     'Target (%)':                               "#040404",
+    'Net Value (%)':                            "#040404",
+    'Net Value (ha)':                           "#040404",
 
     # --- Economics ---
     'Agricultural Land-use (revenue)':          "#7EB87A",

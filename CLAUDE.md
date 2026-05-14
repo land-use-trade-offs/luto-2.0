@@ -33,6 +33,17 @@ The LUTO2 documentation is split into themed files for better memory efficiency.
 - Data flow and preprocessing (dataprep.py)
 - Dynamic pricing and demand elasticity
 
+### 📁 [docs/CLAUDE_GBF2.md](docs/CLAUDE_GBF2.md)
+
+**Read this when working on:**
+
+- GBF2 priority degraded areas logic (mask construction, Zonation performance curve)
+- `BIO_GBF2_BASE_YR`, `BIO_GBF2_MASK`, savanna-burning LDS correction
+- `get_GBF2_target_for_yr_cal()` — baseline / base-year / restoration-fraction interpolation
+- `_add_GBF2_constraints()` in solver.py — how the hard/soft constraint is built
+- `write_biodiversity_GBF2_scores()` in write.py — denominator, ag/non-ag/am numerators, `Relative_Contribution_Percentage` formula and why it sums to ~30%
+- Settings: `BIODIVERSITY_TARGET_GBF_2`, `GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT`, `BIO_CONTRIBUTION_LDS`, `GBF2_CONSTRAINT_TYPE`
+
 ### 📁 [docs/CLAUDE_OUTPUT.md](docs/CLAUDE_OUTPUT.md)
 
 **Read this when working on:**

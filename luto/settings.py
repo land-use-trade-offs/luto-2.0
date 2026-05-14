@@ -137,7 +137,7 @@ DYNAMIC_PRICE = False
 RESFACTOR = 5        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-SIM_YEARS =  list(range(2010, 2051, 5))
+SIM_YEARS =  list(range(2010, 2051, 10))
 
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
@@ -921,7 +921,7 @@ will be 0.6 * 0.8 = 0.48.
 
 # ---------------------- GBF3 parameters ----------------------
 
-BIODIVERSITY_TARGET_GBF_3_NVIS = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
+BIODIVERSITY_TARGET_GBF_3_NVIS = 'USER_DEFINED'           # 'off', 'medium', 'high', or 'USER_DEFINED'
 '''
 Target 3 of the Kunming-Montreal Global Biodiversity Framework (NVIS):
 protect and manage vegetation groups using the National Vegetation Information System.
@@ -958,8 +958,8 @@ and manage human-wildlife interactions
 '''
 
 
-BIODIVERSITY_TARGET_GBF_4_SNES =  'off'           # 'on' or 'off'.
-BIODIVERSITY_TARGET_GBF_4_ECNES = 'off'           # 'on' or 'off'.
+BIODIVERSITY_TARGET_GBF_4_SNES =  'on'           # 'on' or 'off'.
+BIODIVERSITY_TARGET_GBF_4_ECNES = 'on'           # 'on' or 'off'.
 
 
 BIODIVERSITY_GBF_4_TARGET_SOURCE_SNES = 'USER_DEFINED'  # 'USER_DEFINED' or 'dict'

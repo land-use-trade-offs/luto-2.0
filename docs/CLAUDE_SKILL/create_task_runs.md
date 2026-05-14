@@ -91,17 +91,6 @@ BASE_GRID = {
     'WRITE_REPORT_MAX_MEM_GB': [120],           # settings.py: 64
     'CARBON_EFFECTS_WINDOW':   [60],            # settings.py: 50
     'DYNAMIC_PRICE':           [True],          # settings.py: False
-
-    # GHG target — set per batch (settings.py default: 'high')
-    'GHG_EMISSIONS_LIMITS': ['<low|high>'],
-
-    # GBF4 — on/off and region mode as needed (settings.py: 'off' / 'NRM')
-    'BIODIVERSITY_TARGET_GBF_4_SNES':  ['on'],
-    'GBF4_SNES_REGION_MODE':           ['Australia'],
-    'BIODIVERSITY_TARGET_GBF_4_ECNES': ['on'],
-    'GBF4_ECNES_REGION_MODE':          ['Australia'],
-
-    # Add further overrides only if this batch genuinely differs from settings.py
 }
 
 
@@ -229,20 +218,24 @@ python run_all.py Run_G0001 Run_G0003   # specific runs only
 ## Key design notes
 
 ### Run naming: always `Run_G{idx:04}`
+
 - `update_settings` job name: `f'run_G{run_idx:04}'`
 - `pd.Series` column name: `f'Run_G{run_idx:04}'`
 - `run_all.py` globs `Run_G*` — these must match.
 - The `run_label` field in `RUN_OVERRIDES` (e.g. `'Run_RE0001'`) is only a human-readable tag stored in the CSV; it does **not** affect the on-disk directory name. The directory name comes from the `pd.Series` name (`Run_G{idx:04}`), so **always keep the `build()` internals as `run_G` regardless of the batch's labelling convention**.
 
 ### `RUN_OVERRIDES` vs Cartesian grid
+
 `RUN_OVERRIDES` defines runs **explicitly** — each tuple is one exact run. This is the right choice when:
+
 - Runs aren't a simple Cartesian product (e.g. GHG=low only gets GBF2=15%, GHG=high only gets GBF2=20%)
 - You want each run labelled and documented with a scenario narrative
 
 For a true Cartesian product (every combination of N axes), use `get_grid_search_param_df` with multi-value lists instead and remove `RUN_OVERRIDES`.
 
-### `AG_MANAGEMENTS` must mirror `RENEWABLES_OPTIONS`
-`write_settings` writes flat literals and does NOT re-evaluate. When renewables are ON in `RENEWABLES_OPTIONS`, `AG_MANAGEMENTS` must also have `'Utility Solar PV': True, 'Onshore Wind': True`. Keep them in sync manually in both `BASE_GRID` and any override that toggles renewables.
+### `AG_MANAGEMENTS` and `RENEWABLES_OPTIONS` sync
+
+`settings.py` defines `AG_MANAGEMENTS['Utility Solar PV']` as `RENEWABLES_OPTIONS['Utility Solar PV']` (and same for Wind), so they are **automatically in sync** when inherited via `get_settings_df()`. No manual sync is needed unless you explicitly override `RENEWABLES_OPTIONS` in BASE_GRID with different values — in that case you must also override `AG_MANAGEMENTS` to match, because `write_settings` writes flat literals and does not re-evaluate the reference.
 
 ### Unspecified settings: fall back to source `luto/settings.py`
 
@@ -284,7 +277,7 @@ Everything else (`BIO_CONTRIBUTION_*`, `WATER_REGION_DEF`, `IMPORT_TREND`, `HIR_
 - [ ] Copy `create_tasks.py` from a recent iteration; update docstring, `TASK_DIR`
 - [ ] **BASE_GRID: only list cluster params + intentional overrides** — do not copy settings.py values verbatim; everything else inherits automatically from `get_settings_df()`
 - [ ] Cross-check BASE_GRID against the "Known intentional overrides" table above; remove any key that matches its `settings.py` default
-- [ ] If renewables are ON: verify `RENEWABLES_OPTIONS` and `AG_MANAGEMENTS` Solar/Wind flags are in sync
+- [ ] If `RENEWABLES_OPTIONS` is **overridden** in BASE_GRID: also override `AG_MANAGEMENTS` to match (otherwise both are inherited correctly from `settings.py` automatically)
 - [ ] Define `RUN_OVERRIDES` — one tuple per run, all override lists are single-element
 - [ ] Run `python create_tasks.py` — check console output for expected run count
 - [ ] Inspect `grid_search_parameters_unique.csv` — verify only the expected axes vary

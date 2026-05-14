@@ -2288,10 +2288,13 @@ def write_area_transition_start_end(data: Data, path, yr_cal_end):
     save2nc(xr_ag2non_ag_filtered_array, os.path.join(path, f'xr_transition_area_ag2non_ag_start_end.nc'))
     
     # Record maximum cell magnitude for this transition period for later use in scaling the transition area in the visualization
+    def _minmax(arr):
+        return (arr.min().item(), arr.max().item()) if arr.size > 0 else (0.0, 0.0)
+
     return (f"Area transition matrix written from year {data.YR_CAL_BASE} to {yr_cal_end}", {
         'transition_area': {
-            'ag2ag':     (xr_ag2ag_filtered_array.min().item(),     xr_ag2ag_filtered_array.max().item()),
-            'ag2non_ag': (xr_ag2non_ag_filtered_array.min().item(), xr_ag2non_ag_filtered_array.max().item()),
+            'ag2ag':     _minmax(xr_ag2ag_filtered_array),
+            'ag2non_ag': _minmax(xr_ag2non_ag_filtered_array),
         }
     })
 
@@ -3110,31 +3113,53 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
             'cell': range(data.NCELLS)}
     ).unstack()
 
-    # Get the total area of the priority degraded areas
-    total_priority_degraded_area = GBF2_MASK_area_ha.sum()
+    # Masked base-year ag dvar (consistent masking with ag_dvar_mrj)
+    BASEYEAR_dvar = chunk_unify_size(
+        tools.ag_mrj_to_xr(data, data.AG_L_MRJ)
+    ).assign_coords(region=('cell', data.REGION_NRM_NAME))
 
-    # Calculate xarray biodiversity GBF2 scores
-    xr_gbf2_ag = priority_degraded_area_score_r * ag_impact_j * ag_dvar_mrj
-    xr_gbf2_non_ag = priority_degraded_area_score_r * non_ag_impact_k * non_ag_dvar_rk
-    xr_gbf2_am = priority_degraded_area_score_r * am_impact_ajr * am_dvar_amrj
+    # Denominator: total degraded area score at base year, consistent with solver target formula.
+    # = (BIO_GBF2_MASK * REAL_AREA * AG_MASK_PROPORTION_R).sum() - BIO_GBF2_BASE_YR.sum()
+    degreded_area_weighted_bio_contr = (
+        float((data.BIO_GBF2_MASK * data.REAL_AREA * data.AG_MASK_PROPORTION_R).sum())
+        - float(data.BIO_GBF2_BASE_YR.sum())
+    )
 
-    xr_gbf2_ag     = add_all(xr_gbf2_ag,     ['lm', 'lu'])
-    xr_gbf2_non_ag = add_all(xr_gbf2_non_ag, ['lu'])
-    xr_gbf2_am     = add_all(xr_gbf2_am,     ['lm', 'lu', 'am'])
+    # Savanna-burning correction: LDS-treated cells have a lower effective base-year bio contribution,
+    # so their restoration contribution must be increased by (1 - BIO_CONTRIBUTION_LDS) * base_dvar.
+    savburn_eligible_r = xr.DataArray(
+        data.SAVBURN_ELIGIBLE.astype(np.float32),
+        dims=['cell'],
+        coords={'cell': range(data.NCELLS)}
+    ).assign_coords(region=('cell', data.REGION_NRM_NAME))
+
+    # Calculate xarray biodiversity GBF2 scores;
+    #   ag: (current - base) relative to the solver-consistent base year, including savburn correction.
+    #   non-ag and am: absolute score (zero in base year 2010).
+    xr_gbf2_ag      = priority_degraded_area_score_r * (
+        ag_impact_j * (ag_dvar_mrj - BASEYEAR_dvar)
+        + savburn_eligible_r * (1 - settings.BIO_CONTRIBUTION_LDS) * BASEYEAR_dvar
+    )
+    xr_gbf2_non_ag  = priority_degraded_area_score_r * non_ag_impact_k * non_ag_dvar_rk
+    xr_gbf2_am      = priority_degraded_area_score_r * am_impact_ajr * am_dvar_amrj
+
+    xr_gbf2_ag      = add_all(xr_gbf2_ag,     ['lm', 'lu'])
+    xr_gbf2_non_ag  = add_all(xr_gbf2_non_ag, ['lu'])
+    xr_gbf2_am      = add_all(xr_gbf2_am,     ['lm', 'lu', 'am'])
 
     GBF2_score_ag, GBF2_score_ag_AUS = bio_to_region_and_aus_df(
         xr_gbf2_ag, group_dims=['region', 'lm', 'lu'],
-        value_name='Area Weighted Score (ha)', base_score=total_priority_degraded_area, yr_cal=yr_cal)
+        value_name='Area Weighted Score (ha)', base_score=degreded_area_weighted_bio_contr, yr_cal=yr_cal)
     GBF2_score_non_ag, GBF2_score_non_ag_AUS = bio_to_region_and_aus_df(
         xr_gbf2_non_ag, group_dims=['region', 'lu'],
-        value_name='Area Weighted Score (ha)', base_score=total_priority_degraded_area, yr_cal=yr_cal)
+        value_name='Area Weighted Score (ha)', base_score=degreded_area_weighted_bio_contr, yr_cal=yr_cal)
     GBF2_score_am, GBF2_score_am_AUS = bio_to_region_and_aus_df(
         xr_gbf2_am, group_dims=['region', 'am', 'lm', 'lu'],
-        value_name='Area Weighted Score (ha)', base_score=total_priority_degraded_area, yr_cal=yr_cal)
+        value_name='Area Weighted Score (ha)', base_score=degreded_area_weighted_bio_contr, yr_cal=yr_cal)
 
-    GBF2_score_ag = GBF2_score_ag.assign(Type='Agricultural Land-use')
-    GBF2_score_non_ag = GBF2_score_non_ag.assign(Type='Non-Agricultural Land-use')
-    GBF2_score_am = GBF2_score_am.assign(Type='Agricultural Management')
+    GBF2_score_ag       = GBF2_score_ag.assign(Type='Agricultural Land-use')
+    GBF2_score_non_ag   = GBF2_score_non_ag.assign(Type='Non-Agricultural Land-use')
+    GBF2_score_am       = GBF2_score_am.assign(Type='Agricultural Management')
         
     # Fill nan to empty dataframes
     if GBF2_score_ag.empty:
@@ -3181,7 +3206,6 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
             GBF2_score_ag,
             GBF2_score_non_ag,
             GBF2_score_am], axis=0
-        ).assign( Priority_Target=(data.get_GBF2_target_for_yr_cal(yr_cal) / total_priority_degraded_area) * 100,
         ).rename(columns={
             'lu':'Landuse',
             'lm':'Water_supply',
@@ -3222,7 +3246,7 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
         gdf = gdf.to_crs('EPSG:4326')
         gdf['geometry'] = gdf.simplify(tolerance=0.05, preserve_topology=True)
 
-        # Write as a JS window variable directly to VUE_modules; copytree carries it into DATA_REPORT
+        # Write as a JS window variable directly to VUE_modules
         geojson_dict = json.loads(gdf.to_json())
         with open(geojson_js_path, 'w', encoding='utf-8') as f:
             f.write(f'window.BIO_GBF2_MASK = {json.dumps(geojson_dict)};\n')

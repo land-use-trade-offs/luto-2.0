@@ -82,6 +82,62 @@ window.BiodiversityView = {
 
     const selectMapData = computed(() => currentLayerData.value?.[selectYear.value] ?? {});
 
+    const selectMultiInput = computed(() => {
+      if (!dataLoaded.value) return null;
+      const metric = selectMetric.value;
+      const cat = selectCategory.value;
+      const cr = chartRegister[metric];
+      const region = selectRegion.value;
+      const water = selectWater.value;
+      const agMgt = selectAgMgt.value;
+      const landuse = selectLanduse.value;
+      const species = selectSpecies.value;
+      const withSpecies = hasSpecies.value;
+
+      let candidate = null;
+
+      if (cat === 'Sum') {
+        const sumEntry = cr?.['Sum'] ?? cr?.['overview']?.['sum'];
+        if (!sumEntry) return null;
+        const raw = window[sumEntry.name]?.[region];
+        if (!raw) return null;
+        candidate = withSpecies ? raw?.[species] : raw;
+      } else if (cat === 'Ag') {
+        const entry = cr?.['Ag'];
+        if (!entry) return null;
+        const node = withSpecies ? window[entry.name]?.[region]?.[species] : window[entry.name]?.[region];
+        candidate = node?.[water];
+      } else if (cat === 'Ag Mgt') {
+        const entry = cr?.['Ag Mgt'];
+        if (!entry) return null;
+        const node = withSpecies ? window[entry.name]?.[region]?.[species] : window[entry.name]?.[region];
+        candidate = node?.[agMgt]?.[water];
+      } else if (cat === 'Non-Ag') {
+        const entry = cr?.['Non-Ag'];
+        if (!entry) return null;
+        const raw = window[entry.name]?.[region];
+        candidate = withSpecies ? raw?.[species] : raw;
+      }
+
+      if (!candidate || Array.isArray(candidate) || candidate['Area'] === undefined) return null;
+
+      if (landuse !== 'ALL' && cat !== 'Sum') {
+        return {
+          Percent: (candidate.Percent || []).filter(s => s.name === landuse),
+          Area:    (candidate.Area    || []).filter(s => s.name === landuse),
+        };
+      }
+      return candidate;
+    });
+
+    const selectMultiYAxis = computed(() => {
+      if (!selectMultiInput.value) return null;
+      return {
+        'Area': 'Area-weighted Score (ha)',
+        'Percent': 'Relative Percentage (Pre-1750 = 100%)',
+      };
+    });
+
     const selectChartData = computed(() => {
       const metric = selectMetric.value;
       const cat = selectCategory.value;
@@ -100,13 +156,17 @@ window.BiodiversityView = {
       if (cat === "Sum") {
         const sumEntry = cr?.['Sum'] ?? cr?.['overview']?.['sum'];
         const rawSumData = window[sumEntry?.['name']]?.[region];
-        seriesData = (withSpecies ? rawSumData?.[species] : rawSumData) || [];
+        const candidate = withSpecies ? rawSumData?.[species] : rawSumData;
+        const isMultiInput = candidate && !Array.isArray(candidate) && candidate['Area'] !== undefined;
+        seriesData = isMultiInput ? [] : (candidate || []);
       } else if (cat === "Ag") {
-        seriesData = (chartData?.[water] || []).filter(s => landuse === "ALL" || s.name === landuse);
+        const agData = chartData?.[water];
+        seriesData = Array.isArray(agData) ? agData.filter(s => landuse === "ALL" || s.name === landuse) : [];
       } else if (cat === "Ag Mgt") {
-        seriesData = (chartData?.[agMgt]?.[water] || []).filter(s => landuse === "ALL" || s.name === landuse);
+        const amData = chartData?.[agMgt]?.[water];
+        seriesData = Array.isArray(amData) ? amData.filter(s => landuse === "ALL" || s.name === landuse) : [];
       } else if (cat === "Non-Ag") {
-        seriesData = (chartData || []).filter(s => landuse === "ALL" || s.name === landuse);
+        seriesData = Array.isArray(chartData) ? chartData.filter(s => landuse === "ALL" || s.name === landuse) : [];
       }
       return {
         ...window["Chart_default_options"],
@@ -412,7 +472,7 @@ window.BiodiversityView = {
       availableAgMgt, availableWater, availableSpecies, availableLanduse,
       selectMetric, selectCategory, selectAgMgt, selectWater, selectSpecies, selectLanduse,
       hasSpecies, speciesLabel, formatLanduse,
-      selectMapData, selectChartData, gbf2MaskOverlay,
+      selectMapData, selectChartData, selectMultiInput, selectMultiYAxis, gbf2MaskOverlay,
       dataLoaded, isLoadingData, isDrawerOpen, toggleDrawer,
     };
     const _fn = v => String(v).trim().replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
@@ -571,6 +631,8 @@ window.BiodiversityView = {
           }">
           <chart-container
             :chartData="selectChartData"
+            :multiInput="selectMultiInput"
+            :multiYAxis="selectMultiYAxis"
             :draggable="true"
             :zoomable="true"
             style="width: 100%; height: 200px;">

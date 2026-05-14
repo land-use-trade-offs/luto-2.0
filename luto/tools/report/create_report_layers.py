@@ -62,12 +62,14 @@ def _build_tree(combos: list) -> list | dict:
     if not combos:
         return []
     if len(combos[0]) == 1:
-        seen = dict.fromkeys(c[0] for c in combos)   # unique, ordered
-        return list(seen)
+        seen = dict.fromkeys(c[0] for c in combos)
+        vals = list(seen)
+        return ['ALL', *sorted(v for v in vals if v != 'ALL')] if 'ALL' in seen else sorted(vals)
     groups: dict = {}
     for combo in combos:
         groups.setdefault(combo[0], []).append(combo[1:])
-    return {k: _build_tree(v) for k, v in groups.items()}
+    sorted_keys = (['ALL'] if 'ALL' in groups else []) + sorted(k for k in groups if k != 'ALL')
+    return {k: _build_tree(groups[k]) for k in sorted_keys}
 
 
 

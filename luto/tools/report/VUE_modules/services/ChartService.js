@@ -50,18 +50,6 @@ window.ChartService = {
           name: "BIO_GBF2_NonAg",
         },
         overview: {
-          Ag: {
-            path: "data/BIO_GBF2_overview_Ag.js",
-            name: "BIO_GBF2_overview_Ag",
-          },
-          "Ag Mgt": {
-            path: "data/BIO_GBF2_overview_Am.js",
-            name: "BIO_GBF2_overview_Am",
-          },
-          "Non-Ag": {
-            path: "data/BIO_GBF2_overview_NonAg.js",
-            name: "BIO_GBF2_overview_NonAg",
-          },
           sum: {
             path: "data/BIO_GBF2_overview_sum.js",
             name: "BIO_GBF2_overview_sum",
@@ -86,18 +74,6 @@ window.ChartService = {
           name: "BIO_GBF3_NVIS_NonAg",
         },
         overview: {
-          Ag: {
-            path: "data/BIO_GBF3_NVIS_overview_Ag.js",
-            name: "BIO_GBF3_NVIS_overview_Ag",
-          },
-          "Ag Mgt": {
-            path: "data/BIO_GBF3_NVIS_overview_Am.js",
-            name: "BIO_GBF3_NVIS_overview_Am",
-          },
-          "Non-Ag": {
-            path: "data/BIO_GBF3_NVIS_overview_NonAg.js",
-            name: "BIO_GBF3_NVIS_overview_NonAg",
-          },
           sum: {
             path: "data/BIO_GBF3_NVIS_overview_sum.js",
             name: "BIO_GBF3_NVIS_overview_sum",
@@ -122,18 +98,6 @@ window.ChartService = {
           name: "BIO_GBF4_SNES_NonAg",
         },
         overview: {
-          Ag: {
-            path: "data/BIO_GBF4_SNES_overview_Ag.js",
-            name: "BIO_GBF4_SNES_overview_Ag",
-          },
-          "Ag Mgt": {
-            path: "data/BIO_GBF4_SNES_overview_Am.js",
-            name: "BIO_GBF4_SNES_overview_Am",
-          },
-          "Non-Ag": {
-            path: "data/BIO_GBF4_SNES_overview_NonAg.js",
-            name: "BIO_GBF4_SNES_overview_NonAg",
-          },
           sum: {
             path: "data/BIO_GBF4_SNES_overview_sum.js",
             name: "BIO_GBF4_SNES_overview_sum",
@@ -158,18 +122,6 @@ window.ChartService = {
           name: "BIO_GBF4_ECNES_NonAg",
         },
         overview: {
-          Ag: {
-            path: "data/BIO_GBF4_ECNES_overview_Ag.js",
-            name: "BIO_GBF4_ECNES_overview_Ag",
-          },
-          "Ag Mgt": {
-            path: "data/BIO_GBF4_ECNES_overview_Am.js",
-            name: "BIO_GBF4_ECNES_overview_Am",
-          },
-          "Non-Ag": {
-            path: "data/BIO_GBF4_ECNES_overview_NonAg.js",
-            name: "BIO_GBF4_ECNES_overview_NonAg",
-          },
           sum: {
             path: "data/BIO_GBF4_ECNES_overview_sum.js",
             name: "BIO_GBF4_ECNES_overview_sum",
@@ -190,18 +142,6 @@ window.ChartService = {
           name: "BIO_GBF8_GROUP_NonAg",
         },
         overview: {
-          Ag: {
-            path: "data/BIO_GBF8_GROUP_overview_Ag.js",
-            name: "BIO_GBF8_GROUP_overview_Ag",
-          },
-          "Ag Mgt": {
-            path: "data/BIO_GBF8_GROUP_overview_Am.js",
-            name: "BIO_GBF8_GROUP_overview_Am",
-          },
-          "Non-Ag": {
-            path: "data/BIO_GBF8_GROUP_overview_NonAg.js",
-            name: "BIO_GBF8_GROUP_overview_NonAg",
-          },
           sum: {
             path: "data/BIO_GBF8_GROUP_overview_sum.js",
             name: "BIO_GBF8_GROUP_overview_sum",
@@ -222,18 +162,6 @@ window.ChartService = {
           name: "BIO_GBF8_SPECIES_NonAg",
         },
         overview: {
-          Ag: {
-            path: "data/BIO_GBF8_SPECIES_overview_Ag.js",
-            name: "BIO_GBF8_SPECIES_overview_Ag",
-          },
-          "Ag Mgt": {
-            path: "data/BIO_GBF8_SPECIES_overview_Am.js",
-            name: "BIO_GBF8_SPECIES_overview_Am",
-          },
-          "Non-Ag": {
-            path: "data/BIO_GBF8_SPECIES_overview_NonAg.js",
-            name: "BIO_GBF8_SPECIES_overview_NonAg",
-          },
           sum: {
             path: "data/BIO_GBF8_SPECIES_overview_sum.js",
             name: "BIO_GBF8_SPECIES_overview_sum",
@@ -254,18 +182,6 @@ window.ChartService = {
           name: "BIO_quality_NonAg",
         },
         overview: {
-          Ag: {
-            path: "data/BIO_quality_overview_Ag.js",
-            name: "BIO_quality_overview_Ag",
-          },
-          "Ag Mgt": {
-            path: "data/BIO_quality_overview_Am.js",
-            name: "BIO_quality_overview_Am",
-          },
-          "Non-Ag": {
-            path: "data/BIO_quality_overview_NonAg.js",
-            name: "BIO_quality_overview_NonAg",
-          },
           sum: {
             path: "data/BIO_quality_overview_sum.js",
             name: "BIO_quality_overview_sum",
