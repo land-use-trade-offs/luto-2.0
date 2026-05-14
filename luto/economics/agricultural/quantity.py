@@ -758,6 +758,6 @@ def get_quantity_renewable(data, re_type: str, yr_idx: int):
     )
 
     quantity = yield_per_ha * data.REAL_AREA
-    
+
     return quantity.data.astype(np.float32)
 

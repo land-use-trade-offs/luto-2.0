@@ -98,7 +98,11 @@ window.EconomicsView = {
           ? ((landuse === "ALL" || !landuse) ? items : items.filter(s => s.name === landuse))
           : [];
       } else if (cat === "Ag Mgt") {
-        seriesData = chartData?.[water]?.[landuse];
+        // chart: agMgt → water → [series by LU]
+        const items = chartData?.[agMgt]?.[water];
+        seriesData = (items && items.length)
+          ? ((landuse === "ALL" || !landuse) ? items : items.filter(s => s.name === landuse))
+          : [];
       } else if (cat === "Non-Ag") {
         seriesData = (landuse && landuse !== "ALL") ? chartData?.filter(s => s.name === landuse) : chartData;
       }

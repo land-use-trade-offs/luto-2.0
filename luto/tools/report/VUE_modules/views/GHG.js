@@ -155,17 +155,17 @@ window.GHGView = {
         await ensureComboLayer(mapRegister[newCat].layerPrefix, [selectLanduse.value]);
 
       } else if (newCat === "Ag") {
-        // tree: { water: { lu: [source] } }
+        // tree: { water: { source: [lu] } }
         availableWater.value = Object.keys(tree);
         const prevWater = previousSelections.value["Ag"].water || curWater;
         selectWater.value = (prevWater && availableWater.value.includes(prevWater)) ? prevWater : (availableWater.value[0] || '');
-        availableLanduse.value = Object.keys(tree[selectWater.value] || {});
-        const prevLanduse = previousSelections.value["Ag"].landuse || curLanduse;
-        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
-        availableSource.value = tree[selectWater.value]?.[selectLanduse.value] || [];
+        availableSource.value = Object.keys(tree[selectWater.value] || {});
         const prevSource = previousSelections.value["Ag"].source || curSource;
         selectSource.value = (prevSource && availableSource.value.includes(prevSource)) ? prevSource : (availableSource.value[0] || '');
-        await ensureComboLayer(mapRegister["Ag"].layerPrefix, [selectWater.value, selectLanduse.value, selectSource.value]);
+        availableLanduse.value = tree[selectWater.value]?.[selectSource.value] || [];
+        const prevLanduse = previousSelections.value["Ag"].landuse || curLanduse;
+        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
+        await ensureComboLayer(mapRegister["Ag"].layerPrefix, [selectWater.value, selectSource.value, selectLanduse.value]);
 
       } else if (newCat === "Ag Mgt") {
         // tree: { agMgt: { water: [lu] } }
@@ -200,13 +200,13 @@ window.GHGView = {
       if (cat === "Ag") {
         previousSelections.value["Ag"].water = newWater;
         const tree = getTree("Ag");
-        availableLanduse.value = Object.keys(tree[newWater] || {});
-        const prevLanduse = previousSelections.value["Ag"].landuse;
-        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
-        availableSource.value = tree[newWater]?.[selectLanduse.value] || [];
+        availableSource.value = Object.keys(tree[newWater] || {});
         const prevSource = previousSelections.value["Ag"].source;
         selectSource.value = (prevSource && availableSource.value.includes(prevSource)) ? prevSource : (availableSource.value[0] || '');
-        await ensureComboLayer(mapRegister["Ag"].layerPrefix, [newWater, selectLanduse.value, selectSource.value]);
+        availableLanduse.value = tree[newWater]?.[selectSource.value] || [];
+        const prevLanduse = previousSelections.value["Ag"].landuse;
+        selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
+        await ensureComboLayer(mapRegister["Ag"].layerPrefix, [newWater, selectSource.value, selectLanduse.value]);
       } else if (cat === "Ag Mgt") {
         previousSelections.value["Ag Mgt"].water = newWater;
         const tree = getTree("Ag Mgt");
@@ -220,7 +220,11 @@ window.GHGView = {
     watch(selectSource, async (newSource) => {
       if (selectCategory.value !== "Ag") return;
       previousSelections.value["Ag"].source = newSource;
-      await ensureComboLayer(mapRegister["Ag"].layerPrefix, [selectWater.value, selectLanduse.value, newSource]);
+      const tree = getTree("Ag");
+      availableLanduse.value = tree[selectWater.value]?.[newSource] || [];
+      const prevLanduse = previousSelections.value["Ag"].landuse;
+      selectLanduse.value = (prevLanduse && availableLanduse.value.includes(prevLanduse)) ? prevLanduse : (availableLanduse.value[0] || '');
+      await ensureComboLayer(mapRegister["Ag"].layerPrefix, [selectWater.value, newSource, selectLanduse.value]);
     });
 
     watch(selectLanduse, async (newLanduse) => {
@@ -230,11 +234,7 @@ window.GHGView = {
         await ensureComboLayer(mapRegister["Sum"].layerPrefix, [newLanduse]);
       } else if (cat === "Ag") {
         previousSelections.value["Ag"].landuse = newLanduse;
-        const tree = getTree("Ag");
-        availableSource.value = tree[selectWater.value]?.[newLanduse] || [];
-        const prevSource = previousSelections.value["Ag"].source;
-        selectSource.value = (prevSource && availableSource.value.includes(prevSource)) ? prevSource : (availableSource.value[0] || '');
-        await ensureComboLayer(mapRegister["Ag"].layerPrefix, [selectWater.value, newLanduse, selectSource.value]);
+        await ensureComboLayer(mapRegister["Ag"].layerPrefix, [selectWater.value, selectSource.value, newLanduse]);
       } else if (cat === "Ag Mgt") {
         previousSelections.value["Ag Mgt"].landuse = newLanduse;
         await ensureComboLayer(mapRegister["Ag Mgt"].layerPrefix, [selectAgMgt.value, selectWater.value, newLanduse]);
@@ -320,18 +320,7 @@ window.GHGView = {
           </button>
         </div>
 
-        <!-- Landuse options -->
-        <div v-if="dataLoaded" class="flex flex-wrap gap-1 max-w-[300px]">
-          <span class="text-[0.8rem] mr-1 font-medium">{{ selectCategory === 'Sum' ? 'Type:' : 'Landuse:' }}</span>
-          <button v-for="(val, key) in availableLanduse" :key="key"
-            @click="selectLanduse = val"
-            class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
-            :class="{'bg-sky-500 text-white': selectLanduse === val}">
-            {{ formatLanduse(val) }}
-          </button>
-        </div>
-
-        <!-- Source options (Ag only: emission type — leaf level after Landuse) -->
+        <!-- Source options (Ag only: emission type — before Landuse) -->
         <div v-if="selectCategory === 'Ag' && dataLoaded && availableSource.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
           <span class="text-[0.8rem] mr-1 font-medium">Source:</span>
           <button v-for="(val, key) in availableSource" :key="key"
@@ -339,6 +328,17 @@ window.GHGView = {
             class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
             :class="{'bg-sky-500 text-white': selectSource === val}">
             {{ val }}
+          </button>
+        </div>
+
+        <!-- Landuse options (final selection — leaf level for all categories) -->
+        <div v-if="dataLoaded" class="flex flex-wrap gap-1 max-w-[300px]">
+          <span class="text-[0.8rem] mr-1 font-medium">{{ selectCategory === 'Sum' ? 'Type:' : 'Landuse:' }}</span>
+          <button v-for="(val, key) in availableLanduse" :key="key"
+            @click="selectLanduse = val"
+            class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
+            :class="{'bg-sky-500 text-white': selectLanduse === val}">
+            {{ formatLanduse(val) }}
           </button>
         </div>
       </div>

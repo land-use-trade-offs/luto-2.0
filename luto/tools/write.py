@@ -1097,6 +1097,26 @@ def write_economics(data: Data, yr_cal, path):
         re_potential_xr = xr.concat([solar_potential, wind_potential], dim='am')
         xr_cost_am = xr_cost_am + re_potential_xr.reindex_like(xr_cost_am, fill_value=0.0)
 
+        # ── Part 1b: potential revenue (stack on value matrices, not dvar) ────
+        solar_rev_opt = ag_revenue.get_utility_solar_pv_effect_r_mrj(data, ag_rev_mrj, yr_idx)
+        wind_rev_opt  = ag_revenue.get_onshore_wind_effect_r_mrj(data, ag_rev_mrj, yr_idx)
+
+        solar_rev_xr = xr.DataArray(solar_rev_opt, dims=['lm', 'cell', 'lu'], coords={'lu': solar_lu})
+        wind_rev_xr  = xr.DataArray(wind_rev_opt,  dims=['lm', 'cell', 'lu'], coords={'lu': wind_lu})
+
+        solar_rev_potential = (
+            (solar_dvar_now * solar_rev_xr)
+            .reindex(lu=xr_revenue_am.lu.values, fill_value=0.0)
+            .expand_dims(am=['Utility Solar PV'])
+        )
+        wind_rev_potential = (
+            (wind_dvar_now * wind_rev_xr)
+            .reindex(lu=xr_revenue_am.lu.values, fill_value=0.0)
+            .expand_dims(am=['Onshore Wind'])
+        )
+        re_rev_potential_xr = xr.concat([solar_rev_potential, wind_rev_potential], dim='am')
+        xr_revenue_am = xr_revenue_am + re_rev_potential_xr.reindex_like(xr_revenue_am, fill_value=0.0)
+
         # ── Part 2: existing capacity as lu='Existing Capacity' ───────────────
         solar_cells_now = ag_cost.get_utility_solar_pv_existing_cost_by_region(data, yr_idx, return_cells=True)
         wind_cells_now  = ag_cost.get_onshore_wind_existing_cost_by_region(data, yr_idx, return_cells=True)
@@ -1128,7 +1148,33 @@ def write_economics(data: Data, yr_cal, path):
             xr.concat([exist_re_cost_dry, exist_re_cost_irr], dim='lm')
             .reindex(am=xr_cost_am.am.values, fill_value=0.0)
         )
-        exist_re_rev_full = xr.zeros_like(exist_re_cost_full)
+
+        # Existing capacity revenue: MWh × state electricity price per cell
+        _solar_exist_mwh = ag_quantity.get_exist_renewable_capacity(data, 'Utility Solar PV', yr_cal)
+        _wind_exist_mwh  = ag_quantity.get_exist_renewable_capacity(data, 'Onshore Wind',     yr_cal)
+        _solar_prices = data.SOLAR_PRICES.query('Year == @yr_cal').set_index('State')['Price_AUD_per_MWh'].to_dict()
+        _wind_prices  = data.WIND_PRICES.query('Year == @yr_cal').set_index('State')['Price_AUD_per_MWh'].to_dict()
+        _solar_prices = {data.REGION_STATE_NAME2CODE[k]: v for k, v in _solar_prices.items()}
+        _wind_prices  = {data.REGION_STATE_NAME2CODE[k]: v for k, v in _wind_prices.items()}
+        _solar_price_map = np.vectorize(_solar_prices.get, otypes=[np.float32])(data.REGION_STATE_CODE)
+        _wind_price_map  = np.vectorize(_wind_prices.get,  otypes=[np.float32])(data.REGION_STATE_CODE)
+        solar_exist_rev = _solar_exist_mwh.values * _solar_price_map
+        wind_exist_rev  = _wind_exist_mwh.values  * _wind_price_map
+
+        exist_re_rev_dry = xr.DataArray(
+            np.stack([solar_exist_rev, wind_exist_rev], axis=0),
+            dims=['am', 'cell'],
+            coords={
+                'am':     ['Utility Solar PV', 'Onshore Wind'],
+                'cell':   np.arange(data.NCELLS),
+                'region': ('cell', data.REGION_NRM_NAME),
+            },
+        ).expand_dims(lm=['dry'], lu=['Existing Capacity'])
+        exist_re_rev_irr  = xr.zeros_like(exist_re_rev_dry).assign_coords(lm=['irr'])
+        exist_re_rev_full = (
+            xr.concat([exist_re_rev_dry, exist_re_rev_irr], dim='lm')
+            .reindex(am=xr_revenue_am.am.values, fill_value=0.0)
+        )
 
         xr_cost_am    = xr.concat([xr_cost_am,    exist_re_cost_full], dim='lu')
         xr_revenue_am = xr.concat([xr_revenue_am, exist_re_rev_full],  dim='lu')
