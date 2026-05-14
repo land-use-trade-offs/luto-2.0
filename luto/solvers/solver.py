@@ -1286,6 +1286,16 @@ class LutoSolver:
                         eligible_irr_cells, self._input_data.savanna_eligible_r
                     )
 
+                if am in settings.RENEWABLES_OPTIONS:
+                    gbf2_excl_idx = (
+                        self._input_data.renewable_GBF2_mask_solar_idx
+                        if am == "Utility Solar PV"
+                        else self._input_data.renewable_GBF2_mask_wind_idx
+                    )
+                    if gbf2_excl_idx.size:
+                        eligible_dry_cells = np.setdiff1d(eligible_dry_cells, gbf2_excl_idx)
+                        eligible_irr_cells = np.setdiff1d(eligible_irr_cells, gbf2_excl_idx)
+
                 for r in eligible_dry_cells:
                     am_X_dry_sol_rj[am][r, j] = self.X_ag_man_dry_vars_jr[am][
                         j_idx, r
