@@ -110,7 +110,7 @@ def create_new_dataset(refresh=False):
     shutil.copyfile(nlum_inpath + 'NLUM_2010-11_mask.tif', outpath + 'NLUM_2010-11_mask.tif')
     shutil.copyfile(nlum_inpath + 'ag_landuses.csv', outpath + 'ag_landuses.csv')
 
-    shutil.copyfile(luto_1D_inpath + 'GHG_targets_20260223.xlsx', outpath + 'GHG_targets.xlsx')
+    shutil.copyfile(luto_1D_inpath + 'GHG_targets_20260223_2010-2060.xlsx', outpath + 'GHG_targets.xlsx')
     shutil.copyfile(luto_1D_inpath + 'carbon_prices_20240612.xlsx', outpath + 'carbon_prices.xlsx')
     shutil.copyfile(luto_1D_inpath + 'ag_price_multipliers_20240612.xlsx', outpath + 'ag_price_multipliers.xlsx')
     shutil.copyfile(luto_1D_inpath + 'cost_multipliers_20240612.xlsx', outpath + 'cost_multipliers.xlsx')

@@ -2818,32 +2818,50 @@ def process_biodiversity_data(files, SAVE_DIR):
     df_wide_pct['type'] = 'column'
     df_wide_pct['color'] = df_wide_pct['name'].apply(lambda x: COLORS[x])
 
+    df_wide_area = _groupby_to_records(df_region, ['Type', 'region'], ['name', 'region', 'data'], value_cols=('Year', 'Area Weighted Score (ha)'))
+    df_wide_area['type'] = 'column'
+    df_wide_area['color'] = df_wide_area['name'].apply(lambda x: COLORS[x])
+
     out_dict = {}
-    for region, df in df_wide_pct.groupby('region'):
-        df = df.drop(['region'], axis=1)
-        out_dict[region] = df.to_dict(orient='records')
+    for region, df_pct in df_wide_pct.groupby('region'):
+        df_pct = df_pct.drop(['region'], axis=1)
+        df_area = df_wide_area[df_wide_area['region'] == region].drop(['region'], axis=1)
+        out_dict[region] = {
+            'Percent': df_pct.to_dict(orient='records'),
+            'Area':    df_area.to_dict(orient='records'),
+        }
 
     filename = f'BIO_quality_overview_sum'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
         json.dump(out_dict, f, separators=(',', ':'), indent=2)
         f.write(';\n')
-    
-    
-    
+
+
+
     # ---------------- Overall quality - Ag ----------------
     bio_df_ag = bio_df.query('Type == "Agricultural Land-use" and Landuse != "ALL"').copy()
 
-    df_wide = _groupby_to_records(bio_df_ag, ['region', 'Water_supply', 'Landuse'], ['region', 'water', 'name', 'data'], value_cols=('Year', 'Value (%)'))
-    df_wide['type'] = 'column'; df_wide['color'] = df_wide['name'].map(COLORS)
-    df_wide['_ord'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
-    df_wide = df_wide.sort_values('_ord').drop(columns=['_ord'])
+    df_wide_pct = _groupby_to_records(bio_df_ag, ['region', 'Water_supply', 'Landuse'], ['region', 'water', 'name', 'data'], value_cols=('Year', 'Value (%)'))
+    df_wide_pct['type'] = 'column'; df_wide_pct['color'] = df_wide_pct['name'].map(COLORS)
+    df_wide_pct['_ord'] = df_wide_pct['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+    df_wide_pct = df_wide_pct.sort_values('_ord').drop(columns=['_ord'])
+
+    df_wide_area = _groupby_to_records(bio_df_ag, ['region', 'Water_supply', 'Landuse'], ['region', 'water', 'name', 'data'], value_cols=('Year', 'Area Weighted Score (ha)'))
+    df_wide_area['type'] = 'column'; df_wide_area['color'] = df_wide_area['name'].map(COLORS)
+    df_wide_area['_ord'] = df_wide_area['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+    df_wide_area = df_wide_area.sort_values('_ord').drop(columns=['_ord'])
+
     out_dict = {}
-    for (region, water), df in df_wide.groupby(['region', 'water']):
-        df = df.drop(['region', 'water'], axis=1)
+    for (region, water), df_pct in df_wide_pct.groupby(['region', 'water']):
+        df_pct = df_pct.drop(['region', 'water'], axis=1)
+        df_area = df_wide_area[(df_wide_area['region'] == region) & (df_wide_area['water'] == water)].drop(['region', 'water'], axis=1)
         if region not in out_dict:
             out_dict[region] = {}
-        out_dict[region][water] = df.to_dict(orient='records')
+        out_dict[region][water] = {
+            'Percent': df_pct.to_dict(orient='records'),
+            'Area':    df_area.to_dict(orient='records'),
+        }
 
     filename = f'BIO_quality_Ag'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
@@ -2853,20 +2871,32 @@ def process_biodiversity_data(files, SAVE_DIR):
 
     # ---------------- Overall quality - Am ----------------
     bio_df_am = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` != "ALL"').copy()
+    _am_all_src = bio_df.query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` == "ALL"')
 
-    df_wide = _groupby_to_records(bio_df_am, ['region', 'Water_supply', 'Agricultural Management', 'Landuse'], ['region', 'water', 'am', 'name', 'data'], value_cols=('Year', 'Value (%)'))
-    df_wide['type'] = 'column'; df_wide['color'] = df_wide['name'].map(COLORS)
-    wall = _groupby_to_records(bio_df.query('Type == "Agricultural Management" and Landuse != "ALL" and `Agricultural Management` == "ALL"'), ['region', 'Water_supply', 'Landuse'], ['region', 'water', 'name', 'data'], value_cols=('Year', 'Value (%)'))
-    wall['am'] = 'ALL'; wall['type'] = 'column'; wall['color'] = wall['name'].map(COLORS)
-    df_wide = pd.concat([df_wide, wall], ignore_index=True)
+    df_wide_pct = _groupby_to_records(bio_df_am, ['region', 'Water_supply', 'Agricultural Management', 'Landuse'], ['region', 'water', 'am', 'name', 'data'], value_cols=('Year', 'Value (%)'))
+    df_wide_pct['type'] = 'column'; df_wide_pct['color'] = df_wide_pct['name'].map(COLORS)
+    wall_pct = _groupby_to_records(_am_all_src, ['region', 'Water_supply', 'Landuse'], ['region', 'water', 'name', 'data'], value_cols=('Year', 'Value (%)'))
+    wall_pct['am'] = 'ALL'; wall_pct['type'] = 'column'; wall_pct['color'] = wall_pct['name'].map(COLORS)
+    df_wide_pct = pd.concat([df_wide_pct, wall_pct], ignore_index=True)
+
+    df_wide_area = _groupby_to_records(bio_df_am, ['region', 'Water_supply', 'Agricultural Management', 'Landuse'], ['region', 'water', 'am', 'name', 'data'], value_cols=('Year', 'Area Weighted Score (ha)'))
+    df_wide_area['type'] = 'column'; df_wide_area['color'] = df_wide_area['name'].map(COLORS)
+    wall_area = _groupby_to_records(_am_all_src, ['region', 'Water_supply', 'Landuse'], ['region', 'water', 'name', 'data'], value_cols=('Year', 'Area Weighted Score (ha)'))
+    wall_area['am'] = 'ALL'; wall_area['type'] = 'column'; wall_area['color'] = wall_area['name'].map(COLORS)
+    df_wide_area = pd.concat([df_wide_area, wall_area], ignore_index=True)
+
     out_dict = {}
-    for (region, am, water), df in df_wide.groupby(['region', 'am', 'water']):
-        df = df.drop(['region', 'am', 'water'], axis=1)
+    for (region, am, water), df_pct in df_wide_pct.groupby(['region', 'am', 'water']):
+        df_pct = df_pct.drop(['region', 'am', 'water'], axis=1)
+        df_area = df_wide_area[(df_wide_area['region'] == region) & (df_wide_area['am'] == am) & (df_wide_area['water'] == water)].drop(['region', 'am', 'water'], axis=1)
         if region not in out_dict:
             out_dict[region] = {}
         if am not in out_dict[region]:
             out_dict[region][am] = {}
-        out_dict[region][am][water] = df.to_dict(orient='records')
+        out_dict[region][am][water] = {
+            'Percent': df_pct.to_dict(orient='records'),
+            'Area':    df_area.to_dict(orient='records'),
+        }
 
     filename = f'BIO_quality_Am'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
@@ -2877,14 +2907,24 @@ def process_biodiversity_data(files, SAVE_DIR):
     # ---------------- Overall quality - Non-Ag ----------------
     _q_nonag_src = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"').query('Type == "Non-Agricultural Land-use"')
 
-    df_wide = _groupby_to_records(_q_nonag_src, ['region', 'Landuse'], ['region', 'name', 'data'], value_cols=('Year', 'Value (%)'))
-    df_wide['type'] = 'column'; df_wide['color'] = df_wide['name'].map(COLORS)
-    df_wide['_ord'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
-    df_wide = df_wide.sort_values('_ord').drop(columns=['_ord'])
+    df_wide_pct = _groupby_to_records(_q_nonag_src, ['region', 'Landuse'], ['region', 'name', 'data'], value_cols=('Year', 'Value (%)'))
+    df_wide_pct['type'] = 'column'; df_wide_pct['color'] = df_wide_pct['name'].map(COLORS)
+    df_wide_pct['_ord'] = df_wide_pct['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+    df_wide_pct = df_wide_pct.sort_values('_ord').drop(columns=['_ord'])
+
+    df_wide_area = _groupby_to_records(_q_nonag_src, ['region', 'Landuse'], ['region', 'name', 'data'], value_cols=('Year', 'Area Weighted Score (ha)'))
+    df_wide_area['type'] = 'column'; df_wide_area['color'] = df_wide_area['name'].map(COLORS)
+    df_wide_area['_ord'] = df_wide_area['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+    df_wide_area = df_wide_area.sort_values('_ord').drop(columns=['_ord'])
+
     out_dict = {}
-    for region, df in df_wide.groupby('region'):
-        df = df.drop(['region'], axis=1)
-        out_dict[region] = df.to_dict(orient='records')
+    for region, df_pct in df_wide_pct.groupby('region'):
+        df_pct = df_pct.drop(['region'], axis=1)
+        df_area = df_wide_area[df_wide_area['region'] == region].drop(['region'], axis=1)
+        out_dict[region] = {
+            'Percent': df_pct.to_dict(orient='records'),
+            'Area':    df_area.to_dict(orient='records'),
+        }
 
     filename = f'BIO_quality_NonAg'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:

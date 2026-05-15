@@ -130,13 +130,10 @@ window.BiodiversityView = {
       return candidate;
     });
 
-    const selectMultiYAxis = computed(() => {
-      if (!selectMultiInput.value) return null;
-      return {
-        'Area': 'Area-weighted Score (ha)',
-        'Percent': 'Relative Percentage (Pre-1750 = 100%)',
-      };
-    });
+    const selectMultiYAxis = {
+      'Area': 'Area-weighted Score (ha)',
+      'Percent': 'Relative Percentage (Pre-1750 = 100%)',
+    };
 
     const selectChartData = computed(() => {
       const metric = selectMetric.value;
