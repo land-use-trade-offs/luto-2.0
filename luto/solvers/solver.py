@@ -311,7 +311,7 @@ class LutoSolver:
                 ag_mask = self._input_data.ag_mask_proportion_r
                 for r in sorted(renewable_cells):
                     cap = float(exist_r[r])
-                    if cap <= 0:
+                    if not cap:
                         continue
                     terms = [
                         v for j_idx in range(len(am_j_list))
@@ -319,13 +319,13 @@ class LutoSolver:
                             self.X_ag_man_dry_vars_jr[am][j_idx, r],
                             self.X_ag_man_irr_vars_jr[am][j_idx, r],
                         )
-                        if not isinstance(v, (int, float))
+                        if isinstance(v, gp.Var) # only set ub if the cell is a valide Renewable location
                     ]
                     if terms:
                         ceiling = max(float(ag_mask[r]) - cap, 0.0)
                         self.gurobi_model.addConstr(
                             gp.quicksum(terms) <= ceiling,
-                            name=f"const_{am_name}_exist_ub_{r}"
+                            name=f"const_{am_name}_solvable_ub_{r}"
                         )
                 continue  # skip generic j loop below
 
