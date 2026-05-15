@@ -457,13 +457,19 @@ def get_potential_renewable_wind_r(data: Data, target_idx):
     output = ag_quantity.get_quantity_renewable(data, 'Onshore Wind', target_idx)
     return output
 
-def get_exist_renewable_fraction_solar_r(data: Data, yr_cal: int):
-    print('Getting existing solar capacity (MWh/cell)...', flush=True)
-    return ag_quantity.get_existing_renewable_dvar_fraction(data, 'Utility Solar PV', yr_cal)
+def get_exist_renewable_fraction_solar_r(data: Data, yr_cal: int = None):
+    print('Getting existing solar capacity fraction (all years, solver ceiling)...', flush=True)
+    # Existing real-world capacity and LUTO-simulated capacity compete for the same
+    # cell space [0, 1]. We lock the maximum existing fraction (cumulative 2000-2035)
+    # in advance so that simulated + existing never exceeds 1 in any period.
+    # Using all years (yr_cal=99999) keeps the ceiling fixed across solver calls,
+    # preventing lb > ub when new real-world capacity enters mid-simulation.
+    return ag_quantity.get_existing_renewable_dvar_fraction(data, 'Utility Solar PV', 99999)
 
-def get_exist_renewable_fraction_wind_r(data: Data, yr_cal: int):
-    print('Getting existing wind capacity (MWh/cell)...', flush=True)
-    return ag_quantity.get_existing_renewable_dvar_fraction(data, 'Onshore Wind', yr_cal)
+def get_exist_renewable_fraction_wind_r(data: Data, yr_cal: int = None):
+    print('Getting existing wind capacity fraction (all years, solver ceiling)...', flush=True)
+    # Same rationale as solar: lock maximum existing fraction to prevent simulated + existing > 1.
+    return ag_quantity.get_existing_renewable_dvar_fraction(data, 'Onshore Wind', 99999)
 
 def get_exist_renewable_capacity_by_state_input(data: Data, yr_cal: int):
     print('Getting existing renewable capacity by state...', flush=True)

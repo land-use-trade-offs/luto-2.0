@@ -302,14 +302,14 @@ class LutoSolver:
                         model_lb = 0 if AG_MANAGEMENTS_REVERSIBLE[am] else self._input_data.ag_man_lb_mrj[am][0, r, j]
                         self.X_ag_man_dry_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
                             lb=model_lb,
-                            ub=1 - exist_r[r],            # ub shrinks by existing fraction; 0 when fully occupied
+                            ub=1,  # cell-level ceiling enforced by const_<am>_exist_ub in _add_cell_usage_constraints
                             name=f"X_ag_man_dry_{am_name}_{j}_{r}".replace(" ", "_"),
                         )
                     for r in irr_lu_cells:
                         model_lb = 0 if AG_MANAGEMENTS_REVERSIBLE[am] else self._input_data.ag_man_lb_mrj[am][1, r, j]
                         self.X_ag_man_irr_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
                             lb=model_lb,
-                            ub=1 - exist_r[r],            # ub shrinks by existing fraction; 0 when fully occupied
+                            ub=1,  # cell-level ceiling enforced by const_<am>_exist_ub in _add_cell_usage_constraints
                             name=f"X_ag_man_irr_{am_name}_{j}_{r}".replace(" ", "_"),
                         )
                     continue  # skip generic loop below; variables already created with correct lbs
@@ -522,6 +522,39 @@ class LutoSolver:
                 expr == ub,
                 name=f"const_cell_usage_{r}"
             )
+
+        # Renewable energy: cell-level existing-capacity ceiling.
+        # exist_r = total planned capacity across ALL data years (fixed, monotone).
+        # sum_j(X_ag_man_wind_j_r) + exist_wind_r <= ag_mask[r]
+        # Because exist_r is the same in every period, lb(t) <= ub(t-1) = ub(t), so
+        # the non-reversibility lock can never exceed this ceiling.
+        if any(settings.RENEWABLES_OPTIONS.values()):
+            for am, exist_r_arr in [
+                ('Onshore Wind',     self._input_data.exist_renewable_wind_r),
+                ('Utility Solar PV', self._input_data.exist_renewable_solar_r),
+            ]:
+                if not AG_MANAGEMENTS.get(am) or am not in self._input_data.am2j:
+                    continue
+                am_j_list = self._input_data.am2j[am]
+                am_slug   = tools.am_name_snake_case(am)
+                for r in cells:
+                    cap = float(exist_r_arr[r])
+                    if cap <= 0:
+                        continue
+                    terms = []
+                    for j_idx in range(len(am_j_list)):
+                        v = self.X_ag_man_dry_vars_jr[am][j_idx, r]
+                        if not isinstance(v, (int, float)):
+                            terms.append(v)
+                        v = self.X_ag_man_irr_vars_jr[am][j_idx, r]
+                        if not isinstance(v, (int, float)):
+                            terms.append(v)
+                    if terms:
+                        ceiling = max(float(ag_mask[r]) - cap, 0.0)
+                        self.gurobi_model.addConstr(
+                            gp.quicksum(terms) <= ceiling,
+                            name=f"const_{am_slug}_exist_ub_{r}"
+                        )
 
     def _add_agricultural_management_constraints(
         self, cells: Optional[np.array] = None
