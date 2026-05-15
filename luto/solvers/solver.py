@@ -371,8 +371,9 @@ class LutoSolver:
         4) [B] A single penalty scalar for biodiversity, minimises its deviation from the target.
         """
         print("│   └── Setting up decision variables for soft constraints...")
-        
-        self.V = self.gurobi_model.addMVar(self._input_data.ncms, lb=0, name="V") # force lb=0 to make sure demand penalties are positive; i.e., demand must be met or exceeded
+
+        if settings.DEMAND_CONSTRAINT_TYPE == 'soft':
+            self.V = self.gurobi_model.addMVar(self._input_data.ncms, lb=0, name="V")  # lb=0: demand must be met or exceeded
 
         if settings.GHG_CONSTRAINT_TYPE == "soft":
             self.E = self.gurobi_model.addVar(name="E")
@@ -483,14 +484,17 @@ class LutoSolver:
         weight_water = 0
 
         # Get the penalty values for each sector
-        penalty_demand = (
-            gp.quicksum(
-                self.V[c] * self._input_data.scale_factors['Demand'] * price
-                for c, price in enumerate(self._input_data.economic_prices)
-            ) 
-            * settings.SOLVER_WEIGHT_DEMAND
-            / 1e6  # Convert to million AUD
-        )
+        if settings.DEMAND_CONSTRAINT_TYPE == 'soft':
+            penalty_demand = (
+                gp.quicksum(
+                    self.V[c] * self._input_data.scale_factors['Demand'] * price
+                    for c, price in enumerate(self._input_data.economic_prices)
+                )
+                * settings.SOLVER_WEIGHT_DEMAND
+                / 1e6  # Convert to million AUD
+            )
+        else:
+            penalty_demand = gp.LinExpr(0)
     
         if settings.GHG_CONSTRAINT_TYPE == "soft":
             weight_ghg = settings.SOLVER_WEIGHT_GHG
@@ -697,15 +701,37 @@ class LutoSolver:
         ]
 
         demand_scale = self._input_data.scale_factors['Demand']
-        lower_bound_constraints = self.gurobi_model.addConstrs(
-            (
-                (self.total_q_exprs_c[c] - self._input_data.limits['demand'][c] / demand_scale) == self.V[c]
-                for c in range(self._input_data.ncms)
-            ),  name="demand_soft_bound_lower"
-        )
 
-        # self.demand_penalty_constraints.extend(upper_bound_constraints.values())
-        self.demand_penalty_constraints.extend(lower_bound_constraints.values())
+        if settings.DEMAND_CONSTRAINT_TYPE == 'soft':
+            lower_bound_constraints = self.gurobi_model.addConstrs(
+                (
+                    (self.total_q_exprs_c[c] - self._input_data.limits['demand'][c] / demand_scale) == self.V[c]
+                    for c in range(self._input_data.ncms)
+                ),  name="demand_soft_bound_lower"
+            )
+            self.demand_penalty_constraints.extend(lower_bound_constraints.values())
+        else:
+            print("│   ├── Adding <hard> demand constraints (lower + upper bounds, no penalty)...")
+            lower_bound_constraints = self.gurobi_model.addConstrs(
+                (
+                    self.total_q_exprs_c[c] >= self._input_data.limits['demand'][c] / demand_scale
+                    for c in range(self._input_data.ncms)
+                ),  name="demand_hard_bound_lower"
+            )
+            upper_bound_constraints = self.gurobi_model.addConstrs(
+                (
+                    self.total_q_exprs_c[c] <= (
+                        self._input_data.limits['demand'][c] / demand_scale
+                        * settings.DEMAND_UPPER_BOUND.get(
+                            self._input_data.commodity_names[c],
+                            settings.DEMAND_UPPER_BOUND['__default__']
+                        )
+                    )
+                    for c in range(self._input_data.ncms)
+                ),  name="demand_hard_bound_upper"
+            )
+            self.demand_penalty_constraints.extend(lower_bound_constraints.values())
+            self.demand_penalty_constraints.extend(upper_bound_constraints.values())
 
 
     def _get_water_net_yield_expr_for_region(
