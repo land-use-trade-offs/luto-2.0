@@ -128,8 +128,6 @@ class LutoSolver:
         self.bio_GBF2_constrs = {}
         self.bio_GBF3_NVIS_exprs = {}
         self.bio_GBF3_NVIS_constrs = {}
-        self.bio_GBF3_IBRA_exprs = {}
-        self.bio_GBF3_IBRA_constrs = {}
         self.bio_GBF4_SNES_exprs = {}
         self.bio_GBF4_SNES_constrs = {}
         self.bio_GBF4_ECNES_exprs = {}
@@ -445,7 +443,6 @@ class LutoSolver:
 
         print("│   └── setting up transition flow delta variables (D)...")
         model = self.gurobi_model
-        idata = self._input_data
 
         # Feasibility is fully resolved in input_data (feasible_ag2ag_mrj / feasible_nonag2ag_mrj /
         # feasible_ag2nonag_rk — source-keyed dicts, keyed/shaped like the flow_cost dicts): each leaf
@@ -454,17 +451,17 @@ class LutoSolver:
 
         # ── ag → ag :  D[(fm,fj)][to_m, local_r, to_j], OFF-DIAGONAL only (positive-increment delta) ──
         # No stay/diagonal var: "staying" as (fm,fj) is free — the node-balance constant carries the base.
-        for (fm, fj), valid in idata.feasible_ag2ag_mrj.items():
+        for (fm, fj), valid in self._input_data.feasible_ag2ag_mrj.items():
             idx = list(map(tuple, np.argwhere(valid).tolist()))
             self.F_ag2ag[(fm, fj)] = model.addVars(idx, lb=0.0, name=f"F_a2a_{fm}_{fj}")
 
         # ── ag → non-ag :  F[(fm,fj)][k, local_r] ──
-        for (fm, fj), valid in idata.feasible_ag2nonag_rk.items():
+        for (fm, fj), valid in self._input_data.feasible_ag2nonag_rk.items():
             idx = [(int(k), int(lr)) for lr, k in np.argwhere(valid)]
             self.F_ag2nonag[(fm, fj)] = model.addVars(idx, lb=0.0, name=f"F_a2n_{fm}_{fj}")
 
         # ── non-ag → ag :  F[k][to_m, local_r, to_j] ──
-        for fk, valid in idata.feasible_nonag2ag_mrj.items():
+        for fk, valid in self._input_data.feasible_nonag2ag_mrj.items():
             idx = list(map(tuple, np.argwhere(valid).tolist()))
             self.F_nonag2ag[fk] = model.addVars(idx, lb=0.0, name=f"F_n2a_{fk}")
 
@@ -494,12 +491,11 @@ class LutoSolver:
         """
         print("│   ├── Adding source-cap (Σ out ≤ base) constraints...")
         model     = self.gurobi_model
-        idata     = self._input_data
         const_ag  = self.const_ag
         const_non = self.const_nonag
 
         n = 0
-        for (fm, fj), cells in idata.ag_source_cells.items():
+        for (fm, fj), cells in self._input_data.ag_source_cells.items():
             F_a2a = self.F_ag2ag[(fm, fj)]
             F_a2n = self.F_ag2nonag[(fm, fj)]
             for local_r, r in enumerate(cells):
@@ -509,7 +505,7 @@ class LutoSolver:
                 model.addConstr(out <= const_ag[fm, r, fj], name=f"srccap_a_{fm}_{fj}_{local_r}")
                 n += 1
 
-        for fk, cells in idata.nonag_source_cells.items():
+        for fk, cells in self._input_data.nonag_source_cells.items():
             F_n2a = self.F_nonag2ag[fk]
             for local_r, r in enumerate(cells):
                 out = F_n2a.sum('*', local_r, '*')
@@ -536,7 +532,6 @@ class LutoSolver:
         """
         print("│   └── Adding node-balance (X = base + Σin − Σout) constraints...")
         model     = self.gurobi_model
-        idata     = self._input_data
         const_ag  = self.const_ag
         const_non = self.const_nonag
 
@@ -546,7 +541,7 @@ class LutoSolver:
         in_nonag  = defaultdict(list)   # (r, k)    -> [vars] arriving at non-ag k       (ag2nonag)
         out_nonag = defaultdict(list)   # (r, k)    -> [vars] leaving  non-ag k          (nonag2ag)
 
-        for (fm, fj), cells in idata.ag_source_cells.items():
+        for (fm, fj), cells in self._input_data.ag_source_cells.items():
             for (to_m, local_r, to_j), var in self.F_ag2ag[(fm, fj)].items():
                 g = cells[local_r]
                 in_ag[(to_m, g, to_j)].append(var)   # arrives at (to_m,to_j)
@@ -555,23 +550,23 @@ class LutoSolver:
                 g = cells[local_r]
                 in_nonag[(g, k)].append(var)         # arrives at non-ag k
                 out_ag[(fm, g, fj)].append(var)      # leaves ag source (fm,fj)
-        for fk, cells in idata.nonag_source_cells.items():
+        for fk, cells in self._input_data.nonag_source_cells.items():
             for (to_m, local_r, to_j), var in self.F_nonag2ag[fk].items():
                 g = cells[local_r]
                 in_ag[(to_m, g, to_j)].append(var)   # arrives at ag (to_m,to_j)
                 out_nonag[(g, fk)].append(var)       # leaves non-ag source k
 
         n = 0
-        for j in range(idata.n_ag_lus):
+        for j in range(self._input_data.n_ag_lus):
             for m, X_row in ((0, self.X_ag_dry_vars_jr), (1, self.X_ag_irr_vars_jr)):
-                for r in idata.feasible_ag_cells_mrj[m, j]:
+                for r in self._input_data.feasible_ag_cells_mrj[m, j]:
                     model.addConstr(
                         X_row[j, r] == const_ag[m, r, j]
                         + gp.quicksum(in_ag.get((m, r, j), [])) - gp.quicksum(out_ag.get((m, r, j), [])),
                         name=f"bal_a_{m}_{j}_{r}")
                     n += 1
-        for k in range(idata.n_non_ag_lus):
-            for r in idata.feasible_non_ag_cells[k]:
+        for k in range(self._input_data.n_non_ag_lus):
+            for r in self._input_data.feasible_non_ag_cells[k]:
                 model.addConstr(
                     self.X_non_ag_vars_kr[k, r] == const_non[r, k]
                     + gp.quicksum(in_nonag.get((r, k), [])) - gp.quicksum(out_nonag.get((r, k), [])),
@@ -624,8 +619,6 @@ class LutoSolver:
         # Land-use transition cost = Σ flow_cost · D over the positive-increment delta vars,
         # SUBTRACTED from profit (maxprofit). Source-keyed flow_cost gives the exact per-source transition
         # cost; _qsum drops |coeff| < SOLVER_COEFF_MIN, same filter as every other term.
-        idata = self._input_data
-
         def _flow_cost_expr(Fdict, coeff_of):
             if not Fdict:
                 return gp.LinExpr(0)
@@ -635,15 +628,15 @@ class LutoSolver:
             return _qsum(coeffs, varr)
 
         trans_a2a = gp.quicksum(
-            _flow_cost_expr(self.F_ag2ag[s], (lambda k, c=idata.flow_cost_ag2ag[s]: c[k[0], k[1], k[2]]))
+            _flow_cost_expr(self.F_ag2ag[s], (lambda k, c=self._input_data.flow_cost_ag2ag[s]: c[k[0], k[1], k[2]]))
             for s in self.F_ag2ag
         )
         trans_n2a = gp.quicksum(
-            _flow_cost_expr(self.F_nonag2ag[fk], (lambda k, c=idata.flow_cost_nonag2ag[fk]: c[k[0], k[1], k[2]]))
+            _flow_cost_expr(self.F_nonag2ag[fk], (lambda k, c=self._input_data.flow_cost_nonag2ag[fk]: c[k[0], k[1], k[2]]))
             for fk in self.F_nonag2ag
         )
         trans_a2n = gp.quicksum(
-            _flow_cost_expr(self.F_ag2nonag[s], (lambda k, c=idata.flow_cost_ag2nonag[s]: c[k[0]][k[1]]))
+            _flow_cost_expr(self.F_ag2nonag[s], (lambda k, c=self._input_data.flow_cost_ag2nonag[s]: c[k[0]][k[1]]))
             for s in self.F_ag2nonag
         )
         self.economy_trans_ag2ag_contr    = -(trans_a2a + trans_n2a)   # all inflows INTO ag targets
@@ -747,13 +740,20 @@ class LutoSolver:
             + x_ag_irr_vars.sum(axis=0)
             + x_non_ag_vars.sum(axis=0)
         )
+        # Ranged, not ==: presolve folds bal_a/bal_n into this row and demands
+        # sum(base) == ag_mask between two constants summed along different float32 paths,
+        # which disagree by up to ~1.75x FeasibilityTol (presolve reads constants exactly,
+        # with no tolerance). The +/-10x Ftol band absorbs that residual; conservation
+        # (bal_a/bal_n) still pins the cell total to sum(base), so the band is a pure
+        # feasibility gate and its width is not exploitable by the objective.
+        band = 10 * settings.FEASIBILITY_TOLERANCE
         n_skipped = 0
         for r, expr, ub in zip(cells, X_sum_r, ag_mask[cells]):
             if skip_r[r]:
                 n_skipped += 1
                 continue
-            self.cell_usage_constraint_r[r] = self.gurobi_model.addConstr(
-                expr == ub,
+            self.cell_usage_constraint_r[r] = self.gurobi_model.addRange(
+                expr, ub - band, ub + band,
                 name=f"const_cell_usage_{r}"
             )
         if n_skipped:
@@ -1146,12 +1146,11 @@ class LutoSolver:
 
         # Transition GHG: Σ flow_ghg_ag2ag · D_ag2ag — source-correct carbon release on ag→ag conversion
         # (per-source, aligned with F_ag2ag's cell axis).
-        idata = self._input_data
         ghg_trans_exprs = []
         for s, Fdict in self.F_ag2ag.items():
             if not Fdict:
                 continue
-            c = idata.flow_ghg_ag2ag[s]                      # [to_m, local_r, to_j]
+            c = self._input_data.flow_ghg_ag2ag[s]           # [to_m, local_r, to_j]
             keys = list(Fdict.keys())
             coeffs = np.fromiter((c[k[0], k[1], k[2]] for k in keys), dtype=np.float64, count=len(keys))
             varr = np.fromiter((Fdict[k] for k in keys), dtype=object, count=len(keys))
@@ -1501,6 +1500,15 @@ class LutoSolver:
             )
             self.regional_adoption_constrs.append(self.gurobi_model.addConstr(reg_expr <= reg_area_limit, name=f"reg_adopt_limit_ag_{lu_name}_{reg_id}"))
 
+        # Non-reversible plantings saturate the non-ag caps below, and last year's solved
+        # areas become this year's exact lower bounds; float32 noise then puts the locked-in
+        # floor a hair over the cap, which presolve rejects with NO tolerance (bound
+        # propagation is exact). Grow the cap by 1e-6/yr RELATIVE so the RHS always recedes
+        # ahead of the ratcheting floor (per-step increment ~5e-6 x cap vs float noise
+        # ~2e-10 x cap). Cap erosion by 2050: ~3e-5 relative. Ag caps need no slack: ag is
+        # reversible, so its floors never ratchet onto the cap.
+        nonag_cap_relax = 1 + (self._input_data.target_year - settings.SIM_YEARS[0]) * 1e-6
+
         # Add per-(region, non-ag-landuse) caps from the xlsx ('on' mode)
         reg_adopt_non_ag_limits = self._input_data.limits.get("non_ag_regional_adoption") or []
         for reg_id, k, lu_name, reg_ind, reg_area_limit in reg_adopt_non_ag_limits:
@@ -1510,7 +1518,7 @@ class LutoSolver:
             print(f"│   │   │   ├── Adding constraints for {lu_name} in {settings.REGIONAL_ADOPTION_ZONE} region {reg_id} <= {reg_area_limit:,.0f} HA...")
             reg_expr = _qsum(self._input_data.real_area[reg_ind], self.X_non_ag_vars_kr[k, reg_ind])
             self.regional_adoption_constrs.append(
-                self.gurobi_model.addConstr(reg_expr <= reg_area_limit, name=f"reg_adopt_limit_non_ag_{lu_name}_{reg_id}")
+                self.gurobi_model.addConstr(reg_expr <= reg_area_limit * nonag_cap_relax, name=f"reg_adopt_limit_non_ag_{lu_name}_{reg_id}")
             )
 
         # Add SUM-of-non-ag adoption constraints ('NON_AG_CAP' mode):
@@ -1525,7 +1533,7 @@ class LutoSolver:
             for k in range(self.X_non_ag_vars_kr.shape[0]):
                 reg_expr += _qsum(self._input_data.real_area[reg_ind], self.X_non_ag_vars_kr[k, reg_ind])
             self.regional_adoption_constrs.append(
-                self.gurobi_model.addConstr(reg_expr <= reg_area_limit, name=f"reg_adopt_limit_non_ag_sum_{reg_id}")
+                self.gurobi_model.addConstr(reg_expr <= reg_area_limit * nonag_cap_relax, name=f"reg_adopt_limit_non_ag_sum_{reg_id}")
             )
 
 
@@ -1623,12 +1631,11 @@ class LutoSolver:
         # to_j] for ag targets, [local_r, k] for non-ag targets — where local_r indexes the source's
         # cell list (recover global cells via get_base_dvar_mj_cell_map / get_base_nonag_dvar_k_cell_map
         # at the base year, the same maps that built ag_source_cells / nonag_source_cells).
-        idata = self._input_data
         dvar_D_ag2ag_mrj    = {}   # (from_m, from_j) -> (NLMS, ncells_src, N_AG_LUS)
         dvar_D_ag2nonag_rk  = {}   # (from_m, from_j) -> (ncells_src, N_NON_AG_LUS)
         dvar_D_nonag2ag_mrj = {}   # from_k           -> (NLMS, ncells_k, N_AG_LUS)
-        for (fm, fj), cells in idata.ag_source_cells.items():
-            arr = np.zeros((idata.nlms, len(cells), idata.n_ag_lus), dtype=np.float32)
+        for (fm, fj), cells in self._input_data.ag_source_cells.items():
+            arr = np.zeros((self._input_data.nlms, len(cells), self._input_data.n_ag_lus), dtype=np.float32)
             Fd = self.F_ag2ag[(fm, fj)]
             if len(Fd):
                 keys = np.array(list(Fd.keys()), dtype=np.int64)                            # (n, 3): to_m, local_r, to_j
@@ -1636,15 +1643,15 @@ class LutoSolver:
                 arr[keys[:, 0], keys[:, 1], keys[:, 2]] = vals
             dvar_D_ag2ag_mrj[(fm, fj)] = arr
 
-            arr = np.zeros((len(cells), idata.n_non_ag_lus), dtype=np.float32)
+            arr = np.zeros((len(cells), self._input_data.n_non_ag_lus), dtype=np.float32)
             Fd = self.F_ag2nonag[(fm, fj)]
             if len(Fd):
                 keys = np.array(list(Fd.keys()), dtype=np.int64)                            # (n, 2): k, local_r
                 vals = np.array(self.gurobi_model.getAttr('X', list(Fd.values())), dtype=np.float32)
                 arr[keys[:, 1], keys[:, 0]] = vals
             dvar_D_ag2nonag_rk[(fm, fj)] = arr
-        for fk, cells in idata.nonag_source_cells.items():
-            arr = np.zeros((idata.nlms, len(cells), idata.n_ag_lus), dtype=np.float32)
+        for fk, cells in self._input_data.nonag_source_cells.items():
+            arr = np.zeros((self._input_data.nlms, len(cells), self._input_data.n_ag_lus), dtype=np.float32)
             Fd = self.F_nonag2ag[fk]
             if len(Fd):
                 keys = np.array(list(Fd.keys()), dtype=np.int64)                            # (n, 3): to_m, local_r, to_j
@@ -1731,7 +1738,6 @@ class LutoSolver:
                 for k,v in self.bio_GBF3_NVIS_exprs.items()
             }
         )
-        prod_data["BIO (GBF3) IBRA value (ha)"] = 0  # IBRA flows through GBF3 NVIS path
         prod_data["BIO (GBF4) SNES value (ha)"] = (
             {k: v.getValue() * self._input_data.scale_factors['GBF4_SNES'].sel(dict(layer=k)).item()
              for k, v in self.bio_GBF4_SNES_exprs.items()}
@@ -1809,7 +1815,6 @@ class LutoSolver:
                         for k,v in prod_data["BIO (GBF3) NVIS value (ha)"].items()
                     ]
                 ),
-                "Deviation BIO (GBF3) IBRA value (ha)": 0,  # IBRA flows through GBF3 NVIS path
                 "Deviation BIO (GBF4) SNES value (ha)":(
                     [
                         v - self._input_data.limits['GBF4_SNES'].sel(dict(layer=k)).item()
