@@ -2323,6 +2323,15 @@ class Data:
                     snes_df[col] = float(pct)
             print(f"│   │   ├── Dict targets applied to SNES: {settings.GBF4_SNES_TARGETS_DICT}", flush=True)
 
+        if settings.GBF4_SNES_TARGETS_OVERRIDE:
+            for (reg, sp), yr_dict in settings.GBF4_SNES_TARGETS_OVERRIDE.items():
+                mask = (snes_df['region'] == reg) & (snes_df['SCIENTIFIC_NAME'] == sp)
+                for yr, pct in yr_dict.items():
+                    col = f'TARGET_LEVEL_{yr}'
+                    if col in snes_df.columns:
+                        snes_df.loc[mask, col] = float(pct)
+            print(f"│   │   ├── SNES per-species target overrides applied: {len(settings.GBF4_SNES_TARGETS_OVERRIDE)} pairs", flush=True)
+
         print(f"│   │   └── {len(snes_df)} (species, region) constraints from {snes_df['SCIENTIFIC_NAME'].nunique()} species", flush=True)
 
         return snes_df

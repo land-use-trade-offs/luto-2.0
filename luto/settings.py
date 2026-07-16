@@ -1158,6 +1158,11 @@ GBF4_ECNES_PRESENCE_CLASS = 'LIKELY'  # 'LIKELY', 'LIKELY_AND_MAYBE'
 GBF4_SNES_TARGETS_DICT  = {2030: 30, 2050: 50, 2100: 50}
 GBF4_ECNES_TARGETS_DICT = {2030: 30, 2050: 50, 2100: 50}
 
+# Per-(region, SCIENTIFIC_NAME) SNES target overrides, applied AFTER the uniform dict
+# (and independent of GBF4_TARGET_SNES mode). Maps (region, species) -> {year: pct}.
+# Lets a few species carry a different target from the rest. Empty = no override.
+GBF4_SNES_TARGETS_OVERRIDE = {}
+
 GBF4_SNES_REGION_MODE       = 'AUSTRALIA'                    # 'AUSTRALIA' or 'NRM'
 GBF4_SNES_SELECTED_REGIONS  = ['North East', 'Goulburn Broken']
 '''
@@ -1182,138 +1187,17 @@ GBF4_ECNES_SELECTED_REGIONS: list of NRM region names. Only used when mode = 'NR
 #   NRM mode       — matches on the (region, name) pair exactly.
 #   AUSTRALIA mode — only the name part is used (region is ignored).
 # Match exactly the values in BIODIVERSITY_GBF4_TARGET_*[_NRM].csv.
-GBF4_ECNES_EXCLUDE_REGION_COMMUNITIES = [
-    # Community: "White Box-Yellow Box-Blakely's Red Gum Grassy Woodland and Derived
-    # Native Grassland" (EPBC Critically Endangered).
-
-    # North East — flagged in IIS at RF=10 (2026-05-01).
-    #   BASELINE_AUS = 353 132.5 ; OUT_LUTO = 34 248.4 ; INSIDE_LUTO = 71 554.4
-    #   out_pct = 9.7 % vs target_2030 = 50 %. The 1 595 free decision variables at
-    #   RF=10 cannot deliver enough INSIDE_LUTO restoration to close the ~40 % gap.
-    ('North East',      "White Box-Yellow Box-Blakely's Red Gum Grassy Woodland and Derived Native Grassland"),
-
-    # Goulburn Broken — same deficit shape as North East, excluded pre-emptively.
-    #   BASELINE_AUS = 559 541.9 ; OUT_LUTO = 28 770.0 ; INSIDE_LUTO = 120 881.0
-    #   out_pct = 5.1 % vs target_2030 = 50 %. Even larger gap than North East;
-    #   would surface as the next IIS once North East is dropped.
-    ('Goulburn Broken', "White Box-Yellow Box-Blakely's Red Gum Grassy Woodland and Derived Native Grassland"),
-
-    # North East — BASEYEAR_SCORE_INSIDE_LUTO_NATURAL_LIKELY = 6.2 ha (≤ 100 ha threshold).
-    # data.py NRM mode drops this community automatically; listed here for explicitness.
-    # Confirmed via check on 2026-05-02.
-    ('North East', 'Buloke Woodlands of the Riverina and Murray-Darling Depression Bioregions'),
-
-    # Goulburn Broken — INFEASIBLE in 2045→2050 per-community test (2026-06-11).
-    # tightness=1.27, n_cells=118, coeff_ratio=150: available habitat cannot meet 2050 target.
-    ('Goulburn Broken', 'Buloke Woodlands of the Riverina and Murray-Darling Depression Bioregions'),
-
-    # --- 2040→2045 exclusions (Check_NECMA_G0001_2040_2045 per-community test, 2026-06-12) ---
-    # TIME_LIMIT / INFEASIBLE in isolation for the 2040→2045 transition (Run_G0001).
-    ('Goulburn Broken', 'Grey Box (Eucalyptus microcarpa) Grassy Woodlands and Derived Native Grasslands of South-eastern Australia'),  # TIME_LIMIT, tightness=1.60, n_cells=434
-    ('North East',      'Grey Box (Eucalyptus microcarpa) Grassy Woodlands and Derived Native Grasslands of South-eastern Australia'),  # INFEASIBLE, tightness=1.55, n_cells=116
-
-    # --- 2045→2050 exclusions (Check_NECMA_G0001_2045_2050 per-community test, 2026-06-13) ---
-    # INFEASIBLE in isolation for the 2045→2050 transition (Run_G0001).
-    ('Goulburn Broken', 'Natural Grasslands of the Murray Valley Plains'),                                    # INFEASIBLE, tightness=1.50, n_cells=10
-    ('Goulburn Broken', 'Seasonal Herbaceous Wetlands (Freshwater) of the Temperate Lowland Plains'),         # INFEASIBLE, tightness=1.42, n_cells=141
-]
+GBF4_ECNES_EXCLUDE_REGION_COMMUNITIES = []
 GBF4_SNES_EXCLUDE_REGION_SPECIES = [
-    # Burramys parvus has zero LUTO habitat in Goulburn Broken and the outside-LUTO
-    # component alone (19.6%) cannot meet the 50% target → structurally infeasible.
+    # Only the 6 zero-area (IN_LUTO_HA == 0) SNES pairs — no restorable habitat inside the LUTO
+    # study area, so structurally infeasible. All other NE+GB species are carried (matches Run_0027
+    # and the fresh-baseline decision from the NECMA exploration, Explore_NECMA_runs).
+    ('North East',      'Argyrotegium nitidulum'),
     ('Goulburn Broken', 'Burramys parvus'),
-
-    # Swainsona recta — flagged in IIS across 8 NECMA_follow_runs at RF=3 (2026-06-01).
-    # 32 variables locked by transition bounds from 2035 solution; 150 free variables
-    # cannot deliver enough habitat restoration to meet the target >= 2188.68 (rescaled).
-    ('Goulburn Broken', 'Swainsona recta'),
-
-    # North East — 8 species with BASEYEAR_SCORE_INSIDE_LUTO_NATURAL_LIKELY ≤ 100 ha.
-    # data.py drops these in NRM mode (threshold = 100 ha) because the constraint LHS
-    # is effectively zero and the target can never be met → ValueError at Data() init.
-    # Confirmed via check_snes_nrm.py on 2026-05-02.
-    ('North East', 'Argyrotegium nitidulum'),                       # INSIDE_LUTO_ha = 0.0
-    ('North East', 'Burramys parvus'),                              # INSIDE_LUTO_ha = 0.0
-    ('North East', 'Euphrasia crassiuscula subsp. glandulifera'),   # INSIDE_LUTO_ha = 0.0
-    ('North East', 'Euphrasia eichleri'),                           # INSIDE_LUTO_ha = 82.6 (below 100 ha threshold)
-    ('North East', 'Grevillea burrowa'),                            # INSIDE_LUTO_ha = 0.0
-    ('North East', 'Kelleria bogongensis'),                         # INSIDE_LUTO_ha = 0.0
-    ('North East', 'Lobelia gelida'),                               # INSIDE_LUTO_ha = 0.0
-    ('North East', 'Zieria citriodora'),                            # INSIDE_LUTO_ha = 24.7 (below 100 ha threshold)
-
-    # INFEASIBLE in NECMA single-species debug (2026-06-10): n_cells=9, tightness=1.505,
-    # coeff_ratio=62.1 (range [10.2, 633.0]). Extreme within-row coefficient spread on
-    # very few cells causes NUMERIC in the full model before infeasibility can be proven.
-    ('North East', 'Pomaderris subplicata'),
-
-    # --- 2045→2050 exclusions (identified by Check_NECMA_2045_2050 per-species test, 2026-06-11) ---
-    # INFEASIBLE: structurally infeasible even in isolation — available area cannot meet 2050 target.
-    ('North East',      'Acacia phasmoides'),               # tightness=1.68, n_cells=10
-    ('North East',      'Litoria booroolongensis'),         # tightness=1.62, n_cells=36
-    ('North East',      'Caladenia concolor'),              # tightness=1.44, n_cells=149
-    ('Goulburn Broken', 'Calidris ferruginea'),             # tightness=1.41, n_cells=25
-    ('Goulburn Broken', 'Maccullochella macquariensis'),    # tightness=1.36, n_cells=115
-    
-    # TIME_LIMIT: individually borderline-feasible but cause full-model infeasibility when combined —
-    # cells shared across constraints cannot simultaneously satisfy all targets given 2045 lower bounds.
-    ('North East',      'Grevillea jephcottii'),            # tightness=1.93, n_cells=10
-    ('Goulburn Broken', 'Eucalyptus crenulata'),            # tightness=1.83, n_cells=2
-    ('Goulburn Broken', 'Callocephalon fimbriatum'),        # tightness=1.73, n_cells=453
-    ('Goulburn Broken', 'Amphibromus fluitans'),            # tightness=1.43, n_cells=607
-    ('Goulburn Broken', 'Delma impar'),                     # tightness=1.36, n_cells=256
-    ('Goulburn Broken', 'Dianella amoena'),                 # tightness=1.34, n_cells=126
-    ('Goulburn Broken', 'Litoria raniformis'),              # tightness=1.33, n_cells=196
-
-    # --- 2040→2045 exclusions (Check_NECMA_G0001_2040_2045 per-species test, 2026-06-12) ---
-    # INFEASIBLE: structurally infeasible even in isolation — available area cannot meet 2045 target.
-    ('Goulburn Broken', 'Senecio behrianus'),                       # INFEASIBLE, tightness=1.74, n_cells=3
-    ('Goulburn Broken', 'Eucalyptus alligatrix subsp. limaensis'),  # INFEASIBLE, tightness=1.65, n_cells=16
-    ('North East',      'Lathamus discolor'),                       # INFEASIBLE, tightness=1.58, n_cells=218
-    ('Goulburn Broken', 'Caladenia concolor'),                      # INFEASIBLE, tightness=1.56, n_cells=91
-    ('Goulburn Broken', 'Pimelea spinescens subsp. spinescens'),    # INFEASIBLE, tightness=1.53, n_cells=135
-
-    # TIME_LIMIT: individually borderline-feasible but cause full-model infeasibility when combined.
-    ('North East',      'Anthochaera phrygia'),             # TIME_LIMIT, tightness=2.26, n_cells=436
-    ('North East',      'Maccullochella peelii'),           # TIME_LIMIT, tightness=1.70, n_cells=174
-    ('Goulburn Broken', 'Grantiella picta'),                # TIME_LIMIT, tightness=1.59, n_cells=803
-    ('Goulburn Broken', 'Maccullochella peelii'),           # TIME_LIMIT, tightness=1.57, n_cells=262
-    ('Goulburn Broken', 'Rostratula australis'),            # TIME_LIMIT, tightness=1.57, n_cells=772
-    ('North East',      'Crinia sloanei'),                  # TIME_LIMIT, tightness=1.55, n_cells=143
-
-    # --- 2045→2050 exclusions (Check_NECMA_G0001_2045_2050 per-species test, 2026-06-13) ---
-    # INFEASIBLE: structurally infeasible even in isolation — available area cannot meet 2050 target.
-    ('Goulburn Broken', 'Calochilus richiae'),                              # INFEASIBLE, tightness=1.95, n_cells=14
-    ('North East',      'Maccullochella macquariensis'),                   # INFEASIBLE, tightness=1.75, n_cells=111
-    ('North East',      'Eucalyptus cadens'),                              # INFEASIBLE, tightness=1.61, n_cells=54
-    ('Goulburn Broken', 'Lepidium monoplocoides'),                          # INFEASIBLE, tightness=1.50, n_cells=136
-    ('Goulburn Broken', 'Anthochaera phrygia'),                             # INFEASIBLE, tightness=1.48, n_cells=632
-    ('Goulburn Broken', 'Macquaria australasica'),                          # INFEASIBLE, tightness=1.46, n_cells=60
-    ('North East',      'Rostratula australis'),                            # INFEASIBLE, tightness=1.45, n_cells=217
-    ('North East',      'Synemon plana'),                                   # INFEASIBLE, tightness=1.44, n_cells=6
-    ('Goulburn Broken', 'Falco hypoleucos'),                                 # INFEASIBLE, tightness=1.44, n_cells=711
-    ('Goulburn Broken', 'Swainsona murrayana'),                             # INFEASIBLE, tightness=1.44, n_cells=207
-    ('Goulburn Broken', 'Crinia sloanei'),                                   # INFEASIBLE, tightness=1.44, n_cells=156
-    ('Goulburn Broken', 'Bidyanus bidyanus'),                                # INFEASIBLE, tightness=1.43, n_cells=130
-    ('Goulburn Broken', 'Nannoperca australis Murray-Darling Basin lineage'),# INFEASIBLE, tightness=1.43, n_cells=108
-    ('Goulburn Broken', 'Polytelis swainsonii'),                             # INFEASIBLE, tightness=1.42, n_cells=378
-    ('Goulburn Broken', 'Hibbertia humifusa subsp. erigens'),                # INFEASIBLE, tightness=1.41, n_cells=77
-    ('Goulburn Broken', 'Synemon plana'),                                    # INFEASIBLE, tightness=1.41, n_cells=209
-
-    # TIME_LIMIT: individually borderline-feasible but cause full-model infeasibility when combined.
-    ('Goulburn Broken', 'Galaxias rostratus'),               # TIME_LIMIT, tightness=1.54, n_cells=451
-    ('Goulburn Broken', 'Brachyscome muelleroides'),         # TIME_LIMIT, tightness=1.52, n_cells=61
-    ('Goulburn Broken', 'Glycine latrobeana'),               # TIME_LIMIT, tightness=1.45, n_cells=400
-    ('Goulburn Broken', 'Myriophyllum porcatum'),            # TIME_LIMIT, tightness=1.43, n_cells=471
-    ('Goulburn Broken', 'Sclerolaena napiformis'),           # TIME_LIMIT, tightness=1.42, n_cells=176
-    ('Goulburn Broken', 'Lathamus discolor'),                # TIME_LIMIT, tightness=1.41, n_cells=655
-    ('Goulburn Broken', 'Pteropus poliocephalus'),           # TIME_LIMIT, tightness=1.41, n_cells=275
-    ('Goulburn Broken', 'Botaurus poiciloptilus'),           # TIME_LIMIT, tightness=1.41, n_cells=411
-
-    # --- EP-fill driver (Check_GB_filled_EP analysis, 2026-06-15) ---
-    # 2030->2050 USER_DEFINED target (50%->70%) is EXACTLY binding every year 2020-2050
-    # (total/target ratio = 1.000, 755 cells, 83.2% spatial overlap with 2050 EP dvar area).
-    # This constraint is the primary driver of near-total Environmental Plantings
-    # saturation across Goulburn Broken in Run_G0001. Excluded to break the EP-fill loop.
-    ('Goulburn Broken', 'Hirundapus caudacutus'),
+    ('North East',      'Burramys parvus'),
+    ('North East',      'Euphrasia crassiuscula subsp. glandulifera'),
+    ('North East',      'Euphrasia eichleri'),
+    ('North East',      'Kelleria bogongensis'),
 ]
 
 
