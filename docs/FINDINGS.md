@@ -5,6 +5,52 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20260716 — "Ag man lb clamped" gaps at 1e-1 are θ-fold jumps, not FeasibilityTol slack
+
+### TL;DR
+
+The residual `Ag man lb clamped [<AM>]: ... max gap=4.xe-01` console lines (e.g. Precision
+Agriculture, AgTech EI, Biochar in the RF5/RF3 default runs) are **expected under θ=1.0**, not a bug.
+The clamp's original job was to absorb FeasibilityTol slack (am can exceed its host ag by ≤1e-6 because
+`am ≤ ag` is a linear constraint, not a variable bound), which would give gaps ≤1e-6. The observed
+**1e-1-level** gaps come from a different mechanism: the host ag dvar being clamped against is the
+**θ-folded** base (`get_folded_base_ag_dvar`), and with `EXACT_REACHABILITY_MIN_FRACTION = 1.0` the fold
+keeps only each cell's dominant land-use. An ag-man fraction sitting on a folded-away minority host has
+its solver-world host dvar go to 0, so its lower bound is clamped from its true fraction (~0.44) down to
+0 — the whole adoption fraction, reported as the gap.
+
+### Mechanics
+
+- `get_lower_bound_agricultural_management_matrices` (`transitions.py:665`):
+  `tools.clamp_dvar_bound(am_dvar, 0.0, ag_dvar, f'Ag man lb clamped [{am}]')`, where
+  `ag_dvar = get_folded_base_ag_dvar(data, base_year)` (`:658`). The docstring at `:642-646` already
+  states it: *"an am fraction whose host sliver was folded away is clamped to 0 — its land now lives
+  under the dominant source."*
+- Report threshold in `clamp_dvar_bound` (`tools/__init__.py:81`) is `10^-ROUND_DECIMALS = 1e-6`, so
+  pure FeasibilityTol slack wouldn't even print — the fact that lines appear at all confirms the gap is
+  fold-driven, not tolerance-driven.
+- Worked example, θ=1.0, one cell: prior solve leaves Beef 0.55 / Winter cereals 0.45 with AgTech EI =
+  0.44 on Winter cereals. Fold merges all 0.45 WC into Beef ⇒ `folded[m, r, WC] = 0` ⇒ am lb clamped
+  0.44 → 0, gap 4.4e-01. Matches the logs: 2–15 cells, gaps up to ~0.49.
+
+### Why harmless in the default runs
+
+- The three AMs being clamped are **reversible** (`AG_MANAGEMENTS_REVERSIBLE`). For reversible AMs the
+  solver hardcodes `model_lb = 0` regardless (`solver.py:351,357,404,415`), so these clamped lb values
+  never reach Gurobi — the lines are purely informational.
+- No land or adoption is lost: the true composition lives in `data.ag_dvars` / `ag_man_dvars` and is
+  recovered by the two-stream accounting (`X_acct`). Only the solver-world **lower bound** is dropped.
+
+### The one real caveat
+
+If a **non-reversible** AM (HIR - Beef/Sheep, Utility Solar PV, Onshore Wind) ever sits on a
+folded-away host under θ=1.0, its lock-in lb would silently drop to 0 and the solver could abandon it.
+None of those appear in the inspected clamp logs, so no lock-in was released — but it's the thing to
+watch while θ=1.0. Recovering 1e-6-level gaps means θ→0 (pure exact model, no folding), at the cost of a
+much larger transition problem.
+
+---
+
 ## 20260710 — θ-fold accounting leak fixed via a two-stream (folded / accounting) dvar model
 
 ### TL;DR
