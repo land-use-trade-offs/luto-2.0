@@ -46,7 +46,8 @@ from luto.tools import (
     log_memory_usage,
     set_path,
     write_timestamp,
-    read_timestamp
+    read_timestamp,
+    record_shadow_prices,
 )
 
 
@@ -265,6 +266,9 @@ def solve_timeseries(
 
         for data_type, prod_data in solution.prod_data.items():
             data.add_production_data(target_year, data_type, prod_data)
+
+        if accepted:
+            record_shadow_prices(luto_solver, input_data, target_year, f"{data.path}/out_{target_year}")
 
         if checkpoint_path is not None and accepted:
             final_path = checkpoint_path / f"data_{target_year}.lz4"

@@ -35,6 +35,7 @@ import pandas as pd
 import numpy as np
 import psutil
 import xarray as xr
+import gurobipy as gp
 import numpy_financial as npf
 import matplotlib.patches as patches
 
@@ -662,8 +663,296 @@ def log_memory_usage(output_dir=settings.OUTPUT_DIR, mode='a', interval=1, stop_
             
             # Write working set memory info (most accurate)
             wset_gb = wset_memory / (1024 * 1024 * 1024)
-            
+
             file.write(f'{timestamp}\t{wset_gb:.3f}\n')
             file.flush()
             time.sleep(interval)
+
+
+# ---------------------------------------------------------------------------
+# Shadow-price recording
+#
+# After an ACCEPTED (OPTIMAL) solve we read each constraint's dual (Constr.Pi)
+# straight from the model — no re-solve. Constr.Pi is only a valid basic dual
+# when the accepted solve produced a simplex basis (simplex, or barrier WITH
+# crossover). A barrier-only solve (Crossover=0, or a concurrent solve that
+# finished on the barrier) leaves no basis and Pi is unreliable, so the
+# orchestrator probes the basis ONCE (CBasis on one held constraint) and skips
+# the whole year rather than emit numbers that silently depend on which
+# RETRY_PARAMS attempt happened to win.
+#
+# Real shadow price = Pi * scale['Economy'] / scale[constraint]:
+#   - scale['Economy'] un-scales the (rescaled) objective back to AUD.
+#   - scale[constraint] un-scales the (rescaled) RHS back to its real unit.
+# Model sense is MAXIMIZE: a binding ``>=`` target gives Pi <= 0 (relaxing it by
+# one unit costs objective); a binding ``<=`` cap (GHG, regional adoption) gives
+# Pi >= 0. Regional-adoption constraints are not rescaled, so scale = 1.
+#
+# ``shadow_price`` is per real unit (AUD/ha, AUD/ML, AUD/tCO2e, …) so its magnitude
+# is NOT comparable across constraint families. ``shadow_price_AUD`` normalises for
+# cross-family comparison: it is the marginal value at the constraint's own target,
+# shadow_price * real_RHS = Pi * scale['Economy'] * constr.RHS (the constraint scale
+# cancels since real_RHS = constr.RHS * scale[constraint]). Sign follows the binding
+# direction; take the absolute value to rank "which constraint costs the model most".
+# Both are only meaningful for HARD constraints, so the soft forms of Water/GHG/Demand
+# (``*_CONSTRAINT_TYPE == 'soft'``) are skipped entirely — a soft dual is just the
+# configured penalty weight, not a scarcity price.
+#
+# Each ``calc_shadow_price_*`` is a pure calculation returning a DataFrame (no
+# file IO, no try/except); ``record_shadow_prices`` orchestrates and writes.
+# ---------------------------------------------------------------------------
+
+def calc_shadow_price_GBF2(luto_solver, input_data, target_year) -> pd.DataFrame:
+    """GBF2 priority-degraded-area constraint shadow price (AUD per real ha of target)."""
+    if settings.GBF2_TARGET == "off":
+        return pd.DataFrame()
+    So = float(input_data.scale_factors["Economy"])
+    Ss = float(input_data.scale_factors["GBF2"])
+    constr = luto_solver.bio_GBF2_constrs
+    pi = float(constr.Pi)
+    return pd.DataFrame([{
+        "year": target_year, "constraint": "GBF2", "region": "Australia",
+        "item": "", "presence": "", "pi_rescaled": pi, "scale": Ss,
+        "shadow_price": pi * So / Ss, "shadow_price_AUD": pi * So * float(constr.RHS), "unit": "ha",
+    }])
+
+
+def calc_shadow_price_GBF3_NVIS(luto_solver, input_data, target_year) -> pd.DataFrame:
+    """GBF3 NVIS vegetation-group constraint shadow prices (AUD per real ha of target)."""
+    if settings.GBF3_NVIS_TARGET == "off":
+        return pd.DataFrame()
+    So = float(input_data.scale_factors["Economy"])
+    ss = input_data.scale_factors["GBF3_NVIS"]
+    rows = []
+    for (region, group), constr in luto_solver.bio_GBF3_NVIS_constrs.items():
+        Ss = float(ss.sel(layer=(region, group)).item())
+        pi = float(constr.Pi)
+        rows.append({
+            "year": target_year, "constraint": "GBF3_NVIS", "region": region,
+            "item": group, "presence": "", "pi_rescaled": pi, "scale": Ss,
+            "shadow_price": pi * So / Ss, "shadow_price_AUD": pi * So * float(constr.RHS), "unit": "ha",
+        })
+    return pd.DataFrame(rows)
+
+
+def calc_shadow_price_GBF4_SNES(luto_solver, input_data, target_year) -> pd.DataFrame:
+    """GBF4 SNES species constraint shadow prices (AUD per real ha of target)."""
+    if settings.GBF4_TARGET_SNES == "off":
+        return pd.DataFrame()
+    So = float(input_data.scale_factors["Economy"])
+    ss = input_data.scale_factors["GBF4_SNES"]
+    rows = []
+    for (region, species, presence), constr in luto_solver.bio_GBF4_SNES_constrs.items():
+        Ss = float(ss.sel(layer=(region, species, presence)).item())
+        pi = float(constr.Pi)
+        rows.append({
+            "year": target_year, "constraint": "GBF4_SNES", "region": region,
+            "item": species, "presence": presence, "pi_rescaled": pi, "scale": Ss,
+            "shadow_price": pi * So / Ss, "shadow_price_AUD": pi * So * float(constr.RHS), "unit": "ha",
+        })
+    return pd.DataFrame(rows)
+
+
+def calc_shadow_price_GBF4_ECNES(luto_solver, input_data, target_year) -> pd.DataFrame:
+    """GBF4 ECNES ecological-community constraint shadow prices (AUD per real ha of target)."""
+    if settings.GBF4_TARGET_ECNES == "off":
+        return pd.DataFrame()
+    So = float(input_data.scale_factors["Economy"])
+    ss = input_data.scale_factors["GBF4_ECNES"]
+    rows = []
+    for (region, community, presence), constr in luto_solver.bio_GBF4_ECNES_constrs.items():
+        Ss = float(ss.sel(layer=(region, community, presence)).item())
+        pi = float(constr.Pi)
+        rows.append({
+            "year": target_year, "constraint": "GBF4_ECNES", "region": region,
+            "item": community, "presence": presence, "pi_rescaled": pi, "scale": Ss,
+            "shadow_price": pi * So / Ss, "shadow_price_AUD": pi * So * float(constr.RHS), "unit": "ha",
+        })
+    return pd.DataFrame(rows)
+
+
+def calc_shadow_price_GBF8(luto_solver, input_data, target_year) -> pd.DataFrame:
+    """GBF8 species-conservation constraint shadow prices (AUD per real ha of target)."""
+    if settings.GBF8_TARGET != "on":
+        return pd.DataFrame()
+    So = float(input_data.scale_factors["Economy"])
+    ss = input_data.scale_factors["GBF8"]
+    rows = []
+    for (region, species), constr in luto_solver.bio_GBF8_constrs.items():
+        Ss = float(ss.sel(layer=(region, species)).item())
+        pi = float(constr.Pi)
+        rows.append({
+            "year": target_year, "constraint": "GBF8", "region": region,
+            "item": species, "presence": "", "pi_rescaled": pi, "scale": Ss,
+            "shadow_price": pi * So / Ss, "shadow_price_AUD": pi * So * float(constr.RHS), "unit": "ha",
+        })
+    return pd.DataFrame(rows)
+
+
+def calc_shadow_price_Water(luto_solver, input_data, target_year) -> pd.DataFrame:
+    """Per-region water-yield constraint shadow prices (AUD per real ML of target).
+
+    Only the hard form gives a clean scarcity price; soft mode
+    (``WATER_CONSTRAINT_TYPE == 'soft'``) records nothing — its dual is just the slack penalty.
+    """
+    if settings.WATER_LIMITS != "on" or settings.WATER_CONSTRAINT_TYPE == "soft":
+        return pd.DataFrame()
+    So = float(input_data.scale_factors["Economy"])
+    Ss = float(input_data.scale_factors["Water"])
+    rows = []
+    for constr in luto_solver.water_limit_constraints:
+        pi = float(constr.Pi)
+        rows.append({
+            "year": target_year, "constraint": "Water", "region": "",
+            "item": constr.ConstrName, "presence": "", "pi_rescaled": pi, "scale": Ss,
+            "shadow_price": pi * So / Ss, "shadow_price_AUD": pi * So * float(constr.RHS), "unit": "ML",
+        })
+    return pd.DataFrame(rows)
+
+
+def calc_shadow_price_GHG(luto_solver, input_data, target_year) -> pd.DataFrame:
+    """GHG-emissions constraint shadow price (AUD per real tCO2e of target).
+
+    Only the hard ``<=`` upper bound gives a clean scarcity price; soft mode
+    (``GHG_CONSTRAINT_TYPE == 'soft'``) records nothing — its dual is just the ``SOLVER_WEIGHT_GHG``
+    penalty rate.
+    """
+    if settings.GHG_EMISSIONS_LIMITS == "off" or settings.GHG_CONSTRAINT_TYPE == "soft":
+        return pd.DataFrame()
+    So = float(input_data.scale_factors["Economy"])
+    Ss = float(input_data.scale_factors["GHG"])
+    constr = luto_solver.ghg_consts_ub
+    pi = float(constr.Pi)
+    return pd.DataFrame([{
+        "year": target_year, "constraint": "GHG", "region": "",
+        "item": constr.ConstrName, "presence": "", "pi_rescaled": pi, "scale": Ss,
+        "shadow_price": pi * So / Ss, "shadow_price_AUD": pi * So * float(constr.RHS), "unit": "tCO2e",
+    }])
+
+
+def calc_shadow_price_Demand(luto_solver, input_data, target_year) -> pd.DataFrame:
+    """Per-commodity production/demand constraint shadow prices (AUD per real tonne of demand).
+
+    Only hard bounds (``DEMAND_CONSTRAINT_TYPE == 'hard'``) give a clean marginal price; soft mode
+    records nothing — its dual is just the ``SOLVER_WEIGHT_DEMAND`` penalty rate on the deviation var
+    ``V[c]``. ``presence`` holds the bound kind (eq/lower/upper) so a commodity's paired hard bounds
+    stay distinguishable.
+    """
+    if settings.DEMAND_CONSTRAINT_TYPE == "soft":
+        return pd.DataFrame()
+    So = float(input_data.scale_factors["Economy"])
+    Ss = float(input_data.scale_factors["Demand"])
+    commodities = input_data.commodity_names
+    rows = []
+    for constr in luto_solver.demand_penalty_constraints:
+        name = constr.ConstrName                        # e.g. demand_hard_bound_lower[3]
+        m = re.search(r"\[(\d+)\]", name)
+        commodity = commodities[int(m.group(1))] if m else name
+        bound = name.split("_bound_")[-1].split("[")[0]  # eq / lower / upper
+        pi = float(constr.Pi)
+        rows.append({
+            "year": target_year, "constraint": "Demand", "region": "",
+            "item": commodity, "presence": bound, "pi_rescaled": pi, "scale": Ss,
+            "shadow_price": pi * So / Ss, "shadow_price_AUD": pi * So * float(constr.RHS), "unit": "t",
+        })
+    return pd.DataFrame(rows)
+
+
+def calc_shadow_price_Renewable(luto_solver, input_data, target_year) -> pd.DataFrame:
+    """State-level renewable-generation-target shadow prices (AUD per real MWh of target).
+
+    Solar and wind are rescaled independently, so the scale is looked up per type.
+    """
+    if not any(settings.RENEWABLES_OPTIONS.values()):
+        return pd.DataFrame()
+    So = float(input_data.scale_factors["Economy"])
+    rows = []
+    for key, constr in luto_solver.renewable_constraints.items():
+        # key == f"{am}_{reg_name}"; both parts can contain spaces, so match the known am prefix.
+        am = next((a for a in ("Utility Solar PV", "Onshore Wind") if key.startswith(a + "_")), None)
+        Ss = float(input_data.scale_factors[am]) if am is not None else float("nan")
+        reg = key[len(am) + 1:] if am is not None else key
+        pi = float(constr.Pi)
+        rows.append({
+            "year": target_year, "constraint": am or "Renewable", "region": reg,
+            "item": "", "presence": "", "pi_rescaled": pi, "scale": Ss,
+            "shadow_price": pi * So / Ss, "shadow_price_AUD": pi * So * float(constr.RHS), "unit": "MWh",
+        })
+    return pd.DataFrame(rows)
+
+
+def calc_shadow_price_Regional_Adoption(luto_solver, input_data, target_year) -> pd.DataFrame:
+    """Regional adoption area-cap shadow prices (AUD per real ha of cap).
+
+    These constraints carry no RHS rescale, so scale = 1 and shadow_price = Pi * scale['Economy'].
+    """
+    if settings.REGIONAL_ADOPTION_CONSTRAINTS == "off":
+        return pd.DataFrame()
+    So = float(input_data.scale_factors["Economy"])
+    rows = []
+    for constr in luto_solver.regional_adoption_constrs:
+        pi = float(constr.Pi)
+        rows.append({
+            "year": target_year, "constraint": "Regional_Adoption", "region": "",
+            "item": constr.ConstrName, "presence": "", "pi_rescaled": pi, "scale": 1.0,
+            "shadow_price": pi * So, "shadow_price_AUD": pi * So * float(constr.RHS), "unit": "ha",
+        })
+    return pd.DataFrame(rows)
+
+
+def record_shadow_prices(luto_solver, input_data, target_year, out_dir) -> None:
+    """Compute every active constraint's shadow prices and write one CSV for the year.
+
+    Probes the simplex basis once (barrier-only solves have unreliable duals → skip the year),
+    then concatenates the per-constraint calculators into ``shadow_prices_{target_year}.csv``.
+    The file is written fresh per year, so a resume/re-run simply overwrites the year's file.
+    """
+    # Grab one constraint we already hold to probe the basis — avoids `model.getConstrs()`, which
+    # builds a Python list of *every* constraint (millions of per-cell constraints at full res).
+    gbf2 = luto_solver.bio_GBF2_constrs
+    probe = gbf2 if (gbf2 and not isinstance(gbf2, dict)) else None    # single Constr once GBF2 is on
+    for coll in (
+        luto_solver.bio_GBF3_NVIS_constrs, luto_solver.bio_GBF4_SNES_constrs,
+        luto_solver.bio_GBF4_ECNES_constrs, luto_solver.bio_GBF8_constrs,
+        luto_solver.renewable_constraints,
+    ):
+        if probe is None and coll:
+            probe = next(iter(coll.values()))
+    for coll in (luto_solver.water_limit_constraints, luto_solver.regional_adoption_constrs,
+                 luto_solver.ghg_consts_soft, luto_solver.demand_penalty_constraints):
+        if probe is None and coll:
+            probe = coll[0]
+    probe = probe or luto_solver.ghg_consts_ub
+    if probe is None:
+        print(f"No active constraints to record shadow prices for {target_year}.")
+        return
+
+    # Constr.Pi is a clean basic dual only when the accepted solve left a simplex basis; CBasis
+    # raises GurobiError on a barrier-only solve (no basis) → duals unreliable, skip the year.
+    try:
+        _ = probe.CBasis
+    except gp.GurobiError:
+        print(f"Skipping shadow prices for {target_year}: accepted solve has no simplex basis "
+              f"(barrier-only) — duals would be unreliable.")
+        return
+
+    # Each calculator returns rows for its active constraints, or a column-less empty frame.
+    df = pd.concat(
+        [calc(luto_solver, input_data, target_year) for calc in (
+            calc_shadow_price_GBF2,
+            calc_shadow_price_GBF3_NVIS,
+            calc_shadow_price_GBF4_SNES,
+            calc_shadow_price_GBF4_ECNES,
+            calc_shadow_price_GBF8,
+            calc_shadow_price_Water,
+            calc_shadow_price_GHG,
+            calc_shadow_price_Demand,
+            calc_shadow_price_Renewable,
+            calc_shadow_price_Regional_Adoption,
+        )],
+        ignore_index=True,
+    )
+
+    df.to_csv(f"{out_dir}/shadow_prices_{target_year}.csv", index=False)
+    print(f"Recorded {len(df)} shadow prices for {target_year} -> {out_dir}/shadow_prices_{target_year}.csv")
 
