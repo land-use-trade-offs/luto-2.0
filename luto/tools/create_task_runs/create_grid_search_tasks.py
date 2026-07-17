@@ -78,12 +78,6 @@ grid_search = {
     'SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR':[100],                     # AUD/ha/year; $100/ha/year full maintenance cost
     'HIR_CEILING_PERCENTAGE': [0.8],                                        # HIR achieves 80% of bio/GHG benefits of Destocked - natural land
 
-    # --------------- Target deviation weight ---------------
-    'SOLVER_WEIGHT_DEMAND': [1], 
-    'SOLVER_WEIGHT_GHG': [1],
-    'SOLVER_WEIGHT_WATER': [1],
-
-
     # --------------- Social license ---------------
     'EXCLUDE_NO_GO_LU': [False],                                            # True or False
     'REGIONAL_ADOPTION_CONSTRAINTS': ['off'],                               # 'off' = core (LUF Report 2026); 'NON_AG_CAP' = lower-priority sensitivity

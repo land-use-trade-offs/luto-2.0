@@ -70,7 +70,7 @@ window.SettingsView = {
       },
       'Solver & Optimization': {
         icon: '🔧',
-        keywords: ['SOLVE_WEIGHT', 'SOLVER_WEIGHT', 'TOLERANCE', 'CROSSOVER', 'BARRIER', 'SCALE_FLAG', 'RETRY_PARAMS', 'CONSTRAINT_TYPE', 'ALPHA', 'BETA', 'RESCALE_FACTOR']
+        keywords: ['SOLVE_WEIGHT', 'TOLERANCE', 'CROSSOVER', 'BARRIER', 'SCALE_FLAG', 'RETRY_PARAMS', 'CONSTRAINT_TYPE', 'ALPHA', 'BETA', 'RESCALE_FACTOR']
       },
       'Output & Processing': {
         icon: '📊',

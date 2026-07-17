@@ -231,9 +231,6 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 - `BARRIER_CONVERGENCE_TOLERANCE`: Barrier method convergence (default: 1e-5)
 - `RESCALE_FACTOR`: Rescaling magnitude for numerical stability (default: 1e3)
 - `SOLVER_COEFF_MIN`: Universal minimum coefficient threshold (default: 1e-4). The `_qsum(coeffs, gurobi_vars)` helper in `solver.py` is called by **all** constraint and objective builders; any term whose absolute value falls below this threshold is dropped before entering Gurobi. Applies to Economy, Biodiversity-quality, GHG, Water, Renewable, GBF2/3/4/8, Demand/Quantity, and Regional Adoption limits. Chosen empirically: 1e-3 caused ~3% economic loss; 1e-4 retains meaningful small coefficients while keeping the matrix range ratio at 1e8 (well within Gurobi's safe zone). `RESCALE_ZERO_THRESHOLD` was removed — post-rescale zeroing is superseded by this universal filter.
-- `SOLVER_WEIGHT_DEMAND`: Demand deviation weight in objective (default: 1)
-- `SOLVER_WEIGHT_GHG`: GHG deviation weight in objective (default: 1)
-- `SOLVER_WEIGHT_WATER`: Water deviation weight in objective (default: 1)
 
 ### Output Writing Configuration
 

@@ -660,9 +660,6 @@ class LutoSolver:
 
         penalty_ghg = 0
         penalty_water = 0
-        
-        weight_ghg = 0
-        weight_water = 0
 
         # Get the penalty values for each sector
         if settings.DEMAND_CONSTRAINT_TYPE == 'soft':
@@ -671,33 +668,31 @@ class LutoSolver:
                     self.V[c] * self._input_data.scale_factors['Demand'] * price
                     for c, price in enumerate(self._input_data.economic_prices)
                 )
-                * settings.SOLVER_WEIGHT_DEMAND
                 / 1e6  # Convert to million AUD
             )
         else:
             penalty_demand = gp.LinExpr(0)
-    
+
+        # NOTE: The GHG and Water soft constraints below are planned to be decommissioned,
+        # so that the objective only considers economy (demand deviation is already
+        # priced in AUD). Until then, 'soft' mode remains functional for both.
         if settings.GHG_CONSTRAINT_TYPE == "soft":
-            weight_ghg = settings.SOLVER_WEIGHT_GHG
             penalty_ghg = (
-                self.E 
+                self.E
                  * self._input_data.scale_factors['GHG']
-                 * weight_ghg
                  / self._input_data.base_yr_prod["BASE_YR GHG (tCO2e)"]
                  + 1
-            ) 
-        
+            )
+
         if settings.WATER_CONSTRAINT_TYPE == "soft":
-            weight_water = settings.SOLVER_WEIGHT_WATER
             penalty_water = (
                 gp.quicksum(v for v in self.W)
                  * self._input_data.scale_factors['Water']
-                 * weight_water
                  / self._input_data.base_yr_prod["BASE_YR Water (ML)"].sum()
                  + 1
-            ) / len(self._input_data.limits["water"].keys()) 
+            ) / len(self._input_data.limits["water"].keys())
 
-        return (penalty_demand + penalty_ghg + penalty_water) / (settings.SOLVER_WEIGHT_DEMAND + weight_ghg + weight_water)
+        return penalty_demand + penalty_ghg + penalty_water
         
 
         

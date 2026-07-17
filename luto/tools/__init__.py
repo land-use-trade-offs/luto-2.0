@@ -814,8 +814,8 @@ def calc_shadow_price_GHG(luto_solver, input_data, target_year) -> pd.DataFrame:
     """GHG-emissions constraint shadow price (AUD per real tCO2e of target).
 
     Only the hard ``<=`` upper bound gives a clean scarcity price; soft mode
-    (``GHG_CONSTRAINT_TYPE == 'soft'``) records nothing — its dual is just the ``SOLVER_WEIGHT_GHG``
-    penalty rate.
+    (``GHG_CONSTRAINT_TYPE == 'soft'``) records nothing — its dual is just the objective's
+    penalty rate on the deviation var.
     """
     if settings.GHG_EMISSIONS_LIMITS == "off" or settings.GHG_CONSTRAINT_TYPE == "soft":
         return pd.DataFrame()
@@ -834,7 +834,7 @@ def calc_shadow_price_Demand(luto_solver, input_data, target_year) -> pd.DataFra
     """Per-commodity production/demand constraint shadow prices (AUD per real tonne of demand).
 
     Only hard bounds (``DEMAND_CONSTRAINT_TYPE == 'hard'``) give a clean marginal price; soft mode
-    records nothing — its dual is just the ``SOLVER_WEIGHT_DEMAND`` penalty rate on the deviation var
+    records nothing — its dual is just the commodity-price penalty rate on the deviation var
     ``V[c]``. ``presence`` holds the bound kind (eq/lower/upper) so a commodity's paired hard bounds
     stay distinguishable.
     """

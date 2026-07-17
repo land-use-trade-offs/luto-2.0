@@ -160,24 +160,7 @@ OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires sof
 
 
 
-"""
-If any of the targets are set to 'soft':
-    Then they will have a deviation from target (normalised to near 1
-    by dividing their BASE_YR (2010) sum) in the objective function.
-
-    Here the weights determine the relative importance of each target 
-    in the objective function.E.g., if SOLVER_WEIGHT_GHG = 2 and the 
-    rest are 1, then reducing GHG deviation from target will be twice 
-    as important as the other targets in the objective function.
-
-If the target is set to 'hard' or 'off': 
-    Then the deviation from target will be 0 and the weight will not be used.
-"""
-SOLVER_WEIGHT_DEMAND = 1
-SOLVER_WEIGHT_GHG = 1
-SOLVER_WEIGHT_WATER = 1
-
-DEMAND_CONSTRAINT_TYPE = 'hard'   
+DEMAND_CONSTRAINT_TYPE = 'hard'
 '''
 Options are 'soft', or 'hard'. This determines the type of demand constraint to apply in the model.
 - 'soft': commodity can be produced under/over the target, but the under/over part will pay a penalty that
@@ -805,6 +788,7 @@ LVSTK_GHG_SCOPE_1 = ['CO2E_KG_HEAD_DUNG_URINE', 'CO2E_KG_HEAD_ENTERIC', 'CO2E_KG
 
 GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (linear programming approach)
 # GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)
+# NOTE: 'soft' mode is planned to be decommissioned so the objective only considers economy.
 
 SOLVE_WEIGHT_BETA = 0.5
 '''
@@ -836,6 +820,7 @@ WATER_CLIMATE_CHANGE_IMPACT = 'on'      # 'on' or 'off'. 'off' will turn off cli
 
 WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
 # WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)
+# NOTE: 'soft' mode is planned to be decommissioned so the objective only considers economy.
 
 
 # Regionalisation to enforce water use limits by
