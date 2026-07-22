@@ -114,7 +114,7 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 - **`luto/settings.py`**: Configuration parameters for all model aspects
 - **`luto/solvers/`**: Optimization solver interface and input data preparation
   - `solver.py`: GUROBI solver wrapper (LutoSolver class)
-    - Biodiversity constraint methods: `_add_GBF2_constraints()`, `_add_GBF3_NVIS_constraints()`, `_add_GBF3_IBRA_constraints()`, `_add_GBF4_SNES_constraints()`, `_add_GBF4_ECNES_constraints()`, `_add_GBF8_constraints()`
+    - Biodiversity constraint methods: `_add_GBF2_constraints()`, `_add_GBF3_NVIS_constraints()`, `_add_GBF4_SNES_constraints()`, `_add_GBF4_ECNES_constraints()`, `_add_GBF8_constraints()`. IBRA bioregion targets have **no separate constraint method** — they run through `_add_GBF3_NVIS_constraints()` when `GBF3_NVIS_REGION_MODE = 'IBRA_REG'`.
     - Renewable energy constraint method: `_add_renewable_energy_constraints()` — enforces state-level solar and wind generation targets
   - `input_data.py`: Prepares optimization model input data
     - Biodiversity data attributes use `*_pre_1750_area_*` naming (e.g., `GBF3_NVIS_pre_1750_area_vr`, `GBF4_SNES_pre_1750_area_sr`)
@@ -133,8 +133,7 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
     - Applied to crops and livestock (beef, sheep, dairy) when `DYNAMIC_PRICE` enabled
   - **Biodiversity module** (`biodiversity.py`): GBF (Global Biodiversity Framework) calculations
     - `get_GBF2_MASK_area()`: Returns GBF2 priority degraded areas (mask × real area)
-    - `get_GBF3_NVIS_matrices_vr()`: NVIS vegetation layer matrices for GBF3
-    - `get_GBF3_IBRA_matrices_vr()`: IBRA bioregion layer matrices for GBF3
+    - `get_GBF3_NVIS_matrices_vr()`: NVIS vegetation layer matrices for GBF3 (also serves IBRA layers, selected by `GBF3_NVIS_REGION_MODE`)
     - `get_GBF4_SNES_matrix_sr()`, `get_GBF4_ECNES_matrix_sr()`: Species/Ecological Community NES matrices
     - Variable naming convention: `*_pre_1750_area_*` for baseline biodiversity area matrices
 - **`luto/economics/non_agricultural/`**: Non-agricultural land use economics
@@ -204,9 +203,9 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
   - `GBF2_TARGET`: Priority degraded areas restoration ('off', 'low', 'medium', 'high')
   - `GBF2_CONSTRAINT_TYPE`: Hard or soft GBF2 constraint ('hard' or 'soft')
   - `GBF3_NVIS_TARGET`: NVIS vegetation group targets ('off', 'medium', 'high', 'USER_DEFINED')
-  - `BIODIVERSITY_TARGET_GBF_3_IBRA`: IBRA bioregion targets ('off', 'medium', 'high', 'USER_DEFINED')
-  - `GBF4_TARGET_SNES`: Species NES (National Environmental Significance) ('on' or 'off')
-  - `GBF4_TARGET_ECNES`: Ecological Community NES ('on' or 'off')
+  - `GBF3_NVIS_REGION_MODE`: 'AUSTRALIA', 'NRM', or 'IBRA_REG' (IBRA bioregion targets are handled through the NVIS stream — there is no separate `BIODIVERSITY_TARGET_GBF_3_IBRA` setting or IBRA constraint method)
+  - `GBF4_TARGET_SNES`: Species NES targets ('off', 'USER_DEFINED', or 'dict')
+  - `GBF4_TARGET_ECNES`: Ecological Community NES targets ('off', 'USER_DEFINED', or 'dict')
   - `GBF8_TARGET`: Species conservation targets ('on' or 'off')
 
 ### Renewable Energy Settings
@@ -254,7 +253,7 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
    - Revenue calculations apply demand elasticity multipliers when `DYNAMIC_PRICE` enabled
    - Elasticity multipliers computed as: `1 + (demand_delta / demand_elasticity)`
 4. **Solver Input**: `solvers/input_data.py` prepares optimization model data
-   - Biodiversity matrices: GBF2 mask areas, GBF3 NVIS layers, GBF3 IBRA layers, GBF4 SNES/ECNES matrices, GBF8 species data
+   - Biodiversity matrices: GBF2 mask areas, GBF3 NVIS layers (NVIS or IBRA, per `GBF3_NVIS_REGION_MODE`), GBF4 SNES/ECNES matrices, GBF8 species data
    - Renewable energy: Solar/wind yield arrays (`renewable_solar_r`, `renewable_wind_r`), state region mapping, rescaled targets
    - Data rescaling: All arrays rescaled to 0–1e3 magnitude via `rescale_lhs`/`rescale_lhs_rhs` in `input_data.py` (no post-rescale zeroing). Inside every constraint and objective builder in `solver.py`, the `_qsum()` helper drops any term with `|coeff| < SOLVER_COEFF_MIN` (1e-4) before it enters Gurobi — giving a matrix range ratio of ~1e8.
 5. **Optimization**: `solvers/solver.py` runs GUROBI optimization with biodiversity and renewable energy constraints
@@ -316,7 +315,7 @@ The biodiversity module follows consistent naming conventions for GBF (Global Bi
 ### Function Naming Pattern
 
 - **GBF constraint methods**: Use `_add_GBF{N}_{TYPE}_constraints()` format
-  - Examples: `_add_GBF2_constraints()`, `_add_GBF3_NVIS_constraints()`, `_add_GBF3_IBRA_constraints()`, `_add_GBF4_SNES_constraints()`
+  - Examples: `_add_GBF2_constraints()`, `_add_GBF3_NVIS_constraints()`, `_add_GBF4_SNES_constraints()`, `_add_GBF4_ECNES_constraints()`, `_add_GBF8_constraints()`
   - Maintain consistency between method names and GBF target types
 
 ### Data Structure Indices
@@ -329,10 +328,8 @@ The biodiversity module follows consistent naming conventions for GBF (Global Bi
 
 1. **GBF2**: Priority degraded areas restoration
    - Function: `get_GBF2_MASK_area(data)` returns mask × real area
-2. **GBF3 NVIS**: NVIS major vegetation group targets
-   - Function: `get_GBF3_NVIS_matrices_vr(data)` returns vegetation layers
-3. **GBF3 IBRA**: IBRA bioregion targets
-   - Function: `get_GBF3_IBRA_matrices_vr(data)` returns bioregion layers
+2. **GBF3 NVIS / IBRA**: NVIS major vegetation group targets, or IBRA bioregion targets
+   - Function: `get_GBF3_NVIS_matrices_vr(data)` returns the layers for both; `GBF3_NVIS_REGION_MODE` ('AUSTRALIA', 'NRM', or 'IBRA_REG') selects NVIS vs IBRA. There is no separate IBRA function, attribute, setting, or constraint method.
 4. **GBF4**: Species and Ecological Community NES
    - SNES: `get_GBF4_SNES_matrix_sr(data)`
    - ECNES: `get_GBF4_ECNES_matrix_sr(data)`

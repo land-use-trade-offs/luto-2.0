@@ -66,8 +66,9 @@ import luto.economics.non_agricultural.biodiversity as non_ag_biodiversity
 
 
 # ── Per-function peak memory  ────────────
-# Used by write_data to compute n_jobs = floor(WRITE_REPORT_MAX_MEM_MB / peak_delta_mb).
-# (MB above data-object baseline, measured at RESFACTOR=5)
+# Used by write_data's get_n_jobs(): budget = max(4096, WRITE_REPORT_MAX_MEM_MB - live data RSS),
+# then n_jobs = min(max_workers, budget // (peak_mb + ~500 MB per-worker overhead)).
+# (peak_mb = MB above data-object baseline, measured at RESFACTOR=5)
 peak_mb_RES5 = {
     # Profiled 2026-05-30 using Data_RES5.lz4, yr_cal=2050
     'write_dvar_and_mosaic_map':                    1_452,  #    44s

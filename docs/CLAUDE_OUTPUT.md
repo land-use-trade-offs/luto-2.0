@@ -234,64 +234,38 @@ This pattern is used in: `write_ghg_*`, `write_biodiversity_*`, `write_water_*`,
 
 4. **No manual chunking** — intermediate arrays are no larger than source matrices already in memory.
 
-## save2nc() Function - Optimized NetCDF Export
+## save2nc() Function - NetCDF Export
 
-The `save2nc()` function implements four critical optimizations:
-
-### 1. Cell-Dimension Chunking
+`save2nc(in_xr, save_path)` CF-encodes and writes a complete `(layer × cell)` DataArray. It is deliberately **simple** — it does not do valid-layer filtering itself; **callers filter first** (see below).
 
 ```python
-# Chunking strategy: Keep 'cell' dimension full size, chunk other dimensions to 1
-# This enables fast reads of complete spatial layers (cell is the map dimension)
-encoding = {
-    var_name: {
-        'chunksizes': (1, 1, ..., full_cell_size),  # Other dims=1, cell=full
-        'zlib': True,
-        'complevel': 5
-    }
-}
+def save2nc(in_xr, save_path):
+    in_xr = in_xr.compute()                       # compute dask graph once, if any
+    n_cells  = in_xr.sizes['cell']
+    # Multi-index layer coords (e.g. lm+lu) are CF-compressed so they round-trip
+    mi_names = [c for c in in_xr.coords if c not in ('layer','cell') and 'layer' in in_xr[c].dims]
+    if mi_names:
+        midx = pd.MultiIndex.from_arrays([in_xr[n].values for n in mi_names], names=mi_names)
+        in_xr = in_xr.drop_vars(mi_names).assign_coords(
+            xr.Coordinates.from_pandas_multiindex(midx, 'layer'))
+        ds = cfxr.encode_multi_index_as_compress(in_xr.to_dataset(name='data'), 'layer')
+        chunksizes = [n_cells if d == 'cell' else 1 for d in ds['data'].dims]
+        ds.to_netcdf(save_path, encoding={'data': {
+            'dtype': 'float32', 'zlib': True, 'complevel': 1, 'chunksizes': chunksizes}})
+    else:
+        chunksizes = [n_cells if d == 'cell' else 1 for d in in_xr.dims]
+        in_xr.rename('data').to_netcdf(save_path, encoding={'data': {
+            'dtype': 'float32', 'zlib': True, 'complevel': 1, 'chunksizes': chunksizes}})
 ```
 
-### 2. Valid Layer Filtering
-
-```python
-# Calculate which dimension combinations have meaningful data
-# Skip layers where abs(sum(data)) < 1e-3 (negligible values)
-valid_df = in_xr.sum(['cell'], skipna=True).to_dataframe('ly_sum').query('abs(ly_sum) > 1e-3')
-
-# For multi-index DataFrames, iterate through each dimension level
-# Remove 'ALL' entries when only one other valid option exists
-# Example: If lm=['ALL', 'irr'] (no dryland), drop 'ALL' since 'irr' alone is informative
-for level_name in valid_df.index.names:
-    other_levels = [l for l in valid_df.index.names if l != level_name]
-    grouped = valid_df.groupby(level=other_levels)
-
-    rows_to_drop = []
-    for _, group_df in grouped:
-        if group_df.index.get_level_values(level_name).nunique() == 2:
-            mask_all = group_df.index.get_level_values(level_name) == 'ALL'
-            rows_to_drop.extend(group_df[mask_all].index.tolist())
-
-    valid_df = valid_df.drop(rows_to_drop, errors='ignore')
-
-# Store as NetCDF attribute for fast filtering during map generation
-loop_sel = valid_df.index.to_frame().to_dict('records')
-xr_dataset.attrs['valid_layers'] = str(loop_sel)
-```
-
-### 3. Min/Max Attributes
-
-```python
-# Add global min and max values as attributes for legend scaling
-in_xr.attrs['min_max'] = (float(in_xr.min().values), float(in_xr.max().values))
-```
-
-### 4. Simplified NetCDF Writing
-
-```python
-# Direct write without dask compute (faster for pre-chunked data)
-in_xr.astype('float32').to_netcdf(save_path, encoding=encoding)
-```
+Key points:
+- **Cell-dimension chunking**: `cell` kept full-size, every other dim chunked to 1 — fast reads of complete spatial layers. `float32`, `zlib` complevel 1.
+- **Multi-index layers** (e.g. `lm`+`lu`) are compressed via `cf_xarray.encode_multi_index_as_compress` so they survive the NetCDF round-trip.
+- **Valid-layer filtering is the caller's job, NOT save2nc's.** Callers compute the non-empty layers and `.sel(layer=valid_layers)` *before* calling save2nc. There is no `valid_layers` NetCDF attribute and no min/max attribute. Examples in `write_dvar_and_mosaic_map`:
+  ```python
+  valid_layers_ag = (ag_map_stack.sum('cell') > 0.001).to_dataframe('valid').query('valid == True').index
+  save2nc(ag_map_stack.sel(layer=valid_layers_ag), os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc'))
+  ```
 
 ## Greyscale Ramp for Unselected Cells (`is_selected` Coord)
 
@@ -665,19 +639,31 @@ Each map layer in the report needs a consistent `min_max` colorbar range that sp
 
 1. **`get_mag(arr)`** — called once per output xarray per year. Returns `[MIN_P-quantile, MAX_P-quantile]` (currently `[0.5%, 99.5%]`) of non-zero cell values. Using quantiles avoids extreme outliers distorting the colorbar.
 
-2. **`MAX_CELL_MAGNITUDE`** — a plain pre-initialized 2-level dict (`write.py:71`). Each leaf is a list that accumulates `[min_q, max_q]` pairs from every year's parallel job:
+2. **`MAX_CELL_MAGNITUDE`** — a plain pre-initialized 2-level dict (defined near the top of `write.py`). Each leaf is a list that accumulates `[min_q, max_q]` pairs from every year's parallel job:
 
    ```python
    MAX_CELL_MAGNITUDE = {
-       'area':        {'ag': [], 'non_ag': [], 'am': []},
-       'ghg_emission': {'ag': [], 'non_ag': [], 'ag_man': [], 'transition': [], 'sum': []},
-       'production':  defaultdict(list),   # commodity names are dynamic
-       'renewable_energy': [],             # 1-level (no sub-key)
-       ...
+       'area':                     {'ag': [], 'non_ag': [], 'am': []},
+       'bio_quality':              {'ag': [], 'non_ag': [], 'am': [], 'all': []},
+       'biodiversity_GBF2':        {'ag': [], 'non_ag': [], 'am': [], 'sum': []},
+       'biodiversity_GBF3':        {'ag': [], 'non_ag': [], 'am': [], 'sum': []},
+       'biodiversity_GBF4_SNES':   {'ag': [], 'non_ag': [], 'am': [], 'sum': []},
+       'biodiversity_GBF4_ECNES':  {'ag': [], 'non_ag': [], 'am': [], 'sum': []},
+       'biodiversity_GBF8':        {'ag': [], 'non_ag': [], 'am': []},
+       'Economics_ag':             {'ag_revenue': [], 'ag_cost': [], 'ag2ag_cost': [], 'non_ag2ag_cost': [], 'profit_ag': []},
+       'Economics_am':             {'am_revenue': [], 'am_cost': [], 'am_profit': []},
+       'Economics_non_ag':         {'non_ag_revenue': [], 'non_ag_cost': [], 'nonag2nonag_cost': [], 'ag2nonag_cost': [], 'non_ag_profit': []},
+       'Economics_sum':            {'sum_profit': []},
+       'ghg_emission':             {'ag': [], 'non_ag': [], 'ag_man': [], 'transition': [], 'sum': []},
+       'production':               defaultdict(list),  # commodity names are dynamic
+       'water_yield':              {'ag': [], 'non_ag': [], 'am': [], 'sum': []},
+       'renewable_energy':         [],                 # 1-level (no sub-key)
+       'renewable_existing_dvar':  [],                 # 1-level
+       'transition_area':          {'ag2ag': [], 'ag2non_ag': []},
    }
    ```
 
-   Two-level keys (e.g. `area → ag`) use a nested dict. Single-level keys (renewables) use a bare list. `production` uses `defaultdict(list)` because commodity names are not known at module load time.
+   Two-level keys (e.g. `area → ag`) use a nested dict. Single-level keys (`renewable_energy`, `renewable_existing_dvar`) use a bare list. `production` uses `defaultdict(list)` because commodity names are not known at module load time.
 
 3. **Merge loop** — after each parallel job returns `(msg, mag)`, the driver checks the *target* type to dispatch:
 

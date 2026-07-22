@@ -115,7 +115,7 @@ VUE_modules/
 │   ├── Water_Sum/Ag/Am/NonAg_NRM.js
 │   ├── Water_overview_NRM_*.js / Water_ranking_NRM.js
 │   ├── Water_overview_watershed.js
-│   ├── BIO_GBF2/GBF3_NVIS/GBF3_IBRA/GBF4_SNES/GBF4_ECNES/GBF8_GROUP/GBF8_SPECIES_Ag/Am/NonAg.js
+│   ├── BIO_GBF2/GBF3_NVIS/GBF4_SNES/GBF4_ECNES/GBF8_GROUP/GBF8_SPECIES_Ag/Am/NonAg.js
 │   ├── BIO_*_overview_*.js / BIO_ranking.js
 │   ├── Renewable_energy_Am.js
 │   ├── Transition_ag2ag_area.js        # Chart heatmap: region → from_water → to_water → year → leaf
@@ -185,7 +185,7 @@ The index file (`window["<prefix>__index"]`) holds `{ dims: [...], tree: {…} }
 |--------|----------|---------------------------|
 | Area | Ag / Ag Mgt / Non-Ag | — |
 | Biodiversity | GBF2 | Sum / Ag / Ag Mgt / Non-Ag / **mask** |
-| Biodiversity | GBF3_NVIS / GBF3_IBRA / GBF4_ECNES / GBF4_SNES / GBF8_GROUP / GBF8_SPECIES / quality | Ag / Ag Mgt / Non-Ag |
+| Biodiversity | GBF3_NVIS / GBF4_ECNES / GBF4_SNES / GBF8_GROUP / GBF8_SPECIES / quality | Ag / Ag Mgt / Non-Ag (GBF3_NVIS/GBF4/GBF8 also carry a `Sum` layer) |
 | Dvar | Ag / Ag Mgt / Non-Ag / Lumap | — |
 | Economics | Sum | Profit |
 | Economics | Ag | Profit / Revenue / Cost / Transition(Ag2Ag) / Transition(NonAg2Ag) |
@@ -205,7 +205,7 @@ Registry of all chart/heatmap data JS files, keyed by `chartCategories[module][c
 | Area | Ag / Ag Mgt / Non-Ag | — |
 | Area | overview | Land-use / Category / Source |
 | Area | ranking | — |
-| Biodiversity | GBF2 / GBF3_NVIS / GBF3_IBRA / GBF4_SNES / GBF4_ECNES / GBF8_GROUP / GBF8_SPECIES / quality | Ag / Ag Mgt / Non-Ag |
+| Biodiversity | GBF2 / GBF3_NVIS / GBF4_SNES / GBF4_ECNES / GBF8_GROUP / GBF8_SPECIES / quality | Ag / Ag Mgt / Non-Ag |
 | Biodiversity | GBF2…quality | overview → Ag / Am / NonAg / sum |
 | Biodiversity | ranking | — |
 | Economics | Sum | Profit |
@@ -398,8 +398,6 @@ The `Transition.js` view auto-discovers SubCat buttons from `MapService.mapCateg
 3. Create the heatmap chart data file and register it in `ChartService.js` under `Transition → <NewSubCat>`
 4. **Do not edit `Transition.js`** — the new SubCat button appears automatically.
 
-See `jinzhu_inspect_code/transition_view_guide.md` for a step-by-step worked example.
-
 ### Adding a New Analysis View
 1. Create `views/NewView.js` following the progressive selection pattern from `Area.js`
 2. Register the route in `routes/route.js`
@@ -415,7 +413,7 @@ See `jinzhu_inspect_code/transition_view_guide.md` for a step-by-step worked exa
 - **11 routes**: Home, Area, Economics, GHG, Water, Production, Biodiversity, Renewable, Transition, Map (DVAR), Settings
 - **Transition View**: dual heatmap + spatial map; SubCats auto-discovered from MapService registry; cell-click cross-filter; `nullMessage` on NaN cells
 - **Renewable Energy View**: MWh by AgMgt/Water/Landuse; `Existing Capacity` land use shows pre-simulation installations
-- **Biodiversity View**: 8 metrics (quality + GBF2/3/4/8); metric visibility gated by model settings; `mask` map layer for GBF2 priority cells
+- **Biodiversity View**: 7 metrics (quality, GBF2, GBF3_NVIS, GBF4_SNES, GBF4_ECNES, GBF8_GROUP, GBF8_SPECIES); metric visibility gated by model settings; `mask` map layer for GBF2 priority cells. IBRA bioregion results reuse the GBF3_NVIS metric (no separate GBF3_IBRA metric)
 - **Water View**: NRM tab (full progressive selection) + Watershed tab (overview only)
 - **Economics View**: Sum/Ag/Ag Mgt/Non-Ag categories; MapType level (Profit/Revenue/Cost); Transition sub-types under Ag and Non-Ag
 - **`<heatmap-container>`**: new Highcharts heatmap Vue wrapper for transition matrices
