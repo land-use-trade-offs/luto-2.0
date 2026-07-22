@@ -25,6 +25,7 @@ import glob
 import json
 import shutil
 import threading
+import psutil
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -68,7 +69,7 @@ import luto.economics.non_agricultural.biodiversity as non_ag_biodiversity
 # Used by write_data to compute n_jobs = floor(WRITE_REPORT_MAX_MEM_MB / peak_delta_mb).
 # (MB above data-object baseline, measured at RESFACTOR=5)
 peak_mb_RES5 = {
-    # Profiled 2026-05-30 using output/2026_05_29__16_37_37_RF5_2010-2050/Data_RES5.lz4, yr_cal=2050
+    # Profiled 2026-05-30 using Data_RES5.lz4, yr_cal=2050
     'write_dvar_and_mosaic_map':                    1_452,  #    44s
     'write_transition_nonag2ag':                    6_783,  #    52s
     'write_transition_ag2ag':                       6_506,  #   353s
@@ -124,9 +125,7 @@ MAX_CELL_MAGNITUDE = {
     'transition_area':          {'ag2ag': [], 'ag2non_ag': []},
 }
 
-# Quantiles to get a robust estimate of the magnitude for setting colorbar limits in the report.
-# This elinimates extreme values calculates using vanilla min/max.
-MIN_P, MAX_P = 0.005, 0.995
+
 
 
 # ── Shared helpers ────────────────────────────────────────────────────────────
@@ -154,10 +153,10 @@ def add_all(da, dims):
     return da
 
 
-def get_mag(arr: xr.DataArray) -> list:
-    """Return [MIN_P-quantile, MAX_P-quantile] of non-zero values via numpy (avoids MultiIndex quantile bug)."""
+def get_mag(arr: xr.DataArray, min_p: float = 0.005, max_p: float = 0.995) -> list:
+    """Return [min_p-quantile, max_p-quantile] of non-zero values via numpy (avoids MultiIndex quantile bug)."""
     vals = arr.where(arr != 0).compute().values.ravel()
-    return [float(np.nanquantile(vals, MIN_P)), float(np.nanquantile(vals, MAX_P))]
+    return [float(np.nanquantile(vals, min_p)), float(np.nanquantile(vals, max_p))]
 
 
 def save2chunk(in_xr: xr.DataArray, chunks_dir: str, chunk_idx: int) -> list:
@@ -456,52 +455,53 @@ def write_data(data: Data):
     paths = [f"{data.path}/out_{yr}" for yr in years]
     write_settings(data.path)
 
-    # Windows WaitForMultipleObjects limit: 63 handles total;
-    max_workers = min(os.cpu_count(), 61) if os.name == 'nt' else os.cpu_count()
+    # Cap workers 
+    max_workers = min(os.cpu_count(), 32)
 
     def get_n_jobs(peak_mb):
-        return min(max_workers, max(1, settings.WRITE_REPORT_MAX_MEM_MB // max(peak_mb, 1)))
-
-    # DVars must be written first as other outputs depend on them
-    dvar_jobs = [delayed(write_dvar_and_mosaic_map)(data, yr, path_yr) for yr, path_yr in zip(years, paths)]
-    for result in Parallel(n_jobs=get_n_jobs(WRITE_FUNC_PEAK_MB['write_dvar_and_mosaic_map']), return_as="generator")(dvar_jobs):
-        print(result, flush=True)
-
-    # Collect all annotated tasks: (delayed_obj, peak_delta_mb)
-    annotated_tasks = [(
-        delayed(write_area_transition_start_end)(data, f'{data.path}/out_{years[-1]}', years[-1]),
-        WRITE_FUNC_PEAK_MB['write_area_transition_start_end'],
-    )]
-    for yr, path_yr in zip(years, paths):
-        annotated_tasks.extend(write_output_single_year(data, yr, path_yr))
+        # Budget = TOTAL RAM (WRITE_REPORT_MAX_MEM_MB) minus the parent's resident `data` (measured
+        # live, so it tracks year/RESFACTOR growth and the magnitude lists), divided per concurrent
+        # worker by its task working set + a fixed per-worker overhead (interpreter + libs + the
+        # unmapped bits of `data` pickled per worker, ~0.4 GB USS; does NOT scale with RESFACTOR).
+        mem_mb_worker = 500
+        mem_mb_data_obj = psutil.Process().memory_info().rss / 1024 ** 2
+        mem_mb_budget = max(4096, settings.WRITE_REPORT_MAX_MEM_MB - mem_mb_data_obj)
+        return min(max_workers, max(1, int(mem_mb_budget // (max(peak_mb, 1) + mem_mb_worker))))
 
     def process_write_task(result):
-        if isinstance(result, tuple):
-            msg, mag = result
-            for top_key, sub in mag.items():
-                target = MAX_CELL_MAGNITUDE[top_key]
-                if isinstance(target, list):
-                    target.extend(sub)
-                else:
-                    for sub_key, vals in sub.items():
-                        target[sub_key].extend(vals)
-            print(msg, flush=True)
-        else:
+        # A task returns either a plain message, or (message, magnitudes) to fold into MAX_CELL_MAGNITUDE.
+        if not isinstance(result, tuple):
             print(result, flush=True)
+            return
+        msg, mag = result
+        for top_key, sub in mag.items():
+            target = MAX_CELL_MAGNITUDE[top_key]
+            if isinstance(target, list):
+                target.extend(sub)
+            else:
+                for sub_key, vals in sub.items():
+                    target[sub_key].extend(vals)
+        print(msg, flush=True)
 
-    # Dynamic scheduling: tasks that fit multiple times within budget run in parallel; heaviest run one at a time.
-    groups = {}
-    for task, peak_mb in annotated_tasks:
-        n = get_n_jobs(peak_mb)
-        if n not in groups:
-            groups[n] = []
-        groups[n].append(task)
+    # 1) DVars first — every other output reads the xr_dvar_*.nc files these write.
+    dvar_tasks = [delayed(write_dvar_and_mosaic_map)(data, yr, p) for yr, p in zip(years, paths)]
+    n_jobs = min(get_n_jobs(WRITE_FUNC_PEAK_MB['write_dvar_and_mosaic_map']), len(dvar_tasks))
+    for result in Parallel(n_jobs=n_jobs, return_as='generator_unordered')(dvar_tasks):
+        process_write_task(result)
 
-    # Run tiers from most memory-constrained (n_jobs=1) to least (n_jobs=max_workers)
-    for n_workers in sorted(groups.keys()):
-        tasks = groups[n_workers]
-        valid_workers = min(n_workers, len(tasks), max_workers)
-        for result in Parallel(n_jobs=valid_workers, return_as='generator_unordered')(tasks):
+    # 2) All remaining tasks, grouped by per-task peak memory and run heaviest-tier-first (fewest
+    #    workers). n_jobs is re-derived per tier so late tiers see the parent's current RSS (the
+    #    accumulating magnitude lists), not a stale build-time value.
+    tasks_by_peak = defaultdict(list)
+    tasks_by_peak[WRITE_FUNC_PEAK_MB['write_area_transition_start_end']].append(
+        delayed(write_area_transition_start_end)(data, paths[-1], years[-1]))
+    for yr, p in zip(years, paths):
+        for task, peak_mb in write_output_single_year(data, yr, p):
+            tasks_by_peak[peak_mb].append(task)
+    for peak_mb in sorted(tasks_by_peak, reverse=True):
+        tasks = tasks_by_peak[peak_mb]
+        n_jobs = min(get_n_jobs(peak_mb), len(tasks))
+        for result in Parallel(n_jobs=n_jobs, return_as='generator_unordered')(tasks):
             process_write_task(result)
 
     clean = lambda lst: [0.0 if np.isnan(v) else float(v) for v in lst]
