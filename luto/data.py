@@ -2438,10 +2438,10 @@ class Data:
                 kind='linear', fill_value='extrapolate',
             )
             interp_pct = float(f(yr))
-            attainable_pct = row['ATTAINABLE_LEVEL']
+            attainable_pct = row['ATTAINABLE_LEVEL'] - settings.GBF4_SNES_CAP_MARGIN
             target_pct = min(interp_pct, attainable_pct)
             if interp_pct > attainable_pct:
-                print(f"│   ├── SNES target capped for '{species}' ({presence}) [{region}]: {interp_pct:.2f}% -> {attainable_pct:.2f}% (attainable limit)", flush=True)
+                print(f"│   ├── SNES target capped for '{species}' ({presence}) [{region}]: {interp_pct:.2f}% -> {attainable_pct:.2f}% (attainable - {settings.GBF4_SNES_CAP_MARGIN:g} margin)", flush=True)
             score_all_aus = row['ALL_HA'] * target_pct / 100
             score_out_LUTO = row['NATURAL_OUT_LUTO_HA']
             result.loc[dict(layer=(region, species, presence))] = score_all_aus - score_out_LUTO
@@ -2668,9 +2668,16 @@ class Data:
                 f"Unknown REGIONAL_ADOPTION_NON_AG_REGION={region_mode!r}. Expected 'NRM' or 'State'."
             )
 
-        pct = settings.REGIONAL_ADOPTION_NON_AG_CAP
+        pct_default = settings.REGIONAL_ADOPTION_NON_AG_CAP
+        sel = settings.REGIONAL_ADOPTION_NON_AG_CAP_REGIONS          # [] -> all regions
+        override = settings.REGIONAL_ADOPTION_NON_AG_CAP_OVERRIDE    # {} -> uniform cap for all
         limits = []
         for reg in np.unique(region_arr):
+            if sel and reg not in sel:                 # scope: only cap the named regions
+                continue
+            pct = override.get(reg, pct_default)        # per-region override, else the uniform cap
+            if pct is None:
+                continue
             reg_ind = np.where(region_arr == reg)[0]
             reg_total_area_ha = self.REAL_AREA[reg_ind].sum()
             limits.append((reg, reg_ind, reg_total_area_ha * pct / 100))

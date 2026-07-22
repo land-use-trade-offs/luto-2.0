@@ -67,23 +67,50 @@ class SolverSolution:
     obj_val: dict[str, float]
 
 
-def _qsum(coeffs: np.ndarray, gurobi_vars: np.ndarray, coeff_min: float = None) -> "gp.LinExpr":
+def _qsum(coeffs: np.ndarray, gurobi_vars: np.ndarray) -> "gp.LinExpr":
     """
-    Return ``gp.quicksum(coeffs * gurobi_vars)`` filtered to ``|coeff| >= coeff_min``.
+    Return ``gp.quicksum(coeffs * gurobi_vars)`` filtered to ``|coeff| >= SOLVER_COEFF_MIN``.
 
     ``coeffs`` and ``gurobi_vars`` must be aligned (same length, same ordering).
     The caller must pre-slice both arrays with the same index before calling, so
     this function only needs a plain boolean mask — never a sub-index of a
     potentially-boolean index array (which would produce a dimension mismatch).
-
-    ``coeff_min`` defaults to ``settings.SOLVER_COEFF_MIN``.
     """
-    if coeff_min is None:
-        coeff_min = settings.SOLVER_COEFF_MIN
-    mask = np.abs(coeffs) >= coeff_min
+    mask = np.abs(coeffs) >= settings.SOLVER_COEFF_MIN
     if not mask.any():
         return gp.LinExpr(0)
     return gp.quicksum(coeffs[mask] * gurobi_vars[mask])
+
+
+def _floor_assembled_matrix(model) -> None:
+    """Drop ``|coeff| < coeff_min`` from an ASSEMBLED model's constraint matrix AND objective vector.
+
+    ``_qsum`` floors coefficients as each term is built, but some are created DOWNSTREAM: the water/
+    GHG/etc. accounting term ``coeff × X_acct`` where a folded-sliver ``X_acct`` is a LinExpr with
+    ``~1/RESFACTOR²`` weights distributes a floored-and-kept ``coeff`` into a sub-floor product on the
+    dominant var (see ``docs/FINDINGS.md`` 20260721). This single post-build sweep catches those (and
+    the same leak in the objective, which ``getA()`` — LHS-only — can't reach). Physically safe: a
+    ``~1e-5`` ML/cell water term against a ``~1e7`` ML regional limit is negligible — the same
+    negligibility contract as ``SOLVER_COEFF_MIN``, enforced on the assembled model.
+    """
+    model.update()
+    A = model.getA().tocoo()
+    cons = model.getConstrs()
+    varz = model.getVars()
+    mask = (np.abs(A.data) < settings.SOLVER_COEFF_MIN) & (A.data != 0.0)
+    n = int(mask.sum())
+    for r, c in zip(A.row[mask], A.col[mask]):
+        model.chgCoeff(cons[int(r)], varz[int(c)], 0.0)
+    # objective vector: same re-expression leak reaches obj coeffs via _qsum(ag_obj × X_acct)
+    n_obj = 0
+    for v in varz:
+        oc = v.Obj
+        if 0.0 < abs(oc) < settings.SOLVER_COEFF_MIN:
+            v.Obj = 0.0
+            n_obj += 1
+    model.update()
+    print(f"│   └── floored {n:,} matrix + {n_obj:,} objective sub-{settings.SOLVER_COEFF_MIN:g} "
+          f"coefficients (post-build)", flush=True)
 
 
 class LutoSolver:
@@ -146,7 +173,7 @@ class LutoSolver:
         self._setup_vars()
         self._setup_constraints()
         self._setup_objective()
-
+        _floor_assembled_matrix(self.gurobi_model)
 
     def _setup_vars(self):
         print("├── Setting up decision variables...")
@@ -230,6 +257,15 @@ class LutoSolver:
 
     def _setup_ag_accounting_vars(self):
         """Build the ACCOUNTING stream dvar_account — a linear re-expression of the folded decision vars dvar_flow.
+
+        MENTAL MODEL — a cell is a FIXED-COMPOSITION BUNDLE scaled by ONE scalar (the dominant's var).
+        Example: a cell is 0.7 Beef + 0.3 Apple. Folding merges the minor Apple fraction into the dominant
+        Beef, so a SINGLE variable X_Beef (dominant_frac = 0.7 + 0.3 = 1.0) represents "how much of this cell
+        remains in its original composition". Each land use is then a CONSTANT RATIO of that one variable:
+            dvar_account[Beef]  = (0.7 / 1.0) · X_Beef
+            dvar_account[Apple] = (0.3 / 1.0) · X_Beef
+        Reduce X_Beef by 1/3 (transition 1/3 of the cell away) and BOTH shrink by 1/3 — Beef 0.7 → 0.467,
+        Apple 0.3 → 0.2 — the composition ratio 7:3 is preserved, only the scale changes.
 
         dvar_flow carries the FOLDED composition: every sub-θ sliver's land was merged into its cell's dominant.
         Accounting (profit/water/GHG/GBF/production) must instead score each TRUE land-use's fraction. For a
@@ -828,7 +864,7 @@ class LutoSolver:
         """
         Constraints to penalise under and over production compared to demand.
         """
-        print("│   ├── Adding constraints for demand penalties...")
+        print("│   ├── Adding constraints for demand ...")
 
         # Precompute j→c quantity coefficient arrays in numpy (bypasses p loop entirely).
         # jc_dry_coeff[j][c] = ag_q_mrp[0, dry_cells, :] @ pr2cm_cp[c, :] for active p only

@@ -5,6 +5,170 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20260722 — write.py 258 GB peak: NOT per-worker data copies — it's uncapped Linux workers + resident `data`
+
+### TL;DR
+
+`write_outputs` on a full **annual (41-yr)** NCI run peaks at **~258 GB**, vs ~83 GB for a 5-yearly
+run and ~100 GB solving. AB profiling **disproved** the intuitive "each loky worker pickles its own
+~12 GB copy of `data`" hypothesis: with the big arrays **memmap-shared by joblib automatically**, a
+worker's *private* footprint (USS) is only **~0.4 GB** (0.14 GB interpreter+libs + 0.26 GB unmapped
+`data` bits). So workers do **not** duplicate the 58.7 GB `data`. The real model is
+**`peak = resident parent data (~59 GB @16 yr, scales with years/RESFACTOR → ~150 GB @41 yr) +
+Σ_concurrent_workers (task_working_mb + ~0.4 GB) + accumulated MAX_CELL_MAGNITUDE lists`**. A's 258 GB
+≈ ~150 GB parent + ~50–70 GB concurrent worker working-sets + ~40 GB magnitude. It exploded on
+**NCI/Linux specifically** because `max_workers = min(cpu_count, WRITE_MAX_WORKERS_WINDOWS) if
+os.name=='nt' else os.cpu_count()` — the cap is **Windows-only**, so Linux ran uncapped at
+`os.cpu_count()` (~208 on a 104c/208t node). The peak lands at the **end of `write_data`** (the
+crosstab/GBF8 *light* tier, which gets the most workers), **not** in `create_report`/map-layers
+(those peak ~140 GB).
+
+### The irony: the lightest task drives the peak
+
+`get_n_jobs(peak_mb) = min(max_workers, WRITE_REPORT_MAX_MEM_MB // peak_mb)` budgets only a task's
+**working arrays**, ignoring the fixed per-worker process tax. So the *lightest* function
+(`write_crosstab`, ~36 MB) earns `n_jobs = max_workers` (~208 on Linux) while heavy tasks
+(`write_transition`, ~18 GB) get ~1–3. The light tier therefore spawns the most **worker processes**,
+and the cost is `n_workers × (interpreter + libs + unmapped-data + working)` — cheapness buys maximal
+parallelism, and parallelism, not the task, is what costs the memory.
+
+### AB evidence (tier-1 mosaic dispatch, A's checkpoint, worker budget 64 GB)
+
+| run | workers | peak GB |
+|-----|---------|---------|
+| OLD (joblib auto-memmap)        | 6  | 82.8 |
+| NEW (explicit dump+memmap)      | 6  | 79.0 (≈ OLD → memmap fix redundant) |
+| SCALE15 (worker-count scaling)  | 15 | 104.2 (+~3 GB/worker, linear in *workers*, not data) |
+
+`data` uncompressed = 58.7 GB; if copied per worker, 15 workers would be ~940 GB — observed 104 GB.
+joblib's loky backend already memmaps the large ndarrays; the memmap file lives in OS page cache
+(not process wset), so neither OLD nor NEW duplicates it.
+
+### The concrete bug: the cheapest task grabs the most workers
+
+Old `get_n_jobs(peak_mb) = min(max_workers, WRITE_REPORT_MAX_MEM_MB // peak_mb)` charges a worker only
+its task working set and treats the fixed per-worker process cost as zero. `write_dvar_area` (~10 GB)
+→ `64 GB // 10 GB ≈ 6` workers (fine). But `write_crosstab` is a few-MB pandas op → `64 GB // ~10 MB
+≈ 6,400` workers. Capped at `os.cpu_count()`, that's ~100–200 workers on an NCI node — for a task that
+needs ~3 — each paying its ~0.5 GB interpreter/libs + ~0.3 GB unmapped-`data` ≈ **0.8 GB private**. So
+the light tier alone is ~100 × 0.8 = ~80 GB on top of the resident `data`.
+
+### Fixes (applied to `luto/tools/write.py`)
+
+- **`get_n_jobs` budgets the real model:** `mem_mb_data_obj = live parent RSS`;
+  `mem_mb_budget = max(4096, WRITE_REPORT_MAX_MEM_MB - mem_mb_data_obj)`;
+  `n_jobs = min(max_workers, mem_mb_budget // (peak_mb + mem_mb_worker[=500]))`. Now crosstab costs
+  `10 + 500 MB` per worker, so it gets a sane count. `WRITE_REPORT_MAX_MEM_MB` is now the **TOTAL** RAM
+  budget — set it to the real allocation. (`import psutil` added.)
+- **`max_workers` capped on ALL platforms:** `min(os.cpu_count(), 32)` — dropped the `if os.name=='nt'`
+  exemption that left Linux uncapped. A light I/O task gains nothing past ~32.
+- **`write_data` refactored:** group tiers by `peak_mb` and recompute `n_jobs` live per tier (so late
+  tiers see the parent's grown RSS); single inlined dispatch path; removed the dead `max_workers` term.
+- **Validated:** full write (4 yr, 128 GB budget) peaked **123 GB ≤ 128 GB** — bounded to budget.
+- **Trade-off:** tighter budget ⇒ fewer workers ⇒ slower heavy tier (memory↔speed). Set the budget to
+  real RAM; and freeing the parent `data` after dispatch (workers share it via memmap) buys back both.
+- **Still TODO (not in this commit):** free the parent `data`; stream `MAX_CELL_MAGNITUDE` (running
+  quantile vs full per-cell lists) — trims the ~40 GB parent accumulation. `get_mag` now takes
+  `min_p`/`max_p` default args.
+- **Not a fix:** an explicit dump+memmap of `data` — joblib already memmap-shares it; changed nothing
+  (79 ≈ 83 GB).
+
+### Investigation artefacts
+
+`jinzhu_inspect_code/Fix_write_huge_mem/` — `doc/PLAN.md`+`PROGRESS.md`, AB scripts/results
+(`ab_OLD/NEW/SCALE15.json`), `80_measure_per_worker.py` (USS), `70_locate_peak.py` (peak-phase split),
+`10_audit_inplace_mutations.py` (confirmed no writer mutates `data` in place → memmap-safe).
+
+---
+
+## 20260721 — variable accounting design (fixed-composition bundle) + a sub-floor coefficient leak & the post-build floor fix
+
+### TL;DR
+
+The two-stream accounting model (`X_ag` folded flow vars + `X_acct` LinExpr re-expression, entry
+`20260710`) is best understood as a **fixed-composition bundle**: a folded cell is one scalar (the
+dominant's var `X_ag[d]`) and every true land use is a **constant ratio** of it
+(`X_acct[lu] = frac_lu · X_ag[d]`). This is valid only because the objective and all constraints are
+**linear** — a fixed-ratio bundle collapses to one variable carrying a blended coefficient, and
+`_setup_ag_accounting_vars` is the *inverse* re-expansion so each LU is scored with its **own raw**
+coefficient. Composition therefore lives **entirely on the dvar side**; the input coefficient
+matrices (`get_ag_w_mrj`, `get_ag_g_mrj`, `ag_obj_mrj`, …) stay **pure per-LU** (no fractions) — by
+design, so one composition is reused across every stream. **New finding:** that same re-expression
+silently **leaks sub-`SOLVER_COEFF_MIN` matrix coefficients** past `_qsum`, wrecking Gurobi's matrix
+range on some scenarios. Root: `_qsum` floors the *raw coefficient* (`ag_w ≥ 1e-4`), then the
+**sliver fraction** (`≈ 1/RESFACTOR²`) multiplies it *downstream* into a sub-floor **product** on the
+dominant's var. Fix: a **post-`formulate()` coefficient floor** that sweeps the assembled matrix (and
+objective) and drops `|coeff| < SOLVER_COEFF_MIN` — the one place that sees the finished product.
+
+### The design — fixed-composition bundle (why linearity makes it work)
+
+A resfactored cell holds a composition, e.g. `0.7 Beef + 0.3 Apple`. θ-folding merges the minor
+Apple fraction into the dominant Beef, so a **single** Gurobi var `X_Beef` (created at
+`solver.py:216`, `dominant_frac = 0.7 + 0.3 = 1.0`) represents "how much of this cell remains in its
+original composition". Each LU is a constant ratio of that scalar:
+
+    dvar_account[Beef]  = (0.7 / dominant_frac) · X_Beef
+    dvar_account[Apple] = (0.3 / dominant_frac) · X_Beef
+
+Reduce `X_Beef` by 1/3 → both shrink by 1/3 (Beef 0.7→0.467, Apple 0.3→0.2); the **ratio is
+preserved**, only the scale changes. Legitimate purely because everything is linear:
+`Σ_lu coeff_lu · frac_lu · X_Beef = (Σ_lu coeff_lu·frac_lu) · X_Beef` — the bundle ⇄ one var with a
+blended coefficient. `_setup_ag_accounting_vars` is the inverse of that collapse (docstring updated
+with this model). **Tradeoff:** the bundle moves as a unit — a folded sliver cannot move
+independently of its dominant and inherits the dominant's transition/exclusion (`T_MAT`) rules; exact
+behaviour for a behaviourally-distinct sliver would require its own dvar (exclusion-aware folding).
+
+### Composition is on the dvar side, NOT the coefficient (don't double-count)
+
+`water = Σ_lu ag_w[lu] · X_acct[lu]` with `ag_w[lu]` **pure** (Apple's rate, Beef's rate) and
+`X_acct[lu]` **composed** (`frac_lu·X_Beef`). Equivalent to the retired *blended coefficient*
+(`Σ frac·ag_w` on one var) — composition must live on **exactly one** side or the fractions apply
+twice. The dvar side was chosen so each stream (water/GHG/profit/biodiversity, all with different
+per-LU coefficients) reuses **one** composition against its **standard raw** coefficient matrix.
+Hence `get_ag_w_mrj` et al. correctly carry no dvar fractions.
+
+### The sub-floor coefficient leak (numerical)
+
+`_qsum` (`solver.py:69`) filters `|coeff| < SOLVER_COEFF_MIN` (1e-4) as each term is built — but it
+floors the **raw coefficient**, e.g. `_qsum(ag_w[0,ind,j], X_acct_dry_jr[j,ind])` (`solver.py:963`).
+For folded cells `X_acct` is a `LinExpr` with sliver weights `slivers/dominant_frac ≈ 1/25`, so the
+kept-and-above-floor `ag_w` is **distributed into a sub-floor product** on the dominant var
+**after** `_qsum` ran. The floor gates the multiplier; the smallness is born in the product. `X_acct`
+entries are therefore a mix of `Var` (untouched), `LinExpr` (sliver re-expression), or `int 0`
+(fully folded). Land uses with near-zero coefficients concentrate the leak (their raw coeff is
+smallest, so the product dives furthest below the floor).
+
+### Diagnosis (NECMA build; `jinzhu_inspect_code/Explore_NECMA_species_targets`)
+
+A tiered-target run failed the barrier with `Matrix range [1e-08, 2e+03]` (ratio ~2e11).
+Instrumentation (`script_9/10/11`, jobs on Gadi): the 40 smallest coefficients were all
+`water_yield_limit_*` on `X_ag_dry_23` = **"Unallocated - natural land"** (net water yield ≈ 0). For
+Murray-Darling / LU 23 (38,386 cells): `X_acct` = 6,665 `Var` / 19,254 sliver `LinExpr` / 12,467
+`int`; the 65 *direct* sub-floor `ag_w` cells are correctly dropped by `_qsum`; **2,106 sub-floor
+PRODUCTS** come from the re-expression, e.g. `ag_w = 1.882e-3 (≥floor) × frac = -1/24 = -7.84e-5
+(<floor)`. Not the biodiversity/SNES targets (those rescale **per constraint**,
+`rescale_lhs_rhs_region_species`, and stay bounded). `WATER_REGION_DEF='Drainage Division'` only
+moved the min `1e-8 → 4e-8` — region granularity is not the lever.
+
+### Fix — post-`formulate()` coefficient floor (the robust, clean plan)
+
+A `_qsum`-side floor can't help (the product doesn't exist yet). Sweep the **assembled** matrix once
+and `chgCoeff(...,0)` for `|coeff| < SOLVER_COEFF_MIN`, plus a companion sweep of the **objective**
+vector (`var.Obj`) since the same leak reaches `_qsum(ag_obj × X_acct)` (`solver.py:584`) and
+`getA()` is LHS-only. Gate with `FLOOR_ASSEMBLED_MATRIX`. Collapses the range `1e-8 → 1e-4` (ratio
+~1e6). **Keep `_qsum`** — this is a backstop, not a replacement (removing it would build millions of
+negligible terms just to floor them out). Correctness-safe: dropping `|coeff| < 1e-4` is the same
+negligibility contract `_qsum` already enforces (a ~1e-5 ML/cell water term against a ~1e7 ML
+regional limit is nil). The matrix floor is the actual barrier fix; the objective floor is defensive
+(objective range is a secondary concern, not the diagnosed failure). Sketch + verification plan:
+`jinzhu_inspect_code/Explore_NECMA_species_targets/doc/patch_water_coeff_floor.md`.
+
+Cheaper *complement* (not a guarantee): prune slivers with `slivers/dominant_frac < ε` in
+`_setup_ag_accounting_vars` (skip **both** transfer lines to conserve mass) — kills the extreme tail
+at source but can't target the product, so it shrinks the range without guaranteeing it.
+
+---
+
 ## 20260716 — "Ag man lb clamped" gaps at 1e-1 are θ-fold jumps, not FeasibilityTol slack
 
 ### TL;DR

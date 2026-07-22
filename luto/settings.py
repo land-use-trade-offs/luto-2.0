@@ -408,11 +408,28 @@ The options are the same as REGIONAL_ADOPTION_ZONE:
 '''
 
 
-REGIONAL_ADOPTION_NON_AG_CAP = 15            
+REGIONAL_ADOPTION_NON_AG_CAP = 15
 '''
-None or numbers between 0-100 (both inclusive); 
- Only work under 'REGIONAL_ADOPTION_CONSTRAINTS = NON_AG_CAP'. 
+None or numbers between 0-100 (both inclusive);
+ Only work under 'REGIONAL_ADOPTION_CONSTRAINTS = NON_AG_CAP'.
  E.g., 15 means the combined area of all non-ag land uses can not exceed 15% of each region's area.
+'''
+
+REGIONAL_ADOPTION_NON_AG_CAP_REGIONS = []
+'''
+Scope of the NON_AG_CAP: which regions (names from REGIONAL_ADOPTION_NON_AG_REGION, e.g. NRM names like
+'North East', 'Goulburn Broken') the SUM-of-non-ag cap is applied to.
+- []  (empty)  -> cap ALL regions (default / original behaviour).
+- ['North East', 'Goulburn Broken'] -> cap ONLY these regions; everywhere else is uncapped.
+Only used under 'REGIONAL_ADOPTION_CONSTRAINTS = NON_AG_CAP'.
+'''
+
+REGIONAL_ADOPTION_NON_AG_CAP_OVERRIDE = {}
+'''
+Per-region cap percentages that OVERRIDE the uniform REGIONAL_ADOPTION_NON_AG_CAP for named regions.
+Maps region name -> percentage (0-100), e.g. {'Goulburn Broken': 10, 'North East': 20}. A region not in
+this dict uses REGIONAL_ADOPTION_NON_AG_CAP. Applied within the REGIONAL_ADOPTION_NON_AG_CAP_REGIONS scope
+(or all regions if that list is empty). Only used under 'REGIONAL_ADOPTION_CONSTRAINTS = NON_AG_CAP'.
 '''
                                         
 
@@ -1147,6 +1164,12 @@ GBF4_ECNES_TARGETS_DICT = {2030: 30, 2050: 50, 2100: 50}
 # (and independent of GBF4_TARGET_SNES mode). Maps (region, species) -> {year: pct}.
 # Lets a few species carry a different target from the rest. Empty = no override.
 GBF4_SNES_TARGETS_OVERRIDE = {}
+
+# Safety margin (percentage points) subtracted from each species' ATTAINABLE_LEVEL when the
+# interpolated SNES target is clamped in data.get_GBF4_SNES_target_inside_LUTO_by_year(). A target
+# pinned exactly at attainable gives zero slack (razor-thin feasible space); this keeps a small
+# buffer. Effective cap per species = ATTAINABLE_LEVEL - GBF4_SNES_CAP_MARGIN.
+GBF4_SNES_CAP_MARGIN = 2.0
 
 GBF4_SNES_REGION_MODE       = 'AUSTRALIA'                    # 'AUSTRALIA' or 'NRM'
 GBF4_SNES_SELECTED_REGIONS  = ['North East', 'Goulburn Broken']
