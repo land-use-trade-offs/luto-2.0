@@ -51,17 +51,12 @@ def extract_dtype_from_path(path):
             'transition':['transition_ag2ag_', 'transition_ag2nonag_', 'transition_nonag2ag_'],
             'biodiversity':['biodiversity'],
             'renewable':['renewable_energy_'],
+            'shadow_price':['shadow_prices'],
             # Metrics xarrays
             'xarray_layer':['xr_'],
     }
 
-    # For .nc/.json files inside a _chunks directory, classify by the directory name (stripped of _{year}_chunks).
-    parent = os.path.dirname(path)
-    in_chunks = re.search(r'_\d{4}_chunks$', os.path.basename(parent))
-    if (path.endswith('.nc') or os.path.basename(path) == 'manifest.json') and in_chunks:
-        base_name = re.sub(r'_\d{4}_chunks$', '', os.path.basename(parent))
-    else:
-        base_name = os.path.basename(path)
+    base_name = os.path.basename(path)
 
     # Check the file type
     for ftype, fpat in f_cat.items():
@@ -97,7 +92,12 @@ def get_all_files(data_root):
     file_paths = []
 
     # Walk through the folder and its subfolders
-    for foldername, _, filenames in os.walk(data_root):
+    for foldername, dirnames, filenames in os.walk(data_root):
+        # Chunked biodiversity outputs (<base>_{year}_chunks) are read straight off disk by
+        # create_report_layers.find_chunks_dirs(), never through this index. Prune them so their
+        # chunk_*.nc / manifest.json neither spam the Unknown-file report nor add hundreds of rows
+        # sharing one (Year, category, base_name) key.
+        dirnames[:] = [d for d in dirnames if not re.search(r'_\d{4}_chunks$', d)]
         for filename in filenames:
             # Create the full path to the file by joining the foldername and filename
             file_path = os.path.join(foldername, filename)
@@ -117,19 +117,8 @@ def get_all_files(data_root):
     # Append the year type and category to the file paths
     file_paths.insert(1, 'category', f_cats)
 
-    # Get the base name and extension of the file path.
-    # For chunk files (inside a _YYYY_chunks dir) use the directory name as base_name.
-    def _base_name_ext(path):
-        parent = os.path.dirname(path)
-        parent_base = os.path.basename(parent)
-        in_chunks = re.search(r'_\d{4}_chunks$', parent_base)
-        if (path.endswith('.nc') or os.path.basename(path) == 'manifest.json') and in_chunks:
-            stem = re.sub(r'_\d{4}_chunks$', '', parent_base)
-            ext = '.nc' if path.endswith('.nc') else '.json'
-            return stem, ext
-        return os.path.splitext(os.path.basename(path))
-
-    file_paths[['base_name','base_ext']] = [_base_name_ext(i) for i in file_paths['path']]
+    # Get the base name and extension of the file path
+    file_paths[['base_name','base_ext']] = [os.path.splitext(os.path.basename(i)) for i in file_paths['path']]
     file_paths = file_paths.reindex(columns=['Year','category','base_name','base_ext','path'])
 
     # Remove the datatime stamp <YYYY_MM_DD__HH_mm_SS> from the base_name
