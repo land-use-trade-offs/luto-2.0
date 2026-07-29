@@ -898,7 +898,7 @@ class Data:
         # When RESFACTOR > 1, average all fullres cells in each block; > 0 means eligible.
         x_mrj_full = np.load(os.path.join(settings.INPUT_DIR, "x_mrj.npy"))
         if settings.RESFACTOR == 1:
-            self.EXCLUDE = x_mrj_full
+            self.EXCLUDE = x_mrj_full[:, self.MASK, :]
         else:
             self.EXCLUDE = np.stack([
                 np.stack([
