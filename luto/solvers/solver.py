@@ -1569,11 +1569,20 @@ class LutoSolver:
 
 
 
-    def solve(self) -> SolverSolution:
+    def solve(self) -> SolverSolution | None:
         print("Starting solve...\n")
 
         # Magic.
         self.gurobi_model.optimize()
+
+        # Bail out if no solution is available (e.g., infeasible model).
+        if self.gurobi_model.SolCount == 0:
+            print(
+                f"No solution available (Status={self.gurobi_model.Status}, SolCount=0); "
+                f"skipping result collection.\n",
+                flush=True,
+            )
+            return None
 
         print("Completed solve, collecting results...\n", flush=True)
 

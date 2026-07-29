@@ -232,6 +232,8 @@ def solve_timeseries(
         # is accepted — any other status falls through to the failure path.
         nf_attempts = list(settings.RETRY_PARAMS)
         accepted = False
+        solution = None
+        status = None
         luto_solver = LutoSolver(input_data)
         luto_solver.formulate()
 
@@ -245,29 +247,32 @@ def solve_timeseries(
             solution = luto_solver.solve()
             status = luto_solver.gurobi_model.Status
 
-            if status == GRB.OPTIMAL:
+            if solution is not None and status == GRB.OPTIMAL:
                 print(f"Optimal solution found with NumericFocus={nf}, Method={method}")
                 accepted = True
                 break
 
             print(f"Non-optimal status {status} with NumericFocus={nf}, Method={method}; retrying with next attempt if available.")
 
-        data.add_lumap(target_year, solution.lumap)
-        data.add_lmmap(target_year, solution.lmmap)
-        data.add_ammaps(target_year, solution.ammaps)
-        data.add_ag_dvars(target_year, solution.ag_X_mrj)
-        data.add_delta_dvars_ag2ag(target_year, solution.dvar_D_ag2ag_mrj)
-        data.add_non_ag_dvars(target_year, solution.non_ag_X_rk)
-        data.add_delta_dvars_ag2nonag(target_year, solution.dvar_D_ag2nonag_rk)
-        data.add_delta_dvars_nonag2ag(target_year, solution.dvar_D_nonag2ag_mrj)
-        data.add_ag_man_dvars(target_year, solution.ag_man_X_mrj)
-        data.add_obj_vals(target_year, solution.obj_val)
-
-
-        for data_type, prod_data in solution.prod_data.items():
-            data.add_production_data(target_year, data_type, prod_data)
-
+        # Only commit results when a solve was accepted. `solution` is None whenever Gurobi
+        # stored no solution (SolCount == 0), so these writes MUST stay inside the guard —
+        # outside it they would raise on None and re-strand the diagnostics below, which is
+        # the bug this guard exists to prevent.
         if accepted:
+            data.add_lumap(target_year, solution.lumap)
+            data.add_lmmap(target_year, solution.lmmap)
+            data.add_ammaps(target_year, solution.ammaps)
+            data.add_ag_dvars(target_year, solution.ag_X_mrj)
+            data.add_delta_dvars_ag2ag(target_year, solution.dvar_D_ag2ag_mrj)
+            data.add_non_ag_dvars(target_year, solution.non_ag_X_rk)
+            data.add_delta_dvars_ag2nonag(target_year, solution.dvar_D_ag2nonag_rk)
+            data.add_delta_dvars_nonag2ag(target_year, solution.dvar_D_nonag2ag_mrj)
+            data.add_ag_man_dvars(target_year, solution.ag_man_X_mrj)
+            data.add_obj_vals(target_year, solution.obj_val)
+
+            for data_type, prod_data in solution.prod_data.items():
+                data.add_production_data(target_year, data_type, prod_data)
+
             record_shadow_prices(luto_solver, input_data, target_year, f"{data.path}/out_{target_year}")
 
         if checkpoint_path is not None and accepted:
