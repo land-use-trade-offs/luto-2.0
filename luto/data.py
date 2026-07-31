@@ -40,7 +40,6 @@ from affine import Affine
 from scipy.interpolate import interp1d
 from math import ceil
 from dataclasses import dataclass
-from scipy.ndimage import distance_transform_edt
 
 
 
@@ -1993,14 +1992,10 @@ class Data:
             lumap_resfactored[lu_idx] = lu_code
             fill_mask[lu_idx] = False
             
-        # Fill -1 with nearest neighbour values
-        nearst_ind = distance_transform_edt(
-            (lumap_resfactored == -1),
-            return_distances=False,
-            return_indices=True
-        )
-      
-        return lumap_resfactored[*nearst_ind]
+        # Fill the remaining cells with the 'Unallocated - natural land' code
+        lumap_resfactored[lumap_resfactored == -1] = self.DESC2AGLU['Unallocated - natural land']
+
+        return lumap_resfactored
 
 
 
