@@ -379,7 +379,6 @@ LUTO2 behavior can be customized through the `luto.settings` module. Key paramet
 Transitions are modelled as explicit per-source delta flows: each cell's land is tracked back to the land uses it came from, and only the land that actually moves is charged.
 
 - `EXACT_REACHABILITY_MIN_FRACTION` (θ): The exact ↔ crisp dial. Each cell's dvar fractions at or below θ are folded into that cell's dominant fraction before delta variables are built, trading resolution for model size. θ→0 is the pure exact per-source model; θ→1 reproduces the old crisp dominant-land-use model. Applies to agricultural sources only — non-agricultural sources are always exact
-- `TRANSITION_MODE_N_JOBS`: Worker count for computing the per-source combos (default: 4)
 
 ### Solver Configuration
 - `THREADS`: Number of parallel threads for optimization (default: 32)

@@ -121,10 +121,6 @@ AMORTISE_UPFRONT_COSTS = False
 # θ only applies to AG land-uses; non-ag sources are always exact (noise-floor cutoff, no folding).
 EXACT_REACHABILITY_MIN_FRACTION = 1.0
 
-# Number of joblib "threading" workers used to compute the (m, j) source combos in batches of this size.
-# n_jobs=4 was found to give the best runtime/memory tradeoff (~42s, +2.4GB peak at RESFACTOR=5).
-TRANSITION_MODE_N_JOBS = 4
-
 # Discount rate for amortisation
 DISCOUNT_RATE = 0.07     # 0.05 = 5% pa.
 
