@@ -1,8 +1,8 @@
 # LUTO2: The Land-Use Trade-Offs Model Version 2.0
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![Version](https://img.shields.io/badge/Version-2.0-green.svg)](https://github.com/land-use-trade-offs/luto-2.0)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
+[![Version](https://img.shields.io/badge/Version-2.3-green.svg)](https://github.com/land-use-trade-offs/luto-2.0)
 
 ## Introduction
 The Land Use Trade-Offs model v2 (LUTO2) is an integrated land systems model designed to simulate the optimal spatial arrangement of land use and land management decisions over time in Australia. It aims to achieve climate and biodiversity targets without compromising economic growth, food production or water security. The model is implemented as a Python package, offering users the flexibility to run interactively or to execute batch processes through scripted automation.
@@ -34,6 +34,19 @@ Documentation, including instructions on how to set up and run LUTO2, can be fou
 LUTO2 comes with a full diagram to illustrate its data preparation, workflow, and code logics. The diagram link can be found in this link.  
 *Replace with updated documentation currently in preparation when ready.*
 
+Developer-facing reference material lives alongside the code:
+
+| File | Covers |
+|------|--------|
+| `CLAUDE.md` | Repository map, conventions, and pointers into the themed docs below |
+| `docs/CLAUDE_SETUP.md` | Environment setup, running the model, settings, memory profiling |
+| `docs/CLAUDE_ARCHITECTURE.md` | Simulation engine, economics modules, solver integration |
+| `docs/CLAUDE_GBF2.md` | GBF2 priority degraded areas: mask, targets, constraint, reporting |
+| `docs/CLAUDE_OUTPUT.md` | NetCDF output format, map layers, write pipeline |
+| `docs/CLAUDE_VUE_REPORTING.md` | Vue.js reporting interface and data hierarchies |
+| `docs/CLAUDE_SKILL/` | Step-by-step guides for recurring tasks (task runs, retries, infeasibility debugging) |
+| `docs/FINDINGS.md` | Running log of investigations: solver numerics, transition-cost audits, performance profiling |
+
 ## Project Structure
 
 The LUTO2 codebase is organized into the following structure:
@@ -41,10 +54,9 @@ The LUTO2 codebase is organized into the following structure:
 ```
 luto/                                    # Main package directory
 ├── data.py                              # Core data management and loading
-├── simulation.py                        # Main simulation engine
+├── simulation.py                        # Main simulation engine (incl. checkpoint/resume)
 ├── settings.py                          # Configuration parameters
 ├── dataprep.py                          # Data preprocessing utilities
-├── helpers.py                           # Utility functions
 ├── economics/                           # Economic models and calculations
 │   ├── agricultural/                    # Agricultural economics modules
 │   │   ├── biodiversity.py              # Biodiversity calculations
@@ -65,13 +77,17 @@ luto/                                    # Main package directory
 │   ├── off_land_commodity/              # Off-land commodity economics
 │   └── land_use_culling.py              # Land use optimization culling
 ├── solvers/                             # Optimization solvers and algorithms
-│   ├── input_data.py                    # GUROBI solver input preparation
-│   └── solver.py                        # GUROBI solver interface
-├── tests/                               # Unit and integration tests
+│   ├── input_data.py                    # GUROBI solver input preparation and rescaling
+│   └── solver.py                        # GUROBI solver interface (LutoSolver)
 └── tools/                               # Utility tools and scripts
+    ├── __init__.py                      # Shared helpers, shadow-price recording
     ├── create_task_runs/                # Task execution and batch processing
-    │   ├── bash_scripts/                # Shell scripts and conda environment
+    │   ├── bash_scripts/                # PBS/local launcher scripts
+    │   │   ├── cmd.sh                   # PBS job script (fresh run + checkpoint resume)
+    │   │   ├── python_script.py         # Per-run entry point; archives results
+    │   │   └── run_all.py               # Submit/launch all runs (PBS or local Windows)
     │   ├── create_grid_search_tasks.py  # Grid search task generation
+    │   ├── create_grid_search_plots.py  # Grid search result plotting
     │   ├── helpers.py                   # Task run utilities
     │   └── parameters.py                # Task run parameters
     ├── Manual_jupyter_books/            # Documentation notebooks
@@ -79,11 +95,12 @@ luto/                                    # Main package directory
     │   └── asset/                       # Notebook assets and data descriptions
     ├── report/                          # Reporting and visualization system
     │   ├── VUE_modules/                 # Vue.js 3 interactive reporting dashboard
+    │   │   ├── assets/                  # Shapefiles and styling assets (NRM, state, AEMO REZ)
     │   │   ├── components/              # Reusable Vue components
-    │   │   ├── data/                    # Chart data files
+    │   │   ├── data/                    # Chart data, map layers and geometry
     │   │   │   ├── chart_option/        # Chart configuration options
-    │   │   │   ├── geo/                 # Geographic boundary data
-    │   │   │   └── map_layers/          # Map layer data
+    │   │   │   ├── geo/                 # Geographic boundary data (NRM, state, REZ)
+    │   │   │   └── map_layers/          # Map layer data (split per dimension combo)
     │   │   ├── dataTransform/           # Data transformation scripts
     │   │   ├── lib/                     # JavaScript libraries (Vue, Leaflet, Highcharts)
     │   │   ├── routes/                  # Vue router configuration
@@ -91,15 +108,14 @@ luto/                                    # Main package directory
     │   │   ├── views/                   # Vue view components (11 modules)
     │   │   ├── index.html               # Main HTML entry point
     │   │   └── index.js                 # Vue application entry
-    │   ├── Assets/                      # Color schemes and styling assets
     │   ├── data_tools/                  # Data processing for reports
-    │   ├── map_tools/                   # Spatial visualization utilities
     │   ├── create_report_data.py        # Generate chart data files
     │   └── create_report_layers.py      # Generate map layer files
-    ├── plotmap.py                       # Mapping utilities
+    ├── inspect_iis.py                   # Decode IIS / .ilp files from infeasible solves
+    ├── mem_monitor.py                   # Memory profiling decorator and live plot
     ├── spatializers.py                  # Spatial data processing and upsampling
     └── write.py                         # Output writing functions
-    
+
 input/                                   # Input data directory (requires separate download)
 output/                                  # Simulation outputs with interactive HTML reports
 docs/                                    # Documentation files
@@ -134,9 +150,9 @@ result = my_expensive_function(my_data)
 ### Common Issues
 
 **Memory Errors:**
-- Ensure you have at least 32 GB RAM available
+- Raise `RESFACTOR` — it is the single biggest lever on memory use
+- Lower `WRITE_REPORT_MAX_MEM_MB` so fewer parallel write workers are spawned, and turn off `WRITE_GBF4_SNES` / `WRITE_GBF4_ECNES` / `WRITE_GBF3_NVIS` if those layers are not needed
 - Close other applications during simulation
-- Consider running smaller scenarios first
 - Use the memory monitor to identify memory-intensive operations
 
 **GUROBI License Issues:**
@@ -149,21 +165,26 @@ result = my_expensive_function(my_data)
 - Check file permissions
 - Ensure sufficient disk space
 
+**Non-optimal Solves (INFEASIBLE / NUMERIC):**
+- A year is only accepted when Gurobi returns `GRB.OPTIMAL`; the attempts in `settings.RETRY_PARAMS` are tried in order first
+- Barrier can report false infeasibility on numerically hard scenarios. The dual-simplex fallback in `RETRY_PARAMS` usually resolves it; if not, re-run that year from its checkpoint with different parameters (`docs/CLAUDE_SKILL/retry_task_runs.md`)
+- Genuinely infeasible biodiversity targets are usually a handful of GBF4 SNES/ECNES species whose targets cannot be met on the available land. Set `DO_IIS = True` and decode the `.ilp` with `luto/tools/inspect_iis.py`, or follow `docs/CLAUDE_SKILL/debug_species_infeasibility.md` to identify which species to exclude or re-target
+
 
 ### Getting Help
 
 1. Check the documentation in `docs/luto2-overview.pdf`
-2. Review log files in `/output/<run_dir>/logs/`
+2. Review `LUTO_RUN__stdout.log` and `LUTO_RUN__stderr.log` in the run directory
 3. Contact the development team: **b.bryan@deakin.edu.au**
 4. Submit issues on GitHub: [github.com/land-use-trade-offs/luto-2.0](https://github.com/land-use-trade-offs/luto-2.0)
 
 ## System Requirements
 
 **Minimum Requirements:**
-- Python 3.10 or higher
-- 16 GB RAM (32 GB recommended for large simulations)
+- Python 3.12 (pinned in `requirements.yml`)
+- 16 GB RAM at `RESFACTOR >= 10`; 32 GB or more for `RESFACTOR = 5`. Full resolution (`RESFACTOR = 1`) is an HPC workload — budget several hundred GB and expect the write/report phase to dominate peak memory.
 - 50 GB available disk space for input data and outputs
-- GUROBI optimization solver license (academic licenses available)
+- GUROBI optimization solver license (academic licenses available); `gurobipy` is pinned to 13.0.0
 
 **Supported Operating Systems:**
 - Windows 10/11
@@ -212,45 +233,74 @@ results = sim.run(data=data)
 ```
 
 ### Advanced Configuration
+
+Several modules read settings at import time, so the reliable way to configure a scenario is to edit `luto/settings.py` — which is exactly what the batch tooling does, writing one settings file per run. If you patch `luto.settings` from a script instead, do it before importing `luto.simulation`:
+
 ```python
-import luto.simulation as sim
 import luto.settings as settings
 
-# Customize simulation settings
-settings.RESFACTOR = 10                                 # 10 makes the spatial resolution to ~10km. 
-settings.SIM_YEARS = [2010, 2020, 2030, 2040, 2050]
+settings.RESFACTOR = 10                                 # 10 makes the spatial resolution to ~10km.
+settings.SIM_YEARS = list(range(2020, 2051, 5))
 
 settings.WATER_LIMITS = 'on'                            # 'on' or 'off'.
-settings.GHG_EMISSIONS_LIMITS = 'high'                  # 'off', 'low', 'medium', or 'high'
-settings.GBF2_TARGET = 'high'             # 'off', 'low', 'medium', or 'high'
-settings.GBF3_NVIS_TARGET = 'off'         # 'off', 'medium', 'high', or 'USER_DEFINED'
-settings.BIODIVERSITY_TARGET_GBF_3_IBRA = 'off'         # 'off', 'medium', 'high', or 'USER_DEFINED'
-settings.GBF4_TARGET_SNES = 'off'         # 'on' or 'off'
-settings.GBF4_TARGET_ECNES = 'off'        # 'on' or 'off'
-settings.GBF8_TARGET = 'off'              # 'on' or 'off'
+settings.GHG_EMISSIONS_LIMITS = 'low'                   # 'off', 'low', 'medium', or 'high'
+settings.DEMAND_CONSTRAINT_TYPE = 'hard'                # 'hard' (per-commodity DEMAND_BOUNDS) or 'soft'
 
-settings.DYNAMIC_PRICE = False                          # Enable demand elasticity-based dynamic pricing
+settings.GBF2_TARGET = 'high'                           # 'off', 'low', 'medium', or 'high'
+settings.GBF3_NVIS_TARGET = 'off'                       # 'off', 'medium', 'high', or 'USER_DEFINED'
+settings.GBF3_NVIS_REGION_MODE = 'NRM'                  # 'AUSTRALIA', 'NRM', or 'IBRA_REG'
+settings.GBF4_TARGET_SNES = 'off'                       # 'off', 'USER_DEFINED', or 'dict'
+settings.GBF4_TARGET_ECNES = 'off'                      # 'off', 'USER_DEFINED', or 'dict'
+settings.GBF8_TARGET = 'off'                            # 'on' or 'off'
 
-settings.RENEWABLES_OPTIONS = {'Utility Solar PV': True, 'Onshore Wind': True}      # Enable renewable energy types
+settings.DYNAMIC_PRICE = True                           # Demand elasticity-based dynamic pricing
+
+settings.RENEWABLES_OPTIONS = {'Utility Solar PV': True, 'Onshore Wind': True}       # Enable renewable energy types
 settings.RENEWABLE_TARGET_SCENARIO_TARGETS = 'Gladstone - Core'                      # Generation target scenario
 settings.RENEWABLE_TARGET_SCENARIO_INPUT_LAYERS = 'step_change'                      # Spatial layer scenario
 
-# Load data with custom parameters
-data = sim.load_data()
+import luto.simulation as sim
 
-# Run simulation
+data = sim.load_data()
 sim.run(data=data)
 ```
 
+IBRA bioregion targets run through the NVIS stream — select them with `GBF3_NVIS_REGION_MODE = 'IBRA_REG'`. There is no separate IBRA target setting.
+
+### Checkpointing and Resume
+
+Long runs (typically full-resolution jobs on HPC) can checkpoint after each solved year. Pass a `checkpoint_dir`; a `data_<year>.lz4` file is written whenever a year solves to optimality, and re-running the same command resumes from the latest checkpoint instead of starting over:
+
+```python
+sim.run(data=data, checkpoint_dir='output/my_run/checkpoint')
+```
+
+A year is only accepted (and checkpointed) when the solver returns `GRB.OPTIMAL`. If the first solve attempt fails, the attempts listed in `settings.RETRY_PARAMS` are tried in order before the run stops.
+
+### Batch and Grid-Search Runs
+
+Multi-scenario runs are generated and launched from `luto/tools/create_task_runs/`:
+
+```bash
+# 1) Define the grid and write one directory per scenario
+python luto/tools/create_task_runs/create_grid_search_tasks.py
+
+# 2) Submit them — PBS on HPC, or as local processes on Windows
+python luto/tools/create_task_runs/bash_scripts/run_all.py
+```
+
+Each run directory carries its own `luto/settings.py`, so scenarios are fully reproducible. `run_all.py` handles both fresh runs and checkpoint resumes; see `docs/CLAUDE_SKILL/create_task_runs.md`, `submit_task_runs_windows.md`, and `retry_task_runs.md`.
+
 ### Viewing Results
-After execution, results are saved in the `/output/<timestamp>/` directory:
+Results are saved in a run directory named `output/<timestamp>_RF<resfactor>_<first_year>-<last_year>/`:
 
 1. **Interactive HTML Dashboard:** 
    ```
    /output/<run_dir>/DATA_REPORT/index.html
    ```
    A Vue.js 3 based interactive dashboard featuring:
-   - **Multi-module Analysis:** Area, Economics, GHG, Production, Water, Biodiversity
+   - **Multi-module Analysis:** Area, Economics, GHG, Production, Water, Biodiversity, Renewable, Transition
+   - **Region-level Switching:** Australia, state, and NRM views of the same data
    - **Progressive Data Selection:** Region → Category → Water/AgMgt → Landuse hierarchies
    - **Dual Visualization:** Charts (Highcharts) and Maps (Leaflet) for all data types
    - **Dynamic Filtering:** Responsive dropdowns with cascading selection updates
@@ -260,6 +310,7 @@ After execution, results are saved in the `/output/<timestamp>/` directory:
 2. **Raw Data Outputs:**
    - **NetCDF Files:** Spatial datasets (`.nc`) for each year and variable
    - **CSV Files:** Tabular data summaries for regional analysis
+   - **Shadow Prices:** `out_<year>/shadow_prices_<year>.csv` — the dual value of every binding constraint (GHG, water, demand, GBF2/3/4/8, renewable, regional adoption), reported both per real unit and normalised to AUD
 
 3. **Execution Logs:** 
    - `LUTO_RUN__stdout.log`: Standard output logs
@@ -276,18 +327,24 @@ LUTO2 behavior can be customized through the `luto.settings` module. Key paramet
 - `RCP`: Representative Concentration Pathway (e.g., 'rcp4p5')
 - `OBJECTIVE`: Optimization objective ('maxprofit' or 'mincost')
 
+### Demand Constraints
+- `DEMAND_CONSTRAINT_TYPE`: `'hard'` (default) forces production into per-commodity bounds; `'soft'` allows deviation at a price-weighted penalty
+- `DEMAND_BOUNDS`: Per-commodity `[lower, upper]` multipliers applied to the demand target under the hard constraint. Most commodities are pinned at `[1.0, 1.0]`; sheep wool is relaxed because meat and wool are co-produced in biologically fixed ratios
+
 ### Environmental Constraints
 - `GHG_EMISSIONS_LIMITS`: Greenhouse gas emission targets ('off', 'low', 'medium', 'high')
+- `GHG_CONSTRAINT_TYPE` / `WATER_CONSTRAINT_TYPE` / `GBF2_CONSTRAINT_TYPE`: 'hard' or 'soft'
 - `WATER_LIMITS`: Whether to enforce water yield constraints ('on' or 'off')
 - `CARBON_EFFECTS_WINDOW`: Years for carbon accumulation averaging (50, 60, 70, 80, or 90 years)
   - Determines the time period over which carbon sequestration is averaged
   - Must match available ages in NetCDF input data
-  - Default: 50 years (based on S-curve carbon accumulation pattern)
+  - Default: 60 years (based on S-curve carbon accumulation pattern)
 - `GBF2_TARGET`: Global Biodiversity Framework Target 2 ('off', 'low', 'medium', 'high')
-- `GBF3_NVIS_TARGET`: Conservation targets for NVIS vegetation types ('off', 'medium', 'high', 'USER_DEFINED')
-- `BIODIVERSITY_TARGET_GBF_3_IBRA`: Conservation targets for IBRA bioregions ('off', 'medium', 'high', 'USER_DEFINED')
-- `GBF4_TARGET_SNES`: Species of National Environmental Significance ('on' or 'off')
-- `GBF4_TARGET_ECNES`: Ecological Communities of National Environmental Significance ('on' or 'off')
+- `GBF3_NVIS_TARGET`: Conservation targets for vegetation groups ('off', 'medium', 'high', 'USER_DEFINED')
+- `GBF3_NVIS_REGION_MODE`: Spatial framing of the GBF3 targets — 'AUSTRALIA', 'NRM', or 'IBRA_REG'. IBRA bioregion targets are served by this mode; there is no separate IBRA setting
+- `GBF4_TARGET_SNES`: Species of National Environmental Significance ('off', 'USER_DEFINED', or 'dict')
+- `GBF4_TARGET_ECNES`: Ecological Communities of National Environmental Significance ('off', 'USER_DEFINED', or 'dict')
+- `GBF4_SNES_TARGETS_OVERRIDE` / `GBF4_SNES_CAP_MARGIN`: Per-species target overrides, and the safety margin subtracted from each species' attainable level to keep a feasibility buffer
 - `GBF8_TARGET`: Species and group targets ('on' or 'off')
 
 ### Renewable Energy Constraints
@@ -310,20 +367,35 @@ LUTO2 behavior can be customized through the `luto.settings` module. Key paramet
 - `EXCLUDE_NO_GO_LU`: Whether to exclude certain land uses from specific areas
 
 ### Economic Parameters
-- `DYNAMIC_PRICE`: Enable demand elasticity-based dynamic pricing (default: False)
+- `DYNAMIC_PRICE`: Enable demand elasticity-based dynamic pricing (default: True)
 - `CARBON_PRICES_FIELD`: Carbon pricing scenario ('Default', 'CONSTANT', etc.)
 - `AMORTISE_UPFRONT_COSTS`: Whether to amortize establishment costs (default: False)
 - `DISCOUNT_RATE`: Discount rate for economic calculations (default: 7%)
 - `AMORTISATION_PERIOD`: Period for cost amortization in years (default: 30)
+- `TRANSITION_COST_MULT`: Scenario multiplier on land-use transition costs (1 = baseline, <1 cheaper switching, >1 higher barrier)
+- `TECH_ADOPT_MULT`: Scenario multiplier on technical adoption ceilings (Asparagopsis, Precision Ag, AgTech EI, Biochar)
+
+### Transition Flow Model
+Transitions are modelled as explicit per-source delta flows: each cell's land is tracked back to the land uses it came from, and only the land that actually moves is charged.
+
+- `EXACT_REACHABILITY_MIN_FRACTION` (θ): The exact ↔ crisp dial. Each cell's dvar fractions at or below θ are folded into that cell's dominant fraction before delta variables are built, trading resolution for model size. θ→0 is the pure exact per-source model; θ→1 reproduces the old crisp dominant-land-use model. Applies to agricultural sources only — non-agricultural sources are always exact
+- `TRANSITION_MODE_N_JOBS`: Worker count for computing the per-source combos (default: 4)
 
 ### Solver Configuration
-- `SOLVE_METHOD`: GUROBI algorithm selection (default: 2 for barrier method)
-- `THREADS`: Number of parallel threads for optimization
-- `FEASIBILITY_TOLERANCE`: Solver tolerance settings
+- `THREADS`: Number of parallel threads for optimization (default: 32)
+- `RETRY_PARAMS`: Ordered list of solve attempts, each a `(NumericFocus, Method, Crossover, Presolve, BarHomogeneous)` tuple. The algorithm is chosen here — there is no standalone `SOLVE_METHOD` setting. The default first attempt is barrier with presolve off; the fallback is dual simplex
+- `FEASIBILITY_TOLERANCE` / `OPTIMALITY_TOLERANCE` / `BARRIER_CONVERGENCE_TOLERANCE`: Solver tolerances. `ROUND_DECIMALS` and the near-zero bound snapping threshold are derived from `FEASIBILITY_TOLERANCE`
+- `RESCALE_FACTOR`: Target magnitude (1e3) that solver input arrays are rescaled to for numerical stability
+- `SOLVER_COEFF_MIN`: Universal floor (1e-4) below which a term's coefficient is dropped before entering Gurobi, keeping the constraint matrix range within Gurobi's safe zone
+- `DO_IIS`: Compute an irreducible infeasible subsystem and write a `.ilp` file when a year is infeasible
 - `VERBOSE`: Control solver output verbosity
 
 ### Output Control
 - `RESFACTOR`: Spatial resolution factor (1 = full resolution, >1 = coarser)
+- `WRITE_OUTPUTS`: Whether to write outputs at the end of a run (set False for quick tests and infeasibility debugging)
+- `WRITE_REPORT_MAX_MEM_MB`: Memory budget (MB) for report generation. Parallel-write worker counts are derived from this budget and each task's measured peak
+- `WRITE_CHUNK_SIZE`: Chunk size used while writing NetCDF outputs
+- `WRITE_GBF3_NVIS` / `WRITE_GBF4_SNES` / `WRITE_GBF4_ECNES`: Per-layer toggles for the expensive biodiversity outputs ('on' or 'off'). SNES alone adds roughly five hours to the write phase
 
 Refer to `luto/settings.py` for a complete list of configurable parameters and detailed descriptions.
 
@@ -357,7 +429,7 @@ settings.CARBON_EFFECTS_WINDOW = 50  # Use 50-year carbon accumulation data
 # Model will load NetCDF data at age=50 and average to get annual sequestration rate
 ```
 
-For more technical details, see the "Carbon Sequestration Data Format" section in `CLAUDE.md`.
+For more technical details, see `docs/CLAUDE_OUTPUT.md`.
 
 ## Copyright
 Copyright 2024-now **Bryan, B.A., Williams, N., Archibald, C.L., de Haan, F., Wang, J., van Schoten, N., Hadjikakou, M., Sanson, J., Zyngier, R., Marcos-Martinez, R., Navarro, J., Gao, L., Aghighi, H., Armstrong, T., Bohl, H., Jaffe, P., Khan, M.S., Moallemi, E.A., Nazari, A., Pan, X., Steyl, D., and Thiruvady, D.R.**  
