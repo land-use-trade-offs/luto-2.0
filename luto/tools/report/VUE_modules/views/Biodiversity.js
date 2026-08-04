@@ -97,6 +97,30 @@ window.BiodiversityView = {
       (dataLoaded.value && selectMetric.value === 'GBF2') ? (window.BIO_GBF2_MASK || null) : null
     );
 
+    // Past NECMA + GBCMA vegetation works, overlaid on the MNES metrics only. The file is
+    // ~1.7 MB so it is fetched the first time one of those metrics is picked, not on mount.
+    const CMA_VEG_METRICS = ['GBF4_SNES', 'GBF4_ECNES'];
+    const cmaVegLoaded = ref(false);
+    const cmaVegOverlay = computed(() =>
+      (cmaVegLoaded.value && CMA_VEG_METRICS.includes(selectMetric.value))
+        ? (window.CMA_VEG_PROJECTS || null)
+        : null
+    );
+
+    async function ensureCMAVegLoaded() {
+      if (cmaVegLoaded.value || !CMA_VEG_METRICS.includes(selectMetric.value)) return;
+      await loadScript('./data/geo/CMA_VEG.js', 'CMA_VEG_PROJECTS', VIEW_NAME);
+      cmaVegLoaded.value = true;
+    }
+
+    // Overlay ids resolve against window.OverlayShp.registry; order sets stacking.
+    const mapOverlays = computed(() => {
+      const out = [];
+      if (gbf2MaskOverlay.value) out.push({ id: 'gbf2_mask', data: gbf2MaskOverlay.value });
+      if (cmaVegOverlay.value) out.push({ id: 'cma_veg', data: cmaVegOverlay.value });
+      return out;
+    });
+
     // ── Per-combo map layer loader ──────────────────────────────────────────
     const { currentLayerData, ensureComboLayer } = window.createMapLayerLoader(VIEW_NAME);
 
@@ -109,6 +133,17 @@ window.BiodiversityView = {
       }
       return data?.[selectYear.value] ?? {};
     });
+
+    // A species can be listed but have no map layer: the writer only keeps layers scoring
+    // above 1 ha Australia-wide, and species whose only score is the outside-LUTO baseline
+    // never get one at all. Say so rather than showing a blank map that reads as a bug.
+    // `currentLayerData` is nulled while ensureComboLayer fetches, without flipping
+    // isLoadingData — so check it too, or this flashes on every combo switch.
+    const hasMapData = computed(() => !!selectMapData.value?.tif_b64);
+    const showNoMapData = computed(() =>
+      dataLoaded.value && !isLoadingData.value
+      && currentLayerData.value !== null && !hasMapData.value
+    );
 
     // For the quality metric, chart data has an extra 'backend' outermost key.
     function qualityRoot(name) {
@@ -500,6 +535,7 @@ window.BiodiversityView = {
       await doCascade(initCat);
       selectCategory.value = initCat;
       dataLoaded.value = true;
+      ensureCMAVegLoaded();
     });
 
     const toggleDrawer = () => { isDrawerOpen.value = !isDrawerOpen.value; };
@@ -508,6 +544,7 @@ window.BiodiversityView = {
 
     watch(selectMetric, async (newMetric) => {
       selectPage.value = 0;
+      ensureCMAVegLoaded();
       const mr = mapRegister[newMetric] || {};
       let cat = selectCategory.value;
       if (!mr[cat]) {
@@ -661,7 +698,8 @@ window.BiodiversityView = {
       selectMetric, selectCategory, selectAgMgt, selectWater, selectSpecies, selectLanduse,
       selectBackend, availableBackends, modelBackend,
       hasSpecies, speciesLabel, formatLanduse,
-      selectMapData, selectChartData, selectMultiInput, selectMultiYAxis, gbf2MaskOverlay,
+      selectMapData, selectChartData, selectMultiInput, selectMultiYAxis,
+      gbf2MaskOverlay, cmaVegOverlay, mapOverlays, showNoMapData,
       dataLoaded, isLoadingData, isDrawerOpen, toggleDrawer,
       // Paged species
       selectPage, isPaged, totalPages, currentPageInfo,
@@ -845,12 +883,29 @@ window.BiodiversityView = {
           </div>
         </div>
 
+        <!-- Shown when the selected combination has no map layer (see hasMapData) -->
+        <div v-if="showNoMapData"
+          class="absolute top-1/2 left-1/2 z-[1002] -translate-x-1/2 -translate-y-1/2
+                 bg-white/90 rounded-lg shadow-lg px-4 py-3 max-w-[320px] text-center pointer-events-none">
+          <div class="text-[0.8rem] font-medium text-gray-700">No mapped area for this selection</div>
+          <div class="text-[0.68rem] text-gray-500 mt-1 leading-snug">
+            <template v-if="hasSpecies && selectSpecies">
+              <strong>{{ selectSpecies }}</strong> has no cells above the mapping threshold for this
+              category. Its chart values may still be non-zero — contributions outside the LUTO study
+              area are scored but not mapped.
+            </template>
+            <template v-else>
+              This combination has no cells above the mapping threshold.
+            </template>
+          </div>
+        </div>
+
         <!-- Map component takes full space -->
         <regions-map
           :mapData="selectMapData"
           :file-name="mapFileName"
           :region-type="selectRegionLevel === 'region_state' ? 'STATE' : 'NRM'"
-          :overlayGeoJSON="gbf2MaskOverlay"
+          :overlays="mapOverlays"
           :show-legend="!isDrawerOpen"
           style="width: 100%; height: 100%;">
         </regions-map>

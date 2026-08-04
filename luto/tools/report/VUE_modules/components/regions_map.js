@@ -226,13 +226,12 @@ window.RegionsMap = {
       type: Object,
       default: () => ({})
     },
-    overlayGeoJSON: {
-      type: Object,
-      default: null
-    },
-    rezOverlay: {
-      type: Object,
-      default: null
+    // Vector overlays to draw over the raster layer, e.g.
+    //   [{ id: 'cma_veg', data: <geojson> }]
+    // `id` must be a key of window.OverlayShp.registry, which owns styling and legends.
+    overlays: {
+      type: Array,
+      default: () => []
     },
     regionType: {
       type: String,
@@ -255,9 +254,7 @@ window.RegionsMap = {
 
     const map = ref(null);
     const boundingBox = ref(null);
-    const gbf2Layer = ref(null);
-    const rezLayer = ref(null);
-    const showREZ = ref(true);
+    const overlayCtl = window.OverlayShp.createController(() => props.overlays, () => map.value);
     const loadScript = window.loadScript;
     const selectedBaseMap = ref('CartoDB');
     const tileLayers = ref({});
@@ -508,6 +505,9 @@ window.RegionsMap = {
         // Initialize map first
         initMap();
 
+        // Draw any overlays the view already had ready before the map existed
+        overlayCtl.sync();
+
         // Skip initial map data load - will be loaded by the watcher when props are populated
         // The watch handler will take care of loading map data when props are ready
 
@@ -620,34 +620,6 @@ window.RegionsMap = {
     Vue.watch(() => props.mapData, async (newVal) => {
       await loadMapData();
     });
-
-    Vue.watch(() => props.overlayGeoJSON, (geojson) => {
-      if (!map.value) return;
-      if (gbf2Layer.value) {
-        map.value.removeLayer(gbf2Layer.value);
-        gbf2Layer.value = null;
-      }
-      if (geojson) {
-        gbf2Layer.value = L.geoJSON(geojson, {
-          style: { color: '#555', weight: 1.5, fillColor: '#666', fillOpacity: 0.35, opacity: 0.7 }
-        }).addTo(map.value);
-      }
-    });
-
-    const updateREZLayer = () => {
-      if (!map.value) return;
-      if (rezLayer.value) {
-        map.value.removeLayer(rezLayer.value);
-        rezLayer.value = null;
-      }
-      if (props.rezOverlay && showREZ.value) {
-        rezLayer.value = L.geoJSON(props.rezOverlay, {
-          style: { color: '#f59e0b', weight: 1.5, fillColor: '#f59e0b', fillOpacity: 0.12, opacity: 0.85 }
-        }).addTo(map.value);
-      }
-    };
-    Vue.watch(() => props.rezOverlay, updateREZLayer);
-    Vue.watch(showREZ, updateREZLayer);
 
     Vue.watch(selectedRegion, (newValue, oldValue) => {
       if (newValue) {
@@ -854,7 +826,8 @@ window.RegionsMap = {
       isExporting,
       exportLayer,
       canExport: computed(() => !!props.mapData?.tif_b64),
-      showREZ,
+      overlayItems: overlayCtl.items,
+      toggleOverlay: overlayCtl.toggle,
     };
   },
   template: `
@@ -898,16 +871,31 @@ window.RegionsMap = {
             </span>
           </button>
 
-          <!-- REZ toggle button — only shown in views that pass rezOverlay -->
-          <button v-if="$props.rezOverlay"
-            @click="showREZ = !showREZ"
+          <!-- One toggle per overlay the view supplied; see components/overlay_shp.js -->
+          <button v-for="o in overlayItems.filter(i => i.toggleable)" :key="o.id"
+            @click="toggleOverlay(o.id)"
             class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg shadow-lg text-[0.72rem] font-medium transition-all select-none cursor-pointer"
-            :class="showREZ ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-white/70 text-gray-500 hover:bg-white/90'">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-            </svg>
-            Renewable Energy Zones
+            :class="o.visible ? 'text-white' : 'bg-white/70 text-gray-500 hover:bg-white/90'"
+            :style="o.visible ? { backgroundColor: o.color } : {}">
+            <svg v-if="o.icon" xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none"
+              viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" v-html="o.icon"></svg>
+            {{ o.label }}
           </button>
+        </div>
+
+        <!-- Legends for any visible overlay that declares one.
+             Bottom-left: the top-left column is occupied by the region selector and the
+             per-view control panels in every view that passes overlays. -->
+        <div v-if="overlayItems.some(o => o.visible && o.legend)"
+          class="absolute bottom-[20px] left-[20px] z-[9999] flex flex-col gap-1">
+          <div v-for="o in overlayItems.filter(i => i.visible && i.legend)" :key="o.id"
+            class="bg-white/80 rounded-lg shadow px-2 py-1.5 text-[0.65rem] leading-tight">
+            <div class="font-medium mb-0.5">{{ o.legend.title }}</div>
+            <div v-for="item in o.legend.items" :key="item.label" class="flex items-center gap-1">
+              <span class="inline-block w-3 h-2 rounded-sm" :style="{ background: item.color }"></span>
+              {{ item.label }}
+            </div>
+          </div>
         </div>
 
         <!-- Map Container - Leaflet map will be initialized here -->
