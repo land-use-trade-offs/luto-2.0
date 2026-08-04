@@ -221,6 +221,34 @@ def build_out_dict_bulk(df_wide_pct, df_wide_area, key_cols):
     return out_dict
 
 
+def _paged_species_order(bio_paths: pd.DataFrame, chunks_base: str) -> list | None:
+    """Species order for a paged metric, read from the manifest that cuts the map pages.
+
+    `create_report_layers.get_map2json_paged` derives each map page's [start, end] from
+    `manifest.json` in the *earliest* year's chunks dir, and the Vue builds its chart
+    filenames from those same bounds. So the chart pages have to be cut on this list.
+
+    Deriving the order from the score CSVs instead does not work: the CSVs drop rows whose
+    area-weighted score is zero, while the manifest keeps every species that was batched.
+    Any species in one but not the other shifts every later page boundary, and the Vue then
+    requests a chart page file that was never written.
+
+    Returns None when no manifest is found, so callers can fall back to the CSV-derived
+    order (which is still correct whenever the two sets happen to coincide).
+    """
+    if bio_paths.empty:
+        return None
+    for _, row in bio_paths.sort_values('Year').iterrows():
+        out_dir = os.path.dirname(row['path'])
+        manifest_path = os.path.join(out_dir, f"{chunks_base}_{row['Year']}_chunks", 'manifest.json')
+        if not os.path.isfile(manifest_path):
+            continue
+        with open(manifest_path) as f:
+            manifest = json.load(f)
+        return [sp for key in sorted(manifest, key=int) for sp in manifest[key]]
+    return None
+
+
 def _write_paged_chart_js(
     out_dict: dict,
     filename_prefix: str,
@@ -3426,7 +3454,8 @@ def process_biodiversity_data(files, SAVE_DIR):
         # Drop the per-species 'ALL' aggregate (it's re-aggregated explicitly in sum charts).
         # Keep AUSTRALIA rows so the AUSTRALIA region selection shows data in the report.
         bio_df = bio_df.query('species != "ALL"')
-        _nvis_species_order = sorted(bio_df['species'].unique().tolist())
+        _nvis_species_order = (_paged_species_order(bio_paths, 'xr_biodiversity_GBF3_NVIS_ag')
+                               or sorted(bio_df['species'].unique().tolist()))
 
         # ---------------- (GBF3-NVIS) Ranking  ----------------
         bio_rank_total = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL" and region != "AUSTRALIA"')\
@@ -3624,7 +3653,8 @@ def process_biodiversity_data(files, SAVE_DIR):
         # species in the report dropdowns; sum charts re-aggregate explicitly.
         # Keep AUSTRALIA rows so the AUSTRALIA region selection shows data in the report.
         bio_df = bio_df.query('species != "ALL"')
-        _snes_species_order = sorted(bio_df['species'].unique().tolist())
+        _snes_species_order = (_paged_species_order(bio_paths, 'xr_biodiversity_GBF4_SNES_ag')
+                               or sorted(bio_df['species'].unique().tolist()))
         # ---------------- (GBF4 SNES) Ranking  ----------------
         bio_rank_total = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL" and region != "AUSTRALIA"')\
             .groupby(['Year', 'region_level', 'region'])\
@@ -3777,7 +3807,8 @@ def process_biodiversity_data(files, SAVE_DIR):
         # Drop the per-species 'ALL' aggregate (re-aggregated explicitly in sum charts).
         # Keep AUSTRALIA rows so the AUSTRALIA region selection shows data in the report.
         bio_df = bio_df.query('species != "ALL"')
-        _ecnes_species_order = sorted(bio_df['species'].unique().tolist())
+        _ecnes_species_order = (_paged_species_order(bio_paths, 'xr_biodiversity_GBF4_ECNES_ag')
+                                or sorted(bio_df['species'].unique().tolist()))
 
         # Build target lookup once (species × region → Target_by_Percent, BASE_TOTAL_SCORE).
         # Target_by_Percent is NaN when no constraint is active (write.py sets it to NaN
