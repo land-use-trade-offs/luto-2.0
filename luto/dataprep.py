@@ -63,6 +63,7 @@ def create_new_dataset(refresh=False):
     bio_GBF4_inpath = bio_GBF2_inpath
     bio_GBF8_inpath = 'N:/Data-Master/Biodiversity/Environmental-suitability/Annual-species-suitability_20-year_snapshots_5km_to_NetCDF/'
     bio_NES_Zonation_inpath = bio_GBF4_inpath
+    bio_RHI_Zonation_inpath = 'N:/Data-Master/Biodiversity/DCCEEW/RHI (Relative Habitat Importance)'
     renewable_energy_inpath = 'N:/Data-Master/Renewable Energy/processed'
     ag_yield_trend = 'N:/Data-Master/AG 2050/'
     
@@ -207,7 +208,12 @@ def create_new_dataset(refresh=False):
     
     # Copy biodiversity NES Zonation files
     shutil.copyfile(bio_NES_Zonation_inpath + 'bio_NES_Zonation.nc', outpath + 'bio_NES_Zonation.nc')
-    
+
+    # Copy biodiversity RHI Zonation file (DCCEEW's native 0-100 ranks, no rescaling). data.py thresholds
+    # it against the 'RHI' sheet of Biodiversity_conserve_performance.xlsx, which script 5_4 builds from
+    # these same values over in-LUTO cells and writes alongside this layer, so the two share a scale.
+    shutil.copyfile(f'{bio_RHI_Zonation_inpath}/bio_RHI_Zonation.nc', outpath + 'bio_RHI_Zonation.nc')
+
     # Copy renewable energy data files
     shutil.copyfile(f'{renewable_energy_inpath}/renewable_targets.csv', outpath + 'renewable_targets.csv')
     shutil.copyfile(f'{renewable_energy_inpath}/renewable_energy_layers_1D.nc', outpath + 'renewable_energy_layers_1D.nc')

@@ -3104,8 +3104,14 @@ def write_biodiversity_quality_scores(data: Data, yr_cal, path):
     xr_per_backend_ag, xr_per_backend_non_ag, xr_per_backend_am, xr_per_backend_all = [], [], [], []
 
     for backend_layer in settings.BIO_QUALITY_LAYERS:
-        # Load raw biodiversity arrays for this backend
-        bio_quality_raw, bio_quality_lds = data.compute_bio_quality_arrays(backend_layer)
+        # Load this backend's layer and weight it the same way Data.__init__ weights the selected one,
+        # so the reported scores are comparable with the run's own BIO_QUALITY_RAW/LDS.
+        bio_quality_raw = data.load_bio_quality_layer(backend_layer)[0] * data.CONNECTIVITY_SCORE
+        bio_quality_lds = np.where(
+            data.SAVBURN_ELIGIBLE,
+            bio_quality_raw - (bio_quality_raw * (1 - settings.BIO_CONTRIBUTION_LDS)),
+            bio_quality_raw,
+        ).astype(np.float32)
 
         # Compute biodiversity score matrices
         bio_ag_priority_mrj = tools.ag_mrj_to_xr(
@@ -3589,7 +3595,8 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
     ''' No annualisation needed: GBF3 NVIS scores are a point-in-time snapshot (stock)
     derived from the `yr_cal` lumap, not a flow over `gap` years.
 
-    Biodiversity GBF3 (NVIS) scores are written regardless of GBF3_NVIS_TARGET, but only when `WRITE_GBF3_NVIS` is not 'off'. '''
+    Written whenever `WRITE_GBF3_NVIS` is not 'off', independently of `GBF3_NVIS_TARGET`.
+    'selected' narrows the output to the vegetation groups the solver constrained. '''
 
     if settings.WRITE_GBF3_NVIS == 'off':
         return f"Skipping Biodiversity GBF3 NVIS scores for year {yr_cal} as `WRITE_GBF3_NVIS` is set to 'off'"
@@ -3604,6 +3611,20 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
     )
     
     all_groups = sorted(nvis_all_targets_df['group'].unique())
+
+    if settings.WRITE_GBF3_NVIS == 'selected':
+        # NVIS has no always-present `data` attribute for the selected set — `BIO_GBF3_NVIS_SEL`
+        # is only built when GBF3_NVIS_TARGET is on — so re-derive it here from the same method.
+        # Unlike SNES/ECNES this returns nothing at all when the target is off, so there is
+        # genuinely no selection to write in that case.
+        selected = set(data.get_NVIS_targets_df()['group'])
+        all_groups = [g for g in all_groups if g in selected]
+        if not all_groups:
+            cause = ("`GBF3_NVIS_TARGET` is 'off', so no groups are constrained — use 'all' to write "
+                     "every group" if settings.GBF3_NVIS_TARGET == 'off' else
+                     "check GBF3_NVIS_REGION_MODE / GBF3_NVIS_SELECTED_REGIONS / GBF3_NVIS_EXCLUDE_REGION_GROUPS")
+            return (f"Skipping Biodiversity GBF3 NVIS scores for year {yr_cal}: `WRITE_GBF3_NVIS` is "
+                    f"'selected' but no vegetation groups are selected — {cause}")
 
     # Unpack the agricultural management land-use
     am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]
@@ -3992,14 +4013,25 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
     ''' No annualisation needed: GBF4 SNES scores are a point-in-time snapshot (stock)
     derived from the `yr_cal` lumap, not a flow over `gap` years.
 
-    Biodiversity GBF4 SNES only being written to disk when `GBF4_TARGET_SNES` is not 'off' '''
-    
+    Written whenever `WRITE_GBF4_SNES` is not 'off', independently of `GBF4_TARGET_SNES`.
+    'selected' narrows the output to the species the solver constrained. '''
+
     if settings.WRITE_GBF4_SNES == 'off':
         return f"Skipping Biodiversity GBF4 SNES scores for year {yr_cal} as `WRITE_GBF4_SNES` is set to 'off'"
 
     # 1. Load all species target df and get species list.
     snes_all_targets_df = data.get_SNES_targets_df(include_all=True)
     all_species = sorted(snes_all_targets_df['SCIENTIFIC_NAME'].unique())
+
+    if settings.WRITE_GBF4_SNES == 'selected':
+        # Keep the sorted order of all_species — batching, the manifest and the report page
+        # boundaries are all cut on this list, so it has to stay stable.
+        selected = set(data.GBF4_SNES_META['SCIENTIFIC_NAME'])
+        all_species = [sp for sp in all_species if sp in selected]
+        if not all_species:
+            return (f"Skipping Biodiversity GBF4 SNES scores for year {yr_cal}: `WRITE_GBF4_SNES` is "
+                    f"'selected' but no species are selected — check GBF4_SNES_REGION_MODE / "
+                    f"GBF4_SNES_SELECTED_REGIONS / GBF4_SNES_EXCLUDE_REGION_SPECIES")
 
     # 2. Unify chunk ag/agmgt/nonag decision variables.
     am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]
@@ -4450,7 +4482,8 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
     ''' No annualisation needed: GBF4 ECNES scores are a point-in-time snapshot (stock)
     derived from the `yr_cal` lumap, not a flow over `gap` years.
 
-    Biodiversity GBF4 ECNES is written regardless of `GBF4_TARGET_SNES`, but only when `WRITE_GBF4_ECNES` is not 'off'. '''
+    Written whenever `WRITE_GBF4_ECNES` is not 'off', independently of `GBF4_TARGET_ECNES`.
+    'selected' narrows the output to the communities the solver constrained. '''
 
     if settings.WRITE_GBF4_ECNES == 'off':
         return f"Skipping Biodiversity GBF4 ECNES scores for year {yr_cal} as `WRITE_GBF4_ECNES` is set to 'off'"
@@ -4458,6 +4491,14 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
     # 1. Load all community target df and get species list.
     ecnes_all_targets_df = data.get_ECNES_targets_df(include_all=True)
     all_species = sorted(ecnes_all_targets_df['COMMUNITY'].unique())
+
+    if settings.WRITE_GBF4_ECNES == 'selected':
+        selected = set(data.GBF4_ECNES_META['COMMUNITY'])
+        all_species = [sp for sp in all_species if sp in selected]
+        if not all_species:
+            return (f"Skipping Biodiversity GBF4 ECNES scores for year {yr_cal}: `WRITE_GBF4_ECNES` is "
+                    f"'selected' but no communities are selected — check GBF4_ECNES_REGION_MODE / "
+                    f"GBF4_ECNES_SELECTED_REGIONS / GBF4_ECNES_EXCLUDE_REGION_COMMUNITIES")
 
     # 2. Unify chunk ag/agmgt/nonag decision variables.
     am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]

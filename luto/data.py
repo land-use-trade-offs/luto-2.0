@@ -1388,15 +1388,8 @@ class Data:
         
         biodiv_raw = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'bio_OVERALL_PRIORITY_RANK_AND_AREA_CONNECTIVITY.h5'), where=self.MASK)
         
-        # Get the biodiversity quality score 
-        if settings.BIO_QUALITY_LAYER == 'Suitability':
-            bio_quality_raw = biodiv_raw[f'BIODIV_PRIORITY_SSP{settings.SSP}'].values
-            performance_sheet = f'ssp{settings.SSP}'
-        elif 'NES' in settings.BIO_QUALITY_LAYER:
-            bio_quality_raw = xr.open_dataarray(f"{settings.INPUT_DIR}/bio_NES_Zonation.nc").sel(layer=settings.BIO_QUALITY_LAYER).compute().values[self.MASK]
-            performance_sheet = settings.BIO_QUALITY_LAYER
-        else:
-            raise ValueError(f"Invalid biodiversity quality layer: {settings.BIO_QUALITY_LAYER}, must be 'Suitability' or contain '*NES_likely|may' layers")
+        # Get the biodiversity quality score (unweighted; connectivity is applied further below)
+        bio_quality_raw, performance_sheet = self.load_bio_quality_layer(settings.BIO_QUALITY_LAYER, biodiv_df=biodiv_raw)
 
         
         # Get connectivity score
@@ -2749,36 +2742,46 @@ class Data:
 
         return (dr_prop * water_dr_yield + (1 - dr_prop) * water_sr_yield)
 
-    def compute_bio_quality_arrays(self, backend_layer: str) -> tuple[np.ndarray, np.ndarray]:
-        """Return (bio_quality_raw, bio_quality_lds) arrays for the given backend layer.
+    def load_bio_quality_layer(self, backend_layer: str, biodiv_df=None) -> tuple[np.ndarray, str]:
+        """Return (raw priority values on MASK, performance-curve sheet name) for a backend layer.
 
-        Uses the stored CONNECTIVITY_SCORE so the connectivity weighting is consistent
-        with what was used during __init__.  Reloads only the raw priority values from
-        disk (cheap — called at write time, not during optimisation).
+        The values are *unweighted* — connectivity is applied by the callers that want it.
+        The GBF2 and renewable exclusion masks deliberately threshold these unweighted values,
+        because the thresholds in Biodiversity_conserve_performance.xlsx are derived from the
+        unweighted layers too.
+
+        `biodiv_df` lets __init__ pass the priority/connectivity table it has already read,
+        avoiding a second pass over the HDF for the 'Suitability' backend.
         """
         if backend_layer == 'Suitability':
-            biodiv_raw = pd.read_hdf(
-                os.path.join(settings.INPUT_DIR, 'bio_OVERALL_PRIORITY_RANK_AND_AREA_CONNECTIVITY.h5'),
-                where=self.MASK
-            )
-            raw = biodiv_raw[f'BIODIV_PRIORITY_SSP{settings.SSP}'].values.astype(np.float32)
-        elif 'NES' in backend_layer:
-            raw = (
+            col = f'BIODIV_PRIORITY_SSP{settings.SSP}'
+            if biodiv_df is None:
+                biodiv_df = pd.read_hdf(
+                    os.path.join(settings.INPUT_DIR, 'bio_OVERALL_PRIORITY_RANK_AND_AREA_CONNECTIVITY.h5'),
+                    where=self.MASK,
+                    columns=[col]
+                )
+            return biodiv_df[col].values.astype(np.float32), f'ssp{settings.SSP}'
+
+        if 'NES' in backend_layer:
+            return (
                 xr.open_dataarray(os.path.join(settings.INPUT_DIR, 'bio_NES_Zonation.nc'))
                 .sel(layer=backend_layer)
                 .compute()
                 .values[self.MASK]
                 .astype(np.float32)
-            )
-        else:
-            raise ValueError(
-                f"Invalid backend_layer '{backend_layer}': must be 'Suitability' or contain 'NES'."
-            )
+            ), backend_layer
 
-        bio_quality_raw = raw * self.CONNECTIVITY_SCORE
-        bio_quality_lds = np.where(
-            self.SAVBURN_ELIGIBLE,
-            bio_quality_raw - (bio_quality_raw * (1 - settings.BIO_CONTRIBUTION_LDS)),
-            bio_quality_raw,
-        ).astype(np.float32)
-        return bio_quality_raw, bio_quality_lds
+        if backend_layer == 'RHI':
+            return (
+                xr.open_dataarray(os.path.join(settings.INPUT_DIR, 'bio_RHI_Zonation.nc'))
+                .compute()
+                .values[self.MASK]
+                .astype(np.float32)
+            ), 'RHI'
+
+        raise ValueError(
+            f"Invalid biodiversity quality layer '{backend_layer}': must be 'Suitability', 'RHI', "
+            f"or a '*NES_likely|may' layer."
+        )
+

@@ -261,9 +261,17 @@ WRITE_CHUNK_SIZE = 4096                     # The processing size of each chunk 
                                             #   E.g., layer of ~200 k cells (under chunk size of 1024) will create ~200 chunks.
                                             #   This makes memory usage to be ~1/200 of the original size.
 
-WRITE_GBF3_NVIS  = 'off'                    # 'on' or 'off'. Controls writing of Biodiversity GBF3 NVIS scores and map layers.
-WRITE_GBF4_SNES  = 'off'                    # 'on' or 'off'. If write, will take ~5 hours to finish.
-WRITE_GBF4_ECNES = 'off'                    # 'on' or 'off'. Controls writing of Biodiversity GBF4 ECNES scores and map layers.
+                                            # ---- Biodiversity score/layer writing -------------------------------
+                                            # 'off'      : skip entirely.
+                                            # 'all'      : every species/community/vegetation group in the input CSV.
+                                            # 'selected' : only the entries the model actually constrained, i.e. the
+                                            #              same set the solver uses (region mode, selected regions,
+                                            #              exclude lists and target dicts all applied). Independent of
+                                            #              whether the matching GBF*_TARGET is on.
+                                            # 'on' is accepted as a legacy alias for 'all'.
+WRITE_GBF3_NVIS  = 'off'                    # 'off' | 'all' | 'selected'. Biodiversity GBF3 NVIS scores and map layers.
+WRITE_GBF4_SNES  = 'off'                    # 'off' | 'all' | 'selected'. 'all' writes ~2000 species and takes ~5 hours.
+WRITE_GBF4_ECNES = 'off'                    # 'off' | 'all' | 'selected'. Biodiversity GBF4 ECNES scores and map layers.
 
 
 # ---------------------------------------------------------------------------- #
@@ -937,12 +945,13 @@ If set to 100, all cells will be considered as priority degraded areas, equal to
 
 
 # Biodiversity quality options
-BIO_QUALITY_LAYERS = ['Suitability', 'ECNES_likely_may', 'ECNES_likely', 'SNES_likely_may', 'SNES_likely', 'MNES_likely_may', 'MNES_likely']
-BIO_QUALITY_LAYER = 'MNES_likely' 
+BIO_QUALITY_LAYERS = ['Suitability', 'ECNES_likely_may', 'ECNES_likely', 'SNES_likely_may', 'SNES_likely', 'MNES_likely_may', 'MNES_likely', 'RHI']
+BIO_QUALITY_LAYER = 'MNES_likely'
 '''
-One of 'Suitability', 'ECNES_likely_may', 'ECNES_likely', 'SNES_likely_may', 'SNES_likely', 'MNES_likely_may', 'MNES_likely'.
+One of 'Suitability', 'ECNES_likely_may', 'ECNES_likely', 'SNES_likely_may', 'SNES_likely', 'MNES_likely_may', 'MNES_likely', 'RHI'.
     - 'Suitability': use the Zonation algorith to compute quanlity score over 10k species.
     - '*NES_likely|may': use the Zonation algorith to compute quanlity score over the SNES/ECNES species community.
+    - 'RHI': DCCEEW's published Relative Habitat Importance layer.
 
 Essentially, the biodiversity quality layer determines how important (0-100) a cell is to the overall biodiversity value. 
     - By choosing 'Suitability' layer, you assume that the overal biodiversity is determined by considering all species (plants, 
@@ -951,15 +960,24 @@ Essentially, the biodiversity quality layer determines how important (0-100) a c
       related to the Environment Protection and Biodiversity Conservation Act 1999 (EPBC Act). 
     - If choosing one of the 'ECNES_likely|may' layers, you assume that the overal biodiversity is determined by ecological
       communities related to the Environment Protection and Biodiversity Conservation Act 1999 (EPBC Act).
-    - If choosing one of the 'MNES_likely|may' layers, you assume that the overal biodiversity is determined by both SNES 
+    - If choosing one of the 'MNES_likely|may' layers, you assume that the overal biodiversity is determined by both SNES
       and ECNES species communities, where each community is treated as a species, and the Zonation algorith sees each
       community and species equally important.
+    - If choosing 'RHI', you assume the overal biodiversity is determined by EPBC-listed threatened and migratory species,
+      as ranked by DCCEEW themselves. Unlike the layers above this one is not produced in-house: DCCEEW ran Zonation 5
+      (CAZMAX) over the SNES 'likely to occur' distributions and published the finished 0-100 raster, which LUTO uses as
+      is. Note it carries those native 0-100 units while the layers above run 0-1, so RHI's absolute bio-quality scores
+      read ~100x theirs in the outputs. Nothing in the model is affected: the GBF2 mask comes from the 'RHI' sheet of
+      Biodiversity_conserve_performance.xlsx, which is on the same 0-100 scale, and the solver rescales the bio-quality
+      matrices by their own maximum before use.
 
-To understand the 'Suitability' layer, refer to 
+To understand the 'Suitability' layer, refer to
     https://academic.oup.com/gigascience/article/doi/10.1093/gigascience/giae002/7619364
-To understand the 'SNES_likely|may' and 'ECNES_likely|may' layers, refer to 
+To understand the 'SNES_likely|may' and 'ECNES_likely|may' layers, refer to
     https://www.dcceew.gov.au/environment/environmental-information-data/databases-applications/snes
     https://www.dcceew.gov.au/environment/environmental-information-data/databases-applications/ecnes
+To understand the 'RHI' layer, refer to
+    https://fed.dcceew.gov.au/datasets/0732222780f84f9387975f26e0bc5af6/about
 
 '''
 
