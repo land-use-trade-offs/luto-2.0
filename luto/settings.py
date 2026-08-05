@@ -1179,6 +1179,14 @@ GBF4_ECNES_TARGETS_DICT = {2030: 30, 2050: 50, 2100: 50}
 # Lets a few species carry a different target from the rest. Empty = no override.
 GBF4_SNES_TARGETS_OVERRIDE = {}
 
+# Per-(region, COMMUNITY) ECNES target overrides — the ECNES counterpart of
+# GBF4_SNES_TARGETS_OVERRIDE, applied AFTER the uniform dict and independent of
+# GBF4_TARGET_ECNES mode. Maps (region, community) -> {year: pct}. Empty = no override.
+# Targets above a community's ATTAINABLE_LEVEL are clamped to it in
+# get_GBF4_ECNES_target_inside_LUTO_by_year() (note ECNES clamps at attainable exactly,
+# with no safety margin — there is no ECNES analogue of GBF4_SNES_CAP_MARGIN).
+GBF4_ECNES_TARGETS_OVERRIDE = {}
+
 # Safety margin (percentage points) subtracted from each species' ATTAINABLE_LEVEL when the
 # interpolated SNES target is clamped in data.get_GBF4_SNES_target_inside_LUTO_by_year(). A target
 # pinned exactly at attainable gives zero slack (razor-thin feasible space); this keeps a small

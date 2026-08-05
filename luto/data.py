@@ -2367,6 +2367,15 @@ class Data:
                     ecnes_df[col] = float(pct)
             print(f"│   │   ├── Dict targets applied to ECNES: {settings.GBF4_ECNES_TARGETS_DICT}", flush=True)
 
+        if settings.GBF4_ECNES_TARGETS_OVERRIDE:
+            for (reg, com), yr_dict in settings.GBF4_ECNES_TARGETS_OVERRIDE.items():
+                mask = (ecnes_df['region'] == reg) & (ecnes_df['COMMUNITY'] == com)
+                for yr, pct in yr_dict.items():
+                    col = f'TARGET_LEVEL_{yr}'
+                    if col in ecnes_df.columns:
+                        ecnes_df.loc[mask, col] = float(pct)
+            print(f"│   │   ├── ECNES per-community target overrides applied: {len(settings.GBF4_ECNES_TARGETS_OVERRIDE)} pairs", flush=True)
+
         print(f"│   │   └── {len(ecnes_df)} (community, region) constraints from {ecnes_df['COMMUNITY'].nunique()} communities", flush=True)
 
         return ecnes_df
