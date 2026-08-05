@@ -109,8 +109,8 @@ def _floor_assembled_matrix(model) -> None:
             v.Obj = 0.0
             n_obj += 1
     model.update()
-    print(f"│   └── floored {n:,} matrix + {n_obj:,} objective sub-{settings.SOLVER_COEFF_MIN:g} "
-          f"coefficients (post-build)", flush=True)
+    print(f"└── Flooring coefficients below {settings.SOLVER_COEFF_MIN:g} (post-build): "
+          f"dropped {n:,} from the matrix, {n_obj:,} from the objective", flush=True)
 
 
 class LutoSolver:
@@ -202,7 +202,7 @@ class LutoSolver:
         """
         Formulate the objective based on settings.OBJECTIVE
         """
-        print(f"└── Setting up the objective function to {settings.OBJECTIVE}...")
+        print(f"├── Setting up the objective function to {settings.OBJECTIVE}...")
 
         # Get objectives
         self.obj_economy = self._setup_economy_objective()
@@ -612,7 +612,7 @@ class LutoSolver:
 
 
     def _setup_economy_objective(self):
-        print("    ├── setting up objective for economy...")
+        print("│   ├── setting up objective for economy...")
         
         # Get economic contributions
         ag_obj_mrj, non_ag_obj_rk, ag_man_objs = self._input_data.economic_contr_mrj
@@ -692,7 +692,7 @@ class LutoSolver:
     
     
     def _setup_penalty_objectives(self):
-        print("    └── setting up objective for soft constraints...")
+        print("│   └── setting up objective for soft constraints...")
 
         penalty_ghg = 0
         penalty_water = 0
