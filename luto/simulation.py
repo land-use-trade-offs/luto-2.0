@@ -244,14 +244,8 @@ def solve_timeseries(
         if luto_solver.bio_unreachable_constrs:
             out_dir = f"{data.path}/out_{target_year}"
             os.makedirs(out_dir, exist_ok=True)
-            csv_path = f"{out_dir}/unreachable_bio_constraints_{target_year}.csv"
-            pd.DataFrame(luto_solver.bio_unreachable_constrs).to_csv(csv_path, index=False)
-            n_drop = sum(1 for rec in luto_solver.bio_unreachable_constrs if rec['dropped'])
-            print(f"\n*** {len(luto_solver.bio_unreachable_constrs)} biodiversity constraint(s) "
-                  f"unreachable in {target_year} ({n_drop} dropped) — recorded in {csv_path}\n"
-                  + "\n".join(f"      {rec['family']:10s} {rec['constraint']}  "
-                              f"(target = {rec['target_over_reachable']:.3f} x the best possible)"
-                              for rec in luto_solver.bio_unreachable_constrs), flush=True)
+            pd.DataFrame(luto_solver.bio_unreachable_constrs).to_csv(
+                f"{out_dir}/unreachable_bio_constraints_{target_year}.csv", index=False)
 
         for nf, method, crossover, presolve, barhomogenous in nf_attempts:
             print(f"Trying NumericFocus={nf}, Method={method}, Crossover={crossover}, Presolve={presolve}, BarHomogeneous={barhomogenous} for year {target_year}...")

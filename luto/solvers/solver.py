@@ -1390,7 +1390,8 @@ class LutoSolver:
         return self.bio_max_contr_r
 
 
-    def _bio_row_admitted(self, family, region, name, lb_raw, lb_rescale, val_vector, ind) -> bool:
+    def _bio_row_admitted(self, family, region, species, presence, lb_raw, lb_rescale, val_vector,
+                          ind) -> bool:
         """Record a GBF3/4/8 row's feasibility margin and say whether the constraint should be added.
 
         The decision is one comparison: the row's MAXIMUM achievable LHS against its target. That
@@ -1406,27 +1407,34 @@ class LutoSolver:
         """
         reachable = (val_vector[ind] * self._max_reachable_contr_r()[ind]).sum()
         targ2attain = (lb_rescale / reachable) if reachable > 0 else float('inf')
-        dropped = reachable < lb_rescale and settings.DROP_UNREACHABLE_BIO_CONSTRAINTS
+        drop = reachable < lb_rescale and settings.DROP_UNREACHABLE_BIO_CONSTRAINTS
 
+        # GBF3 NVIS and GBF8 have no presence class; only the GBF4 families are keyed by it.
+        label = f"{species} ({presence})" if presence else species
         self.bio_rows[family][region].append(
-            {'name': name, 'n_cells': int(ind.size), 'targ2attain': targ2attain, 'dropped': dropped})
+            {'name': label, 'n_cells': int(ind.size), 'targ2attain': targ2attain, 'dropped': drop})
 
         if reachable >= lb_rescale:
-            return True
+            return True                     # satisfiable — add the constraint
 
+        # region / species / presence stay in their own columns so the CSV can be grouped and joined
+        # against the target tables, rather than needing a composite label parsed apart again.
         self.bio_unreachable_constrs.append({
             'year': self._input_data.target_year,
             'family': family,
             'region': region,
-            'constraint': name,
+            'species': species,
+            'presence': presence,
             'target_raw': lb_raw,
             'target_rescaled': lb_rescale,
             'n_cells': int(ind.size),
             'avail_reachable': reachable,
             'targ2attain': targ2attain,
-            'dropped': bool(settings.DROP_UNREACHABLE_BIO_CONSTRAINTS),
+            'dropped': drop,
         })
-        return not settings.DROP_UNREACHABLE_BIO_CONSTRAINTS
+        if drop:
+            return False                    # unreachable — leave it out so the rest of the year solves
+        return True                         # unreachable, but the setting asks to keep it and fail
 
 
     def _print_bio_summary(self, family) -> None:
@@ -1521,7 +1529,7 @@ class LutoSolver:
                 self.bio_skipped["GBF3_NVIS"] += 1
                 continue
 
-            if not self._bio_row_admitted("GBF3_NVIS", region, group,
+            if not self._bio_row_admitted("GBF3_NVIS", region, group, None,
                                           lb_raw, lb_rescale, val_vector, ind):
                 continue
 
@@ -1570,7 +1578,7 @@ class LutoSolver:
                 self.bio_skipped["GBF4_SNES"] += 1
                 continue
 
-            if not self._bio_row_admitted("GBF4_SNES", region, f"{species} ({presence})",
+            if not self._bio_row_admitted("GBF4_SNES", region, species, presence,
                                           lb_raw, lb_rescale, val_vector, ind):
                 continue
             self.bio_GBF4_SNES_exprs[(region, species, presence)] = self._build_biodiv_contr_expr(val_vector, ind)
@@ -1613,7 +1621,7 @@ class LutoSolver:
                 self.bio_skipped["GBF4_ECNES"] += 1
                 continue
 
-            if not self._bio_row_admitted("GBF4_ECNES", region, f"{community} ({presence})",
+            if not self._bio_row_admitted("GBF4_ECNES", region, community, presence,
                                           lb_raw, lb_rescale, val_vector, ind):
                 continue
             self.bio_GBF4_ECNES_exprs[(region, community, presence)] = self._build_biodiv_contr_expr(val_vector, ind)
@@ -1657,7 +1665,7 @@ class LutoSolver:
                 self.bio_skipped["GBF8"] += 1
                 continue
 
-            if not self._bio_row_admitted("GBF8", region, species,
+            if not self._bio_row_admitted("GBF8", region, species, None,
                                           lb_raw, lb_rescale, val_vector, ind):
                 continue
             self.bio_GBF8_exprs[(region, species)] = self._build_biodiv_contr_expr(val_vector, ind)
