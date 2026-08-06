@@ -1325,48 +1325,60 @@ class LutoSolver:
         ncells = self._input_data.ncells
         locked_contr = np.zeros(ncells, dtype=np.float32)   # Σ locked_share·contr
         locked_share = np.zeros(ncells, dtype=np.float32)
-        best_free = np.zeros(ncells, dtype=np.float32)      # best contr still placeable
 
+        # ---- 1. what irreversibility has already committed -----------------------------------------
         for k, k_name in enumerate(NON_AG_LAND_USES):
-            contr = self._input_data.biodiv_contr_non_ag_k[k]
             if not NON_AG_LAND_USES_REVERSIBLE[k_name]:
+                contr = self._input_data.biodiv_contr_non_ag_k[k]
                 share = self._input_data.dvar_lb_nonag[:, k]
                 locked_contr += share * contr
                 locked_share += share
-            cells = self._input_data.feasible_non_ag_cells[k]
-            if len(cells):
-                np.maximum.at(best_free, cells, contr)
 
-        for j in range(self._input_data.n_ag_lus):
-            contr = self._input_data.biodiv_contr_ag_j[j]
-            for m in (0, 1):
-                cells = self._input_data.acct_cells_mrj[m, j]
-                if len(cells):
-                    np.maximum.at(best_free, cells, contr)
-
+        # AM increments are per-cell and can be NEGATIVE (Biochar); a non-reversible AM pins
+        # X_ag_man >= lb and X_ag_man <= X_ag[j], so that share is stuck in (am, j).
+        am_bonus_j = np.zeros(self._input_data.n_ag_lus, dtype=np.float32)   # best +ve increment per j
         for am, am_j_list in self._input_data.am2j.items():
             if not AG_MANAGEMENTS[am]:
                 continue
             for j_idx, j in enumerate(am_j_list):
-                # AM biodiversity values are INCREMENTS on the land use's own contribution,and can 
-                # be NEGATIVE. So the achievable contribution for and under (am, j) is the land use's 
-                # own value plus the increment.
-                combined = (self._input_data.biodiv_contr_ag_j[j] + self._input_data.biodiv_contr_ag_man[am][j_idx])
+                increment = self._input_data.biodiv_contr_ag_man[am][j_idx]
+                am_bonus_j[j] = max(am_bonus_j[j], max(increment.max(), 0.0))
+                if AG_MANAGEMENTS_REVERSIBLE[am]:
+                    continue
+                combined = self._input_data.biodiv_contr_ag_j[j] + increment
                 for m in (0, 1):
-                    cells = self._input_data.feasible_ag_cells_mrj[m, j]
-                    if not len(cells):
-                        continue
-                    if not AG_MANAGEMENTS_REVERSIBLE[am]:
-                        share = self._input_data.ag_man_lb_mrj[am][m, cells, j]
-                        locked_contr[cells] += share * combined[cells]
-                        locked_share[cells] += share
-                    np.maximum.at(best_free, cells, combined[cells])
+                    share = self._input_data.ag_man_lb_mrj[am][m, :, j]
+                    locked_contr += share * combined
+                    locked_share += share
 
-        # Flooring to 0.0 because the previous year's dvars satisfy under FEASIBILITY_TOLERANCE, so 
+        # Flooring to 0.0 because the previous year's dvars satisfy under FEASIBILITY_TOLERANCE, so
         # their per-cell sum can sit a whisker above 1.
         free_share = np.maximum(1.0 - locked_share, 0.0)
-        
-        self._max_contr_r_cache = locked_contr + free_share * best_free
+
+        # ---- 2. fill the free share greedily, EVERY lever capped by its own per-cell headroom -------
+        # This is a fractional knapsack where every unit of area costs the same, so taking levers in
+        # descending contribution is exactly optimal — the result stays a true upper bound.
+        #
+        # Capping matters on both sides. `dvar_ub_nonag` carries T_MAT reachability, no-go zones and
+        # the Riparian/Destocked PHYSICAL caps; `dvar_ub_ag` carries the ag2ag + nonag2ag reachable
+        # share. Leaving EITHER uncapped lets one high-contribution lever notionally take the whole
+        # cell — 'Unallocated - natural land' is worth 1.0, so an uncapped ag side alone is enough to
+        # make every row look reachable and nothing is ever proven infeasible.
+        levers = [(self._input_data.biodiv_contr_non_ag_k[k],
+                   self._input_data.dvar_ub_nonag[:, k] - self._input_data.dvar_lb_nonag[:, k])
+                  for k in range(self._input_data.n_non_ag_lus)]
+        levers += [(self._input_data.biodiv_contr_ag_j[j] + am_bonus_j[j],
+                    self._input_data.dvar_ub_ag[m, :, j] - self._input_data.dvar_lb_ag[m, :, j])
+                   for j in range(self._input_data.n_ag_lus) for m in (0, 1)]
+
+        reachable = locked_contr
+        remaining = free_share
+        for contr, headroom in sorted(levers, key=lambda lever: -lever[0]):
+            take = np.minimum(remaining, np.maximum(headroom, 0.0))
+            reachable = reachable + take * contr
+            remaining = remaining - take
+
+        self._max_contr_r_cache = reachable
         return self._max_contr_r_cache
 
 
