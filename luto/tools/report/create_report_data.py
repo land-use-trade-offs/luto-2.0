@@ -1888,20 +1888,22 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
         df_reg = groupby_to_records(df .groupby(['Year','Type'])[['Value (t CO2e)']] .sum(numeric_only=True) .reset_index(), ['Type'], ['name','data'], value_cols=('Year', 'Value (t CO2e)'))
         df_reg['type'] = 'column'
 
+        # Add on Year, never positionally. A region need not carry every simulation year: the
+        # `abs(Value) > 1` filter above drops a whole (region, year) group when nothing in it
+        # clears 1 tCO2e — e.g. a no-target baseline with no non-ag land in the base year. Adding
+        # `.values` to a Series then raised "operands could not be broadcast together", and
+        # zip(years, ...) silently mislabelled the remaining points. Reindex on the full `years`
+        # so every series still spans the x-axis, with 0 where a year genuinely has nothing.
+        net_land = df.groupby('Year')['Value (t CO2e)'].sum().reindex(years, fill_value=0)
+
         if region == "AUSTRALIA":
             df_reg.loc[len(df_reg)] = ['Off-land emissions', net_offland_AUS_wide,  'column']
             df_reg.loc[len(df_reg)] = ['GHG emission limit', GHG_limit_wide, 'line']
-            df_reg.loc[len(df_reg)] = [
-                'Net emissions', 
-                list(zip(years, (df.groupby('Year')['Value (t CO2e)'].sum().values + GHG_off_land.groupby('Year')['Value (t CO2e)'].sum()))),
-                'line'
-            ]
+            net_offland = GHG_off_land.groupby('Year')['Value (t CO2e)'].sum().reindex(years, fill_value=0)
+            net_total = net_land.add(net_offland, fill_value=0)
+            df_reg.loc[len(df_reg)] = ['Net emissions', list(zip(net_total.index, net_total.values)), 'line']
         else:
-            df_reg.loc[len(df_reg)] = [
-                'Net emissions', 
-                list(zip(years, (df.groupby('Year')['Value (t CO2e)'].sum().values))),
-                'line'
-            ]
+            df_reg.loc[len(df_reg)] = ['Net emissions', list(zip(net_land.index, net_land.values)), 'line']
                 
 
         df_reg['name_order'] = df_reg['name'].apply(lambda x: order_GHG.index(x))
