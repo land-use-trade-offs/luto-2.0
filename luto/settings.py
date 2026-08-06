@@ -307,7 +307,31 @@ Range from 1e-2 (fast, loose) to 1e-8 (slow, tight; Gurobi default).
    prevents the barrier from closing the gap to 1e-5; crossover polishes the result.
 '''
 
-SCALE_FLAG = 0                      
+DROP_UNREACHABLE_BIO_CONSTRAINTS = True
+'''
+Drop a GBF3/GBF4/GBF8 biodiversity row when it is PROVABLY unsatisfiable, and record it.
+
+At build time each row's ceiling is computed as
+    Σ_cells  pre_1750_area[cell] × max_reachable_contribution[cell]
+where max_reachable_contribution accounts for IRREVERSIBLE lock-in: shares already committed to a
+non-reversible land use (every planting type — see NON_AG_LAND_USES_REVERSIBLE) are stuck at that
+land use's own contribution, and only the free remainder can take the best lever still placeable in
+that cell. If that ceiling is below the row's target, NO allocation can satisfy it.
+
+Why dropping is the right default: such a row makes the entire year infeasible, taking every other
+species, community and vegetation-group target down with it. Excluding it costs one target and saves
+the rest. Nothing is silent — each exclusion is printed and written to
+`out_<year>/unreachable_bio_constraints_<year>.csv`.
+
+Set to False to keep the row and let the solve fail, e.g. when reproducing a historical run.
+
+NOTE this is a symptom-level guard. The usual root cause is path dependence: an early year meets a
+low target with a cheap, low-contribution, irreversible land use (EP at 0.70), and a later year's
+higher target can then only be met by a higher-contribution one (riparian at 1.0), which
+irreversibility forbids. Prefer fixing the target trajectory over relying on this.
+'''
+
+SCALE_FLAG = 0
 ''' 
 Scales the rows and columns of the model to improve the numerical properties of 
 the constraint matrix. -1: Auto, 0: No scaling, 1: equilibrium scaling (First scale each 

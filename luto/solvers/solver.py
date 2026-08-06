@@ -126,6 +126,11 @@ class LutoSolver:
         self._input_data = input_data
         self.gurobi_model = gp.Model(f"LUTO {settings.VERSION}", env=gurenv)
 
+        # Biodiversity rows proven unreachable at build time (see _bio_row_admitted). Persisted by
+        # simulation.py so an excluded species is never lost in a log.
+        self.unreachable_bio_constrs = []
+        self._max_contr_r_cache = None
+
         # Initialise variable stores
         self.X_ag_dry_vars_jr = None
         self.X_ag_irr_vars_jr = None
@@ -1297,6 +1302,137 @@ class LutoSolver:
         )
 
 
+    def _max_reachable_contr_r(self) -> np.ndarray:
+        """Per-cell ceiling on biodiversity contribution, accounting for IRREVERSIBLE lock-in.
+
+        Every planting type is irreversible (``NON_AG_LAND_USES_REVERSIBLE``), and
+        ``get_non_ag_lb_matrices`` pins this year's lower bound to last year's allocation. So a cell
+        that took Environmental Plantings (contribution 0.70) in an earlier year can never trade that
+        share up to riparian (1.00), no matter how much the target rises later. The reachable ceiling
+        is therefore::
+
+            locked_share·contr(locked)  +  free_share·max(contr over levers still placeable here)
+
+        Ignoring lock-in (i.e. assuming 1.0 everywhere) makes the headroom screen far too optimistic:
+        it calls a cell comfortable in the year the cheap lever is chosen, and only discovers the trap
+        years later when the requirement climbs past what that lever can deliver.
+
+        Cached — one vector serves every GBF3/4/8 row in the year.
+        """
+        if self._max_contr_r_cache is not None:
+            return self._max_contr_r_cache
+
+        ncells = self._input_data.ncells
+        locked_contr = np.zeros(ncells, dtype=np.float32)   # Σ locked_share·contr
+        locked_share = np.zeros(ncells, dtype=np.float32)
+        best_free = np.zeros(ncells, dtype=np.float32)      # best contr still placeable
+
+        for k, k_name in enumerate(NON_AG_LAND_USES):
+            contr = self._input_data.biodiv_contr_non_ag_k[k]
+            if not NON_AG_LAND_USES_REVERSIBLE[k_name]:
+                share = self._input_data.dvar_lb_nonag[:, k]
+                locked_contr += share * contr
+                locked_share += share
+            cells = self._input_data.feasible_non_ag_cells[k]
+            if len(cells):
+                np.maximum.at(best_free, cells, contr)
+
+        for j in range(self._input_data.n_ag_lus):
+            contr = self._input_data.biodiv_contr_ag_j[j]
+            for m in (0, 1):
+                cells = self._input_data.acct_cells_mrj[m, j]
+                if len(cells):
+                    np.maximum.at(best_free, cells, contr)
+
+        for am, am_j_list in self._input_data.am2j.items():
+            if not AG_MANAGEMENTS[am]:
+                continue
+            for j_idx, j in enumerate(am_j_list):
+                # AM biodiversity values are INCREMENTS on the land use's own contribution,and can 
+                # be NEGATIVE. So the achievable contribution for and under (am, j) is the land use's 
+                # own value plus the increment.
+                combined = (self._input_data.biodiv_contr_ag_j[j] + self._input_data.biodiv_contr_ag_man[am][j_idx])
+                for m in (0, 1):
+                    cells = self._input_data.feasible_ag_cells_mrj[m, j]
+                    if not len(cells):
+                        continue
+                    if not AG_MANAGEMENTS_REVERSIBLE[am]:
+                        share = self._input_data.ag_man_lb_mrj[am][m, cells, j]
+                        locked_contr[cells] += share * combined[cells]
+                        locked_share[cells] += share
+                    np.maximum.at(best_free, cells, combined[cells])
+
+        # Flooring to 0.0 because the previous year's dvars satisfy under FEASIBILITY_TOLERANCE, so 
+        # their per-cell sum can sit a whisker above 1.
+        free_share = np.maximum(1.0 - locked_share, 0.0)
+        
+        self._max_contr_r_cache = locked_contr + free_share * best_free
+        return self._max_contr_r_cache
+
+
+    def _bio_row_admitted(self, family, label, lb_raw, lb_rescale, val_vector, ind) -> bool:
+        """Print a GBF3/4/8 row's feasibility margin and say whether the constraint should be added.
+
+        The whole decision is one comparison: the row's MAXIMUM achievable LHS against its target.
+        That maximum is Σ val_vector·max_reachable_contr over the row's cells, where the per-cell
+        ceiling already accounts for irreversible lock-in — so ``reachable < lb_rescale`` is a SOUND
+        proof that no allocation can satisfy this row, and dropping it is safe. Keeping such a row
+        cannot help: it makes the whole year infeasible and takes every other target down with it.
+        Dropping is recorded, never silent, and gated by ``settings.DROP_UNREACHABLE_BIO_CONSTRAINTS``.
+
+        The two ratios printed alongside are diagnostic only, and both read the SAME way —
+        ``target / capacity``, so **larger is worse and > 1 is impossible**:
+
+        - ``need_contr = lb_rescale / avail`` — the average biodiversity contribution the row demands,
+          comparable straight against the levers (riparian 1.0, LDS/destocking 0.75, EP/agroforestry
+          0.7, carbon plantings 0.12). Above 0.7 the row needs something better than EP, which is the
+          early warning for the irreversibility trap.
+        - ``need_reach = lb_rescale / reachable`` — the same demand against the lock-in-aware ceiling.
+          Above 1.0 the row is impossible; that is the flagged case.
+
+        ``n_cells=1`` means no substitution is available at all.
+        """
+        avail = val_vector[ind].sum()
+        reachable = (val_vector[ind] * self._max_reachable_contr_r()[ind]).sum()
+        need_contr = (lb_rescale / avail) if avail > 0 else float('inf')
+        need_reach = (lb_rescale / reachable) if reachable > 0 else float('inf')
+
+        flag = ""
+        if reachable < lb_rescale:
+            flag = f"  <<< UNREACHABLE (target = {need_reach:.3f} x the best possible)"
+        elif need_reach > 0.90:
+            flag = f"  <<< RAZOR-THIN (target = {need_reach:.3f} x the best possible)"
+        elif need_contr > 0.70:
+            flag = "  <<< TIGHT (needs more than EP's 0.70)"
+        print(f"│   │   │   ├── target={lb_raw:>12,.0f}  n_cells={ind.size:>5}  "
+              f"avail={avail:>12,.0f}  need_contr={need_contr:.3f}  need_reach={need_reach:.3f}  "
+              f"coeff=[{val_vector[ind].min():.3e},{val_vector[ind].max():.3e}]  {label}{flag}")
+
+        if reachable >= lb_rescale:
+            return True
+
+        self.unreachable_bio_constrs.append({
+            'year': self._input_data.target_year,
+            'family': family,
+            'constraint': label,
+            'target_raw': lb_raw,
+            'target_rescaled': lb_rescale,
+            'n_cells': int(ind.size),
+            'avail_optimistic': avail,
+            'avail_reachable': reachable,
+            'target_over_reachable': need_reach,
+            'contribution_needed': need_contr,
+            'dropped': bool(settings.DROP_UNREACHABLE_BIO_CONSTRAINTS),
+        })
+        if settings.DROP_UNREACHABLE_BIO_CONSTRAINTS:
+            print(f"│   │   │   │   └── DROPPED {family}: unreachable even at the per-cell contribution "
+                  f"ceiling — recorded, constraint not added")
+            return False
+        print(f"│   │   │   │   └── KEEPING {family} despite being unreachable "
+              f"(DROP_UNREACHABLE_BIO_CONSTRAINTS=False) — this year will be INFEASIBLE")
+        return True
+
+
     def _build_biodiv_contr_expr(self, val_vector: np.ndarray, ind: np.ndarray) -> "gp.LinExpr":
         """
         Build the biodiversity contribution expression for one GBF3/4/8 constraint.
@@ -1355,13 +1491,13 @@ class LutoSolver:
 
         for region, group in region_group:
 
-            lb_raw_vector = v_limits.sel(dict(layer=(region, group))).item()                        
+            lb_raw = v_limits.sel(dict(layer=(region, group))).item()                        
 
-            if lb_raw_vector < 0:
-                print(f"│   │   │   ├── SKIPPING negative target {lb_raw_vector:15,.0f} for {region} [{group}]")
+            if lb_raw < 0:
+                print(f"│   │   │   ├── SKIPPING negative target {lb_raw:15,.0f} for {region} [{group}]")
                 continue
 
-            lb_rescale_vector = lb_raw_vector / scale_factors.sel(layer=(region, group)).item()
+            lb_rescale = lb_raw / scale_factors.sel(layer=(region, group)).item()
             val_vector = val_matrix.sel(group=group, drop=True).data
             # AUSTRALIA mode: no NRM cell is named 'AUSTRALIA', so bypass region mask
             if region == "AUSTRALIA":
@@ -1370,12 +1506,18 @@ class LutoSolver:
                 reg_vector = reg_matrix == region
                 ind = np.intersect1d(np.where(val_vector > 0)[0], np.where(reg_vector)[0])
             
-            print(f"│   │   │   ├── target is {lb_raw_vector:15,.0f} for {region} [{group}]")
+            if ind.size == 0:
+                print(f"│   │   │   ├── WARNING: NVIS empty layer for {region} [{group}]")
+                continue
+
+            if not self._bio_row_admitted("GBF3_NVIS", f"{group} [{region}]",
+                                          lb_raw, lb_rescale, val_vector, ind):
+                continue
 
             self.bio_GBF3_NVIS_exprs[(region, group)] = self._build_biodiv_contr_expr(val_vector, ind)
 
             self.bio_GBF3_NVIS_constrs[(region, group)] = self.gurobi_model.addConstr(
-                self.bio_GBF3_NVIS_exprs[(region, group)] >= lb_rescale_vector,
+                self.bio_GBF3_NVIS_exprs[(region, group)] >= lb_rescale,
                 name=f"bio_GBF3_NVIS_limit_{region}_{group}".replace(" ", "_")
             )
 
@@ -1415,10 +1557,9 @@ class LutoSolver:
                 print(f"│   │   │   ├── WARNING: SNES empty layer for {species} ({presence}) [{region}]")
                 continue
 
-            print(
-                f"│   │   │   ├── target={lb_raw:>12,.0f}  n_cells={ind.size:>5}  "
-                f"{species} ({presence}) [{region}]"
-            )
+            if not self._bio_row_admitted("GBF4_SNES", f"{species} ({presence}) [{region}]",
+                                          lb_raw, lb_rescale, val_vector, ind):
+                continue
             self.bio_GBF4_SNES_exprs[(region, species, presence)] = self._build_biodiv_contr_expr(val_vector, ind)
             self.bio_GBF4_SNES_constrs[(region, species, presence)] = self.gurobi_model.addConstr(
                 self.bio_GBF4_SNES_exprs[(region, species, presence)] >= lb_rescale,
@@ -1457,14 +1598,9 @@ class LutoSolver:
                 print(f"│   │   │   ├── WARNING: ECNES empty layer for {community} ({presence}) [{region}]")
                 continue
 
-            avail = val_vector[ind].sum()
-            tightness = avail / lb_rescale if lb_rescale > 0 else float('inf')
-            print(
-                f"│   │   │   ├── target={lb_raw:>12,.0f}  n_cells={ind.size:>5}  "
-                f"avail={avail:>12,.0f}  tightness={tightness:.3f}  "
-                f"coeff=[{val_vector[ind].min():.3e},{val_vector[ind].max():.3e}]  "
-                f"{community} ({presence}) [{region}]"
-            )
+            if not self._bio_row_admitted("GBF4_ECNES", f"{community} ({presence}) [{region}]",
+                                          lb_raw, lb_rescale, val_vector, ind):
+                continue
             self.bio_GBF4_ECNES_exprs[(region, community, presence)] = self._build_biodiv_contr_expr(val_vector, ind)
             self.bio_GBF4_ECNES_constrs[(region, community, presence)] = self.gurobi_model.addConstr(
                 self.bio_GBF4_ECNES_exprs[(region, community, presence)] >= lb_rescale,
@@ -1504,7 +1640,9 @@ class LutoSolver:
                 print(f"│   │   │   ├── WARNING: GBF8 empty layer for {species} [{region}]")
                 continue
 
-            print(f"│   │   │   ├── target is {lb_raw:15,.0f} for {species} [{region}]")
+            if not self._bio_row_admitted("GBF8", f"{species} [{region}]",
+                                          lb_raw, lb_rescale, val_vector, ind):
+                continue
             self.bio_GBF8_exprs[(region, species)] = self._build_biodiv_contr_expr(val_vector, ind)
             self.bio_GBF8_constrs[(region, species)] = self.gurobi_model.addConstr(
                 self.bio_GBF8_exprs[(region, species)] >= lb_rescale,

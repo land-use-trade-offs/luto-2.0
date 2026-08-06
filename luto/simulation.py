@@ -32,6 +32,7 @@ import threading
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 
 from gurobipy import GRB
 import joblib
@@ -236,6 +237,21 @@ def solve_timeseries(
         status = None
         luto_solver = LutoSolver(input_data)
         luto_solver.formulate()
+
+        # Persist any biodiversity rows proven unreachable at build time. Written BEFORE the solve on
+        # purpose: the record is most valuable exactly when the year goes on to fail, and the
+        # `accepted` guard below would throw it away.
+        if luto_solver.unreachable_bio_constrs:
+            out_dir = f"{data.path}/out_{target_year}"
+            os.makedirs(out_dir, exist_ok=True)
+            csv_path = f"{out_dir}/unreachable_bio_constraints_{target_year}.csv"
+            pd.DataFrame(luto_solver.unreachable_bio_constrs).to_csv(csv_path, index=False)
+            n_drop = sum(1 for rec in luto_solver.unreachable_bio_constrs if rec['dropped'])
+            print(f"\n*** {len(luto_solver.unreachable_bio_constrs)} biodiversity constraint(s) "
+                  f"unreachable in {target_year} ({n_drop} dropped) — recorded in {csv_path}\n"
+                  + "\n".join(f"      {rec['family']:10s} {rec['constraint']}  "
+                              f"(target = {rec['target_over_reachable']:.3f} x the best possible)"
+                              for rec in luto_solver.unreachable_bio_constrs), flush=True)
 
         for nf, method, crossover, presolve, barhomogenous in nf_attempts:
             print(f"Trying NumericFocus={nf}, Method={method}, Crossover={crossover}, Presolve={presolve}, BarHomogeneous={barhomogenous} for year {target_year}...")
