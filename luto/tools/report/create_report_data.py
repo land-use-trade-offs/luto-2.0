@@ -3439,7 +3439,13 @@ def process_biodiversity_data(files, SAVE_DIR):
         'Outside LUTO study area': 'Outside LUTO study area',
     }
 
-    if settings.WRITE_GBF3_NVIS != 'off':
+    # A WRITE_* setting alone does not guarantee files exist: in 'selected' mode the writer emits
+    # nothing when the matching target is off (nothing is constrained, so there is no selection to
+    # write). Reading that empty set gives a frame with no 'species' column, and the queries below then
+    # fail with an opaque NameError -- AFTER the whole simulation has solved. Guard on the files being
+    # present, as the region-species blocks further down already do via os.path.exists.
+    _nvis_written = not files.query('base_name.str.contains("biodiversity_GBF3_NVIS_scores")').empty
+    if settings.WRITE_GBF3_NVIS != 'off' and _nvis_written:
         filter_str = '''
             category == "biodiversity"
             and base_name.str.contains("biodiversity_GBF3_NVIS_scores")
@@ -3636,7 +3642,13 @@ def process_biodiversity_data(files, SAVE_DIR):
     # IBRA reporting branch disabled (GBF3 IBRA pipeline incomplete).
 
 
-    if settings.WRITE_GBF4_SNES != 'off':
+    # A WRITE_* setting alone does not guarantee files exist: in 'selected' mode the writer emits
+    # nothing when the matching target is off (nothing is constrained, so there is no selection to
+    # write). Reading that empty set gives a frame with no 'species' column, and the queries below then
+    # fail with an opaque NameError -- AFTER the whole simulation has solved. Guard on the files being
+    # present, as the region-species blocks further down already do via os.path.exists.
+    _snes_written = not files.query('base_name.str.contains("biodiversity_GBF4_SNES_scores")').empty
+    if settings.WRITE_GBF4_SNES != 'off' and _snes_written:
 
         filter_str = '''
             category == "biodiversity"
@@ -3793,7 +3805,13 @@ def process_biodiversity_data(files, SAVE_DIR):
             
             
             
-    if settings.WRITE_GBF4_ECNES != 'off':
+    # A WRITE_* setting alone does not guarantee files exist: in 'selected' mode the writer emits
+    # nothing when the matching target is off (nothing is constrained, so there is no selection to
+    # write). Reading that empty set gives a frame with no 'species' column, and the queries below then
+    # fail with an opaque NameError -- AFTER the whole simulation has solved. Guard on the files being
+    # present, as the region-species blocks further down already do via os.path.exists.
+    _ecnes_written = not files.query('base_name.str.contains("biodiversity_GBF4_ECNES_scores")').empty
+    if settings.WRITE_GBF4_ECNES != 'off' and _ecnes_written:
         #---------------- (GBF4 ECNES) ----------------
         bio_paths = files.query('base_name.str.contains("biodiversity_GBF4_ECNES_scores")')
         bio_df = _read_concat(bio_paths['path'], ignore_index=False)
