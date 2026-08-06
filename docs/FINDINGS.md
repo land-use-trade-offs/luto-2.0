@@ -5,6 +5,127 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20260806 — a biodiversity target that irreversibility makes unreachable: why Gurobi stalls instead of saying INFEASIBLE, and the build-time screen that catches it
+
+### TL;DR
+
+A GBF4 ECNES row (**NE Buloke Woodlands**, ONE cell) became physically unsatisfiable at 2025 and took
+the whole year down. Gurobi never said so: attempt 1 (barrier) returned `INF_OR_UNBD`, attempt 2 (dual
+simplex) ran **2.28 M iterations over 5 h** with objective → −4.7e32 and primal infeasibility → 8.9e29
+without terminating. The cause is **path dependence through irreversible land use**, not numerics:
+2020 met a low target with the cheapest sufficient lever (EP, contribution 0.70) on 60 % of the cell;
+EP is irreversible, so from 2025 the rising target could only be met by a *higher*-contribution lever,
+which the lock-in forbids. Added `LutoSolver._max_reachable_contr_r()` — a per-cell contribution
+ceiling that respects lock-in and every lever's real bound — plus `_bio_row_admitted()`, which proves
+such rows impossible **before the solve**, records them to
+`out_<yr>/unreachable_bio_constraints_<yr>.csv` and excludes them. The year then solves on the first
+attempt.
+
+### The mechanism (path dependence, not ill-conditioning)
+
+`NON_AG_LAND_USES_REVERSIBLE` marks **8 of 9** non-ag land uses irreversible (only `Destocked` is
+reversible), and `get_non_ag_lb_matrices` pins the next year's lower bound to this year's allocation.
+Traced on the real cell (`data_2020.lz4`, cell **177804**, REAL_AREA 2 498 ha):
+
+| | value |
+|---|---|
+| 2020 solution | **Environmental Plantings 0.603164** — irreversible, locked for every later year |
+| free share | 0.396836 |
+| locked share's contribution | EP = **0.70** |
+| best contribution available on the free share | riparian = 1.00, but `RP_PROPORTION` = **0** here |
+
+| year | contribution required | max reachable | verdict |
+|---|---:|---:|---|
+| 2020 | 0.646 | 1.000 (nothing locked yet) | ✅ EP alone clears it — and EP is cheapest, so the optimiser picks it |
+| 2025 | **0.798** | **0.736** | ❌ EP 0.70 ✗ · destocking 0.75 ✗ · riparian unavailable |
+| 2030 | ≈ **0.950** | 0.736 | ❌ unreachable under any allocation |
+
+**The 2020 solve set the trap and the later years sprang it.** This generalises: *any* constraint whose
+required contribution rises across years can become permanently infeasible if an early year satisfies
+it with a cheaper, lower-contribution irreversible land use. Small-area, few-cell rows are most exposed
+— they have no substitution.
+
+### Why Gurobi stalls instead of proving infeasibility
+
+Worth understanding, because the symptom looks like a solver defect and is not:
+
+1. **`INF_OR_UNBD` (Status 4) is not a diagnosis** — it means Gurobi could not *distinguish* infeasible
+   from unbounded, because presolve's dual reductions destroy the information needed to tell them
+   apart. The documented remedy is **`DualReductions=0`**, which forces a definite INFEASIBLE or
+   UNBOUNDED. Our `RETRY_PARAMS` ladder never sets it.
+2. **The infeasibility is marginal, which is the hardest case.** `targ2attain = 1.002` at 2025 — the row
+   misses by **0.2 %**. A grossly infeasible model is easy to certify; a *nearly* feasible one lets the
+   barrier keep converging toward a point that does not exist, which surfaces as "Numerical trouble
+   encountered" rather than a Farkas certificate.
+3. **Plain barrier is not an infeasibility detector.** Only the homogeneous self-dual variant
+   (**`BarHomogeneous=1`**) is designed to certify infeasibility. Attempt 2 in `RETRY_PARAMS` explicitly
+   sets `BarHomogeneous=0`, so that path was never tried.
+4. **The diverging dual simplex *was* the certificate, unterminated.** Objective −4.7e32 with primal
+   infeasibility 8.9e29 is a dual ray growing without bound — which *is* the proof of primal
+   infeasibility. Gurobi could not close its termination tolerances on it because of conditioning:
+   `Matrix range [1e-04, 3e+03]` against `RHS range` up to **3e+05**, and `Bounds range` down to
+   **7e-09** (millions of near-degenerate columns from θ = 0.01 slivers).
+5. **The implication is too deep for presolve.** "This row's max LHS < its RHS" is not a single-row bound
+   violation — deriving it needs the cell-allocation constraint, each lever's `dvar_ub_*`, T_MAT
+   reachability and the irreversible lock-in floor, chained together. Bound propagation does not reach
+   that far, and presolve is kept conservative for barrier anyway (it has caused false infeasibility).
+
+The screen wins not by being cleverer numerically but by using **domain structure** — it computes the
+bound analytically instead of discovering it through linear algebra over 32.9 M nonzeros.
+
+### The screen (`luto/solvers/solver.py`)
+
+`_max_reachable_contr_r()` — per-cell contribution ceiling, cached once per year, pure numpy
+(milliseconds; a `feasRelax` diagnosis would cost a full 4.65 M-row re-solve):
+
+```
+locked   = Σ irreversible non-ag lb·contr + Σ irreversible AM lb·(contr_j + increment)
+free     = max(1 − locked_share, 0)
+ceiling  = locked + greedy fill of `free` over ALL levers, best contribution first,
+           each capped by its own headroom (dvar_ub_nonag/dvar_ub_ag − the matching lb)
+```
+
+Reusing the same bound matrices the solver builds its variables from means no-go zones, T_MAT
+reachability, the Riparian `RP_PROPORTION` and Destocked eligibility caps, and lock-in are **inherited,
+not re-derived**. Every contribution is ≤ 1, so the ceiling is a true upper bound and
+`reachable < target` is a *sound* proof — it can only drop rows that are genuinely impossible.
+
+Two mistakes worth recording, because each cost a 24 h run to find:
+
+- **Uncapped levers.** Taking the single best contribution and letting it cover the whole free share
+  made the ceiling 0.819 vs 0.736, so nothing was ever dropped. `Unallocated - natural land` is worth
+  **1.0** and `T_MAT` allows only `natural → natural` (1 of 37 sources), so a cell holding a 0.12 sliver
+  of it was credited with 1.0 across its entire free share.
+- **Max instead of sum.** A cell can be *split* across levers, so aggregating with `max` understates the
+  ceiling — and understating drops rows that are actually satisfiable, the expensive direction. Greedy
+  best-first is exactly optimal here (every unit of area costs the same).
+
+Also note **ag-management values are INCREMENTS**, not absolute contributions (`Savanna Burning`
+= `1 − BIO_CONTRIBUTION_LDS`; `Biochar` = `Biodiversity_impact − 1`, which can be **negative**), and
+`X_ag_man ≤ X_ag[j]` means an AM adds no area — so it is folded into its land use's contribution rather
+than competing as a separate lever.
+
+### Result
+
+`DROP_UNREACHABLE_BIO_CONSTRAINTS` (default `True`) gates the exclusion; each dropped row is printed in
+the per-family build table and written to `out_<yr>/unreachable_bio_constraints_<yr>.csv` with
+`region` / `species` / `presence` / `targ2attain` as separate columns, **before** the solve so the record
+survives a year that still fails.
+
+| run | code | 2025 |
+|---|---|---|
+| `R3_ECNES_T3050` | original | `INF_OR_UNBD` → dual simplex diverged → killed at 5 h |
+| `P4_dropfix` | screen, uncapped levers | flagged RAZOR-THIN, kept → same failure |
+| `P5_dropfix_local` | screen, per-cell caps | **flagged UNREACHABLE, dropped, solved first attempt**; 2020–2045 all optimal |
+
+**θ is not the fix.** Probe P2 re-ran the failing configuration at θ = 0.0 (nothing folds at all): the
+symptom changed from `Infeasible model` to `Numerical trouble encountered` and simplex stalled
+identically. θ = 0.01 *did* rescue a **different** case — a 15 % non-ag cap at 30/50 that was infeasible
+at θ = 1.0 — but it does nothing for an unreachable row. Investigation artefacts:
+`jinzhu_inspect_code/Explore_CMA_nonag_cap/doc/progress.md`.
+
+---
+
 ## 20260722 — write.py 258 GB peak: NOT per-worker data copies — it's uncapped Linux workers + resident `data`
 
 ### TL;DR
