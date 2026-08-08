@@ -49,7 +49,6 @@ grid_search = {
     'OBJECTIVE':        ['maxprofit'],                                             # 'maxprofit' or 'mincost'
     'RESFACTOR':        [1],
     'SIM_YEARS':        [[2020, 2025, 2030, 2035, 2050]],                          # base year 2010 implicit; explicit step years
-    'DO_IIS':           [False],
     'WRITE_OUTPUTS':    [True],
  
     ###############################################################

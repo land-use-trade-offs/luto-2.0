@@ -709,6 +709,8 @@ def calc_shadow_price_GBF2(luto_solver, input_data, target_year) -> pd.DataFrame
     So = float(input_data.scale_factors["Economy"])
     Ss = float(input_data.scale_factors["GBF2"])
     constr = luto_solver.bio_GBF2_constrs
+    if not isinstance(constr, gp.Constr):   # not built, or dropped by the infeasibility flow
+        return pd.DataFrame()
     pi = float(constr.Pi)
     return pd.DataFrame([{
         "year": target_year, "constraint": "GBF2", "region": "Australia",
@@ -822,6 +824,8 @@ def calc_shadow_price_GHG(luto_solver, input_data, target_year) -> pd.DataFrame:
     So = float(input_data.scale_factors["Economy"])
     Ss = float(input_data.scale_factors["GHG"])
     constr = luto_solver.ghg_consts_ub
+    if constr is None:                      # not built, or dropped by the infeasibility flow
+        return pd.DataFrame()
     pi = float(constr.Pi)
     return pd.DataFrame([{
         "year": target_year, "constraint": "GHG", "region": "",

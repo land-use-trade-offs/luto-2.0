@@ -29,18 +29,18 @@ import os
 import re
 import time
 import threading
-from pathlib import Path
-
-import numpy as np
+import joblib
 import pandas as pd
 
+from contextlib import contextmanager
+from pathlib import Path
 from gurobipy import GRB
-import joblib
+
 from luto import settings
 from luto.data import Data
 from luto.solvers.input_data import get_input_data
 from luto.solvers.solver import LutoSolver
-from luto.tools.inspect_iis import analyze_iis
+from luto.solvers.tools import feasible_solve, resolve_infeasibility, group_of
 from luto.tools.write import write_outputs
 from luto.tools import (
     LogToFile,
@@ -52,47 +52,69 @@ from luto.tools import (
 )
 
 
+# Checkpoint files are named data_<year>.lz4. The same pattern drives both resume
+# discovery and stale-checkpoint rotation.
+CHECKPOINT_RE = re.compile(r'data_\d{4}\.lz4')
 
+# Human-readable meaning of each non-optimal Gurobi status, for the failure banner.
+SOLVER_STATUS_MSGS = {
+    GRB.INFEASIBLE:  "INFEASIBLE",
+    GRB.INF_OR_UNBD: "INFEASIBLE OR UNBOUNDED — set `BARHOMOGENOUS`=1 to distinguish",
+    GRB.UNBOUNDED:   "UNBOUNDED — check objective coefficients and variable bounds",
+    GRB.NUMERIC:     "NUMERICAL ISSUES — consider adjusting tolerances or `NumericFocus`",
+    GRB.SUBOPTIMAL:  "SUBOPTIMAL — constraints may not be fully satisfied",
+}
+
+
+def _run_dir(timestamp: str) -> str:
+    """Timestamped output directory that holds every artefact of one run."""
+    return (f"{settings.OUTPUT_DIR}/{timestamp}"
+            f"_RF{settings.RESFACTOR}_{settings.SIM_YEARS[0]}-{settings.SIM_YEARS[-1]}")
+
+
+@contextmanager
+def _memory_log(save_dir: str, mode: str):
+    """Sample process memory to <save_dir>/RES_*_mem_log.txt while the block runs."""
+    stop_event = threading.Event()
+    thread = threading.Thread(target=log_memory_usage, args=(save_dir, mode, 1, stop_event))
+    thread.start()
+    try:
+        yield
+    finally:
+        stop_event.set()
+        thread.join()
+
+
+# ---------------------------------------------------------------------------- #
+# Entry points                                                                 #
+# ---------------------------------------------------------------------------- #
 
 def load_data() -> Data:
     """
     Load the Data object containing all required data to run a LUTO simulation.
     """
-
-    # Generate new timestamp each time and apply decorator dynamically
-    current_timestamp = write_timestamp()
-    save_dir = f"{settings.OUTPUT_DIR}/{current_timestamp}_RF{settings.RESFACTOR}_{settings.SIM_YEARS[0]}-{settings.SIM_YEARS[-1]}"
-    log_path = f"{save_dir}/LUTO_RUN_"
+    save_dir = _run_dir(write_timestamp())    # new timestamp: this starts a new run
     set_path()
 
-    # Apply the LogToFile decorator dynamically
-    @LogToFile(log_path)
+    @LogToFile(f"{save_dir}/LUTO_RUN_")
     def _load_data():
-        # Thread to log memory usage
-        stop_event = threading.Event()
-        memory_thread = threading.Thread(target=log_memory_usage, args=(save_dir, 'w', 1, stop_event))
-        memory_thread.start()
-
+        # The explicit print puts the failure in the tee'd log; the traceback itself
+        # only surfaces after LogToFile has detached from stdout/stderr.
         try:
-            data = Data()
-            data.timestamp = read_timestamp()
-            data.path = save_dir
+            with _memory_log(save_dir, 'w'):
+                data = Data()
+                data.timestamp = read_timestamp()
+                data.path = save_dir
+                return data
         except Exception as e:
             print(f"An error occurred while loading data: {e}")
-            raise e
-        finally:
-            # Ensure the memory logging thread is stopped
-            stop_event.set()
-            memory_thread.join()
-
-        return data
+            raise
 
     return _load_data()
 
 
 def run(
     data: Data | None = None,
-    do_analyze_iis: bool = settings.DO_IIS,
     do_report: bool = settings.WRITE_OUTPUTS,
     checkpoint_dir: str | None = None,
 ) -> Data:
@@ -102,238 +124,57 @@ def run(
     Parameters
     ----------
     data : Data or None
-        Loaded simulation data. Must be provided; if a checkpoint exists it will
-        replace this object internally, but a freshly loaded Data is still needed
-        to determine the year sequence and base year.
-    do_analyze_iis : bool, default False
-        If True, infeasible per-year solves trigger ``computeIIS()`` +
-        ``analyze_iis()`` and write a debug .ilp file alongside the run output.
-        Task runs typically pass ``settings.DO_IIS`` so this can be controlled
-        as a grid_search parameter.
+        Loaded simulation data. Required unless `checkpoint_dir` holds a checkpoint
+        to resume from, in which case the checkpointed Data replaces it.
     do_report : bool, default True
         If True, write outputs at the end of the run. Set to False to skip output
         writing (e.g. when doing a quick test run or debugging IIS infeasibility).
     checkpoint_dir : str or None, default None
-        If provided, enables checkpoint mode. After each successfully solved year
-        a ``data_<year>.lz4`` file is written to this directory. On re-run, the
-        latest valid checkpoint is loaded and the simulation resumes from the
-        next unsolved year. Useful for long NCI jobs that may be wall-time killed.
+        Where to LOOK for a ``data_<year>.lz4`` checkpoint to resume from; the run
+        continues at the first unsolved year. Checkpoints themselves are always
+        written into the run's own output directory (see `solve_timeseries`) — on a
+        resumed run the reused timestamp makes that the same directory. Useful for
+        long NCI jobs that may be wall-time killed.
     """
-    
-    if (data is None) and (checkpoint_dir is None):
+    if data is None and checkpoint_dir is None:
         raise ValueError("Either `data` must be provided or `checkpoint_dir` must be set to enable checkpoint loading.")
 
-    # Generate new timestamp each time and apply decorator dynamically
-    current_timestamp = read_timestamp()
-    save_dir = f"{settings.OUTPUT_DIR}/{current_timestamp}_RF{settings.RESFACTOR}_{settings.SIM_YEARS[0]}-{settings.SIM_YEARS[-1]}"
-    log_path = f"{save_dir}/LUTO_RUN_"
+    save_dir = _run_dir(read_timestamp())    # reuse the timestamp written at load time
 
-    # Apply the LogToFile decorator dynamically
-    @LogToFile(log_path)
-    def _run():
+    @LogToFile(f"{save_dir}/LUTO_RUN_")
+    def _run(active_data: Data | None) -> Data:
+        resume_year = None
+        if checkpoint_dir is not None:
+            active_data, resume_year = load_latest_checkpoint(Path(checkpoint_dir), active_data, save_dir)
 
-        years = sorted(settings.SIM_YEARS).copy()
-
-        # Use active_data to avoid Python closure scoping issues: assigning to
-        # `data` inside a nested function would make Python treat it as local
-        # throughout _run(), causing UnboundLocalError on non-checkpoint paths.
-        active_data = data
-        checkpoint_path = Path(checkpoint_dir) if checkpoint_dir is not None else None
-        resume_from_year = None
-
-        if checkpoint_path is not None:
-            print(f"Checkpoint mode enabled: {checkpoint_path}")
-            files = sorted(f for f in checkpoint_path.iterdir() if re.match(r'data_\d{4}\.lz4', f.name))
-            if files:
-                checkpoint_file = files[-1]
-                resume_from_year = int(checkpoint_file.stem.split("_")[1])
-                active_data = joblib.load(str(checkpoint_file))
-                active_data.timestamp = read_timestamp()
-                active_data.path = save_dir
-                # load_data_from_disk()'s set_path() normally pre-creates out_<yr> dirs
-                # for write_outputs; checkpoint resume bypasses that, so do it here too.
-                set_path()
-                print(f"Resuming from checkpoint (year {resume_from_year}): {checkpoint_file}")
-            elif data is None:
-                raise ValueError(
-                    f"No checkpoint files found in '{checkpoint_path}' and no `data` was provided; "
-                    "cannot start simulation."
-                )
-            else:
-                print(f"No valid checkpoint found in '{checkpoint_path}'; starting from {years[0]}.")
-
-        # active_data is guaranteed non-None from here on
+        years = sorted(settings.SIM_YEARS)
         if active_data.YR_CAL_BASE not in years:
             years.insert(0, active_data.YR_CAL_BASE)
 
-        if resume_from_year is not None:
-            years_to_run = years[years.index(resume_from_year):]
-            print(f"Resuming simulation from {resume_from_year} to {years[-1]}.")
+        if resume_year is not None:
+            years_to_run = years[years.index(resume_year):]
+            print(f"Resuming simulation from {resume_year} to {years[-1]}.")
         else:
             years_to_run = years
 
-        # Start recording memory usage
-        stop_event = threading.Event()
-        memory_thread = threading.Thread(target=log_memory_usage, args=(save_dir, 'a', 1, stop_event))
-        memory_thread.start()
-
         try:
-            print('\n')
-            print(f"Running LUTO {settings.VERSION} between {years[0]} - {years[-1]} at RES-{settings.RESFACTOR}, total {len(years) - 1} runs!\n", flush=True)
+            with _memory_log(save_dir, 'a'):
+                print('\n')
+                print(f"Running LUTO {settings.VERSION} between {years[0]} - {years[-1]} at RES-{settings.RESFACTOR}, total {len(years) - 1} runs!\n", flush=True)
 
-            if len(years_to_run) > 1:
-                solve_timeseries(active_data, years_to_run, do_analyze_iis, Path(save_dir))
+                if len(years_to_run) > 1:
+                    solve_timeseries(active_data, years_to_run, Path(save_dir))
 
-            # Save final data and write outputs
-            save_data_to_disk(active_data, f"{save_dir}/Data_RES{settings.RESFACTOR}.lz4")
-            if do_report:
-                write_outputs(active_data)
+                save_data_to_disk(active_data, f"{save_dir}/Data_RES{settings.RESFACTOR}.lz4")
+                if do_report:
+                    write_outputs(active_data)
         except Exception as e:
             print(f"An error occurred during the simulation: {e}")
-            raise e
-        finally:
-            # Ensure the memory logging thread is stopped
-            stop_event.set()
-            memory_thread.join()
+            raise
 
         return active_data
 
-    return _run()
-
-
-def solve_timeseries(
-    data: Data,
-    years_to_run: list[int],
-    do_analyze_iis: bool,
-    checkpoint_path: Path | None = None,
-) -> None:
-
-    # Save the base-year state before any solving so a retry can re-attempt the
-    # first target year. Skipped on resume (file already exists from a prior run).
-    if checkpoint_path is not None:
-        base_ckpt = checkpoint_path / f"data_{years_to_run[0]}.lz4"
-        if not base_ckpt.exists():
-            save_data_to_disk(data, str(base_ckpt))
-            print(f"Saved base checkpoint for year {years_to_run[0]}: {base_ckpt}")
-
-    for step in range(len(years_to_run) - 1):
-        base_year = years_to_run[step]
-        target_year = years_to_run[step + 1]
-
-        print( "-------------------------------------------------")
-        print( f"Running for year {target_year}"   )
-        print( "-------------------------------------------------\n")
-
-        start_time = time.time()
-        input_data = get_input_data(data, base_year, target_year)
-        data.last_year = target_year
-
-        # Retry loop with escalating numerical settings. settings.RETRY_PARAMS is a list
-        # of (NumericFocus, Method, Crossover) tuples tried in order; only GRB.OPTIMAL
-        # is accepted — any other status falls through to the failure path.
-        nf_attempts = list(settings.RETRY_PARAMS)
-        accepted = False
-        solution = None
-        status = None
-        luto_solver = LutoSolver(input_data)
-        luto_solver.formulate()
-
-        # Persist any biodiversity rows proven unreachable at build time. Written BEFORE the solve on
-        # purpose: the record is most valuable exactly when the year goes on to fail, and the
-        # `accepted` guard below would throw it away.
-        if luto_solver.bio_unreachable_constrs:
-            out_dir = f"{data.path}/out_{target_year}"
-            os.makedirs(out_dir, exist_ok=True)
-            pd.DataFrame(luto_solver.bio_unreachable_constrs).to_csv(
-                f"{out_dir}/unreachable_bio_constraints_{target_year}.csv", index=False)
-
-        for nf, method, crossover, presolve, barhomogenous in nf_attempts:
-            print(f"Trying NumericFocus={nf}, Method={method}, Crossover={crossover}, Presolve={presolve}, BarHomogeneous={barhomogenous} for year {target_year}...")
-            luto_solver.gurobi_model.Params.NumericFocus    = nf
-            luto_solver.gurobi_model.Params.Method          = method
-            luto_solver.gurobi_model.Params.Crossover       = crossover
-            luto_solver.gurobi_model.Params.Presolve        = presolve
-            luto_solver.gurobi_model.Params.BarHomogeneous  = barhomogenous
-            solution = luto_solver.solve()
-            status = luto_solver.gurobi_model.Status
-
-            if solution is not None and status == GRB.OPTIMAL:
-                print(f"Optimal solution found with NumericFocus={nf}, Method={method}")
-                accepted = True
-                break
-
-            print(f"Non-optimal status {status} with NumericFocus={nf}, Method={method}; retrying with next attempt if available.")
-
-        # Only commit results when a solve was accepted. `solution` is None whenever Gurobi
-        # stored no solution (SolCount == 0), so these writes MUST stay inside the guard —
-        # outside it they would raise on None and re-strand the diagnostics below, which is
-        # the bug this guard exists to prevent.
-        if accepted:
-            data.add_lumap(target_year, solution.lumap)
-            data.add_lmmap(target_year, solution.lmmap)
-            data.add_ammaps(target_year, solution.ammaps)
-            data.add_ag_dvars(target_year, solution.ag_X_mrj)
-            data.add_delta_dvars_ag2ag(target_year, solution.dvar_D_ag2ag_mrj)
-            data.add_non_ag_dvars(target_year, solution.non_ag_X_rk)
-            data.add_delta_dvars_ag2nonag(target_year, solution.dvar_D_ag2nonag_rk)
-            data.add_delta_dvars_nonag2ag(target_year, solution.dvar_D_nonag2ag_mrj)
-            data.add_ag_man_dvars(target_year, solution.ag_man_X_mrj)
-            data.add_obj_vals(target_year, solution.obj_val)
-
-            for data_type, prod_data in solution.prod_data.items():
-                data.add_production_data(target_year, data_type, prod_data)
-
-            record_shadow_prices(luto_solver, input_data, target_year, f"{data.path}/out_{target_year}")
-
-        if checkpoint_path is not None and accepted:
-            final_path = checkpoint_path / f"data_{target_year}.lz4"
-            save_data_to_disk(data, str(final_path))
-            for old in checkpoint_path.iterdir():
-                if re.match(r'data_\d{4}\.lz4', old.name) and old != final_path:
-                    old.unlink()
-            print(f"Saved checkpoint for year {target_year}: {final_path}")
-
-        print(f'Processing for {target_year} completed in {round(time.time() - start_time)} seconds\n\n' )
-
-        if not accepted:
-            print('!' * 100)
-
-            status_msgs = {
-                GRB.INFEASIBLE:  "INFEASIBLE",
-                GRB.INF_OR_UNBD: "INFEASIBLE OR UNBOUNDED — set `BARHOMOGENOUS`=1 to distinguish",
-                GRB.UNBOUNDED:   "UNBOUNDED — check objective coefficients and variable bounds",
-                GRB.NUMERIC:     "NUMERICAL ISSUES — consider adjusting tolerances or `NumericFocus`",
-                GRB.SUBOPTIMAL:  "SUBOPTIMAL — constraints may not be fully satisfied",
-            }
-            print(f"Solver status for year {target_year}: {status_msgs.get(status, f'unexpected status {status}')}")
-
-            if status == GRB.INFEASIBLE:
-                model_path = f"{data.path}/debug_model_{base_year}_{target_year}.mps"
-                luto_solver.gurobi_model.write(model_path)
-                print(f"Saved model to {model_path}")
-                if do_analyze_iis:
-                    print("Computing IIS...")
-                    luto_solver.gurobi_model.computeIIS()
-                    iis_path = f"{data.path}/debug_model_{base_year}_{target_year}.ilp"
-                    luto_solver.gurobi_model.write(iis_path)
-                    print(f"IIS saved to {iis_path}")
-                    analyze_iis(iis_path, data)
-
-            print('!' * 100)
-            print('\n')
-            break
-
-
-
-def save_data_to_disk(data: Data, path: str, compress_level=3) -> None:
-    """Save using joblib with atomic tmp→rename to prevent partial writes."""
-    print(f'Saving data to {path}...')
-    tmp = Path(f"{path}.tmp")
-    joblib.dump(data, str(tmp), compress=('lz4', compress_level))
-    # Write to .tmp first, then rename atomically (os.replace → POSIX rename()).
-    # If the job is killed mid-write, only the .tmp is left partial; the final
-    # .lz4 is never created until the write completes successfully.
-    os.replace(tmp, path)
+    return _run(data)
 
 
 def load_data_from_disk(path: str) -> Data:
@@ -348,28 +189,330 @@ def load_data_from_disk(path: str) -> Data:
     Returns
         Data: `Data` object.
     """
-
-    # Generate new timestamp each time and apply decorator dynamically
-    current_timestamp = write_timestamp()
-    save_dir = f"{settings.OUTPUT_DIR}/{current_timestamp}_RF{settings.RESFACTOR}_{settings.SIM_YEARS[0]}-{settings.SIM_YEARS[-1]}"
-    log_path = f"{save_dir}/LUTO_RUN_"
-
+    save_dir = _run_dir(write_timestamp())    # new timestamp: this starts a new run
     set_path()
 
-    # Apply the LogToFile decorator dynamically
-    @LogToFile(log_path, 'w')
+    @LogToFile(f"{save_dir}/LUTO_RUN_", 'w')
     def _load_data():
         print(f"Loading data from {path}...\n")
 
-        # Load joblib-compressed file
         data = joblib.load(path)
         data.timestamp = read_timestamp()
         data.path = save_dir
 
-        # Check if the resolution factor from the data object matches the settings.RESFACTOR
         if int(data.RESMULT ** 0.5) != settings.RESFACTOR:
             raise ValueError(f'Resolution factor from data loading ({int(data.RESMULT ** 0.5)}) does not match it of settings ({settings.RESFACTOR})!')
 
         return data
 
     return _load_data()
+
+
+# ---------------------------------------------------------------------------- #
+# Time-series solve                                                            #
+# ---------------------------------------------------------------------------- #
+
+def solve_timeseries(
+    data: Data,
+    years_to_run: list[int],
+    checkpoint_path: Path | None = None,
+) -> None:
+    """Solve each consecutive (base, target) year pair, checkpointing after each success.
+
+    Stops at the first year that cannot be solved. `checkpoint_path` is where the
+    ``data_<year>.lz4`` checkpoints are written (the run's own output directory when
+    called from `run()`); pass None to disable checkpointing.
+    """
+    # Save the base-year state before any solving so a retry can re-attempt the
+    # first target year. Skipped on resume (file already exists from a prior run).
+    if checkpoint_path is not None:
+        base_ckpt = checkpoint_path / f"data_{years_to_run[0]}.lz4"
+        if not base_ckpt.exists():
+            save_data_to_disk(data, str(base_ckpt))
+            print(f"Saved base checkpoint for year {years_to_run[0]}: {base_ckpt}")
+
+    for base_year, target_year in zip(years_to_run[:-1], years_to_run[1:]):
+        print( "-------------------------------------------------")
+        print( f"Running for year {target_year}"   )
+        print( "-------------------------------------------------\n")
+
+        start_time = time.time()
+        input_data = get_input_data(data, base_year, target_year)
+        data.last_year = target_year
+
+        luto_solver = LutoSolver(input_data)
+        luto_solver.formulate()
+
+        # Save the model to disk BEFORE solving (see save_model_to_disk for why).
+        save_model_to_disk(luto_solver.gurobi_model, data.path, base_year, target_year)
+        # Drop constraints that cannot hold even alone, BEFORE solving. Dropped rows
+        # are recorded in out_<year>/dropped_constraints_<year>.csv.
+        drop_unreachable_before_solve(luto_solver, data, target_year)
+
+        accepted, solution, status = solve_with_retries(luto_solver, data, target_year)
+
+        if accepted:
+            store_solution(data, target_year, solution)
+            record_shadow_prices(luto_solver, input_data, target_year, f"{data.path}/out_{target_year}")
+            if checkpoint_path is not None:
+                save_checkpoint(data, checkpoint_path, target_year)
+
+        print(f'Processing for {target_year} completed in {round(time.time() - start_time)} seconds\n\n' )
+
+        if not accepted:
+            print('!' * 100)
+            print(f"Solver status for year {target_year}: {SOLVER_STATUS_MSGS.get(status, f'unexpected status {status}')}")
+            print('!' * 100)
+            print('\n')
+            break
+
+
+def solve_with_retries(luto_solver: LutoSolver, data: Data, target_year: int):
+    """Run the RETRY_PARAMS ladder against the current model. Returns (accepted, solution, status).
+
+    settings.RETRY_PARAMS is a list of (NumericFocus, Method, Crossover, Presolve,
+    BarHomogeneous) tuples tried in order; only GRB.OPTIMAL is accepted.
+
+    A failed attempt is treated as a CONFLICT first and a numerical problem second: diagnose
+    and drop, then re-solve with the same configuration. Only when nothing more can be
+    dropped does the next RETRY_PARAMS entry get tried.
+
+    That ordering matters in wall-clock. Falling straight through to the next configuration
+    sends a genuinely infeasible model into the dual-simplex rung, which has been measured
+    diverging for 35 min+ without terminating — so the diagnosis that would have explained
+    the failure in minutes never gets reached. Diagnosing first costs one restricted IIS.
+    """
+    accepted, solution, status = False, None, None
+    for params in settings.RETRY_PARAMS:
+        accepted, solution, status = solve_attempt(luto_solver, target_year, *params)
+        while not accepted and diagnose_and_drop_conflict(luto_solver, data, target_year):
+            accepted, solution, status = solve_attempt(luto_solver, target_year, *params)
+        if accepted:
+            break
+    return accepted, solution, status
+
+
+def solve_attempt(luto_solver, target_year, nf, method, crossover, presolve, barhomogenous):
+    """One RETRY_PARAMS attempt against the current model. Returns (accepted, solution, status)."""
+    print(f"Trying NumericFocus={nf}, Method={method}, Crossover={crossover}, Presolve={presolve}, BarHomogeneous={barhomogenous} for year {target_year}...")
+    luto_solver.gurobi_model.Params.NumericFocus    = nf
+    luto_solver.gurobi_model.Params.Method          = method
+    luto_solver.gurobi_model.Params.Crossover       = crossover
+    luto_solver.gurobi_model.Params.Presolve        = presolve
+    luto_solver.gurobi_model.Params.BarHomogeneous  = barhomogenous
+
+    solution = luto_solver.solve()
+    status = luto_solver.gurobi_model.Status
+    if solution is not None and status == GRB.OPTIMAL:
+        print(f"Optimal solution found with NumericFocus={nf}, Method={method}")
+        return True, solution, status
+
+    print(f"Non-optimal status {status} with NumericFocus={nf}, Method={method}; retrying with next attempt if available.")
+    return False, solution, status
+
+
+def store_solution(data: Data, target_year: int, solution) -> None:
+    """Copy the accepted solver solution into the Data singleton."""
+    data.add_lumap(target_year, solution.lumap)
+    data.add_lmmap(target_year, solution.lmmap)
+    data.add_ammaps(target_year, solution.ammaps)
+    data.add_ag_dvars(target_year, solution.ag_X_mrj)
+    data.add_delta_dvars_ag2ag(target_year, solution.dvar_D_ag2ag_mrj)
+    data.add_non_ag_dvars(target_year, solution.non_ag_X_rk)
+    data.add_delta_dvars_ag2nonag(target_year, solution.dvar_D_ag2nonag_rk)
+    data.add_delta_dvars_nonag2ag(target_year, solution.dvar_D_nonag2ag_mrj)
+    data.add_ag_man_dvars(target_year, solution.ag_man_X_mrj)
+    data.add_obj_vals(target_year, solution.obj_val)
+
+    for data_type, prod_data in solution.prod_data.items():
+        data.add_production_data(target_year, data_type, prod_data)
+
+
+# ---------------------------------------------------------------------------- #
+# Infeasibility handling                                                       #
+# ---------------------------------------------------------------------------- #
+
+def drop_unreachable_before_solve(luto_solver: LutoSolver, data: Data, target_year: int) -> list:
+    """Test each constraint group ALONE and drop whatever cannot hold, before any real solve.
+
+    Catches a group that is infeasible BY ITSELF — one ECNES community whose target exceeds
+    anything its cells could reach — which would otherwise take the whole year down and leave the
+    retry ladder grinding for hours to discover it.
+
+    It cannot see a conflict that needs two groups TOGETHER; that is `diagnose_and_drop_conflict`'s
+    job, after the ladder has failed.
+    """
+    if not (settings.DROP_UNREACHABLE_CONSTRAINTS and settings.INFEASIBILITY_DIAGNOSIS_GROUPS):
+        return []
+
+    print("├── Pre-solve per-group feasibility test...")
+    dropped, records = feasible_solve(
+        luto_solver.gurobi_model,
+        groups=settings.INFEASIBILITY_DIAGNOSIS_GROUPS,
+        droppable=settings.DROP_UNREACHABLE_CONSTRAINTS)
+
+    # Removes from the model AND the solver's bookkeeping dicts — a stale Constr left in those
+    # would crash `record_shadow_prices` after the accepted solve.
+    luto_solver.remove_constraints_by_name(dropped)
+
+    # Written BEFORE the solve on purpose: the record matters most when the year still goes on to
+    # fail, and nothing downstream would preserve it then.
+    record_dropped(records, luto_solver, data, target_year, 'pre_solve')
+    return dropped
+
+
+def diagnose_and_drop_conflict(luto_solver: LutoSolver, data: Data, target_year: int) -> bool:
+    """After the ladder fails: ask the IIS what conflicts, drop it, and say whether to retry.
+
+    Returns True when something was dropped — the caller should put the ladder back on the reduced
+    model — and False when there is nothing left to give up, which ends the year.
+    """
+    if not settings.INFEASIBILITY_DIAGNOSIS_GROUPS:
+        return False
+
+    print("├── Not optimal — diagnosing the conflict...")
+    resolution = resolve_infeasibility(
+        luto_solver.gurobi_model,
+        droppable=settings.DROP_UNREACHABLE_CONSTRAINTS,
+        keep_groups=settings.INFEASIBILITY_DIAGNOSIS_GROUPS)
+
+    if not resolution['dropped']:
+        print(f"├── {resolution['status']} — nothing droppable in the conflict; "
+              f"giving up on {target_year}")
+        return False
+
+    print(f"├── dropping {len(resolution['dropped'])} row(s) and re-solving {target_year}:")
+    for n in resolution['dropped']:
+        print(f"│       [{group_of(n)}] {n}")
+
+    # Removes from the model AND the solver's bookkeeping dicts — a stale Constr left in those
+    # would crash `record_shadow_prices` after the accepted solve.
+    luto_solver.remove_constraints_by_name(resolution['dropped'])
+    record_dropped([{'group': group_of(n), 'constraint': n, 'action': 'DROPPED'}
+                     for n in resolution['dropped']],
+                    luto_solver, data, target_year, 'post_solve')
+    return True
+
+
+def record_dropped(records, luto_solver, data, target_year, stage) -> None:
+    """Append dropped-constraint records to out_<year>/dropped_constraints_<year>.csv.
+
+    Re-attaches family / region / item / presence from the solver's own index, because the
+    constraint name cannot be parsed back into them (spaces became underscores, and the arity
+    differs by family). Appends rather than overwrites: a year can drop rows in BOTH the pre-solve
+    per-group test and the post-failure IIS, and the first record must survive the second.
+    """
+    if records is None or (hasattr(records, 'empty') and records.empty) or len(records) == 0:
+        return
+    df = pd.DataFrame(records)
+    index = luto_solver.bio_constraint_index()
+    parts = pd.DataFrame(
+        [index.get(n, {'family': None, 'region': None, 'item': None, 'presence': None})
+         for n in df['constraint']],
+        index=df.index)
+    df = pd.concat([df, parts], axis=1).assign(year=target_year, stage=stage)
+
+    out_dir = f"{data.path}/out_{target_year}"
+    os.makedirs(out_dir, exist_ok=True)
+    path = f"{out_dir}/dropped_constraints_{target_year}.csv"
+    df.to_csv(path, mode='a' if os.path.exists(path) else 'w', header=not os.path.exists(path), index=False)
+
+
+# ---------------------------------------------------------------------------- #
+# Persistence (checkpoints, model dumps, Data serialisation)                   #
+# ---------------------------------------------------------------------------- #
+
+def load_latest_checkpoint(
+    checkpoint_path: Path,
+    data: Data | None,
+    save_dir: str,
+) -> tuple[Data, int | None]:
+    """Load the newest data_<year>.lz4 in `checkpoint_path`, falling back to `data`.
+
+    Returns (data, resume_year); resume_year is None when starting fresh. Raises when
+    there is neither a checkpoint nor a `data` object to fall back on.
+    """
+    print(f"Checkpoint mode enabled: {checkpoint_path}")
+    files = sorted(f for f in checkpoint_path.iterdir() if CHECKPOINT_RE.match(f.name))
+
+    if not files:
+        if data is None:
+            raise ValueError(
+                f"No checkpoint files found in '{checkpoint_path}' and no `data` was provided; "
+                "cannot start simulation."
+            )
+        print(f"No valid checkpoint found in '{checkpoint_path}'; starting from {min(settings.SIM_YEARS)}.")
+        return data, None
+
+    checkpoint_file = files[-1]
+    resume_year = int(checkpoint_file.stem.split("_")[1])
+    data = joblib.load(str(checkpoint_file))
+    data.timestamp = read_timestamp()
+    data.path = save_dir
+    # load_data()'s set_path() normally pre-creates the out_<yr> dirs that
+    # write_outputs expects; checkpoint resume bypasses load_data(), so do it here.
+    set_path()
+    print(f"Resuming from checkpoint (year {resume_year}): {checkpoint_file}")
+    return data, resume_year
+
+
+def save_checkpoint(data: Data, checkpoint_path: Path, target_year: int) -> None:
+    """Write data_<target_year>.lz4 and delete older checkpoints — only the latest is kept."""
+    final_path = checkpoint_path / f"data_{target_year}.lz4"
+    save_data_to_disk(data, str(final_path))
+    for old in checkpoint_path.iterdir():
+        if CHECKPOINT_RE.match(old.name) and old != final_path:
+            old.unlink()
+    print(f"Saved checkpoint for year {target_year}: {final_path}")
+
+
+def save_model_to_disk(gurobi_model, out_dir: str, base_year: int, target_year: int) -> None:
+    """Write the year's Gurobi model to MPS, replacing the previous year's file.
+
+    Written BEFORE the solve, unconditionally — the same reasoning as the unreachable-rows CSV. The
+    model is most valuable exactly when the year does not finish, and the cases that most need a
+    post-mortem are the ones that never reach the failure branch at all: a wall-time kill, an OOM,
+    or INF_OR_UNBD where Gurobi cannot even classify what went wrong.
+
+    Only the latest year is kept. At ~800 MB per model there is no point accumulating one per year,
+    and the interesting model is always the one that just failed. Written to a temp name and
+    renamed, so an interrupted write cannot leave a truncated file that looks valid.
+
+    Plain .mps, NOT .mps.gz/.bz2 — this Gurobi build ships without compression codecs and any
+    compressed extension raises "Unable to write to file". Run_Archive.zip compresses it anyway.
+
+    Constraint names matter here: MPS is whitespace-delimited, so a single name containing a space
+    makes Gurobi discard EVERY name in the file and emit c0, c1, c2 ... which makes the artefact
+    useless for attributing a failure. Every `name=` in solver.py must therefore stay
+    space-free (see the `.replace(" ", "_")` on the regional-adoption rows).
+    """
+    dest = Path(out_dir) / f"debug_model_{base_year}_{target_year}.mps"
+    # The temp name must KEEP the .mps extension: Gurobi picks the writer from the extension, so
+    # "....mps.tmp" fails with "Unknown file type" and the save is silently lost.
+    tmp = dest.with_name(f"{dest.stem}.tmp{dest.suffix}")
+    try:
+        os.makedirs(out_dir, exist_ok=True)
+        gurobi_model.write(str(tmp))
+        # `tmp` must be excluded here: it ends in .mps (Gurobi picks its writer from the extension,
+        # so it has to) which means this very glob matches the file just written, and deleting it
+        # makes the rename below fail with "cannot find the file specified".
+        for stale in Path(out_dir).glob("debug_model_*.mps"):
+            if stale not in (dest, tmp):
+                stale.unlink()
+        tmp.replace(dest)
+        print(f"Saved model to {dest} ({dest.stat().st_size / 1e6:,.0f} MB)")
+    except Exception as exc:
+        # Never let a diagnostic artefact take the run down with it.
+        print(f"WARNING: could not save model to {dest}: {exc}")
+        tmp.unlink(missing_ok=True)
+
+
+def save_data_to_disk(data: Data, path: str, compress_level=3) -> None:
+    """Save using joblib with atomic tmp→rename to prevent partial writes."""
+    print(f'Saving data to {path}...')
+    tmp = Path(f"{path}.tmp")
+    joblib.dump(data, str(tmp), compress=('lz4', compress_level))
+    # Write to .tmp first, then rename atomically (os.replace → POSIX rename()).
+    # If the job is killed mid-write, only the .tmp is left partial; the final
+    # .lz4 is never created until the write completes successfully.
+    os.replace(tmp, path)

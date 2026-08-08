@@ -33,6 +33,7 @@ from gurobipy import GRB
 
 from luto import tools
 from luto.solvers.input_data import SolverInputData
+from luto.solvers.tools import check_constraint_names
 from luto.settings import (
     AG_MANAGEMENTS, 
     AG_MANAGEMENTS_REVERSIBLE, 
@@ -162,12 +163,8 @@ class LutoSolver:
         self.bio_GBF8_exprs = {}
         self.bio_GBF8_constrs = {}
         self.regional_adoption_constrs = []
+        self._bio_index = None
 
-        # Biodiversity pre-determined constraint records
-        self.bio_unreachable_constrs = []                       # rows proven unreachable at build time
-        self.bio_max_contr_r = None                             # cached per-cell contribution ceiling
-        self.bio_rows = defaultdict(lambda: defaultdict(list))  # {family: {region: [row, ...]}}
-        self.bio_skipped = defaultdict(int)                     # {family: n_skipped}
 
 
     def formulate(self):
@@ -180,6 +177,10 @@ class LutoSolver:
         self._setup_constraints()
         self._setup_objective()
         _floor_assembled_matrix(self.gurobi_model)
+        self.bio_constraint_index()   # warm the cache while every constraint is still live
+        # ONE name containing whitespace makes Gurobi discard EVERY name when the model is written
+        # to MPS — which silently blinds all post-mortem attribution. Assert it here, not there.
+        check_constraint_names(self.gurobi_model)
 
     def _setup_vars(self):
         print("├── Setting up decision variables...")
@@ -424,7 +425,7 @@ class LutoSolver:
                         ceiling = max(ag_mask[r] - cap, 0.0)
                         self.gurobi_model.addConstr(
                             gp.quicksum(terms) <= ceiling,
-                            name=f"const_{am_name}_solvable_ub_{r}"
+                            name=f"const_{am_name}_solvable_ub_{r}".replace(" ", "_")
                         )
                 continue  # skip generic j loop below
 
@@ -1303,153 +1304,85 @@ class LutoSolver:
         )
 
 
-    def _max_reachable_contr_r(self) -> np.ndarray:
-        """Per-cell ceiling on biodiversity contribution, accounting for IRREVERSIBLE lock-in.
+    def bio_constraint_index(self) -> dict:
+        """{constraint_name: {family, region, item, presence}} for every biodiversity row built.
 
-        Every planting type is irreversible (``NON_AG_LAND_USES_REVERSIBLE``), and
-        ``get_non_ag_lb_matrices`` pins this year's lower bound to last year's allocation. So a cell
-        that took Environmental Plantings (contribution 0.70) in an earlier year can never trade that
-        share up to riparian (1.00), no matter how much the target rises later. The reachable ceiling
-        is therefore::
+        CACHED, and built eagerly at the end of `formulate()`. It must be: reading `ConstrName`
+        from a Constr that has since been removed from the model raises "Constr was removed from
+        the model", and the whole point of this index is to describe rows that were dropped. Build
+        it once while every constraint is still live, then look up freely afterwards.
 
-            locked_share·contr(locked)  +  free_share·max(contr over levers still placeable here)
-
-        Ignoring lock-in (i.e. assuming 1.0 everywhere) makes the headroom screen far too optimistic:
-        it calls a cell comfortable in the year the cheap lever is chosen, and only discovers the trap
-        years later when the requirement climbs past what that lever can deliver.
-
-        Cached — one vector serves every GBF3/4/8 row in the year.
+        The constraint NAME is all a Gurobi model carries, and it cannot be parsed back into its
+        parts: `.replace(" ", "_")` makes the separator ambiguous ("Goulburn_Broken" vs the
+        underscore before the community), and the arity differs by family — SNES/ECNES have a
+        presence class, GBF3/GBF8 do not, GBF2 has no key at all. So record the mapping here, where
+        the tuple is still known, instead of reconstructing it later from a mangled string.
         """
-        if self.bio_max_contr_r is not None:
-            return self.bio_max_contr_r
+        if self._bio_index is not None:
+            return self._bio_index
 
-        ncells = self._input_data.ncells
-        locked_contr = np.zeros(ncells, dtype=np.float32)   # Σ locked_share·contr
-        locked_share = np.zeros(ncells, dtype=np.float32)
-
-        # ---- 1. NON-AG levers: (contribution, per-cell headroom) -----------------------------------
-        # Headroom comes straight from the bound matrices the solver itself uses for these vars, so
-        # no-go zones, T_MAT reachability, the Riparian RP_PROPORTION cap and the Destocked
-        # eligible-fraction cap are all inherited rather than re-derived here.
-        nonag_levers = []
-        for k, k_name in enumerate(NON_AG_LAND_USES):
-            contr = self._input_data.biodiv_contr_non_ag_k[k]
-            lb = self._input_data.dvar_lb_nonag[:, k]
-            nonag_levers.append((contr, self._input_data.dvar_ub_nonag[:, k] - lb))
-            if not NON_AG_LAND_USES_REVERSIBLE[k_name]:
-                locked_contr += lb * contr          # irreversible: this share can never be given back
-                locked_share += lb
-
-        # ---- 2. AG-MANAGEMENT: a bonus ON ag land, never area of its own ---------------------------
-        # X_ag_man <= X_ag[j], so an AM adds no new area — it raises what the underlying land use is
-        # worth. Its value is an INCREMENT (Savanna Burning = 1 - BIO_CONTRIBUTION_LDS; Biochar can be
-        # negative), so it is folded into that land use's contribution below rather than competing for
-        # the cell as a separate lever. There is no ag_man_ub_mrj — the vars are built with ub=1.
-        am_bonus_j = np.zeros(self._input_data.n_ag_lus, dtype=np.float32)
-        for am, am_j_list in self._input_data.am2j.items():
-            if not AG_MANAGEMENTS[am]:
-                continue
-            for j_idx, j in enumerate(am_j_list):
-                increment = self._input_data.biodiv_contr_ag_man[am][j_idx]
-                am_bonus_j[j] = max(am_bonus_j[j], max(increment.max(), 0.0))
-                if AG_MANAGEMENTS_REVERSIBLE[am]:
-                    continue
-                combined = self._input_data.biodiv_contr_ag_j[j] + increment
-                for m in (0, 1):
-                    share = self._input_data.ag_man_lb_mrj[am][m, :, j]
-                    locked_contr += share * combined    # non-reversible AM pins this share into (am, j)
-                    locked_share += share
-
-        # ---- 3. AG levers: same shape, with the best AM bonus folded in -----------------------------
-        ag_levers = [
-            (
-                self._input_data.biodiv_contr_ag_j[j] + am_bonus_j[j],
-                self._input_data.dvar_ub_ag[m, :, j] - self._input_data.dvar_lb_ag[m, :, j]
-            )
-            for j in range(self._input_data.n_ag_lus)
-            for m in (0, 1)
+        index = {}
+        specs = [
+            ('GBF3_NVIS',  self.bio_GBF3_NVIS_constrs,  ('region', 'item')),
+            ('GBF4_SNES',  self.bio_GBF4_SNES_constrs,  ('region', 'item', 'presence')),
+            ('GBF4_ECNES', self.bio_GBF4_ECNES_constrs, ('region', 'item', 'presence')),
+            ('GBF8',       self.bio_GBF8_constrs,       ('region', 'item')),
         ]
+        for family, constrs, fields in specs:
+            for key, constr in (constrs or {}).items():
+                row = {'family': family, 'region': None, 'item': None, 'presence': None}
+                row.update(dict(zip(fields, key)))
+                index[constr.ConstrName] = row
 
-        # ---- 4. fill the free share with the levers, best first -------------------------------------
-        # SUM, not max: a cell can be SPLIT across levers, so taking only the single best one would
-        # understate the ceiling — and understating makes `reachable < target` fire on rows that are
-        # actually satisfiable, dropping a species for no reason. Every unit of area costs the same, so
-        # filling greedily in descending contribution is exactly optimal for this fractional knapsack
-        # and the result stays a true upper bound.
-        #
-        # Flooring free_share at 0 because the previous year's dvars satisfy the cell-allocation
-        # constraint only to FEASIBILITY_TOLERANCE, so their per-cell sum can sit a whisker above 1.
-        reachable = locked_contr
-        remaining = np.maximum(1.0 - locked_share, 0.0)
-        for contr, headroom in sorted(nonag_levers + ag_levers, key=lambda lever: -lever[0]):
-            take = np.minimum(remaining, np.maximum(headroom, 0.0))
-            reachable = reachable + take * contr
-            remaining = remaining - take
-
-        self.bio_max_contr_r = reachable
-        return self.bio_max_contr_r
+        # GBF2 is a single national row with no key, so it has no parts to record.
+        gbf2 = self.bio_GBF2_constrs
+        if gbf2 is not None and not isinstance(gbf2, dict):
+            index[gbf2.ConstrName] = {'family': 'GBF2', 'region': None, 'item': None,
+                                      'presence': None}
+        self._bio_index = index
+        return index
 
 
-    def _bio_row_admitted(self, family, region, species, presence, lb_raw, lb_rescale, val_vector,
-                          ind) -> bool:
-        """Record a GBF3/4/8 row's feasibility margin and say whether the constraint should be added.
+    def remove_constraints_by_name(self, names) -> None:
+        """Remove rows from the Gurobi model AND from the bookkeeping the dual readers walk.
 
-        The decision is one comparison: the row's MAXIMUM achievable LHS against its target. That
-        maximum is Σ val_vector·max_reachable_contr over the row's cells, where the per-cell ceiling
-        already accounts for irreversible lock-in — so ``reachable < lb_rescale`` is a SOUND proof that
-        no allocation can satisfy this row, and dropping it is safe. Keeping such a row cannot help: it
-        makes the whole year infeasible and takes every other target down with it. Dropping is
-        recorded, never silent, and gated by ``settings.DROP_UNREACHABLE_BIO_CONSTRAINTS``.
+        The infeasibility flow in `simulation.py` drops rows by name. Removing them only from the
+        model leaves stale `Constr` objects in these collections, and the first attribute read on
+        one — `record_shadow_prices` reading `.Pi` after the next ACCEPTED solve — raises
+        "Constr was removed from the model". So the two removals must happen together, here.
 
-        ``targ2attain`` = target / attainable ceiling. Above 1.0 the row is impossible; that is the
-        dropped case. Rows are collected here and printed by ``_print_bio_summary`` once the family is
-        built, so the log is one grouped table instead of a line per species.
+        The purged collections are exactly the ones `record_shadow_prices` iterates. The structural
+        per-cell collections (cell usage, ag-management links) are not scanned: they are millions
+        of rows, no sane `DROP_UNREACHABLE_CONSTRAINTS` policy includes them, and no dual reader
+        walks them.
+
+        `bio_constraint_index()` is deliberately NOT invalidated — it is warmed while every row is
+        still live precisely so that dropped rows can be described afterwards.
         """
-        reachable = (val_vector[ind] * self._max_reachable_contr_r()[ind]).sum()
-        targ2attain = (lb_rescale / reachable) if reachable > 0 else float('inf')
-        drop = reachable < lb_rescale and settings.DROP_UNREACHABLE_BIO_CONSTRAINTS
+        if not names:
+            return
+        doomed = set(names)
 
-        # GBF3 NVIS and GBF8 have no presence class; only the GBF4 families are keyed by it.
-        label = f"{species} ({presence})" if presence else species
-        self.bio_rows[family][region].append(
-            {'name': label, 'n_cells': int(ind.size), 'targ2attain': targ2attain, 'dropped': drop})
+        # Purge bookkeeping FIRST, while every held Constr can still be matched by name.
+        for coll in (self.bio_GBF3_NVIS_constrs, self.bio_GBF4_SNES_constrs,
+                     self.bio_GBF4_ECNES_constrs, self.bio_GBF8_constrs,
+                     self.renewable_constraints):
+            for key in [k for k, c in coll.items() if c.ConstrName in doomed]:
+                del coll[key]
 
-        if reachable >= lb_rescale:
-            return True                     # satisfiable — add the constraint
+        self.water_limit_constraints    = [c for c in self.water_limit_constraints if c.ConstrName not in doomed]
+        self.regional_adoption_constrs  = [c for c in self.regional_adoption_constrs if c.ConstrName not in doomed]
+        self.demand_penalty_constraints = [c for c in self.demand_penalty_constraints if c.ConstrName not in doomed]
+        self.ghg_consts_soft            = [c for c in self.ghg_consts_soft if c.ConstrName not in doomed]
 
-        # region / species / presence stay in their own columns so the CSV can be grouped and joined
-        # against the target tables, rather than needing a composite label parsed apart again.
-        self.bio_unreachable_constrs.append({
-            'year': self._input_data.target_year,
-            'family': family,
-            'region': region,
-            'species': species,
-            'presence': presence,
-            'target_raw': lb_raw,
-            'target_rescaled': lb_rescale,
-            'n_cells': int(ind.size),
-            'avail_reachable': reachable,
-            'targ2attain': targ2attain,
-            'dropped': drop,
-        })
-        if drop:
-            return False                    # unreachable — leave it out so the rest of the year solves
-        return True                         # unreachable, but the setting asks to keep it and fail
+        if isinstance(self.bio_GBF2_constrs, gp.Constr) and self.bio_GBF2_constrs.ConstrName in doomed:
+            self.bio_GBF2_constrs = {}      # back to the "not built" sentinel
+        if self.ghg_consts_ub is not None and self.ghg_consts_ub.ConstrName in doomed:
+            self.ghg_consts_ub = None
 
-
-    def _print_bio_summary(self, family) -> None:
-        """One grouped table per family: how many rows were skipped, then the kept rows by region."""
-        rows_by_region = self.bio_rows[family]
-        n_rows = sum(len(v) for v in rows_by_region.values())
-        n_drop = sum(1 for v in rows_by_region.values() for r in v if r['dropped'])
-        print(f"│   │   │   ├── {n_rows} constraint(s), {self.bio_skipped[family]} skipped"
-              + (f", {n_drop} DROPPED as unreachable" if n_drop else ""))
-        for region in sorted(rows_by_region):
-            print(f"│   │   │   │   ├── {region}")
-            for r in sorted(rows_by_region[region], key=lambda row: -row['targ2attain']):
-                flag = "   <<< DROPPED (unreachable)" if r['dropped'] else ""
-                print(f"│   │   │   │   │   ├── n_cells={r['n_cells']:>6}, "
-                      f"targ2attain={r['targ2attain']:>7.3f}   {r['name']}{flag}")
+        self.gurobi_model.remove(
+            [c for c in self.gurobi_model.getConstrs() if c.ConstrName in doomed])
+        self.gurobi_model.update()
 
 
     def _build_biodiv_contr_expr(self, val_vector: np.ndarray, ind: np.ndarray) -> "gp.LinExpr":
@@ -1508,12 +1441,14 @@ class LutoSolver:
 
         print("│   │   ├── Adding constraints for biodiversity GBF 3 NVIS...")
 
+        n_added = n_skipped = 0
+
         for region, group in region_group:
 
             lb_raw = v_limits.sel(dict(layer=(region, group))).item()                        
 
             if lb_raw < 0:
-                self.bio_skipped["GBF3_NVIS"] += 1
+                n_skipped += 1
                 continue
 
             lb_rescale = lb_raw / scale_factors.sel(layer=(region, group)).item()
@@ -1526,12 +1461,9 @@ class LutoSolver:
                 ind = np.intersect1d(np.where(val_vector > 0)[0], np.where(reg_vector)[0])
             
             if ind.size == 0:
-                self.bio_skipped["GBF3_NVIS"] += 1
+                n_skipped += 1
                 continue
 
-            if not self._bio_row_admitted("GBF3_NVIS", region, group, None,
-                                          lb_raw, lb_rescale, val_vector, ind):
-                continue
 
             self.bio_GBF3_NVIS_exprs[(region, group)] = self._build_biodiv_contr_expr(val_vector, ind)
 
@@ -1539,8 +1471,9 @@ class LutoSolver:
                 self.bio_GBF3_NVIS_exprs[(region, group)] >= lb_rescale,
                 name=f"bio_GBF3_NVIS_limit_{region}_{group}".replace(" ", "_")
             )
+            n_added += 1
 
-        self._print_bio_summary("GBF3_NVIS")
+        print(f"│   │   │   ├── {n_added} constraint(s) added, {n_skipped} skipped")
 
 
 
@@ -1559,6 +1492,8 @@ class LutoSolver:
 
         print("│   │   ├── Adding constraints for biodiversity GBF 4 SNES...")
 
+        n_added = n_skipped = 0
+
         for region, species, presence in region_sp_pres:
             lb_raw     = v_limits.sel(dict(layer=(region, species, presence))).item()
             lb_rescale = lb_raw / scale_factors.sel(dict(layer=(region, species, presence))).item()
@@ -1571,23 +1506,21 @@ class LutoSolver:
                 ind = np.intersect1d(np.where(val_vector > 0)[0], np.where(reg_vector)[0])
 
             if lb_raw <= 0:
-                self.bio_skipped["GBF4_SNES"] += 1
+                n_skipped += 1
                 continue
 
             if ind.size == 0:
-                self.bio_skipped["GBF4_SNES"] += 1
+                n_skipped += 1
                 continue
 
-            if not self._bio_row_admitted("GBF4_SNES", region, species, presence,
-                                          lb_raw, lb_rescale, val_vector, ind):
-                continue
             self.bio_GBF4_SNES_exprs[(region, species, presence)] = self._build_biodiv_contr_expr(val_vector, ind)
             self.bio_GBF4_SNES_constrs[(region, species, presence)] = self.gurobi_model.addConstr(
                 self.bio_GBF4_SNES_exprs[(region, species, presence)] >= lb_rescale,
                 name=f"bio_GBF4_SNES_limit_{region}_{species}_{presence}".replace(" ", "_"),
             )
+            n_added += 1
 
-        self._print_bio_summary("GBF4_SNES")
+        print(f"│   │   │   ├── {n_added} constraint(s) added, {n_skipped} skipped")
 
     def _add_GBF4_ECNES_constraints(self) -> None:
         if settings.GBF4_TARGET_ECNES == 'off':
@@ -1602,6 +1535,8 @@ class LutoSolver:
 
         print("│   │   ├── Adding constraints for biodiversity GBF 4 ECNES...")
 
+        n_added = n_skipped = 0
+
         for region, community, presence in region_comm_pres:
             lb_raw     = v_limits.sel(dict(layer=(region, community, presence))).item()
             lb_rescale = lb_raw / scale_factors.sel(dict(layer=(region, community, presence))).item()
@@ -1614,23 +1549,21 @@ class LutoSolver:
                 ind = np.intersect1d(np.where(val_vector > 0)[0], np.where(reg_vector)[0])
 
             if lb_raw <= 0:
-                self.bio_skipped["GBF4_ECNES"] += 1
+                n_skipped += 1
                 continue
 
             if ind.size == 0:
-                self.bio_skipped["GBF4_ECNES"] += 1
+                n_skipped += 1
                 continue
 
-            if not self._bio_row_admitted("GBF4_ECNES", region, community, presence,
-                                          lb_raw, lb_rescale, val_vector, ind):
-                continue
             self.bio_GBF4_ECNES_exprs[(region, community, presence)] = self._build_biodiv_contr_expr(val_vector, ind)
             self.bio_GBF4_ECNES_constrs[(region, community, presence)] = self.gurobi_model.addConstr(
                 self.bio_GBF4_ECNES_exprs[(region, community, presence)] >= lb_rescale,
                 name=f"bio_GBF4_ECNES_limit_{region}_{community}_{presence}".replace(" ", "_"),
             )
+            n_added += 1
 
-        self._print_bio_summary("GBF4_ECNES")
+        print(f"│   │   │   ├── {n_added} constraint(s) added, {n_skipped} skipped")
 
 
     def _add_GBF8_constraints(self) -> None:
@@ -1646,6 +1579,8 @@ class LutoSolver:
 
         print("│   │   ├── Adding constraints for biodiversity GBF 8...")
 
+        n_added = n_skipped = 0
+
         for region, species in region_species:
             lb_raw      = v_limits.sel(dict(layer=(region, species))).item()
             lb_rescale  = lb_raw / scale_factors.sel(layer=(region, species)).item()
@@ -1658,23 +1593,21 @@ class LutoSolver:
                 ind = np.intersect1d(np.where(val_vector > 0)[0], np.where(reg_vector)[0])
 
             if lb_raw <= 0:
-                self.bio_skipped["GBF8"] += 1
+                n_skipped += 1
                 continue
 
             if ind.size == 0:
-                self.bio_skipped["GBF8"] += 1
+                n_skipped += 1
                 continue
 
-            if not self._bio_row_admitted("GBF8", region, species, None,
-                                          lb_raw, lb_rescale, val_vector, ind):
-                continue
             self.bio_GBF8_exprs[(region, species)] = self._build_biodiv_contr_expr(val_vector, ind)
             self.bio_GBF8_constrs[(region, species)] = self.gurobi_model.addConstr(
                 self.bio_GBF8_exprs[(region, species)] >= lb_rescale,
                 name=f"bio_GBF8_limit_{region}_{species}".replace(" ", "_"),
             )
+            n_added += 1
 
-        self._print_bio_summary("GBF8")
+        print(f"│   │   │   ├── {n_added} constraint(s) added, {n_skipped} skipped")
 
 
     def _add_regional_adoption_constraints(self) -> None:
@@ -1694,7 +1627,12 @@ class LutoSolver:
                   _qsum(self._input_data.real_area[reg_ind], self.X_ag_dry_vars_jr[j, reg_ind])
                 + _qsum(self._input_data.real_area[reg_ind], self.X_ag_irr_vars_jr[j, reg_ind])
             )
-            self.regional_adoption_constrs.append(self.gurobi_model.addConstr(reg_expr <= reg_area_limit, name=f"reg_adopt_limit_ag_{lu_name}_{reg_id}"))
+            self.regional_adoption_constrs.append(
+                self.gurobi_model.addConstr(
+                    reg_expr <= reg_area_limit, 
+                    name=f"reg_adopt_limit_ag_{lu_name}_{reg_id}".replace(" ", "_")
+                )
+            )
 
         # Non-reversible plantings saturate the non-ag caps below, and last year's solved
         # areas become this year's exact lower bounds; float32 noise then puts the locked-in
@@ -1714,7 +1652,10 @@ class LutoSolver:
             print(f"│   │   │   ├── Adding constraints for {lu_name} in {settings.REGIONAL_ADOPTION_ZONE} region {reg_id} <= {reg_area_limit:,.0f} HA...")
             reg_expr = _qsum(self._input_data.real_area[reg_ind], self.X_non_ag_vars_kr[k, reg_ind])
             self.regional_adoption_constrs.append(
-                self.gurobi_model.addConstr(reg_expr <= reg_area_limit * nonag_cap_relax, name=f"reg_adopt_limit_non_ag_{lu_name}_{reg_id}")
+                self.gurobi_model.addConstr(
+                    reg_expr <= reg_area_limit * nonag_cap_relax, 
+                    name=f"reg_adopt_limit_non_ag_{lu_name}_{reg_id}".replace(" ", "_")
+                )
             )
 
         # Add SUM-of-non-ag adoption constraints ('NON_AG_CAP' mode):
@@ -1729,7 +1670,10 @@ class LutoSolver:
             for k in range(self.X_non_ag_vars_kr.shape[0]):
                 reg_expr += _qsum(self._input_data.real_area[reg_ind], self.X_non_ag_vars_kr[k, reg_ind])
             self.regional_adoption_constrs.append(
-                self.gurobi_model.addConstr(reg_expr <= reg_area_limit * nonag_cap_relax, name=f"reg_adopt_limit_non_ag_sum_{reg_id}")
+                self.gurobi_model.addConstr(
+                    reg_expr <= reg_area_limit * nonag_cap_relax, 
+                    name=f"reg_adopt_limit_non_ag_sum_{reg_id}".replace(" ", "_")
+                )
             )
 
 

@@ -168,7 +168,7 @@ result = my_expensive_function(my_data)
 **Non-optimal Solves (INFEASIBLE / NUMERIC):**
 - A year is only accepted when Gurobi returns `GRB.OPTIMAL`; the attempts in `settings.RETRY_PARAMS` are tried in order first
 - Barrier can report false infeasibility on numerically hard scenarios. The dual-simplex fallback in `RETRY_PARAMS` usually resolves it; if not, re-run that year from its checkpoint with different parameters (`docs/CLAUDE_SKILL/retry_task_runs.md`)
-- Genuinely infeasible biodiversity targets are usually a handful of GBF4 SNES/ECNES species whose targets cannot be met on the available land. Set `DO_IIS = True` and decode the `.ilp` with `luto/tools/inspect_iis.py`, or follow `docs/CLAUDE_SKILL/debug_species_infeasibility.md` to identify which species to exclude or re-target
+- Genuinely infeasible biodiversity targets are usually a handful of GBF4 SNES/ECNES species whose targets cannot be met on the available land. The run diagnoses these itself: rows that cannot hold are dropped (governed by `DROP_UNREACHABLE_CONSTRAINTS` / `INFEASIBILITY_DIAGNOSIS_GROUPS`) and recorded in `out_<year>/dropped_constraints_<year>.csv`. For a manual post-mortem, load the `debug_model_*.mps` saved before every solve and use `luto/solvers/tools.py` (`diagnose`, `resolve_infeasibility`), or follow `docs/CLAUDE_SKILL/debug_species_infeasibility.md`
 
 
 ### Getting Help
@@ -386,7 +386,8 @@ Transitions are modelled as explicit per-source delta flows: each cell's land is
 - `FEASIBILITY_TOLERANCE` / `OPTIMALITY_TOLERANCE` / `BARRIER_CONVERGENCE_TOLERANCE`: Solver tolerances. `ROUND_DECIMALS` and the near-zero bound snapping threshold are derived from `FEASIBILITY_TOLERANCE`
 - `RESCALE_FACTOR`: Target magnitude (1e3) that solver input arrays are rescaled to for numerical stability
 - `SOLVER_COEFF_MIN`: Universal floor (1e-4) below which a term's coefficient is dropped before entering Gurobi, keeping the constraint matrix range within Gurobi's safe zone
-- `DO_IIS`: Compute an irreducible infeasible subsystem and write a `.ilp` file when a year is infeasible
+- `DROP_UNREACHABLE_CONSTRAINTS`: Ordered list of constraint groups that may be sacrificed (least-valued first) when a year cannot solve; drops are recorded in `out_<year>/dropped_constraints_<year>.csv`
+- `INFEASIBILITY_DIAGNOSIS_GROUPS`: Constraint groups the infeasibility diagnosis restricts its probe to (pre-solve per-group test and post-failure IIS); `[]` turns the machinery off
 - `VERBOSE`: Control solver output verbosity
 
 ### Output Control

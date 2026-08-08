@@ -67,7 +67,7 @@ data = None if _checkpoint_dir else sim.load_data()
 # Get data and run the simulation, catching any errors to ensure the run dir 
 # is archived and cleaned up before exiting non-zero.
 try:
-    data = sim.run(data=data, do_analyze_iis=settings.DO_IIS, do_report=settings.WRITE_OUTPUTS, checkpoint_dir=_checkpoint_dir)
+    data = sim.run(data=data, do_report=settings.WRITE_OUTPUTS, checkpoint_dir=_checkpoint_dir)
     sim_error = None
     simulation_root = pathlib.Path(data.path).absolute().parent.parent
 except Exception as e:

@@ -237,13 +237,6 @@ small production coefficients; 1e-4 retains those while keeping the matrix range
 ratio at 1e8 (well within Gurobi's safe zone).
 '''
 
-DO_IIS = False
-'''
-If True, when a per-year solve terminates infeasible the run will compute and write
-the Irreducible Infeasible Subsystem (.ilp) and call analyze_iis() for diagnostics.
-Off by default because computeIIS() can be expensive on large LUTO models; turn on
-for debugging infeasibility (e.g. as a grid_search parameter).
-'''
 
 
 
@@ -307,28 +300,60 @@ Range from 1e-2 (fast, loose) to 1e-8 (slow, tight; Gurobi default).
    prevents the barrier from closing the gap to 1e-5; crossover polishes the result.
 '''
 
-DROP_UNREACHABLE_BIO_CONSTRAINTS = True
+DROP_UNREACHABLE_CONSTRAINTS = ['bio_snes', 'bio_ecnes', 'bio_nvis']
 '''
-Drop a GBF3/GBF4/GBF8 biodiversity row when it is PROVABLY unsatisfiable, and record it.
+Which constraint groups may be SACRIFICED to keep a year solvable — ORDERED, least-valued first.
 
-At build time each row's ceiling is computed as
-    Σ_cells  pre_1750_area[cell] × max_reachable_contribution[cell]
-where max_reachable_contribution accounts for IRREVERSIBLE lock-in: shares already committed to a
-non-reversible land use (every planting type — see NON_AG_LAND_USES_REVERSIBLE) are stuck at that
-land use's own contribution, and only the free remainder can take the best lever still placeable in
-that cell. If that ceiling is below the row's target, NO allocation can satisfy it.
+This list is the drop policy for BOTH halves of the infeasibility flow in simulation.py:
 
-Why dropping is the right default: such a row makes the entire year infeasible, taking every other
-species, community and vegetation-group target down with it. Excluding it costs one target and saves
-the rest. Nothing is silent — each exclusion is printed and written to
-`out_<year>/unreachable_bio_constraints_<year>.csv`.
+  1. Pre-solve, each group in INFEASIBILITY_DIAGNOSIS_GROUPS is feasibility-tested alone; a row
+     that cannot hold even by itself (e.g. one ECNES community whose target exceeds anything its
+     cells could reach) is dropped before the real solve.
+  2. After a failed solve, the IIS names a set of rows that cannot all hold together; the earliest
+     group in this list that appears in the IIS gives up one row, and the solve is retried.
 
-Set to False to keep the row and let the solve fail, e.g. when reproducing a historical run.
+Order matters: when a conflict could be resolved from several of these groups, the FIRST group
+listed loses its row. Groups not listed are never dropped — the adoption caps, GHG, water and
+demand are deliberately absent, so a conflict entirely among those ends the year and is REPORTED
+instead of silently relaxing a scenario-defining constraint.
 
-NOTE this is a symptom-level guard. The usual root cause is path dependence: an early year meets a
-low target with a cheap, low-contribution, irreversible land use (EP at 0.70), and a later year's
-higher target can then only be met by a higher-contribution one (riparian at 1.0), which
-irreversibility forbids. Prefer fixing the target trajectory over relying on this.
+Group names come from CONSTRAINT_GROUPS in solvers/tools.py. Every drop is recorded in
+out_<year>/dropped_constraints_<year>.csv, never silent.
+
+Set to [] to drop nothing (e.g. when reproducing a historical run): the pre-solve test is then
+skipped, and a failed year is still diagnosed — the IIS is printed — but nothing is removed, so
+the year fails as-is.
+'''
+
+INFEASIBILITY_DIAGNOSIS_GROUPS = ['bio_nvis', 'bio_snes', 'bio_ecnes', 'nonag_cap']
+'''
+Which constraint groups the infeasibility diagnosis works on. Two roles in simulation.py:
+
+  * pre-solve: each of these groups is feasibility-tested ALONE (plus the structural rows);
+  * post-failure: the diagnosis probe keeps ONLY these groups (plus structural), and the IIS is
+    computed on that restricted copy.
+
+Restriction is what makes the IIS affordable, not just faster: one measured feasibility solve went
+from 417 s (full model) to 13 s (restricted), and the full model's computeIIS did not finish in
+2.7 h. It is not free — discarding constraints is a relaxation, so:
+
+    restricted model INFEASIBLE  ->  the full model is infeasible too, and the conflict lies
+                                     entirely within the groups kept. Sound.
+    restricted model FEASIBLE    ->  says NOTHING about the full model. A conflict involving a
+                                     discarded group is invisible, and the year will still fail.
+
+So only exclude a group when you are confident it does not bind. The default keeps the
+biodiversity families and the non-ag adoption cap — the two sides of every conflict observed so
+far — and discards demand, GHG, water, renewables and the transition-flow system. (Water was
+tested: a restriction that still contained it returned the identical IIS, so it does not
+participate.)
+
+Group names come from CONSTRAINT_GROUPS in solvers/tools.py. `cell_usage` and `ag_mgt_link` are
+always kept regardless: without them land is not scarce and almost anything looks feasible.
+
+Set to [] (or None) to turn the diagnosis machinery OFF entirely — both the pre-solve test and the
+post-failure IIS are skipped, and a failed year just fails. NOTE there is currently no value that
+diagnoses against the FULL model; the closest is listing every group from CONSTRAINT_GROUPS.
 '''
 
 SCALE_FLAG = 0
