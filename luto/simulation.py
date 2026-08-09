@@ -40,7 +40,7 @@ from luto import settings
 from luto.data import Data
 from luto.solvers.input_data import get_input_data
 from luto.solvers.solver import LutoSolver
-from luto.solvers.tools import feasible_solve, resolve_infeasibility, group_of
+from luto.solvers.tools import feasible_solve, is_feasible, resolve_infeasibility, group_of
 from luto.tools.write import write_outputs
 from luto.tools import (
     LogToFile,
@@ -339,8 +339,14 @@ def drop_unreachable_before_solve(luto_solver: LutoSolver, data: Data, target_ye
     anything its cells could reach — which would otherwise take the whole year down and leave the
     retry ladder grinding for hours to discover it.
 
-    It cannot see a conflict that needs two groups TOGETHER; that is `diagnose_and_drop_conflict`'s
-    job, after the ladder has failed.
+    Then a JOINT check: if the diagnosis groups together are still infeasible after the per-group
+    drops, the full model is provably infeasible too (restriction is a relaxation), so the conflict
+    is resolved HERE rather than discovered after a failed ladder rung. This is not an optimisation
+    but a termination guarantee: on R2_SNES_T1525_cap10 (2026-08-09) the jointly-infeasible model
+    sent rung 1 into `Numerical trouble`, Gurobi fell back to its INTERNAL simplex within the same
+    optimize() call, and that simplex diverged without terminating — so the post-failure IIS that
+    would have named the conflict was never reached. The joint probe had already proven the
+    infeasibility before the ladder started; act on it.
     """
     if not (settings.DROP_UNREACHABLE_CONSTRAINTS and settings.INFEASIBILITY_DIAGNOSIS_GROUPS):
         return []
@@ -358,6 +364,18 @@ def drop_unreachable_before_solve(luto_solver: LutoSolver, data: Data, target_ye
     # Written BEFORE the solve on purpose: the record matters most when the year still goes on to
     # fail, and nothing downstream would preserve it then.
     record_dropped(records, luto_solver, data, target_year, 'pre_solve')
+
+    # Joint check — resolve a provable combined conflict before any production rung runs.
+    status, secs = is_feasible(
+        luto_solver.gurobi_model, keep_groups=settings.INFEASIBILITY_DIAGNOSIS_GROUPS)
+    while status == 'INFEASIBLE':
+        print(f"├── diagnosis groups JOINTLY infeasible ({secs:.0f}s probe) — "
+              f"resolving before the solve...")
+        if not diagnose_and_drop_conflict(luto_solver, data, target_year):
+            break   # nothing droppable in the conflict; let the ladder fail loudly and report
+        status, secs = is_feasible(
+            luto_solver.gurobi_model, keep_groups=settings.INFEASIBILITY_DIAGNOSIS_GROUPS)
+
     return dropped
 
 
