@@ -40,7 +40,9 @@ from luto import settings
 from luto.data import Data
 from luto.solvers.input_data import get_input_data
 from luto.solvers.solver import LutoSolver
-from luto.solvers.tools import feasible_solve, is_feasible, resolve_infeasibility, group_of
+from luto.solvers.tools import (
+    feasible_solve, is_feasible, knife_edge_rows, resolve_infeasibility, group_of,
+)
 from luto.tools.write import write_outputs
 from luto.tools import (
     LogToFile,
@@ -375,6 +377,24 @@ def drop_unreachable_before_solve(luto_solver: LutoSolver, data: Data, target_ye
             break   # nothing droppable in the conflict; let the ladder fail loudly and report
         status, secs = is_feasible(
             luto_solver.gurobi_model, keep_groups=settings.INFEASIBILITY_DIAGNOSIS_GROUPS)
+
+    # Knife-edge census — DETECTION ONLY, nothing is removed. The joint probe just said feasible;
+    # re-asking with every diagnosis-group RHS tightened by 1e-4 of its magnitude names the rows
+    # whose relative headroom is below that — the rows a stalled solve would be crawling on.
+    # Recorded now so a stall is pre-attributed and the analysis can see which targets are
+    # satisfied only by a hair. Analysis note: filter dropped_constraints_<year>.csv on action —
+    # only 'DROPPED' rows left the model; 'KNIFE_EDGE' rows stayed in.
+    if status == 'OPTIMAL':
+        edge = knife_edge_rows(
+            luto_solver.gurobi_model, keep_groups=settings.INFEASIBILITY_DIAGNOSIS_GROUPS)
+        if edge:
+            print(f"├── {len(edge)} row(s) with relative headroom < 1e-4 — knife-edge, "
+                  f"recorded (kept in the model):")
+            for n in edge:
+                print(f"│       [{group_of(n)}] {n}")
+            record_dropped([{'group': group_of(n), 'constraint': n, 'action': 'KNIFE_EDGE'}
+                            for n in edge],
+                           luto_solver, data, target_year, 'pre_solve')
 
     return dropped
 

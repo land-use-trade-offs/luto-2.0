@@ -253,6 +253,64 @@ def _droppable_rows(iis_names, droppable) -> list[str]:
     return rows
 
 
+def knife_edge_rows(model, keep_groups=None, time_limit: float | None = None,
+                    rel_tighten: float = 1e-4) -> list[str]:
+    """Rows satisfiable only by a hair — relative headroom below `rel_tighten`.
+
+    A knife-edge row is FEASIBLE at every tolerance (its slack is positive), so no feasibility
+    verdict can find it. What finds it is a perturbation census: on the probe copy, tighten every
+    candidate row's RHS by `rel_tighten` of its magnitude (`>=` rows demand a fraction more, `<=`
+    rows allow a fraction less; equalities and zero-RHS rows are left alone). If the joint model
+    flips INFEASIBLE, the IIS names the rows whose relative headroom is below the perturbation —
+    the rows a relaxed production solve can crawl on for hours without ever refuting. 1e-4 is the
+    threshold the saturation analysis put on status-4 risk (the GB cap sat at 5e-6 when its runs
+    returned status 4; healthy rows sat above 0.17).
+
+    DETECTION ONLY — the caller's model is never touched and nothing is removed. simulation.py
+    records the names as KNIFE_EDGE in dropped_constraints_<year>.csv so a later stall is
+    pre-attributed and the analysis can see which targets are met only by a hair. Structural and
+    ungrouped rows are filtered from the result. Returns [] when every row has comfortable
+    headroom (or when there was nothing to perturb).
+    """
+    m = _feasibility_copy(model, time_limit, keep_groups)
+    n_perturbed = 0
+    for c in m.getConstrs():
+        g = group_of(c.ConstrName)
+        if g is None or g in STRUCTURAL:
+            continue
+        rhs = c.RHS
+        if rhs == 0.0:
+            continue
+        if c.Sense == GRB.GREATER_EQUAL:
+            c.RHS = rhs + rel_tighten * abs(rhs)
+        elif c.Sense == GRB.LESS_EQUAL:
+            c.RHS = rhs - rel_tighten * abs(rhs)
+        else:
+            continue
+        n_perturbed += 1
+    if n_perturbed == 0:
+        return []
+    m.update()
+
+    # Enumerate: an IIS is one minimal certificate, so remove its named rows from the perturbed
+    # copy and re-ask until it turns feasible — independent thin conflicts each get named. Rows
+    # that relax once a named row is gone are attributed through it (headroom is a JOINT property;
+    # one name per thin interaction is what the record needs).
+    edge = []
+    for _ in range(20):
+        try:
+            m.computeIIS()
+        except gp.GurobiError:
+            break                       # feasible under the tightening — census complete
+        named = [n for n in _iis_rows(m)
+                 if group_of(n) is not None and group_of(n) not in STRUCTURAL]
+        if not named:
+            break                       # conflict entirely among structural rows — nothing to name
+        edge.extend(named)
+        _remove_named(m, named)
+    return edge
+
+
 def is_feasible(model, drop_groups=(), time_limit: float | None = None, keep_groups=None):
     """Solve a copy with `drop_groups` removed. Returns (status_name, seconds).
 
