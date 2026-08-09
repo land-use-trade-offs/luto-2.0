@@ -379,21 +379,31 @@ def drop_unreachable_before_solve(luto_solver: LutoSolver, data: Data, target_ye
             luto_solver.gurobi_model, keep_groups=settings.INFEASIBILITY_DIAGNOSIS_GROUPS)
 
     # Knife-edge census — DETECTION ONLY, nothing is removed. The joint probe just said feasible;
-    # re-asking with every diagnosis-group RHS tightened by 1e-4 of its magnitude names the rows
-    # whose relative headroom is below that — the rows a stalled solve would be crawling on.
-    # Recorded now so a stall is pre-attributed and the analysis can see which targets are
-    # satisfied only by a hair. Analysis note: filter dropped_constraints_<year>.csv on action —
-    # only 'DROPPED' rows left the model; 'KNIFE_EDGE' rows stayed in.
+    # re-asking with every diagnosis-group RHS tightened by a LADDER of relative margins names the
+    # rows whose headroom is below each level. 1e-2 is the early-warning net (a row under 1% today
+    # is usually thinner next year — lock-in ratchets monotonically); 1e-6 is the measured
+    # stall/status-4 zone (the GB cap sat at 5e-6 when its runs failed; healthy rows sit above
+    # 8.5e-2). Each row is recorded with `headroom_lt` = the TIGHTEST level that named it, so the
+    # record says not just "thin" but HOW thin. Analysis note: filter dropped_constraints CSVs on
+    # action — only 'DROPPED' rows left the model; 'KNIFE_EDGE' rows stayed in.
     if status == 'OPTIMAL':
-        edge = knife_edge_rows(
-            luto_solver.gurobi_model, keep_groups=settings.INFEASIBILITY_DIAGNOSIS_GROUPS)
+        edge = {}
+        for eps in (1e-2, 1e-4, 1e-6):          # loose → tight; tighter names overwrite
+            named = knife_edge_rows(
+                luto_solver.gurobi_model,
+                keep_groups=settings.INFEASIBILITY_DIAGNOSIS_GROUPS, rel_tighten=eps)
+            if not named and not edge:
+                break                            # nothing under 1% — tighter levels are subsets
+            for n in named:
+                edge[n] = eps
         if edge:
-            print(f"├── {len(edge)} row(s) with relative headroom < 1e-4 — knife-edge, "
+            print(f"├── {len(edge)} row(s) with relative headroom < 1e-2 — knife-edge, "
                   f"recorded (kept in the model):")
-            for n in edge:
-                print(f"│       [{group_of(n)}] {n}")
-            record_dropped([{'group': group_of(n), 'constraint': n, 'action': 'KNIFE_EDGE'}
-                            for n in edge],
+            for n, eps in sorted(edge.items(), key=lambda kv: kv[1]):
+                print(f"│       [{group_of(n)}] headroom<{eps:g}  {n}")
+            record_dropped([{'group': group_of(n), 'constraint': n, 'action': 'KNIFE_EDGE',
+                             'headroom_lt': eps}
+                            for n, eps in edge.items()],
                            luto_solver, data, target_year, 'pre_solve')
 
     return dropped
@@ -449,6 +459,11 @@ def record_dropped(records, luto_solver, data, target_year, stage) -> None:
          for n in df['constraint']],
         index=df.index)
     df = pd.concat([df, parts], axis=1).assign(year=target_year, stage=stage)
+    # Canonical column set: appends from different stages carry different keys (feasible_solve has
+    # round/iis_size, the knife-edge census has headroom_lt) and a CSV append with a different
+    # column set from the existing header silently misaligns the file. Absent keys become blanks.
+    df = df.reindex(columns=['year', 'stage', 'group', 'constraint', 'action', 'round',
+                             'iis_size', 'headroom_lt', 'family', 'region', 'item', 'presence'])
 
     out_dir = f"{data.path}/out_{target_year}"
     os.makedirs(out_dir, exist_ok=True)
