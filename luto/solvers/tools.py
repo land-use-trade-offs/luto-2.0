@@ -177,6 +177,23 @@ def _feasibility_copy(model, time_limit: float | None = None, keep_groups=None,
     m.setObjective(0, GRB.MINIMIZE)     # feasibility, not optimality — far cheaper
     m.Params.OutputFlag = 0
     m.Params.DualReductions = 0         # so INF_OR_UNBD cannot hide a definite INFEASIBLE
+
+    # PIN the probe's numerics. `model.copy()` inherits the source model's parameters (verified),
+    # so without this the diagnosis runs under whatever solver rung happened to fail last — and on
+    # knife-edge models the parameters DECIDE the verdict. Measured on R3_ECNES_T3050_cap20/25
+    # (2026-08-09): with the failed rung's inherited (Presolve=auto, BarHomogeneous=off) the probe
+    # certified the model feasible-within-tolerance and the diagnosis found nothing; under
+    # (Presolve=0, BarHomogeneous=1) the same probe produced clean IISs whose 6-8 dropped rows then
+    # made the year solve at a normal objective. Method is pinned too: BarHomogeneous only applies
+    # to barrier, so an inherited Method=1 would silently bypass the flag. Presolve stays OFF per
+    # the RETRY_PARAMS note (presolve + homogeneous barrier manufactures false infeasibility);
+    # Crossover is skipped — only the status is read, never a basis.
+    m.Params.Method = 2
+    m.Params.Crossover = 0
+    m.Params.Presolve = 0
+    m.Params.BarHomogeneous = 1
+    m.Params.NumericFocus = 0
+
     if time_limit:
         m.Params.TimeLimit = time_limit
     return m
