@@ -397,14 +397,36 @@ def drop_unreachable_before_solve(luto_solver: LutoSolver, data: Data, target_ye
             for n in named:
                 edge[n] = eps
         if edge:
-            print(f"├── {len(edge)} row(s) with relative headroom < 1e-2 — knife-edge, "
-                  f"recorded (kept in the model):")
-            for n, eps in sorted(edge.items(), key=lambda kv: kv[1]):
-                print(f"│       [{group_of(n)}] headroom<{eps:g}  {n}")
-            record_dropped([{'group': group_of(n), 'constraint': n, 'action': 'KNIFE_EDGE',
-                             'headroom_lt': eps}
-                            for n, eps in edge.items()],
-                           luto_solver, data, target_year, 'pre_solve')
+            # Rows at or below the drop threshold AND in a droppable group are removed: inside
+            # that margin the production solve cannot distinguish them from infeasible, and both
+            # observed stall classes trace to exactly such rows. Non-droppable groups (the cap,
+            # GBF2, ...) are NEVER removed regardless of thinness — when the cap itself is the
+            # thin row, its droppable partner in the interaction is what the IIS names alongside
+            # it, and dropping the partner is what relieves the knife edge.
+            threshold = getattr(settings, 'KNIFE_EDGE_DROP_BELOW', 1e-4)
+            droppable = set(settings.DROP_UNREACHABLE_CONSTRAINTS)
+            to_drop = {n: eps for n, eps in edge.items()
+                       if eps <= threshold and group_of(n) in droppable}
+            to_keep = {n: eps for n, eps in edge.items() if n not in to_drop}
+
+            if to_drop:
+                print(f"├── dropping {len(to_drop)} knife-edge row(s) with relative headroom "
+                      f"<= {threshold:g} (numerically indistinguishable from infeasible):")
+                for n, eps in sorted(to_drop.items(), key=lambda kv: kv[1]):
+                    print(f"│       [{group_of(n)}] headroom<{eps:g}  {n}")
+                luto_solver.remove_constraints_by_name(list(to_drop))
+                record_dropped([{'group': group_of(n), 'constraint': n,
+                                 'action': 'DROPPED_KNIFE_EDGE', 'headroom_lt': eps}
+                                for n, eps in to_drop.items()],
+                               luto_solver, data, target_year, 'pre_solve')
+            if to_keep:
+                print(f"├── {len(to_keep)} thin row(s) recorded as knife-edge, kept in the model:")
+                for n, eps in sorted(to_keep.items(), key=lambda kv: kv[1]):
+                    print(f"│       [{group_of(n)}] headroom<{eps:g}  {n}")
+                record_dropped([{'group': group_of(n), 'constraint': n, 'action': 'KNIFE_EDGE',
+                                 'headroom_lt': eps}
+                                for n, eps in to_keep.items()],
+                               luto_solver, data, target_year, 'pre_solve')
 
     return dropped
 

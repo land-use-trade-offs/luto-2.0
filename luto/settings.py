@@ -325,6 +325,27 @@ skipped, and a failed year is still diagnosed — the IIS is printed — but not
 the year fails as-is.
 '''
 
+KNIFE_EDGE_DROP_BELOW = 1e-4
+'''
+Drop threshold for the pre-solve knife-edge census (see solvers/tools.knife_edge_rows).
+
+The census names rows that are SATISFIABLE but only by a hair — tightening every diagnosis-group
+RHS by 1%/1e-4/1e-6 of its magnitude and reading the IIS at each level. Rows whose relative
+headroom is below THIS value, and whose group is in DROP_UNREACHABLE_CONSTRAINTS, are dropped
+before the solve and recorded as action='DROPPED_KNIFE_EDGE' with their headroom tier
+(`headroom_lt`) in out_<year>/dropped_constraints_<year>.csv. Thin rows above the threshold (and
+ALL rows of non-droppable groups, e.g. the non-ag cap) are recorded as 'KNIFE_EDGE' but kept.
+
+Why drop them at all: a row inside this margin is numerically indistinguishable from infeasible to
+the production solve (FeasibilityTol 1e-2) — measured on R2_SNES_T1525_cap10, whose 2045 stalled
+DETERMINISTICALLY (twice, to the digit) on rows every probe certified feasible. Dropping trades a
+met-by-a-hair target for guaranteed termination, and the record says exactly how thin the margin
+was. 1e-4 is the saturation threshold from the Phase-1 analysis: the GB cap sat at 5e-6 relative
+slack when its runs returned status 4; healthy rows sit above 8.5e-2.
+
+Set to 0 to disable knife-edge dropping (the census still records).
+'''
+
 INFEASIBILITY_DIAGNOSIS_GROUPS = ['bio_nvis', 'bio_snes', 'bio_ecnes', 'nonag_cap']
 '''
 Which constraint groups the infeasibility diagnosis works on. Two roles in simulation.py:
