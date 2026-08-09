@@ -194,6 +194,16 @@ def _feasibility_copy(model, time_limit: float | None = None, keep_groups=None,
     m.Params.BarHomogeneous = 1
     m.Params.NumericFocus = 0
 
+    # TIGHT feasibility tolerance, deliberately stricter than production. The probe answers a
+    # mathematical question — "can these rows all hold?" — while production (FeasibilityTol 1e-2,
+    # relaxed for convergence) answers an engineering one. A row satisfiable only within 1e-2 is
+    # exactly a knife-edge row that production numerics cannot traverse: R2_SNES_T1525_cap10
+    # (2026-08-09) stalled DETERMINISTICALLY — twice, to the digit — on rows its 1e-2 probe kept
+    # certifying feasible, so the IIS never named them. At 1e-6 (Gurobi's default) the probe calls
+    # such rows infeasible, the IIS names them, and the loose production solve then runs on a model
+    # comfortably inside its own tolerance.
+    m.Params.FeasibilityTol = 1e-6
+
     if time_limit:
         m.Params.TimeLimit = time_limit
     return m
