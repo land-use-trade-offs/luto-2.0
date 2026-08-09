@@ -3903,9 +3903,13 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
         .rename(columns={'region_state': 'region'})
     )
     target_aus = target_nrm.groupby('group', as_index=False)['TARGET_INSIDE_SCORE'].sum()
+    # Strip any 'AUSTRALIA' from nrm/state rows — in AUSTRALIA mode target_nrm carries
+    # region='AUSTRALIA' which would duplicate the explicit Australia aggregates below, and the
+    # duplicated keys fan out the left-merge that assigns TARGET_INSIDE_SCORE ("Length of values
+    # does not match length of index"). Same guard as the SNES/ECNES writers.
     all_targets = pd.concat([
-        target_nrm.assign(region_level='region_NRM'),
-        target_state.assign(region_level='region_state'),
+        target_nrm[target_nrm['region'] != 'AUSTRALIA'].assign(region_level='region_NRM'),
+        target_state[target_state['region'] != 'AUSTRALIA'].assign(region_level='region_state'),
         target_aus.assign(region='AUSTRALIA', region_level='region_NRM'),
         target_aus.assign(region='AUSTRALIA', region_level='region_state'),
     ], ignore_index=True)
