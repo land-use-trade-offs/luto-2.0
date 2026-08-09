@@ -311,6 +311,88 @@ def knife_edge_rows(model, keep_groups=None, time_limit: float | None = None,
     return edge
 
 
+def feasibility_spectrum(model, keep_groups=None, droppable=None, time_limit: float | None = None,
+                         edge_levels=(1e-6, 1e-4, 1e-2), max_rounds: int = 20,
+                         verbose: bool = True) -> dict:
+    """ONE probe copy, one ladder — infeasibility detection and knife-edge detection are the same
+    process at different tightenings, so they are asked as one.
+
+        eps = 0    unperturbed. An IIS here is a PROOF of infeasibility; the least-valued
+                   droppable row is surrendered per round (resolve_infeasibility's policy) until
+                   the copy turns feasible → returned in 'dropped'. If a round's IIS contains no
+                   droppable row, the conflict is among scenario-defining rows → status
+                   'INFEASIBLE_UNRESOLVABLE', with the IIS attached.
+        eps > 0    candidate RHS tightened by eps·|RHS| (>= demands more, <= allows less;
+                   equalities and zero-RHS rows never perturbed). An IIS now names rows whose
+                   relative headroom is below eps → returned in 'edge' as {name: tier}. Tightest
+                   level first, named rows removed from the copy, so each row lands on the
+                   tightest tier that names it and independent thin conflicts all surface.
+
+    Building the copy is the dominant cost (~minutes at LUTO scale); every additional level or
+    round on the shared copy is an RHS update + computeIIS (seconds). This supersedes the
+    production use of `feasible_solve` + a separate joint check + `knife_edge_rows` — those remain
+    for interactive diagnosis.
+
+    `droppable` (ordered, least-valued first) gates only what may be SURRENDERED at eps=0.
+    Non-droppable rows still land in 'edge' — the caller records them but must never remove them.
+    Returns {'status', 'dropped': [names], 'edge': {name: eps}} (+ 'iis' when unresolvable).
+    """
+    droppable = list(droppable or [])
+    m = _feasibility_copy(model, time_limit, keep_groups, verbose=verbose)
+
+    # Candidate rows (perturbable): non-structural grouped inequalities with non-zero RHS.
+    # Original RHS stored once; levels recompute from it.
+    orig_rhs = {}
+    for c in m.getConstrs():
+        g = group_of(c.ConstrName)
+        if g is None or g in STRUCTURAL:
+            continue
+        if c.Sense not in (GRB.GREATER_EQUAL, GRB.LESS_EQUAL) or c.RHS == 0.0:
+            continue
+        orig_rhs[c.ConstrName] = (c, c.RHS, c.Sense)
+
+    dropped, edge = [], {}
+
+    # ── eps = 0: provable infeasibility, one droppable row per round ──
+    for _ in range(max_rounds):
+        try:
+            m.computeIIS()
+        except gp.GurobiError:
+            break                                   # feasible — proof phase complete
+        iis = _iis_rows(m)
+        candidates = _droppable_rows(iis, droppable)
+        if not candidates:
+            return {'status': 'INFEASIBLE_UNRESOLVABLE', 'dropped': dropped, 'edge': edge,
+                    'iis': _by_group(iis)}
+        victim = candidates[0]
+        dropped.append(victim)
+        if verbose:
+            print(f"│   ├── provably infeasible — dropping [{group_of(victim)}] {victim}")
+        _remove_named(m, [victim])
+        orig_rhs.pop(victim, None)
+
+    # ── eps > 0: knife-edge tiers on the same copy, tightest first ──
+    for eps in sorted(edge_levels):
+        for name, (c, rhs, sense) in orig_rhs.items():
+            c.RHS = rhs + eps * abs(rhs) if sense == GRB.GREATER_EQUAL else rhs - eps * abs(rhs)
+        m.update()
+        for _ in range(max_rounds):
+            try:
+                m.computeIIS()
+            except gp.GurobiError:
+                break                               # feasible under this tightening — next level
+            named = [n for n in _iis_rows(m) if n in orig_rhs]
+            if not named:
+                break                               # defensively: no perturbed row implicated
+            for n in named:
+                edge[n] = eps
+            _remove_named(m, named)
+            for n in named:
+                orig_rhs.pop(n, None)
+
+    return {'status': 'OPTIMAL', 'dropped': dropped, 'edge': edge}
+
+
 def is_feasible(model, drop_groups=(), time_limit: float | None = None, keep_groups=None):
     """Solve a copy with `drop_groups` removed. Returns (status_name, seconds).
 

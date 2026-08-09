@@ -40,9 +40,7 @@ from luto import settings
 from luto.data import Data
 from luto.solvers.input_data import get_input_data
 from luto.solvers.solver import LutoSolver
-from luto.solvers.tools import (
-    feasible_solve, is_feasible, knife_edge_rows, resolve_infeasibility, group_of,
-)
+from luto.solvers.tools import feasibility_spectrum, resolve_infeasibility, group_of
 from luto.tools.write import write_outputs
 from luto.tools import (
     LogToFile,
@@ -335,100 +333,79 @@ def store_solution(data: Data, target_year: int, solution) -> None:
 # ---------------------------------------------------------------------------- #
 
 def drop_unreachable_before_solve(luto_solver: LutoSolver, data: Data, target_year: int) -> list:
-    """Test each constraint group ALONE and drop whatever cannot hold, before any real solve.
+    """One pre-solve feasibility SPECTRUM: provable infeasibility and knife-edge thinness are the
+    same question at different tightenings, asked on one shared probe copy (tools.py).
 
-    Catches a group that is infeasible BY ITSELF — one ECNES community whose target exceeds
-    anything its cells could reach — which would otherwise take the whole year down and leave the
-    retry ladder grinding for hours to discover it.
+        eps = 0      an IIS is a PROOF — the least-valued droppable row is surrendered per round
+                     until feasible. Catches rows impossible alone (NE Buloke) AND joint conflicts
+                     (SNES × cap) before any production rung runs. Termination guarantee, not an
+                     optimisation: a jointly-infeasible model can send a rung into `Numerical
+                     trouble` → Gurobi's internal simplex fallback → divergence that never
+                     terminates, so the post-failure IIS is unreachable (R2_SNES_T1525_cap10,
+                     2026-08-09, deterministic to the digit).
+        eps > 0      rows with relative headroom below 1e-6/1e-4/1e-2. Below
+                     KNIFE_EDGE_DROP_BELOW (droppable groups only) they are removed — inside that
+                     margin the production solve cannot distinguish them from infeasible, and both
+                     observed stall classes trace to exactly such rows. The 1e-2 band is recorded
+                     as early warning (lock-in ratchets: under-1% today is thinner next year).
 
-    Then a JOINT check: if the diagnosis groups together are still infeasible after the per-group
-    drops, the full model is provably infeasible too (restriction is a relaxation), so the conflict
-    is resolved HERE rather than discovered after a failed ladder rung. This is not an optimisation
-    but a termination guarantee: on R2_SNES_T1525_cap10 (2026-08-09) the jointly-infeasible model
-    sent rung 1 into `Numerical trouble`, Gurobi fell back to its INTERNAL simplex within the same
-    optimize() call, and that simplex diverged without terminating — so the post-failure IIS that
-    would have named the conflict was never reached. The joint probe had already proven the
-    infeasibility before the ladder started; act on it.
+    Non-droppable groups (the cap, GBF2, ...) are NEVER removed however thin — when the cap
+    itself is the thin row, the IIS names its droppable partner, and dropping the partner
+    relieves the edge. Analysis note: filter dropped_constraints CSVs on `action` — 'DROPPED'
+    (proven) and 'DROPPED_KNIFE_EDGE' (inside numerical noise, margin in `headroom_lt`) left the
+    model; 'KNIFE_EDGE' rows stayed in.
     """
     if not (settings.DROP_UNREACHABLE_CONSTRAINTS and settings.INFEASIBILITY_DIAGNOSIS_GROUPS):
         return []
 
-    print("├── Pre-solve per-group feasibility test...")
-    dropped, records = feasible_solve(
+    print("├── Pre-solve feasibility spectrum (provable infeasibility → knife-edge census)...")
+    spec = feasibility_spectrum(
         luto_solver.gurobi_model,
-        groups=settings.INFEASIBILITY_DIAGNOSIS_GROUPS,
+        keep_groups=settings.INFEASIBILITY_DIAGNOSIS_GROUPS,
         droppable=settings.DROP_UNREACHABLE_CONSTRAINTS)
 
-    # Removes from the model AND the solver's bookkeeping dicts — a stale Constr left in those
-    # would crash `record_shadow_prices` after the accepted solve.
-    luto_solver.remove_constraints_by_name(dropped)
+    # Proven drops. Removal goes through the solver so the bookkeeping dicts stay in sync — a
+    # stale Constr would crash `record_shadow_prices` after the accepted solve. Records are
+    # written BEFORE the solve on purpose: they matter most when the year still goes on to fail.
+    if spec['dropped']:
+        luto_solver.remove_constraints_by_name(spec['dropped'])
+        record_dropped([{'group': group_of(n), 'constraint': n, 'action': 'DROPPED'}
+                        for n in spec['dropped']],
+                       luto_solver, data, target_year, 'pre_solve')
 
-    # Written BEFORE the solve on purpose: the record matters most when the year still goes on to
-    # fail, and nothing downstream would preserve it then.
-    record_dropped(records, luto_solver, data, target_year, 'pre_solve')
+    if spec['status'] == 'INFEASIBLE_UNRESOLVABLE':
+        print("├── conflict among non-droppable rows — nothing more can be given up; the ladder "
+              "will run and the year will fail loudly if it cannot solve")
+        record_dropped([{'group': None, 'constraint': None, 'action': 'UNRESOLVABLE'}],
+                       luto_solver, data, target_year, 'pre_solve')
+        return spec['dropped']
 
-    # Joint check — resolve a provable combined conflict before any production rung runs.
-    status, secs = is_feasible(
-        luto_solver.gurobi_model, keep_groups=settings.INFEASIBILITY_DIAGNOSIS_GROUPS)
-    while status == 'INFEASIBLE':
-        print(f"├── diagnosis groups JOINTLY infeasible ({secs:.0f}s probe) — "
-              f"resolving before the solve...")
-        if not diagnose_and_drop_conflict(luto_solver, data, target_year):
-            break   # nothing droppable in the conflict; let the ladder fail loudly and report
-        status, secs = is_feasible(
-            luto_solver.gurobi_model, keep_groups=settings.INFEASIBILITY_DIAGNOSIS_GROUPS)
+    threshold = getattr(settings, 'KNIFE_EDGE_DROP_BELOW', 1e-4)
+    droppable = set(settings.DROP_UNREACHABLE_CONSTRAINTS)
+    to_drop = {n: eps for n, eps in spec['edge'].items()
+               if eps <= threshold and group_of(n) in droppable}
+    to_keep = {n: eps for n, eps in spec['edge'].items() if n not in to_drop}
 
-    # Knife-edge census — DETECTION ONLY, nothing is removed. The joint probe just said feasible;
-    # re-asking with every diagnosis-group RHS tightened by a LADDER of relative margins names the
-    # rows whose headroom is below each level. 1e-2 is the early-warning net (a row under 1% today
-    # is usually thinner next year — lock-in ratchets monotonically); 1e-6 is the measured
-    # stall/status-4 zone (the GB cap sat at 5e-6 when its runs failed; healthy rows sit above
-    # 8.5e-2). Each row is recorded with `headroom_lt` = the TIGHTEST level that named it, so the
-    # record says not just "thin" but HOW thin. Analysis note: filter dropped_constraints CSVs on
-    # action — only 'DROPPED' rows left the model; 'KNIFE_EDGE' rows stayed in.
-    if status == 'OPTIMAL':
-        edge = {}
-        for eps in (1e-2, 1e-4, 1e-6):          # loose → tight; tighter names overwrite
-            named = knife_edge_rows(
-                luto_solver.gurobi_model,
-                keep_groups=settings.INFEASIBILITY_DIAGNOSIS_GROUPS, rel_tighten=eps)
-            if not named and not edge:
-                break                            # nothing under 1% — tighter levels are subsets
-            for n in named:
-                edge[n] = eps
-        if edge:
-            # Rows at or below the drop threshold AND in a droppable group are removed: inside
-            # that margin the production solve cannot distinguish them from infeasible, and both
-            # observed stall classes trace to exactly such rows. Non-droppable groups (the cap,
-            # GBF2, ...) are NEVER removed regardless of thinness — when the cap itself is the
-            # thin row, its droppable partner in the interaction is what the IIS names alongside
-            # it, and dropping the partner is what relieves the knife edge.
-            threshold = getattr(settings, 'KNIFE_EDGE_DROP_BELOW', 1e-4)
-            droppable = set(settings.DROP_UNREACHABLE_CONSTRAINTS)
-            to_drop = {n: eps for n, eps in edge.items()
-                       if eps <= threshold and group_of(n) in droppable}
-            to_keep = {n: eps for n, eps in edge.items() if n not in to_drop}
+    if to_drop:
+        print(f"├── dropping {len(to_drop)} knife-edge row(s) with relative headroom "
+              f"<= {threshold:g} (numerically indistinguishable from infeasible):")
+        for n, eps in sorted(to_drop.items(), key=lambda kv: kv[1]):
+            print(f"│       [{group_of(n)}] headroom<{eps:g}  {n}")
+        luto_solver.remove_constraints_by_name(list(to_drop))
+        record_dropped([{'group': group_of(n), 'constraint': n,
+                         'action': 'DROPPED_KNIFE_EDGE', 'headroom_lt': eps}
+                        for n, eps in to_drop.items()],
+                       luto_solver, data, target_year, 'pre_solve')
+    if to_keep:
+        print(f"├── {len(to_keep)} thin row(s) recorded as knife-edge, kept in the model:")
+        for n, eps in sorted(to_keep.items(), key=lambda kv: kv[1]):
+            print(f"│       [{group_of(n)}] headroom<{eps:g}  {n}")
+        record_dropped([{'group': group_of(n), 'constraint': n, 'action': 'KNIFE_EDGE',
+                         'headroom_lt': eps}
+                        for n, eps in to_keep.items()],
+                       luto_solver, data, target_year, 'pre_solve')
 
-            if to_drop:
-                print(f"├── dropping {len(to_drop)} knife-edge row(s) with relative headroom "
-                      f"<= {threshold:g} (numerically indistinguishable from infeasible):")
-                for n, eps in sorted(to_drop.items(), key=lambda kv: kv[1]):
-                    print(f"│       [{group_of(n)}] headroom<{eps:g}  {n}")
-                luto_solver.remove_constraints_by_name(list(to_drop))
-                record_dropped([{'group': group_of(n), 'constraint': n,
-                                 'action': 'DROPPED_KNIFE_EDGE', 'headroom_lt': eps}
-                                for n, eps in to_drop.items()],
-                               luto_solver, data, target_year, 'pre_solve')
-            if to_keep:
-                print(f"├── {len(to_keep)} thin row(s) recorded as knife-edge, kept in the model:")
-                for n, eps in sorted(to_keep.items(), key=lambda kv: kv[1]):
-                    print(f"│       [{group_of(n)}] headroom<{eps:g}  {n}")
-                record_dropped([{'group': group_of(n), 'constraint': n, 'action': 'KNIFE_EDGE',
-                                 'headroom_lt': eps}
-                                for n, eps in to_keep.items()],
-                               luto_solver, data, target_year, 'pre_solve')
-
-    return dropped
+    return spec['dropped'] + list(to_drop)
 
 
 def diagnose_and_drop_conflict(luto_solver: LutoSolver, data: Data, target_year: int) -> bool:
