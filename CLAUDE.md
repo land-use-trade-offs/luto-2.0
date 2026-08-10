@@ -225,7 +225,7 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 
 - `SOLVE_METHOD`: GUROBI algorithm (default: 2 for barrier method)
 - `THREADS`: Parallel threads for optimization (default: min(32, cpu_count))
-- `FEASIBILITY_TOLERANCE`: Solver tolerance (default: 1e-2, relaxed from 1e-6)
+- `FEASIBILITY_TOLERANCE`: Primal feasibility tolerance (1e-6). Also the precision granule: `ROUND_DECIMALS` is derived from it, and the near-zero bound snap threshold is `FEASIBILITY_TOLERANCE * 10`
 - `OPTIMALITY_TOLERANCE`: Optimality tolerance (default: 1e-2)
 - `BARRIER_CONVERGENCE_TOLERANCE`: Barrier method convergence (default: 1e-5)
 - `RESCALE_FACTOR`: Rescaling magnitude for numerical stability (default: 1e3)

@@ -337,7 +337,7 @@ before the solve and recorded as action='DROPPED_KNIFE_EDGE' with their headroom
 ALL rows of non-droppable groups, e.g. the non-ag cap) are recorded as 'KNIFE_EDGE' but kept.
 
 Why drop them at all: a row inside this margin is numerically indistinguishable from infeasible to
-the production solve (FeasibilityTol 1e-2) — measured on R2_SNES_T1525_cap10, whose 2045 stalled
+the production solve (FeasibilityTol 1e-6) — measured on R2_SNES_T1525_cap10, whose 2045 stalled
 DETERMINISTICALLY (twice, to the digit) on rows every probe certified feasible. Dropping trades a
 met-by-a-hair target for guaranteed termination, and the record says exactly how thin the margin
 was. 1e-4 is the saturation threshold from the Phase-1 analysis: the GB cap sat at 5e-6 relative

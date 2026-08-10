@@ -194,15 +194,18 @@ def _feasibility_copy(model, time_limit: float | None = None, keep_groups=None,
     m.Params.BarHomogeneous = 1
     m.Params.NumericFocus = 0
 
-    # TIGHT feasibility tolerance, deliberately stricter than production. The probe answers a
-    # mathematical question — "can these rows all hold?" — while production (FeasibilityTol 1e-2,
-    # relaxed for convergence) answers an engineering one. A row satisfiable only within 1e-2 is
-    # exactly a knife-edge row that production numerics cannot traverse: R2_SNES_T1525_cap10
-    # (2026-08-09) stalled DETERMINISTICALLY — twice, to the digit — on rows its 1e-2 probe kept
-    # certifying feasible, so the IIS never named them. At 1e-6 (Gurobi's default) the probe calls
-    # such rows infeasible, the IIS names them, and the loose production solve then runs on a model
-    # comfortably inside its own tolerance.
-    m.Params.FeasibilityTol = 1e-6
+    # Pin the feasibility tolerance to the PRODUCTION value so a probe verdict means the same thing
+    # the production solve means, whatever a failed rung left on the model.
+    #
+    # CORRECTION (2026-08-10): this line was introduced believing production ran at FeasibilityTol
+    # 1e-2 and that 1e-6 therefore made the probe *stricter*. It does not — `settings.py` has
+    # FEASIBILITY_TOLERANCE = 1e-6, so probe and production agree, and since the copy inherits the
+    # source model's parameters anyway, pinning it is a no-op in value. It is kept for the same
+    # reason the algorithm parameters above are pinned: the verdict must not depend on inherited
+    # state. Do NOT re-derive a "the probe is tighter than production" argument from it — there is
+    # no tolerance gap, and the knife-edge census (which perturbs RHS by RELATIVE margins) is what
+    # actually finds rows satisfiable only by a hair.
+    m.Params.FeasibilityTol = 1e-6      # == settings.FEASIBILITY_TOLERANCE
 
     if time_limit:
         m.Params.TimeLimit = time_limit
