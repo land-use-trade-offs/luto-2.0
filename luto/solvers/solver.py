@@ -33,7 +33,7 @@ from gurobipy import GRB
 
 from luto import tools
 from luto.solvers.input_data import SolverInputData
-from luto.solvers.tools import check_constraint_names
+from luto.solvers.tools import check_constraint_names, reduce_forced_zero_rows
 from luto.settings import (
     AG_MANAGEMENTS, 
     AG_MANAGEMENTS_REVERSIBLE, 
@@ -177,6 +177,12 @@ class LutoSolver:
         self._setup_constraints()
         self._setup_objective()
         _floor_assembled_matrix(self.gurobi_model)
+        if settings.REDUCE_FORCED_ZERO_ROWS:
+            # Exact: rows forcing their own variables to zero carry no information, but they are
+            # 30% of the matrix and the most degenerate part of it. See the setting's docstring.
+            n = reduce_forced_zero_rows(self.gurobi_model)
+            print(f"└── Reduced {n:,} forced-zero row(s) (exact: their variables were already "
+                  f"pinned at 0)")
         self.bio_constraint_index()   # warm the cache while every constraint is still live
         # ONE name containing whitespace makes Gurobi discard EVERY name when the model is written
         # to MPS — which silently blinds all post-mortem attribution. Assert it here, not there.

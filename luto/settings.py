@@ -217,6 +217,29 @@ E.g., the water yield for some cells is 10t but the Biodiversity-score is 1e-7, 
 the model sensitive to variations in input data. 
 '''
 
+REDUCE_FORCED_ZERO_ROWS = False
+'''
+Apply the forced-zero row reduction to the PRODUCTION model, not just the diagnosis probes.
+
+An equality row `sum(a_i x_i) = 0` whose coefficients are all positive and whose variables all have
+lb >= 0 has exactly one solution: every variable in it is zero. Deleting the row and fixing those
+variables is therefore EXACT -- no feasible solution is removed, the optimum is unchanged.
+
+LUTO emits an enormous number of them from the transition-flow node balances, one per (source, cell)
+with no land to move. Measured on R2_SNES_T1525_cap15's 2045 model: 1,393,366 of 1,760,948 flow_in
+rows (79 %), pinning 4,369,481 variables -- 30 % of ALL rows in the model, and the most degenerate
+30 %. Gurobi's presolve would normally clear them, but the barrier runs with Presolve=0 by design
+(presolve + homogeneous barrier once produced false infeasibility), so they go straight into the
+factorisation of A.D.A'.
+
+Default False pending full-trajectory validation: the mathematics is not in doubt, but a solve is
+allowed to differ in which OPTIMAL vertex it reports, so the claim to check is that the objective
+and the reported dvars are unchanged. The diagnosis probes apply the reduction unconditionally
+(solvers/tools._feasibility_copy) -- there it is not an optimisation but a precondition, because
+without it a probe including the flow system returns NUMERIC and the caller cannot tell that from
+feasible.
+'''
+
 SOLVER_COEFF_MIN = 1e-4
 '''
 Minimum absolute coefficient threshold applied by ``_qsum()`` in solver.py before

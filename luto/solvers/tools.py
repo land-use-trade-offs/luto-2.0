@@ -153,8 +153,56 @@ def check_constraint_names(model, limit: int = 10) -> list[str]:
 # Feasibility probes (always on copies — the caller's model is never touched)  #
 # ---------------------------------------------------------------------------- #
 
+def reduce_forced_zero_rows(m, verbose: bool = False) -> int:
+    """Delete equality rows that force their own variables to zero, and fix those variables.
+
+    EXACT, not an approximation. A row `Σ aᵢxᵢ = 0` in which every coefficient is positive and every
+    variable has `lb ≥ 0` admits exactly one solution: all those variables are zero. Fixing them and
+    deleting the row therefore changes nothing about the feasible set.
+
+    Why it is worth doing: the transition-flow system emits an enormous number of these. Measured on
+    R2_SNES_T1525_cap15's 2045 model (2026-08-10), 1,393,366 of the 1,760,948 `flow_in` rows — 79 % —
+    have RHS exactly 0, between them pinning 4,369,481 variables (60 % of the model). They are
+    variable-fixings written as constraints, and each is a degenerate basis position.
+
+    The consequence is not slowness but UNDECIDABILITY: with them present the full model returns
+    NUMERIC — Gurobi cannot say feasible or infeasible — and `resolve_infeasibility` reads
+    "computeIIS says feasible" as feasible, so a genuinely infeasible year is diagnosed as fine and
+    the retry ladder grinds for a day. With them removed the SAME model returns INFEASIBLE in 85 s
+    and 22 barrier iterations. Presolve would normally clear this, but LUTO runs the barrier with
+    Presolve=0 by design.
+
+    A row whose variables cannot all be zero — any `lb > 0` — is NOT touched: that row is genuinely
+    infeasible and must stay visible to the diagnosis rather than be quietly removed.
+    """
+    doomed, fix = [], set()
+    for c in m.getConstrs():
+        if c.Sense != GRB.EQUAL or c.RHS != 0.0:
+            continue
+        row = m.getRow(c)
+        vs = [row.getVar(k) for k in range(row.size())]
+        if not vs:
+            continue
+        if any(row.getCoeff(k) <= 0 for k in range(row.size())):
+            continue                        # a negative coefficient permits a non-zero solution
+        if any(v.LB > 0 for v in vs):
+            continue                        # genuinely infeasible row — leave it for the IIS to name
+        doomed.append(c)
+        fix.update(vs)
+    if not doomed:
+        return 0
+    for v in fix:
+        v.UB = 0.0
+    m.remove(doomed)
+    m.update()
+    if verbose:
+        print(f"│   │   ├── reduced: {len(doomed):,} forced-zero row(s) removed, "
+              f"{len(fix):,} variable(s) fixed at 0 (exact)")
+    return len(doomed)
+
+
 def _feasibility_copy(model, time_limit: float | None = None, keep_groups=None,
-                      verbose: bool = False):
+                      verbose: bool = False, reduce_forced_zero: bool = True):
     """A copy set up to answer feasibility only: zero objective, no dual reductions, quiet.
 
     `keep_groups` restricts the copy to those groups plus STRUCTURAL, discarding the rest. That is
@@ -179,6 +227,13 @@ def _feasibility_copy(model, time_limit: float | None = None, keep_groups=None,
             if verbose:
                 print(f"│   │   ├── restricted to {sorted(keep)}: dropped {len(discard):,} row(s), "
                       f"{m.NumConstrs:,} remain")
+
+    # Exact reduction — see reduce_forced_zero_rows. Without it a probe that includes the
+    # transition-flow system is UNDECIDABLE (status NUMERIC), which the callers cannot distinguish
+    # from feasible. Costs seconds; buys a verdict.
+    if reduce_forced_zero:
+        reduce_forced_zero_rows(m, verbose=verbose)
+
     m.setObjective(0, GRB.MINIMIZE)     # feasibility, not optimality — far cheaper
     m.Params.OutputFlag = 0
     m.Params.DualReductions = 0         # so INF_OR_UNBD cannot hide a definite INFEASIBLE
