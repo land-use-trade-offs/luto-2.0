@@ -369,7 +369,7 @@ slack when its runs returned status 4; healthy rows sit above 8.5e-2.
 Set to 0 to disable knife-edge dropping (the census still records).
 '''
 
-INFEASIBILITY_DIAGNOSIS_GROUPS = ['bio_nvis', 'bio_snes', 'bio_ecnes', 'nonag_cap']
+INFEASIBILITY_DIAGNOSIS_GROUPS = ['bio_nvis', 'bio_snes', 'bio_ecnes', 'nonag_cap', 'flow_in', 'flow_out']
 '''
 Which constraint groups the infeasibility diagnosis works on. Two roles in simulation.py:
 
@@ -387,10 +387,24 @@ from 417 s (full model) to 13 s (restricted), and the full model's computeIIS di
                                      discarded group is invisible, and the year will still fail.
 
 So only exclude a group when you are confident it does not bind. The default keeps the
-biodiversity families and the non-ag adoption cap — the two sides of every conflict observed so
-far — and discards demand, GHG, water, renewables and the transition-flow system. (Water was
-tested: a restriction that still contained it returned the identical IIS, so it does not
-participate.)
+biodiversity families, the non-ag adoption cap AND the transition-flow system (`flow_in` /
+`flow_out`), and discards demand, GHG, water and renewables. (Water was tested: a restriction that
+still contained it returned the identical IIS, so it does not participate.)
+
+The flow system is in the default because excluding it manufactures false FEASIBLE verdicts
+(2026-08-10): a species target can be satisfiable in an unconstrained-land sense yet unreachable
+given how land is permitted to MOVE — T_MAT reachability and source availability live in the flow
+rows. Five capped runs stalled for days on exactly this: their flow-blind probes reported feasible,
+the ladder ran into `Numerical trouble`, and Gurobi's internal simplex fallback never returned.
+With flow in scope the same probe answers INFEASIBLE in ~75 s and the IIS names the rows
+(Macquaria australasica, E. alligatrix, ...); dropping them let every stalled year solve by
+ordinary barrier in ~8-14 min. Diagnosis cost: ~25-75 s per IIS round.
+
+`bio_gbf2` is deliberately NOT in the default: when GBF2 is on ('high', hard), its severely-scaled
+national row (dual ~500x the largest SNES dual) makes every deletion-filter LP inside computeIIS
+glacial — 111 min for 5 rounds, measured on R4_GBF2_T3050_cap25. Excluding it only blinds the
+probe, never the solve (GBF2 stays a hard constraint in the real model); the accepted risk is that
+a genuinely GBF2-involving conflict surfaces as a real-solve failure instead of a pre-solve drop.
 
 Group names come from CONSTRAINT_GROUPS in solvers/tools.py. `cell_usage` and `ag_mgt_link` are
 always kept regardless: without them land is not scarce and almost anything looks feasible.
