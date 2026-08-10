@@ -5,6 +5,194 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20260810 (later) — the blind spot WAS the flow system: widening the diagnosis scope unstalled all five runs
+
+### TL;DR
+
+The five capped runs that had defeated every attempt since 2026-08-06 (`R2_SNES_T1525_cap10/15`,
+`R3_ECNES_T1525_cap10/15` at 2045; `R4_GBF2_T3050_cap25` at 2050) were all unstalled the same day by
+**one settings change per run**: adding `flow_in`/`flow_out` to `INFEASIBILITY_DIAGNOSIS_GROUPS`.
+The pre-solve `feasibility_spectrum` then found and dropped the species/community rows whose targets
+are unreachable **only through the transition-flow system** — rows the old bio+cap-scoped probe
+certified as feasible, because without the flow rows they are. With those rows gone, every
+previously-stalling year solved by ordinary barrier in 448–812 s where prior attempts burned 5–24 h
+in Gurobi's internal simplex fallback without terminating.
+
+The decisive experiment (`flow_widen.py`, on `R2_SNES_T1525_cap15`'s saved 2045 MPS):
+
+| step | scope | verdict | time |
+|---|---|---|--:|
+| ground truth `is_feasible` | bio + cap + **flow** | **INFEASIBLE** (clean, not NUMERIC) | 74 s |
+| production `feasibility_spectrum` | same | dropped 1 SNES row → OPTIMAL | 163 s |
+
+**Decidability was a scope problem, not a model problem.** The full "everything" probe returns
+NUMERIC (status 12) — that is what motivated the unsound reduction retracted in the entry below.
+But bio + cap + flow *without* ghg/water/demand/adopt is cleanly decidable in ~75 s on the same
+4.6M-row model (the sound `reduce_forced_zero_rows` runs on the probe copy by default). The
+conflict lives entirely inside the widened scope, so restricted-INFEASIBLE proves full-model
+infeasibility — the sound direction of the relaxation inference.
+
+### What the widened scope found that the old scope could not
+
+Rolled into all five runs' own `luto/settings.py` (kill → patch → resubmit from checkpoint). Rows
+newly named at 2045, on top of what the old scope had already found:
+
+| run | old scope found | widened scope added | diagnosis old → new |
+|---|---|---|---|
+| `R2_cap10` | Swainsona recta | + Calidris ferruginea, + Macquaria australasica | 1m21s → 4m13s |
+| `R2_cap15` | **nothing** | E. alligatrix, Macquaria australasica | 1m05s → 3m09s |
+| `R3_cap10` | 6 rows | + GB Buloke Woodlands (ECNES) | 21m09s → 4m57s |
+| `R3_cap15` | NE Buloke (ECNES) | + E. alligatrix, + Macquaria australasica | 1m29s → 3m33s |
+
+`R2_cap15` is the clean demonstration: its old-scope spectrum found *zero* droppable rows (bio+cap
+alone is satisfiable), then the production solve stalled anyway — four times. The widened spectrum
+named two species in 3 minutes and the year solved.
+
+**Macquaria australasica (Macquarie Perch) and Eucalyptus alligatrix subsp. limaensis recur across
+runs** as flow-dependent conflicts — targets satisfiable in an unconstrained-land sense but not
+given how land is permitted to MOVE (T_MAT reachability + source availability), which is exactly
+why every flow-blind probe reported feasible. The cost of widening is minutes per year; a
+per-IIS-round cost of ~25–75 s replaced rounds that ranged to 27 min at the old scope (the old
+scope's occasional slow rounds were not cheaper — just blinder).
+
+### R4 and GBF2: the one row that makes computeIIS glacial
+
+`R4_GBF2_T3050_cap25` (the only run where `GBF2_TARGET='high'` is actually on) was the exception:
+its diagnosis was pathologically slow at ANY scope containing `bio_gbf2` — 111 min for 5 rounds at
+the old scope (individual rounds to 27 min), and its first widened attempt sat >28 min without
+completing the spectrum. GBF2's dual reached −$145.6 B in earlier runs, ~500× the largest SNES dual
+— one severely-scaled national row is enough to cripple the deletion-filter LPs inside computeIIS.
+Removing `bio_gbf2` from the diagnosis scope (NOT from the model — GBF2 stays a hard constraint in
+the real solve; the probe just can't see it) let the spectrum finish promptly and 2050 solved:
+**146 barrier iterations, 538 s, optimal**, after three failed attempts on prior days. Documented
+risk, accepted: a genuinely GBF2-involving conflict would now be invisible to the pre-solve fixer
+and would surface as a real-solve failure — in minutes, not the hours the alternative cost.
+
+### Barrier endgame blow-up that RECOVERED (distinct from the stall class)
+
+During `R2_cap10`'s post-drop 2050 solve, one iteration jumped from near-convergence
+(obj 1.18e4, compl 1e-7, iter 188) to obj −3.1e11 / pinf 5.6e10 (iter 189), then re-converged over
+~190 iterations back to the same 1.18e4. Mechanism: the barrier's Newton system `A·D·Aᵀ` becomes
+ill-conditioned *by construction* as complementarity → 0 (D = X/S diverges both ways), and this
+model's conditioning (matrix 1e-4→7e3, Presolve=0 leaving 1.7M degenerate flow equalities in the
+factorisation, knife-edge cap) makes one garbage Newton step likely at the endgame. Under
+`BarHomogeneous=1` a bad step loses *centrality but not interiority*, so it recovers by ordinary
+re-centering — unlike the "Numerical trouble → internal simplex fallback" class, which abandons
+barrier entirely and never returns. Diagnostic: monotone residual shrink after the spike = leave it
+alone; frozen objective across thousands of simplex iterations = the stall class.
+
+### Schema drift corrupted every dropped_constraints CSV written across code vintages
+
+`record_dropped()` appends with `header=not os.path.exists(path)` — the header is written by
+whichever code version CREATES the file, and later appends from a different version write raw
+values in their own column order with no header check. Three vintages exist (9-col, 11-col, and the
+current 12-col which also moved `year,stage` to the front), so any file touched by more than one
+vintage has rows that silently misalign against its own header. Fixed forensically: each row's
+field COUNT uniquely identifies its schema, so `fix_dropped_csv.py` (task dir) reparses by count,
+maps to the canonical 12-col schema, de-duplicates on `(year, constraint, action)` (kill/resubmit
+cycles append the same drop repeatedly), and rewrites. Applied to all 9 live files and, via
+extract-repair-rezip, to the 7 affected files sealed inside completed runs' `Run_Archive.zip`
+(originals backed up under `_dropped_csv_backup_20260810/`; all archives pass `unzip -t`).
+**The code path itself is NOT yet fixed** — a future schema change will corrupt again unless
+`record_dropped` starts validating the on-disk header before appending.
+
+### Where this leaves the science
+
+The T1525-cap cells now *complete with a measured sacrifice list* instead of hanging: the capped
+land budget at the halved target is deliverable **except for** the named flow-dependent rows, and
+`dropped_constraints_<yr>.csv` records exactly which targets were given up (action=DROPPED), which
+were met by a hair (KNIFE_EDGE — the GB cap itself, headroom < 1e-4, in every one of these runs),
+and which comfortably. Separately, `lockin_test2.py` (`freed_cells`) gave a definite verdict on the
+E. alligatrix 2045 target: with the species' OWN 18 cells' lock-in freed the model is decidable and
+the target is still unreachable by −0.86 %, while freeing ALL lock-in clears it by +23.3 % — so the
+blocking irreversibility sits in cells *beyond* the species' own habitat. Status at time of
+writing: 4 of 5 runs through all solves and writing reports; `R2_cap10` re-converged at 2050 after
+the endgame spike. (`lk2_base_nf3`, which would have double-checked the base-bounds verdict at
+NumericFocus=3, was killed to free the queue — acceptable loss given `freed_cells` already
+answered the local-vs-global question.)
+
+---
+
+## 20260810 — a "reduction" that silently built a different model, and the IIS that confidently described it
+
+### TL;DR
+
+A diagnostic script claimed to make the numerically-undecidable 2045 model decidable by removing
+1,393,366 zero-RHS node-balance rows and pinning the 4,369,481 variables they touch. The
+justification — `Σaᵢxᵢ = 0` with all `aᵢ > 0` and `xᵢ ≥ 0` admits only all-zeros — **is valid, but the
+script never tested it.** It selected rows by NAME PREFIX and pinned regardless of sign. **96 % of
+those rows are mixed-sign**: they read `X = ΣF` (inflow-minus-outflow), for which all-zeros is one
+solution among many. **4,234,347 variables were forced to zero that the model never forced.**
+
+The result was not a reduction of the model but a different, massively over-constrained one — which
+duly returned INFEASIBLE in 85 s, and an IIS of 34 rows naming one species, five cells and a specific
+lever chain. All of it was an artefact. Three further analyses were built on that IIS before anyone
+checked the script against its own stated argument.
+
+### The bug
+
+```python
+# reduced_iis.py -- selects by NAME, pins regardless of coefficient sign
+idx = [i for i in range(len(cons))
+       if rhs[i] == 0.0 and sense[i] == "=" and names[i].startswith(("bal_a_", "bal_n_"))]
+for c in doomed:
+    for k in range(m.getRow(c).size()):
+        fix.add(m.getRow(c).getVar(k))     # <-- no sign check
+for v in fix:
+    v.UB = 0.0
+```
+
+```
+bal_a_0_0_112512   (+1 / -3)          # X = sum of inflows; all-zeros is NOT the only solution
+      1.0  X_ag_dry_0_112512
+     -1.0  F_a2a_0_14[...]  -1.0  F_a2a_0_22[...]  -1.0  F_a2a_0_23[...]
+```
+
+| | rows removed | vars pinned |
+|---|--:|--:|
+| `reduced_iis.py` (name prefix, no sign check) | 1,393,366 | 4,369,481 |
+| `tools.reduce_forced_zero_rows` (**checks signs** — correct) | **59,902** | **135,134** |
+
+A 20× discrepancy between two things that were supposed to be the same reduction — visible for free
+by running both, which is what eventually exposed it.
+
+### Why it survived so long
+
+1. **A false self-check.** The script printed `no var had LB>0 -- reduction is exact`. That tests
+   nothing relevant: `lb = 0` says nothing about whether a mixed-sign row *forces* a variable to zero.
+   A check that cannot fail for the wrong reason reads as reassurance.
+2. **The artefact was specific, and specificity reads as truth.** The IIS named one species, five
+   cells, thirteen HIR links. Vague output invites doubt; a precise, mechanistic story invites
+   elaboration. The over-constraint *manufactured* that precision.
+3. **The prose and the code drifted apart.** The exactness argument was written for a sign-checking
+   reduction and correctly describes `tools.reduce_forced_zero_rows`. It was then applied to a script
+   that did something else. **The argument was never re-derived against the code that ran.**
+
+### Rules taken from this
+
+1. **A reduction must be validated on the model, not in the docstring.** Cheapest sufficient test:
+   solve both and compare objectives and variable values, or assert the claimed property row-by-row
+   (here: `all(coeff > 0)`) *in the code that does the pinning*.
+2. **Never let two implementations of "the same" transform diverge unchecked.** Run both, diff the
+   counts. A 20× gap is not subtle.
+3. **An IIS is a statement about the model handed to it — nothing more.** Its specificity carries no
+   evidence about whether that model is the one you meant to build.
+4. **Prefer MAXIMISATION over feasibility for reachability questions.** "Is this model feasible?"
+   returned NUMERIC on the full 4.6M-row model, which is what motivated the reduction at all.
+   "Remove constraint C, maximise its LHS, compare to its RHS" solved the **full unreduced model in
+   107 s / 26 barrier iterations** and answers a strictly more informative question — by how much does
+   it miss. `luto/tests/find_infeasible_ecnes.py` already uses this shape; reach for it first.
+   *(Resolved same day, entry above: the NUMERIC verdict was a SCOPE problem — bio+cap+flow without
+   ghg/water/demand/adopt answers INFEASIBLE cleanly in 74 s, so no reduction was ever needed.)*
+
+### Not affected
+
+`tools.reduce_forced_zero_rows` has the sign check and is correct (`REDUCE_FORCED_ZERO_ROWS` also
+defaults `False`). The 20260806 NE Buloke entry below is unaffected — it was traced arithmetically
+from `data_2020.lz4` cell 177804 with no IIS and no reduction.
+
+---
+
 ## 20260806 — a biodiversity target that irreversibility makes unreachable: why Gurobi stalls instead of saying INFEASIBLE, and the build-time screen that catches it
 
 ### TL;DR
