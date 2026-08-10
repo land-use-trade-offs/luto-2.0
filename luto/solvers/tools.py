@@ -61,6 +61,11 @@ import pandas as pd
 
 from gurobipy import GRB
 
+try:
+    from luto import settings
+except ImportError:     # this module is also loaded STANDALONE by file path (post-mortem scripts
+    settings = None     # read a saved MPS without importing the package); fall back to defaults
+
 
 # ---------------------------------------------------------------------------- #
 # Constraint groups and naming                                                 #
@@ -194,18 +199,19 @@ def _feasibility_copy(model, time_limit: float | None = None, keep_groups=None,
     m.Params.BarHomogeneous = 1
     m.Params.NumericFocus = 0
 
-    # Pin the feasibility tolerance to the PRODUCTION value so a probe verdict means the same thing
-    # the production solve means, whatever a failed rung left on the model.
+    # Tolerances come FROM SETTINGS, never hardcoded: a probe verdict must mean the same thing the
+    # production solve means, and the two cannot be allowed to drift. They are pinned rather than
+    # inherited for the same reason as the algorithm parameters above — the verdict must not depend
+    # on what a failed rung happened to leave on the model.
     #
-    # CORRECTION (2026-08-10): this line was introduced believing production ran at FeasibilityTol
-    # 1e-2 and that 1e-6 therefore made the probe *stricter*. It does not — `settings.py` has
-    # FEASIBILITY_TOLERANCE = 1e-6, so probe and production agree, and since the copy inherits the
-    # source model's parameters anyway, pinning it is a no-op in value. It is kept for the same
-    # reason the algorithm parameters above are pinned: the verdict must not depend on inherited
-    # state. Do NOT re-derive a "the probe is tighter than production" argument from it — there is
-    # no tolerance gap, and the knife-edge census (which perturbs RHS by RELATIVE margins) is what
-    # actually finds rows satisfiable only by a hair.
-    m.Params.FeasibilityTol = 1e-6      # == settings.FEASIBILITY_TOLERANCE
+    # (History, so the argument is not re-derived: these lines were once hardcoded to 1e-6 and
+    # justified as "stricter than production", on the belief that production ran at 1e-2. It does
+    # not — FEASIBILITY_TOLERANCE has always been 1e-6, so there is no tolerance gap to exploit.
+    # What actually finds rows satisfiable only by a hair is `knife_edge_rows`, which perturbs the
+    # RHS by RELATIVE margins and is independent of tolerance.)
+    m.Params.FeasibilityTol = getattr(settings, "FEASIBILITY_TOLERANCE", 1e-6)
+    m.Params.OptimalityTol  = getattr(settings, "OPTIMALITY_TOLERANCE", 1e-2)
+    m.Params.BarConvTol     = getattr(settings, "BARRIER_CONVERGENCE_TOLERANCE", 1e-5)
 
     if time_limit:
         m.Params.TimeLimit = time_limit
