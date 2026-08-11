@@ -485,7 +485,7 @@ def load_latest_checkpoint(
     there is neither a checkpoint nor a `data` object to fall back on.
     """
     print(f"Checkpoint mode enabled: {checkpoint_path}")
-    files = sorted(f for f in checkpoint_path.iterdir() if CHECKPOINT_RE.match(f.name))
+    files = sorted(f for f in checkpoint_path.iterdir() if CHECKPOINT_RE.fullmatch(f.name))
 
     if not files:
         if data is None:
@@ -512,6 +512,9 @@ def save_checkpoint(data: Data, checkpoint_path: Path, target_year: int) -> None
     """Write data_<target_year>.lz4 and delete older checkpoints — only the latest is kept."""
     final_path = checkpoint_path / f"data_{target_year}.lz4"
     save_data_to_disk(data, str(final_path))
+    # `match` here on purpose, unlike the fullmatch in load_latest_checkpoint: the prefix form also
+    # sweeps up any `data_<year>.lz4.tmp` orphaned by an earlier killed write, which is exactly what
+    # rotation should do. Discovery must be strict; cleanup should be greedy.
     for old in checkpoint_path.iterdir():
         if CHECKPOINT_RE.match(old.name) and old != final_path:
             old.unlink()
