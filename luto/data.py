@@ -1714,6 +1714,19 @@ class Data:
                 (df['TARGET_LEVEL_2100'] > 0)
             ].reset_index(drop=True)
 
+        # Step 2b: per-(region, group) overrides, applied AFTER the uniform dict and independent of
+        # GBF3_NVIS_TARGET mode — the NVIS counterpart of GBF4_SNES/ECNES_TARGETS_OVERRIDE. Note the
+        # AUSTRALIA relabelling above has already happened, so keys use 'AUSTRALIA' in that mode.
+        if settings.GBF3_NVIS_TARGETS_OVERRIDE:
+            for (reg, grp), yr_dict in settings.GBF3_NVIS_TARGETS_OVERRIDE.items():
+                mask = (df['region'] == reg) & (df['group'] == grp)
+                for yr, pct in yr_dict.items():
+                    col = f'TARGET_LEVEL_{yr}'
+                    if col in df.columns:
+                        df.loc[mask, col] = float(pct)
+            print(f"│   │   ├── NVIS per-group target overrides applied: "
+                  f"{len(settings.GBF3_NVIS_TARGETS_OVERRIDE)} pairs", flush=True)
+
         # Step 5: filter by GBF3_NVIS_SELECTED_REGIONS (NRM mode only)
         if settings.GBF3_NVIS_REGION_MODE == 'NRM':
             df = df.query(f"region in {settings.GBF3_NVIS_SELECTED_REGIONS}").reset_index(drop=True)

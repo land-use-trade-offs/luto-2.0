@@ -1165,6 +1165,22 @@ GBF3_TARGETS_DICT = {
 }
 
 
+# Per-(region, vegetation group) GBF3 NVIS target overrides — the NVIS counterpart of
+# GBF4_SNES_TARGETS_OVERRIDE / GBF4_ECNES_TARGETS_OVERRIDE. Applied AFTER the uniform
+# GBF3_TARGETS_DICT and independent of GBF3_NVIS_TARGET mode, so it works with 'medium', 'high' and
+# 'USER_DEFINED' alike. Maps (region, group) -> {year: pct}. Empty = no override (a byte-identical
+# no-op, so every run that does not set it is unaffected).
+#
+# Lets the vegetation floor carry a target level that GBF3_TARGETS_DICT has no preset for — there is
+# no 15/25 option, so halving NVIS alongside SNES/ECNES is only expressible this way short of the
+# USER_DEFINED Excel route.
+#
+# NOTE ON KEYS: in AUSTRALIA region mode the rows are relabelled 'AUSTRALIA' BEFORE this is applied,
+# so keys must use ('AUSTRALIA', group) there, not the NRM region name. In NRM mode use the NRM
+# region name, exactly as GBF3_NVIS_EXCLUDE_REGION_GROUPS does.
+GBF3_NVIS_TARGETS_OVERRIDE = {}
+
+
 GBF3_NVIS_TARGET_CLASS  = 'NVIS_MVG'             # 'NVIS_MVG', 'NVIS_MVS'
 '''
 The National Vegetation Information System (NVIS) provides the 100m resolution information on
