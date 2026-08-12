@@ -1505,7 +1505,8 @@ class LutoSolver:
             lb_rescale = lb_raw / scale_factors.sel(dict(layer=(region, species, presence))).item()
             val_vector = val_matrix.sel(dict(layer=(species, presence)), drop=True).values
 
-            if region == "Australia":
+            # AUSTRALIA mode: no NRM cell is named 'AUSTRALIA', so bypass region mask
+            if region == "AUSTRALIA":
                 ind = np.where(val_vector > 0)[0]
             else:
                 reg_vector = reg_matrix == region
@@ -1548,7 +1549,8 @@ class LutoSolver:
             lb_rescale = lb_raw / scale_factors.sel(dict(layer=(region, community, presence))).item()
             val_vector = val_matrix.sel(dict(layer=(community, presence)), drop=True).values
 
-            if region == "Australia":
+            # AUSTRALIA mode: no NRM cell is named 'AUSTRALIA', so bypass region mask
+            if region == "AUSTRALIA":
                 ind = np.where(val_vector > 0)[0]
             else:
                 reg_vector = reg_matrix == region
@@ -1592,7 +1594,8 @@ class LutoSolver:
             lb_rescale  = lb_raw / scale_factors.sel(layer=(region, species)).item()
             val_vector  = val_matrix.sel(species=species, drop=True).data
 
-            if region == "Australia":
+            # AUSTRALIA mode: no NRM cell is named 'AUSTRALIA', so bypass region mask
+            if region == "AUSTRALIA":
                 ind = np.where(val_vector > 0)[0]
             else:
                 reg_vector = reg_matrix == region
