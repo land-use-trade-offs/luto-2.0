@@ -1203,10 +1203,17 @@ class Data:
         ###############################################################
         print("├── Loading demand data", flush=True)
         
-        # Load demand multiplier data
+        # Load demand multiplier data.
+        #
+        # These multipliers are the commodity demand trajectory that BELONGS to a carbon pathway, so
+        # `GHG_EMISSIONS_LIMITS = 'off'` -- which maps to None in GHG_TARGETS_DICT and has no sheet of
+        # its own -- means no pathway-driven demand shift at all: every multiplier is 1.0. The
+        # workbook is still read in that case, but only to borrow its year index and commodity
+        # columns, so the frame keeps the same shape however the carbon constraint is set.
+        ghg_pathway = settings.GHG_TARGETS_DICT[settings.GHG_EMISSIONS_LIMITS]
         AusTIME_multipliers = pd.read_excel(
-                f'{settings.INPUT_DIR}/AusTIMES_demand_multiplier.xlsx', 
-                sheet_name=settings.GHG_TARGETS_DICT[settings.GHG_EMISSIONS_LIMITS].split(' ')[0] + ' Demand', 
+                f'{settings.INPUT_DIR}/AusTIMES_demand_multiplier.xlsx',
+                sheet_name=(ghg_pathway or settings.GHG_TARGETS_DICT['low']).split(' ')[0] + ' Demand',
                 index_col=0,
             ).T.reset_index(drop=True
             ).rename(columns={
@@ -1216,7 +1223,10 @@ class Data:
             }).drop(columns=['Cottonseed']      # LUTO do not have cottonseed in our model
             ).astype({'Year': int}
             ).set_index('Year')
-            
+
+        if ghg_pathway is None:                 # GHG off -- no carbon pathway, so no demand shift
+            AusTIME_multipliers.loc[:, :] = 1.0
+
         demand_multipliers = pd.DataFrame(
             index=range(2010, AusTIME_multipliers.index.max() + 1),
             columns=self.COMMODITIES,
@@ -2287,7 +2297,7 @@ class Data:
         """Load and filter SNES targets from CSV.
 
         Returns a DataFrame with selected (region, SCIENTIFIC_NAME, presence) rows.
-        Australia mode: presence in {'LIKELY', 'LIKELY_AND_MAYBE'}, region='Australia'
+        AUSTRALIA mode: presence in {'LIKELY', 'LIKELY_AND_MAYBE'}, region='AUSTRALIA'
         NRM mode:       presence='LIKELY', region=NRM region name
         Set include_all=True to return all NRM/STATE rows for writing/reporting.
         Dict targets are applied inside this function so all call sites stay consistent.
@@ -2342,7 +2352,7 @@ class Data:
         """Load and filter ECNES targets from CSV.
 
         Returns a DataFrame with selected (region, COMMUNITY, presence) rows.
-        Australia mode: presence in {'LIKELY', 'LIKELY_AND_MAYBE'}, region='Australia'
+        AUSTRALIA mode: presence in {'LIKELY', 'LIKELY_AND_MAYBE'}, region='AUSTRALIA'
         NRM mode:       presence='LIKELY', region=NRM region name
         Set include_all=True to return all rows for writing/reporting.
         Dict targets are applied inside this function so all call sites stay consistent.
