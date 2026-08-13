@@ -235,7 +235,8 @@ def _feasibility_copy(model, time_limit: float | None = None, keep_groups=None,
         reduce_forced_zero_rows(m, verbose=verbose)
 
     m.setObjective(0, GRB.MINIMIZE)     # feasibility, not optimality — far cheaper
-    m.Params.OutputFlag = 0
+    m.Params.OutputFlag = 0             # NB: silences the probe, so an idle gurobi.log during a
+                                        # long computeIIS does NOT mean the solver is idle
     m.Params.DualReductions = 0         # so INF_OR_UNBD cannot hide a definite INFEASIBLE
 
     # PIN the probe's numerics. `model.copy()` inherits the source model's parameters (verified),
@@ -392,10 +393,18 @@ def feasibility_spectrum(model, keep_groups=None, droppable=None, time_limit: fl
                    level first, named rows removed from the copy, so each row lands on the
                    tightest tier that names it and independent thin conflicts all surface.
 
-    Building the copy is the dominant cost (~minutes at LUTO scale); every additional level or
-    round on the shared copy is an RHS update + computeIIS (seconds). This supersedes the
-    production use of `feasible_solve` + a separate joint check + `knife_edge_rows` — those remain
-    for interactive diagnosis.
+    COST — `computeIIS` dominates, and it scales badly. Measured 2026-08-14 on a national
+    (AUSTRALIA-scope) model of 4.57M rows / 42.7M nonzeros: the copy took 42.5s, while a SINGLE
+    computeIIS ran >3h45m without finishing. The same phase costs ~65s end-to-end on an NRM-scope
+    model, and ~85 min on a lighter national one. IIS is a combinatorial search, so cost is driven
+    by model size and row density rather than by the number of levels or rounds.
+
+    Callers at national scope should either pass `time_limit` or skip this entirely (an unbounded
+    IIS can consume a whole PBS walltime before a single year is solved). Note `time_limit` bounds
+    each Gurobi call, so the worst case is roughly len(edge_levels) * max_rounds * time_limit.
+
+    This supersedes the production use of `feasible_solve` + a separate joint check +
+    `knife_edge_rows` — those remain for interactive diagnosis.
 
     `droppable` (ordered, least-valued first) gates only what may be SURRENDERED at eps=0.
     Non-droppable rows still land in 'edge' — the caller records them but must never remove them.
