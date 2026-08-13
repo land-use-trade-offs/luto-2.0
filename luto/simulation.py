@@ -107,7 +107,7 @@ def load_data() -> Data:
                 data.path = save_dir
                 return data
         except Exception as e:
-            print(f"An error occurred while loading data: {e}")
+            print(f"An error occurred while loading data: {e}", flush=True)
             raise
 
     return _load_data()
@@ -153,13 +153,13 @@ def run(
 
         if resume_year is not None:
             years_to_run = years[years.index(resume_year):]
-            print(f"Resuming simulation from {resume_year} to {years[-1]}.")
+            print(f"Resuming simulation from {resume_year} to {years[-1]}.", flush=True)
         else:
             years_to_run = years
 
         try:
             with _memory_log(save_dir, 'a'):
-                print('\n')
+                print('\n', flush=True)
                 print(f"Running LUTO {settings.VERSION} between {years[0]} - {years[-1]} at RES-{settings.RESFACTOR}, total {len(years) - 1} runs!\n", flush=True)
 
                 if len(years_to_run) > 1:
@@ -169,7 +169,7 @@ def run(
                 if do_report:
                     write_outputs(active_data)
         except Exception as e:
-            print(f"An error occurred during the simulation: {e}")
+            print(f"An error occurred during the simulation: {e}", flush=True)
             raise
 
         return active_data
@@ -194,7 +194,7 @@ def load_data_from_disk(path: str) -> Data:
 
     @LogToFile(f"{save_dir}/LUTO_RUN_", 'w')
     def _load_data():
-        print(f"Loading data from {path}...\n")
+        print(f"Loading data from {path}...\n", flush=True)
 
         data = joblib.load(path)
         data.timestamp = read_timestamp()
@@ -229,12 +229,12 @@ def solve_timeseries(
         base_ckpt = checkpoint_path / f"data_{years_to_run[0]}.lz4"
         if not base_ckpt.exists():
             save_data_to_disk(data, str(base_ckpt))
-            print(f"Saved base checkpoint for year {years_to_run[0]}: {base_ckpt}")
+            print(f"Saved base checkpoint for year {years_to_run[0]}: {base_ckpt}", flush=True)
 
     for base_year, target_year in zip(years_to_run[:-1], years_to_run[1:]):
-        print( "-------------------------------------------------")
-        print( f"Running for year {target_year}"   )
-        print( "-------------------------------------------------\n")
+        print( "-------------------------------------------------", flush=True)
+        print( f"Running for year {target_year}"   , flush=True)
+        print( "-------------------------------------------------\n", flush=True)
 
         start_time = time.time()
         input_data = get_input_data(data, base_year, target_year)
@@ -257,13 +257,13 @@ def solve_timeseries(
             if checkpoint_path is not None:
                 save_checkpoint(data, checkpoint_path, target_year)
 
-        print(f'Processing for {target_year} completed in {round(time.time() - start_time)} seconds\n\n' )
+        print(f'Processing for {target_year} completed in {round(time.time() - start_time)} seconds\n\n' , flush=True)
 
         if not accepted:
-            print('!' * 100)
-            print(f"Solver status for year {target_year}: {SOLVER_STATUS_MSGS.get(status, f'unexpected status {status}')}")
-            print('!' * 100)
-            print('\n')
+            print('!' * 100, flush=True)
+            print(f"Solver status for year {target_year}: {SOLVER_STATUS_MSGS.get(status, f'unexpected status {status}')}", flush=True)
+            print('!' * 100, flush=True)
+            print('\n', flush=True)
             break
 
 
@@ -294,7 +294,7 @@ def solve_with_retries(luto_solver: LutoSolver, data: Data, target_year: int):
 
 def solve_attempt(luto_solver, target_year, nf, method, crossover, presolve, barhomogenous):
     """One RETRY_PARAMS attempt against the current model. Returns (accepted, solution, status)."""
-    print(f"Trying NumericFocus={nf}, Method={method}, Crossover={crossover}, Presolve={presolve}, BarHomogeneous={barhomogenous} for year {target_year}...")
+    print(f"Trying NumericFocus={nf}, Method={method}, Crossover={crossover}, Presolve={presolve}, BarHomogeneous={barhomogenous} for year {target_year}...", flush=True)
     luto_solver.gurobi_model.Params.NumericFocus    = nf
     luto_solver.gurobi_model.Params.Method          = method
     luto_solver.gurobi_model.Params.Crossover       = crossover
@@ -304,10 +304,10 @@ def solve_attempt(luto_solver, target_year, nf, method, crossover, presolve, bar
     solution = luto_solver.solve()
     status = luto_solver.gurobi_model.Status
     if solution is not None and status == GRB.OPTIMAL:
-        print(f"Optimal solution found with NumericFocus={nf}, Method={method}")
+        print(f"Optimal solution found with NumericFocus={nf}, Method={method}", flush=True)
         return True, solution, status
 
-    print(f"Non-optimal status {status} with NumericFocus={nf}, Method={method}; retrying with next attempt if available.")
+    print(f"Non-optimal status {status} with NumericFocus={nf}, Method={method}; retrying with next attempt if available.", flush=True)
     return False, solution, status
 
 
@@ -358,7 +358,7 @@ def drop_unreachable_before_solve(luto_solver: LutoSolver, data: Data, target_ye
     if not (settings.DROP_UNREACHABLE_CONSTRAINTS and settings.INFEASIBILITY_DIAGNOSIS_GROUPS):
         return []
 
-    print("├── Pre-solve feasibility spectrum (provable infeasibility → knife-edge census)...")
+    print("├── Pre-solve feasibility spectrum (provable infeasibility → knife-edge census)...", flush=True)
     spec = feasibility_spectrum(
         luto_solver.gurobi_model,
         keep_groups=settings.INFEASIBILITY_DIAGNOSIS_GROUPS,
@@ -375,7 +375,7 @@ def drop_unreachable_before_solve(luto_solver: LutoSolver, data: Data, target_ye
 
     if spec['status'] == 'INFEASIBLE_UNRESOLVABLE':
         print("├── conflict among non-droppable rows — nothing more can be given up; the ladder "
-              "will run and the year will fail loudly if it cannot solve")
+              "will run and the year will fail loudly if it cannot solve", flush=True)
         record_dropped([{'group': None, 'constraint': None, 'action': 'UNRESOLVABLE'}],
                        luto_solver, data, target_year, 'pre_solve')
         return spec['dropped']
@@ -388,18 +388,18 @@ def drop_unreachable_before_solve(luto_solver: LutoSolver, data: Data, target_ye
 
     if to_drop:
         print(f"├── dropping {len(to_drop)} knife-edge row(s) with relative headroom "
-              f"<= {threshold:g} (numerically indistinguishable from infeasible):")
+              f"<= {threshold:g} (numerically indistinguishable from infeasible):", flush=True)
         for n, eps in sorted(to_drop.items(), key=lambda kv: kv[1]):
-            print(f"│       [{group_of(n)}] headroom<{eps:g}  {n}")
+            print(f"│       [{group_of(n)}] headroom<{eps:g}  {n}", flush=True)
         luto_solver.remove_constraints_by_name(list(to_drop))
         record_dropped([{'group': group_of(n), 'constraint': n,
                          'action': 'DROPPED_KNIFE_EDGE', 'headroom_lt': eps}
                         for n, eps in to_drop.items()],
                        luto_solver, data, target_year, 'pre_solve')
     if to_keep:
-        print(f"├── {len(to_keep)} thin row(s) recorded as knife-edge, kept in the model:")
+        print(f"├── {len(to_keep)} thin row(s) recorded as knife-edge, kept in the model:", flush=True)
         for n, eps in sorted(to_keep.items(), key=lambda kv: kv[1]):
-            print(f"│       [{group_of(n)}] headroom<{eps:g}  {n}")
+            print(f"│       [{group_of(n)}] headroom<{eps:g}  {n}", flush=True)
         record_dropped([{'group': group_of(n), 'constraint': n, 'action': 'KNIFE_EDGE',
                          'headroom_lt': eps}
                         for n, eps in to_keep.items()],
@@ -417,7 +417,7 @@ def diagnose_and_drop_conflict(luto_solver: LutoSolver, data: Data, target_year:
     if not settings.INFEASIBILITY_DIAGNOSIS_GROUPS:
         return False
 
-    print("├── Not optimal — diagnosing the conflict...")
+    print("├── Not optimal — diagnosing the conflict...", flush=True)
     resolution = resolve_infeasibility(
         luto_solver.gurobi_model,
         droppable=settings.DROP_UNREACHABLE_CONSTRAINTS,
@@ -425,12 +425,12 @@ def diagnose_and_drop_conflict(luto_solver: LutoSolver, data: Data, target_year:
 
     if not resolution['dropped']:
         print(f"├── {resolution['status']} — nothing droppable in the conflict; "
-              f"giving up on {target_year}")
+              f"giving up on {target_year}", flush=True)
         return False
 
-    print(f"├── dropping {len(resolution['dropped'])} row(s) and re-solving {target_year}:")
+    print(f"├── dropping {len(resolution['dropped'])} row(s) and re-solving {target_year}:", flush=True)
     for n in resolution['dropped']:
-        print(f"│       [{group_of(n)}] {n}")
+        print(f"│       [{group_of(n)}] {n}", flush=True)
 
     # Removes from the model AND the solver's bookkeeping dicts — a stale Constr left in those
     # would crash `record_shadow_prices` after the accepted solve.
@@ -484,7 +484,7 @@ def load_latest_checkpoint(
     Returns (data, resume_year); resume_year is None when starting fresh. Raises when
     there is neither a checkpoint nor a `data` object to fall back on.
     """
-    print(f"Checkpoint mode enabled: {checkpoint_path}")
+    print(f"Checkpoint mode enabled: {checkpoint_path}", flush=True)
     files = sorted(f for f in checkpoint_path.iterdir() if CHECKPOINT_RE.fullmatch(f.name))
 
     if not files:
@@ -493,7 +493,7 @@ def load_latest_checkpoint(
                 f"No checkpoint files found in '{checkpoint_path}' and no `data` was provided; "
                 "cannot start simulation."
             )
-        print(f"No valid checkpoint found in '{checkpoint_path}'; starting from {min(settings.SIM_YEARS)}.")
+        print(f"No valid checkpoint found in '{checkpoint_path}'; starting from {min(settings.SIM_YEARS)}.", flush=True)
         return data, None
 
     checkpoint_file = files[-1]
@@ -504,7 +504,7 @@ def load_latest_checkpoint(
     # load_data()'s set_path() normally pre-creates the out_<yr> dirs that
     # write_outputs expects; checkpoint resume bypasses load_data(), so do it here.
     set_path()
-    print(f"Resuming from checkpoint (year {resume_year}): {checkpoint_file}")
+    print(f"Resuming from checkpoint (year {resume_year}): {checkpoint_file}", flush=True)
     return data, resume_year
 
 
@@ -518,7 +518,7 @@ def save_checkpoint(data: Data, checkpoint_path: Path, target_year: int) -> None
     for old in checkpoint_path.iterdir():
         if CHECKPOINT_RE.match(old.name) and old != final_path:
             old.unlink()
-    print(f"Saved checkpoint for year {target_year}: {final_path}")
+    print(f"Saved checkpoint for year {target_year}: {final_path}", flush=True)
 
 
 def save_model_to_disk(gurobi_model, out_dir: str, base_year: int, target_year: int) -> None:
@@ -555,16 +555,16 @@ def save_model_to_disk(gurobi_model, out_dir: str, base_year: int, target_year: 
             if stale not in (dest, tmp):
                 stale.unlink()
         tmp.replace(dest)
-        print(f"Saved model to {dest} ({dest.stat().st_size / 1e6:,.0f} MB)")
+        print(f"Saved model to {dest} ({dest.stat().st_size / 1e6:,.0f} MB)", flush=True)
     except Exception as exc:
         # Never let a diagnostic artefact take the run down with it.
-        print(f"WARNING: could not save model to {dest}: {exc}")
+        print(f"WARNING: could not save model to {dest}: {exc}", flush=True)
         tmp.unlink(missing_ok=True)
 
 
 def save_data_to_disk(data: Data, path: str, compress_level=3) -> None:
     """Save using joblib with atomic tmp→rename to prevent partial writes."""
-    print(f'Saving data to {path}...')
+    print(f'Saving data to {path}...', flush=True)
     tmp = Path(f"{path}.tmp")
     joblib.dump(data, str(tmp), compress=('lz4', compress_level))
     # Write to .tmp first, then rename atomically (os.replace → POSIX rename()).
