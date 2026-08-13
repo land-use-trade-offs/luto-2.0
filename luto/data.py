@@ -1274,6 +1274,18 @@ class Data:
             self.DEMAND_C = (self.DEMAND_C *  demand_multipliers).dropna(axis=1)
             print(f"│   └── Years after applying demand multipliers: {self.DEMAND_C.columns.min()} - {self.DEMAND_C.columns.max()}", flush=True)
         
+        # Demand cannot be negative. Some projections are unclamped extrapolations that cross zero
+        # (SSP5 'other non-cereal crops' does, from 2041), and a negative target becomes an equality
+        # asking a sum of non-negative production terms to equal a negative number — infeasible by
+        # construction, with no solver setting able to absorb it.
+        neg = self.DEMAND_C < 0
+        if neg.to_numpy().any():
+            for cm in self.DEMAND_C.index[neg.any(axis=1)]:
+                bad = self.DEMAND_C.loc[cm][neg.loc[cm]]
+                print(f"│   ⚠ WARNING: negative demand clamped to 0 for '{cm}' — "
+                      f"{len(bad)} year(s) from {bad.index.min()}, min {bad.min():,.0f}", flush=True)
+            self.DEMAND_C = self.DEMAND_C.clip(lower=0)
+
         # Convert to numpy array of shape (91, 26)
         self.D_CY = self.DEMAND_C.to_numpy(dtype = np.float32).T
         self.D_CY_xr = xr.DataArray(

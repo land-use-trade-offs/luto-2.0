@@ -814,7 +814,9 @@ def get_limits(data: Data, yr_cal: int) -> dict[str, Any]:
     
     limits = {}
     
-    limits['demand'] = data.D_CY[yr_cal - data.YR_CAL_BASE]
+    # Clamped again here, not only in Data.__init__: a resumed run loads a pickled Data and never
+    # re-runs __init__, so a checkpoint written before the clamp existed would still carry negatives.
+    limits['demand'] = np.maximum(data.D_CY[yr_cal - data.YR_CAL_BASE], 0.0)
     
     if settings.WATER_LIMITS == 'on':
         limits['water'] = data.WATER_YIELD_TARGETS
