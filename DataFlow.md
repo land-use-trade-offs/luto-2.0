@@ -1,400 +1,740 @@
-# DataFlow.md
+# DataFlow.md — LUTO2 input-data tracing map
 
-## Table of Contents
+**Purpose**: trace every array the solver consumes back to the raw dataset it came from, and forward
+again. The map is anchored on `luto/solvers/input_data.py` — the single place where all model inputs
+converge into one `SolverInputData` object — because that is the only complete inventory of what the
+optimisation actually sees.
 
-- [DataFlow.md](#dataflowmd)
-  - [Table of Contents](#table-of-contents)
-  - [luto.economics.non\_agricultural.ghg.get\_ghg\_env\_plantings](#lutoeconomicsnon_agriculturalghgget_ghg_env_plantings)
-    - [Data Flow Summary](#data-flow-summary)
-    - [Key Transformations](#key-transformations)
-    - [Data Processing Pipeline](#data-processing-pipeline)
-  - [luto.economics.non\_agricultural.ghg.get\_ghg\_rip\_plantings](#lutoeconomicsnon_agriculturalghgget_ghg_rip_plantings)
-    - [Data Flow Summary](#data-flow-summary-1)
-    - [Key Transformations](#key-transformations-1)
-    - [Data Processing Pipeline](#data-processing-pipeline-1)
-  - [luto.economics.non\_agricultural.ghg.get\_ghg\_agroforestry\_base](#lutoeconomicsnon_agriculturalghgget_ghg_agroforestry_base)
-    - [Data Flow Summary](#data-flow-summary-2)
-    - [Key Transformations](#key-transformations-2)
-    - [Data Processing Pipeline](#data-processing-pipeline-2)
-  - [luto.economics.non\_agricultural.ghg.get\_ghg\_sheep\_agroforestry](#lutoeconomicsnon_agriculturalghgget_ghg_sheep_agroforestry)
-    - [Data Flow Summary](#data-flow-summary-3)
-    - [Key Transformations](#key-transformations-3)
-    - [Data Processing Pipeline](#data-processing-pipeline-3)
-  - [luto.economics.non\_agricultural.ghg.get\_ghg\_beef\_agroforestry](#lutoeconomicsnon_agriculturalghgget_ghg_beef_agroforestry)
-    - [Data Flow Summary](#data-flow-summary-4)
-    - [Key Transformations](#key-transformations-4)
-    - [Data Processing Pipeline](#data-processing-pipeline-4)
-  - [luto.economics.non\_agricultural.ghg.get\_ghg\_carbon\_plantings\_block](#lutoeconomicsnon_agriculturalghgget_ghg_carbon_plantings_block)
-    - [Data Flow Summary](#data-flow-summary-5)
-    - [Key Transformations](#key-transformations-5)
-    - [Data Processing Pipeline](#data-processing-pipeline-5)
-  - [luto.economics.non\_agricultural.ghg.get\_ghg\_carbon\_plantings\_belt\_base](#lutoeconomicsnon_agriculturalghgget_ghg_carbon_plantings_belt_base)
-    - [Data Flow Summary](#data-flow-summary-6)
-    - [Key Transformations](#key-transformations-6)
-    - [Data Processing Pipeline](#data-processing-pipeline-6)
-  - [luto.economics.non\_agricultural.ghg.get\_ghg\_sheep\_carbon\_plantings\_belt](#lutoeconomicsnon_agriculturalghgget_ghg_sheep_carbon_plantings_belt)
-    - [Data Flow Summary](#data-flow-summary-7)
-    - [Key Transformations](#key-transformations-7)
-    - [Data Processing Pipeline](#data-processing-pipeline-7)
-  - [luto.economics.non\_agricultural.ghg.get\_ghg\_beef\_carbon\_plantings\_belt](#lutoeconomicsnon_agriculturalghgget_ghg_beef_carbon_plantings_belt)
-    - [Data Flow Summary](#data-flow-summary-8)
-    - [Key Transformations](#key-transformations-8)
-    - [Data Processing Pipeline](#data-processing-pipeline-8)
-  - [luto.economics.non\_agricultural.ghg.get\_ghg\_beccs](#lutoeconomicsnon_agriculturalghgget_ghg_beccs)
-    - [Data Flow Summary](#data-flow-summary-9)
-    - [Key Transformations](#key-transformations-9)
-    - [Data Processing Pipeline](#data-processing-pipeline-9)
-  - [luto.economics.non\_agricultural.ghg.get\_ghg\_destocked\_land](#lutoeconomicsnon_agriculturalghgget_ghg_destocked_land)
-    - [Data Flow Summary](#data-flow-summary-10)
-    - [Key Transformations](#key-transformations-10)
-    - [Data Processing Pipeline](#data-processing-pipeline-10)
-  - [luto.economics.non\_agricultural.ghg.get\_ghg\_matrix](#lutoeconomicsnon_agriculturalghgget_ghg_matrix)
-    - [Data Flow Summary](#data-flow-summary-11)
-    - [Key Transformations](#key-transformations-11)
-    - [Data Processing Pipeline](#data-processing-pipeline-11)
-    - [Function Summary Matrix](#function-summary-matrix)
+**Verified against**: commit `4ea251d9` (working tree, 2026-08-12). Line numbers are navigation
+anchors, not contracts — re-grep the symbol if a number has drifted.
 
 ---
 
-## luto.economics.non_agricultural.ghg.get_ghg_env_plantings
+## Table of Contents
 
-### Data Flow Summary
+- [1. The eight layers](#1-the-eight-layers)
+- [2. Path constants](#2-path-constants)
+- [3. Upstream script inventory (`N:` preprocessing)](#3-upstream-script-inventory-n-preprocessing)
+- [4. Master index — `SolverInputData` field → provenance](#4-master-index--solverinputdata-field--provenance)
+  - [4.1 Economy](#41-economy)
+  - [4.2 GHG](#42-ghg)
+  - [4.3 Water](#43-water)
+  - [4.4 Biodiversity — quality score](#44-biodiversity--quality-score)
+  - [4.5 Biodiversity — GBF targets](#45-biodiversity--gbf-targets)
+  - [4.6 Quantity / demand](#46-quantity--demand)
+  - [4.7 Transitions, bounds, feasibility](#47-transitions-bounds-feasibility)
+  - [4.8 Renewable energy](#48-renewable-energy)
+  - [4.9 Regions, masks, bookkeeping](#49-regions-masks-bookkeeping)
+  - [4.10 Limits (RHS)](#410-limits-rhs)
+- [5. `input/` file inventory → raw provenance](#5-input-file-inventory--raw-provenance)
+- [6. Detailed trace — reforestation carbon (EP / CP / HIR)](#6-detailed-trace--reforestation-carbon-ep--cp--hir)
+- [7. Detailed trace — non-agricultural GHG functions](#7-detailed-trace--non-agricultural-ghg-functions)
+- [8. The last mile — rescaling and coefficient filtering](#8-the-last-mile--rescaling-and-coefficient-filtering)
+- [9. Issue register](#9-issue-register)
+  - [9.1 RESOLVED — carbon-pool caps applied to the wrong pools](#91-resolved--carbon-pool-caps-applied-to-the-wrong-pools)
+  - [9.2 OPEN — no re-run trigger linking FullCAM refreshes to `script_9`](#92-open--no-re-run-trigger-linking-fullcam-refreshes-to-script_9)
+  - [9.3 OPEN — dead IBRA path in the GBF3 stream](#93-open--dead-ibra-path-in-the-gbf3-stream)
+  - [9.4 OPEN — `cell_savanna_burning.h5` has no traceable origin](#94-open--cell_savanna_burningh5-has-no-traceable-origin)
+  - [9.5 OPEN — `no_go_areas/` is a toy dataset feeding real constraints](#95-open--no_go_areas-is-a-toy-dataset-feeding-real-constraints)
+  - [9.6 OPEN — `input/` files nothing reads](#96-open--input-files-nothing-reads)
+
+---
+
+## 1. The eight layers
+
+Every number in the model travels the same eight-layer chain. When tracing, name the layer you are
+at — most confusion comes from conflating L1 (the `N:` script that *built* a file) with L2
+(`dataprep.py`, which usually only *copies or subsets* it).
+
+| Layer | Where | What happens |
+|-------|-------|--------------|
+| **L0** Raw source | `N:/Data-Master/...`, `N:/LUF-Modelling/...` | External datasets: FullCAM, ABARES/ABS, NLUM, DCCEEW, CSIRO, NVIS, AEMO |
+| **L1** Upstream script | `N:/Data-Master/LUTO_2.0_input_data/Scripts/script_*.py` | Heavy spatial assembly → `Input_data/{1D,2D,3D,4D}_*` intermediates |
+| **L2** `luto/dataprep.py` | repo | `create_new_dataset()` — copy, subset, unit-convert, reshape into `input/` |
+| **L3** `input/<file>` | repo `input/` | The model's on-disk contract: `.h5`, `.nc`, `.npy`, `.npz`, `.csv`, `.xlsx`, `.tif` |
+| **L4** `luto/data.py` | repo | `Data.__init__` loads + masks (`where=self.MASK` / `.isel(cell=self.MASK)`), applies risk/CPI/climate adjustments → `Data` attributes |
+| **L5** `luto/economics/**` | repo | Per-theme matrices: cost, revenue, quantity, GHG, water, biodiversity, transitions |
+| **L6** `luto/solvers/input_data.py` | repo | `get_*` builders + rescaling → `SolverInputData` |
+| **L7** `luto/solvers/solver.py` | repo | `_qsum()` coefficient filter → Gurobi constraint/objective terms |
+
+Two rules that hold throughout:
+
+- **Masking happens at L4, once.** `self.MASK` (from `NLUM_2010-11_mask.tif` + `RESFACTOR`) is applied
+  at load. Everything downstream is indexed by the compact cell index `r` of length `data.NCELLS`.
+- **Per-hectare → per-cell happens at L5**, by `× data.REAL_AREA`. If an array is still per-hectare at
+  L6 it is a bug.
+
+---
+
+## 2. Path constants
+
+L1→L2 source roots, all defined in `luto/dataprep.py:47-68`:
+
+| Variable | Path |
+|----------|------|
+| `luto_1D_inpath` | `N:/Data-Master/LUTO_2.0_input_data/Input_data/1D_Parameter_Timeseries/` |
+| `luto_2D_inpath` | `N:/Data-Master/LUTO_2.0_input_data/Input_data/2D_Spatial_Snapshot/` |
+| `luto_3D_inpath` | `N:/Data-Master/LUTO_2.0_input_data/Input_data/3D_Spatial_Timeseries/` |
+| `luto_4D_inpath` | `N:/Data-Master/LUTO_2.0_input_data/Input_data/4D_Spatial_SSP_Timeseries/` |
+| `fdh_inpath` | `N:/LUF-Modelling/fdh-archive/data/neoluto-data/new-data-and-domain/` |
+| `profit_map_inpath` | `N:/Data-Master/Profit_map/` |
+| `demand_scenarios_inpath` | `N:/LUF-Modelling/Food_demand_AU/au.food.demand/Outputs` |
+| `demand_elasticity_inpath` | `N:/Data-Master/Demand_elasticity` |
+| `water_domestic_use` | `N:/Data-Master/Water/Water_account/` |
+| `no_go_areas` | `N:/Data-Master/Regional_adoption_and_Social_license/` |
+| `nlum_inpath` | `N:/Data-Master/National_Landuse_Map/` |
+| `BECCS_inpath` | `N:/Data-Master/BECCS/From_CSIRO/20211124_as_submitted/` |
+| `GHG_off_land_inpath` | `N:/LUF-Modelling/Food_demand_AU/au.food.demand/Inputs/Off_land_GHG_emissions` |
+| `bio_HACS_inpath` | `N:/Data-Master/Habitat_condition_assessment_system/Data/Processed/` |
+| `bio_GBF2_inpath`, `bio_GBF4_inpath`, `bio_NES_Zonation_inpath` | `N:/Data-Master/Biodiversity/DCCEEW/SNES_ECNES/Processed/` |
+| `bio_GBF3_NVIS_inpath` | `N:/Data-Master/NVIS/Processed` |
+| `bio_GBF8_inpath` | `N:/Data-Master/Biodiversity/Environmental-suitability/Annual-species-suitability_20-year_snapshots_5km_to_NetCDF/` |
+| `bio_RHI_Zonation_inpath` | `N:/Data-Master/Biodiversity/DCCEEW/RHI (Relative Habitat Importance)` |
+| `renewable_energy_inpath` | `N:/Data-Master/Renewable Energy/processed` |
+| `ag_yield_trend` | `N:/Data-Master/AG 2050/` |
+
+Two L2 destinations: `raw_data` (= `RAW_DATA`, staging for files `dataprep` will process) and
+`outpath` (= `INPUT_DIR`, i.e. `input/`, the L3 contract). A file copied straight to `outpath` has
+**no** L2 transformation — trace it directly to its L1 script.
+
+---
+
+## 3. Upstream script inventory (`N:` preprocessing)
+
+`N:/Data-Master/LUTO_2.0_input_data/Scripts/` — L1. Note the `script_N_` prefix; the older names
+(`4_assemble_biophysical_data.py`) are gone.
+
+| Script | Produces (L1 output) |
+|--------|----------------------|
+| `script_1_assemble_zones_data.py` | `2D/cell_zones_df.h5` — cell area, irrigation potential, river region / drainage division IDs, NRM & state codes |
+| `script_2_assemble_agricultural_data.py` | `2D/cell_LU_mapping.h5`, `cell_livestock_data.h5`, `SA2_crop_data.h5`, `SA2_crop_GHG_data.h5`, `SA2_livestock_GHG_data.h5`, `SA2_irrigated_pasture_GHG_data.h5`, `SA2_off_land_commodity_data.h5` |
+| `script_3_agriculture_climate_damage.py` | `2D/SA2_climate_damage_mult.h5` |
+| `script_4_assemble_biophysical_data.py` | `2D/cell_biophysical_df.h5` — natural-land carbon stocks (L153-192), fire/drought risk percentiles (L633-651), EP/CP establishment costs, soil carbon, water price, growing-season rainfall |
+| `script_5_0_SNES_ECNES_selected.py` | SNES/ECNES species shortlist |
+| `script_5_1_assemble_biodiversity_data.py` | `bio_DCCEEW_{SNES,ECNES}_sparse.npz` + `_species.npy`, `bio_NES_Zonation.nc` |
+| `script_5_2_get_NVIS_SNES_ECNES_targets_by_regions.py` | `BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS.csv`, `bio_DCCEEW_{SNES,ECNES}_target_ALL_REGIONS.csv` |
+| `script_5_3_get_Zonation_layers.py` | Zonation priority layers |
+| `script_5_4_get_Zonation_performance_curves.py` | `Biodiversity_conserve_performance.xlsx`, `bio_RHI_Zonation.nc` |
+| `script_6_water_yield_modelling.py` | `4D/Water_yield_GCM-Ensemble_ssp{126,245,370,585}_2010-2100_{DR,SR}_ML_HA_mean.h5` |
+| `script_7_assemble_additional_land_use_sieve_data.py` | land-use sieve layers feeding the `x_mrj` exclusion build |
+| `script_8_assemble_ag_yield_gap_data.py` | agricultural yield-gap data |
+| `script_9_reforestation_carbon_data.py` | `3D/tCO2_ha_{ep_block,ep_rip,ep_belt,cp_block,cp_belt,hir_block,hir_rip}.nc` |
+| `script_10_1_REM_get_tables_inputs.py` | `renewable_targets.csv`, `renewable_price_AUD_MWh_{solar,wind}.csv`, `renewable_energy_bundle.csv` |
+| `script_10_2_REM_get_existing_capacity.py` | `renewable_existing_capacity_MW_1D.nc`, `renewable_existing_capacity_area_fraction_1D.nc` |
+| `script_10_3_REM_get_align_input_layers.py` | `renewable_energy_layers_1D.nc` |
+
+`2D/cell_savanna_burning.h5` has **no producing script** in `Scripts/` — it arrives in
+`2D_Spatial_Snapshot/` from elsewhere. Flag if you need its provenance.
+
+---
+
+## 4. Master index — `SolverInputData` field → provenance
+
+Field order follows the dataclass (`input_data.py:57-160`). "Builder" is the `get_*` in
+`input_data.py`; "L5 entry" is the economics function it delegates to; "Key `data.` attributes" are
+the L4 attributes that carry actual data (structural attributes like `NCELLS`, `NLMS`, `DESC2AGLU`
+are omitted — they are shape metadata, not payload).
+
+### 4.1 Economy
+
+`economic_contr_mrj` is a 3-tuple `(ag_obj_mrj, non_ag_obj_rk, ag_man_objs)`; under `maxprofit` it is
+revenue − cost, under `mincost` it is cost. **Land-use transition costs are not baked in** — they are
+charged in the solver against per-source delta vars (`input_data.py:639-643`).
+
+| Field | Builder (line) | L5 entry | Key `data.` attributes | L3 files |
+|-------|----------------|----------|------------------------|----------|
+| `economic_contr_mrj` (ag part) | `get_ag_c_mrj` 209 / `get_ag_r_mrj` 221 → `get_economic_mrj` 626 | `ag_cost.get_cost_matrices`, `ag_revenue.get_rev_matrices` | `AGEC_CROPS`, `AGEC_LVSTK`, `CROP_PRICE_MULTIPLIERS`, `LVSTK_PRICE_MULTIPLIERS`, `AC/QC/FOC/FLC/FDC/WP_COST_MULTS`, `WATER_DELIVERY_PRICE`, `SAVBURN_COST_HA`, `REAL_AREA` | `agec_crops.h5`, `agec_lvstk.h5`, `ag_price_multipliers.xlsx`, `cost_multipliers.xlsx`, `water_delivery_price.h5`, `cell_savanna_burning.h5`, `real_area.h5` |
+| `economic_contr_mrj` (non-ag part) | `get_non_ag_c_rk` 215 / `get_non_ag_r_rk` 227 | `non_ag_cost.get_cost_matrix`, `non_ag_revenue.get_rev_matrix` | `BECCS_COSTS_AUD_HA_YR`, `BECCS_REV_AUD_HA_YR`, `BECCS_TCO2E_HA_YR`, `BECCS_{COST,REV}_MULTS`, `MAINT_COST_MULTS`, `{EP,CP}_{BLOCK,BELT,RIP}_AVG_T_CO2_HA_PER_YR` | `cell_BECCS_df.h5`, `cost_multipliers.xlsx`, `tCO2_ha_*.nc` |
+| `economic_contr_mrj` (am part) | `get_ag_man_c_mrj` 579 / `get_ag_man_r_mrj` 596 / `get_ag_man_t_mrj` 602 | `ag_cost.get_agricultural_management_cost_matrices`, etc. | `ASPARAGOPSIS_DATA`, `ECOLOGICAL_GRAZING_DATA`, `PRECISION_AGRICULTURE_DATA`, `AGTECH_EI_DATA`, `BIOCHAR_DATA`, `RENEWABLE_BUNDLE_{SOLAR,WIND}`, `RENEWABLE_LAYERS`, `SOLAR_PRICES`, `WIND_PRICES` | `20260317_Bundle_{MR,AgTech_NE,AgTech_EI}.xlsx`, `20231107_ECOGRAZE_Bundle.xlsx`, `20260401_Bundle_BC.xlsx`, `renewable_energy_bundle.csv`, `renewable_energy_layers_1D.nc`, `renewable_price_AUD_MWh_{solar,wind}.csv` |
+| `economic_prices` | `get_commodity_prices_target_yr` 676 | `ag_revenue.get_commodity_prices` | `AGEC_CROPS`, `AGEC_LVSTK`, price multipliers, demand-elasticity multipliers when `DYNAMIC_PRICE` | as above + `demand_elasticity.csv` |
+| `economic_target_yr_carbon_price` | `get_target_yr_carbon_price` 684 | — (direct) | `CARBON_PRICES` | `carbon_prices.xlsx` |
+
+### 4.2 GHG
+
+| Field | Builder (line) | L5 entry | Key `data.` attributes | L3 files |
+|-------|----------------|----------|------------------------|----------|
+| `ag_g_mrj` | `get_ag_g_mrj` 233 | `ag_ghg.get_ghg_matrices` | `AGGHG_CROPS`, `AGGHG_LVSTK`, `AGGHG_IRRPAST`, `SOIL_CARBON_AVG_T_CO2_HA_PER_YR`, `SAVBURN_ELIGIBLE`, `SAVBURN_TOTAL_TCO2E_HA`, `CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR`, `BIO_HABITAT_CONTRIBUTION_LOOK_UP` | `agGHG_crops.h5`, `agGHG_lvstk.h5`, `agGHG_irrpast.h5`, `soil_carbon_t_ha.h5`, `cell_savanna_burning.h5`, `natural_land_t_co2_ha.h5`, `fire_risk.h5`, `bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv` |
+| `non_ag_g_rk` | `get_non_ag_g_rk` 239 | `non_ag_ghg.get_ghg_matrix` | `{EP,CP}_*_AVG_T_CO2_HA_PER_YR`, `BECCS_TCO2E_HA_YR`, `CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR`, `BIO_HABITAT_CONTRIBUTION_LOOK_UP`, `LU_LVSTK_NATURAL` | `tCO2_ha_*.nc`, `cell_BECCS_df.h5`, `natural_land_t_co2_ha.h5`, `fire_risk.h5` — full trace in §6-§7 |
+| `ag_man_g_mrj` | `get_ag_man_g_mrj` 585 | `ag_ghg.get_agricultural_management_ghg_matrices` | the five AM bundle dicts | AM bundle `.xlsx` files |
+| `flow_ghg_ag2ag` | inline 1071 | `ag_ghg.get_ghg_transition_emissions_from_base_year` | `CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR`, `BIO_HABITAT_CONTRIBUTION_LOOK_UP` | `natural_land_t_co2_ha.h5` |
+| `offland_ghg` | inline 1330 | — (direct, `/ GHG scale`) | `OFF_LAND_GHG_EMISSION_C` | `agGHG_lvstk_off_land.csv` |
+
+### 4.3 Water
+
+`WATER_CLIMATE_CHANGE_IMPACT = 'off'` swaps the climate-projected yield layers for the historical
+ones (`WATER_YIELD_HIST_DR/SR`) at `input_data.py:1119-1122` and `1132-1136`.
+
+| Field | Builder (line) | L5 entry | Key `data.` attributes | L3 files |
+|-------|----------------|----------|------------------------|----------|
+| `ag_w_mrj` | `get_ag_w_mrj` 245 | `ag_water.get_water_net_yield_matrices` | `WATER_YIELD_DR_FILE`, `WATER_YIELD_SR_FILE`, `WREQ_DRY_RJ`, `WREQ_IRR_RJ`, `WATER_REGION_ID`, `WATER_REGION_HIST_LEVEL`, `WATER_OUTSIDE_LUTO_BY_CCI`, `WATER_USE_DOMESTIC` | `water_yield_ssp{SSP}_2010-2100_{dr,sr}_ml_ha.h5`, `water_yield_baselines.h5`, `water_yield_outside_LUTO_*.h5`, `water_yield_natural_land_*.h5`, `Water_Use_Domestic.csv`, `rivreg_{id,lut}.h5` / `draindiv_{id,lut}.h5` |
+| `non_ag_w_rk` | `get_non_ag_w_rk` 340 | `non_ag_water.get_w_net_yield_matrix` | `WATER_YIELD_DR_FILE`, `WATER_YIELD_SR_FILE`, `REAL_AREA` | same yield layers |
+| `ag_man_w_mrj` | `get_ag_man_w_mrj` 608 | `ag_water.get_agricultural_management_water_matrices` | AM bundles + `RENEWABLE_BUNDLE_{SOLAR,WIND}` | AM bundle `.xlsx`, `renewable_energy_bundle.csv` |
+| `water_region_indices` / `water_region_names` | 250 / 256 | — (direct) | `WATER_REGION_INDEX_R`, `WATER_REGION_NAMES` | `rivreg_*.h5` or `draindiv_*.h5` per `WATER_REGION_DEF` |
+
+`WATER_LIMITS = 'off'` short-circuits both region getters to `{}`.
+
+### 4.4 Biodiversity — quality score
+
+| Field | Builder (line) | L5 entry | Key `data.` attributes | L3 files |
+|-------|----------------|----------|------------------------|----------|
+| `ag_b_mrj` | `get_ag_b_mrj` 263 | `ag_biodiversity.get_bio_quality_score_mrj` | `BIO_QUALITY_RAW`, `BIO_QUALITY_LDS`, `BIO_HABITAT_CONTRIBUTION_LOOK_UP`, `SAVBURN_ELIGIBLE` (the quality layers are built in `data.py` from the priority-rank layer × `CONNECTIVITY_SCORE`) | `bio_OVERALL_PRIORITY_RANK_AND_AREA_CONNECTIVITY.h5`, `bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv`, `cell_savanna_burning.h5` |
+| `non_ag_b_rk` | `get_non_ag_b_rk` 354 | `non_ag_biodiversity.get_breq_matrix` | `BIO_QUALITY_RAW`, `BIO_HABITAT_CONTRIBUTION_LOOK_UP`, `LU_LVSTK_NATURAL` | as above |
+| `ag_man_b_mrj` | `get_ag_man_b_mrj` 614 | `ag_biodiversity.get_ag_mgt_biodiversity_matrices` | AM bundles, `RENEWABLE_BUNDLE_*` | AM bundle `.xlsx`, `renewable_energy_bundle.csv` |
+| `biodiv_contr_ag_j` | `get_ag_biodiv_contr_j` 269 | `ag_biodiversity.get_ag_biodiversity_contribution` | `BIO_HABITAT_CONTRIBUTION_LOOK_UP` | `bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv` (HCAS `HABITAT_CONDITION.csv`) |
+| `biodiv_contr_non_ag_k` | `get_non_ag_biodiv_impact_k` 274 | `non_ag_biodiversity.get_non_ag_lu_biodiv_contribution` | same | same |
+| `biodiv_contr_ag_man` | `get_ag_man_biodiv_impacts` 279 | `ag_biodiversity.get_ag_management_biodiversity_contribution` | AM bundles | AM bundle `.xlsx` |
+
+### 4.5 Biodiversity — GBF targets
+
+Every GBF field is gated: when its setting is `'off'` the builder returns `np.empty(0)` / `{}` / `[]`
+and the whole stream costs nothing. The `*_region_*` companions are the constraint key lists.
+
+| Field | Builder (line) | L5 entry | Key `data.` attributes | L3 files |
+|-------|----------------|----------|------------------------|----------|
+| `GBF2_mask_area_r` | `get_GBF2_mask_area_r` 283 | `ag_biodiversity.get_GBF2_MASK_area` | `BIO_GBF2_MASK`, `BIO_GBF2_MASK_LDS`, `BIO_GBF2_BASE_YR`, `REAL_AREA` | `bio_OVERALL_PRIORITY_RANK_AND_AREA_CONNECTIVITY.h5`, `Biodiversity_conserve_performance.xlsx`, `BIODIVERSITY_GBF2_TOP_RANK_CELL_BIO_SCORES_AND_TARGET.csv` |
+| `GBF3_NVIS_pre_1750_area_vr` | `get_GBF3_NVIS_pre_1750_area_vr` 290 | `ag_biodiversity.get_GBF3_NVIS_matrices_vr` | `GBF3_NVIS_LAYERS_LDS` ← `get_NVIS_sparse_array` (`data.py:1651-1670`) | `bio_GBF3_{GBF3_NVIS_TARGET_CLASS}_sparse.npz` + `_groups.npy` |
+| `GBF3_NVIS_region_group` | 297 | — (direct) | `BIO_GBF3_NVIS_SEL` ← `get_NVIS_targets_df` (`data.py:1672-1714`) | `BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS.csv` |
+
+**`GBF3_NVIS_REGION_MODE` does not swap the layer file.** The spatial layers always come from
+`bio_GBF3_{GBF3_NVIS_TARGET_CLASS}_sparse.npz` (`data.py:1664`). The mode — `AUSTRALIA`, `NRM` or
+`IBRA_REG` — is a filter on the **targets CSV**: `get_NVIS_targets_df` queries
+`region_level == '{GBF3_NVIS_REGION_MODE}'` alongside `sheet_name == '{TARGET_CLASS}'` and
+`resfactor == {RESFACTOR}` (`data.py:1700-1706`), and `AUSTRALIA` additionally collapses every
+regional row to a single `'AUSTRALIA'` label so the solver bypasses NRM masking. There is no separate
+IBRA layer, attribute or constraint method — see §9.3.
+| `GBF4_SNES_pre_1750_area_sr` | 303 | `ag_biodiversity.get_GBF4_SNES_matrix_sr` | `GBF4_SNES_LAYERS_LDS` | `bio_GBF4_SNES_sparse.npz`, `bio_GBF4_SNES_sparse_species.npy` |
+| `GBF4_SNES_region_species` | 309 | — (direct) | `BIO_GBF4_SNES_SEL` | `BIODIVERSITY_GBF4_TARGET_SNES.csv` |
+| `GBF4_ECNES_pre_1750_area_sr` | 315 | `ag_biodiversity.get_GBF4_ECNES_matrix_sr` | `GBF4_ECNES_LAYERS_LDS` | `bio_GBF4_ECNES_sparse.npz`, `bio_GBF4_ECNES_sparse_species.npy` |
+| `GBF4_ECNES_region_species` | 321 | — (direct) | `BIO_GBF4_ECNES_SEL` | `BIODIVERSITY_GBF4_TARGET_ECNES.csv` |
+| `GBF8_pre_1750_area_sr` | 327 | `ag_biodiversity.get_GBF8_matrix_sr` | `BIO_GBF8_SEL_SPECIES`, `BIO_GBF8_GROUPS_LAYER` | `bio_GBF8_ssp{SSP}_EnviroSuit.nc`, `..._group.nc` |
+| `GBF8_region_species` | 333 | — (direct) | `BIO_GBF8_SEL`, `BIO_GBF8_BASELINE_SCORE_GROUPS`, `BIO_GBF8_OUTSDIE_LUTO_SCORE_GROUPS` | `BIODIVERSITY_GBF8_{SCORES,TARGET}{,_group}.csv` |
+
+### 4.6 Quantity / demand
+
+| Field | Builder (line) | L5 entry | Key `data.` attributes | L3 files |
+|-------|----------------|----------|------------------------|----------|
+| `ag_q_mrp` | `get_ag_q_mrp` 360 | `ag_quantity.get_quantity_matrices` | `AGEC_CROPS`, `AGEC_LVSTK`, `FEED_REQ`, `PASTURE_KG_DM_HA`, `SAFE_PUR_NATL`, `SAFE_PUR_MODL`, `CLIMATE_CHANGE_IMPACT`, `PRODUCTIVITY_MUL_*` | `agec_*.h5`, `feed_req.h5`, `pasture_kg_dm_ha.h5`, `safe_pur_{natl,modl}.h5`, `climate_change_impacts_{rcp}_{on,off}.h5`, `yieldincreases_bau2022.csv`, `yieldincreases_ag_2050.xlsx` |
+| `non_ag_q_crk` | `get_non_ag_q_crk` 366 | `non_ag_quantity.get_quantity_matrix` | `LU2PR`, `PR2CM` (structural — non-ag LUs produce no commodity) | — |
+| `ag_man_q_mrp` | `get_ag_man_q_mrj` 590 | `ag_quantity.get_agricultural_management_quantity_matrices` | AM bundles | AM bundle `.xlsx` |
+| `commodity_names` | inline 1307 | — | `COMMODITIES` | derived from `ag_landuses.csv` |
+| `limits['demand']` | `get_limits` 817 | — | `D_CY` ← `DEMAND_DATA` × AusTIMES multipliers | `demand_projections.h5`, `AusTIMES_demand_multiplier.xlsx`, `demand_elasticity.csv` |
+
+### 4.7 Transitions, bounds, feasibility
+
+The transition system is **source-keyed**: costs and feasibility are sliced per base-year source
+(`(from_m, from_j)` for ag, `k` for non-ag), and the solver creates one delta var per feasible
+`(source, cell, target)`.
+
+| Field | Builder (line) | L5 entry | Key `data.` attributes | L3 files |
+|-------|----------------|----------|------------------------|----------|
+| `ag_x_mrj` | `get_ag_x_mrj` 394 | `ag_transition.get_to_ag_exclude_matrices` | `EXCLUDE` (← `x_mrj.npy`), `T_MAT`, `NO_GO_{LANDUSE,REGION}_AG` | `x_mrj.npy`, `ag_tmatrix.npy`, `no_go_areas/` |
+| `flow_cost_ag2ag` | `get_ag_t_mrj` 372 | `ag_transition.get_transition_matrices_ag2ag` | `T_MAT`, `TRANS_COST_MULTS`, `AG_TMATRIX`, `WATER_LICENCE_PRICE`, `IRRIG_COST_MULTS`, `REGIONAL_ADOPTION_ZONES` | `ag_tmatrix.npy`, `transition_cost_clearing_forest.npz`, `cost_multipliers.xlsx`, `water_licence_price.h5`, `regional_adoption_zones.h5` |
+| `flow_cost_ag2nonag` | inline 1080-1086 | `non_ag_transition.get_transition_matrix_ag2nonag` | `EP_EST_COST_HA`, `RP_EST_COST_HA`, `AF_EST_COST_HA`, `CP_EST_COST_HA`, `AG2EP_TRANSITION_COSTS_HA`, `AG_TO_DESTOCKED_NATURAL_COSTS_HA`, `RP_FENCING_LENGTH`, `EST/FENCE/IRRIG_COST_MULTS` | `ep_est_cost_ha.h5`, `cp_est_cost_ha.h5`, `ag_to_ep_tmatrix.npy`, `ag_to_destock_tmatrix.npy`, `stream_length_m_cell.h5`, `cost_multipliers.xlsx` |
+| `flow_cost_nonag2ag` | inline 1090-1096 | `non_ag_transition.get_transition_matrix_nonag2ag` | `EP2AG_TRANSITION_COSTS_HA`, `T_MAT` | `ep_to_ag_tmatrix.npy` |
+| `dvar_ub_ag` / `dvar_lb_ag` | 484 / 517 | `ag_transition.get_ag2ag_{ub,lb}` + `non_ag_transition.get_nonag2ag_ub` | `T_MAT`, `EXCLUDE`, base dvars | `ag_tmatrix.npy`, `x_mrj.npy` |
+| `dvar_ub_nonag` / `dvar_lb_nonag` | 504 / 524 | `non_ag_transition.get_non_ag_{ub,lb}_matrices` | `RP_PROPORTION`, `LU_LVSTK_NATURAL`, `NO_GO_*_NON_AG`, reversibility flags | `stream_length_m_cell.h5`, `no_go_areas/` |
+| `feasible_*` (4 fields) | 399, 410, 426, 450, 466 | — (pure logic over `ag_x_mrj`, `dvar_ub_nonag`, `T_MAT` reach) | `T_MAT` | `ag_tmatrix.npy` |
+| `ag_source_cells` / `nonag_source_cells` | 416 / 421 | `ag_transition.get_base_dvar_mj_cell_map`, `non_ag_transition.get_base_nonag_dvar_k_cell_map` | base-year dvars | — (runtime state) |
+| `ag_man_limits` | `get_ag_man_limits` 620 | `ag_transition.get_agricultural_management_adoption_limits` | AM bundles | AM bundle `.xlsx` |
+| `ag_man_lb_mrj` | `get_ag_man_lb_mrj` 533 | `ag_transition.get_lower_bound_agricultural_management_matrices` | base-year AM dvars | — (runtime state) |
+| `dvar_base_ag_mrj` / `dvar_base_non_ag_rk` | inline 1346-1347 | `ag_transition.get_folded_base_ag_dvar`, `data.non_ag_dvars` | `lumaps`, `lmmaps` | `lumap.h5`, `lmmap.h5` (base year only; later years are runtime state) |
+| `ag_fold_map`, `acct_cells_mrj` | 1310, 1316-1324 | `ag_transition.get_ag_dvar_fold_map` | θ-fold bookkeeping | — (runtime) |
+
+### 4.8 Renewable energy
+
+| Field | Builder (line) | L5 entry | Key `data.` attributes | L3 files |
+|-------|----------------|----------|------------------------|----------|
+| `renewable_solar_r` | `get_potential_renewable_solar_r` 538 | `ag_quantity.get_quantity_renewable(data, 'Utility Solar PV', ...)` | `RENEWABLE_LAYERS`, `RENEWABLE_BUNDLE_SOLAR`, `REAL_AREA` | `renewable_energy_layers_1D.nc`, `renewable_energy_bundle.csv` |
+| `renewable_wind_r` | 543 | same, `'Onshore Wind'` | `RENEWABLE_LAYERS`, `RENEWABLE_BUNDLE_WIND` | as above |
+| `exist_renewable_solar_r` / `_wind_r` | 548 / 557 | `ag_quantity.get_existing_renewable_dvar_fraction(..., 99999)` | `RENEWABME_EXISTING_DVAR_FRACTION_{SOLAR,WIND}` | `renewable_existing_capacity_area_fraction_1D.nc` |
+| `limits['renewable_*']` | `get_limits` 825-832 | `ag_quantity.get_exist_renewable_capacity_by_state` | `RENEWABLE_TARGETS`, `RENEWABLE_EXISTING_CAPACITY_LAYER_{SOLAR,WIND}_MWH_CELL` | `renewable_targets.csv`, `renewable_existing_capacity_MW_1D.nc` |
+| `renewable_MNES_mask_{solar,wind}_idx` | 787 / 793 | — (direct) | `RENEWABLE_MNES_MASK_{SOLAR,WIND}` | `renewable_QLD_EPBC_MNES_prioritization.nc` + `_performance.csv` |
+| `renewable_GBF2_mask_{solar,wind}_idx` | 775 / 781 | — (direct) | `RENEWABLE_GBF2_MASK_{SOLAR,WIND}` | GBF2 mask inputs (§4.5) |
+
+The existing-capacity ceiling deliberately uses `yr_cal=99999` (all years) so simulated + existing
+never exceeds 1 in any period (`input_data.py:550-554`).
+
+### 4.9 Regions, masks, bookkeeping
+
+| Field | Builder (line) | `data.` attribute | L3 file |
+|-------|----------------|-------------------|---------|
+| `region_state_r`, `region_state_name2idx` | 566, 570 | `REGION_STATE_CODE`, `REGION_STATE_NAME2CODE` | `REGION_STATE_r.h5` ← `cell_zones_df.h5` |
+| `region_NRM_names_r` | 574 | `REGION_NRM_NAME` | `REGION_NRM_r.h5` ← `cell_zones_df.h5` |
+| `savanna_eligible_r` | 765 | `SAVBURN_ELIGIBLE` | `cell_savanna_burning.h5` |
+| `GBF2_mask_idx` | 769 | `BIO_GBF2_MASK_LDS` | see §4.5 |
+| `real_area` | 1339 | `REAL_AREA` | `real_area.h5` ← `cell_zones_df['CELL_HA']` |
+| `ag_mask_proportion_r` | 1340 | `AG_MASK_PROPORTION_R` | derived from `lumap.h5` |
+| `lu2pr_pj`, `pr2cm_cp`, `desc2aglu` | 1336-1338 | `LU2PR`, `PR2CM`, `DESC2AGLU` | derived from `ag_landuses.csv` |
+| `base_yr_prod` | 1298-1305 | 6 base-year aggregates re-derived at `target_index=0` and cached on `data` | (recomputes the L5 matrices above) |
+| `scale_factors` | 1283-1296 | rescaling bands — see §8 | — |
+
+### 4.10 Limits (RHS)
+
+`get_limits` (799-855) returns **raw, unscaled** targets; the solver divides each by its
+`scale_factors` entry inline.
+
+| Key | Source attribute | L3 file | Gate |
+|-----|------------------|---------|------|
+| `demand` | `D_CY` | `demand_projections.h5`, `AusTIMES_demand_multiplier.xlsx` | always |
+| `water` | `WATER_YIELD_TARGETS` | water yield baselines/outside-LUTO layers | `WATER_LIMITS == 'on'` |
+| `ghg` | `GHG_TARGETS[yr]` | `GHG_targets.xlsx` | `GHG_EMISSIONS_LIMITS != 'off'` |
+| `renewable_*` | `RENEWABLE_TARGETS` (TWh→MWh) | `renewable_targets.csv` | any `RENEWABLES_OPTIONS` |
+| `GBF2` | `get_GBF2_target_for_yr_cal` | `Biodiversity_conserve_performance.xlsx` | `GBF2_TARGET != 'off'` |
+| `GBF3_NVIS` | `get_GBF3_NVIS_limit_score_inside_LUTO_by_yr` | `BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS.csv` | `GBF3_NVIS_TARGET != 'off'` |
+| `GBF4_SNES` / `GBF4_ECNES` | `get_GBF4_{SNES,ECNES}_target_inside_LUTO_by_year` | `BIODIVERSITY_GBF4_TARGET_{SNES,ECNES}.csv` | respective setting `!= 'off'` |
+| `GBF8` | `get_GBF8_target_inside_LUTO_by_yr` | `BIODIVERSITY_GBF8_TARGET{,_group}.csv` | `GBF8_TARGET == 'on'` |
+| `ag_regional_adoption`, `non_ag_regional_adoption{,_sum}` | `ag_transition.get_regional_adoption_limits` | `regional_adoption_zones.h5/.xlsx` | `REGIONAL_ADOPTION_CONSTRAINTS != 'off'` |
+
+---
+
+## 5. `input/` file inventory → raw provenance
+
+The L3 contract, with its L4 consumer and L2/L1/L0 origin. "copy" in the L2 column means
+`dataprep.py` does no transformation — trace straight through to L1.
+
+### Structural / land use
+
+| `input/` file | `data.py` | L2 (`dataprep.py`) | L1 / L0 origin |
+|---------------|-----------|--------------------|----------------|
+| `NLUM_2010-11_mask.tif` | 146 | copy 111 | `nlum_inpath` (National Landuse Map) |
+| `ag_landuses.csv` | 227 | copy 112 | `nlum_inpath` |
+| `lumap.h5` | 143 | built 340 | `raw_data/cell_LU_mapping.h5` ← script_2 |
+| `lmmap.h5` | 442 | built 355 | `raw_data/cell_LU_mapping.h5` ← script_2 |
+| `real_area.h5` | 435 | built 422 (`zones['CELL_HA']`) | `cell_zones_df.h5` ← script_1 |
+| `x_mrj.npy` | 898 | built 545-608 (SA2 concordance pivot × rainfall ≥175 mm × irrigation potential, then OR'd with the observed 2010 map) | `NLUM_SPREAD_LU_ID_Mapped_Concordance.h5` + `cell_biophysical_df.h5` + `cell_zones_df.h5` |
+| `state_id.npy` | **not read** | built 311 | `cell_zones_df.h5` (superseded by `REGION_STATE_r.h5`) |
+| `REGION_NRM_r.h5` / `REGION_STATE_r.h5` | 517 / 524 | built 360 / 363 | `cell_zones_df.h5` ← script_1 |
+| `regional_adoption_zones.h5` / `.xlsx` | 597 / 601 | built 379 / 411 | `cell_zones_df.h5` |
+| `no_go_areas/` | 561 | copytree 163 | `no_go_areas` (toy dataset — flagged as such in `dataprep.py:56`) |
+
+### Agricultural economics & production
+
+| `input/` file | `data.py` | L2 | L1 / L0 |
+|---------------|-----------|----|---------|
+| `agec_crops.h5` | 212 | built 1019 | `SA2_crop_data.h5` ← script_2 |
+| `agec_lvstk.h5` | 213 | built 1039 | `cell_livestock_data.h5` ← script_2 |
+| `agGHG_crops.h5` | 885 | built 1078 | `SA2_crop_GHG_data.h5` ← script_2 |
+| `agGHG_lvstk.h5` | 886 | built 1153 | `SA2_livestock_GHG_data.h5` ← script_2 |
+| `agGHG_irrpast.h5` | 887 | built 1159 | `SA2_irrigated_pasture_GHG_data.h5` ← script_2 |
+| `agGHG_lvstk_off_land.csv` | 1305 | built 1209 | `GHG_off_land_inpath` |
+| `feed_req.h5` | 646 | built 510 | `cell_livestock_data.h5` |
+| `pasture_kg_dm_ha.h5` | 648 | built 514 | `cell_livestock_data.h5` |
+| `safe_pur_natl.h5` / `safe_pur_modl.h5` | 651 / 654 | built 517 / 520 | `cell_livestock_data.h5` |
+| `soil_carbon_t_ha.h5` | 711 | built 540 (`SOC_T_HA_TOP_30CM`) | `cell_biophysical_df.h5` ← script_4 |
+| `climate_change_impacts_{rcp}_{on,off}.h5` | 486 | built 939-981 (parallel) | `SA2_climate_damage_mult.h5` ← script_3 |
+| `yieldincreases_bau2022.csv` | 827 | copy 97 | `fdh_inpath` |
+| `yieldincreases_ag_2050.xlsx` | 839 | copy 98 | `ag_yield_trend` (ABARES) |
+| `ag_price_multipliers.xlsx` | 216-217 | copy 116 | `luto_1D_inpath` |
+| `cost_multipliers.xlsx` | 411-425 | copy 117 | `luto_1D_inpath` |
+
+### Transitions
+
+| `input/` file | `data.py` | L2 | L1 / L0 |
+|---------------|-----------|----|---------|
+| `ag_tmatrix.npy` | 891 | built 486 | `transitions_costs_20251002.xlsx` + `tmatrix_cat2lus.csv` (`fdh_inpath`) |
+| `ag_to_ep_tmatrix.npy` | 972 | built 502 | same |
+| `ep_to_ag_tmatrix.npy` | 977 | built 494 | same |
+| `ag_to_destock_tmatrix.npy` | 892 | built 258 | `transitions_costs_20251002.xlsx` |
+| `transition_cost_clearing_forest.npz` | 1002 | built 271 | `transitions_costs_20251002.xlsx` |
+| `ep_est_cost_ha.h5` / `cp_est_cost_ha.h5` | 918 / 921 | built 919 / 922 — **CPI-adjusted 2021→2010 AUD (×99.2/118.8)**, `dataprep.py:913-916` | `cell_biophysical_df.h5` ← script_4 |
+| `stream_length_m_cell.h5` | 863 | built 886 | `cell_biophysical_df.h5` |
+
+### Carbon
+
+| `input/` file | `data.py` | L2 | L1 / L0 |
+|---------------|-----------|----|---------|
+| `tCO2_ha_{ep_block,ep_rip,ep_belt,cp_block,cp_belt,hir_block,hir_rip}.nc` | 932-969 | subset 122-137 — ages `[50,60,70,80,90]` only, recompressed | script_9 ← FullCAM `carbonstock_RES_1_*` NetCDFs + `HIR_NFMR_AC_*.npy` |
+| `natural_land_t_co2_ha.h5` | 1155 | built 897-901 | `cell_biophysical_df.h5` L153-192 ← script_4 (ERF max-aboveground-biomass rasters) |
+| `fire_risk.h5` | 924 | built 908-910 | `cell_biophysical_df.h5` L633-651 ← `N:/Data-Master/Fire_drought_risk/ep_CO2_percentage.csv` |
+| `cell_BECCS_df.h5` | 1641 | built 1244-1291 | `df_info_best_grid_20211116.pkl` (CSIRO, Lei Gao) |
+| `carbon_prices.xlsx` | 1337 | copy 115 | `luto_1D_inpath` |
+| `GHG_targets.xlsx` | 1353 | copy 114 | `luto_1D_inpath/GHG_targets_20260223_2010-2060.xlsx` |
+| `cell_savanna_burning.h5` | 1366 | re-saved 119 | `luto_2D_inpath` — **no producing script in `Scripts/`** |
+
+### Water
+
+| `input/` file | `data.py` | L2 | L1 / L0 |
+|---------------|-----------|----|---------|
+| `water_yield_ssp{126,245,370,585}_2010-2100_{dr,sr}_ml_ha.h5` | 1117-1118 | built 141-156 (transposed out of the 4D HDF5) | script_6 |
+| `water_yield_baselines.h5` | 1105 | built 617 | script_6 outputs |
+| `water_yield_outside_LUTO_study_area_hist_1970_2000.h5` | 1122 | built 743 | script_6 |
+| `water_yield_outside_LUTO_study_area_2010_2100_{dd,rr}_ml.h5` | 2200 / 2220 | built 711-712 | script_6 |
+| `water_yield_natural_land_2010_2100_{dd,rr}_ml.h5` | 2204 / 2224 | built 719-720 | script_6 |
+| `rivreg_id.h5` / `rivreg_lut.h5` | 2194 / 2196 | built 635 / 632 | `cell_zones_df.h5` ← script_1 |
+| `draindiv_id.h5` / `draindiv_lut.h5` | 2214 / 2216 | built 647 / 644 | `cell_zones_df.h5` |
+| `water_licence_price.h5` | 1095 | built 532 (`WATER_PRICE_ML_ABARES`) | `cell_biophysical_df.h5` |
+| `water_delivery_price.h5` | 1100 | built 528 (`lvstk['WP']`) | `cell_livestock_data.h5` |
+| `Water_Use_Domestic.csv`, `Water_Use_Agriculture_ML.csv` | 1125 | copy 159-160 | `water_domestic_use` (Water Account) |
+
+### Biodiversity
+
+| `input/` file | `data.py` | L2 | L1 / L0 |
+|---------------|-----------|----|---------|
+| `bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv` | 1394 | copy 174 (renamed from `HABITAT_CONDITION.csv`) | HCAS processed |
+| `bio_OVERALL_PRIORITY_RANK_AND_AREA_CONNECTIVITY.h5` | 1399, 2791 | built 765 | HCAS / Zonation |
+| `Biodiversity_conserve_performance.xlsx` | 1446 | copy 177 | script_5_4 |
+| `BIODIVERSITY_GBF2_TOP_RANK_CELL_BIO_SCORES_AND_TARGET.csv` | — (diagnostic) | built 873 | derived in `dataprep` |
+| `bio_GBF3_NVIS_{MVG,MVS}_sparse.npz`, `..._groups.npy` | 1665 | copy 180-183 | `bio_GBF3_NVIS_inpath` (NVIS 7.0 pre-1750) |
+| `BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS.csv` | 1701 | copy 184 | script_5_2 |
+| `bio_GBF3_IBRA_{Regions,SubRegions}.nc` | **not read** | built 455-460 | IBRA layers — produced but never loaded (§9.3) |
+| `bio_GBF4_{SNES,ECNES}_sparse.npz`, `..._sparse_species.npy` | 1773 / 1800 | copy 187-190 | script_5_1 (DCCEEW SNES/ECNES) |
+| `BIODIVERSITY_GBF4_TARGET_{SNES,ECNES}.csv` | 2306 / 2361 | copy 191-192 | script_5_2 |
+| `bio_GBF8_ssp{SSP}_EnviroSuit{,_group}.nc` | 1608 / 1631 | copy 195-202 | `bio_GBF8_inpath` (environmental suitability, 5 km) |
+| `BIODIVERSITY_GBF8_{SCORES,TARGET}{,_group}.csv` | 1609-1622 | copy 204-207 | `bio_GBF8_inpath` |
+| `bio_NES_Zonation.nc` | 2800 | copy 210 | script_5_1 / 5_3 |
+| `bio_RHI_Zonation.nc` | 2809 | copy 215 | script_5_4 (DCCEEW RHI) |
+
+### Renewables
+
+| `input/` file | `data.py` | L2 | L1 |
+|---------------|-----------|----|----|
+| `renewable_targets.csv` | 731 | copy 218 | script_10_1 (AEMO ISP scenarios) |
+| `renewable_energy_bundle.csv` | 725 | copy 220 | script_10_1 |
+| `renewable_price_AUD_MWh_{solar,wind}.csv` | 737-738 | copy 221-222 | script_10_1 |
+| `renewable_energy_layers_1D.nc` | 744 | copy 219 | script_10_3 |
+| `renewable_existing_capacity_{MW,area_fraction}_1D.nc` | (existing-capacity attrs) | copy 225-226 | script_10_2 |
+| `renewable_QLD_EPBC_MNES_prioritization.nc` / `_performance.csv` | 1487 / 1488 | copy 223-224 | `renewable_energy_inpath` |
+
+### Demand & AM bundles
+
+| `input/` file | `data.py` | L2 | L1 / L0 |
+|---------------|-----------|----|---------|
+| `demand_projections.h5` | 1249 | built 1240 | `All_LUTO_demand_scenarios_with_convergences.csv` (`demand_scenarios_inpath`) |
+| `demand_elasticity.csv` | 1289 | copy 103 | `demand_elasticity_inpath/20260311_values for runs.csv` |
+| `AusTIMES_demand_multiplier.xlsx` | 1214 | copy 104 | `luto_1D_inpath/20260220_CNS25 Pathways AusTIMES data.xlsx` |
+| `20260317_Bundle_MR.xlsx` | 672-675 | copy 167 | `luto_1D_inpath` (Asparagopsis) |
+| `20231107_ECOGRAZE_Bundle.xlsx` | 681-683 | copy 170 | `luto_1D_inpath` |
+| `20260317_Bundle_AgTech_NE.xlsx` | 689-691 | copy 168 | `luto_1D_inpath` (precision agriculture) |
+| `20260317_Bundle_AgTech_EI.xlsx` | 697-699 | copy 169 | `luto_1D_inpath` |
+| `20260401_Bundle_BC.xlsx` | 705-706 | copy 171 | `luto_1D_inpath` (biochar) |
+
+**Demand-multiplier gate** (`data.py:1203-1229`): the AusTIMES multipliers belong to a carbon
+pathway. `GHG_EMISSIONS_LIMITS = 'off'` maps to `None` in `GHG_TARGETS_DICT` and has no sheet, so the
+workbook is read only to borrow its year index and commodity columns, then every multiplier is
+forced to `1.0`. The frame keeps its shape however the carbon constraint is set.
+
+---
+
+## 6. Detailed trace — reforestation carbon (EP / CP / HIR)
+
+The carbon pipeline is the most-changed part of the model and the one most often mis-remembered: it
+is **NetCDF/xarray, not HDF5/pandas**, and the attributes carry a `_PER_YR` suffix.
 
 ```
-Raw FullCAM Output → 4_assemble_biophysical_data.py → cell_biophysical_df.h5 →
-dataprep.py → ep_block_avg_t_co2_ha_yr.h5 →
-data.py (with fire/reversal risk adjustments) → EP_BLOCK_AVG_T_CO2_HA →
-get_ghg_env_plantings() → GHG emissions per cell
+FullCAM REST API 2025 GeoTIFFs
+  → script_9_reforestation_carbon_data.py        (cap, CO2e conversion, riparian burn-in, species blend)
+  → 3D_Spatial_Timeseries/tCO2_ha_*.nc           (age 0-90 × 6,956,407 cells)
+  → dataprep.py:122-137                          (subset ages [50,60,70,80,90], recompress)
+  → input/tCO2_ha_*.nc
+  → data.py:929-969                              (select CARBON_EFFECTS_WINDOW, mask, risk-discount, annualise)
+  → data.{EP_BLOCK,EP_BELT,EP_RIP,CP_BLOCK,CP_BELT}_AVG_T_CO2_HA_PER_YR
+  → non_agricultural/ghg.py + revenue.py         (× -1, × REAL_AREA)
+  → non_ag_g_rk / non_ag_obj_rk
 ```
 
-### Key Transformations
-1. **Annual Averaging**: Raw cumulative carbon (90 years) ÷ settings.CARBON_EFFECTS_WINDOW = annual rate (done in data.py)
-2. **Component Aggregation**: Trees + Debris = Above-ground carbon
-3. **Risk Discounting**: Above-ground × fire_risk × (1 - reversal_risk)
-4. **Spatial Scaling**: Per-hectare rate × cell area = total per cell
-5. **Sign Convention**: Negative values for carbon sequestration
+**L1 — `script_9_reforestation_carbon_data.py`**
 
-### Data Processing Pipeline
+| Stage | Lines | What it does |
+|-------|-------|--------------|
+| Load | 120-122, 199-214, 273-276 | EP: `carbonstock_RES_1_specId_7_specCat_{BlockES,Water,BeltH}.nc`. CP: Mallee (`specId_23`) + E. globulus (`specId_8`). HIR: `HIR_NFMR_AC_{gt,lt}_500mm{,_rip}.npy` |
+| Gap-fill | 124-128, 218-223 | `fill_nan_nearest_2d` per year per C-pool |
+| Eglob-Belt proxy | 204-214 | FullCAM v2024 Eglob-Belt is unreliable → `Eglob_Belt = Eglob_Block × (EP_Belt / EP_Block)` |
+| Riparian burn-in | 136, 279-280 | `block = (1 − rip_area_prop)·block + rip_area_prop·rip` |
+| Species blend | 233-237 | Mallee→E. globulus ramp over 550-650 mm rainfall; HIR ramps over 450-550 mm (283-285) |
+| Cap + CO2e | 139-149, 240-246, 289-295 | caps `max_tree_C=1500`, `max_debris_C=300`, `max_soil_C=500` t C/ha, then `× 44/12`. **The EP/CP caps were paired with the wrong pools until 2026-08-12** — see §9.1 |
+| Soil as change | 156-183, 249-267, 298-312 | soil variable is written as `array[age] − array[age=0]` — sequestration *after* planting, excluding the pre-existing stock |
+| Write | 161-184, 254-267, 303-315 | `tCO2_ha_*.nc`, dims `(age, cell)`, vars `{PREFIX}_{TREES,DEBRIS,SOIL}_T_CO2_HA` |
+| GeoTIFF export | 327-355 | Side artefact, **not** on the model's data path: `save_dataset_as_multiband_tiffs` writes 18 multiband tifs (91 bands, float32, LZW, nodata −99) to `N:/Data-Master/FullCAM/Output_TOT_CO2_HA_GeoTiffs/` — EP block/rip/belt, CP block/belt and HIR **block** only (HIR rip is not exported). For visualisation/QA; nothing in `luto/` reads them. Refreshed 2026-08-13 alongside the cap fix; they had been stale since 2025-10-09. |
 
-| Step | Code Location | Process |
-|------|---------------|---------|
-| 1. Raw FullCAM Data Processing | **Code**: N:\Data-Master\LUTO_2.0_input_data\Scripts\4_assemble_biophysical_data.py<br>**Section**: ############## Average annual carbon sequestration by reforestation land uses | • `EP_BLOCK_TREES_AVG_T_CO2_HA_YR` = h5f['Trees_tCO2_ha'][90] (Above Ground Biomass cumulative from 2010-2100, no averaging)<br>• `EP_BLOCK_DEBRIS_AVG_T_CO2_HA_YR` = h5f['Debris_tCO2_ha'][90] (Debris carbon cumulative, no averaging)<br>• `EP_BLOCK_SOIL_AVG_T_CO2_HA_YR` = (h5f['Soil_tCO2_ha'][90] - h5f['Soil_tCO2_ha'][0]) (Marginal soil carbon change, no averaging) |
-| 2. LUTO Data Preprocessing | **Code**: luto/dataprep.py<br>**Lines**: 807-811 - Average annual carbon sequestration by Environmental Plantings (block plantings) | • Load biophysical data: `bioph = pd.read_hdf(raw_data + 'cell_biophysical_df.h5')` (line 250)<br>• Create AG/BG DataFrame: `s = pd.DataFrame(columns=['EP_BLOCK_AG_AVG_T_CO2_HA_YR', 'EP_BLOCK_BG_AVG_T_CO2_HA_YR'])` (line 808)<br>• Combine above-ground: `s['EP_BLOCK_AG_AVG_T_CO2_HA_YR'] = bioph.eval('EP_BLOCK_TREES_AVG_T_CO2_HA_YR + EP_BLOCK_DEBRIS_AVG_T_CO2_HA_YR')` (line 809)<br>• Extract below-ground: `s['EP_BLOCK_BG_AVG_T_CO2_HA_YR'] = bioph['EP_BLOCK_SOIL_AVG_T_CO2_HA_YR']` (line 810)<br>• Save to HDF5: `s.to_hdf(outpath + 'ep_block_avg_t_co2_ha_yr.h5', ...)` (line 811) |
-| 3. LUTO Runtime Data Loading | **Code**: luto/data.py<br>**Lines**: 750-754 - Load environmental plantings (block) GHG sequestration | • Load fire risk data: `fr_df = pd.read_hdf(..., "fire_risk.h5", where=self.MASK)` (line 745)<br>• Select fire risk level: `fire_risk = fr_df[fr_dict[settings.FIRE_RISK]]` (line 747)<br>• Load EP data with spatial mask: `ep_df = pd.read_hdf(..., "ep_block_avg_t_co2_ha_yr.h5", where=self.MASK)` (line 750)<br>• Apply risk adjustments and annual averaging: `EP_BLOCK_AVG_T_CO2_HA = (ep_df.EP_BLOCK_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL) + ep_df.EP_BLOCK_BG_AVG_T_CO2_HA_YR).to_numpy(dtype=np.float32) / settings.CARBON_EFFECTS_WINDOW` (lines 751-754)<br>• **Risk Logic**: Above-ground carbon discounted by fire risk & reversal risk; below-ground carbon stable<br>• **Annual Averaging**: Cumulative carbon divided by CARBON_EFFECTS_WINDOW (default 91 years) |
-| 4. GHG Calculation Function Usage | **Code**: luto/economics/non_agricultural/ghg.py<br>**Lines**: 29-48 - get_ghg_env_plantings function | • **Function Purpose**: Calculate GHG emissions (negative = sequestration) for each spatial cell<br>• **Input Parameters**: `data` (Data object), `aggregate` (Boolean output format flag)<br>• **Calculation**: `return -data.EP_BLOCK_AVG_T_CO2_HA * data.REAL_AREA` (line 46 if aggregate=True, line 48 if aggregate=False)<br>• **Units**: Tonnes CO2e per cell<br>• **Scaling**: Multiplied by `data.REAL_AREA` to convert from per-hectare to per-cell basis<br>• **Sign Convention**: Negative values indicate CO2 removal from atmosphere (climate beneficial) |
+**L2 — `dataprep.py:122-137`**: `sel(age=[50,60,70,80,90])`, `assign_coords(cell=range(6956407))`,
+re-encode zlib level 5. No unit change.
 
+**L4 — `data.py:923-969`**:
 
-## luto.economics.non_agricultural.ghg.get_ghg_rip_plantings
+```python
+fr_df     = pd.read_hdf(".../fire_risk.h5", where=self.MASK)          # 924
+fire_risk = fr_df[{"low":"FD_RISK_PERC_5TH","med":"FD_RISK_MEDIAN","high":"FD_RISK_PERC_95TH"}[settings.FIRE_RISK]]
 
-### Data Flow Summary
-
-```
-Raw FullCAM Output → 4_assemble_biophysical_data.py → cell_biophysical_df.h5 →
-dataprep.py → EP_RIP_AVG_T_CO2_HA_PER_YR_yr.h5 →
-data.py (with fire/reversal risk adjustments) → EP_RIP_AVG_T_CO2_HA_PER_YR →
-get_ghg_rip_plantings() → GHG emissions per cell
-```
-
-### Key Transformations
-1. **Annual Averaging**: Raw cumulative carbon (90 years) ÷ settings.CARBON_EFFECTS_WINDOW = annual rate (done in data.py)
-2. **Component Aggregation**: Trees + Debris = Above-ground carbon
-3. **Risk Discounting**: Above-ground × fire_risk × (1 - reversal_risk)
-4. **Spatial Scaling**: Per-hectare rate × cell area = total per cell
-5. **Sign Convention**: Negative values for carbon sequestration
-
-### Data Processing Pipeline
-
-| Step | Code Location | Process |
-|------|---------------|---------|
-| 1. Raw FullCAM Data Processing | **Code**: N:\Data-Master\LUTO_2.0_input_data\Scripts\4_assemble_biophysical_data.py<br>**Lines**: 131-134 - Riparian plantings carbon sequestration | • `EP_RIP_TREES_AVG_T_CO2_HA_YR` = h5f['Trees_tCO2_ha'][90] (Above Ground Biomass cumulative from 2010-2100, no averaging)<br>• `EP_RIP_DEBRIS_AVG_T_CO2_HA_YR` = h5f['Debris_tCO2_ha'][90] (Debris carbon cumulative, no averaging)<br>• `EP_RIP_SOIL_AVG_T_CO2_HA_YR` = (h5f['Soil_tCO2_ha'][90] - h5f['Soil_tCO2_ha'][0]) (Marginal soil carbon change, no averaging) |
-| 2. LUTO Data Preprocessing | **Code**: luto/dataprep.py<br>**Lines**: 813-817 - Average annual carbon sequestration by Riparian Plantings | • Load biophysical data: `bioph = pd.read_hdf(raw_data + 'cell_biophysical_df.h5')` (line 250)<br>• Create AG/BG DataFrame: `s = pd.DataFrame(columns=['EP_RIP_AG_AVG_T_CO2_HA_YR', 'EP_RIP_BG_AVG_T_CO2_HA_YR'])` (line 814)<br>• Combine above-ground: `s['EP_RIP_AG_AVG_T_CO2_HA_YR'] = bioph.eval('EP_RIP_TREES_AVG_T_CO2_HA_YR + EP_RIP_DEBRIS_AVG_T_CO2_HA_YR')` (line 815)<br>• Extract below-ground: `s['EP_RIP_BG_AVG_T_CO2_HA_YR'] = bioph['EP_RIP_SOIL_AVG_T_CO2_HA_YR']` (line 816)<br>• Save to HDF5: `s.to_hdf(outpath + 'EP_RIP_AVG_T_CO2_HA_PER_YR_yr.h5', ...)` (line 817) |
-| 3. LUTO Runtime Data Loading | **Code**: luto/data.py<br>**Lines**: 764-769 - Load riparian plantings GHG sequestration | • Load fire risk data: `fr_df = pd.read_hdf(..., "fire_risk.h5", where=self.MASK)` (line 745)<br>• Select fire risk level: `fire_risk = fr_df[fr_dict[settings.FIRE_RISK]]` (line 747)<br>• Load EP data with spatial mask: `ep_df = pd.read_hdf(..., "EP_RIP_AVG_T_CO2_HA_PER_YR_yr.h5", where=self.MASK)` (line 765)<br>• Apply risk adjustments and annual averaging: `EP_RIP_AVG_T_CO2_HA_PER_YR = ((ep_df.EP_RIP_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)) + ep_df.EP_RIP_BG_AVG_T_CO2_HA_YR).to_numpy(dtype=np.float32) / settings.CARBON_EFFECTS_WINDOW` (lines 766-769)<br>• **Risk Logic**: Above-ground carbon discounted by fire risk & reversal risk; below-ground carbon stable<br>• **Annual Averaging**: Cumulative carbon divided by CARBON_EFFECTS_WINDOW (default 91 years) |
-| 4. GHG Calculation Function Usage | **Code**: luto/economics/non_agricultural/ghg.py<br>**Lines**: 54-75 - get_ghg_rip_plantings function | • **Function Purpose**: Calculate GHG emissions (negative = sequestration) for riparian plantings per cell<br>• **Input Parameters**: `data` (Data object), `aggregate` (Boolean output format flag)<br>• **Calculation**: `return -data.EP_RIP_AVG_T_CO2_HA_PER_YR * data.REAL_AREA` (line 71 if aggregate=True, line 73 if aggregate=False)<br>• **Units**: Tonnes CO2e per cell<br>• **Scaling**: Multiplied by `data.REAL_AREA` to convert from per-hectare to per-cell basis<br>• **Sign Convention**: Negative values indicate CO2 removal from atmosphere (climate beneficial) |
-
-
-## luto.economics.non_agricultural.ghg.get_ghg_agroforestry_base
-
-### Data Flow Summary
-
-```
-Raw FullCAM Output → 4_assemble_biophysical_data.py → cell_biophysical_df.h5 →
-dataprep.py → EP_BELT_AVG_T_CO2_HA_PER_YR_yr.h5 →
-data.py (with fire/reversal risk adjustments) → EP_BELT_AVG_T_CO2_HA_PER_YR →
-get_ghg_agroforestry_base() → Base agroforestry GHG per cell
+ds = xr.open_dataset(".../tCO2_ha_ep_block.nc") \
+       .sel(age=settings.CARBON_EFFECTS_WINDOW).load().isel(cell=self.MASK)   # 932
+self.EP_BLOCK_AVG_T_CO2_HA_PER_YR = (
+    (ds['EP_BLOCK_TREES_T_CO2_HA'] + ds['EP_BLOCK_DEBRIS_T_CO2_HA'])
+    * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)     # aboveground: risk-discounted
+    + ds['EP_BLOCK_SOIL_T_CO2_HA']                            # belowground: undiscounted
+).values / settings.CARBON_EFFECTS_WINDOW                     # cumulative → annual rate
 ```
 
-### Key Transformations
-1. **Belt Plantation Type**: Linear/boundary tree plantings integrated with agriculture
-2. **Annual Averaging**: Raw cumulative carbon (90 years) ÷ 91 = annual rate
-3. **Component Aggregation**: Trees + Debris = Above-ground carbon
-4. **Risk Discounting**: Above-ground × fire_risk × (1 - reversal_risk)
-5. **Spatial Scaling**: Per-hectare rate × cell area = total per cell
-6. **Sign Convention**: Negative values for carbon sequestration
+Identical shape for `EP_BELT` (939-945), `EP_RIP` (947-953), `CP_BLOCK` (955-961), `CP_BELT`
+(963-969). `.sel(age=...).load().isel(cell=self.MASK)` is deliberate — label-based `.sel(cell=...)`
+on a 6.9 M cell axis is pathologically slow (`data.py:930-931`).
 
-### Data Processing Pipeline
+Current settings: `CARBON_EFFECTS_WINDOW = 60`, `FIRE_RISK = 'med'`, `RISK_OF_REVERSAL = 0`
+(`settings.py:70, 84, 92`). `CARBON_EFFECTS_WINDOW` must be one of `[50,60,70,80,90]` — the ages the
+L2 subset kept.
 
-| Step | Code Location | Process |
-|------|---------------|---------|
-| 1. Raw FullCAM Data Processing | **Code**: N:\Data-Master\LUTO_2.0_input_data\Scripts\4_assemble_biophysical_data.py<br>**Lines**: 136-139 - Environmental plantings (belt) carbon sequestration | • `EP_BELT_TREES_AVG_T_CO2_HA_YR` = h5f['Trees_tCO2_ha'][90] (Above Ground Biomass cumulative from 2010-2100, no averaging)<br>• `EP_BELT_DEBRIS_AVG_T_CO2_HA_YR` = h5f['Debris_tCO2_ha'][90] (Debris carbon cumulative, no averaging)<br>• `EP_BELT_SOIL_AVG_T_CO2_HA_YR` = (h5f['Soil_tCO2_ha'][90] - h5f['Soil_tCO2_ha'][0]) (Marginal soil carbon change, no averaging) |
-| 2. LUTO Data Preprocessing | **Code**: luto/dataprep.py<br>**Lines**: 819-823 - Average annual carbon sequestration by Environmental Plantings (belt) | • Load biophysical data: `bioph = pd.read_hdf(raw_data + 'cell_biophysical_df.h5')` (line 250)<br>• Create AG/BG DataFrame: `s = pd.DataFrame(columns=['EP_BELT_AG_AVG_T_CO2_HA_YR', 'EP_BELT_BG_AVG_T_CO2_HA_YR'])` (line 820)<br>• Combine above-ground: `s['EP_BELT_AG_AVG_T_CO2_HA_YR'] = bioph.eval('EP_BELT_TREES_AVG_T_CO2_HA_YR + EP_BELT_DEBRIS_AVG_T_CO2_HA_YR')` (line 821)<br>• Extract below-ground: `s['EP_BELT_BG_AVG_T_CO2_HA_YR'] = bioph['EP_BELT_SOIL_AVG_T_CO2_HA_YR']` (line 822)<br>• Save to HDF5: `s.to_hdf(outpath + 'EP_BELT_AVG_T_CO2_HA_PER_YR_yr.h5', ...)` (line 823) |
-| 3. LUTO Runtime Data Loading | **Code**: luto/data.py<br>**Lines**: 757-762 - Load environmental plantings (belt) GHG sequestration | • Load fire risk data: `fr_df = pd.read_hdf(..., "fire_risk.h5", where=self.MASK)` (line 745)<br>• Select fire risk level: `fire_risk = fr_df[fr_dict[settings.FIRE_RISK]]` (line 747)<br>• Load EP data with spatial mask: `ep_df = pd.read_hdf(..., "EP_BELT_AVG_T_CO2_HA_PER_YR_yr.h5", where=self.MASK)` (line 758)<br>• Apply risk adjustments and annual averaging: `EP_BELT_AVG_T_CO2_HA_PER_YR = ((ep_df.EP_BELT_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)) + ep_df.EP_BELT_BG_AVG_T_CO2_HA_YR).to_numpy(dtype=np.float32) / settings.CARBON_EFFECTS_WINDOW` (lines 759-762)<br>• **Risk Logic**: Above-ground carbon discounted by fire risk & reversal risk; below-ground carbon stable<br>• **Annual Averaging**: Cumulative carbon divided by CARBON_EFFECTS_WINDOW (default 91 years) |
-| 4. GHG Calculation Function Usage | **Code**: luto/economics/non_agricultural/ghg.py<br>**Lines**: 78-93 - get_ghg_agroforestry_base function | • **Function Purpose**: Calculate base agroforestry GHG sequestration for belt plantings per cell<br>• **Input Parameters**: `data` (Data object only - no aggregate flag)<br>• **Calculation**: `return -data.EP_BELT_AVG_T_CO2_HA_PER_YR * data.REAL_AREA` (line 93)<br>• **Units**: Tonnes CO2e per cell<br>• **Scaling**: Multiplied by `data.REAL_AREA` to convert from per-hectare to per-cell basis<br>• **Sign Convention**: Negative values indicate CO2 removal from atmosphere (climate beneficial)<br>• **Usage**: Base function for hybrid agroforestry systems (sheep/beef + forestry) |
+**Unallocated natural land** takes a different route (`data.py:1140-1160`):
 
-
-## luto.economics.non_agricultural.ghg.get_ghg_sheep_agroforestry
-
-### Data Flow Summary
-
-```
-Agricultural GHG Matrix (ag_g_mrj) + Base Agroforestry (EP_BELT) + Exclusion Matrix →
-Proportional Contribution Calculation → Mixed sheep-agroforestry GHG per cell
+```python
+nat_land_CO2 = pd.read_hdf(".../natural_land_t_co2_ha.h5", where=self.MASK)
+self.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR = np.array(
+    nat_land_CO2['NATURAL_LAND_TREES_DEBRIS_SOIL_TCO2_HA']
+    - nat_land_CO2['NATURAL_LAND_AGB_DEBRIS_TCO2_HA'] * (100 - fire_risk) / 100   # minus fire DAMAGE
+) / settings.CARBON_EFFECTS_WINDOW
 ```
 
-### Key Transformations
-1. **Hybrid Land Use**: Combines sheep grazing with agroforestry plantings
-2. **Proportional Allocation**: Uses exclusion matrix to determine area splits
-3. **Agricultural Component**: Sheep GHG from dryland production
-4. **Forestry Component**: Belt plantation carbon sequestration
-5. **Weighted Contribution**: `(1 - exclusion) × sheep_ghg + exclusion × agroforestry_ghg`
+The `/ CARBON_EFFECTS_WINDOW` lives **here**, not in `ghg.py` — see §7.
 
-### Data Processing Pipeline
+`HIR` layers (`tCO2_ha_hir_{block,rip}.nc`) are prepared through L2 but are not currently loaded in
+`data.py`; the HIR mask was retired on 2026-06-16 (`dataprep.py:904-906`).
 
-| Step | Code Location | Process |
-|------|---------------|---------|
-| 1. Agricultural GHG Matrix Input | **External Input**: `ag_g_mrj` from agricultural economics module | • **Structure**: `ag_g_mrj[m, r, j]` where m=water regime, r=cell, j=land use<br>• **Sheep Selection**: `ag_g_mrj[0, :, sheep_j]` - dryland sheep GHG per cell<br>• **Source**: Agricultural module calculations for sheep production GHG |
-| 2. Exclusion Matrix Calculation | **Code**: luto/tools/__init__.py<br>**Lines**: 367-384 - get_exclusions_agroforestry_base function | • **Purpose**: Determine proportion of cell area for agroforestry vs agriculture<br>• **Base Proportion**: `exclude = np.ones(data.NCELLS) * settings.AF_PROPORTION` (line 379)<br>• **Existing Agroforestry**: `exclude[get_agroforestry_cells(lumap)] = settings.AF_PROPORTION` (line 382)<br>• **Configuration**: `settings.AF_PROPORTION` defines maximum agroforestry proportion per cell |
-| 3. Base Agroforestry GHG | **Code**: luto/economics/non_agricultural/ghg.py<br>**Lines**: 78-93 - get_ghg_agroforestry_base function | • **Calculation**: `-data.EP_BELT_AVG_T_CO2_HA_PER_YR * data.REAL_AREA` (line 93)<br>• **Data Source**: EP_BELT carbon sequestration from belt plantings<br>• **Risk Adjustments**: Fire risk and reversal risk already applied in data.py |
-| 4. Sheep-Agroforestry Integration | **Code**: luto/economics/non_agricultural/ghg.py<br>**Lines**: 96-130 - get_ghg_sheep_agroforestry function | • **Sheep Code**: `sheep_j = tools.get_sheep_code(data)` - get land use index for 'Sheep - modified land' (line 114)<br>• **Sheep GHG**: `sheep_cost = ag_g_mrj[0, :, sheep_j]` - dryland sheep emissions per cell (line 117)<br>• **Base Agroforestry**: `base_agroforestry_cost = get_ghg_agroforestry_base(data)` (line 118)<br>• **Agroforestry Contribution**: `agroforestry_contr = base_agroforestry_cost * agroforestry_x_r` (line 121)<br>• **Sheep Contribution**: `sheep_contr = sheep_cost * (1 - agroforestry_x_r)` (line 122)<br>• **Total GHG**: `ghg_total = agroforestry_contr + sheep_contr` (line 123)<br>• **Output Format**: Returns numpy array (aggregate=True) or DataFrame (aggregate=False) |
+---
 
+## 7. Detailed trace — non-agricultural GHG functions
 
-## luto.economics.non_agricultural.ghg.get_ghg_beef_agroforestry
+`luto/economics/non_agricultural/ghg.py`. Sign convention throughout: **negative = sequestration**.
+Every function multiplies by `data.REAL_AREA` (per-ha → per-cell); none re-applies risk discounting
+or annualisation, both of which already happened at L4.
 
-### Data Flow Summary
+| Function | Lines | Formula | Source attribute |
+|----------|-------|---------|------------------|
+| `get_ghg_env_plantings` | 29-51 | `-EP_BLOCK_AVG_T_CO2_HA_PER_YR × REAL_AREA` | `tCO2_ha_ep_block.nc` |
+| `get_ghg_rip_plantings` | 54-75 | `-EP_RIP_AVG_T_CO2_HA_PER_YR × REAL_AREA` | `tCO2_ha_ep_rip.nc` |
+| `get_ghg_agroforestry_base` | 78-93 | `-EP_BELT_AVG_T_CO2_HA_PER_YR × REAL_AREA` | `tCO2_ha_ep_belt.nc` |
+| `get_ghg_sheep_agroforestry` | 96-130 | `base_af × x_r + ag_g_mrj[0,:,sheep_j] × (1 − x_r)` | + `agGHG_lvstk.h5` |
+| `get_ghg_beef_agroforestry` | 133-167 | same with `beef_j` | + `agGHG_lvstk.h5` |
+| `get_ghg_carbon_plantings_block` | 170-192 | `-CP_BLOCK_AVG_T_CO2_HA_PER_YR × REAL_AREA` | `tCO2_ha_cp_block.nc` |
+| `get_ghg_carbon_plantings_belt_base` | 195-210 | `-CP_BELT_AVG_T_CO2_HA_PER_YR × REAL_AREA` | `tCO2_ha_cp_belt.nc` |
+| `get_ghg_sheep_carbon_plantings_belt` | 213-247 | `base_cp × x_r + sheep × (1 − x_r)` | + `agGHG_lvstk.h5` |
+| `get_ghg_beef_carbon_plantings_belt` | 250-284 | same with `beef_j` | + `agGHG_lvstk.h5` |
+| `get_ghg_beccs` | 287-308 | `-np.nan_to_num(BECCS_TCO2E_HA_YR) × REAL_AREA` | `cell_BECCS_df.h5` |
+| `get_ghg_destocked_land` | 311-348 | per base-year livestock-natural LU: `CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR × (habitat_contr[from_lu] − 1) × REAL_AREA` | `natural_land_t_co2_ha.h5`, `fire_risk.h5`, `bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv` |
+| `get_ghg_matrix` | 352-398 | assembles all nine into `(r, k)` | — |
 
-```
-Agricultural GHG Matrix (ag_g_mrj) + Base Agroforestry (EP_BELT) + Exclusion Matrix →
-Proportional Contribution Calculation → Mixed beef-agroforestry GHG per cell
-```
+**Exclusion (mixing) proportions** — `luto/tools/__init__.py`:
 
-### Key Transformations
-1. **Hybrid Land Use**: Combines beef grazing with agroforestry plantings
-2. **Proportional Allocation**: Uses exclusion matrix to determine area splits
-3. **Agricultural Component**: Beef GHG from dryland production
-4. **Forestry Component**: Belt plantation carbon sequestration
-5. **Weighted Contribution**: `(1 - exclusion) × beef_ghg + exclusion × agroforestry_ghg`
+- `get_exclusions_agroforestry_base` (351-368): `np.ones(NCELLS) × settings.AF_PROPORTION`, where
+  `AF_PROPORTION = AGROFORESTRY_ROW_WIDTH / (ROW_WIDTH + ROW_SPACING)` (`settings.py:631`).
+- `get_exclusions_carbon_plantings_belt_base` (371-388): same shape with `CP_BELT_PROPORTION`
+  (`settings.py:614`).
 
-### Data Processing Pipeline
+**Destocked land — two corrections to earlier versions of this document:**
 
-| Step | Code Location | Process |
-|------|---------------|---------|
-| 1. Agricultural GHG Matrix Input | **External Input**: `ag_g_mrj` from agricultural economics module | • **Structure**: `ag_g_mrj[m, r, j]` where m=water regime, r=cell, j=land use<br>• **Beef Selection**: `ag_g_mrj[0, :, beef_j]` - dryland beef GHG per cell<br>• **Source**: Agricultural module calculations for beef production GHG |
-| 2. Exclusion Matrix Calculation | **Code**: luto/tools/__init__.py<br>**Lines**: 367-384 - get_exclusions_agroforestry_base function | • **Purpose**: Determine proportion of cell area for agroforestry vs agriculture<br>• **Base Proportion**: `exclude = np.ones(data.NCELLS) * settings.AF_PROPORTION` (line 379)<br>• **Existing Agroforestry**: `exclude[get_agroforestry_cells(lumap)] = settings.AF_PROPORTION` (line 382)<br>• **Configuration**: `settings.AF_PROPORTION` defines maximum agroforestry proportion per cell |
-| 3. Base Agroforestry GHG | **Code**: luto/economics/non_agricultural/ghg.py<br>**Lines**: 78-93 - get_ghg_agroforestry_base function | • **Calculation**: `-data.EP_BELT_AVG_T_CO2_HA_PER_YR * data.REAL_AREA` (line 93)<br>• **Data Source**: EP_BELT carbon sequestration from belt plantings<br>• **Risk Adjustments**: Fire risk and reversal risk already applied in data.py |
-| 4. Beef-Agroforestry Integration | **Code**: luto/economics/non_agricultural/ghg.py<br>**Lines**: 133-167 - get_ghg_beef_agroforestry function | • **Beef Code**: `beef_j = tools.get_beef_code(data)` - get land use index for 'Beef - modified land' (line 151)<br>• **Beef GHG**: `beef_cost = ag_g_mrj[0, :, beef_j]` - dryland beef emissions per cell (line 154)<br>• **Base Agroforestry**: `base_agroforestry_cost = get_ghg_agroforestry_base(data)` (line 155)<br>• **Agroforestry Contribution**: `agroforestry_contr = base_agroforestry_cost * agroforestry_x_r` (line 158)<br>• **Beef Contribution**: `beef_contr = beef_cost * (1 - agroforestry_x_r)` (line 159)<br>• **Total GHG**: `ghg_total = agroforestry_contr + beef_contr` (line 160)<br>• **Output Format**: Returns numpy array (aggregate=True) or DataFrame (aggregate=False) |
+1. There is **no** `/ settings.CARBON_EFFECTS_WINDOW` in `ghg.py`. The annualisation moved into
+   `data.py:1160` when the attribute was renamed to `..._PER_YR`. Do not divide twice.
+2. The sign is **negative** for a sequestration benefit, matching every other non-ag function:
+   `BIO_HABITAT_CONTRIBUTION_LOOK_UP` is normalised so unallocated natural land = 1 and livestock-on-
+   natural < 1 (`data.py:1420-1433`), so `(contribution − 1) < 0`.
 
+`get_ghg_matrix` keys the dict by **land-use display name** (`'Environmental Plantings'`,
+`'Destocked - natural land'`, …) at lines 377-385, while the `aggregate=False` DataFrames carry
+SCREAMING_SNAKE column names (`'ENV_PLANTINGS'`, `'DESTOCKED_LAND'`, …). Both naming systems are
+live; do not assume they match.
 
-## luto.economics.non_agricultural.ghg.get_ghg_carbon_plantings_block
+---
 
-### Data Flow Summary
+## 8. The last mile — rescaling and coefficient filtering
 
-```
-Raw FullCAM Output → 4_assemble_biophysical_data.py → cell_biophysical_df.h5 →
-dataprep.py → CP_BLOCK_AVG_T_CO2_HA_PER_YR_yr.h5 →
-data.py (with fire/reversal risk adjustments) → CP_BLOCK_AVG_T_CO2_HA_PER_YR →
-get_ghg_carbon_plantings_block() → GHG emissions per cell
-```
+Between L6 and L7 the arrays are rescaled for numerical conditioning. This is the only place where
+input magnitudes change without a physical reason, so it is worth knowing when reading solver logs.
 
-### Key Transformations
-1. **Block Plantation Type**: Full area coverage for carbon sequestration purposes
-2. **Annual Averaging**: Raw cumulative carbon (90 years) ÷ 91 = annual rate
-3. **Component Aggregation**: Trees + Debris = Above-ground carbon
-4. **Risk Discounting**: Above-ground × fire_risk × (1 - reversal_risk)
-5. **Spatial Scaling**: Per-hectare rate × cell area = total per cell
-6. **Sign Convention**: Negative values for carbon sequestration
+**Rescaling** (`input_data.py:1198-1296`). Each band is rescaled independently:
 
-### Data Processing Pipeline
+| Band | Function | Paired RHS |
+|------|----------|------------|
+| `Economy` | `rescale_lhs` | — (objective) |
+| `Demand` | `rescale_lhs_rhs` | `limits['demand']` |
+| `Biodiversity` | `rescale_lhs` | — |
+| `GHG` | `rescale_lhs_rhs` | `limits['ghg']` (skipped, scale 1.0, when GHG off) |
+| `Water` | `rescale_lhs_rhs` | `limits['water']` (skipped when `WATER_LIMITS != 'on'`) |
+| `GBF2` | `rescale_lhs_rhs` | `limits['GBF2']` |
+| `GBF3_NVIS`, `GBF4_SNES`, `GBF4_ECNES`, `GBF8` | `rescale_lhs_rhs_region_species` | per-(region, species/group) targets |
+| `Utility Solar PV`, `Onshore Wind` | `rescale_lhs_rhs` | per-state MWh targets |
 
-| Step | Code Location | Process |
-|------|---------------|---------|
-| 1. Raw FullCAM Data Processing | **Code**: N:\Data-Master\LUTO_2.0_input_data\Scripts\4_assemble_biophysical_data.py<br>**Lines**: 141-144 - Carbon plantings (block) carbon sequestration | • `CP_BLOCK_TREES_AVG_T_CO2_HA_YR` = h5f['Trees_tCO2_ha'][90] (Above Ground Biomass cumulative from 2010-2100, no averaging)<br>• `CP_BLOCK_DEBRIS_AVG_T_CO2_HA_YR` = h5f['Debris_tCO2_ha'][90] (Debris carbon cumulative, no averaging)<br>• `CP_BLOCK_SOIL_AVG_T_CO2_HA_YR` = (h5f['Soil_tCO2_ha'][90] - h5f['Soil_tCO2_ha'][0]) (Marginal soil carbon change, no averaging) |
-| 2. LUTO Data Preprocessing | **Code**: luto/dataprep.py<br>**Lines**: 825-829 - Average annual carbon sequestration by Carbon Plantings (block) | • Load biophysical data: `bioph = pd.read_hdf(raw_data + 'cell_biophysical_df.h5')` (line 250)<br>• Create AG/BG DataFrame: `s = pd.DataFrame(columns=['CP_BLOCK_AG_AVG_T_CO2_HA_YR', 'CP_BLOCK_BG_AVG_T_CO2_HA_YR'])` (line 826)<br>• Combine above-ground: `s['CP_BLOCK_AG_AVG_T_CO2_HA_YR'] = bioph.eval('CP_BLOCK_TREES_AVG_T_CO2_HA_YR + CP_BLOCK_DEBRIS_AVG_T_CO2_HA_YR')` (line 827)<br>• Extract below-ground: `s['CP_BLOCK_BG_AVG_T_CO2_HA_YR'] = bioph['CP_BLOCK_SOIL_AVG_T_CO2_HA_YR']` (line 828)<br>• Save to HDF5: `s.to_hdf(outpath + 'CP_BLOCK_AVG_T_CO2_HA_PER_YR_yr.h5', ...)` (line 829) |
-| 3. LUTO Runtime Data Loading | **Code**: luto/data.py<br>**Lines**: 771-777 - Load carbon plantings (block) GHG sequestration | • Load fire risk data: `fr_df = pd.read_hdf(..., "fire_risk.h5", where=self.MASK)` (line 745)<br>• Select fire risk level: `fire_risk = fr_df[fr_dict[settings.FIRE_RISK]]` (line 747)<br>• Load CP data with spatial mask: `cp_df = pd.read_hdf(..., "CP_BLOCK_AVG_T_CO2_HA_PER_YR_yr.h5", where=self.MASK)` (line 772)<br>• Apply risk adjustments and annual averaging: `CP_BLOCK_AVG_T_CO2_HA_PER_YR = ((cp_df.CP_BLOCK_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)) + cp_df.CP_BLOCK_BG_AVG_T_CO2_HA_YR).to_numpy(dtype=np.float32) / settings.CARBON_EFFECTS_WINDOW` (lines 773-777)<br>• **Risk Logic**: Above-ground carbon discounted by fire risk & reversal risk; below-ground carbon stable<br>• **Annual Averaging**: Cumulative carbon divided by CARBON_EFFECTS_WINDOW (default 91 years) |
-| 4. GHG Calculation Function Usage | **Code**: luto/economics/non_agricultural/ghg.py<br>**Lines**: 170-192 - get_ghg_carbon_plantings_block function | • **Function Purpose**: Calculate GHG emissions (negative = sequestration) for carbon plantings (block) per cell<br>• **Input Parameters**: `data` (Data object), `aggregate` (Boolean output format flag)<br>• **Calculation**: `return -data.CP_BLOCK_AVG_T_CO2_HA_PER_YR * data.REAL_AREA` (line 188 if aggregate=True, line 190 if aggregate=False)<br>• **Units**: Tonnes CO2e per cell<br>• **Scaling**: Multiplied by `data.REAL_AREA` to convert from per-hectare to per-cell basis<br>• **Sign Convention**: Negative values indicate CO2 removal from atmosphere (climate beneficial) |
+The source-keyed dicts are rescaled explicitly (1203-1205, 1217) because `rescale_lhs` only walks one
+dict level. `limits` itself stays **raw** — the solver divides by `scale_factors[...]` inline.
 
+**Coefficient filter** (L7): `_qsum(coeffs, gurobi_vars)` in `solver.py` is called by *every*
+constraint and objective builder and drops any term with `|coeff| < settings.SOLVER_COEFF_MIN`
+(1e-4). This supersedes the removed `RESCALE_ZERO_THRESHOLD` post-rescale zeroing — there is no
+zeroing in `input_data.py` any more.
 
-## luto.economics.non_agricultural.ghg.get_ghg_carbon_plantings_belt_base
+---
 
-### Data Flow Summary
+## 9. Issue register
 
-```
-Raw FullCAM Output → 4_assemble_biophysical_data.py → cell_biophysical_df.h5 →
-dataprep.py → CP_BELT_AVG_T_CO2_HA_PER_YR_yr.h5 →
-data.py (with fire/reversal risk adjustments) → CP_BELT_AVG_T_CO2_HA_PER_YR →
-get_ghg_carbon_plantings_belt_base() → Base carbon plantings belt GHG per cell
-```
+Things found while tracing this map that are wrong, unverifiable, or dead. One has been fixed; the
+rest are **flagged, not changed** — each needs a decision from whoever owns that data or code.
 
-### Key Transformations
-1. **Belt Plantation Type**: Linear/boundary tree plantings for carbon sequestration
-2. **Annual Averaging**: Raw cumulative carbon (90 years) ÷ 91 = annual rate
-3. **Component Aggregation**: Trees + Debris = Above-ground carbon
-4. **Risk Discounting**: Above-ground × fire_risk × (1 - reversal_risk)
-5. **Spatial Scaling**: Per-hectare rate × cell area = total per cell
-6. **Sign Convention**: Negative values for carbon sequestration
+| # | Issue | Severity | Status |
+|---|-------|----------|--------|
+| [9.1](#91-resolved--carbon-pool-caps-applied-to-the-wrong-pools) | EP/CP carbon-pool caps applied to the wrong pools | changed model inputs | ✅ **RESOLVED** 2026-08-12/13 |
+| [9.2](#92-open--no-re-run-trigger-linking-fullcam-refreshes-to-script_9) | No re-run trigger linking FullCAM refreshes to `script_9` | silent 4-month data staleness | ⚠️ **OPEN** — process gap |
+| [9.3](#93-open--dead-ibra-path-in-the-gbf3-stream) | Dead IBRA path (`get_GBF3_IBRA_matrices_vr`) | would `AttributeError` if called; misleads readers | ⚠️ **OPEN** — needs a decision |
+| [9.4](#94-open--cell_savanna_burningh5-has-no-traceable-origin) | `cell_savanna_burning.h5` has no producing script | provenance untraceable | ⚠️ **OPEN** — needs an owner |
+| [9.5](#95-open--no_go_areas-is-a-toy-dataset-feeding-real-constraints) | `no_go_areas/` is a self-described toy dataset | feeds real exclusion logic | ⚠️ **OPEN** — verify intent |
+| [9.6](#96-open--input-files-nothing-reads) | Four `input/` files nothing reads | wasted `dataprep` time and disk | ⚠️ **OPEN** — safe to prune after checking |
 
-### Data Processing Pipeline
+---
 
-| Step | Code Location | Process |
-|------|---------------|---------|
-| 1. Raw FullCAM Data Processing | **Code**: N:\Data-Master\LUTO_2.0_input_data\Scripts\4_assemble_biophysical_data.py<br>**Lines**: 146-149 - Carbon plantings (belt) carbon sequestration | • `CP_BELT_TREES_AVG_T_CO2_HA_YR` = h5f['Trees_tCO2_ha'][90] (Above Ground Biomass cumulative from 2010-2100, no averaging)<br>• `CP_BELT_DEBRIS_AVG_T_CO2_HA_YR` = h5f['Debris_tCO2_ha'][90] (Debris carbon cumulative, no averaging)<br>• `CP_BELT_SOIL_AVG_T_CO2_HA_YR` = (h5f['Soil_tCO2_ha'][90] - h5f['Soil_tCO2_ha'][0]) (Marginal soil carbon change, no averaging) |
-| 2. LUTO Data Preprocessing | **Code**: luto/dataprep.py<br>**Lines**: 831-835 - Average annual carbon sequestration by Carbon Plantings (belt) | • Load biophysical data: `bioph = pd.read_hdf(raw_data + 'cell_biophysical_df.h5')` (line 250)<br>• Create AG/BG DataFrame: `s = pd.DataFrame(columns=['CP_BELT_AG_AVG_T_CO2_HA_YR', 'CP_BELT_BG_AVG_T_CO2_HA_YR'])` (line 832)<br>• Combine above-ground: `s['CP_BELT_AG_AVG_T_CO2_HA_YR'] = bioph.eval('CP_BELT_TREES_AVG_T_CO2_HA_YR + CP_BELT_DEBRIS_AVG_T_CO2_HA_YR')` (line 833)<br>• Extract below-ground: `s['CP_BELT_BG_AVG_T_CO2_HA_YR'] = bioph['CP_BELT_SOIL_AVG_T_CO2_HA_YR']` (line 834)<br>• Save to HDF5: `s.to_hdf(outpath + 'CP_BELT_AVG_T_CO2_HA_PER_YR_yr.h5', ...)` (line 835) |
-| 3. LUTO Runtime Data Loading | **Code**: luto/data.py<br>**Lines**: 779-785 - Load carbon plantings (belt) GHG sequestration | • Load fire risk data: `fr_df = pd.read_hdf(..., "fire_risk.h5", where=self.MASK)` (line 745)<br>• Select fire risk level: `fire_risk = fr_df[fr_dict[settings.FIRE_RISK]]` (line 747)<br>• Load CP data with spatial mask: `cp_df = pd.read_hdf(..., "CP_BELT_AVG_T_CO2_HA_PER_YR_yr.h5", where=self.MASK)` (line 780)<br>• Apply risk adjustments and annual averaging: `CP_BELT_AVG_T_CO2_HA_PER_YR = ((cp_df.CP_BELT_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)) + cp_df.CP_BELT_BG_AVG_T_CO2_HA_YR).to_numpy(dtype=np.float32) / settings.CARBON_EFFECTS_WINDOW` (lines 781-785)<br>• **Risk Logic**: Above-ground carbon discounted by fire risk & reversal risk; below-ground carbon stable<br>• **Annual Averaging**: Cumulative carbon divided by CARBON_EFFECTS_WINDOW (default 91 years) |
-| 4. GHG Calculation Function Usage | **Code**: luto/economics/non_agricultural/ghg.py<br>**Lines**: 195-211 - get_ghg_carbon_plantings_belt_base function | • **Function Purpose**: Calculate base carbon plantings (belt) GHG sequestration per cell<br>• **Input Parameters**: `data` (Data object only - no aggregate flag)<br>• **Calculation**: `return -data.CP_BELT_AVG_T_CO2_HA_PER_YR * data.REAL_AREA` (line 210)<br>• **Units**: Tonnes CO2e per cell<br>• **Scaling**: Multiplied by `data.REAL_AREA` to convert from per-hectare to per-cell basis<br>• **Sign Convention**: Negative values indicate CO2 removal from atmosphere (climate beneficial)<br>• **Usage**: Base function for hybrid carbon plantings belt systems (sheep/beef + forestry) |
+### 9.1 RESOLVED — carbon-pool caps applied to the wrong pools
 
+Caps were paired with the wrong pools in `script_9`, for EP and CP (HIR was correct). **Verified
+against the data**, not inferred. Fixed, regenerated and propagated over 2026-08-12/13; the full
+audit trail is kept below because it explains why the shipped carbon numbers changed.
 
-## luto.economics.non_agricultural.ghg.get_ghg_sheep_carbon_plantings_belt
+The `VARIABLE` axis of the FullCAM source NetCDFs is `['DEBRIS_C_HA', 'SOIL_C_HA', 'TREE_C_HA']`
+(read directly from `carbonstock_RES_1_specId_{7,23}_specCat_BlockES.nc`, dims
+`(y, x, YEAR, VARIABLE)`, shape `(3364, 4071, 91, 3)`). After
+`.data[np.nonzero(NLUM_mask)].transpose(1, 2, 0)` the array is `(age, VARIABLE, cell)`, so axis-1
+index **0 = DEBRIS, 1 = SOIL, 2 = TREES**. The output `Dataset` block named them correctly; the cap
+block did not (line numbers below are pre-fix — the corrected blocks are now at 142-152 and 246-252):
 
-### Data Flow Summary
+| axis-1 index | pool | cap intended | cap applied |
+|---|---|---|---|
+| 0 | DEBRIS | `max_debris_C` = 300 | `max_tree_C` = **1500** |
+| 1 | SOIL | `max_soil_C` = 500 | `max_debris_C` = **300** |
+| 2 | TREES | `max_tree_C` = 1500 | `max_soil_C` = **500** |
 
-```
-Agricultural GHG Matrix (ag_g_mrj) + Base Carbon Plantings Belt (CP_BELT) + Exclusion Matrix →
-Proportional Contribution Calculation → Mixed sheep-carbon plantings belt GHG per cell
-```
+The **pre-fix** `input/tCO2_ha_*.nc` files showed the signature unambiguously. Maxima at age 60, as
+shipped before 2026-08-12:
 
-### Key Transformations
-1. **Hybrid Land Use**: Combines sheep grazing with carbon plantings belt
-2. **Proportional Allocation**: Uses exclusion matrix to determine area splits
-3. **Agricultural Component**: Sheep GHG from dryland production
-4. **Forestry Component**: Belt carbon plantation sequestration
-5. **Weighted Contribution**: `(1 - exclusion) × sheep_ghg + exclusion × carbon_plantings_ghg`
+| file | TREES max | DEBRIS max | SOIL max |
+|---|---|---|---|
+| `ep_block` | **1833.33** (= 500 × 44/12, clipped) | 1568.30 (over the intended 1100) | 958.99 |
+| `ep_rip` | **1833.33** | 1924.86 | 962.00 |
+| `ep_belt` | **1833.33** | 2128.60 | 962.00 |
+| `cp_block` | **1833.33** | 2072.45 | 996.30 |
+| `cp_belt` | **1833.33** | 2833.11 | 1011.09 |
+| `hir_block` | 5500.00 (= 1500 × 44/12) ✓ | 1100.00 (= 300 × 44/12) ✓ | 1165.26 |
+| `hir_rip` | 5500.00 ✓ | 1100.00 ✓ | 1783.17 |
 
-### Data Processing Pipeline
+Every EP/CP tree layer pinned at exactly `500 × 44/12 = 1833.33` t CO2e/ha — one third of the intended
+ceiling — while debris ran past its intended 1100 t CO2e/ha. HIR pinned at exactly the right two
+values, confirming both the diagnosis and that the HIR block (axis order trees/debris/soil, per
+`script_9:272`) was sound.
 
-| Step | Code Location | Process |
-|------|---------------|---------|
-| 1. Agricultural GHG Matrix Input | **External Input**: `ag_g_mrj` from agricultural economics module | • **Structure**: `ag_g_mrj[m, r, j]` where m=water regime, r=cell, j=land use<br>• **Sheep Selection**: `ag_g_mrj[0, :, sheep_j]` - dryland sheep GHG per cell<br>• **Source**: Agricultural module calculations for sheep production GHG |
-| 2. Exclusion Matrix Calculation | **Code**: luto/tools/__init__.py<br>**Lines**: 387-404 - get_exclusions_carbon_plantings_belt_base function | • **Purpose**: Determine proportion of cell area for carbon plantings belt vs agriculture<br>• **Base Proportion**: `exclude = np.ones(data.NCELLS) * settings.CP_BELT_PROPORTION` (line 399)<br>• **Existing Carbon Plantings**: `exclude[get_carbon_plantings_belt_cells(lumap)] = settings.CP_BELT_PROPORTION` (line 402)<br>• **Configuration**: `settings.CP_BELT_PROPORTION` defines maximum carbon plantings belt proportion per cell |
-| 3. Base Carbon Plantings Belt GHG | **Code**: luto/economics/non_agricultural/ghg.py<br>**Lines**: 195-211 - get_ghg_carbon_plantings_belt_base function | • **Calculation**: `-data.CP_BELT_AVG_T_CO2_HA_PER_YR * data.REAL_AREA` (line 210)<br>• **Data Source**: CP_BELT carbon sequestration from belt plantings<br>• **Risk Adjustments**: Fire risk and reversal risk already applied in data.py |
-| 4. Sheep-Carbon Plantings Belt Integration | **Code**: luto/economics/non_agricultural/ghg.py<br>**Lines**: 213-247 - get_ghg_sheep_carbon_plantings_belt function | • **Sheep Code**: `sheep_j = tools.get_sheep_code(data)` - get land use index for 'Sheep - modified land' (line 231)<br>• **Sheep GHG**: `sheep_cost = ag_g_mrj[0, :, sheep_j]` - dryland sheep emissions per cell (line 234)<br>• **Base Carbon Plantings**: `base_cp_cost = get_ghg_carbon_plantings_belt_base(data)` (line 235)<br>• **Carbon Plantings Contribution**: `cp_contr = base_cp_cost * cp_belt_x_r` (line 238)<br>• **Sheep Contribution**: `sheep_contr = sheep_cost * (1 - cp_belt_x_r)` (line 239)<br>• **Total GHG**: `ghg_total = cp_contr + sheep_contr` (line 240)<br>• **Output Format**: Returns numpy array (aggregate=True) or DataFrame (aggregate=False) |
+**Magnitude.** In `ep_block`, cells clipped at the tree cap: 6,108 at age 50 rising to 7,818 at age 90
+(≈0.09-0.11% of the 6.96 M cell grid). Against the raw FullCAM layer at YEAR 2070 (age 60): tree
+carbon reaches 2,088.8 t C/ha, 7,656 cells exceed 500 t C/ha but only **11** exceed the intended
+1,500 — so ~7,645 cells are being clipped that should not be. The clipped group averages 703.5 t C/ha
+raw, i.e. roughly 200 t C/ha ≈ 745 t CO2e/ha of sequestration discarded per affected cell. Raw debris
+peaks at 606 t C/ha with 542 cells over the intended 300 cap, so the debris error runs the other way
+but is far smaller.
 
+Net effect: EP/CP tree sequestration is **understated in the highest-biomass cells** and debris is
+mildly overstated.
 
-## luto.economics.non_agricultural.ghg.get_ghg_beef_carbon_plantings_belt
+**Fix applied** to `script_9_reforestation_carbon_data.py` (2026-08-12): the 15 cap lines for
+`ep_block`, `ep_rip`, `ep_belt`, `cp_block`, `cp_belt` now pair index 0→`max_debris_C`,
+1→`max_soil_C`, 2→`max_tree_C`, with a comment recording the `VARIABLE` axis order above each block.
+The HIR block is unchanged — its arrays are ordered trees/debris/soil and its caps already matched.
 
-### Data Flow Summary
+**Regenerated 2026-08-12.** The EP/CP half of `script_9` was re-run (~35 min) and the five rebuilt
+layers verified: `TREES` now tops out at 5500.00, `DEBRIS` at 1100.00 and `SOIL` below 1833.33 t
+CO2e/ha — the same signature HIR already had. HIR was **not** regenerated: the fix does not touch it
+and its inputs are unchanged since Oct 2025. The pre-fix layers were kept as a rollback until the new
+data had been verified at both the 3D and `input/` level, then deleted (2026-08-13).
 
-```
-Agricultural GHG Matrix (ag_g_mrj) + Base Carbon Plantings Belt (CP_BELT) + Exclusion Matrix →
-Proportional Contribution Calculation → Mixed beef-carbon plantings belt GHG per cell
-```
+**Propagated to `input/` 2026-08-12.** The `dataprep.py:122-137` copy block was run standalone (all
+seven layers, ~3 min) rather than the full `create_new_dataset()`, which would have wiped and rebuilt
+the entire `input/` directory. Verified through the exact access pattern `data.py:932` uses
+(`.sel(age=settings.CARBON_EFFECTS_WINDOW)`, currently 60): all seven files carry `age` coords
+`[50, 60, 70, 80, 90]`, and every pool sits within its intended cap — `TREES` 5500.00, `DEBRIS`
+1100.00, `SOIL` ≤1833.33 t CO2e/ha. **The correction is now live for simulation runs.**
 
-### Key Transformations
-1. **Hybrid Land Use**: Combines beef grazing with carbon plantings belt
-2. **Proportional Allocation**: Uses exclusion matrix to determine area splits
-3. **Agricultural Component**: Beef GHG from dryland production
-4. **Forestry Component**: Belt carbon plantation sequestration
-5. **Weighted Contribution**: `(1 - exclusion) × beef_ghg + exclusion × carbon_plantings_ghg`
+**Measured effect on the regenerated data** (`ep_block`, age 60, old vs new): 2,738,204 cells changed,
+but **2,737,660 of them are non-agricultural** — essentially the entire area outside the ag estate.
+Only **544 ag cells** changed, against the 539 predicted from the cap analysis. Over ag land the EP-block
+carbon pool rises **+0.04%** (CP-block +0.02%); the much larger whole-grid figure (EP +1.86%) is
+dominated by cells the model cannot use.
 
-### Data Processing Pipeline
+**Side finding — the shipped layers were 4 months stale.** The old `tCO2_ha_*.nc` were built
+2026-02-26, but the FullCAM sources (`carbonstock_RES_1_*.nc`) were refreshed 2026-06-02/05. The
+regeneration therefore also picked up that newer vintage. This is why the non-ag cell count changed so
+widely — the nearest-neighbour gap-fill differs in the nodata region between vintages. Worth a standing
+check that `script_9` is re-run whenever FullCAM outputs are refreshed.
 
-| Step | Code Location | Process |
-|------|---------------|---------|
-| 1. Agricultural GHG Matrix Input | **External Input**: `ag_g_mrj` from agricultural economics module | • **Structure**: `ag_g_mrj[m, r, j]` where m=water regime, r=cell, j=land use<br>• **Beef Selection**: `ag_g_mrj[0, :, beef_j]` - dryland beef GHG per cell<br>• **Source**: Agricultural module calculations for beef production GHG |
-| 2. Exclusion Matrix Calculation | **Code**: luto/tools/__init__.py<br>**Lines**: 387-404 - get_exclusions_carbon_plantings_belt_base function | • **Purpose**: Determine proportion of cell area for carbon plantings belt vs agriculture<br>• **Base Proportion**: `exclude = np.ones(data.NCELLS) * settings.CP_BELT_PROPORTION` (line 399)<br>• **Existing Carbon Plantings**: `exclude[get_carbon_plantings_belt_cells(lumap)] = settings.CP_BELT_PROPORTION` (line 402)<br>• **Configuration**: `settings.CP_BELT_PROPORTION` defines maximum carbon plantings belt proportion per cell |
-| 3. Base Carbon Plantings Belt GHG | **Code**: luto/economics/non_agricultural/ghg.py<br>**Lines**: 195-211 - get_ghg_carbon_plantings_belt_base function | • **Calculation**: `-data.CP_BELT_AVG_T_CO2_HA_PER_YR * data.REAL_AREA` (line 210)<br>• **Data Source**: CP_BELT carbon sequestration from belt plantings<br>• **Risk Adjustments**: Fire risk and reversal risk already applied in data.py |
-| 4. Beef-Carbon Plantings Belt Integration | **Code**: luto/economics/non_agricultural/ghg.py<br>**Lines**: 250-284 - get_ghg_beef_carbon_plantings_belt function | • **Beef Code**: `beef_j = tools.get_beef_code(data)` - get land use index for 'Beef - modified land' (line 268)<br>• **Beef GHG**: `beef_cost = ag_g_mrj[0, :, beef_j]` - dryland beef emissions per cell (line 271)<br>• **Base Carbon Plantings**: `base_cp_cost = get_ghg_carbon_plantings_belt_base(data)` (line 272)<br>• **Carbon Plantings Contribution**: `cp_contr = base_cp_cost * cp_belt_x_r` (line 275)<br>• **Beef Contribution**: `beef_contr = beef_cost * (1 - cp_belt_x_r)` (line 276)<br>• **Total GHG**: `ghg_total = cp_contr + beef_contr` (line 277)<br>• **Output Format**: Returns numpy array (aggregate=True) or DataFrame (aggregate=False)<br>• **Note**: Line 282 has incorrect column name 'SHEEP_CARBON_PLANTINGS_BELT' - should be 'BEEF_CARBON_PLANTINGS_BELT' |
+**Marginal vs average.** The aggregate effect is small because the mis-cap concentrates in
+high-rainfall forest mostly outside the agricultural estate. The *marginal* effect can still matter:
+those ~540 ag cells each gain roughly 750 t CO2e/ha, so any sitting near the economic margin become
+markedly more attractive for plantings. Tightening the debris cap (300 instead of 1500, affecting 542
+cells with raw debris >300 t C/ha) pushes the other way and partly offsets.
 
+**Soil cap resolved too.** Earlier analysis could not tell whether it bound, because soil is stored as
+a change from age 0. With the cap corrected from 300 to its intended 500 t C/ha, soil maxima rose from
+~959-1011 to 1517-1728 t CO2e/ha across the five layers — so it *was* binding.
 
-## luto.economics.non_agricultural.ghg.get_ghg_beccs
+**Derived artefacts refreshed** (2026-08-13): the 18 multiband GeoTIFFs in
+`N:/Data-Master/FullCAM/Output_TOT_CO2_HA_GeoTiffs/` were rebuilt from the corrected layers and
+verified (91 bands, float32, LZW, nodata −99; band 61 reproduces the age-60 NetCDF slice). They are
+visualisation/QA only — nothing in `luto/` reads them — so this changed no model result. They had been
+stale since 2025-10-09.
 
-### Data Flow Summary
+---
 
-```
-Raw BECCS Input Data → data.py → BECCS_TCO2E_HA_YR →
-get_ghg_beccs() → BECCS GHG emissions per cell
-```
+### 9.2 OPEN — no re-run trigger linking FullCAM refreshes to `script_9`
 
-### Key Transformations
-1. **BECCS Technology**: Bio-Energy with Carbon Capture and Storage
-2. **Direct CO2 Removal**: Active atmospheric carbon capture through biomass processing
-3. **NaN Handling**: Uses `np.nan_to_num()` to handle missing data points
-4. **Spatial Scaling**: Per-hectare rate × cell area = total per cell
-5. **Sign Convention**: Negative values for carbon sequestration
+The shipped `tCO2_ha_*.nc` were built 2026-02-26; the FullCAM sources they derive from
+(`carbonstock_RES_1_*.nc`) were refreshed 2026-06-02/05. The model therefore ran for four months on
+carbon layers that silently lagged their inputs, and the GeoTIFFs lagged by ten months. Nothing in the
+pipeline detects this — the staleness is invisible unless someone compares file timestamps by hand.
 
-### Data Processing Pipeline
+**Impact**: silent, unbounded. The June refresh moved values across ~2.7 M cells; it happened to land
+almost entirely outside the ag estate this time, but nothing guarantees that.
 
-| Step | Code Location | Process |
-|------|---------------|---------|
-| 1. Raw BECCS Data Loading | **Code**: luto/data.py<br>**Lines**: 1370-1377 - Load BECCS data | • **Data Source**: External BECCS technology data (costs, revenues, GHG, energy output)<br>• **Economic Data**: `BECCS_COSTS_AUD_HA_YR` and `BECCS_REV_AUD_HA_YR` (lines 1374-1375)<br>• **GHG Data**: `BECCS_TCO2E_HA_YR` - tonnes CO2e captured per hectare per year (line 1376)<br>• **Energy Data**: `BECCS_MWH_HA_YR` - energy output in MWh per hectare per year (line 1377)<br>• **Data Format**: Numpy arrays indexed by spatial cells |
-| 2. GHG Calculation Function Usage | **Code**: luto/economics/non_agricultural/ghg.py<br>**Lines**: 287-309 - get_ghg_beccs function | • **Function Purpose**: Calculate BECCS GHG emissions (negative = capture) per cell<br>• **Input Parameters**: `data` (Data object), `aggregate` (Boolean output format flag)<br>• **NaN Handling**: `np.nan_to_num(data.BECCS_TCO2E_HA_YR)` - converts NaN to 0 for cells without BECCS capability (line 304, 306)<br>• **Calculation**: `return -np.nan_to_num(data.BECCS_TCO2E_HA_YR) * data.REAL_AREA` (line 304 if aggregate=True, line 306 if aggregate=False)<br>• **Units**: Tonnes CO2e per cell<br>• **Scaling**: Multiplied by `data.REAL_AREA` to convert from per-hectare to per-cell basis<br>• **Sign Convention**: Negative values indicate CO2 removal from atmosphere (climate beneficial)<br>• **Technology Note**: BECCS actively captures CO2 from atmosphere via biomass energy production with carbon storage |
+**Action**: make `script_9` → `dataprep` → GeoTIFF re-run routine whenever FullCAM outputs change, or
+add a timestamp assertion (source mtime ≤ output mtime) at the top of `script_9` so a stale build
+fails loudly. The same exposure applies to every L1 script in §3, not just `script_9`.
 
+---
 
-## luto.economics.non_agricultural.ghg.get_ghg_destocked_land
+### 9.3 OPEN — dead IBRA path in the GBF3 stream
 
-### Data Flow Summary
+`ag_biodiversity.get_GBF3_IBRA_matrices_vr` (`biodiversity.py:388-397`) returns
+`data.GBF3_IBRA_LAYERS_LDS * data.REAL_AREA`, but **no such attribute is ever set** — `IBRA` appears
+in `data.py` only in the `GBF3_NVIS_REGION_MODE` validation (lines 1693-1697). Nothing calls the
+function (`input_data.py:294` calls `get_GBF3_NVIS_matrices_vr` in every mode). The two
+`bio_GBF3_IBRA_*.nc` files that `dataprep.py:455-460` writes are likewise never read.
 
-```
-Base Year Land Use Map + Target Year Land Use Map + Carbon Stock Data + Habitat Contribution →
-Land Use Transition Analysis → Destocking Detection → Annualized Carbon Recovery →
-get_ghg_destocked_land() → Destocked land GHG emissions per cell
-```
+**Impact**: would raise `AttributeError` the moment anything called it. More corrosively, its presence
+implies `IBRA_REG` mode loads different spatial layers — it does not (see §4.5).
 
-### Key Transformations
-1. **Land Use Transition**: Livestock natural land → Unallocated natural land conversion
-2. **Destocking Definition**: Removal of livestock from natural ecosystems
-3. **Carbon Stock Recovery**: Natural regeneration of carbon following livestock removal
-4. **Habitat Contribution Factor**: Biodiversity-based multiplier for carbon capacity
-5. **Annualization**: Divide by CARBON_EFFECTS_WINDOW (91 years) for annual rate
-6. **Sign Convention**: Positive values for carbon sequestration benefit
+**Action**: either wire it up or delete the function together with the `dataprep` writes.
 
-### Data Processing Pipeline
+---
 
-| Step | Code Location | Process |
-|------|---------------|---------|
-| 1. Land Use Maps and Carbon Stock Data | **Code**: luto/data.py<br>**Multiple locations** - Land use maps and carbon stock loading | • **Base Year Map**: `data.lumaps[data.YR_CAL_BASE]` - land use in 2010 (line 332)<br>• **Target Year Map**: `lumap` parameter - land use in simulation year<br>• **Carbon Stock**: `data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR` - carbon stock potential of unallocated natural land (line 337)<br>• **Livestock Categories**: `data.LU_LVSTK_NATURAL` - livestock on natural land categories (line 335)<br>• **Habitat Contribution**: `data.BIO_HABITAT_CONTRIBUTION_LOOK_UP` - biodiversity-based carbon capacity factors (line 338) |
-| 2. Land Use Transition Detection | **Code**: luto/economics/non_agricultural/ghg.py<br>**Lines**: 331-342 - Destocked land identification | • **Initialization**: `penalty_ghg_r = np.zeros(data.NCELLS)` - create empty GHG array (line 333)<br>• **Transition Loop**: `for from_lu in data.LU_LVSTK_NATURAL:` - iterate through livestock natural land uses (line 335)<br>• **Cell Selection**: `lumap_BASE_YR == from_lu` - identify cells that were livestock natural land in 2010 (line 336)<br>• **Destocking Condition**: Only cells that transition from livestock natural land to unallocated natural land qualify |
-| 3. Carbon Recovery Calculation | **Code**: luto/economics/non_agricultural/ghg.py<br>**Lines**: 336-341 - Carbon sequestration from destocking | • **Base Carbon Stock**: `data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR[lumap_BASE_YR == from_lu]` - natural carbon capacity per hectare (line 337)<br>• **Habitat Factor**: `data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[from_lu] - 1` - additional carbon capacity from biodiversity recovery (line 338)<br>• **Spatial Scaling**: `* data.REAL_AREA[lumap_BASE_YR == from_lu]` - convert to per-cell basis (line 339)<br>• **Annualization**: `/ settings.CARBON_EFFECTS_WINDOW` - divide by 91 years for annual carbon sequestration rate (line 340)<br>• **Accumulation**: `penalty_ghg_r[lumap_BASE_YR == from_lu] = (...)` - assign calculated values to relevant cells (line 336) |
-| 4. GHG Output Function | **Code**: luto/economics/non_agricultural/ghg.py<br>**Lines**: 343-349 - get_ghg_destocked_land function | • **Function Purpose**: Calculate annual GHG benefit from destocking livestock from natural land<br>• **Input Parameters**: `data` (Data object), `lumap` (current land use map), `aggregate` (Boolean output format flag)<br>• **Calculation**: Returns `penalty_ghg_r` array with positive values for carbon sequestration (line 344, 346)<br>• **Units**: Tonnes CO2e per cell per year<br>• **Output Format**: Returns numpy array (aggregate=True) or DataFrame (aggregate=False)<br>• **Ecological Note**: Represents carbon recovery from removing livestock pressure on natural ecosystems |
+### 9.4 OPEN — `cell_savanna_burning.h5` has no traceable origin
 
+Read straight out of `2D_Spatial_Snapshot/` at `dataprep.py:119`, but no script in
+`N:/Data-Master/LUTO_2.0_input_data/Scripts/` produces it.
 
-## luto.economics.non_agricultural.ghg.get_ghg_matrix
+**Impact**: it feeds `SAVBURN_ELIGIBLE` and `SAVBURN_TOTAL_TCO2E_HA` — live inputs to ag GHG, ag
+biodiversity and the savanna-burning land use — and cannot be rebuilt or audited from the repo.
 
-### Data Flow Summary
+**Action**: find the owner and record the provenance in §3, or bring its build into `Scripts/`.
 
-```
-All Individual Non-Agricultural GHG Functions + Agricultural GHG Matrix →
-Matrix Assembly and Concatenation → Comprehensive Non-Agricultural GHG Matrix
-```
+---
 
-### Key Transformations
-1. **Matrix Assembly**: Combines all non-agricultural GHG sources into unified structure
-2. **Agricultural Integration**: Incorporates agricultural GHG data for hybrid systems
-3. **Exclusion Matrix Application**: Applies spatial constraints for agroforestry and carbon plantings
-4. **Matrix Reshaping**: Converts 1D arrays to (r, k) matrix format for optimization solver
-5. **Output Format Control**: Returns either aggregated matrix or detailed DataFrame
+### 9.5 OPEN — `no_go_areas/` is a toy dataset feeding real constraints
 
-### Data Processing Pipeline
+Labelled "just a toy example dataset" in `dataprep.py:56`, yet it drives `NO_GO_LANDUSE_AG`,
+`NO_GO_REGION_AG` and the non-ag equivalents through `ag_transition` / `non_ag_transition`.
 
-| Step | Code Location | Process |
-|------|---------------|---------|
-| 1. Exclusion Matrix Preparation | **Code**: luto/economics/non_agricultural/ghg.py<br>**Lines**: 372-373 - Calculate exclusion matrices | • **Agroforestry Exclusions**: `agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, lumap)` (line 372)<br>• **Carbon Plantings Exclusions**: `cp_belt_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, lumap)` (line 373)<br>• **Purpose**: Determine spatial allocation constraints for hybrid land use systems |
-| 2. Non-Agricultural GHG Matrix Assembly | **Code**: luto/economics/non_agricultural/ghg.py<br>**Lines**: 375-386 - Call all individual GHG functions | • **Environmental Plantings**: `get_ghg_env_plantings(data, aggregate)` (line 378)<br>• **Riparian Plantings**: `get_ghg_rip_plantings(data, aggregate)` (line 379)<br>• **Sheep Agroforestry**: `get_ghg_sheep_agroforestry(data, ag_g_mrj, agroforestry_x_r, aggregate)` (line 380)<br>• **Beef Agroforestry**: `get_ghg_beef_agroforestry(data, ag_g_mrj, agroforestry_x_r, aggregate)` (line 381)<br>• **Carbon Plantings Block**: `get_ghg_carbon_plantings_block(data, aggregate)` (line 382)<br>• **Sheep Carbon Plantings Belt**: `get_ghg_sheep_carbon_plantings_belt(data, ag_g_mrj, cp_belt_x_r, aggregate)` (line 383)<br>• **Beef Carbon Plantings Belt**: `get_ghg_beef_carbon_plantings_belt(data, ag_g_mrj, cp_belt_x_r, aggregate)` (line 384)<br>• **BECCS**: `get_ghg_beccs(data, aggregate)` (line 385)<br>• **Destocked Land**: `get_ghg_destocked_land(data, lumap, aggregate)` (line 386) |
-| 3. Matrix Aggregation (aggregate=True) | **Code**: luto/economics/non_agricultural/ghg.py<br>**Lines**: 388-393 - Matrix reshaping and concatenation | • **Reshape Operation**: `[non_agr_ghg_matrix.reshape((data.NCELLS, 1)) for non_agr_ghg_matrix in non_agr_ghg_matrices.values()]` (lines 390-392)<br>• **Purpose**: Convert 1D arrays (indexed by r) to 2D matrix format (r, k) where k represents different non-agricultural land use options<br>• **Concatenation**: `np.concatenate(non_agr_ghg_matrices, axis=1)` (line 393)<br>• **Final Structure**: Matrix with rows=spatial cells, columns=non-agricultural land use options |
-| 4. DataFrame Output (aggregate=False) | **Code**: luto/economics/non_agricultural/ghg.py<br>**Lines**: 395-396 - DataFrame concatenation | • **DataFrame Assembly**: `pd.concat(list(non_agr_ghg_matrices.values()), axis=1)` (line 396)<br>• **Purpose**: Provides detailed view with named columns for each non-agricultural GHG source<br>• **Column Names**: 'ENV_PLANTINGS', 'RIP_PLANTINGS', 'SHEEP_AGROFORESTRY', 'BEEF_AGROFORESTRY', 'CARBON_PLANTINGS_BLOCK', 'SHEEP_CARBON_PLANTINGS_BELT', 'BEEF_CARBON_PLANTINGS_BELT', 'BECCS', 'DESTOCKED_LAND' |
-| 5. Integration with Optimization Solver | **Code**: Used by solver modules for optimization | • **Matrix Usage**: Output matrix feeds into GUROBI optimization solver as constraint/objective coefficients<br>• **Dimensions**: Rows (r) = spatial cells, Columns (k) = non-agricultural land use decision variables<br>• **Units**: All values in tonnes CO2e per cell per year<br>• **Sign Convention**: Negative values represent climate benefits (carbon sequestration/emission reduction) |
+**Impact**: placeholder exclusions silently shape which land uses are reachable in which regions.
 
+**Action**: confirm whether the toy data is still in play. If it is, either replace it with the real
+layer or make the placeholder explicit at load time rather than in a `dataprep` comment.
 
-### Function Summary Matrix
+---
 
-| Function | Primary Data Source | Plantation Type | Hybrid System | Key Features |
-|----------|-------------------|-----------------|---------------|--------------|
-| `get_ghg_env_plantings` | EP_BLOCK_AVG_T_CO2_HA | Block (full area) | No | Base environmental restoration |
-| `get_ghg_rip_plantings` | EP_RIP_AVG_T_CO2_HA_PER_YR | Riparian (waterway) | No | Waterway restoration |
-| `get_ghg_agroforestry_base` | EP_BELT_AVG_T_CO2_HA_PER_YR | Belt (boundary) | No | Base for hybrid systems |
-| `get_ghg_sheep_agroforestry` | EP_BELT + ag_g_mrj | Belt + Agriculture | Yes | Sheep + Agroforestry |
-| `get_ghg_beef_agroforestry` | EP_BELT + ag_g_mrj | Belt + Agriculture | Yes | Beef + Agroforestry |
-| `get_ghg_carbon_plantings_block` | CP_BLOCK_AVG_T_CO2_HA_PER_YR | Block (full area) | No | Carbon sequestration focus |
-| `get_ghg_carbon_plantings_belt_base` | CP_BELT_AVG_T_CO2_HA_PER_YR | Belt (boundary) | No | Base for hybrid systems |
-| `get_ghg_sheep_carbon_plantings_belt` | CP_BELT + ag_g_mrj | Belt + Agriculture | Yes | Sheep + Carbon Plantings |
-| `get_ghg_beef_carbon_plantings_belt` | CP_BELT + ag_g_mrj | Belt + Agriculture | Yes | Beef + Carbon Plantings |
-| `get_ghg_beccs` | BECCS_TCO2E_HA_YR | Technology-based | No | Active CO2 capture |
-| `get_ghg_destocked_land` | CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR | Natural recovery | No | Livestock removal benefit |
-| `get_ghg_matrix` | All above functions | All types | Mixed | Complete matrix assembly |
+### 9.6 OPEN — `input/` files nothing reads
+
+Written by `dataprep` but never loaded by `data.py`: `state_id.npy`,
+`bio_GBF3_IBRA_{Regions,SubRegions}.nc`, `tCO2_ha_hir_{block,rip}.nc`, `Water_Use_Agriculture_ML.csv`.
+
+**Impact**: minor — wasted `dataprep` time and disk on every refresh. Listed mainly so a future reader
+does not mistake them for live inputs.
+
+**Action**: prune after confirming no external tooling (report scripts, notebooks under `luto/tools/`)
+depends on them. Note `tCO2_ha_hir_*` is kept deliberately — the HIR mask was retired 2025-06-16
+(`dataprep.py:904-906`) and the layers may return.
