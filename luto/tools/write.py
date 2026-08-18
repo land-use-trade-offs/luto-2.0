@@ -4851,10 +4851,10 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
     ''' No annualisation needed: GBF8 group scores are a point-in-time snapshot (stock)
     derived from the `yr_cal` lumap, not a flow over `gap` years.
 
-    Biodiversity GBF8 groups only being written to disk when `GBF8_TARGET` is 'on' '''
-    
+    Biodiversity GBF8 groups only being written to disk when `GBF8_TARGET` is not 'off' '''
+
     # Do nothing if biodiversity limits are off and no need to report
-    if not settings.GBF8_TARGET == 'on':
+    if settings.GBF8_TARGET == 'off':
         return "Skipped: Biodiversity GBF8 groups scores not written as `GBF8_TARGET` is set to 'off'"
 
         
@@ -5039,9 +5039,9 @@ def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
     ''' No annualisation needed: GBF8 species scores are a point-in-time snapshot (stock)
     derived from the `yr_cal` lumap, not a flow over `gap` years.
 
-    Biodiversity GBF8 species only being written to disk when `GBF8_TARGET` is 'on' and selected species are provided '''
+    Biodiversity GBF8 species only being written to disk when `GBF8_TARGET` is not 'off' and selected species are provided '''
 
-    if settings.GBF8_TARGET != 'on':
+    if settings.GBF8_TARGET == 'off':
         return "Skipped: Biodiversity GBF8 species scores not written as `GBF8_TARGET` is set to 'off'"
     if len(data.BIO_GBF8_SEL_SPECIES) == 0:
         return "Skipped: Biodiversity GBF8 species scores not written as no selected species provided in `BIO_GBF8_SEL_SPECIES`"

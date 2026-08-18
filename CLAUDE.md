@@ -204,9 +204,9 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
   - `GBF2_CONSTRAINT_TYPE`: Hard or soft GBF2 constraint ('hard' or 'soft')
   - `GBF3_NVIS_TARGET`: NVIS vegetation group targets ('off', 'medium', 'high', 'USER_DEFINED')
   - `GBF3_NVIS_REGION_MODE`: 'AUSTRALIA', 'NRM', or 'IBRA_REG' (IBRA bioregion targets are handled through the NVIS stream — there is no separate `BIODIVERSITY_TARGET_GBF_3_IBRA` setting or IBRA constraint method)
-  - `GBF4_TARGET_SNES`: Species NES targets ('off', 'USER_DEFINED', or 'dict')
-  - `GBF4_TARGET_ECNES`: Ecological Community NES targets ('off', 'USER_DEFINED', or 'dict')
-  - `GBF8_TARGET`: Species conservation targets ('on' or 'off')
+  - `GBF4_TARGET_SNES`: Species NES targets ('off', 'medium', 'high', or 'USER_DEFINED'; levels apply uniform presets from `GBF4_SNES_TARGETS_DICT` to ALL species, GBF2-style; 'USER_DEFINED' keeps CSV targets and filters to species with TARGET_LEVEL_2030 > 0)
+  - `GBF4_TARGET_ECNES`: Ecological Community NES targets ('off', 'medium', 'high', or 'USER_DEFINED'; levels apply uniform presets from `GBF4_ECNES_TARGETS_DICT` to ALL communities)
+  - `GBF8_TARGET`: Species conservation targets ('off', 'medium', 'high', or 'USER_DEFINED'; levels apply uniform presets from `GBF8_TARGETS_DICT` to ALL ~10.6k species; 'USER_DEFINED' = former 'on', reads hand-filled USER_DEFINED_TARGET_PERCENT_* CSV columns)
 
 ### Renewable Energy Settings
 

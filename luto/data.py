@@ -1620,7 +1620,22 @@ class Data:
             BIO_GBF8_SPECIES_raw = xr.open_dataset(f'{settings.INPUT_DIR}/bio_GBF8_ssp{settings.SSP}_EnviroSuit.nc', chunks={'year':1,'species':1})['data']        
             bio_GBF8_baseline_score = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF8_SCORES.csv').sort_values(by='species', ascending=True)
             bio_GBF8_target_percent = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF8_TARGET.csv').sort_values(by='species', ascending=True)
-            
+
+            # The input CSV carries hand-filled 'USER_DEFINED_TARGET_PERCENT_{yr}' columns;
+            # map them onto the 'TARGET_LEVEL_{yr}' columns the rest of the class consumes.
+            for _yr in (2030, 2050, 2100):
+                if f'TARGET_LEVEL_{_yr}' not in bio_GBF8_target_percent.columns:
+                    bio_GBF8_target_percent[f'TARGET_LEVEL_{_yr}'] = bio_GBF8_target_percent.get(f'USER_DEFINED_TARGET_PERCENT_{_yr}')
+
+            # 'low'/'medium'/'high' — uniform preset targets for ALL species BEFORE selection,
+            # so the selection below keeps every species (preset > 0) regardless of the CSV.
+            # 'USER_DEFINED' keeps the CSV targets; only species with all three year targets
+            # defined and > 0 are selected.
+            if settings.GBF8_TARGET in ('medium', 'high'):
+                for _yr, _pct in settings.GBF8_TARGETS_DICT[settings.GBF8_TARGET].items():
+                    bio_GBF8_target_percent[f'TARGET_LEVEL_{_yr}'] = float(_pct)
+                print(f"│   │   ├── '{settings.GBF8_TARGET}' level targets applied to all GBF8 species", flush=True)
+
             self.BIO_GBF8_SEL_SPECIES = [row['species'] for _,row in bio_GBF8_target_percent.iterrows()
                                         if all([row.get('TARGET_LEVEL_2030', 0)>0,
                                                 row.get('TARGET_LEVEL_2050', 0)>0,
@@ -2327,9 +2342,20 @@ class Data:
         snes_df = (
             snes_df
             .query(f"region_level == '{settings.GBF4_SNES_REGION_MODE}'")
-            .query("TARGET_LEVEL_2030 > 0")
             .reset_index(drop=True)
         )
+
+        if settings.GBF4_TARGET_SNES in ('medium', 'high'):
+            # Uniform preset targets for ALL species at this presence/region
+            # (the CSV's own TARGET_LEVEL_* values, mostly NaN, are ignored)
+            for yr, pct in settings.GBF4_SNES_TARGETS_DICT[settings.GBF4_TARGET_SNES].items():
+                col = f'TARGET_LEVEL_{yr}'
+                if col in snes_df.columns:
+                    snes_df[col] = float(pct)
+            print(f"│   │   ├── '{settings.GBF4_TARGET_SNES}' level targets applied to all SNES species", flush=True)
+        else:
+            # 'USER_DEFINED' — keep CSV targets; only species with a defined 2030 target
+            snes_df = snes_df.query("TARGET_LEVEL_2030 > 0").reset_index(drop=True)
 
         if settings.GBF4_SNES_REGION_MODE != 'AUSTRALIA':
             snes_df = snes_df.query(f"region.isin({settings.GBF4_SNES_SELECTED_REGIONS})").reset_index(drop=True)
@@ -2338,13 +2364,6 @@ class Data:
             for region, species in settings.GBF4_SNES_EXCLUDE_REGION_SPECIES:
                 snes_df = snes_df[~((snes_df['region'] == region) & (snes_df['SCIENTIFIC_NAME'] == species))].reset_index(drop=True)
             print(f"│   │   ├── Excluded {len(settings.GBF4_SNES_EXCLUDE_REGION_SPECIES)} SNES (region, species) pairs", flush=True)
-
-        if settings.GBF4_TARGET_SNES == 'dict':
-            for yr, pct in settings.GBF4_SNES_TARGETS_DICT.items():
-                col = f'TARGET_LEVEL_{yr}'
-                if col in snes_df.columns:
-                    snes_df[col] = float(pct)
-            print(f"│   │   ├── Dict targets applied to SNES: {settings.GBF4_SNES_TARGETS_DICT}", flush=True)
 
         if settings.GBF4_SNES_TARGETS_OVERRIDE:
             for (reg, sp), yr_dict in settings.GBF4_SNES_TARGETS_OVERRIDE.items():
@@ -2381,9 +2400,21 @@ class Data:
         ecnes_df = (
             ecnes_df
             .query(f"region_level == '{settings.GBF4_ECNES_REGION_MODE}'")
-            .query("TARGET_LEVEL_2030 > 0")
             .reset_index(drop=True)
         )
+
+        if settings.GBF4_TARGET_ECNES in ('medium', 'high'):
+            # Uniform preset targets for ALL communities at this presence/region
+            # (the CSV's own TARGET_LEVEL_* values, mostly NaN, are ignored)
+            for yr, pct in settings.GBF4_ECNES_TARGETS_DICT[settings.GBF4_TARGET_ECNES].items():
+                col = f'TARGET_LEVEL_{yr}'
+                if col in ecnes_df.columns:
+                    ecnes_df[col] = float(pct)
+            print(f"│   │   ├── '{settings.GBF4_TARGET_ECNES}' level targets applied to all ECNES communities", flush=True)
+        else:
+            # 'USER_DEFINED' — keep CSV targets; only communities with a defined 2030 target
+            ecnes_df = ecnes_df.query("TARGET_LEVEL_2030 > 0").reset_index(drop=True)
+
         if settings.GBF4_ECNES_REGION_MODE != 'AUSTRALIA':
             ecnes_df = ecnes_df.query(f"region.isin({settings.GBF4_ECNES_SELECTED_REGIONS})").reset_index(drop=True)
 
@@ -2394,13 +2425,6 @@ class Data:
                 ~ecnes_df.apply(lambda r: (r['region'], r['COMMUNITY']) in excl_set, axis=1)
             ].reset_index(drop=True)
             print(f"│   │   ├── Excluded {before - len(ecnes_df)} ECNES (region, community) pairs", flush=True)
-
-        if settings.GBF4_TARGET_ECNES == 'dict':
-            for yr, pct in settings.GBF4_ECNES_TARGETS_DICT.items():
-                col = f'TARGET_LEVEL_{yr}'
-                if col in ecnes_df.columns:
-                    ecnes_df[col] = float(pct)
-            print(f"│   │   ├── Dict targets applied to ECNES: {settings.GBF4_ECNES_TARGETS_DICT}", flush=True)
 
         if settings.GBF4_ECNES_TARGETS_OVERRIDE:
             for (reg, com), yr_dict in settings.GBF4_ECNES_TARGETS_OVERRIDE.items():

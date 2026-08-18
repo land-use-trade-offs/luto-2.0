@@ -325,13 +325,13 @@ def get_GBF4_ECNES_region_species(data: Data) -> list:
     return data.BIO_GBF4_ECNES_SEL
 
 def get_GBF8_pre_1750_area_sr(data: Data, target_year: int) -> xr.DataArray:
-    if settings.GBF8_TARGET != "on":
+    if settings.GBF8_TARGET == "off":
         return np.empty(0)
     print('Getting GBF8 species conservation area matrices...', flush=True)
     return ag_biodiversity.get_GBF8_matrix_sr(data, target_year)
 
 def get_GBF8_region_species(data: Data) -> list:
-    if settings.GBF8_TARGET != "on":
+    if settings.GBF8_TARGET == "off":
         return []
     print('Getting GBF8 (region, species) constraint pairs...', flush=True)
     return data.BIO_GBF8_SEL
@@ -845,7 +845,7 @@ def get_limits(data: Data, yr_cal: int) -> dict[str, Any]:
     if settings.GBF4_TARGET_ECNES != 'off':
         limits["GBF4_ECNES"] = data.get_GBF4_ECNES_target_inside_LUTO_by_year(yr_cal)
 
-    if settings.GBF8_TARGET == "on":
+    if settings.GBF8_TARGET != "off":
         limits["GBF8"] = data.get_GBF8_target_inside_LUTO_by_yr(yr_cal)
 
     if settings.REGIONAL_ADOPTION_CONSTRAINTS != 'off':
@@ -1278,7 +1278,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
             GBF8_pre_1750_area_sr, GBF8_region_species, region_NRM_names_r,
             targets=limits['GBF8'],
         )
-        if settings.GBF8_TARGET == "on" else
+        if settings.GBF8_TARGET != "off" else
         (GBF8_pre_1750_area_sr, 1.0)
     )
 

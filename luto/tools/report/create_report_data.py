@@ -4001,7 +4001,7 @@ def process_biodiversity_data(files, SAVE_DIR):
     
     
 
-    if settings.GBF8_TARGET == 'on':
+    if settings.GBF8_TARGET != 'off':
         
         filter_str = '''
             category == "biodiversity" 

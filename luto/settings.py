@@ -1153,7 +1153,9 @@ protect and manage vegetation groups using the National Vegetation Information S
 - if 'off' is selected, turn off the GBF-3 NVIS target for biodiversity.
 - if 'medium' is selected, the conservation target is set to 30% by 2030 and 30% by 2050 for each vegetation group.
 - if 'high' is selected, the conservation target is set to 30% by 2030 and 50% by 2050 for each vegetation group.
-- if 'USER_DEFINED' is selected, the conservation target is reading from input Excel file.
+- if 'USER_DEFINED' is selected, targets are kept from the input CSV; only groups with all year targets > 0 are constrained.
+Level presets apply to ALL vegetation groups at the configured region mode (no CSV-target filter).
+(No 'low' level — a 0% target only makes sense for GBF2's degraded-areas logic.)
 '''
 
 
@@ -1283,19 +1285,32 @@ and manage human-wildlife interactions
 '''
 
 
-GBF4_TARGET_SNES  = 'off'           # 'off', 'USER_DEFINED', or 'dict'
-GBF4_TARGET_ECNES = 'off'           # 'off', 'USER_DEFINED', or 'dict'
+GBF4_TARGET_SNES  = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
+GBF4_TARGET_ECNES = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
 '''
 'off'               — GBF4 SNES/ECNES constraints disabled.
-'USER_DEFINED'      — read targets from input CSV file.
-'dict'              — still selecte sepecies as "USER_DEFINED", but overwrite targets by the values in GBF4_{SNES,ECNES}_TARGETS_DICT.
+'USER_DEFINED'      — targets read from the input CSV as-is; only species/communities with a
+                      defined TARGET_LEVEL_2030 > 0 in the CSV are selected.
+'medium'/'high'     — ALL species/communities at the configured presence/region are selected
+                      (no CSV-target filter), and every TARGET_LEVEL_{year} column is set to the
+                      uniform level preset in GBF4_{SNES,ECNES}_TARGETS_DICT
+                      (same convention as GBF2_TARGETS_DICT; no 'low' level — a 0% target
+                      only makes sense for GBF2's degraded-areas logic).
 '''
 
 GBF4_SNES_PRESENCE_CLASS  = 'LIKELY'  # 'LIKELY', 'LIKELY_AND_MAYBE'
 GBF4_ECNES_PRESENCE_CLASS = 'LIKELY'  # 'LIKELY', 'LIKELY_AND_MAYBE'
 
-GBF4_SNES_TARGETS_DICT  = {2030: 30, 2050: 50, 2100: 50}
-GBF4_ECNES_TARGETS_DICT = {2030: 30, 2050: 50, 2100: 50}
+# Uniform target presets (percent) keyed by GBF4_TARGET_{SNES,ECNES} level.
+# Only consulted when the target setting is 'medium'/'high'.
+GBF4_SNES_TARGETS_DICT  = {
+    'medium': {2030: 30, 2050: 30, 2100: 30},
+    'high':   {2030: 30, 2050: 50, 2100: 50},
+}
+GBF4_ECNES_TARGETS_DICT = {
+    'medium': {2030: 30, 2050: 30, 2100: 30},
+    'high':   {2030: 30, 2050: 50, 2100: 50},
+}
 
 # Per-(region, SCIENTIFIC_NAME) SNES target overrides, applied AFTER the uniform dict
 # (and independent of GBF4_TARGET_SNES mode). Maps (region, species) -> {year: pct}.
@@ -1355,11 +1370,28 @@ GBF4_SNES_EXCLUDE_REGION_SPECIES = [
 
 
 # -------------------------------- Climate change impacts on biodiversity -------------------------------
-GBF8_TARGET = 'off'           # 'on' or 'off'.
+GBF8_TARGET = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
 '''
-Target 8 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 
+Target 8 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to
 reduce the impacts of climate change on biodiversity and ecosystems.
+
+'off'               — GBF8 constraints disabled.
+'USER_DEFINED'      — targets read from the hand-filled USER_DEFINED_TARGET_PERCENT_{year}
+                      columns of BIODIVERSITY_GBF8_TARGET.csv; only species with all three
+                      year targets defined and > 0 are selected.
+'medium'/'high'     — ALL species in the CSV are selected and given the uniform level preset
+                      from GBF8_TARGETS_DICT (same convention as GBF2_TARGETS_DICT; no 'low'
+                      level — a 0% target only makes sense for GBF2's degraded-areas logic).
+                      NOTE: that is every species in the file (~10,600) — a far larger
+                      constraint set than any historical GBF8 run.
 '''
+
+# Uniform target presets (percent) keyed by GBF8_TARGET level.
+# Only consulted when GBF8_TARGET is 'medium'/'high'.
+GBF8_TARGETS_DICT = {
+    'medium': {2030: 30, 2050: 30, 2100: 30},
+    'high':   {2030: 30, 2050: 50, 2100: 50},
+}
 
 
 

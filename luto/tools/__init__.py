@@ -775,7 +775,7 @@ def calc_shadow_price_GBF4_ECNES(luto_solver, input_data, target_year) -> pd.Dat
 
 def calc_shadow_price_GBF8(luto_solver, input_data, target_year) -> pd.DataFrame:
     """GBF8 species-conservation constraint shadow prices (AUD per real ha of target)."""
-    if settings.GBF8_TARGET != "on":
+    if settings.GBF8_TARGET == "off":
         return pd.DataFrame()
     So = float(input_data.scale_factors["Economy"])
     ss = input_data.scale_factors["GBF8"]

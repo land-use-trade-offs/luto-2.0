@@ -1575,7 +1575,7 @@ class LutoSolver:
 
 
     def _add_GBF8_constraints(self) -> None:
-        if settings.GBF8_TARGET != "on":
+        if settings.GBF8_TARGET == "off":
             print('│   │   ├── TURNING OFF constraints for biodiversity GBF 8 ...')
             return
 
@@ -1911,7 +1911,7 @@ class LutoSolver:
         prod_data["BIO (GBF8) value (ha)"] = (
             {k: v.getValue() * self._input_data.scale_factors['GBF8'].sel(layer=k).item()
              for k, v in self.bio_GBF8_exprs.items()}
-            if settings.GBF8_TARGET == "on"
+            if settings.GBF8_TARGET != "off"
             else 0
         )
                 
@@ -1994,7 +1994,7 @@ class LutoSolver:
                         v - self._input_data.limits['GBF8'].sel(dict(layer=k)).item()
                         for k,v in prod_data["BIO (GBF8) value (ha)"].items()   
                     ]
-                    if settings.GBF8_TARGET == "on"          
+                    if settings.GBF8_TARGET != "off"
                     else 0
                 ),
             }
