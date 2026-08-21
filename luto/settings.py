@@ -27,7 +27,7 @@
 # LUTO model version.                                                          #
 # ---------------------------------------------------------------------------- #
 
-VERSION = '2.3'
+VERSION = '2.4'
 
 
 # ---------------------------------------------------------------------------- #
@@ -119,7 +119,7 @@ AMORTISE_UPFRONT_COSTS = False
 # θ→0: pure exact per-source model (at RESFACTOR=5 nothing folds below 0.04, the min block fraction).
 # θ→1: one source per cell carrying the whole cell = the old crisp dominant-LU model.
 # θ only applies to AG land-uses; non-ag sources are always exact (noise-floor cutoff, no folding).
-EXACT_REACHABILITY_MIN_FRACTION = 1.0
+EXACT_REACHABILITY_MIN_FRACTION = 0.01
 
 # Discount rate for amortisation
 DISCOUNT_RATE = 0.07     # 0.05 = 5% pa.
@@ -323,9 +323,13 @@ Range from 1e-2 (fast, loose) to 1e-8 (slow, tight; Gurobi default).
    prevents the barrier from closing the gap to 1e-5; crossover polishes the result.
 '''
 
-DROP_UNREACHABLE_CONSTRAINTS = ['bio_snes', 'bio_ecnes', 'bio_nvis']
+DROP_UNREACHABLE_CONSTRAINTS = []
 '''
 Which constraint groups may be SACRIFICED to keep a year solvable — ORDERED, least-valued first.
+
+DEFAULT [] (since v2.4): the diagnose-and-drop machinery (solvers/tools.py) is OFF — nothing is
+probed or removed, and an infeasible year fails as-is. To enable it, set an ordered list such as
+['bio_snes', 'bio_ecnes', 'bio_nvis'] together with INFEASIBILITY_DIAGNOSIS_GROUPS below.
 
 This list is the drop policy for BOTH halves of the infeasibility flow in simulation.py:
 
@@ -366,12 +370,19 @@ met-by-a-hair target for guaranteed termination, and the record says exactly how
 was. 1e-4 is the saturation threshold from the Phase-1 analysis: the GB cap sat at 5e-6 relative
 slack when its runs returned status 4; healthy rows sit above 8.5e-2.
 
-Set to 0 to disable knife-edge dropping (the census still records).
+Set to 0 to disable knife-edge dropping (the census still records). Inert while
+DROP_UNREACHABLE_CONSTRAINTS / INFEASIBILITY_DIAGNOSIS_GROUPS are empty — the census itself
+only runs as part of the pre-solve spectrum.
 '''
 
-INFEASIBILITY_DIAGNOSIS_GROUPS = ['bio_nvis', 'bio_snes', 'bio_ecnes', 'nonag_cap', 'flow_in', 'flow_out']
+INFEASIBILITY_DIAGNOSIS_GROUPS = []
 '''
-Which constraint groups the infeasibility diagnosis works on. Two roles in simulation.py:
+Which constraint groups the infeasibility diagnosis works on.
+
+DEFAULT [] (since v2.4): diagnosis is OFF — the pre-solve feasibility spectrum, knife-edge census
+and post-failure restricted IIS are all skipped (simulation.py bypasses them when this is empty).
+The recommended set when diagnosing infeasible runs is
+['bio_nvis', 'bio_snes', 'bio_ecnes', 'nonag_cap', 'flow_in', 'flow_out']. Two roles in simulation.py:
 
   * pre-solve: each of these groups is feasibility-tested ALONE (plus the structural rows);
   * post-failure: the diagnosis probe keeps ONLY these groups (plus structural), and the IIS is
@@ -386,12 +397,12 @@ from 417 s (full model) to 13 s (restricted), and the full model's computeIIS di
     restricted model FEASIBLE    ->  says NOTHING about the full model. A conflict involving a
                                      discarded group is invisible, and the year will still fail.
 
-So only exclude a group when you are confident it does not bind. The default keeps the
+So only exclude a group when you are confident it does not bind. The recommended set keeps the
 biodiversity families, the non-ag adoption cap AND the transition-flow system (`flow_in` /
 `flow_out`), and discards demand, GHG, water and renewables. (Water was tested: a restriction that
 still contained it returned the identical IIS, so it does not participate.)
 
-The flow system is in the default because excluding it manufactures false FEASIBLE verdicts
+The flow system is in the recommended set because excluding it manufactures false FEASIBLE verdicts
 (2026-08-10): a species target can be satisfiable in an unconstrained-land sense yet unreachable
 given how land is permitted to MOVE — T_MAT reachability and source availability live in the flow
 rows. Five capped runs stalled for days on exactly this: their flow-blind probes reported feasible,
