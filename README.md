@@ -2,7 +2,7 @@
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
-[![Version](https://img.shields.io/badge/Version-2.3-green.svg)](https://github.com/land-use-trade-offs/luto-2.0)
+[![Version](https://img.shields.io/github/v/release/land-use-trade-offs/luto-2.0?label=Version&color=green)](https://github.com/land-use-trade-offs/luto-2.0/releases/latest)
 
 ## Introduction
 The Land Use Trade-Offs model v2 (LUTO2) is an integrated land systems model designed to simulate the optimal spatial arrangement of land use and land management decisions over time in Australia. It aims to achieve climate and biodiversity targets without compromising economic growth, food production or water security. The model is implemented as a Python package, offering users the flexibility to run interactively or to execute batch processes through scripted automation.
