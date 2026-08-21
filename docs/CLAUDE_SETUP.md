@@ -58,7 +58,7 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 - `SSP`: Shared Socioeconomic Pathway code (e.g., '245' for SSP2-RCP4.5)
 - `SCENARIO`: Auto-derived from SSP (e.g., 'SSP2')
 - `RCP`: Auto-derived from SSP (e.g., 'rcp4p5')
-- `SIM_YEARS`: Simulation time periods (default: 2010-2050 in 5-year steps; 2010 is base year)
+- `SIM_YEARS`: Simulation time periods (default: `list(range(2020, 2051, 5))` = 2020-2050 in 5-year steps)
 - `RESFACTOR`: Spatial resolution factor (1 = full resolution, >1 = coarser)
 - `OBJECTIVE`: Optimization objective ('maxprofit' or 'mincost')
 
@@ -91,40 +91,46 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
   - Determines annual sequestration rate by averaging total CO2 over this period
   - Default: 50 years (follows S-curve logic with rapid early accumulation)
 - `BIODIVERSITY_TARGET_GBF_*`: Global Biodiversity Framework targets
-  - `BIODIVERSITY_TARGET_GBF_2`: Priority degraded areas restoration ('off', 'low', 'medium', 'high')
+  - `GBF2_TARGET`: Priority degraded areas restoration ('off', 'low', 'medium', 'high')
   - `GBF2_CONSTRAINT_TYPE`: Hard or soft constraint ('hard' or 'soft')
-  - `BIODIVERSITY_TARGET_GBF_3_NVIS`: NVIS vegetation group targets ('off', 'medium', 'high', 'USER_DEFINED')
-  - `BIODIVERSITY_TARGET_GBF_3_IBRA`: IBRA bioregion targets ('off', 'medium', 'high', 'USER_DEFINED')
-  - `BIODIVERSITY_TARGET_GBF_4_SNES`: Species NES (National Environmental Significance) ('on' or 'off')
-  - `BIODIVERSITY_TARGET_GBF_4_ECNES`: Ecological Community NES ('on' or 'off')
-  - `BIODIVERSITY_TARGET_GBF_8`: Species conservation targets ('on' or 'off')
+  - `GBF3_NVIS_TARGET`: NVIS vegetation group targets ('off', 'medium', 'high', 'USER_DEFINED')
+  - `GBF3_NVIS_TARGET_CLASS`: Layer class ('NVIS_MVG' or 'NVIS_MVS'); also selects the class for IBRA layers when `GBF3_NVIS_REGION_MODE = 'IBRA_REG'`
+  - `GBF3_NVIS_REGION_MODE`: 'AUSTRALIA', 'NRM', or 'IBRA_REG' (IBRA bioregion targets are handled through the NVIS stream — there is no separate `BIODIVERSITY_TARGET_GBF_3_IBRA` setting or IBRA constraint method)
+  - `GBF4_TARGET_SNES`: Species NES targets ('off', 'USER_DEFINED', or 'dict')
+  - `GBF4_TARGET_ECNES`: Ecological Community NES targets ('off', 'USER_DEFINED', or 'dict')
+  - `GBF4_SNES_TARGETS_OVERRIDE`: dict letting a few species carry a different target from the rest (empty = no override)
+  - `GBF4_SNES_CAP_MARGIN`: safety margin (percentage points, default 2.0) subtracted from each species' `ATTAINABLE_LEVEL` when clamping an interpolated SNES target, to keep a feasibility buffer (effective cap = `ATTAINABLE_LEVEL - GBF4_SNES_CAP_MARGIN`)
+  - `GBF8_TARGET`: Species conservation targets ('on' or 'off')
 
 ### Renewable Energy Settings
 - `RENEWABLES_OPTIONS`: Dict controlling which renewable energy types are enabled, e.g. `{'Utility Solar PV': True, 'Onshore Wind': True}`. Set values to `False` to disable individual types. Also drives the corresponding `AG_MANAGEMENTS` entries.
-- `RENEWABLE_TARGET_SCENARIO`: Target scenario ('CNS25 - Accelerated Transition' or 'CNS25 - Current Targets')
+- `RENEWABLE_TARGET_SCENARIO_TARGETS`: Generation-target scenario (e.g. 'Gladstone - Core', 'Gladstone - BESS Sensitivity', 'AEMO 2026 ISP - Step Change', 'AEMO 2026 ISP - Accelerated Transition', 'AEMO 2026 ISP - Slower Growth')
+- `RENEWABLE_TARGET_SCENARIO_INPUT_LAYERS`: Spatial-layer scenario (e.g. 'step_change', 'accelerated_transition', 'ANU_transmission_T3/T5/T10')
 - `RE_TARGET_LEVEL`: Spatial level for constraints ('STATE' or 'NRM'; only STATE currently supported)
 - `INSTALL_CAPACITY_MW_HA`: Per-hectare capacity (MW/ha) per renewable type
 - `RENEWABLES_ADOPTION_LIMITS`: Maximum adoption fraction per type (default: 1.0 for both)
 
 ### Solver Configuration
-- `SOLVE_METHOD`: GUROBI algorithm (default: 2 for barrier method)
-- `THREADS`: Parallel threads for optimization (default: min(32, cpu_count))
-- `FEASIBILITY_TOLERANCE`: Solver tolerance (default: 1e-2, relaxed from 1e-6)
+- Gurobi `Method` (algorithm; 2 = barrier) is not a standalone setting — it is the 2nd element of each `RETRY_PARAMS` tuple (default first attempt uses barrier). There is no `SOLVE_METHOD` setting.
+- `THREADS`: Parallel threads for optimization (default: 32)
+- `FEASIBILITY_TOLERANCE`: Solver feasibility tolerance (default: 1e-6)
 - `OPTIMALITY_TOLERANCE`: Optimality tolerance (default: 1e-2)
 - `BARRIER_CONVERGENCE_TOLERANCE`: Barrier method convergence (default: 1e-5)
 - `RESCALE_FACTOR`: Rescaling magnitude for numerical stability (default: 1e3)
 - `SOLVER_COEFF_MIN`: Universal minimum coefficient threshold (default: 1e-4). The `_qsum(coeffs, gurobi_vars)` helper in `solver.py` is called by **all** constraint and objective builders; any term whose absolute value falls below this threshold is dropped before entering Gurobi. Applies to Economy, Biodiversity-quality, GHG, Water, Renewable, GBF2/3/4/8, Demand/Quantity, and Regional Adoption limits. Chosen empirically: 1e-3 caused ~3% economic loss; 1e-4 retains meaningful small coefficients while keeping the matrix range ratio at 1e8 (well within Gurobi's safe zone). `RESCALE_ZERO_THRESHOLD` was removed — post-rescale zeroing is superseded by this universal filter.
+  - `_qsum` floors coefficients as each term is *built*, but some coefficients are created **downstream** — e.g. the accounting term `coeff × X_acct`, where a folded-sliver `X_acct` is a `LinExpr` with `~1/RESFACTOR²` weights, distributes a kept `coeff` into sub-floor products. A single post-build sweep, `_floor_assembled_matrix(model)`, runs after `_setup_objective()` and drops `|coeff| < SOLVER_COEFF_MIN` from both the assembled constraint matrix (`getA()`) **and** the objective vector (`v.Obj`), which `getA()` can't reach. See `docs/FINDINGS.md` (20260721).
 
 ### Output Writing Configuration
-- `WRITE_PARALLEL`: Enable parallel output writing (default: True)
-- `WRITE_THREADS`: Number of parallel write threads (default: min(6, cpu_count))
-- `WRITE_REPORT_MAX_MEM_GB`: Max memory for report generation (default: 64)
+- `WRITE_REPORT_MAX_MEM_MB`: Max memory (MB) for report generation (default: `64 * 1024` = 65536). Parallel-write `n_jobs` is budgeted from this: `get_n_jobs(peak_mb)` subtracts the parent `Data` object's live RSS, then divides the remaining budget by each worker's `peak_mb + ~500 MB` overhead (true per-worker cost, not a plain floor-division).
 - `WRITE_CHUNK_SIZE`: Chunk size for NetCDF writing (default: 4096)
 
 ### No-Go Areas & Regional Adoption
 - `EXCLUDE_NO_GO_LU`: Enforce no-go area constraints (True/False)
 - `REGIONAL_ADOPTION_CONSTRAINTS`: Regional adoption limits ('off', 'on', 'NON_AG_CAP')
-- `REGIONAL_ADOPTION_ZONE`: Zone type ('NRM_CODE', 'LGA_CODE', etc.)
+- `REGIONAL_ADOPTION_ZONE`: Zone type ('ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT')
+- `REGIONAL_ADOPTION_NON_AG_CAP`: uniform sum-of-non-ag cap % per region (only under `NON_AG_CAP`)
+- `REGIONAL_ADOPTION_NON_AG_CAP_REGIONS`: scope of the cap — `[]` caps all regions (default); a list of region names caps only those, leaving the rest uncapped
+- `REGIONAL_ADOPTION_NON_AG_CAP_OVERRIDE`: dict of per-region cap % that override the uniform `REGIONAL_ADOPTION_NON_AG_CAP` for named regions (applied within the `_REGIONS` scope)
 
 ### Land-Use Culling
 - `CULL_MODE`: Land-use culling mode ('absolute', 'percentage', 'none')
@@ -288,28 +294,16 @@ profit = (profit_combo * decision_vars).sum(dim=['am', 'lm', 'lu'])
 profit = xr.dot(profit_combo, decision_vars, dims=['am', 'lm', 'lu'])
 ```
 
-#### Implementation Locations
+#### Where this applies
 
-Key locations where xr.dot() is used in LUTO2:
+This is a **standing convention** for any large-array `(a * b).sum(dim=...)` reduction in `write.py` and the report data tools — apply it whenever you add or refactor such a reduction. (Do not rely on hard-coded line numbers here: `write.py` has been substantially rewritten — notably the transition reporting, which now aggregates solved per-source delta flows rather than a `base × target × cost` Cartesian product — so exact call sites move.)
 
-- [write.py:424](luto/tools/write.py#L424) - Commodity production calculations
-- [write.py:652](luto/tools/write.py#L652) - Agricultural profit aggregation
-- [write.py:758](luto/tools/write.py#L758) - Non-agricultural profit aggregation
-- [write.py:840](luto/tools/write.py#L840) - Agricultural Management profit
-- [write.py:1266](luto/tools/write.py#L1266) - Ag-to-ag transition costs (dimension elimination)
-- [write.py:1987](luto/tools/write.py#L1987) - GHG emissions calculation
-
-**Special case - Dimension elimination** (line 1266):
+**Special case - Dimension elimination.** When a product would create a full Cartesian intermediate over two water-supply dimensions, sum each dimension separately instead:
 ```python
-# Instead of creating full Cartesian product of water-supply dimensions:
-# cost_xr = base[From-ws, ...] * target[To-ws, ...] * cost[To-ws, ...]
-# Which creates huge intermediate: [From-ws × To-ws × ...] (~5GB)
-
-# Sum each water-supply dimension separately:
+# Instead of the huge intermediate: base[From-ws, ...] * target[To-ws, ...] * cost[To-ws, ...]
 ag_base_no_ws = ag_dvar_mrj_base.sum(dim='From-water-supply')
 target_cost_product = xr.dot(ag_dvar_mrj_target, ag_transitions_cost_mat, dims=['To-water-supply'])
 cost_xr = ag_base_no_ws * target_cost_product
-# Result: [From-lu × To-lu × Type] (~1.6GB, 68% memory reduction)
 ```
 
 #### When to Use xr.dot()

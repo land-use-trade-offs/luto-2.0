@@ -628,10 +628,10 @@ For agricultural products, the quantity is calculated as:
 
 For renewable products, the quantity is calculated as:
     quantity = (
-        INSTALL_CAPACITY_MW_HA 
-        * capacity_factor_multiplier 
-        * (1 - re_remain_percent_after_distribution) 
-        * 365 * 24 
+        INSTALL_CAPACITY_MW_HA
+        * capacity_factor_multiplier
+        * distribution_loss_factor_multiplier # (1.0 = no loss)
+        * 365 * 24
         * real_area
     )
 '''

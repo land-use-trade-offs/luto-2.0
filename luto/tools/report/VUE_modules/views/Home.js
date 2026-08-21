@@ -14,11 +14,34 @@ window.HomeView = {
     const selectRegion = inject('globalSelectedRegion');
     const ChartData = ref({});
 
+    // Navigate to region-level data handling different structures across categories.
+    // After the region_level change, data is wrapped as: { region_NRM: { region: ... }, region_state: ... }
+    // Water uses 'NRM' as its level key; BIO Quality has an extra 'Suitability' backend wrapper;
+    // Production overview still uses direct region keys (national only).
+    function getChartRegionData(cat, sub, region) {
+      const dataObj = ChartData.value?.[cat]?.[sub];
+      if (!dataObj) return undefined;
+      if (cat === 'Biodiversity' && sub === 'Quality') {
+        return dataObj?.['Suitability']?.['region_NRM']?.[region];
+      }
+      if (cat === 'Water') {
+        return dataObj?.['NRM']?.[region];
+      }
+      if (cat === 'Production') {
+        return dataObj?.[region];
+      }
+      return dataObj?.['region_NRM']?.[region];
+    }
+
+    function getRankingLevel(cat) {
+      return cat === 'Water' ? 'NRM' : 'region_NRM';
+    }
+
     // Species selection state (for GBF3/4/8 charts that have region → species → [series] structure)
     const selectSpecies = ref('');
     const availableSpecies = computed(() => {
       if (!dataLoaded.value) return [];
-      const data = ChartData.value?.[selectChartCategory.value]?.[selectChartSubCategory.value]?.[selectRegion.value];
+      const data = getChartRegionData(selectChartCategory.value, selectChartSubCategory.value, selectRegion.value);
       if (!data || Array.isArray(data)) return [];
       return Object.keys(data);
     });
@@ -84,7 +107,7 @@ window.HomeView = {
     //  Reactive data
     const selectChartData = computed(() => {
       let seriesData, yAxisTitle = null;
-      let originalData = ChartData.value?.[selectChartCategory.value]?.[selectChartSubCategory.value]?.[selectRegion.value] || [];
+      let originalData = getChartRegionData(selectChartCategory.value, selectChartSubCategory.value, selectRegion.value) || [];
       // If species-level data (region → species → [series]), pick the selected species
       if (hasSpeciesData.value && selectSpecies.value) {
         originalData = originalData[selectSpecies.value] || [];
@@ -117,32 +140,41 @@ window.HomeView = {
 
 
     const selectRanking = computed(() => {
+      const r = selectRegion.value;
+      const y = selectYear.value;
+      const rnm = 'region_NRM';
+      const E = rankingData.value['Economics']?.[rnm]?.[r];
+      const A = rankingData.value['Area']?.[rnm]?.[r];
+      const G = rankingData.value['GHG']?.[rnm]?.[r];
+      const W = rankingData.value['Water']?.['NRM']?.[r];
+      const B = rankingData.value['Biodiversity (Quality)']?.[rnm]?.[r];
       return {
-        economicTotal: rankingData.value['Economics']?.[selectRegion.value]?.['Profit']?.['value']?.[selectYear.value] || 'N/A',
-        economicCost: rankingData.value['Economics']?.[selectRegion.value]?.['Cost']?.['value']?.[selectYear.value] || 'N/A',
-        economicRevenue: rankingData.value['Economics']?.[selectRegion.value]?.['Revenue']?.['value']?.[selectYear.value] || 'N/A',
-        areaTotal: rankingData.value['Area']?.[selectRegion.value]?.['Total']?.['value']?.[selectYear.value] || 'N/A',
-        areaAgLand: rankingData.value['Area']?.[selectRegion.value]?.['Agricultural Land-use']?.['value']?.[selectYear.value] || 'N/A',
-        areaAgMgt: rankingData.value['Area']?.[selectRegion.value]?.['Agricultural Management']?.['value']?.[selectYear.value] || 'N/A',
-        areaNonAg: rankingData.value['Area']?.[selectRegion.value]?.['Non-Agricultural Land-use']?.['value']?.[selectYear.value] || 'N/A',
-        ghgTotal: rankingData.value['GHG']?.[selectRegion.value]?.['Total']?.['value']?.[selectYear.value] || 'N/A',
-        ghgEmissions: rankingData.value['GHG']?.[selectRegion.value]?.['GHG emissions']?.['value']?.[selectYear.value] || 'N/A',
-        ghgReduction: rankingData.value['GHG']?.[selectRegion.value]?.['GHG sequestrations']?.['value']?.[selectYear.value] || 'N/A',
-        waterTotal: rankingData.value['Water']?.[selectRegion.value]?.['Total']?.['value']?.[selectYear.value] || 'N/A',
-        waterAgLand: rankingData.value['Water']?.[selectRegion.value]?.['Agricultural Land-use']?.['value']?.[selectYear.value] || 'N/A',
-        waterAgMgt: rankingData.value['Water']?.[selectRegion.value]?.['Agricultural Management']?.['value']?.[selectYear.value] || 'N/A',
-        waterNonAg: rankingData.value['Water']?.[selectRegion.value]?.['Non-Agricultural Land-use']?.['value']?.[selectYear.value] || 'N/A',
-        biodiversityTotal: rankingData.value['Biodiversity (Quality)']?.[selectRegion.value]?.['Total']?.['value']?.[selectYear.value] || 'N/A',
-        biodiversityAgLand: rankingData.value['Biodiversity (Quality)']?.[selectRegion.value]?.['Agricultural Land-use']?.['value']?.[selectYear.value] || 'N/A',
-        biodiversityAgMgt: rankingData.value['Biodiversity (Quality)']?.[selectRegion.value]?.['Agricultural Management']?.['value']?.[selectYear.value] || 'N/A',
-        biodiversityNonAg: rankingData.value['Biodiversity (Quality)']?.[selectRegion.value]?.['Non-Agricultural Land-use']?.['value']?.[selectYear.value] || 'N/A'
+        economicTotal: E?.['Profit']?.['value']?.[y] || 'N/A',
+        economicCost: E?.['Cost']?.['value']?.[y] || 'N/A',
+        economicRevenue: E?.['Revenue']?.['value']?.[y] || 'N/A',
+        areaTotal: A?.['Total']?.['value']?.[y] || 'N/A',
+        areaAgLand: A?.['Agricultural Land-use']?.['value']?.[y] || 'N/A',
+        areaAgMgt: A?.['Agricultural Management']?.['value']?.[y] || 'N/A',
+        areaNonAg: A?.['Non-Agricultural Land-use']?.['value']?.[y] || 'N/A',
+        ghgTotal: G?.['Total']?.['value']?.[y] || 'N/A',
+        ghgEmissions: G?.['GHG emissions']?.['value']?.[y] || 'N/A',
+        ghgReduction: G?.['GHG sequestrations']?.['value']?.[y] || 'N/A',
+        waterTotal: W?.['Total']?.['value']?.[y] || 'N/A',
+        waterAgLand: W?.['Agricultural Land-use']?.['value']?.[y] || 'N/A',
+        waterAgMgt: W?.['Agricultural Management']?.['value']?.[y] || 'N/A',
+        waterNonAg: W?.['Non-Agricultural Land-use']?.['value']?.[y] || 'N/A',
+        biodiversityTotal: B?.['Total']?.['value']?.[y] || 'N/A',
+        biodiversityAgLand: B?.['Agricultural Land-use']?.['value']?.[y] || 'N/A',
+        biodiversityAgMgt: B?.['Agricultural Management']?.['value']?.[y] || 'N/A',
+        biodiversityNonAg: B?.['Non-Agricultural Land-use']?.['value']?.[y] || 'N/A'
       };
     });
 
     const selectRankingColors = computed(() => {
       if (!dataLoaded.value) { return {} }
+      const rl = getRankingLevel(selectChartCategory.value);
       return Object.fromEntries(
-        Object.entries(rankingData.value[selectChartCategory.value]).map(([region, values]) => [
+        Object.entries(rankingData.value[selectChartCategory.value]?.[rl] || {}).map(([region, values]) => [
           region,
           values?.[selectRankingSubCategory.value]?.['color']?.[selectYear.value] || {}
         ])
@@ -201,19 +233,19 @@ window.HomeView = {
       await loadScript(chartOverview_area_landuse['path'], chartOverview_area_landuse['name'], VIEW_NAME);
       await loadScript(chartOverview_bio_quality['path'], chartOverview_bio_quality['name'], VIEW_NAME);
       // Conditional biodiversity script loading based on runScenario
-      if (runScenario.value['BIODIVERSITY_TARGET_GBF_2'] !== 'off') {
+      if (runScenario.value['GBF2_TARGET'] !== 'off') {
         await loadScript(chartOverview_bio_GBF2['path'], chartOverview_bio_GBF2['name'], VIEW_NAME);
       }
-      if (runScenario.value['BIODIVERSITY_TARGET_GBF_3_NVIS'] !== 'off') {
+      if (runScenario.value['WRITE_GBF3_NVIS'] !== 'off') {
         await loadScript(chartOverview_bio_GBF3_NVIS['path'], chartOverview_bio_GBF3_NVIS['name'], VIEW_NAME);
       }
-      if (runScenario.value['BIODIVERSITY_TARGET_GBF_4_SNES'] !== 'off') {
+      if (runScenario.value['GBF4_TARGET_SNES'] !== 'off') {
         await loadScript(chartOverview_bio_GBF4_SNES['path'], chartOverview_bio_GBF4_SNES['name'], VIEW_NAME);
       }
-      if (runScenario.value['BIODIVERSITY_TARGET_GBF_4_ECNES'] !== 'off') {
+      if (runScenario.value['WRITE_GBF4_ECNES'] !== 'off') {
         await loadScript(chartOverview_bio_GBF4_ECNES['path'], chartOverview_bio_GBF4_ECNES['name'], VIEW_NAME);
       }
-      if (runScenario.value['BIODIVERSITY_TARGET_GBF_8'] !== 'off') {
+      if (runScenario.value['GBF8_TARGET'] !== 'off') {
         await loadScript(chartOverview_bio_GBF8_SPECIES['path'], chartOverview_bio_GBF8_SPECIES['name'], VIEW_NAME);
         await loadScript(chartOverview_bio_GBF8_GROUP['path'], chartOverview_bio_GBF8_GROUP['name'], VIEW_NAME);
       }
@@ -297,19 +329,19 @@ window.HomeView = {
       };
 
       // Dynamically add GBF data based on what was loaded
-      if (runScenario.value['BIODIVERSITY_TARGET_GBF_2'] !== 'off') {
+      if (runScenario.value['GBF2_TARGET'] !== 'off') {
         ChartData.value['Biodiversity']['GBF2'] = window[chartOverview_bio_GBF2['name']];
       }
-      if (runScenario.value['BIODIVERSITY_TARGET_GBF_3_NVIS'] !== 'off') {
+      if (runScenario.value['WRITE_GBF3_NVIS'] !== 'off') {
         ChartData.value['Biodiversity']['GBF3 (NVIS)'] = window[chartOverview_bio_GBF3_NVIS['name']];
       }
-      if (runScenario.value['BIODIVERSITY_TARGET_GBF_4_SNES'] !== 'off') {
+      if (runScenario.value['GBF4_TARGET_SNES'] !== 'off') {
         ChartData.value['Biodiversity']['GBF4 (SNES)'] = window[chartOverview_bio_GBF4_SNES['name']];
       }
-      if (runScenario.value['BIODIVERSITY_TARGET_GBF_4_ECNES'] !== 'off') {
+      if (runScenario.value['WRITE_GBF4_ECNES'] !== 'off') {
         ChartData.value['Biodiversity']['GBF4 (ECNES)'] = window[chartOverview_bio_GBF4_ECNES['name']];
       }
-      if (runScenario.value['BIODIVERSITY_TARGET_GBF_8'] !== 'off') {
+      if (runScenario.value['GBF8_TARGET'] !== 'off') {
         ChartData.value['Biodiversity']['GBF8 (SPECIES)'] = window[chartOverview_bio_GBF8_SPECIES['name']];
         ChartData.value['Biodiversity']['GBF8 (GROUP)'] = window[chartOverview_bio_GBF8_GROUP['name']];
       }
@@ -322,7 +354,8 @@ window.HomeView = {
       selectChartCategory.value = availableChartCategories.value[0];
 
       selectChartSubCategory.value = Object.keys(ChartData.value[selectChartCategory.value])[0];
-      const rankingKeys = Object.keys(rankingData.value?.[selectChartCategory.value]?.[selectRegion.value] || {}).filter(key => key !== "Total");
+      const rl0 = getRankingLevel(selectChartCategory.value);
+      const rankingKeys = Object.keys(rankingData.value?.[selectChartCategory.value]?.[rl0]?.[selectRegion.value] || {}).filter(key => key !== "Total");
       selectRankingSubCategory.value = rankingKeys[0] || 'N/A';
       rankingColors.value = window.Supporting_info.colors_ranking;
 
@@ -341,7 +374,8 @@ window.HomeView = {
 
     watch(selectChartCategory, (newCategory) => {
       availableChartSubCategories.value = Object.keys(ChartData.value[selectChartCategory.value])
-      const rankKeys = Object.keys(rankingData.value?.[selectChartCategory.value]?.[selectRegion.value] || {}).filter(key => key !== "Total");
+      const rl = getRankingLevel(newCategory);
+      const rankKeys = Object.keys(rankingData.value?.[newCategory]?.[rl]?.[selectRegion.value] || {}).filter(key => key !== "Total");
       availableRankSubcategories.value = rankKeys.sort((a, b) => rankSubcategoryOrder.indexOf(a) - rankSubcategoryOrder.indexOf(b));
       selectChartSubCategory.value = availableChartSubCategories.value[0];
       selectRankingSubCategory.value = availableRankSubcategories.value[0] || 'N/A';
@@ -405,7 +439,7 @@ window.HomeView = {
         <p class="text-[#505051] font-bold p-1 pt-8">
           SSP - {{ runScenario.SSP }} |
           GHG - {{ runScenario.GHG_EMISSIONS_LIMITS }} |
-          Biodiversity - {{ runScenario.BIODIVERSITY_TARGET_GBF_2 }}
+          Biodiversity - {{ runScenario.GBF2_TARGET }}
         </p>
 
         <!-- Ranking Cards Section -->

@@ -28,172 +28,333 @@ import luto.tools as tools
 import luto.data as Data
 import luto.economics.agricultural.ghg as ag_ghg
 
+from functools import lru_cache
 from luto import settings
 from typing import Dict
 from luto.data import Data
 from luto.economics.agricultural.water import get_wreq_matrices
 
 
-def get_to_ag_exclude_matrices(data: Data, lumap: np.ndarray):
-    """Return x_mrj exclude matrices.
 
-    An exclude matrix indicates whether switching land-use for a certain cell r
-    with land-use i to all other land-uses j under all land management types
-    (i.e., dryland, irrigated) m is possible.
+@lru_cache(maxsize=1)
+def _fold_ag_dvar(data: Data, base_year: int):
+    """SOLVER-WORLD base ag dvar fold — shared compute behind ``get_folded_base_ag_dvar`` ([0], the
+    folded base) and ``get_ag_dvar_fold_map`` ([1], the sliver map). Returns ``(folded_base, fold_map)``.
+    Prefer the two public wrappers; this private, ``lru_cache``-d function exists only so the single fold
+    (which most callers need only the folded base of) is computed once per (data, base_year).
 
-    Parameters
-    ----------
+    - ``[0]`` folded base dvar — sub-θ slivers merged into the dominant. This is the FOLDED composition,
+      used by the TRANSITION machinery (source maps, flow costs, ub/lb bounds, node-balance base). It makes
+      the transition problem small, but it is NOT the true composition.
+    - ``[1]`` fold map — the sliver bookkeeping that recovers the ACTUAL (unfolded, true) dvar for
+      ACCOUNTING. The two-stream accounting model uses it to build X_acct (the true per-land-use fractions)
+      so water/GHG/biodiversity/production/profit score the TRUE composition rather than the folded one.
 
-    data: Data object.
-    base_year: int
-        Current base year of the solve.
-    lumaps: dict[str, numpy.ndarray]
-        All previously generated land-use maps (shape = ncells, dtype=int).
+    ``folded_base`` (NLMS, NCELLS, N_AG_LUS): the true base with every sub-θ land-use fraction FOLDED into
+    the cell's dominant source (θ = EXACT_REACHABILITY_MIN_FRACTION).
 
+    ★ FOLD-INTO-DOMINANT: θ is a dial between the exact per-source flow model and the old crisp
+    dominant-LU model, applied per cell. Worked example, θ = 0.10, one dry cell:
 
-    Returns
-    -------
-    numpy.ndarray
-        x_mrj exclude matrix. The m-slices correspond to the
-        different land-management versions of the land-use `j` to switch _to_.
-        With m==0 conventional dryland, m==1 conventional irrigated.
+        true base:    Beef 0.55 │ Winter cereals 0.35 │ Hay 0.06 │ Citrus 0.04
+        folded base:  Beef 0.65 │ Winter cereals 0.35                            (Hay+Citrus → Beef)
+
+    - Beef and Winter cereals are > θ, so each becomes its own SOURCE: the solver attaches one flow
+      delta variable per legal (T_MAT-finite) target, e.g. D[Beef→Sheep], D[Beef→EP],
+      D[WC→Barley], ... Their transitions are TRUE and EXACT — a flow out of Winter cereals is
+      charged Winter cereals' own from→to cost/water/GHG row, never some cell-average.
+    - Hay (0.06) and Citrus (0.04) are ≤ θ: they get NO delta variables of their own. Their 0.10 of
+      land is added to Beef (the dominant), stays fully mobile through Beef's delta variables, and
+      pays Beef's from→to costs if it moves — the crisp approximation, confined to the sub-θ tail.
+    - Beef, the cell's overall-largest land-use, is always exempt from folding (receiver of last
+      resort), so every cell keeps at least one source and NO land is ever locked in by θ.
+
+    Receiver choice: the sliver's same-lm largest land-use if that land-use is itself > θ (avoids
+    fake dry↔irr cost attribution), else the cell's overall-largest land-use. Cell totals are
+    preserved exactly, so ag_mask/Σ-X accounting is unchanged. θ→0: nothing folds (pure exact);
+    θ→1: one source per cell carrying the whole cell (pure crisp).
+
+    Everything the solver derives from the base-year ag dvar (source maps, flow costs, ub/base
+    consts, ag-man lb) MUST use the folded base (``[0]``, via ``get_folded_base_ag_dvar``) so the solver
+    world is self-consistent. The true map (data.ag_dvars) is untouched — reporting sees real allocations;
+    solved delta flows attribute folded land's moves to its dominant source (bounded by the folded area).
+
+    ``fold_map`` (``[1]``, via ``get_ag_dvar_fold_map``) is a dict describing every folded sliver — the
+    data the two-stream accounting needs to re-express each dominant as its true land-uses (all arrays are
+    size 0 when nothing folded, so X_acct == the folded stream, a no-op):
+
+        from_m, cells, from_j : sliver source (lm, cell, land-use) index arrays
+        vals                  : the sliver's base-year fraction moved into the dominant (the `slivers` array)
+        to_m, to_j            : the receiver dominant's (lm, land-use) index arrays (cell is `cells`)
+        folded_dom            : folded_base[to_m, cells, to_j] — the dominant's post-fold mass (denominator)
+
+    Cached (maxsize=1): every consumer calls this for the same (data, base_year) within one step.
     """
-    # Spatial exclusoin; if a land-use never exists in a SA2 region in 2010, it will be disallowed in this region forever
+    base = data.ag_dvars[base_year].astype(np.float32).copy()
+    noise = 10 ** (-settings.ROUND_DECIMALS)
+    theta = settings.EXACT_REACHABILITY_MIN_FRACTION
+
+    # Overall dominant (m*, j*) per cell — receiver of last resort, exempt from folding.
+    flat = base.transpose(1, 0, 2).reshape(data.NCELLS, data.NLMS * data.N_AG_LUS)
+    dom_flat = flat.argmax(axis=1)
+    dom_m, dom_j = np.divmod(dom_flat, data.N_AG_LUS)
+
+    # Same-lm dominant per (m, cell).
+    dom_j_same = base.argmax(axis=2)                                     # (NLMS, NCELLS)
+
+    sliver = (base > noise) & (base <= theta)
+    sliver[dom_m, np.arange(data.NCELLS), dom_j] = False                 # exempt the receiver
+
+    # Fold map — initialised empty, filled below once the slivers are known. Empty (size-0) arrays ⇒
+    # nothing folded, so X_acct == the folded stream (the accounting correction is a no-op).
+    fold_map = dict(
+        from_m=np.array([], dtype=np.intp),
+        cells=np.array([], dtype=np.intp),
+        from_j=np.array([], dtype=np.intp),
+        vals=np.array([], dtype=np.float32),
+        to_m=np.array([], dtype=np.intp),
+        to_j=np.array([], dtype=np.intp),
+        folded_dom=np.array([], dtype=np.float32),
+    )
+    if not sliver.any():
+        return base, fold_map
+
+    from_m, cells, from_j = np.where(sliver)
+    vals = base[from_m, cells, from_j].copy()
+
+    # Receiver: same-lm dominant if itself > θ, else the overall dominant. (A sliver that IS its
+    # lm's largest land-use fails the > θ test on itself and falls through to the overall dominant.)
+    to_j_same = dom_j_same[from_m, cells]
+    same_ok = base[from_m, cells, to_j_same] > theta
+    to_m = np.where(same_ok, from_m, dom_m[cells])
+    to_j = np.where(same_ok, to_j_same, dom_j[cells])
+
+    np.add.at(base, (to_m, cells, to_j), vals)
+    base[from_m, cells, from_j] = 0.0
+
+    fold_map.update(
+        from_m=from_m.astype(np.intp),
+        cells=cells.astype(np.intp),
+        from_j=from_j.astype(np.intp),
+        vals=vals.astype(np.float32),
+        to_m=to_m.astype(np.intp),
+        to_j=to_j.astype(np.intp),
+        folded_dom=base[to_m, cells, to_j].astype(np.float32),   # post-fold dominant mass (denominator)
+    )
+
+    folded_ha = float((vals * data.REAL_AREA[cells]).sum())
+    print(
+        f"  └── θ fold (θ={theta}): {len(vals):,} sub-θ land-use fractions folded into dominant sources, "
+        f"{folded_ha:,.1f} ha re-attributed (max single fraction {vals.max():.4f})",
+        flush=True,
+    )
+    return base, fold_map
+
+
+def get_folded_base_ag_dvar(data: Data, base_year: int) -> np.ndarray:
+    """SOLVER-WORLD folded base ag dvar (NLMS, NCELLS, N_AG_LUS) — sub-θ slivers merged into the cell's
+    dominant source. This is what the TRANSITION machinery (source maps, flow costs, ub/lb bounds,
+    node-balance base) reads. See ``_fold_ag_dvar`` for the full fold semantics, and
+    ``get_ag_dvar_fold_map`` for the sliver bookkeeping the accounting stream needs.
+    """
+    return _fold_ag_dvar(data, base_year)[0]
+
+
+def get_ag_dvar_fold_map(data: Data, base_year: int) -> dict:
+    """θ-fold sliver map (dict) consumed by the two-stream accounting to build X_acct — the true
+    per-land-use composition — from the folded decision vars. Its arrays are empty when nothing folded.
+    See ``_fold_ag_dvar`` for the field descriptions.
+    """
+    return _fold_ag_dvar(data, base_year)[1]
+
+
+@lru_cache(maxsize=1)
+def get_base_dvar_mj_cell_map(data: Data, base_year: int) -> dict:
+    """Slice the FOLDED base ag dvar by each (from_m, from_j), returning {(from_m, from_j): cell_idx}
+    for every source combo holding land in at least one cell.
+
+    ★ THIS IS THE KEY DESIGN FOR THE DELTA TRANSITION COST. We slice the solver-world base dvar by the
+    same source (from_m, from_j) — e.g. dry-Apples. All cells in one slice share the same transition
+    costs (the cost of leaving dry-Apples for each target). The solver then creates, for each slice,
+    the same number of delta variables (delta >= 0, positive-increment Gurobi vars) — one per sliced
+    cell — that represent the TRUE transition flow out of that source on those cells. Transition cost
+    is then trans_cost = delta_dvars * cost_cells, and the objective minimises sum(trans_cost).
+
+    Sources come from `get_folded_base_ag_dvar` (sub-θ land-uses already folded into their dominant),
+    so EVERY nonzero land-use is a source — the noise cutoff here only drops float dust, and no land
+    is ever left without flow-to vars. θ's effect on model size acts through the folding, not through this
+    slice. This map is the single source of truth for BOTH (a) the solver's per-source delta/cost
+    slices and (b) target eligibility (`get_to_ag_exclude_matrices`), and ghg.py's exact transition-
+    emission slicing reuses it, so all stay aligned.
+
+    Cached (maxsize=1): the exclude builder and all exact cost functions call this for the same
+    (data, base_year) pair within one solve step, so subsequent calls are free.
+    """
+    noise = 10 ** (-settings.ROUND_DECIMALS)
+    base_dvar_mrj = get_folded_base_ag_dvar(data, base_year)   # folded dvar, for TRANSITION (solver world)
+    return {
+        (m, j): np.where(base_dvar_mrj[m, :, j] > noise)[0]
+        for m in range(data.NLMS)
+        for j in range(data.N_AG_LUS)
+        if (base_dvar_mrj[m, :, j] > noise).any()
+    }
+
+
+def get_to_ag_exclude_matrices(data: Data, base_year: int) -> np.ndarray:
+    """To-ag target-eligibility (exclude) matrix (NLMS, NCELLS, N_AG_LUS) via per-source reachability.
+
+    Covers BOTH ag→ag and non-ag→ag reachability. A cell r is eligible for ag target tj iff:
+
+    - SOME source present at r — an agricultural source from the FOLDED base (every nonzero folded
+      land-use; sub-θ land is already absorbed into its dominant) or a non-agricultural source — can
+      transition to tj (finite T_MAT entry); AND
+    - tj is spatially allowed (EXCLUDE) and not a no-go LU there.
+
+    Every ag land-use vouches for itself via the finite T_MAT diagonal, so (with a reconciled
+    x_mrj) every held land-use always gets its own X var — no lb pin needed for var existence.
+
+    Notes:
+
+    - The present sources come from `get_base_dvar_mj_cell_map` (ag) and
+      `get_base_nonag_dvar_k_cell_map` (nonag) — the SAME maps that drive the solver's per-source
+      flow-out slices, so eligibility and the flow vars share one threshold.
+    - `ag_lu2cells` then derives straight from this matrix and cannot diverge from the solver's
+      direct `ag_x_mrj[m, r, j]` reads.
+    """
+    # Lazy import to avoid the agricultural <-> non_agricultural transitions import cycle.
+    from luto.economics.non_agricultural.transitions import get_base_nonag_dvar_k_cell_map
+
+    mj_cell_map = get_base_dvar_mj_cell_map(data, base_year)
+    k_cell_map  = get_base_nonag_dvar_k_cell_map(data, base_year)
+
+    # Binary T_MAT allow/disallow matrices (finite → True, NaN → False)
+    t_ag2ag_jj = ~np.isnan(
+        data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu=data.AGRICULTURAL_LANDUSES).values
+    )   # (N_AG_LUS_from, N_AG_LUS_to)
+    t_nonag2ag_kj = ~np.isnan(
+        data.T_MAT.sel(from_lu=data.NON_AGRICULTURAL_LANDUSES, to_lu=data.AGRICULTURAL_LANDUSES).values
+    )   # (N_NON_AG_LUS, N_AG_LUS_to)
+
+    # Per-source reachability union: mark every target reachable from any present source at r.
+    reach_rj = np.zeros((data.NCELLS, data.N_AG_LUS), dtype=bool)
+    for (_fm, fj), cells in mj_cell_map.items():
+        if cells.size:
+            reach_rj[cells] |= t_ag2ag_jj[fj]
+    for k, cells in k_cell_map.items():
+        if cells.size:
+            reach_rj[cells] |= t_nonag2ag_kj[k]
+
+    t_rj = reach_rj.astype(np.int8)  # (NCELLS, N_AG_LUS)
+
+    # Spatial exclusion and no-go zones
     x_mrj = data.EXCLUDE.copy().astype(np.int8)
 
-    # Transition exclusion; Whether a landuse can be converted to another one (np.nan indicates NOT-ALLOW)
-    t_ij = data.T_MAT.loc[:,data.AGRICULTURAL_LANDUSES].copy()                              # Lexicographical transition matix (2D, all-lus to ag-lus).
-    ag_cells, non_ag_cells = tools.get_ag_and_non_ag_cells(lumap)                           # Get ag and non-ag index from base year lumap
-    lumap2desc = np.vectorize(data.ALLLU2DESC.get, otypes=[str])
-    
-    t_rj = np.ones((data.NCELLS, len(data.AGRICULTURAL_LANDUSES))).astype(np.float32)       # Empty ones_rj array to be filled with transition flag (1 allow, 0 not allow)
-    t_rj[ag_cells, :] = t_ij[lumap[ag_cells]]                                               # For ag cells in the base year lumap, get transition cost (np.nan is not-allow) for them
-    t_rj[non_ag_cells, :] *= t_ij.sel(from_lu=lumap2desc(lumap[non_ag_cells]))              # For non-ag cells in the base year lumap, get transition cost (np.nan is not-allow) for them
-    t_rj[non_ag_cells, :] *= t_ij.sel(from_lu=lumap2desc(data.LUMAP[non_ag_cells]))         # For non-ag cells, find its ag status in BASE_YR (2010), then get transition cost based on these 2010-ag status
-    t_rj = np.where(np.isnan(t_rj), 0, 1).astype(np.int8)     
-
-    # No-go exclusion; user-defined layer specifying which land-use are not disallowd at where
     no_go_x_mrj = np.ones_like(data.AG_L_MRJ)
     if settings.EXCLUDE_NO_GO_LU:
         for no_go_x_r, no_go_desc in zip(data.NO_GO_REGION_AG, data.NO_GO_LANDUSE_AG):
-            no_go_j = data.DESC2AGLU[no_go_desc]
-            no_go_x_mrj[:,:,no_go_j] = no_go_x_r
+            no_go_x_mrj[:, :, data.DESC2AGLU[no_go_desc]] = no_go_x_r
 
-    return (x_mrj * t_rj * no_go_x_mrj).astype(np.int8)
+    return (x_mrj * t_rj[np.newaxis, :, :] * no_go_x_mrj).astype(np.int8)
 
-def get_transition_matrices_ag2ag(data: Data, yr_idx: int, base_lumap: np.ndarray, base_lmmap: np.ndarray, separate=False):
+
+def get_ag2ag_ub(data: Data, base_year: int) -> np.ndarray:
+    """ag→ag TARGET upper bound (NLMS, NCELLS, N_AG_LUS), FRACTIONAL.
+
+    `ub[to_m, r, to_j]` is the product of four factors:
+
+    - T_MAT: binary allow/disallow per (from_j → to_j) — `finite → 1`, `NaN → 0`.
+    - fraction: reachable land share = `Σ_{from_j : T_MAT[from_j→to_j] finite} Σ_m base_dvar[m, r, from_j]`
+      (base-year fractions of every source LU that can reach to_j; overlapping sources summed, not OR-ed).
+    - no-go: user-defined LUs banned in specific regions.
+    - spatial exclusion (`data.EXCLUDE`): LU never present in the SA2 region in 2010 → banned there.
+
+    Example: cell is 0.2 Apples + 0.8 (reachable LUs); if Apples↛to_j then ub[to_j] = 0.8.
+    ag-source component only — nonag2ag adds its own fraction in the combined ag ub (later step).
+    Uses the FOLDED base (get_folded_base_ag_dvar): reach follows solver-world source identity.
     """
-    Calculate the transition matrices for land-use and land management transitions.
-    Args:
-        data (Data object): The data object containing the necessary input data.
-        yr_idx (int): The index of the current year.
-        base_lumap (np.ndarray): Land use map of the base year for the transitions.
-        base_lmmap (np.ndarray): Land management map of the base year for the transitions.
-        separate (bool, optional): Whether to return separate cost matrices for each cost component.
-                                   Defaults to False.
-    Returns:
-            numpy.ndarray or dict: The transition matrices for land-use and land management transitions.
-                               If `separate` is False, returns a numpy array representing the total costs.
-                               If `separate` is True, returns a dictionary with separate cost matrices for
-                               establishment costs, Water license cost, and carbon releasing costs.
+    ag_dvar = get_folded_base_ag_dvar(data, base_year)                                                  # folded dvar, for TRANSITION reach (NLMS, NCELLS, N_AG_LUS)
+
+    # Transition exclusion (T_MAT): binary allow/disallow per (from_j → to_j).
+    t_ag2ag_jj = (~np.isnan(
+        data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu=data.AGRICULTURAL_LANDUSES).values
+    )).astype(np.float32)                                                                              # (from_j, to_j)
+    
+    # Reachable land share: sum the base-year fractions of every source LU that can reach to_j.
+    ag_frac_rj    = ag_dvar.sum(axis=0)                                                                # (NCELLS, from_j)
+    reach_frac_rj = (ag_frac_rj @ t_ag2ag_jj).astype(np.float32)                                       # (NCELLS, to_j)
+
+    # No-go exclusion: user-defined LUs banned in specific regions.
+    no_go = np.ones((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
+    if settings.EXCLUDE_NO_GO_LU:
+        for no_go_x_r, no_go_desc in zip(data.NO_GO_REGION_AG, data.NO_GO_LANDUSE_AG):
+            no_go[:, :, data.DESC2AGLU[no_go_desc]] = no_go_x_r
+
+    # Spatial exclusion (data.EXCLUDE): LU never present in the SA2 region in 2010 → banned there.
+    x_mrj = data.EXCLUDE.astype(np.float32)
+    return (x_mrj * reach_frac_rj[np.newaxis, :, :] * no_go).astype(np.float32)
+
+
+def get_ag2ag_lb(data: Data, base_year: int) -> np.ndarray:
+    """ag→ag TARGET lower bound (NLMS, NCELLS, N_AG_LUS): all zeros.
+
+    The old sub-θ sliver 'stay' pin is gone — fold-into-dominant (get_folded_base_ag_dvar) absorbs
+    every sub-θ land-use into the cell's dominant source BEFORE the solver world is built, so no
+    land-use is ever left without flow-to vars or without an X var, and nothing needs to be locked in place.
+    Kept as a function (rather than deleted) as the hook for any future genuine ag lower bound.
+    """
+    return np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
+
+
+def get_transition_matrices_ag2ag(data: Data, yr_idx: int, from_m: int, from_j: int, cells=None, separate=False):
+    """Source-parameterised ag2ag transition-cost primitive.
+
+    Answers ONE question: transitioning FROM a single source (from_m, from_j) TO every target
+    (to_m, to_j), on `cells` (default all NCELLS), what is the cost/water/GHG per cell? Returns
+    (NLMS, len(cells), N_AG_LUS) [to_m, r, to_j] (separate=True → {component: same-shape array}).
+
+    UNMASKED — no exclude / no "not-staying" mask. The diagonal ((to_m,to_j)==(from_m,from_j)) is
+    naturally 0 (T_MAT[j→j]=0, zero water-delta, zero GHG), and target eligibility is the solver's job
+    (a flow/delta var is created only for a valid transition).
+
+    This is THE per-source cost primitive of the delta transition model. Callers select which cells to
+    evaluate per source: the ag2ag/ag2nonag cost builds it on each source's dvar>θ cells
+    (`get_base_dvar_mj_cell_map`, θ = EXACT_REACHABILITY_MIN_FRACTION); the nonag→ag levers call it for a
+    uniform livestock source (cells=None → all cells). The year-invariant water / T_MAT terms are
+    derived internally each call (water via the lru_cached `get_wreq_matrices`, so per-source calls in
+    a dict loop stay a single compute per step).
+
+    Components:
+      - Establishment  : amortise(T_MAT[from_j → to_j] × mult) × REAL_AREA  (both target lm equal)
+      - Water license  : amortised [(target req − source (from_m,from_j) req) × price + irrigation setup/teardown]
+      - GHG (× carbon price) : natural→modified / unallocated-natural→livestock-natural release
     """
     yr_cal = data.YR_CAL_BASE + yr_idx
+    if cells is None:
+        cells = np.arange(data.NCELLS)
+    n = len(cells)
+    N_AG = data.N_AG_LUS
+    area = data.REAL_AREA[cells]                                                    # (n,)
 
-    # Return l_mrj (Boolean) for current land-use and land management
-    l_mrj = tools.lumap2ag_l_mrj(base_lumap, base_lmmap)
-    l_mrj_not = np.logical_not(l_mrj)
+    # ── Establishment: source only enters via the T_MAT[from_j] row ──
+    t_ij  = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu=data.AGRICULTURAL_LANDUSES).values * data.TRANS_COST_MULTS[yr_cal]
+    t_row = np.nan_to_num(t_ij[from_j]).astype(np.float32)                          # (N_AG,)
+    e_rj  = tools.amortise(np.tile(t_row, (n, 1))) * area[:, None]                  # (n, N_AG)
+    e_mrj = np.stack([e_rj, e_rj], axis=0).astype(np.float32)                       # (NLMS, n, N_AG)
 
-    # Get the exclusion matrix
-    x_mrj = get_to_ag_exclude_matrices(data, base_lumap)
+    # ── Water licence delta (source-parameterised), amortised like Establishment above ──
+    w_mrj       = get_wreq_matrices(data, yr_idx)                                   # <ML/cell> (lru_cached)
+    w_raw_mrj   = tools.get_ag_to_ag_water_delta_matrix(data, from_m, from_j, cells, w_mrj, yr_idx)
+    w_delta_mrj = tools.amortise(w_raw_mrj).astype(np.float32)
 
-    ag_cells, _ = tools.get_ag_and_non_ag_cells(base_lumap)
-
-    n_ag_lms, ncells, n_ag_lus = data.AG_L_MRJ.shape
-
-    # -------------------------------------------------------------- #
-    # Transition costs (upfront, amortised to annual, per cell).  #
-    # -------------------------------------------------------------- #
-
-    # Raw transition-cost matrix is in $/ha and lexigraphically ordered (shape: land-use x land-use).
-    t_ij = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu=data.AGRICULTURAL_LANDUSES).values * data.TRANS_COST_MULTS[yr_cal]
-
-    # Non-irrigation related transition costs for cell r to change to land-use j calculated based on lumap (in $/ha).
-    # Only consider for cells currently being used for agriculture.
-    e_rj = np.zeros((ncells, n_ag_lus)).astype(np.float32)
-    e_rj[ag_cells, :] = t_ij[base_lumap[ag_cells]]
-
-    # Amortise upfront costs to annualised costs and converted to $ per cell via REAL_AREA
-    e_rj = tools.amortise(e_rj) * data.REAL_AREA[:, np.newaxis]
-
-    # Repeat the transition costs into dryland and irrigated land management types
-    e_mrj = np.stack([e_rj, e_rj], axis=0)
-
-    # Update the cost matrix with exclude matrices; the transition cost for a cell that remain the same is 0.
-    e_mrj = np.einsum('mrj,mrj,mrj->mrj', e_mrj, x_mrj, l_mrj_not).astype(np.float32)
-    e_mrj = np.nan_to_num(e_mrj)
-
-    # -------------------------------------------------------------- #
-    # Water license cost (upfront, amortised to annual, per cell).   #
-    # -------------------------------------------------------------- #
-
-    w_mrj = get_wreq_matrices(data, yr_idx)                                                     # <unit: ML/cell>
-    w_delta_mrj = tools.get_ag_to_ag_water_delta_matrix(w_mrj, l_mrj, data, yr_idx)
-    w_delta_mrj = np.einsum('mrj,mrj,mrj->mrj', w_delta_mrj, x_mrj, l_mrj_not).astype(np.float32)
-
-    # -------------------------------------------------------------- #
-    # Carbon costs of transitioning cells.                           #
-    # -------------------------------------------------------------- #
-
-    # Apply the cost of carbon released by transitioning natural land to modified land
-    ghg_transition = ag_ghg.get_ghg_transition_emissions(data, base_lumap, separate=True)       # <unit: t/ha>
-        
-    ghg_transition = {
-        k:np.einsum('mrj,mrj,mrj->mrj', v, x_mrj, l_mrj_not).astype(np.float32)                 # No GHG penalty for cells that remain the same, or are prohibited from transitioning
-        for k, v in ghg_transition.items()
-    }
-    
-    ghg_transition = {
-        k:tools.amortise(v * data.get_carbon_price_by_yr_idx(yr_idx))                           # Amortise the GHG penalties
-        for k,v in ghg_transition.items()
-    }
-    
-    ghg_t_types = ghg_transition.keys()
-    ghg_t_smrj = np.stack([ghg_transition[t] for t in ghg_t_types], axis=0)                     # s: ghg_t_types, m: land management, r: cell, j: land use
-    ghg_t_mrj = np.einsum('smrj->mrj', ghg_t_smrj)
-
-    
-    # TODO: add cost of biodiversity loss/gain from land-use transitions.
-    
-    # -------------------------------------------------------------- #
-    # Total costs.                                                   #
-    # -------------------------------------------------------------- #
+    # ── GHG release ($ = carbon price × raw emissions, amortised): source-parameterised ──
+    price   = data.get_carbon_price_by_yr_idx(yr_idx)
+    ghg_raw = ag_ghg.get_ghg_transition_emissions(data, from_m, from_j, cells, separate=True)   # raw t/cell
+    ghg     = {k: tools.amortise(v * price).astype(np.float32) for k, v in ghg_raw.items()}
 
     if separate:
-        return {'Establishment cost': e_mrj, 'Water license cost': w_delta_mrj, **ghg_transition}
-    else:
-        t_mrj = e_mrj + w_delta_mrj + ghg_t_mrj
-        return t_mrj
+        return {'Establishment cost': e_mrj, 'Water license cost': w_delta_mrj, **ghg}
+    return (e_mrj + w_delta_mrj + sum(ghg.values())).astype(np.float32)
 
-
-def get_transition_matrices_ag2ag_from_base_year(data: Data, yr_idx, base_year, separate=False):
-    """
-    Calculate the transition matrices for land-use and land management transitions.
-    Args:
-        data (Data object): The data object containing the necessary input data.
-        yr_idx (int): The index of the current year.
-        base_year (int): The base year for the transition calculations.
-        separate (bool, optional): Whether to return separate cost matrices for each cost component.
-                                   Defaults to False.
-    Returns:
-        numpy.ndarray or dict: The transition matrices for land-use and land management transitions.
-        If `separate` is False, returns a numpy array representing the total costs.
-        If `separate` is True, returns a dictionary with separate cost matrices for
-        establishment costs, Water license cost, and carbon releasing costs.
-    """
-    lumap = data.lumaps[base_year]
-    lmmap = data.lmmaps[base_year]
-    return get_transition_matrices_ag2ag(data, yr_idx, lumap, lmmap, separate)
-    
 
 def get_asparagopsis_effect_t_mrj(data: Data):
     """
@@ -206,7 +367,7 @@ def get_asparagopsis_effect_t_mrj(data: Data):
 
 def get_precision_agriculture_effect_t_mrj(data: Data):
     """
-    Gets the effects on transition costs of asparagopsis taxiformis, which are none.
+    Gets the effects on transition costs of precision agriculture, which are none.
     Transition/establishment costs are handled in the costs matrix.
     """
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture']
@@ -315,7 +476,7 @@ def get_asparagopsis_adoption_limits(data: Data, yr_idx):
     yr_cal = data.YR_CAL_BASE + yr_idx
     for lu in settings.AG_MANAGEMENTS_TO_LAND_USES['Asparagopsis taxiformis']:
         j = data.DESC2AGLU[lu]
-        asparagopsis_limits[j] = data.ASPARAGOPSIS_DATA[lu].loc[yr_cal, 'Technical_Adoption']
+        asparagopsis_limits[j] = min(data.ASPARAGOPSIS_DATA[lu].loc[yr_cal, 'Technical_Adoption'] * settings.TECH_ADOPT_MULT, 1)
 
     return asparagopsis_limits
 
@@ -331,7 +492,7 @@ def get_precision_agriculture_adoption_limit(data: Data, yr_idx):
     yr_cal = data.YR_CAL_BASE + yr_idx
     for lu in settings.AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture']:
         j = data.DESC2AGLU[lu]
-        prec_agr_limits[j] = data.PRECISION_AGRICULTURE_DATA[settings.LU2TYPE[lu]].loc[yr_cal, 'Technical_Adoption']
+        prec_agr_limits[j] = min(data.PRECISION_AGRICULTURE_DATA[settings.LU2TYPE[lu]].loc[yr_cal, 'Technical_Adoption'] * settings.TECH_ADOPT_MULT, 1)
 
     return prec_agr_limits
 
@@ -378,7 +539,7 @@ def get_agtech_ei_adoption_limit(data: Data, yr_idx):
     yr_cal = data.YR_CAL_BASE + yr_idx
     for lu in settings.AG_MANAGEMENTS_TO_LAND_USES['AgTech EI']:
         j = data.DESC2AGLU[lu]
-        agtech_ei_limits[j] = data.AGTECH_EI_DATA[settings.LU2TYPE[lu]].loc[yr_cal, 'Technical_Adoption']
+        agtech_ei_limits[j] = min(data.AGTECH_EI_DATA[settings.LU2TYPE[lu]].loc[yr_cal, 'Technical_Adoption'] * settings.TECH_ADOPT_MULT, 1)
 
     return agtech_ei_limits
 
@@ -394,7 +555,7 @@ def get_biochar_adoption_limit(data: Data, yr_idx):
     yr_cal = data.YR_CAL_BASE + yr_idx
     for lu in settings.AG_MANAGEMENTS_TO_LAND_USES['Biochar']:
         j = data.DESC2AGLU[lu]
-        biochar_limits[j] = data.BIOCHAR_DATA[settings.LU2TYPE[lu]].loc[yr_cal, 'Technical_Adoption']
+        biochar_limits[j] = min(data.BIOCHAR_DATA[settings.LU2TYPE[lu]].loc[yr_cal, 'Technical_Adoption'] * settings.TECH_ADOPT_MULT, 1)
 
     return biochar_limits
 
@@ -476,81 +637,37 @@ def get_agricultural_management_adoption_limits(data: Data, yr_idx) -> Dict[str,
 
 def get_lower_bound_agricultural_management_matrices(data: Data, base_year) -> dict[str, dict]:
     """
-    Gets the lower bound for the agricultural land use of the current years optimisation.
+    Returns per-am lower bounds (shape: NLMS × NCELLS × N_AG_LUS) for the next solve.
+
+    Each am_lb[am][m, r, j] is the floor-truncated min(am_dvar, ag_dvar).  The clamp
+    against ag_dvar corrects for FeasibilityTol: the solver enforces am ≤ ag as a linear
+    constraint (not a variable bound), so the reported am_dvar can exceed ag_dvar by up to
+    FeasibilityTol.  The correct "true" am value is min(am_dvar, ag_dvar) — equivalent to
+    what a variable upper-bound on ag_dvar would have enforced exactly.
     """
 
-    if base_year == data.YR_CAL_BASE or base_year not in data.non_ag_dvars:
+    if base_year == data.YR_CAL_BASE or base_year not in data.ag_man_dvars:
         return {
             am: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
             for am in settings.AG_MANAGEMENTS_TO_LAND_USES
             if settings.AG_MANAGEMENTS[am]
         }
 
-    # ag_man lb is derived from the previous year's decision variable, floor-truncated to
-    # ROUND_DECIMALS precision.  However the solver can return ag_man_dvar slightly above
-    # ag_dvar (because of the settings.FEASIBILITY_TOLERANCE), so the raw floor can produce
-    # a lb that exceeds the corresponding ag_dvar — making the next year structurally infeasible.
-    # Cap each am lb against the floor-truncated ag_dvar to guarantee lb <= ag_dvar.
-    #
-    # Additionally, feasibility tolerance also allows ag_dvar to slightly exceed AG_MASK_PROPORTION_R
-    # (the cell usage constraint RHS).  When that happens, ag_lb can itself be > cell_area, so the
-    # am_lb cap above is not enough.  Also cap ag_lb against the cell area so that any management lb
-    # derived from it is guaranteed to satisfy the hard cell usage equality constraint in the next period.
-    ag_lb = np.divide(
-        np.floor(data.ag_dvars[base_year].astype(np.float32) * 10 ** settings.ROUND_DECIMALS),
-        10 ** settings.ROUND_DECIMALS,
-    )  # shape: (NLMS, NCELLS, N_AG_LUS)
-
-    # AG_MASK_PROPORTION_R shape: (NCELLS,) → broadcast to (NLMS, NCELLS, N_AG_LUS)
-    cell_area_mrj = data.AG_MASK_PROPORTION_R[np.newaxis, :, np.newaxis]
-    ag_lb_before = ag_lb
-    ag_lb = np.minimum(ag_lb, cell_area_mrj)
-    cell_cap_updates = ag_lb < ag_lb_before
-    if cell_cap_updates.any():
-        gap = ag_lb_before[cell_cap_updates] - ag_lb[cell_cap_updates]
-        print(
-            f"  └── Ag lb capped against cell area: {cell_cap_updates.sum()} entries updated,"
-            f" max gap={gap.max():.2e}, mean gap={gap.mean():.2e}"
-        )
-
-    # Ensure sum of ag_lb across land uses ≤ cell_area for each (m, cell).
-    # FEASIBILITY_TOLERANCE relaxes the aggregate cell-usage equality: the solver
-    # accepts sum(dvars) = cell_area ± FEASIBILITY_TOLERANCE, so it can return
-    # beef≈cell_area AND sheep=ε with sum slightly above cell_area (within tolerance).
-    # After floor-truncation both become nonzero lbs, and their sum exceeds cell_area,
-    # making HIR am_lb constraints jointly infeasible even though each individual
-    # am_lb passes the per-LU cap above.  Proportionally scale any row that overflows.
-    ag_lb_sum_mr = ag_lb.sum(axis=2)  # (NLMS, NCELLS)
-    cell_area_mr = data.AG_MASK_PROPORTION_R[np.newaxis, :]  # (1, NCELLS)
-    overflow = ag_lb_sum_mr > cell_area_mr
-    if overflow.any():
-        # Guard divisor: np.where evaluates both branches, so zeros in ag_lb_sum_mr
-        # would emit a divide-by-zero RuntimeWarning even though those entries are
-        # discarded by the False mask. Replace zeros with 1.0 only for the division.
-        safe_sum = np.where(ag_lb_sum_mr > 0, ag_lb_sum_mr, 1.0)
-        scale = np.where(overflow, cell_area_mr / safe_sum, 1.0)  # (NLMS, NCELLS)
-        ag_lb = ag_lb * scale[:, :, np.newaxis]
-        print(
-            f"  └── Ag lb sum-overflow scaled: {overflow.sum()} (m,cell) entries rescaled"
-        )
+    # FOLDED base: am lb must not exceed the SOLVER-WORLD host ag land-use (an am fraction whose host
+    # sliver was folded away is clamped to 0 — its land now lives under the dominant source).
+    ag_dvar = get_folded_base_ag_dvar(data, base_year)     # folded dvar, for TRANSITION (NLMS, NCELLS, N_AG_LUS)
 
     result = {}
     for am in settings.AG_MANAGEMENTS_TO_LAND_USES:
         if not settings.AG_MANAGEMENTS[am]:
             continue
-        am_lb_raw = np.divide(
-            np.floor(data.ag_man_dvars[base_year][am].astype(np.float32) * 10 ** settings.ROUND_DECIMALS),
+        am_dvar = data.ag_man_dvars[base_year][am].astype(np.float32)
+        am_dvar_true = tools.clamp_dvar_bound(am_dvar, 0.0, ag_dvar, f'Ag man lb clamped [{am}]')   # am cannot exceed its host ag
+        am_lb = np.divide(
+            np.floor(am_dvar_true * 10 ** settings.ROUND_DECIMALS),
             10 ** settings.ROUND_DECIMALS,
         )
-        am_lb_capped = np.minimum(am_lb_raw, ag_lb)
-        lb_update = am_lb_capped < am_lb_raw
-        if lb_update.any():
-            gap = am_lb_raw[lb_update] - am_lb_capped[lb_update]
-            print(
-                f"  └── Ag man lb capped [{am}]: {lb_update.sum()} cells updated,"
-                f" max gap={gap.max():.2e}, mean gap={gap.mean():.2e}"
-            )
-        result[am] = am_lb_capped
+        result[am] = am_lb
     return result
 
 

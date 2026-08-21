@@ -33,6 +33,7 @@ from gurobipy import GRB
 
 from luto import tools
 from luto.solvers.input_data import SolverInputData
+from luto.solvers.tools import check_constraint_names, reduce_forced_zero_rows
 from luto.settings import (
     AG_MANAGEMENTS, 
     AG_MANAGEMENTS_REVERSIBLE, 
@@ -43,18 +44,12 @@ from luto.settings import (
 
 # Set Gurobi environment.
 gurenv = gp.Env(logfilename="gurobi.log", empty=True)  # (empty = True)
-gurenv.setParam("Method", settings.SOLVE_METHOD)
 gurenv.setParam("OutputFlag", settings.VERBOSE)
-gurenv.setParam("Presolve", settings.PRESOLVE)
-gurenv.setParam("Aggregate", settings.AGGREGATE)
-# NumericFocus is set per-solve in simulation.py (retry loop over settings.RETRY_PARAMS list)
 gurenv.setParam("OptimalityTol", settings.OPTIMALITY_TOLERANCE)
 gurenv.setParam("FeasibilityTol", settings.FEASIBILITY_TOLERANCE)
 gurenv.setParam("BarConvTol", settings.BARRIER_CONVERGENCE_TOLERANCE)
 gurenv.setParam("ScaleFlag", settings.SCALE_FLAG)
 gurenv.setParam("Threads", settings.THREADS)
-gurenv.setParam("BarHomogeneous", settings.BARHOMOGENOUS)
-gurenv.setParam("Crossover", settings.CROSSOVER)
 gurenv.start()
 
 
@@ -66,27 +61,57 @@ class SolverSolution:
     ag_X_mrj: np.ndarray
     non_ag_X_rk: np.ndarray
     ag_man_X_mrj: dict[str, np.ndarray]
+    dvar_D_ag2ag_mrj: dict                                                # Solved ag->ag deltas, SOURCE-KEYED: {(from_m, from_j): ndarray(NLMS, ncells_src, N_AG_LUS) [to_m, local_r, to_j]} over the source's cells (get_base_dvar_mj_cell_map)
+    dvar_D_ag2nonag_rk: dict                                              # Solved ag->nonag deltas, SOURCE-KEYED: {(from_m, from_j): ndarray(ncells_src, N_NON_AG_LUS) [local_r, k]}
+    dvar_D_nonag2ag_mrj: dict                                             # Solved nonag->ag deltas, SOURCE-KEYED: {from_k: ndarray(NLMS, ncells_k, N_AG_LUS) [to_m, local_r, to_j]} (e.g. reversible Destocked back to ag; cells via get_base_nonag_dvar_k_cell_map)
     prod_data: dict[str, Any]
     obj_val: dict[str, float]
 
 
-def _qsum(coeffs: np.ndarray, gurobi_vars: np.ndarray, coeff_min: float = None) -> "gp.LinExpr":
+def _qsum(coeffs: np.ndarray, gurobi_vars: np.ndarray) -> "gp.LinExpr":
     """
-    Return ``gp.quicksum(coeffs * gurobi_vars)`` filtered to ``|coeff| >= coeff_min``.
+    Return ``gp.quicksum(coeffs * gurobi_vars)`` filtered to ``|coeff| >= SOLVER_COEFF_MIN``.
 
     ``coeffs`` and ``gurobi_vars`` must be aligned (same length, same ordering).
     The caller must pre-slice both arrays with the same index before calling, so
     this function only needs a plain boolean mask — never a sub-index of a
     potentially-boolean index array (which would produce a dimension mismatch).
-
-    ``coeff_min`` defaults to ``settings.SOLVER_COEFF_MIN``.
     """
-    if coeff_min is None:
-        coeff_min = settings.SOLVER_COEFF_MIN
-    mask = np.abs(coeffs) >= coeff_min
+    mask = np.abs(coeffs) >= settings.SOLVER_COEFF_MIN
     if not mask.any():
         return gp.LinExpr(0)
     return gp.quicksum(coeffs[mask] * gurobi_vars[mask])
+
+
+def _floor_assembled_matrix(model) -> None:
+    """Drop ``|coeff| < coeff_min`` from an ASSEMBLED model's constraint matrix AND objective vector.
+
+    ``_qsum`` floors coefficients as each term is built, but some are created DOWNSTREAM: the water/
+    GHG/etc. accounting term ``coeff × X_acct`` where a folded-sliver ``X_acct`` is a LinExpr with
+    ``~1/RESFACTOR²`` weights distributes a floored-and-kept ``coeff`` into a sub-floor product on the
+    dominant var (see ``docs/FINDINGS.md`` 20260721). This single post-build sweep catches those (and
+    the same leak in the objective, which ``getA()`` — LHS-only — can't reach). Physically safe: a
+    ``~1e-5`` ML/cell water term against a ``~1e7`` ML regional limit is negligible — the same
+    negligibility contract as ``SOLVER_COEFF_MIN``, enforced on the assembled model.
+    """
+    model.update()
+    A = model.getA().tocoo()
+    cons = model.getConstrs()
+    varz = model.getVars()
+    mask = (np.abs(A.data) < settings.SOLVER_COEFF_MIN) & (A.data != 0.0)
+    n = int(mask.sum())
+    for r, c in zip(A.row[mask], A.col[mask]):
+        model.chgCoeff(cons[int(r)], varz[int(c)], 0.0)
+    # objective vector: same re-expression leak reaches obj coeffs via _qsum(ag_obj × X_acct)
+    n_obj = 0
+    for v in varz:
+        oc = v.Obj
+        if 0.0 < abs(oc) < settings.SOLVER_COEFF_MIN:
+            v.Obj = 0.0
+            n_obj += 1
+    model.update()
+    print(f"└── Flooring coefficients below {settings.SOLVER_COEFF_MIN:g} (post-build): "
+          f"dropped {n:,} from the matrix, {n_obj:,} from the objective", flush=True)
 
 
 class LutoSolver:
@@ -108,6 +133,9 @@ class LutoSolver:
         self.X_non_ag_vars_kr = None
         self.X_ag_man_dry_vars_jr = None
         self.X_ag_man_irr_vars_jr = None
+        self.F_ag2ag = {}       # (from_m, from_j) -> tupledict{(to_m, local_r, to_j): Var}
+        self.F_ag2nonag = {}    # (from_m, from_j) -> tupledict{(k, local_r): Var}
+        self.F_nonag2ag = {}    # from_k           -> tupledict{(to_m, local_r, to_j): Var}
         self.V = None
         self.E = None
         self.W = None
@@ -128,8 +156,6 @@ class LutoSolver:
         self.bio_GBF2_constrs = {}
         self.bio_GBF3_NVIS_exprs = {}
         self.bio_GBF3_NVIS_constrs = {}
-        self.bio_GBF3_IBRA_exprs = {}
-        self.bio_GBF3_IBRA_constrs = {}
         self.bio_GBF4_SNES_exprs = {}
         self.bio_GBF4_SNES_constrs = {}
         self.bio_GBF4_ECNES_exprs = {}
@@ -137,6 +163,8 @@ class LutoSolver:
         self.bio_GBF8_exprs = {}
         self.bio_GBF8_constrs = {}
         self.regional_adoption_constrs = []
+        self._bio_index = None
+
 
 
     def formulate(self):
@@ -148,14 +176,26 @@ class LutoSolver:
         self._setup_vars()
         self._setup_constraints()
         self._setup_objective()
-
+        _floor_assembled_matrix(self.gurobi_model)
+        if settings.REDUCE_FORCED_ZERO_ROWS:
+            # Exact: rows forcing their own variables to zero carry no information, but they are
+            # 30% of the matrix and the most degenerate part of it. See the setting's docstring.
+            n = reduce_forced_zero_rows(self.gurobi_model)
+            print(f"└── Reduced {n:,} forced-zero row(s) (exact: their variables were already "
+                  f"pinned at 0)")
+        self.bio_constraint_index()   # warm the cache while every constraint is still live
+        # ONE name containing whitespace makes Gurobi discard EVERY name when the model is written
+        # to MPS — which silently blinds all post-mortem attribution. Assert it here, not there.
+        check_constraint_names(self.gurobi_model)
 
     def _setup_vars(self):
         print("├── Setting up decision variables...")
-        self._setup_ag_vars()
+        self._setup_ag_folded_vars()         
+        self._setup_ag_accounting_vars()     
         self._setup_non_ag_vars()
         self._setup_ag_management_variables()
         self._setup_deviation_penalties()
+        self._setup_flow_vars()  
 
     def _setup_constraints(self):
         print("├── Adding the constraints...")
@@ -166,39 +206,32 @@ class LutoSolver:
         self._add_ghg_emissions_limit_constraints()
         self._add_biodiversity_constraints()
         self._add_regional_adoption_constraints()
-        self._add_water_usage_limit_constraints() 
+        self._add_water_usage_limit_constraints()
         self._add_renewable_energy_constraints()
-        
+        self._add_flow_out_constraints()                    # source cap (Σ out ≤ x_old; bounds deltas)
+        self._add_flow_in_constraints()                     # node balance (X = base + Σin − Σout)
+
     def _setup_objective(self):
         """
         Formulate the objective based on settings.OBJECTIVE
         """
-        print(f"└── Setting up the objective function to {settings.OBJECTIVE}...")
+        print(f"├── Setting up the objective function to {settings.OBJECTIVE}...")
 
-        # Get objectives 
-        self.obj_economy = self._setup_economy_objective()    
-        self.obj_biodiv = self._setup_biodiversity_objective()   
-        self.obj_penalties = self._setup_penalty_objectives()                                                                    
- 
+        # Get objectives
+        self.obj_economy = self._setup_economy_objective()
+        self.obj_penalties = self._setup_penalty_objectives()
+
         # Set the objective function
         if settings.OBJECTIVE == "mincost":
             sense = GRB.MINIMIZE
-            obj_wrap = (
-                self.obj_economy  * settings.SOLVE_WEIGHT_ALPHA 
-                - self.obj_biodiv * (1 - settings.SOLVE_WEIGHT_ALPHA)
-            )
             objective = (
-                obj_wrap * (1 - settings.SOLVE_WEIGHT_BETA) + 
+                self.obj_economy  * (1 - settings.SOLVE_WEIGHT_BETA) +
                 self.obj_penalties * settings.SOLVE_WEIGHT_BETA
             )
         elif settings.OBJECTIVE == "maxprofit":
             sense = GRB.MAXIMIZE
-            obj_wrap = (
-                self.obj_economy  * settings.SOLVE_WEIGHT_ALPHA 
-                + self.obj_biodiv * (1 - settings.SOLVE_WEIGHT_ALPHA)
-            )
             objective = (
-                obj_wrap * (1 - settings.SOLVE_WEIGHT_BETA) 
+                self.obj_economy  * (1 - settings.SOLVE_WEIGHT_BETA)
                 - self.obj_penalties * settings.SOLVE_WEIGHT_BETA
             )
         else:
@@ -207,7 +240,7 @@ class LutoSolver:
         self.gurobi_model.setObjective(objective, sense)
            
 
-    def _setup_ag_vars(self):
+    def _setup_ag_folded_vars(self):
         print("│   ├── setting up decision variables for agricultural land uses...")
         self.X_ag_dry_vars_jr = np.zeros(
             (self._input_data.n_ag_lus, self._input_data.ncells), dtype=object
@@ -215,18 +248,88 @@ class LutoSolver:
         self.X_ag_irr_vars_jr = np.zeros(
             (self._input_data.n_ag_lus, self._input_data.ncells), dtype=object
         )
-        for j in range(self._input_data.n_ag_lus):
-            dry_lu_cells = self._input_data.ag_lu2cells[0, j]
-            for r in dry_lu_cells:
-                self.X_ag_dry_vars_jr[j, r] = self.gurobi_model.addVar(
-                    ub=1, name=f"X_ag_dry_{j}_{r}".replace(" ", "_")
-                )
 
-            irr_lu_cells = self._input_data.ag_lu2cells[1, j]
-            for r in irr_lu_cells:
-                self.X_ag_irr_vars_jr[j, r] = self.gurobi_model.addVar(
-                    ub=1, name=f"X_ag_irr_{j}_{r}".replace(" ", "_")
+        # Target-var bounds from the TO view. dvar_lb_ag/dvar_ub_ag are already cleaned in input_data
+        # (0 ≤ lb ≤ base ≤ ub, with reporting), so use them directly; the node-balance/cap constant is
+        # just the (cleaned, in-box) base dvar — the all-delta=0 stay point is feasible by construction.
+        dvar_lb_ag = self._input_data.dvar_lb_ag
+        dvar_ub_ag = self._input_data.dvar_ub_ag
+        for j in range(self._input_data.n_ag_lus):
+            for r in self._input_data.feasible_ag_cells_mrj[0, j]:
+                self.X_ag_dry_vars_jr[j, r] = self.gurobi_model.addVar(
+                    lb=dvar_lb_ag[0, r, j], ub=dvar_ub_ag[0, r, j],
+                    name=f"X_ag_dry_{j}_{r}".replace(" ", "_")
                 )
+            for r in self._input_data.feasible_ag_cells_mrj[1, j]:
+                self.X_ag_irr_vars_jr[j, r] = self.gurobi_model.addVar(
+                    lb=dvar_lb_ag[1, r, j], ub=dvar_ub_ag[1, r, j],
+                    name=f"X_ag_irr_{j}_{r}".replace(" ", "_")
+                )
+        self.const_ag = self._input_data.dvar_base_ag_mrj
+
+
+    def _setup_ag_accounting_vars(self):
+        """Build the ACCOUNTING stream dvar_account — a linear re-expression of the folded decision vars dvar_flow.
+
+        MENTAL MODEL — a cell is a FIXED-COMPOSITION BUNDLE scaled by ONE scalar (the dominant's var).
+        Example: a cell is 0.7 Beef + 0.3 Apple. Folding merges the minor Apple fraction into the dominant
+        Beef, so a SINGLE variable X_Beef (dominant_frac = 0.7 + 0.3 = 1.0) represents "how much of this cell
+        remains in its original composition". Each land use is then a CONSTANT RATIO of that one variable:
+            dvar_account[Beef]  = (0.7 / 1.0) · X_Beef
+            dvar_account[Apple] = (0.3 / 1.0) · X_Beef
+        Reduce X_Beef by 1/3 (transition 1/3 of the cell away) and BOTH shrink by 1/3 — Beef 0.7 → 0.467,
+        Apple 0.3 → 0.2 — the composition ratio 7:3 is preserved, only the scale changes.
+
+        dvar_flow carries the FOLDED composition: every sub-θ sliver's land was merged into its cell's dominant.
+        Accounting (profit/water/GHG/GBF/production) must instead score each TRUE land-use's fraction. For a
+        folded group (dominant receiver d with post-fold mass dominant_frac, true base
+        base_d = dominant_frac − Σ slivers, and each sliver s carrying its folded fraction `slivers[s]`):
+
+            dvar_account[d] = (base_d / dominant_frac) · dvar_flow[d]                  dominant → its TRUE share
+            dvar_account[s] = dvar_flow[s] + (slivers / dominant_frac) · dvar_flow[d]  sliver inflow-land + folded share
+            dvar_account[·] = dvar_flow[·]                                             any LU not in a fold: unchanged
+
+        This adds NO Gurobi variables and NO constraints — the same terms the retired blended coefficient
+        produced, written per true LU. Σ_LU coeff·dvar_account == coeff_eff[d]·dvar_flow[d] + Σ_s coeff_s·dvar_flow[s]
+        exactly (stay-exact, scales with the live dominant, → 0 on a full flip). Entries stay Gurobi Var where
+        untouched and become LinExpr where adjusted; `_qsum` handles both. The dominant's ORIGINAL dvar_flow is
+        read when spreading sliver shares, so scale the dominant last / read from dvar_flow (never dvar_account).
+        """
+        self.X_acct_dry_jr = self.X_ag_dry_vars_jr.copy()
+        self.X_acct_irr_jr = self.X_ag_irr_vars_jr.copy()
+
+        fold_map = self._input_data.ag_fold_map
+        if not fold_map['cells'].size:
+            return
+
+        dvar_flow    = (self.X_ag_dry_vars_jr, self.X_ag_irr_vars_jr)   # folded decision vars (read-only source)
+        dvar_account = (self.X_acct_dry_jr,    self.X_acct_irr_jr)      # accounting stream (written)
+
+        cells          = fold_map['cells']
+        from_m, from_j = fold_map['from_m'], fold_map['from_j']
+        to_m, to_j     = fold_map['to_m'], fold_map['to_j']
+        slivers        = fold_map['vals'].astype(np.float64)
+        dominant_frac  = fold_map['folded_dom'].astype(np.float64)   # > 0 by construction (holds ≥ Σ slivers)
+
+        # A folded dominant's var `dom` collapses the cell's original composition [raw dominant, *slivers]
+        # into ONE variable (dominant_frac = raw + Σ slivers). Un-fold it by TRANSFERRING each sliver's share
+        # of the LIVE var from the dominant to the sliver — the dominant keeps whatever the slivers don't take,
+        # so the group total is conserved and no separate dominant-scaling pass is needed. dvar_account[d]
+        # starts as `dom` (a copy of the flow var), so each subtraction whittles it down to (raw/dominant_frac)·dom.
+        # NOTE the transferred share is the LIVE (slivers/dominant_frac)·dom — subtracting the constant slivers
+        # would freeze the dominant at its base and go negative once it sheds (the rejected v1 error).
+        for k, r in enumerate(cells):
+            dom = dvar_flow[to_m[k]][to_j[k], r]                # the receiver dominant's live folded var
+            if not isinstance(dom, (gp.Var, gp.LinExpr)):
+                # No folded var for the dominant ⇒ the dominant LU is banned (EXCLUDE_NO_GO_LU) in this
+                # region, so the folded stream force-converts that land — its whole folded group has no
+                # STANDING ag to account. Skip; do NOT mint a fresh var (X_acct must stay a re-expression
+                # of the folded decision vars, never a new free variable). The sliver's own var, if any,
+                # is still scored via acct_cells; only the folded-in mass (force-converted) gets nothing.
+                continue
+            share = (slivers[k] / dominant_frac[k]) * dom       # this sliver's fraction of the folded dominant (live)
+            dvar_account[from_m[k]][from_j[k], r] = dvar_account[from_m[k]][from_j[k], r] + share   # sliver gains it
+            dvar_account[to_m[k]][to_j[k], r]     = dvar_account[to_m[k]][to_j[k], r]     - share   # dominant loses it
 
 
     def _setup_non_ag_vars(self):
@@ -235,19 +338,22 @@ class LutoSolver:
             (self._input_data.n_non_ag_lus, self._input_data.ncells), dtype=object
         )
         
+        lb_n = self._input_data.dvar_lb_nonag
+        ub_n = self._input_data.dvar_ub_nonag
+        self.const_nonag = self._input_data.dvar_base_non_ag_rk
+        
+        # If the lower and upper bounds are very close (within 1% of the lower bound), collapse to a single value
+        collapse = (lb_n > 0) & (np.abs(ub_n - lb_n) / np.where(lb_n > 0, lb_n, 1.0) < 0.01)
+        lb_eff = np.where(collapse, self.const_nonag, lb_n)
+        ub_eff = np.where(collapse, self.const_nonag, ub_n)
+
         for k, k_name in enumerate(NON_AG_LAND_USES):
             if not NON_AG_LAND_USES[k_name]:
                 continue
-            lu_cells = self._input_data.non_ag_lu2cells[k]
-            for r in lu_cells:
-                x_lb = (
-                    0
-                    if NON_AG_LAND_USES_REVERSIBLE[k_name]
-                    else self._input_data.non_ag_lb_rk[r, k]
-                )
+            for r in self._input_data.feasible_non_ag_cells[k]:
                 self.X_non_ag_vars_kr[k, r] = self.gurobi_model.addVar(
-                    lb=x_lb,
-                    ub=self._input_data.non_ag_x_rk[r, k],
+                    lb=lb_eff[r, k],
+                    ub=ub_eff[r, k],
                     name=f"X_non_ag_{k}_{r}".replace(" ", "_")
                 )
 
@@ -269,52 +375,77 @@ class LutoSolver:
             # Get snake_case version of the AM name for the variable name
             am_name = tools.am_name_snake_case(am)
 
-            for j_idx, j in enumerate(am_j_list):
-                # Create variable for all eligible cells - all lower bounds are zero
-                dry_lu_cells = self._input_data.ag_lu2cells[0, j]
-                irr_lu_cells = self._input_data.ag_lu2cells[1, j]
-
-                # For savanna burning, remove extra ineligible cells
-                if am_name == "savanna_burning":
-                    dry_lu_cells = np.intersect1d(
-                        dry_lu_cells, self._input_data.savanna_eligible_r
-                    )
-                    
-                # For renewable energy AMs, cells with existing capacity (exist_r > 0) can still
-                # receive new installations up to the remaining fraction (1 - exist_r). Cells with
-                # no existing capacity (exist_r == 0) are open for full optimization up to ub=1.
-                if am in settings.RENEWABLES_OPTIONS:
-                    exist_r = (
-                        self._input_data.exist_renewable_solar_r
-                        if am == "Utility Solar PV"
-                        else self._input_data.exist_renewable_wind_r
-                    )
-                    gbf2_excl_idx = (
-                        self._input_data.renewable_GBF2_mask_solar_idx
-                        if am == "Utility Solar PV"
-                        else self._input_data.renewable_GBF2_mask_wind_idx
-                    )
-                    # Hard-exclude renewables from GBF2 priority cells (ub=0 via no variable creation)
+            # Renewable energy AMs: exist_r and GBF2 exclusion are AM-level (not j-level).
+            # Cell-level ceiling constraint added after all LU variables are built.
+            if am in settings.RENEWABLES_OPTIONS:
+                exist_r = (
+                    self._input_data.exist_renewable_solar_r
+                    if am == "Utility Solar PV"
+                    else self._input_data.exist_renewable_wind_r
+                )
+                gbf2_excl_idx = (
+                    self._input_data.renewable_GBF2_mask_solar_idx
+                    if am == "Utility Solar PV"
+                    else self._input_data.renewable_GBF2_mask_wind_idx
+                )
+                renewable_cells = set()
+                for j_idx, j in enumerate(am_j_list):
+                    dry_lu_cells = self._input_data.feasible_ag_cells_mrj[0, j]
+                    irr_lu_cells = self._input_data.feasible_ag_cells_mrj[1, j]
+                    # Hard-exclude GBF2 priority cells (no variable created → effective ub = 0)
                     if gbf2_excl_idx.size:
                         dry_lu_cells = np.setdiff1d(dry_lu_cells, gbf2_excl_idx)
                         irr_lu_cells = np.setdiff1d(irr_lu_cells, gbf2_excl_idx)
                     for r in dry_lu_cells:
                         model_lb = 0 if AG_MANAGEMENTS_REVERSIBLE[am] else self._input_data.ag_man_lb_mrj[am][0, r, j]
                         self.X_ag_man_dry_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
-                            lb=model_lb,
-                            ub=1 - exist_r[r],            # ub shrinks by existing fraction; 0 when fully occupied
+                            lb=model_lb, ub=1,
                             name=f"X_ag_man_dry_{am_name}_{j}_{r}".replace(" ", "_"),
                         )
                     for r in irr_lu_cells:
                         model_lb = 0 if AG_MANAGEMENTS_REVERSIBLE[am] else self._input_data.ag_man_lb_mrj[am][1, r, j]
                         self.X_ag_man_irr_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
-                            lb=model_lb,
-                            ub=1 - exist_r[r],            # ub shrinks by existing fraction; 0 when fully occupied
+                            lb=model_lb, ub=1,
                             name=f"X_ag_man_irr_{am_name}_{j}_{r}".replace(" ", "_"),
                         )
-                    continue  # skip generic loop below; variables already created with correct lbs
+                    renewable_cells.update(dry_lu_cells)
+                    renewable_cells.update(irr_lu_cells)
 
-                # Generic loop: all other AM options use transition-based lower bounds.
+                # Simulated and existing capacity compete for cell space [0, ag_mask].
+                # exist_r is the total across ALL data years (fixed), so the ceiling never
+                # decreases between periods — lb(t) <= ceiling(t-1) = ceiling(t) always holds.
+                ag_mask = self._input_data.ag_mask_proportion_r
+                for r in sorted(renewable_cells):
+                    cap = exist_r[r]
+                    if not cap:
+                        continue
+                    terms = [
+                        v for j_idx in range(len(am_j_list))
+                        for v in (
+                            self.X_ag_man_dry_vars_jr[am][j_idx, r],
+                            self.X_ag_man_irr_vars_jr[am][j_idx, r],
+                        )
+                        if isinstance(v, gp.Var) # only set ub if the cell is a valide Renewable location
+                    ]
+                    if terms:
+                        ceiling = max(ag_mask[r] - cap, 0.0)
+                        self.gurobi_model.addConstr(
+                            gp.quicksum(terms) <= ceiling,
+                            name=f"const_{am_name}_solvable_ub_{r}".replace(" ", "_")
+                        )
+                continue  # skip generic j loop below
+
+            # Generic loop: all other AM options use transition-based lower bounds.
+            for j_idx, j in enumerate(am_j_list):
+                dry_lu_cells = self._input_data.feasible_ag_cells_mrj[0, j]
+                irr_lu_cells = self._input_data.feasible_ag_cells_mrj[1, j]
+
+                # For savanna burning, remove extra ineligible cells
+                if am_name == "savanna_burning":
+                    dry_lu_cells = np.intersect1d(
+                        dry_lu_cells, self._input_data.savanna_eligible_r
+                    )
+
                 for r in dry_lu_cells:
                     dry_x_lb = (
                         0
@@ -322,11 +453,10 @@ class LutoSolver:
                         else self._input_data.ag_man_lb_mrj[am][0, r, j]
                     )
                     self.X_ag_man_dry_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
-                        lb=dry_x_lb,
-                        ub=1,
+                        lb=dry_x_lb, ub=1,
                         name=f"X_ag_man_dry_{am_name}_{j}_{r}".replace(" ", "_"),
                     )
-                
+
                 for r in irr_lu_cells:
                     irr_x_lb = (
                         0
@@ -334,8 +464,7 @@ class LutoSolver:
                         else self._input_data.ag_man_lb_mrj[am][1, r, j]
                     )
                     self.X_ag_man_irr_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
-                        lb=irr_x_lb,
-                        ub=1,
+                        lb=irr_x_lb, ub=1,
                         name=f"X_ag_man_irr_{am_name}_{j}_{r}".replace(" ", "_"),
                     )
 
@@ -347,9 +476,10 @@ class LutoSolver:
         3) [W] Penalty vector for water usage, each one corespondes a region, that minimises the deviations from the target.
         4) [B] A single penalty scalar for biodiversity, minimises its deviation from the target.
         """
-        print("│   └── Setting up decision variables for soft constraints...")
-        
-        self.V = self.gurobi_model.addMVar(self._input_data.ncms, lb=0, name="V") # force lb=0 to make sure demand penalties are positive; i.e., demand must be met or exceeded
+        print("│   ├── setting up decision variables for soft constraints...")
+
+        if settings.DEMAND_CONSTRAINT_TYPE == 'soft':
+            self.V = self.gurobi_model.addMVar(self._input_data.ncms, lb=0, name="V")  # lb=0: demand must be met or exceeded
 
         if settings.GHG_CONSTRAINT_TYPE == "soft":
             self.E = self.gurobi_model.addVar(name="E")
@@ -358,20 +488,156 @@ class LutoSolver:
             num_regions = len(self._input_data.limits["water"].keys())
             self.W = self.gurobi_model.addMVar(num_regions, name="W")
 
-        
+    def _setup_flow_vars(self):
+
+        print("│   └── setting up transition flow delta variables (D)...")
+        model = self.gurobi_model
+
+        # Feasibility is fully resolved in input_data (feasible_ag2ag_mrj / feasible_nonag2ag_mrj /
+        # feasible_ag2nonag_rk — source-keyed dicts, keyed/shaped like the flow_cost dicts): each leaf
+        # already combines target eligibility ∧ the source's T_MAT row ∧ the diagonal drop. Here we
+        # just materialise one delta var per True entry.
+
+        # ── ag → ag :  D[(fm,fj)][to_m, local_r, to_j], OFF-DIAGONAL only (positive-increment delta) ──
+        # No stay/diagonal var: "staying" as (fm,fj) is free — the node-balance constant carries the base.
+        for (fm, fj), valid in self._input_data.feasible_ag2ag_mrj.items():
+            idx = list(map(tuple, np.argwhere(valid).tolist()))
+            self.F_ag2ag[(fm, fj)] = model.addVars(idx, lb=0.0, name=f"F_a2a_{fm}_{fj}")
+
+        # ── ag → non-ag :  F[(fm,fj)][k, local_r] ──
+        for (fm, fj), valid in self._input_data.feasible_ag2nonag_rk.items():
+            idx = [(int(k), int(lr)) for lr, k in np.argwhere(valid)]
+            self.F_ag2nonag[(fm, fj)] = model.addVars(idx, lb=0.0, name=f"F_a2n_{fm}_{fj}")
+
+        # ── non-ag → ag :  F[k][to_m, local_r, to_j] ──
+        for fk, valid in self._input_data.feasible_nonag2ag_mrj.items():
+            idx = list(map(tuple, np.argwhere(valid).tolist()))
+            self.F_nonag2ag[fk] = model.addVars(idx, lb=0.0, name=f"F_n2a_{fk}")
+
+        n_a2a = sum(len(v) for v in self.F_ag2ag.values())
+        n_a2n = sum(len(v) for v in self.F_ag2nonag.values())
+        n_n2a = sum(len(v) for v in self.F_nonag2ag.values())
+        print(f"│       ├── ag2ag    : {n_a2a:,} delta vars")
+        print(f"│       ├── ag2nonag : {n_a2n:,} delta vars")
+        print(f"│       ├── nonag2ag : {n_n2a:,} delta vars")
+        print(f"│       └── total    : {n_a2a + n_a2n + n_n2a:,} delta vars")
+
+
+    def _add_flow_out_constraints(self):
+        """Source cap: a source cannot export more land than it holds.
+
+            Σ_out D[src]  ≤  x_old[src]
+
+        This BOUNDS the delta vars (with negative `flow_cost` entries — water/GHG deltas can be < 0 —
+        the objective would otherwise push a `D` to +∞ around a negative-cost cycle → unbounded). It also
+        rules out "pass-through" (a source re-exporting land it imported). Combined with the node-balance
+        equality (which ties each `D` to real per-LU movement) this gives an EXACT, bounded
+        min-cost transition flow. RHS = `const` (base clipped into the effective [lb,ub] box) — the same
+        quantity node-balance uses, so a source may export at most the land it actually holds.
+
+        ag source (fm,fj) at cell r:  Σ_to D_ag2ag[(fm,fj)][·,r,·] + Σ_k D_ag2nonag[(fm,fj)][k,r] ≤ const_ag[fm,r,fj]
+        non-ag source k at cell r:    Σ_to D_nonag2ag[k][·,r,·]                                    ≤ const_nonag[r,k]
+        """
+        print("│   ├── Adding source-cap (Σ out ≤ base) constraints...")
+        model     = self.gurobi_model
+        const_ag  = self.const_ag
+        const_non = self.const_nonag
+
+        n = 0
+        for (fm, fj), cells in self._input_data.ag_source_cells.items():
+            F_a2a = self.F_ag2ag[(fm, fj)]
+            F_a2n = self.F_ag2nonag[(fm, fj)]
+            for local_r, r in enumerate(cells):
+                out = F_a2a.sum('*', local_r, '*') + F_a2n.sum('*', local_r)
+                if out.size() == 0:
+                    continue
+                model.addConstr(out <= const_ag[fm, r, fj], name=f"srccap_a_{fm}_{fj}_{local_r}")
+                n += 1
+
+        for fk, cells in self._input_data.nonag_source_cells.items():
+            F_n2a = self.F_nonag2ag[fk]
+            for local_r, r in enumerate(cells):
+                out = F_n2a.sum('*', local_r, '*')
+                if out.size() == 0:
+                    continue
+                model.addConstr(out <= const_non[r, fk], name=f"srccap_n_{fk}_{local_r}")
+                n += 1
+        print(f"│   │   └── added {n:,} source-cap constraints")
+
+
+    def _add_flow_in_constraints(self):
+        """Node-balance equality: each LU's final area = base + inflows − outflows.
+
+            X_ag[m,r,j]  = const_ag[m,r,j]  + Σ_in D[·→(m,j)] − Σ_out D[(m,j)→·]
+            X_nonag[r,k] = const_nonag[r,k] + Σ_in D_ag2nonag[·→k] − Σ_out D_nonag2ag[k→·]
+
+        This ties every delta to REAL per-LU land movement (so a single negative-cost arc can't be
+        harvested without moving land — the flaw that made an import/export-only relaxation unbounded),
+        and together with the source cap gives an exact, bounded min-cost transition flow. "Staying" is
+        the all-D=0 solution (X = const). `const` = the base clipped into the var's effective [lb,ub]
+        box (`_setup_*_vars`) ⇒ the stay point is feasible by construction — this replaces the earlier
+        raw/floor(x_old) which fell OUTSIDE the box on float-noise cells (base>ub, base<0, floor<lb) and
+        made presolve infeasible. No non-ag→non-ag term exists.
+        """
+        print("│   └── Adding node-balance (X = base + Σin − Σout) constraints...")
+        model     = self.gurobi_model
+        const_ag  = self.const_ag
+        const_non = self.const_nonag
+
+        # Reverse indices (global cell keys): inflows arrive at a target, outflows leave a source LU.
+        in_ag     = defaultdict(list)   # (m, r, j) -> [vars] arriving at ag LU (m,j)   (ag2ag + nonag2ag)
+        out_ag    = defaultdict(list)   # (m, r, j) -> [vars] leaving  ag LU (m,j)      (ag2ag + ag2nonag)
+        in_nonag  = defaultdict(list)   # (r, k)    -> [vars] arriving at non-ag k       (ag2nonag)
+        out_nonag = defaultdict(list)   # (r, k)    -> [vars] leaving  non-ag k          (nonag2ag)
+
+        for (fm, fj), cells in self._input_data.ag_source_cells.items():
+            for (to_m, local_r, to_j), var in self.F_ag2ag[(fm, fj)].items():
+                g = cells[local_r]
+                in_ag[(to_m, g, to_j)].append(var)   # arrives at (to_m,to_j)
+                out_ag[(fm, g, fj)].append(var)      # leaves source (fm,fj)
+            for (k, local_r), var in self.F_ag2nonag[(fm, fj)].items():
+                g = cells[local_r]
+                in_nonag[(g, k)].append(var)         # arrives at non-ag k
+                out_ag[(fm, g, fj)].append(var)      # leaves ag source (fm,fj)
+        for fk, cells in self._input_data.nonag_source_cells.items():
+            for (to_m, local_r, to_j), var in self.F_nonag2ag[fk].items():
+                g = cells[local_r]
+                in_ag[(to_m, g, to_j)].append(var)   # arrives at ag (to_m,to_j)
+                out_nonag[(g, fk)].append(var)       # leaves non-ag source k
+
+        n = 0
+        for j in range(self._input_data.n_ag_lus):
+            for m, X_row in ((0, self.X_ag_dry_vars_jr), (1, self.X_ag_irr_vars_jr)):
+                for r in self._input_data.feasible_ag_cells_mrj[m, j]:
+                    model.addConstr(
+                        X_row[j, r] == const_ag[m, r, j]
+                        + gp.quicksum(in_ag.get((m, r, j), [])) - gp.quicksum(out_ag.get((m, r, j), [])),
+                        name=f"bal_a_{m}_{j}_{r}")
+                    n += 1
+        for k in range(self._input_data.n_non_ag_lus):
+            for r in self._input_data.feasible_non_ag_cells[k]:
+                model.addConstr(
+                    self.X_non_ag_vars_kr[k, r] == const_non[r, k]
+                    + gp.quicksum(in_nonag.get((r, k), [])) - gp.quicksum(out_nonag.get((r, k), [])),
+                    name=f"bal_n_{k}_{r}")
+                n += 1
+        print(f"│       └── added {n:,} node-balance constraints")
+
+
     def _setup_economy_objective(self):
-        print("    ├── setting up objective for economy...")
+        print("│   ├── setting up objective for economy...")
         
         # Get economic contributions
         ag_obj_mrj, non_ag_obj_rk, ag_man_objs = self._input_data.economic_contr_mrj
 
+        # ACCOUNTING stream: raw coeff (ag_obj_mrj) × X_acct over the accounting support (feasible ∪ slivers).
         ag_exprs = []
         for j in range(self._input_data.n_ag_lus):
-            dry_cells = self._input_data.ag_lu2cells[0, j]
-            irr_cells = self._input_data.ag_lu2cells[1, j]
+            dry_cells = self._input_data.acct_cells_mrj[0, j]
+            irr_cells = self._input_data.acct_cells_mrj[1, j]
             ag_exprs.append(
-                _qsum(ag_obj_mrj[0, dry_cells, j], self.X_ag_dry_vars_jr[j, dry_cells])
-                + _qsum(ag_obj_mrj[1, irr_cells, j], self.X_ag_irr_vars_jr[j, irr_cells])
+                _qsum(ag_obj_mrj[0, dry_cells, j], self.X_acct_dry_jr[j, dry_cells])
+                + _qsum(ag_obj_mrj[1, irr_cells, j], self.X_acct_irr_jr[j, irr_cells])
             )
 
         ag_mam_exprs = []
@@ -379,8 +645,8 @@ class LutoSolver:
             if not AG_MANAGEMENTS[am]:
                 continue
             for j_idx, j in enumerate(am_j_list):
-                dry_cells = self._input_data.ag_lu2cells[0, j]
-                irr_cells = self._input_data.ag_lu2cells[1, j]
+                dry_cells = self._input_data.feasible_ag_cells_mrj[0, j]
+                irr_cells = self._input_data.feasible_ag_cells_mrj[1, j]
                 ag_mam_exprs.append(
                     _qsum(ag_man_objs[am][0, dry_cells, j_idx], self.X_ag_man_dry_vars_jr[am][j_idx, dry_cells])
                     + _qsum(ag_man_objs[am][1, irr_cells, j_idx], self.X_ag_man_irr_vars_jr[am][j_idx, irr_cells])
@@ -390,7 +656,7 @@ class LutoSolver:
         for k, k_name in enumerate(NON_AG_LAND_USES):
             if not NON_AG_LAND_USES[k_name]:
                 continue
-            non_ag_cells = self._input_data.non_ag_lu2cells[k]
+            non_ag_cells = self._input_data.feasible_non_ag_cells[k]
             non_ag_exprs.append(
                 _qsum(non_ag_obj_rk[non_ag_cells, k], self.X_non_ag_vars_kr[k, non_ag_cells])
             )
@@ -398,98 +664,84 @@ class LutoSolver:
         self.economy_ag_contr = gp.quicksum(ag_exprs)
         self.economy_ag_man_contr = gp.quicksum(ag_mam_exprs)
         self.economy_non_ag_contr = gp.quicksum(non_ag_exprs)
-        
-        return (
-            (self.economy_ag_contr + self.economy_ag_man_contr + self.economy_non_ag_contr) 
-            * self._input_data.scale_factors['Economy'] 
-            / 1e6 # Convert to million AUD
-        )  
-    
-    
-    def _setup_biodiversity_objective(self):
-        print("    ├── setting up objective for biodiversity...")
-        
-        ag_exprs = []
-        for j in range(self._input_data.n_ag_lus):
-            dry_cells = self._input_data.ag_lu2cells[0, j]
-            irr_cells = self._input_data.ag_lu2cells[1, j]
-            ag_exprs.append(
-                _qsum(self._input_data.ag_b_mrj[0, dry_cells, j], self.X_ag_dry_vars_jr[j, dry_cells])
-                + _qsum(self._input_data.ag_b_mrj[1, irr_cells, j], self.X_ag_irr_vars_jr[j, irr_cells])
-            )
 
-        ag_mam_exprs = []
-        for am, am_j_list in self._input_data.am2j.items():
-            if not AG_MANAGEMENTS[am]:
-                continue
+        # Land-use transition cost = Σ flow_cost · D over the positive-increment delta vars,
+        # SUBTRACTED from profit (maxprofit). Source-keyed flow_cost gives the exact per-source transition
+        # cost; _qsum drops |coeff| < SOLVER_COEFF_MIN, same filter as every other term.
+        def _flow_cost_expr(Fdict, coeff_of):
+            if not Fdict:
+                return gp.LinExpr(0)
+            keys   = list(Fdict.keys())
+            coeffs = np.fromiter((coeff_of(k) for k in keys), dtype=np.float64, count=len(keys))
+            varr   = np.fromiter((Fdict[k] for k in keys), dtype=object, count=len(keys))
+            return _qsum(coeffs, varr)
 
-            for j_idx, j in enumerate(am_j_list):
-                dry_cells = self._input_data.ag_lu2cells[0, j]
-                irr_cells = self._input_data.ag_lu2cells[1, j]
-                ag_mam_exprs.append(
-                    _qsum(self._input_data.ag_man_b_mrj[am][0, dry_cells, j_idx], self.X_ag_man_dry_vars_jr[am][j_idx, dry_cells])
-                    + _qsum(self._input_data.ag_man_b_mrj[am][1, irr_cells, j_idx], self.X_ag_man_irr_vars_jr[am][j_idx, irr_cells])
-                )
-
-        non_ag_exprs = []
-        for k, k_name in enumerate(NON_AG_LAND_USES):
-            if not NON_AG_LAND_USES[k_name]:
-                continue
-            non_ag_cells = self._input_data.non_ag_lu2cells[k]
-            non_ag_exprs.append(
-                _qsum(self._input_data.non_ag_b_rk[non_ag_cells, k], self.X_non_ag_vars_kr[k, non_ag_cells])
-            )
-        
-        self.bio_ag_contr = gp.quicksum(ag_exprs)
-        self.bio_ag_man_contr = gp.quicksum(ag_mam_exprs)
-        self.bio_non_ag_contr = gp.quicksum(non_ag_exprs)
-        
-        return (
-            (self.bio_ag_contr + self.bio_non_ag_contr + self.bio_ag_man_contr) 
-            * self._input_data.scale_factors['Biodiversity']
+        trans_a2a = gp.quicksum(
+            _flow_cost_expr(self.F_ag2ag[s], (lambda k, c=self._input_data.flow_cost_ag2ag[s]: c[k[0], k[1], k[2]]))
+            for s in self.F_ag2ag
         )
-        
-        
-    def _setup_penalty_objectives(self):
-        print("    └── setting up objective for soft constraints...")
+        trans_n2a = gp.quicksum(
+            _flow_cost_expr(self.F_nonag2ag[fk], (lambda k, c=self._input_data.flow_cost_nonag2ag[fk]: c[k[0], k[1], k[2]]))
+            for fk in self.F_nonag2ag
+        )
+        trans_a2n = gp.quicksum(
+            _flow_cost_expr(self.F_ag2nonag[s], (lambda k, c=self._input_data.flow_cost_ag2nonag[s]: c[k[0]][k[1]]))
+            for s in self.F_ag2nonag
+        )
+        self.economy_trans_ag2ag_contr    = -(trans_a2a + trans_n2a)   # all inflows INTO ag targets
+        self.economy_trans_ag2nonag_contr = -trans_a2n                 # inflows INTO non-ag targets
 
-        penalty_ghg = 0
-        penalty_water = 0
-        
-        weight_ghg = 0
-        weight_water = 0
-
-        # Get the penalty values for each sector
-        penalty_demand = (
-            gp.quicksum(
-                self.V[c] * self._input_data.scale_factors['Demand'] * price
-                for c, price in enumerate(self._input_data.economic_prices)
-            ) 
-            * settings.SOLVER_WEIGHT_DEMAND
+        return (
+            (
+                self.economy_ag_contr 
+                + self.economy_ag_man_contr 
+                + self.economy_non_ag_contr
+                + self.economy_trans_ag2ag_contr 
+                + self.economy_trans_ag2nonag_contr
+            )   
+            * self._input_data.scale_factors['Economy']
             / 1e6  # Convert to million AUD
         )
     
+    
+    def _setup_penalty_objectives(self):
+        print("│   └── setting up objective for soft constraints...")
+
+        penalty_ghg = 0
+        penalty_water = 0
+
+        # Get the penalty values for each sector
+        if settings.DEMAND_CONSTRAINT_TYPE == 'soft':
+            penalty_demand = (
+                gp.quicksum(
+                    self.V[c] * self._input_data.scale_factors['Demand'] * price
+                    for c, price in enumerate(self._input_data.economic_prices)
+                )
+                / 1e6  # Convert to million AUD
+            )
+        else:
+            penalty_demand = gp.LinExpr(0)
+
+        # NOTE: The GHG and Water soft constraints below are planned to be decommissioned,
+        # so that the objective only considers economy (demand deviation is already
+        # priced in AUD). Until then, 'soft' mode remains functional for both.
         if settings.GHG_CONSTRAINT_TYPE == "soft":
-            weight_ghg = settings.SOLVER_WEIGHT_GHG
             penalty_ghg = (
-                self.E 
+                self.E
                  * self._input_data.scale_factors['GHG']
-                 * weight_ghg
                  / self._input_data.base_yr_prod["BASE_YR GHG (tCO2e)"]
                  + 1
-            ) 
-        
+            )
+
         if settings.WATER_CONSTRAINT_TYPE == "soft":
-            weight_water = settings.SOLVER_WEIGHT_WATER
             penalty_water = (
                 gp.quicksum(v for v in self.W)
                  * self._input_data.scale_factors['Water']
-                 * weight_water
                  / self._input_data.base_yr_prod["BASE_YR Water (ML)"].sum()
                  + 1
-            ) / len(self._input_data.limits["water"].keys()) 
+            ) / len(self._input_data.limits["water"].keys())
 
-        return (penalty_demand + penalty_ghg + penalty_water) / (settings.SOLVER_WEIGHT_DEMAND + weight_ghg + weight_water)
+        return penalty_demand + penalty_ghg + penalty_water
         
 
         
@@ -508,20 +760,50 @@ class LutoSolver:
         x_ag_irr_vars = self.X_ag_irr_vars_jr[:, cells]
         x_non_ag_vars = self.X_non_ag_vars_kr[:, cells]
 
-        # Constrain total (ag + non-ag) land per cell to equal the initial (2010) agricultural proportion. 
-        #   E.g., under resfactoring, a cell may only be 25% agricultural in the base year, 
+        # Constrain total (ag + non-ag) land per cell to equal the initial (2010) agricultural proportion.
+        #   E.g., under resfactoring, a cell may only be 25% agricultural in the base year,
         #   so total allocation must equal that fraction.
         ag_mask = self._input_data.ag_mask_proportion_r
+
+        # Precompute max feasible allocation per cell.
+        # A cell with any ag var can always cover ag_mask (its sources can at least "stay" — conservation,
+        # dvar_ub_ag ≥ x_old). Cells with no ag var are limited by the sum of their non-ag UBs.
+        has_any_ag_r = (
+            (self._input_data.dvar_ub_ag[0] > 0).any(axis=1) |
+            (self._input_data.dvar_ub_ag[1] > 0).any(axis=1)
+        )
+        max_nonag_r = self._input_data.dvar_ub_nonag.sum(axis=1)
+        max_alloc_r  = np.where(has_any_ag_r, 1.0, max_nonag_r)
+        # Cells where max_alloc < ag_mask cannot satisfy the equality and must be skipped.
+        # This covers: (a) cells with no variables at all (max=0), and (b) cells whose only
+        # non-ag option has a capped UB below ag_mask (e.g. destock cap < cell ag fraction).
+        skip_r = max_alloc_r < ag_mask - 1e-6
+
         X_sum_r = (
             x_ag_dry_vars.sum(axis=0)
             + x_ag_irr_vars.sum(axis=0)
             + x_non_ag_vars.sum(axis=0)
         )
+        # Ranged, not ==: presolve folds bal_a/bal_n into this row and demands
+        # sum(base) == ag_mask between two constants summed along different float32 paths,
+        # which disagree by up to ~1.75x FeasibilityTol (presolve reads constants exactly,
+        # with no tolerance). The +/-10x Ftol band absorbs that residual; conservation
+        # (bal_a/bal_n) still pins the cell total to sum(base), so the band is a pure
+        # feasibility gate and its width is not exploitable by the objective.
+        band = 10 * settings.FEASIBILITY_TOLERANCE
+        n_skipped = 0
         for r, expr, ub in zip(cells, X_sum_r, ag_mask[cells]):
-            self.cell_usage_constraint_r[r] = self.gurobi_model.addConstr(
-                expr == ub,
+            if skip_r[r]:
+                n_skipped += 1
+                continue
+            self.cell_usage_constraint_r[r] = self.gurobi_model.addRange(
+                expr, ub - band, ub + band,
                 name=f"const_cell_usage_{r}"
             )
+        if n_skipped:
+            print(f"│   │   WARNING: skipped cell-usage constraint for {n_skipped} cells "
+                  f"(max feasible allocation < ag_mask).")
+
 
     def _add_agricultural_management_constraints(
         self, cells: Optional[np.array] = None
@@ -536,14 +818,14 @@ class LutoSolver:
             for j_idx, j in enumerate(am_j_list):
                 if cells is not None:
                     lm_dry_r_vals = [
-                        r for r in cells if self._input_data.ag_x_mrj[0, r, j]
+                        r for r in cells if self._input_data.dvar_ub_ag[0, r, j] > 0
                     ]
                     lm_irr_r_vals = [
-                        r for r in cells if self._input_data.ag_x_mrj[1, r, j]
+                        r for r in cells if self._input_data.dvar_ub_ag[1, r, j] > 0
                     ]
                 else:
-                    lm_dry_r_vals = self._input_data.ag_lu2cells[0, j]
-                    lm_irr_r_vals = self._input_data.ag_lu2cells[1, j]
+                    lm_dry_r_vals = self._input_data.feasible_ag_cells_mrj[0, j]
+                    lm_irr_r_vals = self._input_data.feasible_ag_cells_mrj[1, j]
 
                 for r in lm_dry_r_vals:
                     constr = self.gurobi_model.addConstr(
@@ -570,8 +852,8 @@ class LutoSolver:
             for j_idx, j in enumerate(am_j_list):
                 adoption_limit = self._input_data.ag_man_limits[am][j]
 
-                dry_cells = self._input_data.ag_lu2cells[0, j]
-                irr_cells = self._input_data.ag_lu2cells[1, j]
+                dry_cells = self._input_data.feasible_ag_cells_mrj[0, j]
+                irr_cells = self._input_data.feasible_ag_cells_mrj[1, j]
 
                 # Sum of all usage of the AM option must be less than the limit
                 ag_man_vars_sum = (
@@ -595,17 +877,20 @@ class LutoSolver:
         """
         Constraints to penalise under and over production compared to demand.
         """
-        print("│   ├── Adding constraints for demand penalties...")
+        print("│   ├── Adding constraints for demand ...")
 
         # Precompute j→c quantity coefficient arrays in numpy (bypasses p loop entirely).
         # jc_dry_coeff[j][c] = ag_q_mrp[0, dry_cells, :] @ pr2cm_cp[c, :] for active p only
         # Shape per j: (ncms, len(dry_cells)) — built once, reused in quicksum.
+        # ACCOUNTING stream: raw ag_q_mrp × X_acct over the accounting support (feasible ∪ slivers).
+        # Production becomes uniform — no special per-sliver correction: a folded sliver's X_acct entry
+        # carries its own inflow-land plus its folded share of the dominant, scored at its own products.
         self.ag_q_c = [gp.LinExpr(0) for _ in range(self._input_data.ncms)]
         for j in range(self._input_data.n_ag_lus):
-            dry_cells = self._input_data.ag_lu2cells[0, j]
-            irr_cells = self._input_data.ag_lu2cells[1, j]
-            X_ag_dry_r = self.X_ag_dry_vars_jr[j, dry_cells]
-            X_ag_irr_r = self.X_ag_irr_vars_jr[j, irr_cells]
+            dry_cells = self._input_data.acct_cells_mrj[0, j]
+            irr_cells = self._input_data.acct_cells_mrj[1, j]
+            X_ag_dry_r = self.X_acct_dry_jr[j, dry_cells]
+            X_ag_irr_r = self.X_acct_irr_jr[j, irr_cells]
 
             # active products for this land use
             active_p = np.where(self._input_data.lu2pr_pj[:, j])[0]
@@ -632,8 +917,8 @@ class LutoSolver:
                 continue
 
             for j_idx, j in enumerate(am_j_list):
-                dry_cells = self._input_data.ag_lu2cells[0, j]
-                irr_cells = self._input_data.ag_lu2cells[1, j]
+                dry_cells = self._input_data.feasible_ag_cells_mrj[0, j]
+                irr_cells = self._input_data.feasible_ag_cells_mrj[1, j]
                 X_ag_mam_dry_r = self.X_ag_man_dry_vars_jr[am][j_idx, dry_cells]
                 X_ag_mam_irr_r = self.X_ag_man_irr_vars_jr[am][j_idx, irr_cells]
 
@@ -656,7 +941,7 @@ class LutoSolver:
         for k, k_name in enumerate(NON_AG_LAND_USES):
             if not NON_AG_LAND_USES[k_name]:
                 continue
-            non_ag_cells = self._input_data.non_ag_lu2cells[k]
+            non_ag_cells = self._input_data.feasible_non_ag_cells[k]
             for c in range(self._input_data.ncms):
                 self.non_ag_q_c[c] += _qsum(
                     self._input_data.non_ag_q_crk[c, non_ag_cells, k],
@@ -673,15 +958,42 @@ class LutoSolver:
         ]
 
         demand_scale = self._input_data.scale_factors['Demand']
-        lower_bound_constraints = self.gurobi_model.addConstrs(
-            (
-                (self.total_q_exprs_c[c] - self._input_data.limits['demand'][c] / demand_scale) == self.V[c]
-                for c in range(self._input_data.ncms)
-            ),  name="demand_soft_bound_lower"
-        )
 
-        # self.demand_penalty_constraints.extend(upper_bound_constraints.values())
-        self.demand_penalty_constraints.extend(lower_bound_constraints.values())
+        if settings.DEMAND_CONSTRAINT_TYPE == 'soft':
+            lower_bound_constraints = self.gurobi_model.addConstrs(
+                (
+                    (self.total_q_exprs_c[c] - self._input_data.limits['demand'][c] / demand_scale) == self.V[c]
+                    for c in range(self._input_data.ncms)
+                ),  name="demand_soft_bound_lower"
+            )
+            self.demand_penalty_constraints.extend(lower_bound_constraints.values())
+        elif settings.DEMAND_CONSTRAINT_TYPE == 'hard':
+            print("│   ├── Adding <hard> demand constraints (equality where lb==ub, else lower + upper)...")
+            for c_idx, c_name in enumerate(self._input_data.commodity_names):
+                lb, ub = settings.DEMAND_BOUNDS[c_name]
+                lim = self._input_data.limits['demand'][c_idx] / demand_scale
+                if lb == ub:
+                    self.demand_penalty_constraints.append(
+                        self.gurobi_model.addConstr(
+                            self.total_q_exprs_c[c_idx] == lim * lb,
+                            name=f"demand_hard_bound_eq[{c_idx}]"
+                        )
+                    )
+                else:
+                    self.demand_penalty_constraints.append(
+                        self.gurobi_model.addConstr(
+                            self.total_q_exprs_c[c_idx] >= lim * lb,
+                            name=f"demand_hard_bound_lower[{c_idx}]"
+                        )
+                    )
+                    self.demand_penalty_constraints.append(
+                        self.gurobi_model.addConstr(
+                            self.total_q_exprs_c[c_idx] <= lim * ub,
+                            name=f"demand_hard_bound_upper[{c_idx}]"
+                        )
+                    )
+        else:
+            raise ValueError(f"    Unknown constraint type for demand: {settings.DEMAND_CONSTRAINT_TYPE}")
 
 
     def _get_water_net_yield_expr_for_region(
@@ -692,11 +1004,13 @@ class LutoSolver:
         Get the Gurobi linear expression for the net water yield of a given region.
         """
 
+        # ACCOUNTING stream: raw ag_w_mrj × X_acct. The loop already visits every cell in `ind` for every
+        # j, so a folded sliver's X_acct term (nonzero at its own j) is captured without acct_cells here.
         ag_exprs = []
         for j in range(self._input_data.n_ag_lus):
             ag_exprs.append(
-                _qsum(self._input_data.ag_w_mrj[0, ind, j], self.X_ag_dry_vars_jr[j, ind])
-                + _qsum(self._input_data.ag_w_mrj[1, ind, j], self.X_ag_irr_vars_jr[j, ind])
+                _qsum(self._input_data.ag_w_mrj[0, ind, j], self.X_acct_dry_jr[j, ind])
+                + _qsum(self._input_data.ag_w_mrj[1, ind, j], self.X_acct_irr_jr[j, ind])
             )
 
         ag_mam_exprs = []
@@ -721,10 +1035,10 @@ class LutoSolver:
     def _add_water_usage_limit_constraints(self) -> None:
 
         if settings.WATER_LIMITS != "on":
-            print("│   └── TURNING OFF water usage constraints ...")
+            print("│   ├── TURNING OFF water usage constraints ...")
             return
 
-        print("│   └── Adding constraints for water usage limits...")
+        print("│   ├── Adding constraints for water usage limits...")
         
         # Ensure water use remains below limit for each region
         water_scale = self._input_data.scale_factors['Water']
@@ -759,10 +1073,10 @@ class LutoSolver:
     def _add_renewable_energy_constraints(self) -> None:
 
         if not any(settings.RENEWABLES_OPTIONS.values()):
-            print("│   └── TURNING OFF renewable energy constraints ...")
+            print("│   ├── TURNING OFF renewable energy constraints ...")
             return
 
-        print("│   └── Adding constraints for renewable energy production targets ...")
+        print("│   ├── Adding constraints for renewable energy production targets ...")
 
         re_types = {
             'Utility Solar PV': {
@@ -809,7 +1123,7 @@ class LutoSolver:
                 am_exprs = []
                 for j_idx, j in enumerate(self._input_data.am2j[am]):
 
-                    j_cells         = np.union1d(self._input_data.ag_lu2cells[0, j], self._input_data.ag_lu2cells[1, j])
+                    j_cells         = np.union1d(self._input_data.feasible_ag_cells_mrj[0, j], self._input_data.feasible_ag_cells_mrj[1, j])
                     reg_AND_j_cells = np.intersect1d(j_cells, reg_idx)                      # Get cells that are both in the region and in the agricultural land use
 
                     if settings.EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS == True:
@@ -837,16 +1151,20 @@ class LutoSolver:
 
 
     def _get_total_ghg_expr(self) -> gp.LinExpr:
-        g_dry_coeff = self._input_data.ag_g_mrj[0, :, :] + self._input_data.ag_ghg_t_mrj[0, :, :]
-        g_irr_coeff = self._input_data.ag_g_mrj[1, :, :] + self._input_data.ag_ghg_t_mrj[1, :, :]
+        # Ongoing ag GHG only — the source-dependent TRANSITION GHG (carbon release on conversion)
+        # rides on the transition deltas: Σ flow_ghg_ag2ag·D (added below). flow_ghg_ag2ag is on the
+        # same GHG rescale band as ag_g_mrj.
+        g_dry_coeff = self._input_data.ag_g_mrj[0, :, :]
+        g_irr_coeff = self._input_data.ag_g_mrj[1, :, :]
 
+        # ACCOUNTING stream: raw ag_g_mrj × X_acct over the accounting support (feasible ∪ slivers).
         ghg_ag_exprs = []
         for j in range(self._input_data.n_ag_lus):
-            dry_cells = self._input_data.ag_lu2cells[0, j]
-            irr_cells = self._input_data.ag_lu2cells[1, j]
+            dry_cells = self._input_data.acct_cells_mrj[0, j]
+            irr_cells = self._input_data.acct_cells_mrj[1, j]
             ghg_ag_exprs.append(
-                _qsum(g_dry_coeff[dry_cells, j], self.X_ag_dry_vars_jr[j, dry_cells])
-                + _qsum(g_irr_coeff[irr_cells, j], self.X_ag_irr_vars_jr[j, irr_cells])
+                _qsum(g_dry_coeff[dry_cells, j], self.X_acct_dry_jr[j, dry_cells])
+                + _qsum(g_irr_coeff[irr_cells, j], self.X_acct_irr_jr[j, irr_cells])
             )
 
         ghg_ag_man_exprs = []
@@ -854,8 +1172,8 @@ class LutoSolver:
             if not AG_MANAGEMENTS[am]:
                 continue
             for j_idx, j in enumerate(am_j_list):
-                dry_cells = self._input_data.ag_lu2cells[0, j]
-                irr_cells = self._input_data.ag_lu2cells[1, j]
+                dry_cells = self._input_data.feasible_ag_cells_mrj[0, j]
+                irr_cells = self._input_data.feasible_ag_cells_mrj[1, j]
                 ghg_ag_man_exprs.append(
                     _qsum(self._input_data.ag_man_g_mrj[am][0, dry_cells, j_idx], self.X_ag_man_dry_vars_jr[am][j_idx, dry_cells])
                     + _qsum(self._input_data.ag_man_g_mrj[am][1, irr_cells, j_idx], self.X_ag_man_irr_vars_jr[am][j_idx, irr_cells])
@@ -865,16 +1183,30 @@ class LutoSolver:
         for k, k_name in enumerate(NON_AG_LAND_USES):
             if not NON_AG_LAND_USES[k_name]:
                 continue
-            non_ag_cells = self._input_data.non_ag_lu2cells[k]
+            non_ag_cells = self._input_data.feasible_non_ag_cells[k]
             ghg_non_ag_exprs.append(
                 _qsum(self._input_data.non_ag_g_rk[non_ag_cells, k], self.X_non_ag_vars_kr[k, non_ag_cells])
             )
-            
+
+        # Transition GHG: Σ flow_ghg_ag2ag · D_ag2ag — source-correct carbon release on ag→ag conversion
+        # (per-source, aligned with F_ag2ag's cell axis).
+        ghg_trans_exprs = []
+        for s, Fdict in self.F_ag2ag.items():
+            if not Fdict:
+                continue
+            c = self._input_data.flow_ghg_ag2ag[s]           # [to_m, local_r, to_j]
+            keys = list(Fdict.keys())
+            coeffs = np.fromiter((c[k[0], k[1], k[2]] for k in keys), dtype=np.float64, count=len(keys))
+            varr = np.fromiter((Fdict[k] for k in keys), dtype=object, count=len(keys))
+            ghg_trans_exprs.append(_qsum(coeffs, varr))
+
         self.ghg_ag_contr = gp.quicksum(ghg_ag_exprs)
         self.ghg_ag_man_contr = gp.quicksum(ghg_ag_man_exprs)
-        self.ghg_non_ag_contr = gp.quicksum(ghg_non_ag_exprs)    
-        
-        return self.ghg_ag_contr + self.ghg_ag_man_contr + self.ghg_non_ag_contr + self._input_data.offland_ghg
+        self.ghg_non_ag_contr = gp.quicksum(ghg_non_ag_exprs)
+        self.ghg_trans_contr = gp.quicksum(ghg_trans_exprs)
+
+        return (self.ghg_ag_contr + self.ghg_ag_man_contr + self.ghg_non_ag_contr
+                + self.ghg_trans_contr + self._input_data.offland_ghg)
 
     def _add_ghg_emissions_limit_constraints(self):
         """
@@ -918,7 +1250,6 @@ class LutoSolver:
         print("│   ├── Adding constraints for biodiversity...")
         self._add_GBF2_constraints()
         self._add_GBF3_NVIS_constraints()
-        self._add_GBF3_IBRA_constraints()
         self._add_GBF4_SNES_constraints()
         self._add_GBF4_ECNES_constraints()
         self._add_GBF8_constraints()
@@ -926,7 +1257,7 @@ class LutoSolver:
 
     def _add_GBF2_constraints(self) -> None:
         
-        if settings.BIODIVERSITY_TARGET_GBF_2 == "off":
+        if settings.GBF2_TARGET == "off":
             print("│   │   ├── TURNING OFF constraints for biodiversity GBF 2...")
             return
         
@@ -934,22 +1265,23 @@ class LutoSolver:
         bio_ag_man_exprs = []
         bio_non_ag_exprs = []
 
+        # ACCOUNTING stream: raw per-j biodiv scalar × X_acct over (accounting support ∩ GBF2 mask).
         for j in range(self._input_data.n_ag_lus):
             c_ag = self._input_data.biodiv_contr_ag_j[j]
             if c_ag == 0:
                 continue
-            ind_dry = np.intersect1d(self._input_data.ag_lu2cells[0, j], self._input_data.GBF2_mask_idx)
-            ind_irr = np.intersect1d(self._input_data.ag_lu2cells[1, j], self._input_data.GBF2_mask_idx)
+            ind_dry = np.intersect1d(self._input_data.acct_cells_mrj[0, j], self._input_data.GBF2_mask_idx)
+            ind_irr = np.intersect1d(self._input_data.acct_cells_mrj[1, j], self._input_data.GBF2_mask_idx)
             bio_ag_exprs.append(
-                _qsum(self._input_data.GBF2_mask_area_r[ind_dry] * c_ag, self.X_ag_dry_vars_jr[j, ind_dry])
-                + _qsum(self._input_data.GBF2_mask_area_r[ind_irr] * c_ag, self.X_ag_irr_vars_jr[j, ind_irr])
+                _qsum(self._input_data.GBF2_mask_area_r[ind_dry] * c_ag, self.X_acct_dry_jr[j, ind_dry])
+                + _qsum(self._input_data.GBF2_mask_area_r[ind_irr] * c_ag, self.X_acct_irr_jr[j, ind_irr])
             )
         for am, am_j_list in self._input_data.am2j.items():
             if not AG_MANAGEMENTS[am]:
                 continue
             for j_idx, j in enumerate(am_j_list):
-                ind_dry = np.intersect1d(self._input_data.ag_lu2cells[0, j], self._input_data.GBF2_mask_idx)
-                ind_irr = np.intersect1d(self._input_data.ag_lu2cells[1, j], self._input_data.GBF2_mask_idx)
+                ind_dry = np.intersect1d(self._input_data.feasible_ag_cells_mrj[0, j], self._input_data.GBF2_mask_idx)
+                ind_irr = np.intersect1d(self._input_data.feasible_ag_cells_mrj[1, j], self._input_data.GBF2_mask_idx)
                 bio_ag_man_exprs.append(
                     _qsum(self._input_data.GBF2_mask_area_r[ind_dry] * self._input_data.biodiv_contr_ag_man[am][j_idx][ind_dry], self.X_ag_man_dry_vars_jr[am][j_idx, ind_dry])
                     + _qsum(self._input_data.GBF2_mask_area_r[ind_irr] * self._input_data.biodiv_contr_ag_man[am][j_idx][ind_irr], self.X_ag_man_irr_vars_jr[am][j_idx, ind_irr])
@@ -958,7 +1290,7 @@ class LutoSolver:
             c_non_ag = self._input_data.biodiv_contr_non_ag_k[k]
             if c_non_ag == 0:
                 continue
-            ind = np.intersect1d(self._input_data.non_ag_lu2cells[k], self._input_data.GBF2_mask_idx)
+            ind = np.intersect1d(self._input_data.feasible_non_ag_cells[k], self._input_data.GBF2_mask_idx)
             bio_non_ag_exprs.append(
                 _qsum(self._input_data.GBF2_mask_area_r[ind] * c_non_ag, self.X_non_ag_vars_kr[k, ind])
             )
@@ -978,6 +1310,87 @@ class LutoSolver:
         )
 
 
+    def bio_constraint_index(self) -> dict:
+        """{constraint_name: {family, region, item, presence}} for every biodiversity row built.
+
+        CACHED, and built eagerly at the end of `formulate()`. It must be: reading `ConstrName`
+        from a Constr that has since been removed from the model raises "Constr was removed from
+        the model", and the whole point of this index is to describe rows that were dropped. Build
+        it once while every constraint is still live, then look up freely afterwards.
+
+        The constraint NAME is all a Gurobi model carries, and it cannot be parsed back into its
+        parts: `.replace(" ", "_")` makes the separator ambiguous ("Goulburn_Broken" vs the
+        underscore before the community), and the arity differs by family — SNES/ECNES have a
+        presence class, GBF3/GBF8 do not, GBF2 has no key at all. So record the mapping here, where
+        the tuple is still known, instead of reconstructing it later from a mangled string.
+        """
+        if self._bio_index is not None:
+            return self._bio_index
+
+        index = {}
+        specs = [
+            ('GBF3_NVIS',  self.bio_GBF3_NVIS_constrs,  ('region', 'item')),
+            ('GBF4_SNES',  self.bio_GBF4_SNES_constrs,  ('region', 'item', 'presence')),
+            ('GBF4_ECNES', self.bio_GBF4_ECNES_constrs, ('region', 'item', 'presence')),
+            ('GBF8',       self.bio_GBF8_constrs,       ('region', 'item')),
+        ]
+        for family, constrs, fields in specs:
+            for key, constr in (constrs or {}).items():
+                row = {'family': family, 'region': None, 'item': None, 'presence': None}
+                row.update(dict(zip(fields, key)))
+                index[constr.ConstrName] = row
+
+        # GBF2 is a single national row with no key, so it has no parts to record.
+        gbf2 = self.bio_GBF2_constrs
+        if gbf2 is not None and not isinstance(gbf2, dict):
+            index[gbf2.ConstrName] = {'family': 'GBF2', 'region': None, 'item': None,
+                                      'presence': None}
+        self._bio_index = index
+        return index
+
+
+    def remove_constraints_by_name(self, names) -> None:
+        """Remove rows from the Gurobi model AND from the bookkeeping the dual readers walk.
+
+        The infeasibility flow in `simulation.py` drops rows by name. Removing them only from the
+        model leaves stale `Constr` objects in these collections, and the first attribute read on
+        one — `record_shadow_prices` reading `.Pi` after the next ACCEPTED solve — raises
+        "Constr was removed from the model". So the two removals must happen together, here.
+
+        The purged collections are exactly the ones `record_shadow_prices` iterates. The structural
+        per-cell collections (cell usage, ag-management links) are not scanned: they are millions
+        of rows, no sane `DROP_UNREACHABLE_CONSTRAINTS` policy includes them, and no dual reader
+        walks them.
+
+        `bio_constraint_index()` is deliberately NOT invalidated — it is warmed while every row is
+        still live precisely so that dropped rows can be described afterwards.
+        """
+        if not names:
+            return
+        doomed = set(names)
+
+        # Purge bookkeeping FIRST, while every held Constr can still be matched by name.
+        for coll in (self.bio_GBF3_NVIS_constrs, self.bio_GBF4_SNES_constrs,
+                     self.bio_GBF4_ECNES_constrs, self.bio_GBF8_constrs,
+                     self.renewable_constraints):
+            for key in [k for k, c in coll.items() if c.ConstrName in doomed]:
+                del coll[key]
+
+        self.water_limit_constraints    = [c for c in self.water_limit_constraints if c.ConstrName not in doomed]
+        self.regional_adoption_constrs  = [c for c in self.regional_adoption_constrs if c.ConstrName not in doomed]
+        self.demand_penalty_constraints = [c for c in self.demand_penalty_constraints if c.ConstrName not in doomed]
+        self.ghg_consts_soft            = [c for c in self.ghg_consts_soft if c.ConstrName not in doomed]
+
+        if isinstance(self.bio_GBF2_constrs, gp.Constr) and self.bio_GBF2_constrs.ConstrName in doomed:
+            self.bio_GBF2_constrs = {}      # back to the "not built" sentinel
+        if self.ghg_consts_ub is not None and self.ghg_consts_ub.ConstrName in doomed:
+            self.ghg_consts_ub = None
+
+        self.gurobi_model.remove(
+            [c for c in self.gurobi_model.getConstrs() if c.ConstrName in doomed])
+        self.gurobi_model.update()
+
+
     def _build_biodiv_contr_expr(self, val_vector: np.ndarray, ind: np.ndarray) -> "gp.LinExpr":
         """
         Build the biodiversity contribution expression for one GBF3/4/8 constraint.
@@ -988,15 +1401,16 @@ class LutoSolver:
         Gurobi's recommended [1e-3, 1e6] band.
         """
 
-        # Agricultural contributions (biodiv_contr_ag_j[j] is a per-j scalar)
+        # ACCOUNTING stream: raw per-j biodiv scalar × X_acct. The loop visits every cell in `ind` for
+        # every j, so a folded sliver's X_acct term (nonzero at its own j) is captured without acct_cells.
         ag_terms = []
         for j in range(self._input_data.n_ag_lus):
             c = self._input_data.biodiv_contr_ag_j[j]
             if c == 0:
                 continue
             ag_terms.append(
-                _qsum(val_vector[ind] * c, self.X_ag_dry_vars_jr[j, ind])
-                + _qsum(val_vector[ind] * c, self.X_ag_irr_vars_jr[j, ind])
+                _qsum(val_vector[ind] * c, self.X_acct_dry_jr[j, ind])
+                + _qsum(val_vector[ind] * c, self.X_acct_irr_jr[j, ind])
             )
 
         # Agricultural management contributions (biodiv_contr_ag_man[am][j_idx] is per-cell)
@@ -1021,7 +1435,7 @@ class LutoSolver:
 
 
     def _add_GBF3_NVIS_constraints(self) -> None:
-        if settings.BIODIVERSITY_TARGET_GBF_3_NVIS == "off":
+        if settings.GBF3_NVIS_TARGET == "off":
             print("│   │   ├── TURNING OFF constraints for biodiversity GBF 3 NVIS")
             return
 
@@ -1033,109 +1447,135 @@ class LutoSolver:
 
         print("│   │   ├── Adding constraints for biodiversity GBF 3 NVIS...")
 
+        n_added = n_skipped = 0
+
         for region, group in region_group:
 
-            lb_raw_vector = v_limits.sel(dict(layer=(region, group))).item()                        
+            lb_raw = v_limits.sel(dict(layer=(region, group))).item()                        
 
-            if lb_raw_vector < 0:
-                print(f"│   │   │   ├── SKIPPING negative target {lb_raw_vector:15,.0f} for {region} [{group}]")
+            if lb_raw < 0:
+                n_skipped += 1
                 continue
 
-            lb_rescale_vector = lb_raw_vector / scale_factors.sel(layer=(region, group)).item()
+            lb_rescale = lb_raw / scale_factors.sel(layer=(region, group)).item()
             val_vector = val_matrix.sel(group=group, drop=True).data
-            # Australia mode: no NRM cell is named 'Australia', so bypass region mask
-            if region == "Australia":
+            # AUSTRALIA mode: no NRM cell is named 'AUSTRALIA', so bypass region mask
+            if region == "AUSTRALIA":
                 ind = np.where(val_vector > 0)[0]
             else:
                 reg_vector = reg_matrix == region
                 ind = np.intersect1d(np.where(val_vector > 0)[0], np.where(reg_vector)[0])
             
-            print(f"│   │   │   ├── target is {lb_raw_vector:15,.0f} for {region} [{group}]")
+            if ind.size == 0:
+                n_skipped += 1
+                continue
+
 
             self.bio_GBF3_NVIS_exprs[(region, group)] = self._build_biodiv_contr_expr(val_vector, ind)
 
             self.bio_GBF3_NVIS_constrs[(region, group)] = self.gurobi_model.addConstr(
-                self.bio_GBF3_NVIS_exprs[(region, group)] >= lb_rescale_vector,
+                self.bio_GBF3_NVIS_exprs[(region, group)] >= lb_rescale,
                 name=f"bio_GBF3_NVIS_limit_{region}_{group}".replace(" ", "_")
             )
+            n_added += 1
+
+        print(f"│   │   │   ├── {n_added} constraint(s) added, {n_skipped} skipped")
 
 
-    def _add_GBF3_IBRA_constraints(self) -> None:
-        # IBRA constraints now flow through _add_GBF3_NVIS_constraints (GBF3_NVIS_NRM_REGION_MODE='IBRA')
-        return
+
 
 
     def _add_GBF4_SNES_constraints(self) -> None:
-        if settings.BIODIVERSITY_TARGET_GBF_4_SNES != "on":
+        if settings.GBF4_TARGET_SNES == 'off':
             print('│   │   ├── TURNING OFF constraints for biodiversity GBF 4 SNES...')
             return
 
-        region_species  = self._input_data.GBF4_SNES_region_species      # list[(region, species)]
-        v_limits        = self._input_data.limits["GBF4_SNES"]            # xr.DataArray[layer=(region,species)]
-        scale_factors   = self._input_data.scale_factors['GBF4_SNES']     # xr.DataArray[layer=(region,species)]
-        val_matrix      = self._input_data.GBF4_SNES_pre_1750_area_sr     # xr.DataArray[layer, cell]
+        region_sp_pres = self._input_data.GBF4_SNES_region_species       # list[(region, species, presence)]
+        v_limits       = self._input_data.limits["GBF4_SNES"]            # xr.DataArray[layer=(region,species,presence)]
+        scale_factors  = self._input_data.scale_factors['GBF4_SNES']     # xr.DataArray[layer=(region,species,presence)]
+        val_matrix     = self._input_data.GBF4_SNES_pre_1750_area_sr     # xr.DataArray[layer=(species,presence), cell]
+        reg_matrix     = self._input_data.region_NRM_names_r             # np.ndarray[cell]
 
         print("│   │   ├── Adding constraints for biodiversity GBF 4 SNES...")
 
-        for region, species in region_species:
-            lb_raw      = v_limits.sel(dict(layer=(region, species))).item()
-            lb_rescale  = lb_raw / scale_factors.sel(dict(layer=(region, species))).item()
-            val_vector  = val_matrix.sel(dict(layer=(region, species)), drop=True).values
+        n_added = n_skipped = 0
 
-            ind = np.where(val_vector > 0)[0]
+        for region, species, presence in region_sp_pres:
+            lb_raw     = v_limits.sel(dict(layer=(region, species, presence))).item()
+            lb_rescale = lb_raw / scale_factors.sel(dict(layer=(region, species, presence))).item()
+            val_vector = val_matrix.sel(dict(layer=(species, presence)), drop=True).values
+
+            # AUSTRALIA mode: no NRM cell is named 'AUSTRALIA', so bypass region mask
+            if region == "AUSTRALIA":
+                ind = np.where(val_vector > 0)[0]
+            else:
+                reg_vector = reg_matrix == region
+                ind = np.intersect1d(np.where(val_vector > 0)[0], np.where(reg_vector)[0])
 
             if lb_raw <= 0:
-                print(f"│   │   │   ├── target is {lb_raw:15,.0f}  (skipped — negative) for {species} [{region}]")
+                n_skipped += 1
                 continue
 
             if ind.size == 0:
-                print(f"│   │   │   ├── WARNING: SNES empty layer for {species} [{region}]")
+                n_skipped += 1
                 continue
 
-            print(f"│   │   │   ├── target is {lb_raw:15,.0f} for {species} [{region}]")
-            self.bio_GBF4_SNES_exprs[(region, species)] = self._build_biodiv_contr_expr(val_vector, ind)
-            self.bio_GBF4_SNES_constrs[(region, species)] = self.gurobi_model.addConstr(
-                self.bio_GBF4_SNES_exprs[(region, species)] >= lb_rescale,
-                name=f"bio_GBF4_SNES_limit_{region}_{species}".replace(" ", "_"),
+            self.bio_GBF4_SNES_exprs[(region, species, presence)] = self._build_biodiv_contr_expr(val_vector, ind)
+            self.bio_GBF4_SNES_constrs[(region, species, presence)] = self.gurobi_model.addConstr(
+                self.bio_GBF4_SNES_exprs[(region, species, presence)] >= lb_rescale,
+                name=f"bio_GBF4_SNES_limit_{region}_{species}_{presence}".replace(" ", "_"),
             )
+            n_added += 1
+
+        print(f"│   │   │   ├── {n_added} constraint(s) added, {n_skipped} skipped")
 
     def _add_GBF4_ECNES_constraints(self) -> None:
-        if settings.BIODIVERSITY_TARGET_GBF_4_ECNES != "on":
+        if settings.GBF4_TARGET_ECNES == 'off':
             print('│   │   ├── TURNING OFF constraints for biodiversity GBF 4 ECNES...')
             return
 
-        region_species  = self._input_data.GBF4_ECNES_region_species      # list[(region, species)]
-        v_limits        = self._input_data.limits["GBF4_ECNES"]            # xr.DataArray[layer=(region,species)]
-        scale_factors   = self._input_data.scale_factors['GBF4_ECNES']     # xr.DataArray[layer=(region,species)]
-        val_matrix      = self._input_data.GBF4_ECNES_pre_1750_area_sr     # xr.DataArray[layer, cell]
+        region_comm_pres = self._input_data.GBF4_ECNES_region_species       # list[(region, community, presence)]
+        v_limits         = self._input_data.limits["GBF4_ECNES"]            # xr.DataArray[layer=(region,species,presence)]
+        scale_factors    = self._input_data.scale_factors['GBF4_ECNES']     # xr.DataArray[layer=(region,species,presence)]
+        val_matrix       = self._input_data.GBF4_ECNES_pre_1750_area_sr     # xr.DataArray[layer=(species,presence), cell]
+        reg_matrix       = self._input_data.region_NRM_names_r              # np.ndarray[cell]
 
         print("│   │   ├── Adding constraints for biodiversity GBF 4 ECNES...")
 
-        for region, species in region_species:
-            lb_raw      = v_limits.sel(dict(layer=(region, species))).item()
-            lb_rescale  = lb_raw / scale_factors.sel(dict(layer=(region, species))).item()
-            val_vector  = val_matrix.sel(dict(layer=(region, species)), drop=True).values
+        n_added = n_skipped = 0
 
-            ind = np.where(val_vector > 0)[0]
+        for region, community, presence in region_comm_pres:
+            lb_raw     = v_limits.sel(dict(layer=(region, community, presence))).item()
+            lb_rescale = lb_raw / scale_factors.sel(dict(layer=(region, community, presence))).item()
+            val_vector = val_matrix.sel(dict(layer=(community, presence)), drop=True).values
+
+            # AUSTRALIA mode: no NRM cell is named 'AUSTRALIA', so bypass region mask
+            if region == "AUSTRALIA":
+                ind = np.where(val_vector > 0)[0]
+            else:
+                reg_vector = reg_matrix == region
+                ind = np.intersect1d(np.where(val_vector > 0)[0], np.where(reg_vector)[0])
 
             if lb_raw <= 0:
-                print(f"│   │   │   ├── target is {lb_raw:15,.0f}  (skipped — negative) for {species} [{region}]")
+                n_skipped += 1
                 continue
 
             if ind.size == 0:
-                print(f"│   │   │   ├── WARNING: ECNES empty layer for {species} [{region}]")
+                n_skipped += 1
                 continue
 
-            print(f"│   │   │   ├── target is {lb_raw:15,.0f} for {species} [{region}]")
-            self.bio_GBF4_ECNES_exprs[(region, species)] = self._build_biodiv_contr_expr(val_vector, ind)
-            self.bio_GBF4_ECNES_constrs[(region, species)] = self.gurobi_model.addConstr(
-                self.bio_GBF4_ECNES_exprs[(region, species)] >= lb_rescale,
-                name=f"bio_GBF4_ECNES_limit_{region}_{species}".replace(" ", "_"),
+            self.bio_GBF4_ECNES_exprs[(region, community, presence)] = self._build_biodiv_contr_expr(val_vector, ind)
+            self.bio_GBF4_ECNES_constrs[(region, community, presence)] = self.gurobi_model.addConstr(
+                self.bio_GBF4_ECNES_exprs[(region, community, presence)] >= lb_rescale,
+                name=f"bio_GBF4_ECNES_limit_{region}_{community}_{presence}".replace(" ", "_"),
             )
+            n_added += 1
+
+        print(f"│   │   │   ├── {n_added} constraint(s) added, {n_skipped} skipped")
 
 
     def _add_GBF8_constraints(self) -> None:
-        if settings.BIODIVERSITY_TARGET_GBF_8 != "on":
+        if settings.GBF8_TARGET == "off":
             print('│   │   ├── TURNING OFF constraints for biodiversity GBF 8 ...')
             return
 
@@ -1147,31 +1587,36 @@ class LutoSolver:
 
         print("│   │   ├── Adding constraints for biodiversity GBF 8...")
 
+        n_added = n_skipped = 0
+
         for region, species in region_species:
             lb_raw      = v_limits.sel(dict(layer=(region, species))).item()
             lb_rescale  = lb_raw / scale_factors.sel(layer=(region, species)).item()
             val_vector  = val_matrix.sel(species=species, drop=True).data
 
-            if region == "Australia":
+            # AUSTRALIA mode: no NRM cell is named 'AUSTRALIA', so bypass region mask
+            if region == "AUSTRALIA":
                 ind = np.where(val_vector > 0)[0]
             else:
                 reg_vector = reg_matrix == region
                 ind = np.intersect1d(np.where(val_vector > 0)[0], np.where(reg_vector)[0])
 
             if lb_raw <= 0:
-                print(f"│   │   │   ├── target is {lb_raw:15,.0f}  (skipped — negative) for {species} [{region}]")
+                n_skipped += 1
                 continue
 
             if ind.size == 0:
-                print(f"│   │   │   ├── WARNING: GBF8 empty layer for {species} [{region}]")
+                n_skipped += 1
                 continue
 
-            print(f"│   │   │   ├── target is {lb_raw:15,.0f} for {species} [{region}]")
             self.bio_GBF8_exprs[(region, species)] = self._build_biodiv_contr_expr(val_vector, ind)
             self.bio_GBF8_constrs[(region, species)] = self.gurobi_model.addConstr(
                 self.bio_GBF8_exprs[(region, species)] >= lb_rescale,
                 name=f"bio_GBF8_limit_{region}_{species}".replace(" ", "_"),
             )
+            n_added += 1
+
+        print(f"│   │   │   ├── {n_added} constraint(s) added, {n_skipped} skipped")
 
 
     def _add_regional_adoption_constraints(self) -> None:
@@ -1191,7 +1636,21 @@ class LutoSolver:
                   _qsum(self._input_data.real_area[reg_ind], self.X_ag_dry_vars_jr[j, reg_ind])
                 + _qsum(self._input_data.real_area[reg_ind], self.X_ag_irr_vars_jr[j, reg_ind])
             )
-            self.regional_adoption_constrs.append(self.gurobi_model.addConstr(reg_expr <= reg_area_limit, name=f"reg_adopt_limit_ag_{lu_name}_{reg_id}"))
+            self.regional_adoption_constrs.append(
+                self.gurobi_model.addConstr(
+                    reg_expr <= reg_area_limit, 
+                    name=f"reg_adopt_limit_ag_{lu_name}_{reg_id}".replace(" ", "_")
+                )
+            )
+
+        # Non-reversible plantings saturate the non-ag caps below, and last year's solved
+        # areas become this year's exact lower bounds; float32 noise then puts the locked-in
+        # floor a hair over the cap, which presolve rejects with NO tolerance (bound
+        # propagation is exact). Grow the cap by 1e-6/yr RELATIVE so the RHS always recedes
+        # ahead of the ratcheting floor (per-step increment ~5e-6 x cap vs float noise
+        # ~2e-10 x cap). Cap erosion by 2050: ~3e-5 relative. Ag caps need no slack: ag is
+        # reversible, so its floors never ratchet onto the cap.
+        nonag_cap_relax = 1 + (self._input_data.target_year - settings.SIM_YEARS[0]) * 1e-6
 
         # Add per-(region, non-ag-landuse) caps from the xlsx ('on' mode)
         reg_adopt_non_ag_limits = self._input_data.limits.get("non_ag_regional_adoption") or []
@@ -1202,7 +1661,10 @@ class LutoSolver:
             print(f"│   │   │   ├── Adding constraints for {lu_name} in {settings.REGIONAL_ADOPTION_ZONE} region {reg_id} <= {reg_area_limit:,.0f} HA...")
             reg_expr = _qsum(self._input_data.real_area[reg_ind], self.X_non_ag_vars_kr[k, reg_ind])
             self.regional_adoption_constrs.append(
-                self.gurobi_model.addConstr(reg_expr <= reg_area_limit, name=f"reg_adopt_limit_non_ag_{lu_name}_{reg_id}")
+                self.gurobi_model.addConstr(
+                    reg_expr <= reg_area_limit * nonag_cap_relax, 
+                    name=f"reg_adopt_limit_non_ag_{lu_name}_{reg_id}".replace(" ", "_")
+                )
             )
 
         # Add SUM-of-non-ag adoption constraints ('NON_AG_CAP' mode):
@@ -1217,16 +1679,28 @@ class LutoSolver:
             for k in range(self.X_non_ag_vars_kr.shape[0]):
                 reg_expr += _qsum(self._input_data.real_area[reg_ind], self.X_non_ag_vars_kr[k, reg_ind])
             self.regional_adoption_constrs.append(
-                self.gurobi_model.addConstr(reg_expr <= reg_area_limit, name=f"reg_adopt_limit_non_ag_sum_{reg_id}")
+                self.gurobi_model.addConstr(
+                    reg_expr <= reg_area_limit * nonag_cap_relax, 
+                    name=f"reg_adopt_limit_non_ag_sum_{reg_id}".replace(" ", "_")
+                )
             )
 
 
 
-    def solve(self) -> SolverSolution:
+    def solve(self) -> SolverSolution | None:
         print("Starting solve...\n")
 
         # Magic.
         self.gurobi_model.optimize()
+
+        # Bail out if no solution is available (e.g., infeasible model).
+        if self.gurobi_model.SolCount == 0:
+            print(
+                f"No solution available (Status={self.gurobi_model.Status}, SolCount=0); "
+                f"skipping result collection.\n",
+                flush=True,
+            )
+            return None
 
         print("Completed solve, collecting results...\n", flush=True)
 
@@ -1258,9 +1732,9 @@ class LutoSolver:
 
         # Get agricultural results
         for j in range(self._input_data.n_ag_lus):
-            for r in self._input_data.ag_lu2cells[0, j]:
+            for r in self._input_data.feasible_ag_cells_mrj[0, j]:
                 X_dry_sol_rj[r, j] = self.X_ag_dry_vars_jr[j, r].X
-            for r in self._input_data.ag_lu2cells[1, j]:
+            for r in self._input_data.feasible_ag_cells_mrj[1, j]:
                 X_irr_sol_rj[r, j] = self.X_ag_irr_vars_jr[j, r].X
 
         # Get non-agricultural results
@@ -1269,14 +1743,14 @@ class LutoSolver:
                 non_ag_X_sol_rk[:, k] = np.zeros(self._input_data.ncells)
                 continue
 
-            for r in self._input_data.non_ag_lu2cells[k]:
+            for r in self._input_data.feasible_non_ag_cells[k]:
                 non_ag_X_sol_rk[r, k] = self.X_non_ag_vars_kr[k, r].X
 
         # Get agricultural management results
         for am, am_j_list in self._input_data.am2j.items():
             for j_idx, j in enumerate(am_j_list):
-                eligible_dry_cells = self._input_data.ag_lu2cells[0, j]
-                eligible_irr_cells = self._input_data.ag_lu2cells[1, j]
+                eligible_dry_cells = self._input_data.feasible_ag_cells_mrj[0, j]
+                eligible_irr_cells = self._input_data.feasible_ag_cells_mrj[1, j]
 
                 if am == "Savanna Burning":
                     eligible_dry_cells = np.intersect1d(
@@ -1307,6 +1781,42 @@ class LutoSolver:
 
         # Stack dryland and irrigated decision variables — fractional values preserved as-is
         ag_X_mrj = np.stack((X_dry_sol_rj, X_irr_sol_rj))  # Float32
+
+        # Transition deltas from the SOLVED per-source delta vars — the gross flows the objective
+        # actually charged, kept SOURCE-KEYED so reporting can attribute the TRUE from→to land-use
+        # flows (X-derived max(0, X_new − x_old) can neither split ag2ag from nonag2ag inflows nor
+        # attribute a flow to its source LU). Leaf axes mirror the flow_cost dicts — [to_m, local_r,
+        # to_j] for ag targets, [local_r, k] for non-ag targets — where local_r indexes the source's
+        # cell list (recover global cells via get_base_dvar_mj_cell_map / get_base_nonag_dvar_k_cell_map
+        # at the base year, the same maps that built ag_source_cells / nonag_source_cells).
+        dvar_D_ag2ag_mrj    = {}   # (from_m, from_j) -> (NLMS, ncells_src, N_AG_LUS)
+        dvar_D_ag2nonag_rk  = {}   # (from_m, from_j) -> (ncells_src, N_NON_AG_LUS)
+        dvar_D_nonag2ag_mrj = {}   # from_k           -> (NLMS, ncells_k, N_AG_LUS)
+        for (fm, fj), cells in self._input_data.ag_source_cells.items():
+            arr = np.zeros((self._input_data.nlms, len(cells), self._input_data.n_ag_lus), dtype=np.float32)
+            Fd = self.F_ag2ag[(fm, fj)]
+            if len(Fd):
+                keys = np.array(list(Fd.keys()), dtype=np.int64)                            # (n, 3): to_m, local_r, to_j
+                vals = np.array(self.gurobi_model.getAttr('X', list(Fd.values())), dtype=np.float32)
+                arr[keys[:, 0], keys[:, 1], keys[:, 2]] = vals
+            dvar_D_ag2ag_mrj[(fm, fj)] = arr
+
+            arr = np.zeros((len(cells), self._input_data.n_non_ag_lus), dtype=np.float32)
+            Fd = self.F_ag2nonag[(fm, fj)]
+            if len(Fd):
+                keys = np.array(list(Fd.keys()), dtype=np.int64)                            # (n, 2): k, local_r
+                vals = np.array(self.gurobi_model.getAttr('X', list(Fd.values())), dtype=np.float32)
+                arr[keys[:, 1], keys[:, 0]] = vals
+            dvar_D_ag2nonag_rk[(fm, fj)] = arr
+        for fk, cells in self._input_data.nonag_source_cells.items():
+            arr = np.zeros((self._input_data.nlms, len(cells), self._input_data.n_ag_lus), dtype=np.float32)
+            Fd = self.F_nonag2ag[fk]
+            if len(Fd):
+                keys = np.array(list(Fd.keys()), dtype=np.int64)                            # (n, 3): to_m, local_r, to_j
+                vals = np.array(self.gurobi_model.getAttr('X', list(Fd.values())), dtype=np.float32)
+                arr[keys[:, 0], keys[:, 1], keys[:, 2]] = vals
+            dvar_D_nonag2ag_mrj[fk] = arr
+
         ag_man_X_mrj = {
             am: np.stack((am_X_dry_sol_rj[am], am_X_irr_sol_rj[am]))
             for am in self._input_data.am2j
@@ -1375,34 +1885,33 @@ class LutoSolver:
         )
         prod_data["BIO (GBF2) value (ha)"] = (
             0                                                                               
-            if settings.BIODIVERSITY_TARGET_GBF_2 == "off"         
+            if settings.GBF2_TARGET == "off"         
             else self.bio_GBF2_expr.getValue() * self._input_data.scale_factors['GBF2']       
         )
         prod_data["BIO (GBF3) NVIS value (ha)"]=(
             0
-            if settings.BIODIVERSITY_TARGET_GBF_3_NVIS == "off"
+            if settings.GBF3_NVIS_TARGET == "off"
             else {
                 k: v.getValue() * self._input_data.scale_factors['GBF3_NVIS'].sel(layer=k).item()
                 for k,v in self.bio_GBF3_NVIS_exprs.items()
             }
         )
-        prod_data["BIO (GBF3) IBRA value (ha)"] = 0  # IBRA flows through GBF3 NVIS path
         prod_data["BIO (GBF4) SNES value (ha)"] = (
             {k: v.getValue() * self._input_data.scale_factors['GBF4_SNES'].sel(dict(layer=k)).item()
              for k, v in self.bio_GBF4_SNES_exprs.items()}
-            if settings.BIODIVERSITY_TARGET_GBF_4_SNES == "on"
+            if settings.GBF4_TARGET_SNES != 'off'
             else 0
         )
         prod_data["BIO (GBF4) ECNES value (ha)"] = (
             {k: v.getValue() * self._input_data.scale_factors['GBF4_ECNES'].sel(dict(layer=k)).item()
              for k, v in self.bio_GBF4_ECNES_exprs.items()}
-            if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == "on"
+            if settings.GBF4_TARGET_ECNES != 'off'
             else 0
         )
         prod_data["BIO (GBF8) value (ha)"] = (
             {k: v.getValue() * self._input_data.scale_factors['GBF8'].sel(layer=k).item()
              for k, v in self.bio_GBF8_exprs.items()}
-            if settings.BIODIVERSITY_TARGET_GBF_8 == "on"
+            if settings.GBF8_TARGET != "off"
             else 0
         )
                 
@@ -1414,6 +1923,9 @@ class LutoSolver:
             ag_X_mrj=ag_X_mrj,
             non_ag_X_rk=non_ag_X_sol_rk,
             ag_man_X_mrj=ag_man_X_mrj,
+            dvar_D_ag2ag_mrj=dvar_D_ag2ag_mrj,
+            dvar_D_ag2nonag_rk=dvar_D_ag2nonag_rk,
+            dvar_D_nonag2ag_mrj=dvar_D_nonag2ag_mrj,
             prod_data=prod_data,
             obj_val={
                 "ObjVal":(
@@ -1422,17 +1934,12 @@ class LutoSolver:
                     else self.gurobi_model.ObjVal
                 ),
                 
-                "Obj Economy":                      self.obj_economy.getValue() * settings.SOLVE_WEIGHT_ALPHA,
-                "Obj Biodiversity":                 self.obj_biodiv.getValue() * (1 - settings.SOLVE_WEIGHT_ALPHA),
+                "Obj Economy":                      self.obj_economy.getValue(),
                 "Obj Penalties":                    self.obj_penalties.getValue() * settings.SOLVE_WEIGHT_BETA,
-                
+
                 'Economy (AUD) Ag':                 self.economy_ag_contr.getValue() * self._input_data.scale_factors['Economy'],
                 'Economy (AUD) Non-Ag Value':       self.economy_non_ag_contr.getValue() * self._input_data.scale_factors['Economy'],
-                'Economy (AUD) Ag-Man Value':       self.economy_ag_man_contr.getValue() * self._input_data.scale_factors['Economy'],                
-                
-                "Bio quality (score) Ag":           self.bio_ag_contr.getValue() * self._input_data.scale_factors['Biodiversity'],
-                "Bio quality (score) Non-Ag":       self.bio_non_ag_contr.getValue() * self._input_data.scale_factors['Biodiversity'],
-                "Bio quality (score) Ag-Man":       self.bio_ag_man_contr.getValue() * self._input_data.scale_factors['Biodiversity'],
+                'Economy (AUD) Ag-Man Value':       self.economy_ag_man_contr.getValue() * self._input_data.scale_factors['Economy'],
 
                 "Deviation Production (t)":[
                     prod_data["Production"][c] - self._input_data.limits['demand'][c]
@@ -1453,26 +1960,25 @@ class LutoSolver:
                 ),
                 "Deviation BIO (GBF2) value (ha)":(
                     0                                                                             
-                    if settings.BIODIVERSITY_TARGET_GBF_2 == "off"         
+                    if settings.GBF2_TARGET == "off"         
                     else [
                         prod_data["BIO (GBF2) value (ha)"] - self._input_data.limits['GBF2']
                     ]         
                 ),
                 "Deviation BIO (GBF3) NVIS value (ha)":(
                     0                                                                               
-                    if settings.BIODIVERSITY_TARGET_GBF_3_NVIS == "off"         
+                    if settings.GBF3_NVIS_TARGET == "off"         
                     else [
                         v - self._input_data.limits['GBF3_NVIS'].sel(dict(layer=k)).item()
                         for k,v in prod_data["BIO (GBF3) NVIS value (ha)"].items()
                     ]
                 ),
-                "Deviation BIO (GBF3) IBRA value (ha)": 0,  # IBRA flows through GBF3 NVIS path
                 "Deviation BIO (GBF4) SNES value (ha)":(
                     [
                         v - self._input_data.limits['GBF4_SNES'].sel(dict(layer=k)).item()
                         for k,v in prod_data["BIO (GBF4) SNES value (ha)"].items() 
                     ]                  
-                    if settings.BIODIVERSITY_TARGET_GBF_4_SNES == "on"     
+                    if settings.GBF4_TARGET_SNES != 'off'     
                     else 0
                 ),
                 "Deviation BIO (GBF4) ECNES value (ha)":(
@@ -1480,7 +1986,7 @@ class LutoSolver:
                         v - self._input_data.limits['GBF4_ECNES'].sel(dict(layer=k)).item()
                         for k,v in prod_data["BIO (GBF4) ECNES value (ha)"].items()
                     ]
-                    if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == "on"    
+                    if settings.GBF4_TARGET_ECNES != 'off'    
                     else 0
                 ),
                 "Deviation BIO (GBF8) value (ha)":(
@@ -1488,7 +1994,7 @@ class LutoSolver:
                         v - self._input_data.limits['GBF8'].sel(dict(layer=k)).item()
                         for k,v in prod_data["BIO (GBF8) value (ha)"].items()   
                     ]
-                    if settings.BIODIVERSITY_TARGET_GBF_8 == "on"          
+                    if settings.GBF8_TARGET != "off"
                     else 0
                 ),
             }

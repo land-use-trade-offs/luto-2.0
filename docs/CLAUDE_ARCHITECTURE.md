@@ -9,15 +9,16 @@ This document describes the core architecture, modules, and data flow of LUTO2.
 - **`luto/settings.py`**: Configuration parameters for all model aspects
 - **`luto/solvers/`**: Optimization solver interface and input data preparation
   - `solver.py`: GUROBI solver wrapper (LutoSolver class)
-    - Biodiversity constraint methods: `_add_GBF2_constraints()`, `_add_GBF3_NVIS_constraints()`, `_add_GBF3_IBRA_constraints()`, `_add_GBF4_SNES_constraints()`, `_add_GBF4_ECNES_constraints()`, `_add_GBF8_constraints()`
+    - Biodiversity constraint methods: `_add_GBF2_constraints()`, `_add_GBF3_NVIS_constraints()`, `_add_GBF4_SNES_constraints()`, `_add_GBF4_ECNES_constraints()`, `_add_GBF8_constraints()`. IBRA bioregion targets have **no separate constraint method** — they run through `_add_GBF3_NVIS_constraints()` when `GBF3_NVIS_REGION_MODE = 'IBRA_REG'`.
     - Renewable energy constraint method: `_add_renewable_energy_constraints()` — enforces state-level solar and wind generation targets
     - Hard/soft constraint flexibility: `GHG_CONSTRAINT_TYPE`, `WATER_CONSTRAINT_TYPE`, `GBF2_CONSTRAINT_TYPE`
+    - Two-stream transition/accounting model (see "Theta-Fold Transition Model" below): `_setup_ag_accounting_vars()` re-expresses the folded decision vars for correct accounting.
   - `input_data.py`: Prepares optimization model input data
-    - Biodiversity data attributes use `*_pre_1750_area_*` naming (e.g., `GBF3_NVIS_pre_1750_area_vr`, `GBF3_IBRA_pre_1750_area_vr`, `GBF4_SNES_pre_1750_area_sr`)
+    - Biodiversity data attributes use `*_pre_1750_area_*` naming (e.g., `GBF3_NVIS_pre_1750_area_vr`, `GBF4_SNES_pre_1750_area_sr`). IBRA reuses the NVIS attribute — there is no `GBF3_IBRA_pre_1750_area_vr`.
     - Renewable energy data: `renewable_solar_r`, `renewable_wind_r` yield arrays; `region_state_r` mapping
     - `rescale_solver_input_data()`: Rescales arrays in-place to magnitude 0–1e3 for numerical stability. Each category (Economy, Demand, Biodiversity-quality, GHG, Water, GBF2/3/4/8, Renewable) is rescaled separately. **No post-rescale zeroing** — tiny cross-products are handled by `_qsum` in `solver.py`.
-    - `SOLVER_COEFF_MIN` (1e-4): Universal minimum coefficient threshold. `_qsum(coeffs, gurobi_vars)` in `solver.py` is called by **all** constraint and objective builders; any term whose absolute coefficient falls below this value is dropped before entering Gurobi. Chosen empirically: 1e-3 caused ~3% economic loss; 1e-4 retains meaningful small coefficients while keeping the matrix ratio at 1e8.
-    - Separate rescaling for: Economy, Demand, Biodiversity, GHG, Renewable_Solar, Renewable_Wind, Water, GBF2, GBF3_NVIS, GBF3_IBRA, GBF4_SNES, GBF4_ECNES, GBF8
+    - `SOLVER_COEFF_MIN` (1e-4): Universal minimum coefficient threshold. `_qsum(coeffs, gurobi_vars)` in `solver.py` is called by **all** constraint and objective builders; any term whose absolute coefficient falls below this value is dropped before entering Gurobi. A post-build sweep, `_floor_assembled_matrix()`, runs after `_setup_objective()` and re-applies the floor to the assembled constraint matrix **and** objective vector, catching sub-floor coefficients created downstream by the folded-sliver accounting re-expression. Chosen empirically: 1e-3 caused ~3% economic loss; 1e-4 keeps the matrix ratio at 1e8.
+    - Separate rescaling for: Economy, Demand, Biodiversity, GHG, Renewable_Solar, Renewable_Wind, Water, GBF2, GBF3_NVIS, GBF4_SNES, GBF4_ECNES, GBF8 (12 scale factors; IBRA shares the GBF3_NVIS factor)
 
 ## Economic Modules
 
@@ -36,10 +37,9 @@ This document describes the core architecture, modules, and data flow of LUTO2.
   - Applied to crops and livestock (beef, sheep, dairy) when `DYNAMIC_PRICE` enabled
 - **Biodiversity module** (`biodiversity.py`): GBF (Global Biodiversity Framework) calculations
   - `get_GBF2_MASK_area()`: Returns GBF2 priority degraded areas (mask × real area)
-  - `get_GBF3_NVIS_matrices_vr()`: NVIS vegetation layer matrices for GBF3
-  - `get_GBF3_IBRA_matrices_vr()`: IBRA bioregion layer matrices for GBF3
+  - `get_GBF3_NVIS_matrices_vr()`: NVIS vegetation layer matrices for GBF3 (also serves IBRA layers, selected by `GBF3_NVIS_REGION_MODE`)
   - `get_GBF4_SNES_matrix_sr()`, `get_GBF4_ECNES_matrix_sr()`: Species/Ecological Community NES matrices
-  - `get_GBF8_matrix_sr()`: Species conservation matrices
+  - `get_GBF8_matrix_sr(data, target_year)`: Species conservation matrices
   - Variable naming convention: `*_pre_1750_area_*` for baseline biodiversity area matrices
 - **Agricultural Management options** (10 types): Asparagopsis taxiformis, Precision Agriculture, Ecological Grazing, Savanna Burning, AgTech EI, Biochar, HIR-Beef, HIR-Sheep, Utility Solar PV, Onshore Wind
 
@@ -106,21 +106,24 @@ This document describes the core architecture, modules, and data flow of LUTO2.
    - Renewable energy: electricity yield, revenue, cost, biodiversity effects across all economics modules
 
 4. **Solver Input**: `solvers/input_data.py` prepares optimization model data
-   - Biodiversity matrices: GBF2 mask areas, GBF3 NVIS layers, GBF3 IBRA layers, GBF4 SNES/ECNES matrices, GBF8 species data
+   - Biodiversity matrices: GBF2 mask areas, GBF3 NVIS layers (NVIS or IBRA, per `GBF3_NVIS_REGION_MODE`), GBF4 SNES/ECNES matrices, GBF8 species data
    - Renewable energy: Solar/wind yield arrays (`renewable_solar_r`, `renewable_wind_r`), state region mapping, rescaled targets
-   - Data rescaling: Arrays rescaled in-place to 0-1e3 magnitude for numerical stability (13 separate scale factors)
+   - Data rescaling: Arrays rescaled in-place to 0-1e3 magnitude for numerical stability (12 separate scale factors; IBRA shares GBF3_NVIS)
 
 5. **Optimization**: `solvers/solver.py` runs GUROBI optimization with biodiversity, renewable energy, and environmental constraints
    - Hard/soft constraint flexibility for GHG, water, GBF2
-   - Penalty variables (V: demand, E: GHG, W: water) for soft constraints
-   - Multi-objective: economy + biodiversity terms with configurable weights
+   - Soft constraints add deviation penalties (`_setup_deviation_penalties()`): demand, GHG, water, biodiversity
+   - Objective: `obj_economy × (1 - SOLVE_WEIGHT_BETA) ± obj_penalties × SOLVE_WEIGHT_BETA`. `SOLVE_WEIGHT_BETA` is the **only** economy-vs-penalty knob — the former per-target `SOLVER_WEIGHT_DEMAND/GHG/WATER` weights were removed.
+   - After `_setup_objective()`, `_floor_assembled_matrix()` drops sub-`SOLVER_COEFF_MIN` coefficients from the assembled matrix and objective vector.
 
 6. **Output Generation**: `tools/write.py` writes results to `/output/`
    - **Two-stage writing process**: Decision variables and mosaic maps written first (stage 1), then all other outputs (stage 2)
    - Stage 1 uses `write_dvar_and_mosaic_map()` which combines dvar and mosaic generation in a single function
    - Mosaic maps are concatenated directly to dvar arrays before saving (optimizes file I/O)
    - Biodiversity outputs: GBF2/3/4/8 scores, species impacts, vegetation group restoration
-   - Parallel output writing with joblib (configurable via `WRITE_PARALLEL` and `WRITE_THREADS`)
+   - Transition reporting is rebuilt on the solved per-source **delta flows** (`data.delta_dvars_ag2ag[yr_cal]`), giving exact from→to attribution rather than a `base × target × cost` approximation
+   - **Per-constraint shadow prices**: after each accepted (OPTIMAL) solve, `record_shadow_prices()` (in `luto/tools/__init__.py`, called from `simulation.py`) reads each constraint's dual (`Constr.Pi`) and writes a shadow-price DataFrame per constraint family (GBF2, GBF3_NVIS, GBF4_SNES, GBF4_ECNES, GBF8, Water, GHG, Demand, Renewable, Regional Adoption) into each `out_<year>/` dir. Columns include `shadow_price` (per real unit, e.g. AUD/ha) and `shadow_price_AUD` (normalised, comparable across families)
+   - Parallel output writing with joblib (concurrency auto-determined by `WRITE_REPORT_MAX_MEM_MB`; `get_n_jobs()` budgets by true per-worker cost)
 
 ## Biodiversity Module Naming Conventions
 
@@ -128,12 +131,12 @@ The biodiversity module follows consistent naming conventions for GBF (Global Bi
 
 ### Variable Naming Pattern
 - **Pre-1750 baseline areas**: Use `*_pre_1750_area_*` suffix
-  - Examples: `GBF3_NVIS_pre_1750_area_vr`, `GBF3_IBRA_pre_1750_area_vr`, `GBF4_SNES_pre_1750_area_sr`, `GBF8_pre_1750_area_sr`
+  - Examples: `GBF3_NVIS_pre_1750_area_vr`, `GBF4_SNES_pre_1750_area_sr`, `GBF8_pre_1750_area_sr`
   - These represent baseline biodiversity area matrices before land use changes
 
 ### Function Naming Pattern
 - **GBF constraint methods**: Use `_add_GBF{N}_{TYPE}_constraints()` format
-  - Examples: `_add_GBF2_constraints()`, `_add_GBF3_NVIS_constraints()`, `_add_GBF3_IBRA_constraints()`, `_add_GBF4_SNES_constraints()`
+  - Examples: `_add_GBF2_constraints()`, `_add_GBF3_NVIS_constraints()`, `_add_GBF4_SNES_constraints()`, `_add_GBF4_ECNES_constraints()`, `_add_GBF8_constraints()`
   - Maintain consistency between method names and GBF target types
 
 ### Data Structure Indices
@@ -145,17 +148,14 @@ The biodiversity module follows consistent naming conventions for GBF (Global Bi
 1. **GBF2**: Priority degraded areas restoration
    - Function: `get_GBF2_MASK_area(data)` returns mask × real area
    - Constraint type: hard or soft (configurable via `GBF2_CONSTRAINT_TYPE`)
-2. **GBF3 NVIS**: NVIS major vegetation group targets
-   - Function: `get_GBF3_NVIS_matrices_vr(data)` returns vegetation layers
-   - Settings: `GBF3_NVIS_TARGET_CLASS` ('MVG' or 'MVS')
-3. **GBF3 IBRA**: IBRA bioregion targets
-   - Function: `get_GBF3_IBRA_matrices_vr(data)` returns bioregion layers
-   - Settings: `GBF3_IBRA_TARGET_CLASS` ('IBRA_Regions' or 'IBRA_Sub_regions')
-4. **GBF4**: Species and Ecological Community NES
+2. **GBF3 NVIS / IBRA**: NVIS major vegetation group targets, or IBRA bioregion targets
+   - Function: `get_GBF3_NVIS_matrices_vr(data)` returns the layers for both
+   - Settings: `GBF3_NVIS_TARGET_CLASS` ('NVIS_MVG' or 'NVIS_MVS'); `GBF3_NVIS_REGION_MODE` ('AUSTRALIA', 'NRM', or 'IBRA_REG') selects NVIS vs IBRA. There is no separate IBRA function, attribute, setting, or constraint method.
+3. **GBF4**: Species and Ecological Community NES
    - SNES: `get_GBF4_SNES_matrix_sr(data)`
    - ECNES: `get_GBF4_ECNES_matrix_sr(data)`
-5. **GBF8**: Species conservation
-   - Function: `get_GBF8_species_matrices_sr(data, target_year)`
+4. **GBF8**: Species conservation
+   - Function: `get_GBF8_matrix_sr(data, target_year)`
 
 ### Mask Proportion Strategy (`AG_MASK_PROPORTION_R`)
 
@@ -168,7 +168,7 @@ When `RESFACTOR > 1`, each coarsened cell may only partially overlap the LUTO st
   - `get_GBF2_target_for_yr_cal()` baseline sum → `* AG_MASK_PROPORTION_R`
 
 **Does NOT need `AG_MASK_PROPORTION_R`:**
-- **GBF3 NVIS/IBRA, GBF4 SNES/ECNES, GBF8** — Their layer arrays (`GBF3_NVIS_LAYERS_LDS`, `BIO_GBF4_SPECIES_LAYERS`, etc.) are built via `get_resfactored_average_fraction()`, which coarsens by computing `mean()` over all RESFACTOR² subcells (including zeros outside LUTO). A boundary cell with 7/25 subcells in LUTO gets fraction 7/25. Multiplied by `REAL_AREA` (= cell_area × RESFACTOR²), this correctly yields `7 × cell_area`. The partial-cell correction is already implicit in the fractional layer values.
+- **GBF3 NVIS/IBRA, GBF4 SNES/ECNES, GBF8** — Their layer arrays (`GBF3_NVIS_LAYERS_LDS`, `GBF4_SNES_LAYERS_SEL`, etc.) are built via `get_resfactored_average_fraction()`, which coarsens by computing `mean()` over all RESFACTOR² subcells (including zeros outside LUTO). A boundary cell with 7/25 subcells in LUTO gets fraction 7/25. Multiplied by `REAL_AREA` (= cell_area × RESFACTOR²), this correctly yields `7 × cell_area`. The partial-cell correction is already implicit in the fractional layer values.
 
 **Rule of thumb:** If the constraint coefficient is a **binary mask** or scalar per coarsened cell, multiply by `AG_MASK_PROPORTION_R`. If it comes from `get_resfactored_average_fraction()`, the correction is already built in.
 
@@ -202,21 +202,36 @@ Renewable energy types (Utility Solar PV, Onshore Wind) are implemented as non-r
 - `RENEWABLE_LAYERS`: NetCDF spatial layers (install cost, operation cost, capacity %, distribution loss %)
 - `RENEWABLE_BUNDLE_SOLAR` / `RENEWABLE_BUNDLE_WIND`: Parameters per land use
 
+## Theta-Fold Transition Model & Accounting Stream
+
+Transition costs use a **fold-into-dominant (θ)** model with a **two-stream** formulation in `solver.py`:
+
+- **Decision / flow stream (`dvar_flow`)** carries the *folded* composition: within each cell, every sub-θ land-use sliver is merged into that cell's **dominant** land use, so a single scalar variable represents "how much of this cell stays in its original composition". This keeps the transition matrix small and well-conditioned.
+- **Accounting stream (`dvar_account`)**, built by `_setup_ag_accounting_vars()`, **un-folds** that scalar back into each true land use as a constant-ratio `LinExpr`, so profit / water / GHG / GBF / production are scored against the real per-land-use fractions rather than the folded dominant.
+
+**Mental model** — a cell is a fixed-composition bundle scaled by one scalar. If a cell is 0.7 Beef + 0.3 Apple, folding merges Apple into the dominant Beef so one variable `X_Beef` (mass 1.0) represents the whole cell; each land use is then a constant ratio of it (`Apple = 0.3/1.0 · X_Beef`). Reducing `X_Beef` shrinks both fractions proportionally — the 7:3 composition ratio is preserved, only the scale changes.
+
+**Coefficient-floor consequence**: because accounting terms are `coeff × X_acct` where `X_acct` is a `LinExpr` with `~1/RESFACTOR²` weights, a floored-and-kept `coeff` can distribute into a *sub-floor* product on the dominant var. `_floor_assembled_matrix()` sweeps the assembled matrix and objective vector post-build to drop these (see `docs/FINDINGS.md`, 20260721).
+
+Transition **reporting** (`write.py`) is rebuilt on the solved per-source delta flows (`data.delta_dvars_ag2ag[yr_cal]` etc.), giving exact from→to attribution.
+
 ## Simulation Flow
 
 ```
 load_data() → Data() initialization
     ↓
-run(data) → solve_timeseries(data, years=[2010, 2015, ..., 2050])
+run(data) → solve_timeseries(data, years=sorted(SIM_YEARS))   # default 2020, 2025, …, 2050
     ↓
     For each year pair (base→target):
         ├── get_input_data(data, base_yr, target_yr) → SolverInputData
         ├── LutoSolver(input_data).formulate()
-        │   ├── _setup_vars()
+        │   ├── _setup_vars()             # incl. _setup_ag_accounting_vars() (accounting stream)
         │   ├── _setup_constraints()
-        │   └── _setup_objective()
+        │   ├── _setup_objective()
+        │   └── _floor_assembled_matrix() # post-build sub-SOLVER_COEFF_MIN sweep
         ├── solve() → SolverSolution
-        └── Store results: lumaps, lmmaps, ag_dvars, non_ag_dvars, ag_man_dvars
+        ├── record_shadow_prices(...) → out_<year>/ (per-constraint duals)
+        └── Store results: lumaps, lmmaps, ag_dvars, non_ag_dvars, ag_man_dvars, delta_dvars_ag2ag
     ↓
     save_data_to_disk(data) [joblib + lz4]
     ↓

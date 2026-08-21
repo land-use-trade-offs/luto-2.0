@@ -17,8 +17,46 @@
 # You should have received a copy of the GNU General Public License along with
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
+"""
+⚠ DECOMMISSIONED — kept for reference only, nothing imports this module.
+
+Land-use culling is incompatible with the per-source (from→to) flow transition model: it prunes the
+exclude matrix using a single dominant-LU-per-cell transition cost, whereas transition costs/deltas
+are now keyed per (from_m, from_j) source; pruning after the flow-feasibility dicts are built would
+also leave delta vars targeting cells with no X var (land would vanish through the missing
+node-balance row). The settings it reads (CULL_MODE, MAX_LAND_USES_PER_CELL,
+LAND_USAGE_CULL_PERCENTAGE) have been removed from settings.py. See the commented import in
+luto/solvers/input_data.py.
+"""
+
 import numpy as np
 from luto import settings
+
+
+def get_ag2ag_dominant_source_cost_mrj(data, base_year: int, target_year: int) -> np.ndarray:
+    """Flat dominant-source ag2ag transition cost ndarray(NLMS, NCELLS, N_AG_LUS) [to_m, r, to_j].
+
+    Dominant-source culling helper: assigns each cell exactly one dominant (from_m, from_j) via the
+    integerised base-year lumap/lmmap, evaluates the per-source cost primitive on that source's cells,
+    and scatters the result back so each cell carries the cost of leaving its dominant base-year LU
+    for each target. NOT accurate for the flow model (ignores the true fractional composition) —
+    culling was its only consumer.
+    """
+    # Local import to avoid an import cycle at module load (transitions imports water/ghg/tools).
+    from luto.economics.agricultural.transitions import get_transition_matrices_ag2ag
+
+    yr_idx     = target_year - data.YR_CAL_BASE
+    base_lumap = data.lumaps[base_year]
+    base_lmmap = data.lmmaps[base_year]
+
+    t_mrj = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
+    for from_m in range(data.NLMS):
+        for from_j in range(data.N_AG_LUS):
+            cells = np.where((base_lmmap == from_m) & (base_lumap == from_j))[0]
+            if cells.size == 0:
+                continue
+            t_mrj[:, cells, :] = get_transition_matrices_ag2ag(data, yr_idx, from_m, from_j, cells)
+    return t_mrj
 
 
 def get_percentage_cost_mask(m, r, x_mrj_mask, costs_mrj):

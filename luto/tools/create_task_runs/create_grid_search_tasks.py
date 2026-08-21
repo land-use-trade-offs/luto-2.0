@@ -37,7 +37,7 @@ grid_search = {
     # Task run settings for submitting the job to the cluster
     ###############################################################
     'MEM': ['300GB'],
-    'WRITE_REPORT_MAX_MEM_GB': [300],                                        # Max memory for writing report (in GB)
+    'WRITE_REPORT_MAX_MEM_MB': [300 * 1024],                                 # Max memory for writing report (in MB)
     'NCPUS':[32],
     'TIME': ['24:00:00'],
     'QUEUE': ['normalsr'],                                                  # normalsr for CPU, hugemembw for memory intensive jobs
@@ -49,9 +49,6 @@ grid_search = {
     'OBJECTIVE':        ['maxprofit'],                                             # 'maxprofit' or 'mincost'
     'RESFACTOR':        [1],
     'SIM_YEARS':        [[2020, 2025, 2030, 2035, 2050]],                          # base year 2010 implicit; explicit step years
-    'WRITE_PARALLEL':   [True],
-    'WRITE_THREADS':    [4],
-    'DO_IIS':           [False],  
     'WRITE_OUTPUTS':    [True],
  
     ###############################################################
@@ -80,12 +77,6 @@ grid_search = {
     'SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR':[100],                     # AUD/ha/year; $100/ha/year full maintenance cost
     'HIR_CEILING_PERCENTAGE': [0.8],                                        # HIR achieves 80% of bio/GHG benefits of Destocked - natural land
 
-    # --------------- Target deviation weight ---------------
-    'SOLVER_WEIGHT_DEMAND': [1], 
-    'SOLVER_WEIGHT_GHG': [1],
-    'SOLVER_WEIGHT_WATER': [1],
-
-
     # --------------- Social license ---------------
     'EXCLUDE_NO_GO_LU': [False],                                            # True or False
     'REGIONAL_ADOPTION_CONSTRAINTS': ['off'],                               # 'off' = core (LUF Report 2026); 'NON_AG_CAP' = lower-priority sensitivity
@@ -112,7 +103,7 @@ grid_search = {
     
     # --------------- Biodiversity overall ---------------
     'BIO_QUALITY_LAYER': ['Suitability'],
-    'CONTRIBUTION_PERCENTILE': ['USER_DEFINED'],                            # 50th percentile of HCAS per LUF Report 2026 (need to be 'USER_DEFINED', which is 50th percentile but with nudges for sheep/beef/dairy nat land)
+    'HCAS_CONTRIBUTION_PERCENTILE': ['USER_DEFINED'],                            # 50th percentile of HCAS per LUF Report 2026 (need to be 'USER_DEFINED', which is 50th percentile but with nudges for sheep/beef/dairy nat land)
     'CONNECTIVITY_SOURCE': ['NCI'],
     'CONNECTIVITY_LB': [0.7],                                               # Connectivity score importance: 0.7 per LUF Report 2026
 
@@ -127,27 +118,27 @@ grid_search = {
     'BIO_CONTRIBUTION_DESTOCKING': [0.75],                                  # Destocking (doc=0.75, default=None=uses HCAS lookup difference)
     
     # --------------- Biodiversity settings - GBF 2 ---------------
-    'BIODIVERSITY_TARGET_GBF_2': ['high'],                                  # 'off', 'low', 'medium', 'high'
+    'GBF2_TARGET': ['high'],                                  # 'off', 'low', 'medium', 'high'
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [15],                    # Core: 20% central; test [15,30] alongside (Third iteration)
     'GBF2_CONSTRAINT_TYPE': ['hard'],                                       # 'hard' or 'soft'
 
     # --------------- Biodiversity settings - GBF 3 ---------------
-    'BIODIVERSITY_TARGET_GBF_3_NVIS': ['high'],                             # 'off', 'medium', 'high', 'USER_DEFINED'
-    'GBF3_NVIS_TARGET_CLASS': ['MVS'],                                      # 'MVG' or 'MVS' NVIS class
-    'GBF3_NVIS_REGION_MODE': ['Australia'],                                 # 'Australia' or 'NRM'
+    'GBF3_NVIS_TARGET': ['high'],                             # 'off', 'medium', 'high', 'USER_DEFINED'
+    'GBF3_NVIS_TARGET_CLASS': ['NVIS_MVS'],                                  # 'NVIS_MVG' or 'NVIS_MVS' NVIS class
+    'GBF3_NVIS_REGION_MODE': ['AUSTRALIA'],                                 # 'AUSTRALIA', 'NRM', or 'IBRA_REG'
     'GBF3_NVIS_SELECTED_REGIONS': [['North East', 'Goulburn Broken']],      # Only used when mode = 'NRM'
     'BIODIVERSITY_TARGET_GBF_3_IBRA': ['off'],                              # 'off', 'medium', 'high', 'USER_DEFINED'
 
     # --------------- Biodiversity settings - GBF 4 ---------------
-    'BIODIVERSITY_TARGET_GBF_4_SNES': ['on'],                               # 'on' or 'off'
+    'GBF4_TARGET_SNES': ['USER_DEFINED'],                     # 'off', 'medium', 'high', or 'USER_DEFINED'
     'GBF4_SNES_REGION_MODE': ['Australia'],                                 # 'Australia' or 'NRM'
     'GBF4_SNES_SELECTED_REGIONS': [['North East', 'Goulburn Broken']],      # Only used when mode = 'NRM'
-    'BIODIVERSITY_TARGET_GBF_4_ECNES': ['on'],                              # 'on' or 'off'
+    'GBF4_TARGET_ECNES': ['USER_DEFINED'],                    # 'off', 'medium', 'high', or 'USER_DEFINED'
     'GBF4_ECNES_REGION_MODE': ['Australia'],                                # 'Australia' or 'NRM'
     'GBF4_ECNES_SELECTED_REGIONS': [['North East', 'Goulburn Broken']],     # Only used when mode = 'NRM'
 
     # --------------- Biodiversity settings - GBF 8 ---------------
-    'BIODIVERSITY_TARGET_GBF_8': ['off'],                                   # 'on' or 'off'
+    'GBF8_TARGET': ['off'],                                   # 'off', 'medium', 'high', or 'USER_DEFINED'
 
     # --------------- Renewable energy ---------------
     # Core: RE OFF. REN1-REN4 are separate renewable energy scenario runs (not part of this grid search).
@@ -167,8 +158,7 @@ grid_search = {
 
 
     # --------------- Objective function weights ---------------
-    'SOLVE_WEIGHT_ALPHA': [1],                                              # between 0 and 1, if 1 will turn off biodiversity objective, if 0 will turn off profit objective
-    'SOLVE_WEIGHT_BETA':  [0.5],         
+    'SOLVE_WEIGHT_BETA':  [0.5],
     
     # --------------- Ag management ---------------
     'AG_MANAGEMENTS': [{
@@ -231,7 +221,7 @@ grid_search = {
 
 duplicate_runs = {
     'REGIONAL_ADOPTION_CONSTRAINTS': ('off', 'REGIONAL_ADOPTION_NON_AG_CAP'),
-    'BIODIVERSITY_TARGET_GBF_2': ('off', 'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT'),
+    'GBF2_TARGET': ('off', 'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT'),
 }
 
 

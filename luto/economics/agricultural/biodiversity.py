@@ -46,24 +46,30 @@ different from the biodiversity constraints which are for specific species
 (e.g., GBF2-GBF4, GBF8) or specific areas (NRM, STATE ...).
 '''
 
-def get_bio_quality_score_mrj(data:Data):
+def get_bio_quality_score_mrj(data: Data, bio_quality_raw: np.ndarray = None, bio_quality_lds: np.ndarray = None):
     """
     Return b_mrj biodiversity score matrices by land management, cell, and land-use type.
 
     Parameters
     - data: The data object containing information about land management, cells, and land-use types.
+    - bio_quality_raw: Optional override for data.BIO_QUALITY_RAW (used when computing scores for
+      a backend layer other than settings.BIO_QUALITY_LAYER).
+    - bio_quality_lds: Optional override for data.BIO_QUALITY_LDS.
 
     Returns
     - np.ndarray.
     """
+    bq_raw = bio_quality_raw if bio_quality_raw is not None else data.BIO_QUALITY_RAW
+    bq_lds = bio_quality_lds if bio_quality_lds is not None else data.BIO_QUALITY_LDS
+
     b_mrj = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
 
     for j in range(data.N_AG_LUS):
         b_mrj[:, :, j] = (
-            data.BIO_QUALITY_LDS -                                                     # Biodiversity score after Late Dry Season (LDS) burning
-            (data.BIO_QUALITY_RAW * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[j]))    # Biodiversity degradation for land-use j
-        ) * data.REAL_AREA    
-    
+            bq_lds -                                                       # Biodiversity score after Late Dry Season (LDS) burning
+            (bq_raw * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[j]))     # Biodiversity degradation for land-use j
+        ) * data.REAL_AREA
+
     return b_mrj
 
 
@@ -109,7 +115,7 @@ def get_ecological_grazing_effect_b_mrj(data:Data):
     return np.zeros((data.NLMS, data.NCELLS, nlus), dtype=np.float32)
 
 
-def get_savanna_burning_effect_b_mrj(data:Data):
+def get_savanna_burning_effect_b_mrj(data: Data, bio_quality_raw: np.ndarray = None):
     """
     Gets biodiversity impacts of using Savanna Burning.
 
@@ -119,19 +125,21 @@ def get_savanna_burning_effect_b_mrj(data:Data):
 
     Parameters
     - data: The input data containing information about land management and biodiversity.
+    - bio_quality_raw: Optional override for data.BIO_QUALITY_RAW.
 
     Returns
     - new_b_mrj: A numpy array representing the biodiversity impacts of using Savanna Burning.
     """
+    bq_raw = bio_quality_raw if bio_quality_raw is not None else data.BIO_QUALITY_RAW
+
     nlus = len(settings.AG_MANAGEMENTS_TO_LAND_USES["Savanna Burning"])
     new_b_mrj = np.zeros((data.NLMS, data.NCELLS, nlus), dtype=np.float32)
 
     eds_sav_burning_biodiv_benefits = np.where(
-        data.SAVBURN_ELIGIBLE, 
-        data.BIO_QUALITY_RAW * (1 - settings.BIO_CONTRIBUTION_LDS) * data.REAL_AREA, 
+        data.SAVBURN_ELIGIBLE,
+        bq_raw * (1 - settings.BIO_CONTRIBUTION_LDS) * data.REAL_AREA,
         0
     ).astype(np.float32)
-    
 
     for m, j in itertools.product(range(data.NLMS), range(nlus)):
         new_b_mrj[m, :, j] = eds_sav_burning_biodiv_benefits
@@ -298,28 +306,31 @@ def get_onshore_wind_effect_b_mrj(data:Data, ag_b_mrj: np.ndarray, yr_idx: int):
     return b_mrj_effect
 
 
-def get_ag_mgt_biodiversity_matrices(data:Data, ag_b_mrj: np.ndarray, yr_idx: int):
+def get_ag_mgt_biodiversity_matrices(data: Data, ag_b_mrj: np.ndarray, yr_idx: int, bio_quality_raw: np.ndarray = None):
     """
     Calculate the biodiversity matrices for different agricultural management practices.
 
     Parameters
     - data: The input data used for calculations.
+    - ag_b_mrj: Agricultural biodiversity matrix (already computed for the desired backend layer).
+    - yr_idx: Year index.
+    - bio_quality_raw: Optional override for data.BIO_QUALITY_RAW (forwarded to Savanna Burning).
 
     Returns
     A dictionary containing the biodiversity matrices for different agricultural management practices.
     The keys of the dictionary represent the management practices, and the values represent the corresponding biodiversity matrices.
     """
 
-    asparagopsis_data = get_asparagopsis_effect_b_mrj(data)                       
-    precision_agriculture_data = get_precision_agriculture_effect_b_mrj(data)     
-    eco_grazing_data = get_ecological_grazing_effect_b_mrj(data)                   
-    sav_burning_data = get_savanna_burning_effect_b_mrj(data)                       
-    agtech_ei_data = get_agtech_ei_effect_b_mrj(data)                               
-    biochar_data = get_biochar_effect_b_mrj(data, ag_b_mrj, yr_idx)                 
-    beef_hir_data = get_beef_hir_effect_b_mrj(data, ag_b_mrj)                       
+    asparagopsis_data = get_asparagopsis_effect_b_mrj(data)
+    precision_agriculture_data = get_precision_agriculture_effect_b_mrj(data)
+    eco_grazing_data = get_ecological_grazing_effect_b_mrj(data)
+    sav_burning_data = get_savanna_burning_effect_b_mrj(data, bio_quality_raw)
+    agtech_ei_data = get_agtech_ei_effect_b_mrj(data)
+    biochar_data = get_biochar_effect_b_mrj(data, ag_b_mrj, yr_idx)
+    beef_hir_data = get_beef_hir_effect_b_mrj(data, ag_b_mrj)
     sheep_hir_data = get_sheep_hir_effect_b_mrj(data, ag_b_mrj)
     solar_pv_data = get_utility_solar_pv_effect_b_mrj(data, ag_b_mrj, yr_idx)
-    wind_data = get_onshore_wind_effect_b_mrj(data, ag_b_mrj, yr_idx)                  
+    wind_data = get_onshore_wind_effect_b_mrj(data, ag_b_mrj, yr_idx)
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,
@@ -393,15 +404,10 @@ def get_GBF4_SNES_matrix_sr(data: Data) -> xr.DataArray:
     Returns
     -------
     xr.DataArray
-        dims ['layer', 'cell'] — layer coord is a MultiIndex of (region, species).
-        Region masking is already baked into each layer row.
+        dims ['layer', 'cell'] — layer coord is a MultiIndex of (species, presence).
+        Full-Australia layers; no per-region masking.
     """
-    layers = data.BIO_GBF4_SPECIES_LAYERS  # xr.DataArray[layer, cell]
-    return xr.where(
-        data.SAVBURN_ELIGIBLE,
-        layers * data.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
-        layers * data.REAL_AREA,
-    ).astype(np.float32)
+    return data.GBF4_SNES_LAYERS_LDS * data.REAL_AREA
 
 
 def get_GBF4_ECNES_matrix_sr(data: Data) -> xr.DataArray:
@@ -411,15 +417,10 @@ def get_GBF4_ECNES_matrix_sr(data: Data) -> xr.DataArray:
     Returns
     -------
     xr.DataArray
-        dims ['layer', 'cell'] — layer coord is a MultiIndex of (region, species).
-        Region masking is already baked into each layer row.
+        dims ['layer', 'cell'] — layer coord is a MultiIndex of (species, presence).
+        Full-Australia layers; no per-region masking.
     """
-    layers = data.BIO_GBF4_COMUNITY_LAYERS  # xr.DataArray[layer, cell]
-    return xr.where(
-        data.SAVBURN_ELIGIBLE,
-        layers * data.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
-        layers * data.REAL_AREA,
-    ).astype(np.float32)
+    return data.GBF4_ECNES_LAYERS_LDS * data.REAL_AREA
 
 
 def get_GBF8_matrix_sr(data: Data, target_year: int) -> xr.DataArray:

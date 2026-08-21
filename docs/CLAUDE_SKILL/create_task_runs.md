@@ -31,20 +31,28 @@ jinzhu_inspect_code/<Iteration>/
 One script per batch. It has four parts:
 
 1. **Top-level constants** — `LUTO_DIR`, `TASK_DIR` hardcoded as `Path` objects
-2. **`BASE_GRID`** — **only** cluster params + intentional overrides from `settings.py`
+2. **`BASE_GRID`** — cluster params + all settings that are **constant across all runs** in the batch
 3. **`RUN_OVERRIDES`** — list of `(run_label, scenario_group, overrides_dict)` tuples, one per run
 4. **`build()` + `__main__`** — generates CSVs, creates `Run_G*` dirs, copies `run_all.py`
 
-### BASE_GRID rule: only overrides, never copies
+### BASE_GRID rule: all shared settings, RUN_OVERRIDES for what varies
 
-`build()` seeds every run's `settings_dict` from `get_settings_df()`, which reads the **live** `luto/settings.py`. So any key absent from BASE_GRID is automatically inherited from the source. **Only add a key to BASE_GRID when you deliberately want a different value.** Never copy settings.py values verbatim — that creates a sync hazard.
+`build()` seeds every run's `settings_dict` from `get_settings_df()`, which reads the **live** `luto/settings.py`. Keys absent from BASE_GRID are inherited automatically from the source.
+
+**BASE_GRID** should contain every setting that is **constant across all runs** — whether it differs from the `settings.py` default or not. If a setting appears as a shared column in the scenario table, put it in BASE_GRID so it is visible and auditable in one place.
+
+**RUN_OVERRIDES** should contain only the settings that **vary between runs**. Every key in a run's override dict replaces the corresponding BASE_GRID value for that run.
 
 ```
 BASE_GRID contains:
   ① Cluster params not in settings.py  (MEM, NCPUS, TIME, QUEUE)
-  ② Settings that intentionally differ  (CARBON_EFFECTS_WINDOW, DYNAMIC_PRICE, …)
-  ③ Per-axis params that are constant   across all runs but vary from defaults
-Everything else → inherited from get_settings_df() automatically
+  ② All settings constant across the batch — including those that match settings.py
+     defaults but appear as shared columns in the scenario table
+     (e.g. RESFACTOR=5, REGIONAL_ADOPTION_CONSTRAINTS='off')
+
+RUN_OVERRIDES contains:
+  ③ Per-run settings that differ between runs
+     (e.g. RENEWABLE_TARGET_SCENARIO_INPUT_LAYERS, RENEWABLE_GBF2_CUT_SOLAR, …)
 ```
 
 ### Full template
@@ -74,7 +82,9 @@ TASK_DIR = Path(r'F:\Users\jinzhu\Documents\Custom_runs\<Iteration>')
 
 
 # ----------------------------------------------------------------------
-# BASE GRID — intentional overrides from settings.py defaults.
+# BASE GRID — all settings constant across every run in this batch.
+# Includes cluster params and any scenario-table column that is shared.
+# Settings that vary between runs go in RUN_OVERRIDES instead.
 # Everything not listed here is inherited from luto/settings.py via
 # get_settings_df(), so this list stays in sync automatically.
 # ----------------------------------------------------------------------
@@ -87,7 +97,6 @@ BASE_GRID = {
 
     # --- Intentional overrides (differ from settings.py) ---
     'SIM_YEARS':               [[2010, 2020, 2025, 2030, 2035, 2040, 2045, 2050]],
-    'WRITE_THREADS':           [12],            # settings.py: min(16, cpu_count)
     'WRITE_REPORT_MAX_MEM_GB': [120],           # settings.py: 64
     'CARBON_EFFECTS_WINDOW':   [60],            # settings.py: 50
     'DYNAMIC_PRICE':           [True],          # settings.py: False
@@ -251,9 +260,8 @@ These are the settings that task run scripts legitimately deviate from `settings
 | `CARBON_EFFECTS_WINDOW` | `50` | `60` | Longer carbon window per scenario spec |
 | `GHG_EMISSIONS_LIMITS` | `'high'` | `'low'` (core) / `'high'` (sensitivity) | Per batch GHG ambition level |
 | `SIM_YEARS` | `[2010…2050]` | batch-specific start year | Skip base year when running from 2020 |
-| `WRITE_THREADS` | `min(16, cpu_count)` | `12` | Cluster thread cap |
 | `WRITE_REPORT_MAX_MEM_GB` | `64` | `120` | Cluster memory allocation |
-| `BIODIVERSITY_TARGET_GBF_4_SNES/ECNES` | `'off'` | `'on'` | Enable GBF4 targets |
+| `GBF4_TARGET_SNES/ECNES` | `'off'` | `'on'` | Enable GBF4 targets |
 | `GBF4_*_REGION_MODE` | `'NRM'` | `'Australia'` | Australia-wide run (not NRM-restricted) |
 
 Everything else (`BIO_CONTRIBUTION_*`, `WATER_REGION_DEF`, `IMPORT_TREND`, `HIR_CEILING_PERCENTAGE`, etc.) matches `settings.py` and must **not** be listed in BASE_GRID.
@@ -275,8 +283,8 @@ Everything else (`BIO_CONTRIBUTION_*`, `WATER_REGION_DEF`, `IMPORT_TREND`, `HIR_
 ## Checklist for a new batch
 
 - [ ] Copy `create_tasks.py` from a recent iteration; update docstring, `TASK_DIR`
-- [ ] **BASE_GRID: only list cluster params + intentional overrides** — do not copy settings.py values verbatim; everything else inherits automatically from `get_settings_df()`
-- [ ] Cross-check BASE_GRID against the "Known intentional overrides" table above; remove any key that matches its `settings.py` default
+- [ ] **BASE_GRID: list cluster params + every setting that is constant across all runs** — including shared scenario-table columns even when they match `settings.py` defaults (e.g. `RESFACTOR`, `REGIONAL_ADOPTION_CONSTRAINTS`)
+- [ ] **RUN_OVERRIDES: list only the settings that vary between runs** — do not repeat BASE_GRID values in overrides unless explicitly changing them for a specific run
 - [ ] If `RENEWABLES_OPTIONS` is **overridden** in BASE_GRID: also override `AG_MANAGEMENTS` to match (otherwise both are inherited correctly from `settings.py` automatically)
 - [ ] Define `RUN_OVERRIDES` — one tuple per run, all override lists are single-element
 - [ ] Run `python create_tasks.py` — check console output for expected run count

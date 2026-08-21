@@ -13,6 +13,8 @@ window.GHGView = {
     const yearIndex = ref(0);
     const selectYear = ref(2020);
     const selectRegion = inject("globalSelectedRegion");
+    const availableRegionLevels = ['region_state', 'region_NRM'];
+    const selectRegionLevel = ref('region_state');
 
     const availableYears = ref([]);
     const availableUnit = {
@@ -62,7 +64,7 @@ window.GHGView = {
       const landuse = selectLanduse.value;
       const region = selectRegion.value;
       if (!dataLoaded.value) return {};
-      const chartData = window[chartRegister[cat]?.["name"]]?.[region];
+      const chartData = window[chartRegister[cat]?.["name"]]?.[selectRegionLevel.value]?.[region];
       let seriesData;
 
       if (cat === "Sum") {
@@ -134,6 +136,7 @@ window.GHGView = {
 
     const toggleDrawer = () => { isDrawerOpen.value = !isDrawerOpen.value; };
     watch(yearIndex, (i) => { selectYear.value = availableYears.value[i]; });
+    watch(selectRegionLevel, () => { selectRegion.value = 'AUSTRALIA'; });
 
     watch(selectCategory, async (newCat, oldCat) => {
       if (oldCat === "Sum") previousSelections.value["Sum"] = { landuse: selectLanduse.value };
@@ -246,6 +249,7 @@ window.GHGView = {
 
     const _state = {
       yearIndex, selectYear, selectRegion,
+      availableRegionLevels, selectRegionLevel,
       availableYears, availableCategories,
       availableAgMgt, availableWater, availableSource, availableLanduse,
       selectCategory, selectAgMgt, selectWater, selectSource, selectLanduse,
@@ -263,13 +267,30 @@ window.GHGView = {
   template: /*html*/`
     <div class="relative w-full h-screen">
 
-      <!-- Region selection dropdown -->
-      <div class="absolute w-[262px] top-32 left-[20px] z-50 bg-white/70 rounded-lg shadow-lg max-w-xs z-[9999]">
-        <filterable-dropdown></filterable-dropdown>
+      <!-- Region level tabs + Region selection dropdown -->
+      <div class="absolute w-[262px] top-28 left-[20px] z-[9999] max-w-xs">
+        <!-- Drawer-style region level tabs -->
+        <div class="flex gap-1 ml-2 mb-0">
+          <button v-for="lvl in availableRegionLevels" :key="lvl"
+            @click="selectRegionLevel = lvl"
+            class="px-2 py-0.5 text-[0.65rem] font-medium rounded-t-md border border-b-0 transition-colors"
+            :class="selectRegionLevel === lvl
+              ? 'bg-white/90 border-gray-300 text-sky-600'
+              : 'bg-white/40 border-gray-200 text-gray-500 hover:bg-white/60'">
+            {{ lvl === 'region_state' ? 'State' : 'NRM' }}
+          </button>
+        </div>
+        <!-- Dropdown panel -->
+        <div class="bg-white/70 rounded-lg shadow-lg">
+          <filterable-dropdown
+            :key="selectRegionLevel"
+            :region-type="selectRegionLevel === 'region_state' ? 'STATE' : 'NRM'">
+          </filterable-dropdown>
+        </div>
       </div>
 
       <!-- Year slider -->
-      <div class="absolute top-[200px] left-[20px] z-[1001] w-[262px] bg-white/70 p-2 rounded-lg items-center">
+      <div class="absolute top-[240px] left-[20px] z-[1001] w-[262px] bg-white/70 p-2 rounded-lg items-center">
         <p class="text-[0.8rem]">Year: <strong>{{ selectYear }}</strong></p>
         <el-slider
           v-if="availableYears && availableYears.length > 0"
@@ -285,7 +306,7 @@ window.GHGView = {
       </div>
 
       <!-- Data selection controls container -->
-      <div class="absolute top-[285px] left-[20px] w-[320px] z-[1001] flex flex-col space-y-3 bg-white/70 p-2 rounded-lg">
+      <div class="absolute top-[325px] left-[20px] w-[320px] z-[1001] flex flex-col space-y-3 bg-white/70 p-2 rounded-lg">
 
         <!-- Category buttons (always visible) -->
         <div class="flex space-x-1">
@@ -362,6 +383,7 @@ window.GHGView = {
         <regions-map
           :mapData="selectMapData"
           :file-name="mapFileName"
+          :region-type="selectRegionLevel === 'region_state' ? 'STATE' : 'NRM'"
           :show-legend="!isDrawerOpen"
           style="width: 100%; height: 100%;">
         </regions-map>

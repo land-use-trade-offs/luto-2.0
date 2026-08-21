@@ -159,26 +159,30 @@ The economics module is unique: map files are split by both Category and Map Typ
 | `Economics_Am` | `Region → "ALL" → "ALL" → [series]` |
 | `Economics_Non_Ag` | `Region → [series]` |
 
-**Map files** — Ag (5 map types):
+**Map files** — Sum (1 map type):
 
-| Map Type | Hierarchy | Source level? |
-|----------|-----------|---------------|
-| `map_economics_Ag_profit` | `Water → LU → Year` | No |
-| `map_economics_Ag_revenue` | `Water → Source → LU → Year` | Yes |
-| `map_economics_Ag_cost` | `Water → Source → LU → Year` | Yes |
-| `map_economics_Ag_transition_ag2ag` | `Water → Source → LU → Year` | Yes |
-| `map_economics_Ag_transition_ag2nonag` | `Water → Source → LU → Year` | Yes (`from_lu` treated as LU) |
+`map_economics_Sum_profit` → `LU → Year` (mapType is fixed to `Profit`)
 
-**Map files** — Am (3 map types, no Source level):
+**Map files** — Ag (5 map types — Profit, Revenue, Cost, and two transition maps):
+
+| Map Type key (MapService) | layerPrefix | Hierarchy | Source level? |
+|----------|-----------|-----------|---------------|
+| `Profit` | `map_economics_Ag_profit` | `Water → LU → Year` | No |
+| `Revenue` | `map_economics_Ag_revenue` | `Water → Source → LU → Year` | Yes |
+| `Cost` | `map_economics_Ag_cost` | `Water → Source → LU → Year` | Yes |
+| `Transition (Ag2Ag)` | `map_economics_Ag_transition_ag2ag` | `Water → Source → LU → Year` | Yes |
+| `Transition (NonAg2Ag)` | `map_economics_Ag_transition_nonag2ag` | `Water → Source → LU → Year` | Yes |
+
+**Map files** — Ag Mgt (3 map types, no Source level):
 
 `map_economics_Am_{profit/revenue/cost}` → `AgMgt → Water → LU → Year`
 
-**Map files** — NonAg (3 map types, no Water/Source level):
+**Map files** — NonAg (5 map types — Profit, Revenue, Cost, and two transition maps):
 
-`map_economics_NonAg_{profit/revenue/cost}` → `LU → Year`
+`map_economics_NonAg_{profit/revenue/cost}` → `LU → Year`; plus `Transition (Ag2NonAg)` → `map_economics_NonAg_transition_ag2non_ag` and `Transition (NonAg2NonAg)` → `map_economics_NonAg_transition_nonag2nonag`. (The ag→non-ag transition map lives under **NonAg**, not Ag.)
 
-**MapService structure**: `Economics → {Ag/Am/NonAg} → {MapType} → {path, name}`
-- `availableMapTypes = Object.keys(mapRegister[category])` — dynamic (5 for Ag, 3 for Am/NonAg)
+**MapService structure**: `Economics → {Sum/Ag/Ag Mgt/Non-Ag} → {MapType} → { indexPath, indexName, layerPrefix }`
+- `availableMapTypes = Object.keys(mapRegister[category])` — dynamic (1 for Sum, 5 for Ag, 3 for Ag Mgt, 5 for Non-Ag)
 - Source level shown only when `category === "Ag" && mapType !== "Profit"` (`hasSourceLevel` computed)
 
 ### GHG
@@ -218,16 +222,19 @@ Biodiversity adds a **Metric** selection level on top of the standard Category �
 
 **Available metrics and their `settings.py` gating key:**
 
-| Metric key | Display label | Settings key | Always loaded? |
+The gating key is the `settingsKey` map in `Biodiversity.js` (checked against the run's `settings`):
+
+| Metric key | Display label | Gating settings key | Always loaded? |
 |-----------|--------------|-------------|---------------|
-| `quality` | Quality | — | Yes |
-| `GBF2` | GBF2 | `BIODIVERSITY_TARGET_GBF_2` | If ≠ 'off' |
-| `GBF3_NVIS` | GBF3 NVIS | `BIODIVERSITY_TARGET_GBF_3_NVIS` | If ≠ 'off' |
-| `GBF3_IBRA` | GBF3 IBRA | `BIODIVERSITY_TARGET_GBF_3_IBRA` | If ≠ 'off' |
-| `GBF4_SNES` | GBF4 SNES | `BIODIVERSITY_TARGET_GBF_4_SNES` | If ≠ 'off' |
-| `GBF4_ECNES` | GBF4 ECNES | `BIODIVERSITY_TARGET_GBF_4_ECNES` | If ≠ 'off' |
-| `GBF8_GROUP` | GBF8 Group | `BIODIVERSITY_TARGET_GBF_8` | If ≠ 'off' |
-| `GBF8_SPECIES` | GBF8 Species | `BIODIVERSITY_TARGET_GBF_8` | If ≠ 'off' |
+| `quality` | Quality | `null` | Yes |
+| `GBF2` | GBF2 | `GBF2_TARGET` | If ≠ 'off' |
+| `GBF3_NVIS` | GBF3 NVIS | `WRITE_GBF3_NVIS` | If truthy |
+| `GBF4_SNES` | GBF4 SNES | `WRITE_GBF4_SNES` | If truthy |
+| `GBF4_ECNES` | GBF4 ECNES | `WRITE_GBF4_ECNES` | If truthy |
+| `GBF8_GROUP` | GBF8 Group | `GBF8_TARGET` | If ≠ 'off' |
+| `GBF8_SPECIES` | GBF8 Species | `GBF8_TARGET` | If ≠ 'off' |
+
+There is **no `GBF3_IBRA` metric** — IBRA bioregion results reuse the `GBF3_NVIS` metric/layers (the model selects NVIS vs IBRA upstream via `GBF3_NVIS_REGION_MODE`).
 
 **Per-metric available categories**: GBF3/GBF4 metrics have no `Sum` mosaic layer.
 `availableCategories` is a computed that filters `["Sum","Ag","Ag Mgt","Non-Ag"]` against
@@ -475,10 +482,11 @@ watch(selectSource, async (newSource) => {
 **Cascading flow**:
 `[category, mapType]` → AgMgt → Water → Source (if Ag non-Profit) → LU → `ensureComboLayer`
 
-**`previousSelections` fields**:
+**`previousSelections` fields** (Economics — categories `["Sum", "Ag", "Ag Mgt", "Non-Ag"]`):
 
+- `"Sum"`: `{ mapType, landuse }` (mapType fixed to `Profit`)
 - `"Ag"`: `{ mapType, water, source, landuse }`
-- `"Ag Mgt"`: `{ mapType, agMgt, water, landuse }`
+- `"Ag Mgt"`: `{ mapType, agMgt, water, costType, landuse }` (Cost chart adds a `costType` level: `agMgt → water → costType → [series by LU]`)
 - `"Non-Ag"`: `{ mapType, landuse }`
 
 ### `selectMapData` access pattern

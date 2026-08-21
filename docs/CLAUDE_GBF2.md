@@ -14,7 +14,7 @@ The GBF framework measures degradation relative to a pre-1750 biodiversity basel
 
 Not all degraded cells are targeted. GBF2 focuses on **priority** cells: those that matter most to overall biodiversity benefit if restored. LUTO identifies them using a Zonation-derived **conservation performance curve**.
 
-The curve maps the cumulative area percentage (ranked from highest to lowest biodiversity quality) to the cumulative biodiversity benefit percentage. By choosing a cut at `GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 20` (the top 20% of biodiversity-weighted area), LUTO selects the cells that contribute disproportionately high biodiversity returns per hectare restored.
+The curve maps the cumulative area percentage (ranked from highest to lowest biodiversity quality) to the cumulative biodiversity benefit percentage. By choosing a cut at `GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 15` (the top 15% of biodiversity-weighted area), LUTO selects the cells that contribute disproportionately high biodiversity returns per hectare restored.
 
 **Mask construction** (`data.py`):
 
@@ -29,7 +29,7 @@ threshold = conservation_performance_curve[GBF2_PRIORITY_DEGRADED_AREAS_PERCENTA
 BIO_GBF2_MASK = bio_quality_raw >= threshold   # shape [NCELLS]
 ```
 
-`GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 20` — cells in the top 20% of the performance curve.  
+`GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 15` — cells in the top 15% of the performance curve.  
 Setting it to 0 disables the mask entirely; 100 applies it to all LUTO cells.
 
 ### 1.3 Biodiversity contribution per land use
@@ -43,7 +43,7 @@ BIO_HABITAT_CONTRIBUTION_LOOK_UP = {j: bio_contribution_j, ...}
 
 ### 1.4 Savanna burning (LDS correction)
 
-Cells eligible for savanna burning (`SAVBURN_ELIGIBLE`) operate under a **late dry season (LDS)** fire regime by default. LDS fires suppress biodiversity relative to the ideal early dry season (EDS) fire regime. The `BIO_CONTRIBUTION_LDS = 0.8` factor means a savburn cell only contributes 80% of its raw biodiversity value under the default regime. When EDS savanna burning is applied as an agricultural management, the full value is recovered.
+Cells eligible for savanna burning (`SAVBURN_ELIGIBLE`) operate under a **late dry season (LDS)** fire regime by default. LDS fires suppress biodiversity relative to the ideal early dry season (EDS) fire regime. The `BIO_CONTRIBUTION_LDS = 0.75` factor means a savburn cell only contributes 75% of its raw biodiversity value under the default regime. When EDS savanna burning is applied as an agricultural management, the full value is recovered.
 
 This correction is baked into `BIO_GBF2_BASE_YR`:
 
@@ -83,7 +83,7 @@ GBF2_TARGETS_DICT = {
 }
 ```
 
-For `BIODIVERSITY_TARGET_GBF_2 = 'high'` the model must restore 30% of the degradation by 2030 and 50% by 2050 and 2100.
+For `GBF2_TARGET = 'high'` the model must restore 30% of the degradation by 2030 and 50% by 2050 and 2100.
 
 ### Interpolation formula
 
@@ -185,7 +185,7 @@ Same reasoning — am options are absent at 2010.
 Relative_Contribution_Percentage = (Area_Weighted_Score / degreded_area_weighted_bio_contr) * 100
 ```
 
-For a hard constraint that is tight at `yr_cal`, the sum of non-ALL rows for the AUSTRALIA region across all three types equals the restoration target fraction. For `BIODIVERSITY_TARGET_GBF_2 = 'high'` at 2030 this should be ≈ 30%.
+For a hard constraint that is tight at `yr_cal`, the sum of non-ALL rows for the AUSTRALIA region across all three types equals the restoration target fraction. For `GBF2_TARGET = 'high'` at 2030 this should be ≈ 30%.
 
 ### Exclusions when summing
 
@@ -203,13 +203,13 @@ To avoid double-counting the `add_all`-generated aggregate rows:
 
 | Setting | Default | Effect |
 |---------|---------|--------|
-| `BIODIVERSITY_TARGET_GBF_2` | `'high'` | Scenario: `'off'`, `'low'`, `'medium'`, `'high'` |
+| `GBF2_TARGET` | `'high'` | Scenario: `'off'`, `'low'`, `'medium'`, `'high'` |
 | `GBF2_CONSTRAINT_TYPE` | `'hard'` | Hard or soft solver constraint |
-| `GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT` | `20` | Top-N% of Zonation performance curve used as the priority mask |
+| `GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT` | `15` | Top-N% of Zonation performance curve used as the priority mask |
 | `GBF2_TARGETS_DICT` | see above | Restoration fractions at key years per scenario |
 | `BIO_QUALITY_LAYER` | `'MNES_likely'` | Zonation quality layer used for both priority masking and bio-contribution scores |
-| `CONTRIBUTION_PERCENTILE` | `'USER_DEFINED'` | HCAS percentile or mode for bio-contribution lookup |
-| `BIO_CONTRIBUTION_LDS` | `0.8` | Biodiversity value retained under default LDS savanna fire regime |
+| `HCAS_CONTRIBUTION_PERCENTILE` | `'USER_DEFINED'` | HCAS percentile or mode for bio-contribution lookup |
+| `BIO_CONTRIBUTION_LDS` | `0.75` | Biodiversity value retained under default LDS savanna fire regime |
 | `CONNECTIVITY_SOURCE` | `'NCI'` | Source of spatial connectivity weights applied to quality scores |
 | `CONNECTIVITY_LB` | `0.7` | Lower bound of the rescaled connectivity multiplier |
 
@@ -220,7 +220,7 @@ To avoid double-counting the `add_all`-generated aggregate rows:
 ```
 settings.py
   GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT
-  GBF2_TARGETS_DICT / BIODIVERSITY_TARGET_GBF_2
+  GBF2_TARGETS_DICT / GBF2_TARGET
   BIO_CONTRIBUTION_LDS
           │
           ▼

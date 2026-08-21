@@ -34,7 +34,7 @@ window.SettingsView = {
       },
       'Biodiversity Quality & Connectivity': {
         icon: '🌿',
-        keywords: ['BIO_QUALITY_LAYER', 'BIO_CONTRIBUTION', 'CONNECTIVITY_SOURCE', 'CONNECTIVITY_LB', 'CONTRIBUTION_PERCENTILE', 'HABITAT', 'SUITABILITY']
+        keywords: ['BIO_QUALITY_LAYER', 'BIO_CONTRIBUTION', 'CONNECTIVITY_SOURCE', 'CONNECTIVITY_LB', 'HCAS_CONTRIBUTION_PERCENTILE', 'HABITAT', 'SUITABILITY']
       },
       'Biodiversity GBF Targets': {
         icon: '🎯',
@@ -70,11 +70,11 @@ window.SettingsView = {
       },
       'Solver & Optimization': {
         icon: '🔧',
-        keywords: ['SOLVE_METHOD', 'SOLVE_WEIGHT', 'SOLVER_WEIGHT', 'TOLERANCE', 'PRESOLVE', 'CROSSOVER', 'BARRIER', 'SCALE_FLAG', 'RETRY_PARAMS', 'BARHOMOGENOUS', 'CONSTRAINT_TYPE', 'ALPHA', 'BETA', 'RESCALE_FACTOR']
+        keywords: ['SOLVE_WEIGHT', 'TOLERANCE', 'CROSSOVER', 'BARRIER', 'SCALE_FLAG', 'RETRY_PARAMS', 'CONSTRAINT_TYPE', 'ALPHA', 'BETA', 'RESCALE_FACTOR']
       },
       'Output & Processing': {
         icon: '📊',
-        keywords: ['WRITE', 'OUTPUT', 'WRITE_PARALLEL', 'WRITE_THREADS', 'GEOTIFFS', 'VERBOSE', 'KEEP_OUTPUTS', 'ROUND_DECIMALS']
+        keywords: ['WRITE', 'OUTPUT', 'GEOTIFFS', 'VERBOSE', 'KEEP_OUTPUTS', 'ROUND_DECIMALS']
       },
       'System Resources': {
         icon: '💻',

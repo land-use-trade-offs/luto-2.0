@@ -34,7 +34,7 @@ Row-per-run CSV. Required columns:
 | `PRODUCTIVITY_TREND` | `BAU` / `MEDIUM` / `HIGH` |
 | `REGIONAL_ADOPTION_CONSTRAINTS` | `off` / `NON_AG_CAP` |
 | `REGIONAL_ADOPTION_NON_AG_CAP` | Threshold % (integer or float) |
-| `CONTRIBUTION_PERCENTILE` | `USER_DEFINED` / `AG_UNIFORM` |
+| `HCAS_CONTRIBUTION_PERCENTILE` | `USER_DEFINED` / `AG_UNIFORM` |
 | `BIO_CONTRIBUTION_LDS` | Float (e.g. `0.75`, `0.8`, `0.85`) |
 | `BIO_CONTRIBUTION_ENV_PLANTING` | Float |
 | `BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK` | Float |
@@ -42,7 +42,7 @@ Row-per-run CSV. Required columns:
 | `BIO_CONTRIBUTION_AGROFORESTRY` | Float |
 | `BIO_CONTRIBUTION_DESTOCKING` | Float |
 | `GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT` | Integer (e.g. `10`, `15`, `20`) |
-| `BIODIVERSITY_TARGET_GBF_4_ECNES` | `on` / `off` |
+| `GBF4_TARGET_ECNES` | `on` / `off` |
 | `AG_MANAGEMENTS` | Python dict literal string |
 
 All other columns in this file are ignored by the script.
@@ -274,7 +274,7 @@ def build_runs_js(unique_rows, infeasibility, template_rows, template_varying, t
             f'PRODUCTIVITY_TREND:"{r["PRODUCTIVITY_TREND"]}", '
             f'REGIONAL_ADOPTION_CONSTRAINTS:"{r["REGIONAL_ADOPTION_CONSTRAINTS"]}", '
             f'REGIONAL_ADOPTION_NON_AG_CAP:{r["REGIONAL_ADOPTION_NON_AG_CAP"]}, '
-            f'CONTRIBUTION_PERCENTILE:"{r["CONTRIBUTION_PERCENTILE"]}", '
+            f'HCAS_CONTRIBUTION_PERCENTILE:"{r["HCAS_CONTRIBUTION_PERCENTILE"]}", '
             f'BIO_CONTRIBUTION_LDS:{r["BIO_CONTRIBUTION_LDS"]}, '
             f'BIO_CONTRIBUTION_ENV_PLANTING:{r["BIO_CONTRIBUTION_ENV_PLANTING"]}, '
             f'BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK:{r["BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK"]}, '
@@ -282,7 +282,7 @@ def build_runs_js(unique_rows, infeasibility, template_rows, template_varying, t
             f'BIO_CONTRIBUTION_AGROFORESTRY:{r["BIO_CONTRIBUTION_AGROFORESTRY"]}, '
             f'BIO_CONTRIBUTION_DESTOCKING:{r["BIO_CONTRIBUTION_DESTOCKING"]}, '
             f'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT:{r["GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT"]}, '
-            f'BIODIVERSITY_TARGET_GBF_4_ECNES:"{r["BIODIVERSITY_TARGET_GBF_4_ECNES"]}", '
+            f'GBF4_TARGET_ECNES:"{r["GBF4_TARGET_ECNES"]}", '
             f'AG_MANAGEMENTS:{ag_js}, '
             f'full_settings:{full_settings_js}, '
             f'infeasible:{"true" if inf else "false"}, '
@@ -616,7 +616,7 @@ function buildTable() {{
     tr.className = `row-${{sgKey}}${{r.infeasible ? ' row-infeasible' : ''}}`;
     tr.dataset.group = r.scenario_group;
     tr.dataset.prod = r.PRODUCTIVITY_TREND;
-    tr.dataset.ecnes = r.BIODIVERSITY_TARGET_GBF_4_ECNES;
+    tr.dataset.ecnes = r.GBF4_TARGET_ECNES;
     tr.dataset.regional = r.REGIONAL_ADOPTION_CONSTRAINTS;
     tr.dataset.infeasible = r.infeasible ? '1' : '0';
     tr.dataset.retried = hasRetry ? '1' : '0';
@@ -628,7 +628,7 @@ function buildTable() {{
       <td>${{prodBadge(r.PRODUCTIVITY_TREND)}}</td>
       <td>${{regionalBadge(r.REGIONAL_ADOPTION_CONSTRAINTS)}}</td>
       <td style="text-align:center;font-size:11px">${{r.REGIONAL_ADOPTION_NON_AG_CAP}}%</td>
-      <td>${{ecnesBadge(r.BIODIVERSITY_TARGET_GBF_4_ECNES)}}</td>
+      <td>${{ecnesBadge(r.GBF4_TARGET_ECNES)}}</td>
       <td style="text-align:center;font-size:11px">${{r.BIO_CONTRIBUTION_LDS}}</td>
       <td style="text-align:center;font-size:11px">${{r.GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT}}%</td>
       <td>${{statusBadge(r)}}</td>
@@ -739,7 +739,7 @@ function selectRun(i) {{
   row('PRODUCTIVITY_TREND', prodBadge(r.PRODUCTIVITY_TREND), true);
   row('REGIONAL_ADOPTION_CONSTRAINTS', regionalBadge(r.REGIONAL_ADOPTION_CONSTRAINTS), true);
   row('REGIONAL_ADOPTION_NON_AG_CAP', `${{r.REGIONAL_ADOPTION_NON_AG_CAP}}%`, true);
-  row('CONTRIBUTION_PERCENTILE', valFmt(r.CONTRIBUTION_PERCENTILE), true);
+  row('HCAS_CONTRIBUTION_PERCENTILE', valFmt(r.HCAS_CONTRIBUTION_PERCENTILE), true);
   row('BIO_CONTRIBUTION_LDS', r.BIO_CONTRIBUTION_LDS, true);
   row('BIO_CONTRIBUTION_ENV_PLANTING', r.BIO_CONTRIBUTION_ENV_PLANTING, true);
   row('BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK', r.BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK, true);
@@ -747,7 +747,7 @@ function selectRun(i) {{
   row('BIO_CONTRIBUTION_AGROFORESTRY', r.BIO_CONTRIBUTION_AGROFORESTRY, true);
   row('BIO_CONTRIBUTION_DESTOCKING', r.BIO_CONTRIBUTION_DESTOCKING, true);
   row('GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT', `${{r.GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT}}%`, true);
-  row('BIODIVERSITY_TARGET_GBF_4_ECNES', ecnesBadge(r.BIODIVERSITY_TARGET_GBF_4_ECNES), true);
+  row('GBF4_TARGET_ECNES', ecnesBadge(r.GBF4_TARGET_ECNES), true);
 
   // AG_MANAGEMENTS mini-table
   const amEntries = Object.entries(r.AG_MANAGEMENTS);
@@ -760,11 +760,11 @@ function selectRun(i) {{
   // ── Full settings from template (fixed settings) ──
   const skipInGEP = new Set([
     'scenario_group','global_run_idx','run_idx','local_run_idx','JOB_NAME',
-    'AG_MANAGEMENTS','BIODIVERSITY_TARGET_GBF_4_ECNES','BIO_CONTRIBUTION_LDS',
+    'AG_MANAGEMENTS','GBF4_TARGET_ECNES','BIO_CONTRIBUTION_LDS',
     'BIO_CONTRIBUTION_ENV_PLANTING','BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK',
     'BIO_CONTRIBUTION_CARBON_PLANTING_BELT','BIO_CONTRIBUTION_AGROFORESTRY',
     'BIO_CONTRIBUTION_DESTOCKING','GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT',
-    'CONTRIBUTION_PERCENTILE','PRODUCTIVITY_TREND',
+    'HCAS_CONTRIBUTION_PERCENTILE','PRODUCTIVITY_TREND',
     'REGIONAL_ADOPTION_CONSTRAINTS','REGIONAL_ADOPTION_NON_AG_CAP',
   ]);
   const fullEntries = Object.entries(r.full_settings)
@@ -848,10 +848,8 @@ different schema:
 | `global_run_idx` | Maps to `Run_G####` |
 | `local_run_idx` | Index within ECNES or SNES group |
 | `label` | Filesystem-safe slug of species/community name |
-| `BIODIVERSITY_TARGET_GBF_4_ECNES` | `on` / `off` |
-| `BIODIVERSITY_TARGET_GBF_4_SNES` | `on` / `off` |
-| `GBF4_ECNES_INCLUDE_COMMUNITIES` | Python list literal, e.g. `['Alpine Sphagnum Bogs...']` |
-| `GBF4_SNES_INCLUDE_SPECIES` | Python list literal, e.g. `['Acacia phasmoides']` |
+| `GBF4_TARGET_ECNES` | `on` / `off` |
+| `GBF4_TARGET_SNES` | `on` / `off` |
 | `GBF4_ECNES_SELECTED_REGIONS` | Python list literal of NRM region names |
 | `GBF4_SNES_SELECTED_REGIONS` | Python list literal of NRM region names |
 | `GBF3_NVIS_SELECTED_REGIONS` | Python list literal (same regions as target species) |

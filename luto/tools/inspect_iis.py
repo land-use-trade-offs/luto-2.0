@@ -155,6 +155,11 @@ def _decode_constraint(name: str, luts: dict) -> str:
         j = int(m.group(2))
         return f"Adoption limit: {am_display} on {AG.get(j, f'LU({j})')}"
 
+    m = re.match(r"const_(.+?)_solvable_ub_(\d+)$", name)
+    if m:
+        am_display = AM.get(m.group(1).lower(), m.group(1))
+        return f"Renewable solvable ceiling: {am_display} @ cell {m.group(2)}"
+
     m = re.match(r"demand_soft_bound_lower\[(\d+)\]", name)
     if m:
         c = int(m.group(1))
@@ -190,6 +195,7 @@ def _is_cell_level(name: str) -> bool:
     return bool(
         re.match(r"const_cell_usage_\d+", name)
         or re.match(r"const_ag_mam_(dry|irr)_usage_", name)
+        or re.match(r"const_.+?_solvable_ub_\d+$", name)
     )
 
 

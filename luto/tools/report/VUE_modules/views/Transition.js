@@ -9,6 +9,8 @@ window.TransitionView = {
     const VIEW_NAME = "Transition";
 
     const selectRegion = inject("globalSelectedRegion");
+    const availableRegionLevels = ['region_state', 'region_NRM'];
+    const selectRegionLevel = ref('region_NRM');
 
     const availableCategories = Object.keys(mapRegister);
     const selectCategory = ref(availableCategories[0] || "Area");
@@ -42,15 +44,16 @@ window.TransitionView = {
 
     const selectMapData = computed(() => currentLayerData.value?.[selectYear.value] ?? {});
 
-    // Chart leaf — area mode: region→from_water→to_water→year
-    //              cost mode: region→cost_type→year
+    // Chart leaf — area mode: region_level→region→from_water→to_water→year
+    //              cost mode: region_level→region→cost_type→year
     const selectChartLeaf = computed(() => {
       if (!dataLoaded.value || !currentChartName.value) return null;
       const chartData = window[currentChartName.value];
+      const rl = selectRegionLevel.value;
       if (isAreaMode.value) {
-        return chartData?.[selectRegion.value]?.[selectFromWater.value]?.[selectToWater.value]?.[selectYear.value] || null;
+        return chartData?.[rl]?.[selectRegion.value]?.[selectFromWater.value]?.[selectToWater.value]?.[selectYear.value] || null;
       } else {
-        return chartData?.[selectRegion.value]?.[selectCostType.value]?.[selectYear.value] || null;
+        return chartData?.[rl]?.[selectRegion.value]?.[selectCostType.value]?.[selectYear.value] || null;
       }
     });
 
@@ -91,19 +94,20 @@ window.TransitionView = {
 
       const chartData = window[chartEntry.name];
       const refRegion = 'AUSTRALIA';
+      const rl = selectRegionLevel.value;
       let defaultCombo;
 
       if (cat === "Area") {
-        availableFromWater.value = Object.keys(chartData?.[refRegion] || {});
+        availableFromWater.value = Object.keys(chartData?.[rl]?.[refRegion] || {});
         selectFromWater.value = availableFromWater.value.includes("ALL") ? "ALL" : (availableFromWater.value[0] || "ALL");
-        availableToWater.value = Object.keys(chartData?.[refRegion]?.[selectFromWater.value] || {});
+        availableToWater.value = Object.keys(chartData?.[rl]?.[refRegion]?.[selectFromWater.value] || {});
         selectToWater.value = availableToWater.value.includes("ALL") ? "ALL" : (availableToWater.value[0] || "ALL");
-        availableYears.value = Object.keys(chartData?.[refRegion]?.[selectFromWater.value]?.[selectToWater.value] || {}).sort();
+        availableYears.value = Object.keys(chartData?.[rl]?.[refRegion]?.[selectFromWater.value]?.[selectToWater.value] || {}).sort();
         defaultCombo = [selectFromWater.value, selectToWater.value, 'ALL', 'ALL'];
       } else {
-        availableCostTypes.value = Object.keys(chartData?.[refRegion] || {});
+        availableCostTypes.value = Object.keys(chartData?.[rl]?.[refRegion] || {});
         selectCostType.value = availableCostTypes.value.includes("ALL") ? "ALL" : (availableCostTypes.value[0] || "ALL");
-        availableYears.value = Object.keys(chartData?.[refRegion]?.[selectCostType.value] || {}).sort();
+        availableYears.value = Object.keys(chartData?.[rl]?.[refRegion]?.[selectCostType.value] || {}).sort();
         defaultCombo = [selectCostType.value, 'ALL', 'ALL'];
       }
 
@@ -150,6 +154,7 @@ window.TransitionView = {
     };
 
     watch(yearIndex, (i) => { selectYear.value = availableYears.value[i]; });
+    watch(selectRegionLevel, () => { selectRegion.value = 'AUSTRALIA'; });
 
     watch(selectCategory, (newCat) => {
       const subs = Object.keys(mapRegister[newCat] || {});
@@ -164,7 +169,7 @@ window.TransitionView = {
     watch(selectFromWater, async (newFW) => {
       if (!isAreaMode.value || !selectSubCat.value || !dataLoaded.value) return;
       const chartData = window[currentChartName.value];
-      availableToWater.value = Object.keys(chartData?.['AUSTRALIA']?.[newFW] || {});
+      availableToWater.value = Object.keys(chartData?.[selectRegionLevel.value]?.['AUSTRALIA']?.[newFW] || {});
       if (!availableToWater.value.includes(selectToWater.value)) {
         selectToWater.value = availableToWater.value.includes("ALL") ? "ALL" : (availableToWater.value[0] || "ALL");
       }
@@ -189,6 +194,7 @@ window.TransitionView = {
 
     const _state = {
       yearIndex, selectYear, selectRegion,
+      availableRegionLevels, selectRegionLevel,
       availableYears,
       availableCategories, selectCategory,
       availableSubCats, selectSubCat,
@@ -211,13 +217,28 @@ window.TransitionView = {
   template: /*html*/`
     <div class="relative w-full h-screen">
 
-      <!-- Region dropdown -->
-      <div class="absolute w-[262px] top-32 left-[20px] z-[9999] bg-white/70 rounded-lg shadow-lg">
-        <filterable-dropdown region-type="NRM"></filterable-dropdown>
+      <!-- Region level tabs + Region selection dropdown -->
+      <div class="absolute w-[262px] top-28 left-[20px] z-[9999] max-w-xs">
+        <div class="flex gap-1 ml-2 mb-0">
+          <button v-for="lvl in availableRegionLevels" :key="lvl"
+            @click="selectRegionLevel = lvl"
+            class="px-2 py-0.5 text-[0.65rem] font-medium rounded-t-md border border-b-0 transition-colors"
+            :class="selectRegionLevel === lvl
+              ? 'bg-white/90 border-gray-300 text-sky-600'
+              : 'bg-white/40 border-gray-200 text-gray-500 hover:bg-white/60'">
+            {{ lvl === 'region_state' ? 'State' : 'NRM' }}
+          </button>
+        </div>
+        <div class="bg-white/70 rounded-lg shadow-lg">
+          <filterable-dropdown
+            :key="selectRegionLevel"
+            :region-type="selectRegionLevel === 'region_state' ? 'STATE' : 'NRM'">
+          </filterable-dropdown>
+        </div>
       </div>
 
       <!-- Year slider -->
-      <div class="absolute top-[200px] left-[20px] z-[1001] w-[262px] bg-white/70 p-2 rounded-lg">
+      <div class="absolute top-[230px] left-[20px] z-[1001] w-[262px] bg-white/70 p-2 rounded-lg">
         <p class="text-[0.8rem]">Year: <strong>{{ selectYear }}</strong></p>
         <el-slider
           v-if="availableYears && availableYears.length > 0"
@@ -233,7 +254,7 @@ window.TransitionView = {
       </div>
 
       <!-- Filters + heatmap preview column -->
-      <div class="absolute top-[285px] left-[20px] w-[262px] z-[1001] flex flex-col gap-2">
+      <div class="absolute top-[315px] left-[20px] w-[262px] z-[1001] flex flex-col gap-2">
 
         <!-- Filters box -->
         <div class="flex flex-col space-y-2 bg-white/70 p-2 rounded-lg">
@@ -349,7 +370,7 @@ window.TransitionView = {
         <regions-map
           :mapData="selectMapData"
           :file-name="mapFileName"
-          region-type="STATE"
+          :region-type="selectRegionLevel === 'region_state' ? 'STATE' : 'NRM'"
           style="width:100%; height:100%;">
         </regions-map>
 

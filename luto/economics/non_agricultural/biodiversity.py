@@ -35,22 +35,26 @@ from luto.settings import (
 )
 
 
-def get_biodiv_environmental_plantings(data: Data) -> np.ndarray:
-    return data.BIO_QUALITY_RAW * data.REAL_AREA * BIO_CONTRIBUTION_ENV_PLANTING
+def get_biodiv_environmental_plantings(data: Data, bio_quality_raw: np.ndarray = None) -> np.ndarray:
+    bq_raw = bio_quality_raw if bio_quality_raw is not None else data.BIO_QUALITY_RAW
+    return bq_raw * data.REAL_AREA * BIO_CONTRIBUTION_ENV_PLANTING
 
 
-def get_biodiv_riparian_plantings(data: Data) -> np.ndarray:
-    return data.BIO_QUALITY_RAW * data.REAL_AREA * BIO_CONTRIBUTION_RIPARIAN_PLANTING
+def get_biodiv_riparian_plantings(data: Data, bio_quality_raw: np.ndarray = None) -> np.ndarray:
+    bq_raw = bio_quality_raw if bio_quality_raw is not None else data.BIO_QUALITY_RAW
+    return bq_raw * data.REAL_AREA * BIO_CONTRIBUTION_RIPARIAN_PLANTING
 
 
-def get_biodiv_agroforestry_base(data: Data) -> np.ndarray:
-    return data.BIO_QUALITY_RAW * data.REAL_AREA * BIO_CONTRIBUTION_AGROFORESTRY
+def get_biodiv_agroforestry_base(data: Data, bio_quality_raw: np.ndarray = None) -> np.ndarray:
+    bq_raw = bio_quality_raw if bio_quality_raw is not None else data.BIO_QUALITY_RAW
+    return bq_raw * data.REAL_AREA * BIO_CONTRIBUTION_AGROFORESTRY
 
 
 def get_biodiv_sheep_agroforestry(
-    data: Data, 
-    ag_b_mrj: np.ndarray, 
-    agroforestry_x_r: np.ndarray
+    data: Data,
+    ag_b_mrj: np.ndarray,
+    agroforestry_x_r: np.ndarray,
+    bio_quality_raw: np.ndarray = None,
 ) -> np.ndarray:
     """
     Parameters
@@ -58,6 +62,7 @@ def get_biodiv_sheep_agroforestry(
     data: Data object.
     ag_b_mrj: agricultural biodiversity matrix.
     agroforestry_x_r: Agroforestry exclude matrix.
+    bio_quality_raw: Optional override for data.BIO_QUALITY_RAW.
 
     Returns
     ------
@@ -67,7 +72,7 @@ def get_biodiv_sheep_agroforestry(
 
     # Only use the dryland version of sheep
     sheep_biodiv = ag_b_mrj[0, :, sheep_j]
-    base_agroforestry_biodiv = get_biodiv_agroforestry_base(data)
+    base_agroforestry_biodiv = get_biodiv_agroforestry_base(data, bio_quality_raw)
 
     # Calculate contributions and return the sum
     agroforestry_contr = base_agroforestry_biodiv * agroforestry_x_r
@@ -76,9 +81,10 @@ def get_biodiv_sheep_agroforestry(
 
 
 def get_biodiv_beef_agroforestry(
-    data: Data, 
-    ag_b_mrj: np.ndarray, 
-    agroforestry_x_r: np.ndarray
+    data: Data,
+    ag_b_mrj: np.ndarray,
+    agroforestry_x_r: np.ndarray,
+    bio_quality_raw: np.ndarray = None,
 ) -> np.ndarray:
     """
     Parameters
@@ -86,6 +92,7 @@ def get_biodiv_beef_agroforestry(
     data: Data object.
     ag_b_mrj: agricultural biodiversity matrix.
     agroforestry_x_r: Agroforestry exclude matrix.
+    bio_quality_raw: Optional override for data.BIO_QUALITY_RAW.
 
     Returns
     ------
@@ -95,7 +102,7 @@ def get_biodiv_beef_agroforestry(
 
     # Only use the dryland version of beef
     beef_biodiv = ag_b_mrj[0, :, beef_j]
-    base_agroforestry_biodiv = get_biodiv_agroforestry_base(data)
+    base_agroforestry_biodiv = get_biodiv_agroforestry_base(data, bio_quality_raw)
 
     # Calculate contributions and return the sum
     agroforestry_contr = base_agroforestry_biodiv * agroforestry_x_r
@@ -103,18 +110,21 @@ def get_biodiv_beef_agroforestry(
     return agroforestry_contr + beef_contr
 
 
-def get_biodiv_carbon_plantings_block(data: Data) -> np.ndarray:
-    return data.BIO_QUALITY_RAW * data.REAL_AREA * BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK
+def get_biodiv_carbon_plantings_block(data: Data, bio_quality_raw: np.ndarray = None) -> np.ndarray:
+    bq_raw = bio_quality_raw if bio_quality_raw is not None else data.BIO_QUALITY_RAW
+    return bq_raw * data.REAL_AREA * BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK
 
 
-def get_biodiv_carbon_plantings_belt_base(data: Data) -> np.ndarray:
-    return data.BIO_QUALITY_RAW * data.REAL_AREA * BIO_CONTRIBUTION_CARBON_PLANTING_BELT
+def get_biodiv_carbon_plantings_belt_base(data: Data, bio_quality_raw: np.ndarray = None) -> np.ndarray:
+    bq_raw = bio_quality_raw if bio_quality_raw is not None else data.BIO_QUALITY_RAW
+    return bq_raw * data.REAL_AREA * BIO_CONTRIBUTION_CARBON_PLANTING_BELT
 
 
 def get_biodiv_sheep_carbon_plantings_belt(
-    data: Data, 
-    ag_b_mrj: np.ndarray, 
-    cp_belt_x_r: np.ndarray
+    data: Data,
+    ag_b_mrj: np.ndarray,
+    cp_belt_x_r: np.ndarray,
+    bio_quality_raw: np.ndarray = None,
 ) -> np.ndarray:
     """
     Parameters
@@ -122,6 +132,7 @@ def get_biodiv_sheep_carbon_plantings_belt(
     data: Data object.
     ag_b_mrj: agricultural biodiversity matrix.
     cp_belt_x_r: Carbon plantings belt exclude matrix.
+    bio_quality_raw: Optional override for data.BIO_QUALITY_RAW.
 
     Returns
     ------
@@ -131,7 +142,7 @@ def get_biodiv_sheep_carbon_plantings_belt(
 
     # Only use the dryland version of sheep
     sheep_biodiv = ag_b_mrj[0, :, sheep_j]
-    base_cp_biodiv = get_biodiv_carbon_plantings_belt_base(data)
+    base_cp_biodiv = get_biodiv_carbon_plantings_belt_base(data, bio_quality_raw)
 
     # Calculate contributions and return the sum
     cp_contr = base_cp_biodiv * cp_belt_x_r
@@ -140,9 +151,10 @@ def get_biodiv_sheep_carbon_plantings_belt(
 
 
 def get_biodiv_beef_carbon_plantings_belt(
-    data: Data, 
-    ag_b_mrj: np.ndarray, 
-    cp_belt_x_r: np.ndarray
+    data: Data,
+    ag_b_mrj: np.ndarray,
+    cp_belt_x_r: np.ndarray,
+    bio_quality_raw: np.ndarray = None,
 ) -> np.ndarray:
     """
     Parameters
@@ -150,6 +162,7 @@ def get_biodiv_beef_carbon_plantings_belt(
     data: Data object.
     ag_b_mrj: agricultural biodiversity matrix.
     cp_belt_x_r: Carbon plantings belt exclude matrix.
+    bio_quality_raw: Optional override for data.BIO_QUALITY_RAW.
 
     Returns
     ------
@@ -159,7 +172,7 @@ def get_biodiv_beef_carbon_plantings_belt(
 
     # Only use the dryland version of beef
     beef_biodiv = ag_b_mrj[0, :, beef_j]
-    base_cp_biodiv = get_biodiv_carbon_plantings_belt_base(data)
+    base_cp_biodiv = get_biodiv_carbon_plantings_belt_base(data, bio_quality_raw)
 
     # Calculate contributions and return the sum
     cp_contr = base_cp_biodiv * cp_belt_x_r
@@ -167,31 +180,35 @@ def get_biodiv_beef_carbon_plantings_belt(
     return cp_contr + beef_contr
 
 
-def get_biodiv_beccs(data: Data):
+def get_biodiv_beccs(data: Data, bio_quality_raw: np.ndarray = None):
     """
     Parameters
     ------
     data: Data object.
+    bio_quality_raw: Optional override for data.BIO_QUALITY_RAW.
 
     Returns
     ------
     Numpy array indexed by r
     """
-    return data.BIO_QUALITY_RAW * data.REAL_AREA * BIO_CONTRIBUTION_BECCS
+    bq_raw = bio_quality_raw if bio_quality_raw is not None else data.BIO_QUALITY_RAW
+    return bq_raw * data.REAL_AREA * BIO_CONTRIBUTION_BECCS
 
 
-def get_biodiv_destocked_land(data: Data, lumap: np.ndarray):
+def get_biodiv_destocked_land(data: Data, lumap: np.ndarray, bio_quality_raw: np.ndarray = None):
     """
     Parameters
     ------
     data: Data object.
-    ag_b_mrj: agricultural biodiversity matrix.
     lumap: Land use map of the previous year.
+    bio_quality_raw: Optional override for data.BIO_QUALITY_RAW.
 
     Returns
     ------
     Numpy array indexed by r
     """
+    bq_raw = bio_quality_raw if bio_quality_raw is not None else data.BIO_QUALITY_RAW
+
     destock_b_contr = np.zeros(data.NCELLS)
     to_lu = data.DESC2AGLU['Unallocated - natural land']
 
@@ -201,7 +218,7 @@ def get_biodiv_destocked_land(data: Data, lumap: np.ndarray):
         else:
             contribution = data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[to_lu] - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[from_lu]
         destock_b_contr[lumap == from_lu] = (
-            data.BIO_QUALITY_RAW[lumap == from_lu]
+            bq_raw[lumap == from_lu]
             * contribution
             * data.REAL_AREA[lumap == from_lu]
         )
@@ -209,36 +226,38 @@ def get_biodiv_destocked_land(data: Data, lumap: np.ndarray):
     return destock_b_contr
 
 
-def get_breq_matrix(data: Data, ag_b_mrj: np.ndarray, lumap: np.ndarray):
+def get_breq_matrix(data: Data, ag_b_mrj: np.ndarray, lumap: np.ndarray, bio_quality_raw: np.ndarray = None):
     """
-    Returns non-agricultural c_rk matrix of costs per cell and land use.
+    Returns non-agricultural b_rk matrix of biodiversity scores per cell and land use.
 
     Parameters
     - data: The input data object containing necessary information.
     - ag_b_mrj: Agricultural biodiversity matrix.
     - lumap: Land use map of the previous year.
+    - bio_quality_raw: Optional override for data.BIO_QUALITY_RAW (used when computing scores
+      for a backend layer other than settings.BIO_QUALITY_LAYER).
 
     Returns
-    - numpy.ndarray: The non-agricultural c_rk matrix of costs per cell and land use.
+    - numpy.ndarray: The non-agricultural b_rk matrix of biodiversity scores per cell and land use.
     """
     agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, lumap)
     cp_belt_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, lumap)
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
     non_agr_b_matrices = [
-        get_biodiv_environmental_plantings(data),
-        get_biodiv_riparian_plantings(data),
-        get_biodiv_sheep_agroforestry(data, ag_b_mrj, agroforestry_x_r),
-        get_biodiv_beef_agroforestry(data, ag_b_mrj, agroforestry_x_r),
-        get_biodiv_carbon_plantings_block(data),
-        get_biodiv_sheep_carbon_plantings_belt(data, ag_b_mrj, cp_belt_x_r),
-        get_biodiv_beef_carbon_plantings_belt(data, ag_b_mrj, cp_belt_x_r),
-        get_biodiv_beccs(data),                                               
-        get_biodiv_destocked_land(data, lumap)
+        get_biodiv_environmental_plantings(data, bio_quality_raw),
+        get_biodiv_riparian_plantings(data, bio_quality_raw),
+        get_biodiv_sheep_agroforestry(data, ag_b_mrj, agroforestry_x_r, bio_quality_raw),
+        get_biodiv_beef_agroforestry(data, ag_b_mrj, agroforestry_x_r, bio_quality_raw),
+        get_biodiv_carbon_plantings_block(data, bio_quality_raw),
+        get_biodiv_sheep_carbon_plantings_belt(data, ag_b_mrj, cp_belt_x_r, bio_quality_raw),
+        get_biodiv_beef_carbon_plantings_belt(data, ag_b_mrj, cp_belt_x_r, bio_quality_raw),
+        get_biodiv_beccs(data, bio_quality_raw),
+        get_biodiv_destocked_land(data, lumap, bio_quality_raw)
     ]
 
     return np.concatenate([
-        arr.reshape((data.NCELLS, 1)) for arr in non_agr_b_matrices], 
+        arr.reshape((data.NCELLS, 1)) for arr in non_agr_b_matrices],
         axis=1
     )
 

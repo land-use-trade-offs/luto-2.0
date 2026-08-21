@@ -60,23 +60,28 @@ window.ChartService = {
         Sum: {
           path: "data/BIO_GBF3_NVIS_Sum.js",
           name: "BIO_GBF3_NVIS_Sum",
+          paged: true,
         },
         Ag: {
           path: "data/BIO_GBF3_NVIS_Ag.js",
           name: "BIO_GBF3_NVIS_Ag",
+          paged: true,
         },
         "Ag Mgt": {
           path: "data/BIO_GBF3_NVIS_Am.js",
           name: "BIO_GBF3_NVIS_Am",
+          paged: true,
         },
         "Non-Ag": {
           path: "data/BIO_GBF3_NVIS_NonAg.js",
           name: "BIO_GBF3_NVIS_NonAg",
+          paged: true,
         },
         overview: {
           sum: {
             path: "data/BIO_GBF3_NVIS_overview_sum.js",
             name: "BIO_GBF3_NVIS_overview_sum",
+            paged: true,
           },
         },
       },
@@ -84,23 +89,28 @@ window.ChartService = {
         Sum: {
           path: "data/BIO_GBF4_SNES_Sum.js",
           name: "BIO_GBF4_SNES_Sum",
+          paged: true,
         },
         Ag: {
           path: "data/BIO_GBF4_SNES_Ag.js",
           name: "BIO_GBF4_SNES_Ag",
+          paged: true,
         },
         "Ag Mgt": {
           path: "data/BIO_GBF4_SNES_Am.js",
           name: "BIO_GBF4_SNES_Am",
+          paged: true,
         },
         "Non-Ag": {
           path: "data/BIO_GBF4_SNES_NonAg.js",
           name: "BIO_GBF4_SNES_NonAg",
+          paged: true,
         },
         overview: {
           sum: {
             path: "data/BIO_GBF4_SNES_overview_sum.js",
             name: "BIO_GBF4_SNES_overview_sum",
+            paged: true,
           },
         },
       },
@@ -108,23 +118,28 @@ window.ChartService = {
         Sum: {
           path: "data/BIO_GBF4_ECNES_Sum.js",
           name: "BIO_GBF4_ECNES_Sum",
+          paged: true,
         },
         Ag: {
           path: "data/BIO_GBF4_ECNES_Ag.js",
           name: "BIO_GBF4_ECNES_Ag",
+          paged: true,
         },
         "Ag Mgt": {
           path: "data/BIO_GBF4_ECNES_Am.js",
           name: "BIO_GBF4_ECNES_Am",
+          paged: true,
         },
         "Non-Ag": {
           path: "data/BIO_GBF4_ECNES_NonAg.js",
           name: "BIO_GBF4_ECNES_NonAg",
+          paged: true,
         },
         overview: {
           sum: {
             path: "data/BIO_GBF4_ECNES_overview_sum.js",
             name: "BIO_GBF4_ECNES_overview_sum",
+            paged: true,
           },
         },
       },

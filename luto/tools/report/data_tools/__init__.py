@@ -51,11 +51,11 @@ def extract_dtype_from_path(path):
             'transition':['transition_ag2ag_', 'transition_ag2nonag_', 'transition_nonag2ag_'],
             'biodiversity':['biodiversity'],
             'renewable':['renewable_energy_'],
+            'shadow_price':['shadow_prices'],
             # Metrics xarrays
             'xarray_layer':['xr_'],
     }
 
-    # Get the base name of the file path
     base_name = os.path.basename(path)
 
     # Check the file type
@@ -92,7 +92,12 @@ def get_all_files(data_root):
     file_paths = []
 
     # Walk through the folder and its subfolders
-    for foldername, _, filenames in os.walk(data_root):
+    for foldername, dirnames, filenames in os.walk(data_root):
+        # Chunked biodiversity outputs (<base>_{year}_chunks) are read straight off disk by
+        # create_report_layers.find_chunks_dirs(), never through this index. Prune them so their
+        # chunk_*.nc / manifest.json neither spam the Unknown-file report nor add hundreds of rows
+        # sharing one (Year, category, base_name) key.
+        dirnames[:] = [d for d in dirnames if not re.search(r'_\d{4}_chunks$', d)]
         for filename in filenames:
             # Create the full path to the file by joining the foldername and filename
             file_path = os.path.join(foldername, filename)
@@ -163,7 +168,11 @@ def rename_reorder_hierarchy(sel: dict) -> dict:
     4. 'lu' (Land-use) has to be the lowest level in the hierarchy.
     '''
     sel_rename = {}
-    
+
+    # 0: 'backend' (outermost dim for quality-metric layers)
+    if 'backend' in sel:
+        sel_rename['backend'] = sel['backend']
+
     # 1: 'am'
     if 'am' in sel:
         sel_rename['am'] = RENAME_AM_NON_AG.get(sel['am'], sel['am'])
@@ -206,6 +215,8 @@ def rename_reorder_hierarchy(sel: dict) -> dict:
             'Transition-cost-ag2nonag': 'Cost (trans Ag2NonAg)',
             'Transition-cost-nonag2ag': 'Cost (trans NonAg2Ag)',
             'Transition-cost-agMgt': 'Cost (trans AgMgt)',
+            'Operating Cost': 'Operating Cost',
+            'Capital expenditure': 'Capital expenditure',
         }.get(sel[key], sel[key])
 
     # 7: last: 'lu' or 'from_lu' (land-use is always the bottom-level UI selection)
