@@ -987,7 +987,7 @@ def rescale_lhs_rhs_region_species(
       are (region, species); the matrix row key is the last element (species/group).
 
     Region masking: first element of each constraint tuple is the region.
-    ``'Australia'`` → all cells; any other value → ``region_NRM_names_r == region``.
+    ``'AUSTRALIA'`` → all cells; any other value → ``region_NRM_names_r == region``.
     In-place scaling is safe because NRM regions are non-overlapping — each cell
     belongs to at most one NRM region.
 
@@ -1022,7 +1022,7 @@ def rescale_lhs_rhs_region_species(
 
         cell_mask = (
             np.ones(arr_np.shape[1], dtype=bool)
-            if region == "Australia"
+            if region == "AUSTRALIA"
             else region_NRM_names_r == region
         )
 

@@ -1640,7 +1640,9 @@ class Data:
                                         if all([row.get('TARGET_LEVEL_2030', 0)>0,
                                                 row.get('TARGET_LEVEL_2050', 0)>0,
                                                 row.get('TARGET_LEVEL_2100', 0)>0])]
-            self.BIO_GBF8_SEL = [('Australia', sp) for sp in self.BIO_GBF8_SEL_SPECIES]
+            # 'AUSTRALIA' is the canonical nationwide label — the solver's region-mask bypass
+            # and the rescale helper both match region == 'AUSTRALIA' (same as GBF3/GBF4).
+            self.BIO_GBF8_SEL = [('AUSTRALIA', sp) for sp in self.BIO_GBF8_SEL_SPECIES]
 
             self.BIO_GBF8_OUTSDIE_LUTO_SCORE_SPECIES = bio_GBF8_baseline_score.query(f'species in {self.BIO_GBF8_SEL_SPECIES}')[['species', 'year', f'OUTSIDE_LUTO_NATURAL_SUITABILITY_AREA_WEIGHTED_HA_SSP{settings.SSP}']]
             self.BIO_GBF8_OUTSDIE_LUTO_SCORE_GROUPS = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF8_SCORES_group.csv')[['group', 'year', f'OUTSIDE_LUTO_NATURAL_SUITABILITY_AREA_WEIGHTED_HA_SSP{settings.SSP}']]

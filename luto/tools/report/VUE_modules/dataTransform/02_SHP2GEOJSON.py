@@ -15,7 +15,7 @@ if NRM_AUS.crs.to_epsg() != 4326:
 with BytesIO() as geojson_bytes:
     NRM_AUS.to_file(geojson_bytes, driver='GeoJSON')
     geojson_bytes.seek(0)
-    geojson_str = eval(geojson_bytes.getvalue().decode('utf-8'))
+    geojson_str = json.loads(geojson_bytes.getvalue().decode('utf-8'))
     
 with open('luto/tools/report/VUE_modules/data/geo/NRM_AUS.js', 'w', encoding='utf-8') as f:
     f.write(f'window.NRM_AUS = {json.dumps(geojson_str, indent=2)};\n')
@@ -45,7 +45,7 @@ if AUS_STATE.crs.to_epsg() != 4326:
 with BytesIO() as geojson_bytes:
     AUS_STATE.to_file(geojson_bytes, driver='GeoJSON')
     geojson_bytes.seek(0)
-    geojson_str = eval(geojson_bytes.getvalue().decode('utf-8'))
+    geojson_str = json.loads(geojson_bytes.getvalue().decode('utf-8'))
 
 with open('luto/tools/report/VUE_modules/data/geo/AUS_STATE.js', 'w', encoding='utf-8') as f:
     f.write(f'window.AUS_STATE = {json.dumps(geojson_str, indent=2)};\n')
@@ -77,7 +77,7 @@ if REZ.crs.to_epsg() != 4326:
 with BytesIO() as geojson_bytes:
     REZ.to_file(geojson_bytes, driver='GeoJSON')
     geojson_bytes.seek(0)
-    geojson_str = eval(geojson_bytes.getvalue().decode('utf-8'))
+    geojson_str = json.loads(geojson_bytes.getvalue().decode('utf-8'))
 
 with open('luto/tools/report/VUE_modules/data/geo/REZ.js', 'w', encoding='utf-8') as f:
     f.write(f'window.RENEWABLE_REZ = {json.dumps(geojson_str, indent=2)};\n')

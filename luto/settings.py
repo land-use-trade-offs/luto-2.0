@@ -882,6 +882,11 @@ CARBON_PRICES_FIELD = 'CONSTANT'
 
 # Automatically update the carbon price field if it is set to 'AS_GHG'
 if CARBON_PRICES_FIELD == 'AS_GHG':
+    if GHG_TARGETS_DICT[GHG_EMISSIONS_LIMITS] is None:
+        raise ValueError(
+            "CARBON_PRICES_FIELD='AS_GHG' requires GHG_EMISSIONS_LIMITS to name a GHG target "
+            f"(got '{GHG_EMISSIONS_LIMITS}'); set an explicit carbon price scenario instead."
+        )
     CARBON_PRICES_FIELD = GHG_TARGETS_DICT[GHG_EMISSIONS_LIMITS][:9].replace('(','')  # '1.5C (67%) excl. avoided emis' -> '1.5C 67%'
 
 if CARBON_PRICES_FIELD == 'CONSTANT':
@@ -1198,7 +1203,7 @@ GBF3_NVIS_TARGET_CLASS  = 'NVIS_MVG'             # 'NVIS_MVG', 'NVIS_MVS'
 '''
 The National Vegetation Information System (NVIS) provides the 100m resolution information on
 the distribution of vegetation (~30 primary group layers, or ~90 subgroup layers) across Australia.
-Also used as the class selector for IBRA bioregion layers when GBF3_NVIS_REGION_MODE = 'IBRA'.
+Also used as the class selector for IBRA bioregion layers when GBF3_NVIS_REGION_MODE = 'IBRA_REG'.
 '''
 
 
