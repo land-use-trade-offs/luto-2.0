@@ -1301,12 +1301,15 @@ and manage human-wildlife interactions
 '''
 
 
-GBF4_TARGET_SNES  = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
-GBF4_TARGET_ECNES = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
+GBF4_TARGET_SNES  = 'off'           # 'off', 'medium', 'high', 'dict', or 'USER_DEFINED'
+GBF4_TARGET_ECNES = 'off'           # 'off', 'medium', 'high', 'dict', or 'USER_DEFINED'
 '''
 'off'               — GBF4 SNES/ECNES constraints disabled.
 'USER_DEFINED'      — targets read from the input CSV as-is; only species/communities with a
                       defined TARGET_LEVEL_2030 > 0 in the CSV are selected.
+'dict'              — same species/communities as 'USER_DEFINED', but with the target levels from
+                      GBF4_{SNES,ECNES}_TARGETS_DICT['dict'] applied. Makes automated task runs
+                      easy, e.g. a sensitivity check over different target levels.
 'medium'/'high'     — ALL species/communities at the configured presence/region are selected
                       (no CSV-target filter), and every TARGET_LEVEL_{year} column is set to the
                       uniform level preset in GBF4_{SNES,ECNES}_TARGETS_DICT
@@ -1317,15 +1320,17 @@ GBF4_TARGET_ECNES = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
 GBF4_SNES_PRESENCE_CLASS  = 'LIKELY'  # 'LIKELY', 'LIKELY_AND_MAYBE'
 GBF4_ECNES_PRESENCE_CLASS = 'LIKELY'  # 'LIKELY', 'LIKELY_AND_MAYBE'
 
-# Uniform target presets (percent) keyed by GBF4_TARGET_{SNES,ECNES} level.
-# Only consulted when the target setting is 'medium'/'high'.
+# Uniform target presets (percent) keyed by GBF4_TARGET_{SNES,ECNES} mode.
+# Only consulted when the target setting is 'medium'/'high'/'dict'.
 GBF4_SNES_TARGETS_DICT  = {
     'medium': {2030: 30, 2050: 30, 2100: 30},
     'high':   {2030: 30, 2050: 50, 2100: 50},
+    'dict':   {2030: 30, 2050: 50, 2100: 50},
 }
 GBF4_ECNES_TARGETS_DICT = {
     'medium': {2030: 30, 2050: 30, 2100: 30},
     'high':   {2030: 30, 2050: 50, 2100: 50},
+    'dict':   {2030: 30, 2050: 50, 2100: 50},
 }
 
 # Per-(region, SCIENTIFIC_NAME) SNES target overrides, applied AFTER the uniform dict

@@ -129,15 +129,15 @@ grid_search = {
     'GBF3_NVIS_SELECTED_REGIONS': [['North East', 'Goulburn Broken']],      # Only used when mode = 'NRM'
 
     # --------------- Biodiversity settings - GBF 4 ---------------
-    'GBF4_TARGET_SNES': ['USER_DEFINED'],                     # 'off', 'medium', 'high', or 'USER_DEFINED'
+    'GBF4_TARGET_SNES': ['USER_DEFINED'],                     # 'off', 'medium', 'high', 'dict', or 'USER_DEFINED'
     'GBF4_SNES_REGION_MODE': ['AUSTRALIA'],                                 # 'AUSTRALIA' or 'NRM'
     'GBF4_SNES_SELECTED_REGIONS': [['North East', 'Goulburn Broken']],      # Only used when mode = 'NRM'
-    'GBF4_TARGET_ECNES': ['USER_DEFINED'],                    # 'off', 'medium', 'high', or 'USER_DEFINED'
+    'GBF4_TARGET_ECNES': ['USER_DEFINED'],                    # 'off', 'medium', 'high', 'dict', or 'USER_DEFINED'
     'GBF4_ECNES_REGION_MODE': ['AUSTRALIA'],                                # 'AUSTRALIA' or 'NRM'
     'GBF4_ECNES_SELECTED_REGIONS': [['North East', 'Goulburn Broken']],     # Only used when mode = 'NRM'
 
     # --------------- Biodiversity settings - GBF 8 ---------------
-    'GBF8_TARGET': ['off'],                                   # 'off', 'medium', 'high', or 'USER_DEFINED'
+    'GBF8_TARGET': ['off'],                                   # 'off', 'medium', 'high', 'dict', or 'USER_DEFINED'
 
     # --------------- Renewable energy ---------------
     # Core: RE OFF. REN1-REN4 are separate renewable energy scenario runs (not part of this grid search).

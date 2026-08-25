@@ -2355,6 +2355,16 @@ class Data:
                 if col in snes_df.columns:
                     snes_df[col] = float(pct)
             print(f"│   │   ├── '{settings.GBF4_TARGET_SNES}' level targets applied to all SNES species", flush=True)
+        elif settings.GBF4_TARGET_SNES == 'dict':
+            # 'dict' — select species exactly as 'USER_DEFINED' (only rows with a CSV target),
+            # then overwrite their targets with one uniform {year: pct} dict
+            snes_df = snes_df.query("TARGET_LEVEL_2030 > 0").reset_index(drop=True)
+            dict_targets = settings.GBF4_SNES_TARGETS_DICT['dict']
+            for yr, pct in dict_targets.items():
+                col = f'TARGET_LEVEL_{yr}'
+                if col in snes_df.columns:
+                    snes_df[col] = float(pct)
+            print(f"│   │   ├── Dict targets applied to SNES: {dict_targets}", flush=True)
         else:
             # 'USER_DEFINED' — keep CSV targets; only species with a defined 2030 target
             snes_df = snes_df.query("TARGET_LEVEL_2030 > 0").reset_index(drop=True)
@@ -2413,6 +2423,16 @@ class Data:
                 if col in ecnes_df.columns:
                     ecnes_df[col] = float(pct)
             print(f"│   │   ├── '{settings.GBF4_TARGET_ECNES}' level targets applied to all ECNES communities", flush=True)
+        elif settings.GBF4_TARGET_ECNES == 'dict':
+            # 'dict' — select communities exactly as 'USER_DEFINED' (only rows with a CSV target),
+            # then overwrite their targets with one uniform {year: pct} dict
+            ecnes_df = ecnes_df.query("TARGET_LEVEL_2030 > 0").reset_index(drop=True)
+            dict_targets = settings.GBF4_ECNES_TARGETS_DICT['dict']
+            for yr, pct in dict_targets.items():
+                col = f'TARGET_LEVEL_{yr}'
+                if col in ecnes_df.columns:
+                    ecnes_df[col] = float(pct)
+            print(f"│   │   ├── Dict targets applied to ECNES: {dict_targets}", flush=True)
         else:
             # 'USER_DEFINED' — keep CSV targets; only communities with a defined 2030 target
             ecnes_df = ecnes_df.query("TARGET_LEVEL_2030 > 0").reset_index(drop=True)
