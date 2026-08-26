@@ -1127,6 +1127,10 @@ I.e., the lower bound of the connectivity score for weighting the raw biodiversi
 
 # Habitat condition data source
 HCAS_CONTRIBUTION_PERCENTILE = 'USER_DEFINED'                  # One of ['10', '25', '50', '75', '90'], 'USER_DEFINED', or 'AG_UNIFORM'
+HCAS_AG_UNIFORM_CONTRIBUTION = 0.0                             # Only under 'AG_UNIFORM': the one habitat contribution (0-1) given to EVERY
+                                                               # modified / cropped agricultural land use (data.LU_MODIFIED_LAND). Natural land
+                                                               # (Beef/Dairy/Sheep - natural land, Unallocated - natural land) keeps the CSV's
+                                                               # AG_UNIFORM column values (0.7 / 1.0). 0.0 = only non-ag and native land count.
 '''
 Different land-use types have different biodiversity degradation impacts. We calculated the percentiles values of HCAS (indicating the
 suitability for wild animals ranging between 0-1) for each land-use type.Avaliable percentiles is one of ['10', '25', '50', '75', '90'].
@@ -1161,7 +1165,7 @@ will be 0.6 * 0.8 = 0.48.
 
 # ---------------------- GBF3 parameters ----------------------
 
-GBF3_NVIS_TARGET = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
+GBF3_NVIS_TARGET = 'off'           # 'off', 'medium', 'high', 'dict', or 'USER_DEFINED'
 '''
 Target 3 of the Kunming-Montreal Global Biodiversity Framework (NVIS):
 protect and manage vegetation groups using the National Vegetation Information System.
@@ -1170,6 +1174,8 @@ protect and manage vegetation groups using the National Vegetation Information S
 - if 'medium' is selected, the conservation target is set to 30% by 2030 and 30% by 2050 for each vegetation group.
 - if 'high' is selected, the conservation target is set to 30% by 2030 and 50% by 2050 for each vegetation group.
 - if 'USER_DEFINED' is selected, targets are kept from the input CSV; only groups with all year targets > 0 are constrained.
+- if 'dict' is selected, GBF3_NVIS_SELECTED_REGIONS is a dict {region: {year: pct}} and every group in a region
+  gets that region's level (region-specific uniform targets; in AUSTRALIA mode key it 'AUSTRALIA').
 Level presets apply to ALL vegetation groups at the configured region mode (no CSV-target filter).
 (No 'low' level — a 0% target only makes sense for GBF2's degraded-areas logic.)
 '''
@@ -1179,6 +1185,7 @@ GBF3_TARGETS_DICT = {
     'off':     None,
     'medium':  {2030: 30, 2050: 30},
     'high':    {2030: 30, 2050: 50},
+    'dict':    None,                    # levels come from GBF3_NVIS_SELECTED_REGIONS (a dict in this mode)
     'USER_DEFINED': None
 }
 
@@ -1195,7 +1202,7 @@ GBF3_TARGETS_DICT = {
 #
 # NOTE ON KEYS: in AUSTRALIA region mode the rows are relabelled 'AUSTRALIA' BEFORE this is applied,
 # so keys must use ('AUSTRALIA', group) there, not the NRM region name. In NRM mode use the NRM
-# region name, exactly as GBF3_NVIS_EXCLUDE_REGION_GROUPS does.
+# region name, exactly as GBF3_NVIS_SELECTED_REGIONS does.
 GBF3_NVIS_TARGETS_OVERRIDE = {}
 
 
@@ -1217,80 +1224,19 @@ Controls the spatial resolution of GBF3 NVIS constraints.
 
 GBF3_NVIS_SELECTED_REGIONS = ['North East', 'Goulburn Broken']
 '''
-List of NRM region names to enforce GBF3 NVIS constraints for.
-Must match region names in REGION_NRM_NAME. Only used when GBF3_NVIS_REGION_MODE = 'NRM'.
+NRM region names to enforce GBF3 NVIS constraints for (must match REGION_NRM_NAME); used when
+GBF3_NVIS_REGION_MODE = 'NRM'. Under GBF3_NVIS_TARGET = 'dict' this is a DICT instead — the keys are the
+selected regions and each value is that region's uniform target, e.g.
+    {'North East': {2030: 30, 2050: 45, 2100: 45}, 'Goulburn Broken': {2030: 30, 2050: 32.5, 2100: 32.5}}
+(in AUSTRALIA region mode: {'AUSTRALIA': {...}}).
 '''
 
-# -- GBF3 NVIS explicit (region, group) exclusions, keyed by GBF3_NVIS_TARGET_CLASS.
-# data.py automatically drops any group where IN_LUTO_HA <= 100 ha (structurally
-# infeasible: constraint LHS ≈ 0). The entries below document those groups for both
-# NVIS_MVG and NVIS_MVS target classes, confirmed from
-# BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS_NRM.xlsx on 2026-05-02.
-# To add IIS-diagnosed exclusions beyond the auto filter, append tuples here.
-GBF3_NVIS_EXCLUDE_REGION_GROUPS = {
-    'NVIS_MVG': [
-        # IN_LUTO_HA = 78.4 ha
-        ('Goulburn Broken', 'Acacia Open Woodlands'),
-        # IN_LUTO_HA = 24.8 ha
-        ('North East',      'Callitris Forests and Woodlands'),
-        # IN_LUTO_HA = 0.0 ha
-        ('Goulburn Broken', 'Chenopod Shrublands, Samphire Shrublands and Forblands'),
-        # IN_LUTO_HA = 0.2 ha
-        ('North East',      'Eucalypt Tall Open Forests'),
-        # IN_LUTO_HA = 0.0 ha
-        ('Goulburn Broken', 'Heathlands'),
-        # IN_LUTO_HA = 44.5 ha
-        ('North East',      'Heathlands'),
-        # IN_LUTO_HA = 4.9 ha
-        ('Goulburn Broken', 'Naturally bare - sand, rock, claypan, mudflat'),
-        # IN_LUTO_HA = 0.0 ha
-        ('North East',      'Naturally bare - sand, rock, claypan, mudflat'),
-        # IN_LUTO_HA = 78.8 ha
-        ('Goulburn Broken', 'Other Forests and Woodlands'),
-        # IN_LUTO_HA = 45.5 ha
-        ('North East',      'Other Forests and Woodlands'),
-        # IN_LUTO_HA = 0.0 ha
-        ('Goulburn Broken', 'Other Open Woodlands'),
-        # IN_LUTO_HA = 15.1 ha
-        ('Goulburn Broken', 'Rainforests and Vine Thickets'),
-        # IN_LUTO_HA = 0.0 ha
-        ('North East',      'Tussock Grasslands'),
-        # IN_LUTO_HA = 0.0 ha
-        ('Goulburn Broken', 'Unclassified native vegetation'),
-    ],
-    'NVIS_MVS': [
-        # IN_LUTO_HA = 0.0 ha
-        ('Goulburn Broken', 'Boulders/rock with algae, lichen or scattered plants, or alpine fjaeldmarks'),
-        # IN_LUTO_HA = 0.0 ha
-        ('North East',      'Boulders/rock with algae, lichen or scattered plants, or alpine fjaeldmarks'),
-        # IN_LUTO_HA = 24.8 ha
-        ('North East',      'Callitris forests and woodlands'),
-        # IN_LUTO_HA = 0.0 ha
-        ('Goulburn Broken', 'Callitris open woodlands'),
-        # IN_LUTO_HA = 15.1 ha
-        ('Goulburn Broken', 'Cool temperate rainforest'),
-        # IN_LUTO_HA = 0.0 ha
-        ('Goulburn Broken', 'Heathlands'),
-        # IN_LUTO_HA = 44.5 ha
-        ('North East',      'Heathlands'),
-        # IN_LUTO_HA = 78.8 ha
-        ('Goulburn Broken', 'Leptospermum forests and woodlands'),
-        # IN_LUTO_HA = 45.5 ha
-        ('North East',      'Leptospermum forests and woodlands'),
-        # IN_LUTO_HA = 4.9 ha
-        ('Goulburn Broken', 'Naturally bare, sand, rock, claypan, mudflat'),
-        # IN_LUTO_HA = 0.0 ha
-        ('North East',      'Naturally bare, sand, rock, claypan, mudflat'),
-        # IN_LUTO_HA = 0.0 ha
-        ('North East',      'Other grasslands'),
-        # IN_LUTO_HA = 0.9 ha
-        ('Goulburn Broken', 'Other tussock grasslands'),
-        # IN_LUTO_HA = 38.5 ha
-        ('North East',      'Other tussock grasslands'),
-        # IN_LUTO_HA = 2.0 ha
-        ('Goulburn Broken', 'Unclassified native vegetation'),
-    ],
-}
+GBF3_NVIS_MIN_AREA_HA = 100
+'''
+Drop every (region, group) whose IN_LUTO_HA (restorable habitat inside the LUTO study area) is below this
+many hectares: a constraint with LHS ≈ 0 is structurally infeasible. Applies in every mode and region mode.
+'''
+
 
 
 # ------------------------------- GBF4 Parameters -------------------------------
@@ -1307,9 +1253,10 @@ GBF4_TARGET_ECNES = 'off'           # 'off', 'medium', 'high', 'dict', or 'USER_
 'off'               — GBF4 SNES/ECNES constraints disabled.
 'USER_DEFINED'      — targets read from the input CSV as-is; only species/communities with a
                       defined TARGET_LEVEL_2030 > 0 in the CSV are selected.
-'dict'              — same species/communities as 'USER_DEFINED', but with the target levels from
-                      GBF4_{SNES,ECNES}_TARGETS_DICT['dict'] applied. Makes automated task runs
-                      easy, e.g. a sensitivity check over different target levels.
+'dict'              — same species/communities as 'USER_DEFINED', with REGION-SPECIFIC uniform levels:
+                      GBF4_{SNES,ECNES}_SELECTED_REGIONS is then a dict {region: {year: pct}} whose keys
+                      are the selected regions (in AUSTRALIA mode: {'AUSTRALIA': {...}}). Makes automated
+                      task runs easy, e.g. a sensitivity sweep over target levels per CMA.
 'medium'/'high'     — ALL species/communities at the configured presence/region are selected
                       (no CSV-target filter), and every TARGET_LEVEL_{year} column is set to the
                       uniform level preset in GBF4_{SNES,ECNES}_TARGETS_DICT
@@ -1321,16 +1268,14 @@ GBF4_SNES_PRESENCE_CLASS  = 'LIKELY'  # 'LIKELY', 'LIKELY_AND_MAYBE'
 GBF4_ECNES_PRESENCE_CLASS = 'LIKELY'  # 'LIKELY', 'LIKELY_AND_MAYBE'
 
 # Uniform target presets (percent) keyed by GBF4_TARGET_{SNES,ECNES} mode.
-# Only consulted when the target setting is 'medium'/'high'/'dict'.
+# Only consulted when the target setting is 'medium'/'high' ('dict' levels live in *_SELECTED_REGIONS).
 GBF4_SNES_TARGETS_DICT  = {
     'medium': {2030: 30, 2050: 30, 2100: 30},
     'high':   {2030: 30, 2050: 50, 2100: 50},
-    'dict':   {2030: 30, 2050: 50, 2100: 50},
 }
 GBF4_ECNES_TARGETS_DICT = {
     'medium': {2030: 30, 2050: 30, 2100: 30},
     'high':   {2030: 30, 2050: 50, 2100: 50},
-    'dict':   {2030: 30, 2050: 50, 2100: 50},
 }
 
 # Per-(region, SCIENTIFIC_NAME) SNES target overrides, applied AFTER the uniform dict
@@ -1358,8 +1303,11 @@ GBF4_SNES_SELECTED_REGIONS  = ['North East', 'Goulburn Broken']
 Controls the spatial resolution of GBF4 SNES constraints.
  - 'AUSTRALIA' → nationwide targets (existing behaviour, default)
  - 'NRM'       → per-NRM-region targets from NRM target files
-GBF4_SNES_SELECTED_REGIONS: list of NRM region names. Only used when mode = 'NRM'.
+GBF4_SNES_SELECTED_REGIONS: list of NRM region names (mode = 'NRM'). Under GBF4_TARGET_SNES = 'dict' it is a
+DICT {region: {year: pct}} — keys select the regions, values are each region's uniform level
+(AUSTRALIA mode: {'AUSTRALIA': {...}}).
 '''
+GBF4_SNES_MIN_AREA_HA = 100     # drop (region, species) pairs with IN_LUTO_HA below this (LHS ≈ 0 → infeasible)
 
 GBF4_ECNES_REGION_MODE      = 'AUSTRALIA'                   # 'AUSTRALIA' or 'NRM'
 GBF4_ECNES_SELECTED_REGIONS = ['North East', 'Goulburn Broken']
@@ -1367,27 +1315,12 @@ GBF4_ECNES_SELECTED_REGIONS = ['North East', 'Goulburn Broken']
 Controls the spatial resolution of GBF4 ECNES constraints.
  - 'AUSTRALIA' → nationwide targets (existing behaviour, default)
  - 'NRM'       → per-NRM-region targets from NRM target files
-GBF4_ECNES_SELECTED_REGIONS: list of NRM region names. Only used when mode = 'NRM'.
+GBF4_ECNES_SELECTED_REGIONS: list of NRM region names (mode = 'NRM'). Under GBF4_TARGET_ECNES = 'dict' it is a
+DICT {region: {year: pct}} — keys select the regions, values are each region's uniform level
+(AUSTRALIA mode: {'AUSTRALIA': {...}}).
 '''
+GBF4_ECNES_MIN_AREA_HA = 100    # drop (region, community) pairs with IN_LUTO_HA below this (LHS ≈ 0 → infeasible)
 
-# -- Trouble-maker exclusions used by the rule_out_trouble_maker_speceis workflow.
-# GBF4_ECNES_EXCLUDE_REGION_COMMUNITIES: list of (region, COMMUNITY) tuples to drop.
-# GBF4_SNES_EXCLUDE_REGION_SPECIES:      list of (region, SCIENTIFIC_NAME) tuples to drop.
-#   NRM mode       — matches on the (region, name) pair exactly.
-#   AUSTRALIA mode — only the name part is used (region is ignored).
-# Match exactly the values in BIODIVERSITY_GBF4_TARGET_*[_NRM].csv.
-GBF4_ECNES_EXCLUDE_REGION_COMMUNITIES = []
-GBF4_SNES_EXCLUDE_REGION_SPECIES = [
-    # Only the 6 zero-area (IN_LUTO_HA == 0) SNES pairs — no restorable habitat inside the LUTO
-    # study area, so structurally infeasible. All other NE+GB species are carried (matches Run_0027
-    # and the fresh-baseline decision from the NECMA exploration, Explore_NECMA_runs).
-    ('North East',      'Argyrotegium nitidulum'),
-    ('Goulburn Broken', 'Burramys parvus'),
-    ('North East',      'Burramys parvus'),
-    ('North East',      'Euphrasia crassiuscula subsp. glandulifera'),
-    ('North East',      'Euphrasia eichleri'),
-    ('North East',      'Kelleria bogongensis'),
-]
 
 
 # -------------------------------- Climate change impacts on biodiversity -------------------------------

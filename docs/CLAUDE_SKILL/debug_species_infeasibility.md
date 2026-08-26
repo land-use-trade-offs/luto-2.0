@@ -11,8 +11,10 @@ area) and numerical breakdown (ill-conditioned coefficient rows).
 
 - A run fails with `GRB.NUMERIC` or `GRB.INFEASIBLE` at a specific year and GBF4
   SNES or ECNES constraints are active
-- You want to identify which species to add to `GBF4_SNES_EXCLUDE_REGION_SPECIES`
-  or `GBF4_ECNES_EXCLUDE_REGION_COMMUNITIES`
+- You want to identify which species are physically unachievable (note: since 2026-08-26 there are no
+  hand-written exclusion lists — `GBF4_SNES_MIN_AREA_HA` / `GBF4_ECNES_MIN_AREA_HA` drop pairs with
+  `IN_LUTO_HA` below 100 ha automatically; an unachievable species above that threshold is handled by
+  lowering its level via `GBF4_*_TARGETS_OVERRIDE` or the drop-unreachable flow, not by an exclusion list)
 - Applies to any `USER_DEFINED` or NRM-mode SNES/ECNES run
 
 ## Key concept
@@ -598,7 +600,7 @@ mixes raw and rescaled units and gives inverted results.
 
 ### Exclusions not applied from checkpoints
 
-`GBF4_SNES_EXCLUDE_REGION_SPECIES` is filtered in `data.py` during `Data()` init.
+(Historical: `GBF4_SNES_EXCLUDE_REGION_SPECIES` was filtered in `data.py` during `Data()` init; replaced by the `*_MIN_AREA_HA` rule on 2026-08-26.)
 A saved `data_YYYY.lz4` checkpoint bypasses this. Apply post-load filtering when
 using checkpoints in diagnostic or retry scripts (see Step 5).
 
