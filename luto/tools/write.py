@@ -3622,7 +3622,7 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
         if not all_groups:
             cause = ("`GBF3_NVIS_TARGET` is 'off', so no groups are constrained — use 'all' to write "
                      "every group" if settings.GBF3_NVIS_TARGET == 'off' else
-                     "check GBF3_NVIS_REGION_MODE / GBF3_NVIS_SELECTED_REGIONS / GBF3_NVIS_MIN_AREA_HA")
+                     "check GBF3_NVIS_REGION_MODE / GBF3_NVIS_SEL_REGION_TARGETS / GBF3_NVIS_MIN_AREA_HA")
             return (f"Skipping Biodiversity GBF3 NVIS scores for year {yr_cal}: `WRITE_GBF3_NVIS` is "
                     f"'selected' but no vegetation groups are selected — {cause}")
 
@@ -4035,7 +4035,7 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
         if not all_species:
             return (f"Skipping Biodiversity GBF4 SNES scores for year {yr_cal}: `WRITE_GBF4_SNES` is "
                     f"'selected' but no species are selected — check GBF4_SNES_REGION_MODE / "
-                    f"GBF4_SNES_SELECTED_REGIONS / GBF4_SNES_MIN_AREA_HA")
+                    f"GBF4_SNES_SEL_REGION_TARGETS / GBF4_SNES_MIN_AREA_HA")
 
     # 2. Unify chunk ag/agmgt/nonag decision variables.
     am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]
@@ -4502,7 +4502,7 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
         if not all_species:
             return (f"Skipping Biodiversity GBF4 ECNES scores for year {yr_cal}: `WRITE_GBF4_ECNES` is "
                     f"'selected' but no communities are selected — check GBF4_ECNES_REGION_MODE / "
-                    f"GBF4_ECNES_SELECTED_REGIONS / GBF4_ECNES_MIN_AREA_HA")
+                    f"GBF4_ECNES_SEL_REGION_TARGETS / GBF4_ECNES_MIN_AREA_HA")
 
     # 2. Unify chunk ag/agmgt/nonag decision variables.
     am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]

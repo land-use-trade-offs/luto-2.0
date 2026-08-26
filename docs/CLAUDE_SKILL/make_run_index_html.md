@@ -850,9 +850,9 @@ different schema:
 | `label` | Filesystem-safe slug of species/community name |
 | `GBF4_TARGET_ECNES` | `on` / `off` |
 | `GBF4_TARGET_SNES` | `on` / `off` |
-| `GBF4_ECNES_SELECTED_REGIONS` | Python list literal of NRM region names |
-| `GBF4_SNES_SELECTED_REGIONS` | Python list literal of NRM region names |
-| `GBF3_NVIS_SELECTED_REGIONS` | Python list literal (same regions as target species) |
+| `GBF4_ECNES_SEL_REGION_TARGETS` | Python list literal of NRM region names |
+| `GBF4_SNES_SEL_REGION_TARGETS` | Python list literal of NRM region names |
+| `GBF3_NVIS_SEL_REGION_TARGETS` | Python list literal (same regions as target species) |
 
 For this schema, write a **custom** `make_index.py` placed in `OUT_DIR`. The table columns
 should be: Run, Type (ECNES/SNES badge), Local #, Species/Community (italic), NRM Regions

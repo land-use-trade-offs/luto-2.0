@@ -202,11 +202,11 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 - `BIODIVERSITY_TARGET_GBF_*`: Global Biodiversity Framework targets
   - `GBF2_TARGET`: Priority degraded areas restoration ('off', 'low', 'medium', 'high')
   - `GBF2_CONSTRAINT_TYPE`: Hard or soft GBF2 constraint ('hard' or 'soft')
-  - `GBF3_NVIS_TARGET`: NVIS vegetation group targets ('off', 'medium', 'high', 'USER_DEFINED')
+  - `GBF3_NVIS_TARGET`: NVIS vegetation group targets ('off', 'medium', 'high', 'CSV_DEFINED')
   - `GBF3_NVIS_REGION_MODE`: 'AUSTRALIA', 'NRM', or 'IBRA_REG' (IBRA bioregion targets are handled through the NVIS stream — there is no separate `BIODIVERSITY_TARGET_GBF_3_IBRA` setting or IBRA constraint method)
-  - `GBF4_TARGET_SNES`: Species NES targets ('off', 'medium', 'high', 'dict', or 'USER_DEFINED'; levels apply uniform presets from `GBF4_SNES_TARGETS_DICT` to ALL species, GBF2-style; 'USER_DEFINED' keeps CSV targets and filters to species with TARGET_LEVEL_2030 > 0; **'dict'** = the same species as USER_DEFINED with **region-specific** uniform levels — `GBF4_SNES_SELECTED_REGIONS` is then a dict `{region: {year: pct}}` whose keys select the regions (`{'AUSTRALIA': {...}}` at national scope); a plain list in the other modes)
-  - `GBF4_TARGET_ECNES`: Ecological Community NES targets (same semantics with `GBF4_ECNES_TARGETS_DICT` / `GBF4_ECNES_SELECTED_REGIONS`)
-  - `GBF3_NVIS_TARGET` also accepts 'dict' with `GBF3_NVIS_SELECTED_REGIONS` as `{region: {year: pct}}`
+  - `GBF4_TARGET_SNES`: Species NES targets ('off', 'medium', 'high', 'SPECIFIED', or 'CSV_DEFINED'; levels apply uniform presets from `GBF4_SNES_TARGETS_DICT` to ALL species, GBF2-style; 'CSV_DEFINED' keeps CSV targets and filters to species with TARGET_LEVEL_2030 > 0; **'SPECIFIED'** = the same species as CSV_DEFINED with **region-specific** uniform levels — `GBF4_SNES_SEL_REGION_TARGETS` is then a dict `{region: {year: pct}}` whose keys select the regions (`{'AUSTRALIA': {...}}` at national scope); a plain list in the other modes)
+  - `GBF4_TARGET_ECNES`: Ecological Community NES targets (same semantics with `GBF4_ECNES_TARGETS_DICT` / `GBF4_ECNES_SEL_REGION_TARGETS`)
+  - `GBF3_NVIS_TARGET` also accepts 'SPECIFIED' with `GBF3_NVIS_SEL_REGION_TARGETS` as `{region: {year: pct}}`
   - `GBF4_SNES_MIN_AREA_HA` / `GBF4_ECNES_MIN_AREA_HA` / `GBF3_NVIS_MIN_AREA_HA` (100): every (region, item) whose `IN_LUTO_HA` is below the threshold is dropped in `data.py` (LHS ≈ 0 → structurally infeasible). These replaced the hand-written `GBF4_SNES_EXCLUDE_REGION_SPECIES` / `GBF4_ECNES_EXCLUDE_REGION_COMMUNITIES` / `GBF3_NVIS_EXCLUDE_REGION_GROUPS` lists (removed 2026-08-26)
   - `GBF8_TARGET`: Species conservation targets ('off', 'medium', 'high', or 'USER_DEFINED'; levels apply uniform presets from `GBF8_TARGETS_DICT` to ALL ~10.6k species; 'USER_DEFINED' = former 'on', reads hand-filled USER_DEFINED_TARGET_PERCENT_* CSV columns)
 

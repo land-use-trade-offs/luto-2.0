@@ -93,11 +93,11 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 - `BIODIVERSITY_TARGET_GBF_*`: Global Biodiversity Framework targets
   - `GBF2_TARGET`: Priority degraded areas restoration ('off', 'low', 'medium', 'high')
   - `GBF2_CONSTRAINT_TYPE`: Hard or soft constraint ('hard' or 'soft')
-  - `GBF3_NVIS_TARGET`: NVIS vegetation group targets ('off', 'medium', 'high', 'USER_DEFINED')
+  - `GBF3_NVIS_TARGET`: NVIS vegetation group targets ('off', 'medium', 'high', 'CSV_DEFINED')
   - `GBF3_NVIS_TARGET_CLASS`: Layer class ('NVIS_MVG' or 'NVIS_MVS'); also selects the class for IBRA layers when `GBF3_NVIS_REGION_MODE = 'IBRA_REG'`
   - `GBF3_NVIS_REGION_MODE`: 'AUSTRALIA', 'NRM', or 'IBRA_REG' (IBRA bioregion targets are handled through the NVIS stream — there is no separate `BIODIVERSITY_TARGET_GBF_3_IBRA` setting or IBRA constraint method)
-  - `GBF4_TARGET_SNES`: Species NES targets ('off', 'medium', 'high', 'dict', or 'USER_DEFINED')
-  - `GBF4_TARGET_ECNES`: Ecological Community NES targets ('off', 'medium', 'high', 'dict', or 'USER_DEFINED')
+  - `GBF4_TARGET_SNES`: Species NES targets ('off', 'medium', 'high', 'SPECIFIED', or 'CSV_DEFINED')
+  - `GBF4_TARGET_ECNES`: Ecological Community NES targets ('off', 'medium', 'high', 'SPECIFIED', or 'CSV_DEFINED')
   - `GBF4_SNES_TARGETS_OVERRIDE`: dict letting a few species carry a different target from the rest (empty = no override)
   - `GBF4_SNES_CAP_MARGIN`: safety margin (percentage points, default 2.0) subtracted from each species' `ATTAINABLE_LEVEL` when clamping an interpolated SNES target, to keep a feasibility buffer (effective cap = `ATTAINABLE_LEVEL - GBF4_SNES_CAP_MARGIN`)
   - `GBF8_TARGET`: Species conservation targets ('on' or 'off')

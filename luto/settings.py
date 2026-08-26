@@ -1165,7 +1165,7 @@ will be 0.6 * 0.8 = 0.48.
 
 # ---------------------- GBF3 parameters ----------------------
 
-GBF3_NVIS_TARGET = 'off'           # 'off', 'medium', 'high', 'dict', or 'USER_DEFINED'
+GBF3_NVIS_TARGET = 'off'           # 'off', 'medium', 'high', 'SPECIFIED', or 'CSV_DEFINED'
 '''
 Target 3 of the Kunming-Montreal Global Biodiversity Framework (NVIS):
 protect and manage vegetation groups using the National Vegetation Information System.
@@ -1173,8 +1173,8 @@ protect and manage vegetation groups using the National Vegetation Information S
 - if 'off' is selected, turn off the GBF-3 NVIS target for biodiversity.
 - if 'medium' is selected, the conservation target is set to 30% by 2030 and 30% by 2050 for each vegetation group.
 - if 'high' is selected, the conservation target is set to 30% by 2030 and 50% by 2050 for each vegetation group.
-- if 'USER_DEFINED' is selected, targets are kept from the input CSV; only groups with all year targets > 0 are constrained.
-- if 'dict' is selected, GBF3_NVIS_SELECTED_REGIONS is a dict {region: {year: pct}} and every group in a region
+- if 'CSV_DEFINED' is selected, targets are kept from the input CSV; only groups with all year targets > 0 are constrained.
+- if 'SPECIFIED' is selected, GBF3_NVIS_SEL_REGION_TARGETS is a dict {region: {year: pct}} and every group in a region
   gets that region's level (region-specific uniform targets; in AUSTRALIA mode key it 'AUSTRALIA').
 Level presets apply to ALL vegetation groups at the configured region mode (no CSV-target filter).
 (No 'low' level — a 0% target only makes sense for GBF2's degraded-areas logic.)
@@ -1185,24 +1185,24 @@ GBF3_TARGETS_DICT = {
     'off':     None,
     'medium':  {2030: 30, 2050: 30},
     'high':    {2030: 30, 2050: 50},
-    'dict':    None,                    # levels come from GBF3_NVIS_SELECTED_REGIONS (a dict in this mode)
-    'USER_DEFINED': None
+    'SPECIFIED':    None,                    # levels come from GBF3_NVIS_SEL_REGION_TARGETS (a dict in this mode)
+    'CSV_DEFINED': None
 }
 
 
 # Per-(region, vegetation group) GBF3 NVIS target overrides — the NVIS counterpart of
 # GBF4_SNES_TARGETS_OVERRIDE / GBF4_ECNES_TARGETS_OVERRIDE. Applied AFTER the uniform
 # GBF3_TARGETS_DICT and independent of GBF3_NVIS_TARGET mode, so it works with 'medium', 'high' and
-# 'USER_DEFINED' alike. Maps (region, group) -> {year: pct}. Empty = no override (a byte-identical
+# 'CSV_DEFINED' alike. Maps (region, group) -> {year: pct}. Empty = no override (a byte-identical
 # no-op, so every run that does not set it is unaffected).
 #
 # Lets the vegetation floor carry a target level that GBF3_TARGETS_DICT has no preset for — there is
 # no 15/25 option, so halving NVIS alongside SNES/ECNES is only expressible this way short of the
-# USER_DEFINED Excel route.
+# CSV_DEFINED Excel route.
 #
 # NOTE ON KEYS: in AUSTRALIA region mode the rows are relabelled 'AUSTRALIA' BEFORE this is applied,
 # so keys must use ('AUSTRALIA', group) there, not the NRM region name. In NRM mode use the NRM
-# region name, exactly as GBF3_NVIS_SELECTED_REGIONS does.
+# region name, exactly as GBF3_NVIS_SEL_REGION_TARGETS does.
 GBF3_NVIS_TARGETS_OVERRIDE = {}
 
 
@@ -1222,14 +1222,14 @@ Controls the spatial resolution of GBF3 NVIS constraints.
  - 'IBRA_REG'  → IBRA bioregion targets (bio_GBF3_NVIS_MVG/MVS.nc + IBRA Excel file)
 '''
 
-GBF3_NVIS_SELECTED_REGIONS = {
-    'North East':      {2030: 30, 2050: 50},
-    'Goulburn Broken': {2030: 30, 2050: 50},
+GBF3_NVIS_SEL_REGION_TARGETS = {
+    'North East':      {2030: 30, 2050: 50, 2100: 50},
+    'Goulburn Broken': {2030: 30, 2050: 50, 2100: 50},
 }
 '''
 The NRM regions to enforce GBF3 NVIS constraints for (keys must match REGION_NRM_NAME; used when
-GBF3_NVIS_REGION_MODE = 'NRM') and, under GBF3_NVIS_TARGET = 'dict', each region's uniform target
-{year: pct} (a missing 2100 repeats 2050). In the preset / USER_DEFINED modes only the keys are used, so a
+GBF3_NVIS_REGION_MODE = 'NRM') and, under GBF3_NVIS_TARGET = 'SPECIFIED', each region's uniform target
+{year: pct} (all three years required). In the preset / CSV_DEFINED modes only the keys are used, so a
 plain list of region names is also accepted there. In AUSTRALIA region mode key it 'AUSTRALIA'.
 '''
 
@@ -1249,14 +1249,14 @@ and manage human-wildlife interactions
 '''
 
 
-GBF4_TARGET_SNES  = 'off'           # 'off', 'medium', 'high', 'dict', or 'USER_DEFINED'
-GBF4_TARGET_ECNES = 'off'           # 'off', 'medium', 'high', 'dict', or 'USER_DEFINED'
+GBF4_TARGET_SNES  = 'off'           # 'off', 'medium', 'high', 'SPECIFIED', or 'CSV_DEFINED'
+GBF4_TARGET_ECNES = 'off'           # 'off', 'medium', 'high', 'SPECIFIED', or 'CSV_DEFINED'
 '''
 'off'               — GBF4 SNES/ECNES constraints disabled.
-'USER_DEFINED'      — targets read from the input CSV as-is; only species/communities with a
+'CSV_DEFINED'      — targets read from the input CSV as-is; only species/communities with a
                       defined TARGET_LEVEL_2030 > 0 in the CSV are selected.
-'dict'              — same species/communities as 'USER_DEFINED', with REGION-SPECIFIC uniform levels:
-                      GBF4_{SNES,ECNES}_SELECTED_REGIONS is then a dict {region: {year: pct}} whose keys
+'SPECIFIED'              — same species/communities as 'CSV_DEFINED', with REGION-SPECIFIC uniform levels:
+                      GBF4_{SNES,ECNES}_SEL_REGION_TARGETS is then a dict {region: {year: pct}} whose keys
                       are the selected regions (in AUSTRALIA mode: {'AUSTRALIA': {...}}). Makes automated
                       task runs easy, e.g. a sensitivity sweep over target levels per CMA.
 'medium'/'high'     — ALL species/communities at the configured presence/region are selected
@@ -1270,7 +1270,7 @@ GBF4_SNES_PRESENCE_CLASS  = 'LIKELY'  # 'LIKELY', 'LIKELY_AND_MAYBE'
 GBF4_ECNES_PRESENCE_CLASS = 'LIKELY'  # 'LIKELY', 'LIKELY_AND_MAYBE'
 
 # Uniform target presets (percent) keyed by GBF4_TARGET_{SNES,ECNES} mode.
-# Only consulted when the target setting is 'medium'/'high' ('dict' levels live in *_SELECTED_REGIONS).
+# Only consulted when the target setting is 'medium'/'high' ('SPECIFIED' levels live in *_SEL_REGION_TARGETS).
 GBF4_SNES_TARGETS_DICT  = {
     'medium': {2030: 30, 2050: 30, 2100: 30},
     'high':   {2030: 30, 2050: 50, 2100: 50},
@@ -1300,33 +1300,33 @@ GBF4_ECNES_TARGETS_OVERRIDE = {}
 GBF4_SNES_CAP_MARGIN = 2.0
 
 GBF4_SNES_REGION_MODE       = 'AUSTRALIA'                    # 'AUSTRALIA' or 'NRM'
-GBF4_SNES_SELECTED_REGIONS  = {
-    'North East':      {2030: 30, 2050: 50},
-    'Goulburn Broken': {2030: 30, 2050: 50},
+GBF4_SNES_SEL_REGION_TARGETS  = {
+    'North East':      {2030: 30, 2050: 50, 2100: 50},
+    'Goulburn Broken': {2030: 30, 2050: 50, 2100: 50},
 }
 '''
 Controls the spatial resolution of GBF4 SNES constraints.
  - 'AUSTRALIA' → nationwide targets (existing behaviour, default)
  - 'NRM'       → per-NRM-region targets from NRM target files
-GBF4_SNES_SELECTED_REGIONS: {region: {year: pct}} — the keys select the NRM regions (mode = 'NRM') and,
-under GBF4_TARGET_SNES = 'dict', the values are each region's uniform level (a missing 2100 repeats 2050).
-The preset / USER_DEFINED modes use only the keys, so a plain list of names is also accepted there.
+GBF4_SNES_SEL_REGION_TARGETS: {region: {year: pct}} — the keys select the NRM regions (mode = 'NRM') and,
+under GBF4_TARGET_SNES = 'SPECIFIED', the values are each region's uniform level (all three years required).
+The preset / CSV_DEFINED modes use only the keys, so a plain list of names is also accepted there.
 AUSTRALIA mode: {'AUSTRALIA': {...}}.
 '''
 GBF4_SNES_MIN_AREA_HA = 100     # drop (region, species) pairs with IN_LUTO_HA below this (LHS ≈ 0 → infeasible)
 
 GBF4_ECNES_REGION_MODE      = 'AUSTRALIA'                   # 'AUSTRALIA' or 'NRM'
-GBF4_ECNES_SELECTED_REGIONS = {
-    'North East':      {2030: 30, 2050: 50},
-    'Goulburn Broken': {2030: 30, 2050: 50},
+GBF4_ECNES_SEL_REGION_TARGETS = {
+    'North East':      {2030: 30, 2050: 50, 2100: 50},
+    'Goulburn Broken': {2030: 30, 2050: 50, 2100: 50},
 }
 '''
 Controls the spatial resolution of GBF4 ECNES constraints.
  - 'AUSTRALIA' → nationwide targets (existing behaviour, default)
  - 'NRM'       → per-NRM-region targets from NRM target files
-GBF4_ECNES_SELECTED_REGIONS: {region: {year: pct}} — the keys select the NRM regions (mode = 'NRM') and,
-under GBF4_TARGET_ECNES = 'dict', the values are each region's uniform level (a missing 2100 repeats 2050).
-The preset / USER_DEFINED modes use only the keys, so a plain list of names is also accepted there.
+GBF4_ECNES_SEL_REGION_TARGETS: {region: {year: pct}} — the keys select the NRM regions (mode = 'NRM') and,
+under GBF4_TARGET_ECNES = 'SPECIFIED', the values are each region's uniform level (all three years required).
+The preset / CSV_DEFINED modes use only the keys, so a plain list of names is also accepted there.
 AUSTRALIA mode: {'AUSTRALIA': {...}}.
 '''
 GBF4_ECNES_MIN_AREA_HA = 100    # drop (region, community) pairs with IN_LUTO_HA below this (LHS ≈ 0 → infeasible)
@@ -1334,7 +1334,7 @@ GBF4_ECNES_MIN_AREA_HA = 100    # drop (region, community) pairs with IN_LUTO_HA
 
 
 # -------------------------------- Climate change impacts on biodiversity -------------------------------
-GBF8_TARGET = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
+GBF8_TARGET = 'off'           # 'off', 'medium', 'high', or 'CSV_DEFINED'
 '''
 Target 8 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to
 reduce the impacts of climate change on biodiversity and ecosystems.

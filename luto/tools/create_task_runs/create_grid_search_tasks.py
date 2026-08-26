@@ -123,21 +123,21 @@ grid_search = {
     'GBF2_CONSTRAINT_TYPE': ['hard'],                                       # 'hard' or 'soft'
 
     # --------------- Biodiversity settings - GBF 3 ---------------
-    'GBF3_NVIS_TARGET': ['high'],                             # 'off', 'medium', 'high', 'USER_DEFINED'
+    'GBF3_NVIS_TARGET': ['high'],                             # 'off', 'medium', 'high', 'CSV_DEFINED'
     'GBF3_NVIS_TARGET_CLASS': ['NVIS_MVS'],                                  # 'NVIS_MVG' or 'NVIS_MVS' NVIS class
     'GBF3_NVIS_REGION_MODE': ['AUSTRALIA'],                                 # 'AUSTRALIA', 'NRM', or 'IBRA_REG'
-    'GBF3_NVIS_SELECTED_REGIONS': [['North East', 'Goulburn Broken']],      # Only used when mode = 'NRM'
+    'GBF3_NVIS_SEL_REGION_TARGETS': [['North East', 'Goulburn Broken']],      # Only used when mode = 'NRM'
 
     # --------------- Biodiversity settings - GBF 4 ---------------
-    'GBF4_TARGET_SNES': ['USER_DEFINED'],                     # 'off', 'medium', 'high', 'dict', or 'USER_DEFINED'
+    'GBF4_TARGET_SNES': ['CSV_DEFINED'],                     # 'off', 'medium', 'high', 'SPECIFIED', or 'CSV_DEFINED'
     'GBF4_SNES_REGION_MODE': ['AUSTRALIA'],                                 # 'AUSTRALIA' or 'NRM'
-    'GBF4_SNES_SELECTED_REGIONS': [['North East', 'Goulburn Broken']],      # Only used when mode = 'NRM'
-    'GBF4_TARGET_ECNES': ['USER_DEFINED'],                    # 'off', 'medium', 'high', 'dict', or 'USER_DEFINED'
+    'GBF4_SNES_SEL_REGION_TARGETS': [['North East', 'Goulburn Broken']],      # Only used when mode = 'NRM'
+    'GBF4_TARGET_ECNES': ['CSV_DEFINED'],                    # 'off', 'medium', 'high', 'SPECIFIED', or 'CSV_DEFINED'
     'GBF4_ECNES_REGION_MODE': ['AUSTRALIA'],                                # 'AUSTRALIA' or 'NRM'
-    'GBF4_ECNES_SELECTED_REGIONS': [['North East', 'Goulburn Broken']],     # Only used when mode = 'NRM'
+    'GBF4_ECNES_SEL_REGION_TARGETS': [['North East', 'Goulburn Broken']],     # Only used when mode = 'NRM'
 
     # --------------- Biodiversity settings - GBF 8 ---------------
-    'GBF8_TARGET': ['off'],                                   # 'off', 'medium', 'high', 'dict', or 'USER_DEFINED'
+    'GBF8_TARGET': ['off'],                                   # 'off', 'medium', 'high', 'SPECIFIED', or 'CSV_DEFINED'
 
     # --------------- Renewable energy ---------------
     # Core: RE OFF. REN1-REN4 are separate renewable energy scenario runs (not part of this grid search).

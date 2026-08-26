@@ -15,7 +15,7 @@ area) and numerical breakdown (ill-conditioned coefficient rows).
   hand-written exclusion lists — `GBF4_SNES_MIN_AREA_HA` / `GBF4_ECNES_MIN_AREA_HA` drop pairs with
   `IN_LUTO_HA` below 100 ha automatically; an unachievable species above that threshold is handled by
   lowering its level via `GBF4_*_TARGETS_OVERRIDE` or the drop-unreachable flow, not by an exclusion list)
-- Applies to any `USER_DEFINED` or NRM-mode SNES/ECNES run
+- Applies to any `CSV_DEFINED` or NRM-mode SNES/ECNES run
 
 ## Key concept
 

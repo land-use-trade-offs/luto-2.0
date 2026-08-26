@@ -87,23 +87,6 @@ def lumap2non_ag_l_mk(lumap, num_non_ag_land_uses: int):
     return x_rk.astype(bool)
 
 
-def _region_levels(selected_regions, name):
-    """Under the 'dict' target modes GBF{3,4}_*_SELECTED_REGIONS must be {region: {year: pct}}; return it
-    validated. A plain list is the non-dict form and is an error here."""
-    if not isinstance(selected_regions, dict) or not selected_regions:
-        raise ValueError(f"{name} must be a non-empty dict {{region: {{year: pct}}}} under the 'dict' target mode, "
-                         f"got {selected_regions!r}")
-    out = {}
-    for reg, yr_dict in selected_regions.items():
-        if not isinstance(yr_dict, dict) or not yr_dict:
-            raise ValueError(f"{name}[{reg!r}] must be a {{year: pct}} dict, got {yr_dict!r}")
-        yr_dict = dict(yr_dict)
-        if 2100 not in yr_dict and 2050 in yr_dict:
-            yr_dict[2100] = yr_dict[2050]          # the target is held after 2050 unless said otherwise
-        out[reg] = yr_dict
-    return out
-
-
 @dataclass
 class Data:
     """
@@ -1452,7 +1435,7 @@ class Data:
                 bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')[f'PERCENTILE_{settings.HCAS_CONTRIBUTION_PERCENTILE}'].to_dict()         # Get the biodiversity degradation score at specified percentile (pd.DataFrame)
                 unallow_nat_scale = bio_HCAS_contribution_lookup[self.DESC2AGLU['Unallocated - natural land']]                                          # Get the biodiversity degradation score for unallocated natural land (float)
                 bio_HCAS_contribution_lookup = {int(k): v * (1 / unallow_nat_scale) for k, v in bio_HCAS_contribution_lookup.items()}                   # Normalise the biodiversity degradation score to the unallocated natural land score
-            case 'USER_DEFINED':
+            case 'CSV_DEFINED':
                 bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')['USER_DEFINED'].to_dict()
             case 'AG_UNIFORM':
                 bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')['AG_UNIFORM'].to_dict()
@@ -1531,7 +1514,7 @@ class Data:
         
         if settings.GBF3_NVIS_TARGET != 'off':
             print(f"│   ├── Loading GBF3 vegetation data (NVIS)", flush=True)
-            print(f"│   │   ├── NRM region mode: {settings.GBF3_NVIS_REGION_MODE} | selected regions: {settings.GBF3_NVIS_SELECTED_REGIONS}", flush=True)
+            print(f"│   │   ├── NRM region mode: {settings.GBF3_NVIS_REGION_MODE} | selected regions: {settings.GBF3_NVIS_SEL_REGION_TARGETS}", flush=True)
 
             nvis_targets_df = self.get_NVIS_targets_df(verbose=True)
             self.BIO_GBF3_NVIS_SEL = list(zip(nvis_targets_df['region'], nvis_targets_df['group']))
@@ -1649,7 +1632,7 @@ class Data:
 
             # 'low'/'medium'/'high' — uniform preset targets for ALL species BEFORE selection,
             # so the selection below keeps every species (preset > 0) regardless of the CSV.
-            # 'USER_DEFINED' keeps the CSV targets; only species with all three year targets
+            # 'CSV_DEFINED' keeps the CSV targets; only species with all three year targets
             # defined and > 0 are selected.
             if settings.GBF8_TARGET in ('medium', 'high'):
                 for _yr, _pct in settings.GBF8_TARGETS_DICT[settings.GBF8_TARGET].items():
@@ -1724,7 +1707,7 @@ class Data:
 
         Always reads from CSV. Stateless — no instance attributes read or written.
         Applies cascading filters: target check → dict overwrite → TARGET_CLASS
-        → REGION_MODE → SELECTED_REGIONS → MIN_AREA_HA.
+        → REGION_MODE → SEL_REGION_TARGETS → MIN_AREA_HA.
 
         Returns an empty DataFrame when GBF3_NVIS_TARGET is 'off'.
 
@@ -1759,27 +1742,23 @@ class Data:
         if settings.GBF3_NVIS_REGION_MODE == 'AUSTRALIA':
             df = df.assign(region='AUSTRALIA')
 
-        # Step 2: apply GBF3_TARGETS_DICT if not None (i.e. not USER_DEFINED / dict)
+        # Step 2: apply GBF3_TARGETS_DICT if not None (i.e. not CSV_DEFINED / dict)
         target_dict = settings.GBF3_TARGETS_DICT[settings.GBF3_NVIS_TARGET]
-        if settings.GBF3_NVIS_TARGET == 'dict':
-            # region-specific uniform levels: GBF3_NVIS_SELECTED_REGIONS is {region: {year: pct}}
-            region_levels = _region_levels(settings.GBF3_NVIS_SELECTED_REGIONS, 'GBF3_NVIS_SELECTED_REGIONS')
-            df = df[df['region'].isin(region_levels)].reset_index(drop=True)
-            for reg, yr_dict in region_levels.items():
-                for yr, pct in yr_dict.items():
-                    col = f'TARGET_LEVEL_{yr}'
-                    if col in df.columns:
-                        df.loc[df['region'] == reg, col] = float(pct)
-            if 'TARGET_LEVEL_2100' not in df.columns:
-                df['TARGET_LEVEL_2100'] = df['TARGET_LEVEL_2050']
-            print(f"│   │   ├── NVIS region-specific dict targets applied: "
-                  f"{ {r: v.get(2050) for r, v in region_levels.items()} } (2050 %)", flush=True)
+        if settings.GBF3_NVIS_TARGET == 'SPECIFIED':
+            # region-specific uniform levels from GBF3_NVIS_SEL_REGION_TARGETS = {region: {year: pct}};
+            # every year must be given (a missing one raises)
+            df = df[df['region'].isin(settings.GBF3_NVIS_SEL_REGION_TARGETS)].reset_index(drop=True)
+            for reg, yr_dict in settings.GBF3_NVIS_SEL_REGION_TARGETS.items():
+                for yr in (2030, 2050, 2100):
+                    df.loc[df['region'] == reg, f'TARGET_LEVEL_{yr}'] = float(yr_dict[yr])
+            print(f"│   │   ├── NVIS SPECIFIED targets applied: "
+                  f"{ {r: v[2050] for r, v in settings.GBF3_NVIS_SEL_REGION_TARGETS.items()} } (2050 %)", flush=True)
         elif target_dict is not None:
             df['TARGET_LEVEL_2030'] = target_dict[2030]
             df['TARGET_LEVEL_2050'] = target_dict[2050]
             df['TARGET_LEVEL_2100'] = target_dict.get(2100, target_dict[2050])
         else:
-            # USER_DEFINED: keep CSV targets, filter out rows where any target is zero
+            # CSV_DEFINED: keep CSV targets, filter out rows where any target is zero
             df = df[
                 (df['TARGET_LEVEL_2030'] > 0) &
                 (df['TARGET_LEVEL_2050'] > 0) &
@@ -1799,9 +1778,9 @@ class Data:
             print(f"│   │   ├── NVIS per-group target overrides applied: "
                   f"{len(settings.GBF3_NVIS_TARGETS_OVERRIDE)} pairs", flush=True)
 
-        # Step 5: filter by GBF3_NVIS_SELECTED_REGIONS (NRM mode only; a dict's keys under 'dict')
+        # Step 5: filter by GBF3_NVIS_SEL_REGION_TARGETS (NRM mode only; a dict's keys under 'SPECIFIED')
         if settings.GBF3_NVIS_REGION_MODE == 'NRM':
-            df = df[df['region'].isin(list(settings.GBF3_NVIS_SELECTED_REGIONS))].reset_index(drop=True)
+            df = df[df['region'].isin(list(settings.GBF3_NVIS_SEL_REGION_TARGETS))].reset_index(drop=True)
 
         # Step 6: drop (region, group) pairs with too little restorable habitat inside LUTO
         before = len(df)
@@ -2382,25 +2361,23 @@ class Data:
                 if col in snes_df.columns:
                     snes_df[col] = float(pct)
             print(f"│   │   ├── '{settings.GBF4_TARGET_SNES}' level targets applied to all SNES species", flush=True)
-        elif settings.GBF4_TARGET_SNES == 'dict':
-            # 'dict' — select species exactly as 'USER_DEFINED' (only rows with a CSV target), then give
-            # every species in a region that region's uniform {year: pct} from GBF4_SNES_SELECTED_REGIONS
+        elif settings.GBF4_TARGET_SNES == 'SPECIFIED':
+            # 'SPECIFIED' — select items exactly as 'CSV_DEFINED' (only rows with a CSV target), then give every
+            # item in a region that region's uniform {year: pct} from GBF4_SNES_SEL_REGION_TARGETS
+            # (every year must be given — a missing one raises)
             snes_df = snes_df.query("TARGET_LEVEL_2030 > 0").reset_index(drop=True)
-            region_levels = _region_levels(settings.GBF4_SNES_SELECTED_REGIONS, 'GBF4_SNES_SELECTED_REGIONS')
-            snes_df = snes_df[snes_df['region'].isin(region_levels)].reset_index(drop=True)
-            for reg, yr_dict in region_levels.items():
-                for yr, pct in yr_dict.items():
-                    col = f'TARGET_LEVEL_{yr}'
-                    if col in snes_df.columns:
-                        snes_df.loc[snes_df['region'] == reg, col] = float(pct)
-            print(f"│   │   ├── SNES region-specific dict targets applied: "
-                  f"{ {r: v.get(2050) for r, v in region_levels.items()} } (2050 %)", flush=True)
+            snes_df = snes_df[snes_df['region'].isin(settings.GBF4_SNES_SEL_REGION_TARGETS)].reset_index(drop=True)
+            for reg, yr_dict in settings.GBF4_SNES_SEL_REGION_TARGETS.items():
+                for yr in (2030, 2050, 2100):
+                    snes_df.loc[snes_df['region'] == reg, f'TARGET_LEVEL_{yr}'] = float(yr_dict[yr])
+            print(f"│   │   ├── SNES SPECIFIED targets applied: "
+                  f"{ {r: v[2050] for r, v in settings.GBF4_SNES_SEL_REGION_TARGETS.items()} } (2050 %)", flush=True)
         else:
-            # 'USER_DEFINED' — keep CSV targets; only species with a defined 2030 target
+            # 'CSV_DEFINED' — keep CSV targets; only species with a defined 2030 target
             snes_df = snes_df.query("TARGET_LEVEL_2030 > 0").reset_index(drop=True)
 
         if settings.GBF4_SNES_REGION_MODE != 'AUSTRALIA':
-            snes_df = snes_df[snes_df['region'].isin(list(settings.GBF4_SNES_SELECTED_REGIONS))].reset_index(drop=True)
+            snes_df = snes_df[snes_df['region'].isin(list(settings.GBF4_SNES_SEL_REGION_TARGETS))].reset_index(drop=True)
 
         before = len(snes_df)
         snes_df = snes_df[snes_df['IN_LUTO_HA'] >= settings.GBF4_SNES_MIN_AREA_HA].reset_index(drop=True)
@@ -2454,25 +2431,23 @@ class Data:
                 if col in ecnes_df.columns:
                     ecnes_df[col] = float(pct)
             print(f"│   │   ├── '{settings.GBF4_TARGET_ECNES}' level targets applied to all ECNES communities", flush=True)
-        elif settings.GBF4_TARGET_ECNES == 'dict':
-            # 'dict' — select communities exactly as 'USER_DEFINED' (only rows with a CSV target), then
-            # give every community in a region that region's uniform {year: pct} from GBF4_ECNES_SELECTED_REGIONS
+        elif settings.GBF4_TARGET_ECNES == 'SPECIFIED':
+            # 'SPECIFIED' — select items exactly as 'CSV_DEFINED' (only rows with a CSV target), then give every
+            # item in a region that region's uniform {year: pct} from GBF4_ECNES_SEL_REGION_TARGETS
+            # (every year must be given — a missing one raises)
             ecnes_df = ecnes_df.query("TARGET_LEVEL_2030 > 0").reset_index(drop=True)
-            region_levels = _region_levels(settings.GBF4_ECNES_SELECTED_REGIONS, 'GBF4_ECNES_SELECTED_REGIONS')
-            ecnes_df = ecnes_df[ecnes_df['region'].isin(region_levels)].reset_index(drop=True)
-            for reg, yr_dict in region_levels.items():
-                for yr, pct in yr_dict.items():
-                    col = f'TARGET_LEVEL_{yr}'
-                    if col in ecnes_df.columns:
-                        ecnes_df.loc[ecnes_df['region'] == reg, col] = float(pct)
-            print(f"│   │   ├── ECNES region-specific dict targets applied: "
-                  f"{ {r: v.get(2050) for r, v in region_levels.items()} } (2050 %)", flush=True)
+            ecnes_df = ecnes_df[ecnes_df['region'].isin(settings.GBF4_ECNES_SEL_REGION_TARGETS)].reset_index(drop=True)
+            for reg, yr_dict in settings.GBF4_ECNES_SEL_REGION_TARGETS.items():
+                for yr in (2030, 2050, 2100):
+                    ecnes_df.loc[ecnes_df['region'] == reg, f'TARGET_LEVEL_{yr}'] = float(yr_dict[yr])
+            print(f"│   │   ├── ECNES SPECIFIED targets applied: "
+                  f"{ {r: v[2050] for r, v in settings.GBF4_ECNES_SEL_REGION_TARGETS.items()} } (2050 %)", flush=True)
         else:
-            # 'USER_DEFINED' — keep CSV targets; only communities with a defined 2030 target
+            # 'CSV_DEFINED' — keep CSV targets; only communities with a defined 2030 target
             ecnes_df = ecnes_df.query("TARGET_LEVEL_2030 > 0").reset_index(drop=True)
 
         if settings.GBF4_ECNES_REGION_MODE != 'AUSTRALIA':
-            ecnes_df = ecnes_df[ecnes_df['region'].isin(list(settings.GBF4_ECNES_SELECTED_REGIONS))].reset_index(drop=True)
+            ecnes_df = ecnes_df[ecnes_df['region'].isin(list(settings.GBF4_ECNES_SEL_REGION_TARGETS))].reset_index(drop=True)
 
         before = len(ecnes_df)
         ecnes_df = ecnes_df[ecnes_df['IN_LUTO_HA'] >= settings.GBF4_ECNES_MIN_AREA_HA].reset_index(drop=True)
