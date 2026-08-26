@@ -1340,7 +1340,7 @@ Target 8 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to
 reduce the impacts of climate change on biodiversity and ecosystems.
 
 'off'               — GBF8 constraints disabled.
-'USER_DEFINED'      — targets read from the hand-filled USER_DEFINED_TARGET_PERCENT_{year}
+'CSV_DEFINED'       — targets read from the hand-filled USER_DEFINED_TARGET_PERCENT_{year}
                       columns of BIODIVERSITY_GBF8_TARGET.csv; only species with all three
                       year targets defined and > 0 are selected.
 'medium'/'high'     — ALL species in the CSV are selected and given the uniform level preset
