@@ -1435,15 +1435,15 @@ class Data:
                 bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')[f'PERCENTILE_{settings.HCAS_CONTRIBUTION_PERCENTILE}'].to_dict()         # Get the biodiversity degradation score at specified percentile (pd.DataFrame)
                 unallow_nat_scale = bio_HCAS_contribution_lookup[self.DESC2AGLU['Unallocated - natural land']]                                          # Get the biodiversity degradation score for unallocated natural land (float)
                 bio_HCAS_contribution_lookup = {int(k): v * (1 / unallow_nat_scale) for k, v in bio_HCAS_contribution_lookup.items()}                   # Normalise the biodiversity degradation score to the unallocated natural land score
-            case 'USER_DEFINED':
-                bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')['USER_DEFINED'].to_dict()
+            case 'CSV_DEFINED':
+                bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')['CSV_DEFINED'].to_dict()
             case 'AG_UNIFORM':
                 bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')['AG_UNIFORM'].to_dict()
                 for _lu in self.LU_MODIFIED_LAND:
                     bio_HCAS_contribution_lookup[_lu] = float(settings.HCAS_AG_UNIFORM_CONTRIBUTION)
                 print(f"│   ├── AG_UNIFORM habitat contribution: modified/cropped ag land = {settings.HCAS_AG_UNIFORM_CONTRIBUTION}", flush=True)
             case _:
-                print(f"│   ⚠ WARNING: Invalid habitat condition source: {settings.HCAS_CONTRIBUTION_PERCENTILE}, must be one of [10, 25, 50, 75, 90], 'USER_DEFINED', or 'AG_UNIFORM'", flush=True)
+                print(f"│   ⚠ WARNING: Invalid habitat condition source: {settings.HCAS_CONTRIBUTION_PERCENTILE}, must be one of [10, 25, 50, 75, 90], 'CSV_DEFINED', or 'AG_UNIFORM'", flush=True)
         
         self.BIO_HABITAT_CONTRIBUTION_LOOK_UP = {j: round(x, settings.ROUND_DECIMALS) for j, x in bio_HCAS_contribution_lookup.items()}                 # Round to the specified decimal places to avoid numerical issues in the GUROBI solver
         

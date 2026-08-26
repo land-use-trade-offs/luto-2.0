@@ -1126,7 +1126,7 @@ I.e., the lower bound of the connectivity score for weighting the raw biodiversi
 
 
 # Habitat condition data source
-HCAS_CONTRIBUTION_PERCENTILE = 'USER_DEFINED'                  # One of ['10', '25', '50', '75', '90'], 'USER_DEFINED', or 'AG_UNIFORM'
+HCAS_CONTRIBUTION_PERCENTILE = 'CSV_DEFINED'                  # One of ['10', '25', '50', '75', '90'], 'CSV_DEFINED', or 'AG_UNIFORM'
 HCAS_AG_UNIFORM_CONTRIBUTION = 0.0                             # Only under 'AG_UNIFORM': the one habitat contribution (0-1) given to EVERY
                                                                # modified / cropped agricultural land use (data.LU_MODIFIED_LAND). Natural land
                                                                # (Beef/Dairy/Sheep - natural land, Unallocated - natural land) keeps the CSV's
