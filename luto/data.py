@@ -93,10 +93,15 @@ def _region_levels(selected_regions, name):
     if not isinstance(selected_regions, dict) or not selected_regions:
         raise ValueError(f"{name} must be a non-empty dict {{region: {{year: pct}}}} under the 'dict' target mode, "
                          f"got {selected_regions!r}")
+    out = {}
     for reg, yr_dict in selected_regions.items():
         if not isinstance(yr_dict, dict) or not yr_dict:
             raise ValueError(f"{name}[{reg!r}] must be a {{year: pct}} dict, got {yr_dict!r}")
-    return selected_regions
+        yr_dict = dict(yr_dict)
+        if 2100 not in yr_dict and 2050 in yr_dict:
+            yr_dict[2100] = yr_dict[2050]          # the target is held after 2050 unless said otherwise
+        out[reg] = yr_dict
+    return out
 
 
 @dataclass

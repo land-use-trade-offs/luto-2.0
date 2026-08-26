@@ -1222,13 +1222,15 @@ Controls the spatial resolution of GBF3 NVIS constraints.
  - 'IBRA_REG'  → IBRA bioregion targets (bio_GBF3_NVIS_MVG/MVS.nc + IBRA Excel file)
 '''
 
-GBF3_NVIS_SELECTED_REGIONS = ['North East', 'Goulburn Broken']
+GBF3_NVIS_SELECTED_REGIONS = {
+    'North East':      {2030: 30, 2050: 50},
+    'Goulburn Broken': {2030: 30, 2050: 50},
+}
 '''
-NRM region names to enforce GBF3 NVIS constraints for (must match REGION_NRM_NAME); used when
-GBF3_NVIS_REGION_MODE = 'NRM'. Under GBF3_NVIS_TARGET = 'dict' this is a DICT instead — the keys are the
-selected regions and each value is that region's uniform target, e.g.
-    {'North East': {2030: 30, 2050: 45, 2100: 45}, 'Goulburn Broken': {2030: 30, 2050: 32.5, 2100: 32.5}}
-(in AUSTRALIA region mode: {'AUSTRALIA': {...}}).
+The NRM regions to enforce GBF3 NVIS constraints for (keys must match REGION_NRM_NAME; used when
+GBF3_NVIS_REGION_MODE = 'NRM') and, under GBF3_NVIS_TARGET = 'dict', each region's uniform target
+{year: pct} (a missing 2100 repeats 2050). In the preset / USER_DEFINED modes only the keys are used, so a
+plain list of region names is also accepted there. In AUSTRALIA region mode key it 'AUSTRALIA'.
 '''
 
 GBF3_NVIS_MIN_AREA_HA = 100
@@ -1298,26 +1300,34 @@ GBF4_ECNES_TARGETS_OVERRIDE = {}
 GBF4_SNES_CAP_MARGIN = 2.0
 
 GBF4_SNES_REGION_MODE       = 'AUSTRALIA'                    # 'AUSTRALIA' or 'NRM'
-GBF4_SNES_SELECTED_REGIONS  = ['North East', 'Goulburn Broken']
+GBF4_SNES_SELECTED_REGIONS  = {
+    'North East':      {2030: 30, 2050: 50},
+    'Goulburn Broken': {2030: 30, 2050: 50},
+}
 '''
 Controls the spatial resolution of GBF4 SNES constraints.
  - 'AUSTRALIA' → nationwide targets (existing behaviour, default)
  - 'NRM'       → per-NRM-region targets from NRM target files
-GBF4_SNES_SELECTED_REGIONS: list of NRM region names (mode = 'NRM'). Under GBF4_TARGET_SNES = 'dict' it is a
-DICT {region: {year: pct}} — keys select the regions, values are each region's uniform level
-(AUSTRALIA mode: {'AUSTRALIA': {...}}).
+GBF4_SNES_SELECTED_REGIONS: {region: {year: pct}} — the keys select the NRM regions (mode = 'NRM') and,
+under GBF4_TARGET_SNES = 'dict', the values are each region's uniform level (a missing 2100 repeats 2050).
+The preset / USER_DEFINED modes use only the keys, so a plain list of names is also accepted there.
+AUSTRALIA mode: {'AUSTRALIA': {...}}.
 '''
 GBF4_SNES_MIN_AREA_HA = 100     # drop (region, species) pairs with IN_LUTO_HA below this (LHS ≈ 0 → infeasible)
 
 GBF4_ECNES_REGION_MODE      = 'AUSTRALIA'                   # 'AUSTRALIA' or 'NRM'
-GBF4_ECNES_SELECTED_REGIONS = ['North East', 'Goulburn Broken']
+GBF4_ECNES_SELECTED_REGIONS = {
+    'North East':      {2030: 30, 2050: 50},
+    'Goulburn Broken': {2030: 30, 2050: 50},
+}
 '''
 Controls the spatial resolution of GBF4 ECNES constraints.
  - 'AUSTRALIA' → nationwide targets (existing behaviour, default)
  - 'NRM'       → per-NRM-region targets from NRM target files
-GBF4_ECNES_SELECTED_REGIONS: list of NRM region names (mode = 'NRM'). Under GBF4_TARGET_ECNES = 'dict' it is a
-DICT {region: {year: pct}} — keys select the regions, values are each region's uniform level
-(AUSTRALIA mode: {'AUSTRALIA': {...}}).
+GBF4_ECNES_SELECTED_REGIONS: {region: {year: pct}} — the keys select the NRM regions (mode = 'NRM') and,
+under GBF4_TARGET_ECNES = 'dict', the values are each region's uniform level (a missing 2100 repeats 2050).
+The preset / USER_DEFINED modes use only the keys, so a plain list of names is also accepted there.
+AUSTRALIA mode: {'AUSTRALIA': {...}}.
 '''
 GBF4_ECNES_MIN_AREA_HA = 100    # drop (region, community) pairs with IN_LUTO_HA below this (LHS ≈ 0 → infeasible)
 
