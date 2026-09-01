@@ -432,12 +432,11 @@ def get_GBF8_matrix_sr(data: Data, target_year: int) -> xr.DataArray:
     xr.DataArray
         dims ['species', 'cell'] — species coord holds species name strings.
     """
+    # LDS penalty on SAVBURN_ELIGIBLE cells is already applied inside
+    # get_GBF8_bio_layers_by_yr (same single-application convention as the
+    # GBF3/GBF4 *_LAYERS_LDS attributes) — only the area weighting happens here.
     bio_layers = data.get_GBF8_bio_layers_by_yr(target_year)  # numpy (n_species, n_cells)
-    base = np.where(
-        data.SAVBURN_ELIGIBLE,
-        bio_layers * data.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
-        bio_layers * data.REAL_AREA,
-    ).astype(np.float32)
+    base = (bio_layers * data.REAL_AREA).astype(np.float32)
     return xr.DataArray(
         base,
         dims=['species', 'cell'],
