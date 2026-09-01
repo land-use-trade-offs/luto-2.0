@@ -1647,15 +1647,20 @@ class Data:
             # and the rescale helper both match region == 'AUSTRALIA' (same as GBF3/GBF4).
             self.BIO_GBF8_SEL = [('AUSTRALIA', sp) for sp in self.BIO_GBF8_SEL_SPECIES]
 
-            self.BIO_GBF8_OUTSDIE_LUTO_SCORE_SPECIES = bio_GBF8_baseline_score.query(f'species in {self.BIO_GBF8_SEL_SPECIES}')[['species', 'year', f'OUTSIDE_LUTO_NATURAL_SUITABILITY_AREA_WEIGHTED_HA_SSP{settings.SSP}']]
+            # .isin, not .query(f'species in {list}'): interpolating the ~10.6k-name list into a
+            # query string is a ~700 KB expression the parser may choke on at all-species levels
+            self.BIO_GBF8_OUTSDIE_LUTO_SCORE_SPECIES = bio_GBF8_baseline_score[bio_GBF8_baseline_score['species'].isin(set(self.BIO_GBF8_SEL_SPECIES))][['species', 'year', f'OUTSIDE_LUTO_NATURAL_SUITABILITY_AREA_WEIGHTED_HA_SSP{settings.SSP}']]
             self.BIO_GBF8_OUTSDIE_LUTO_SCORE_GROUPS = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF8_SCORES_group.csv')[['group', 'year', f'OUTSIDE_LUTO_NATURAL_SUITABILITY_AREA_WEIGHTED_HA_SSP{settings.SSP}']]
             
-            self.BIO_GBF8_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES = bio_GBF8_target_percent.query(f'species in {self.BIO_GBF8_SEL_SPECIES}')
+            self.BIO_GBF8_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES = bio_GBF8_target_percent[bio_GBF8_target_percent['species'].isin(set(self.BIO_GBF8_SEL_SPECIES))]
             self.BIO_GBF8_BASELINE_SCORE_GROUPS = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF8_TARGET_group.csv')
             
             self.N_GBF8_SPECIES = len(self.BIO_GBF8_SEL_SPECIES)
             if self.BIO_GBF8_SEL_SPECIES:
-                self.BIO_GBF8_SPECIES_LAYER = BIO_GBF8_SPECIES_raw.sel(species=self.BIO_GBF8_SEL_SPECIES).compute()
+                # Kept LAZY: get_GBF8_bio_layers_by_yr reads from the _cache spatial-match file
+                # (see match_GBF8_bio_layers), so the raw raster stack is never needed in RAM —
+                # a .compute() here would hold ~42 GB when all ~10.6k species are selected.
+                self.BIO_GBF8_SPECIES_LAYER = BIO_GBF8_SPECIES_raw.sel(species=self.BIO_GBF8_SEL_SPECIES)
             else:
                 print("│   │   ⚠ WARNING: No GBF8 species selected, proceeding with empty selection.", flush=True)
                 self.BIO_GBF8_SPECIES_LAYER = BIO_GBF8_SPECIES_raw.isel(species=[])
@@ -2568,12 +2573,13 @@ class Data:
         '''
         Get the biodiversity suitability score [hectare weighted] for each species at the given year.
         
-        The raw biodiversity suitability score [2D (shape, 808*978), (dtype, uint8, 0-100)] represents the 
-        suitability of each cell for each species/group.  Here it is LINEARLY interpolated to the given year,
-        then LINEARLY interpolated to the given spatial coordinates.
-        
-        Because the coordinates are the controid of the `self.MASK` array, so the spatial interpolation is 
-        simultaneously a masking process. 
+        The raw biodiversity suitability score [2D (shape, 808*978), (dtype, uint8, 0-100)] represents the
+        suitability of each cell for each species/group. The spatial LINEAR interpolation to the cell
+        centroids is precomputed once per (SSP, RESFACTOR) by `match_GBF8_bio_layers` and read from the
+        `_cache` dir; here only the LINEAR year interpolation runs.
+
+        Because the coordinates are the controid of the `self.MASK` array, so the spatial interpolation is
+        simultaneously a masking process.
         
         The suitability score is then weighted by the area (ha) of each cell. The area weighting is necessary 
         to ensure that the biodiversity suitability score will not be affected by different RESFACTOR (i.e., cell size) values.
@@ -2591,27 +2597,80 @@ class Data:
             The biodiversity suitability score for each species at the given year.
         '''
         
-        input_lr = self.BIO_GBF8_SPECIES_LAYER if level == 'species' else self.BIO_GBF8_GROUPS_LAYER
-        
-        current_species_val = input_lr.interp(                          # Here the year interpolation is done first                      
+        # The expensive spatial interpolation lives in a per-(SSP, RESFACTOR) disk cache;
+        # here only the cheap year interpolation runs. Both steps are linear, so
+        # cache-then-year-interp equals the original year-then-spatial order.
+        matched = xr.open_dataarray(
+            self.match_GBF8_bio_layers(level),
+            chunks={'species': 512} if level == 'species' else None,
+        )
+        if level == 'species':
+            matched = matched.sel(species=self.BIO_GBF8_SEL_SPECIES)    # subset BEFORE loading
+
+        current_species_val = matched.interp(
             year=yr,
-            method='linear', 
+            method='linear',
             kwargs={'fill_value': 'extrapolate'}
-        ).interp(                                                       # Then the spatial interpolation and masking is done
-            x=xr.DataArray(self.COORD_LON_LAT[0], dims='cell'),
-            y=xr.DataArray(self.COORD_LON_LAT[1], dims='cell'),
-            method='linear'                                             # Use LINEAR interpolation
         ).drop_vars(['year']).values
-        
+
         # Apply Savanna Burning penalties
         current_species_val = np.where(
             self.SAVBURN_ELIGIBLE,
             current_species_val * settings.BIO_CONTRIBUTION_LDS,
             current_species_val
         )
-        
+
         return current_species_val.astype(np.float32)
-    
+
+
+    def match_GBF8_bio_layers(self, level: Literal['species', 'group'] = 'species') -> str:
+        '''
+        Spatially match the raw GBF8 suitability rasters to the resfactored cells and cache
+        the result on disk. Returns the cache file path (building it on the first call).
+
+        The raw layers live on a ~5 km (y, x) raster; matching them to the cell centroids is
+        by far the expensive part of `get_GBF8_bio_layers_by_yr` and depends only on SSP and
+        RESFACTOR — never on the simulated year or the species selection. So it is done ONCE
+        over ALL species/groups and saved to `<INPUT_DIR>/_cache/cache_bio_GBF8_ssp<SSP>_
+        RES<RESFACTOR>_<level>.nc` with dims (year, species|group, cell); any later run (or
+        concurrent task run) with the same SSP and RESFACTOR reuses the file.
+
+        The build streams through dask (year x 128-species chunks), so peak memory stays at
+        a few hundred MB, and writes via a temp file + atomic rename so concurrent task runs
+        racing to build the same cache cannot leave a half-written file behind.
+        '''
+        cache_dir = os.path.join(settings.INPUT_DIR, '_cache')
+        os.makedirs(cache_dir, exist_ok=True)
+        cache_path = os.path.join(
+            cache_dir, f'cache_bio_GBF8_ssp{settings.SSP}_RES{settings.RESFACTOR}_{level}.nc')
+        if os.path.exists(cache_path):
+            return cache_path
+
+        print(f"│   ├── Building GBF8 {level} spatial-match cache (one-off per SSP/RESFACTOR)", flush=True)
+        raw_path = (f'{settings.INPUT_DIR}/bio_GBF8_ssp{settings.SSP}_EnviroSuit.nc'
+                    if level == 'species' else
+                    f'{settings.INPUT_DIR}/bio_GBF8_ssp{settings.SSP}_EnviroSuit_group.nc')
+        dim = 'species' if level == 'species' else 'group'
+        raw = xr.open_dataset(raw_path, chunks={'year': 1, dim: 128})['data']
+
+        matched = raw.interp(                                           # Spatial interpolation and masking
+            x=xr.DataArray(self.COORD_LON_LAT[0], dims='cell'),
+            y=xr.DataArray(self.COORD_LON_LAT[1], dims='cell'),
+            method='linear'                                             # Use LINEAR interpolation
+        ).astype(np.float32)
+
+        tmp_path = f'{cache_path}.tmp{os.getpid()}'
+        matched.to_netcdf(
+            tmp_path,
+            encoding={'data': {
+                'zlib': True, 'complevel': 4, 'dtype': 'float32',
+                'chunksizes': (1, min(128, raw.sizes[dim]), self.NCELLS),
+            }},
+        )
+        os.replace(tmp_path, cache_path)                                # atomic: readers never see a partial file
+        print(f"│   │   └── saved {os.path.basename(cache_path)}", flush=True)
+        return cache_path
+
 
     def get_GBF8_target_inside_LUTO_by_yr(self, yr: int) -> xr.DataArray:
         '''
