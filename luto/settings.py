@@ -151,19 +151,8 @@ RESFACTOR = 5        # set to 1 to run at full spatial resolution, > 1 to run at
 SIM_YEARS = list(range(2020, 2051, 5))
 
 # Define the objective function
-OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
+OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs); over-production is capped by the hard demand bounds (DEMAND_BOUNDS)
 # OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
-
-
-
-DEMAND_CONSTRAINT_TYPE = 'hard'
-'''
-Options are 'soft', or 'hard'. This determines the type of demand constraint to apply in the model.
-- 'soft': commodity can be produced under/over the target, but the under/over part will pay a penalty that
-  equals the deviation amount multiplied by the corresponding prices. 
-- 'hard': commodity must be produced at the target amount, with a relaxation factor (DEMAND_BOUNDS) 
-  that allows for a certain percentage above the target to be produced (e.g., 1.05 allows for 5% overproduction).
-'''                      
 
 DEMAND_BOUNDS = {
     # Commodities need relaxation
@@ -930,16 +919,6 @@ CROP_GHG_SCOPE_1 = ['CO2E_KG_HA_SOIL']
 LVSTK_GHG_SCOPE_1 = ['CO2E_KG_HEAD_DUNG_URINE', 'CO2E_KG_HEAD_ENTERIC', 'CO2E_KG_HEAD_IND_LEACH_RUNOFF', 'CO2E_KG_HEAD_MANURE_MGT']
 
 
-GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (linear programming approach)
-# GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)
-# NOTE: 'soft' mode is planned to be decommissioned so the objective only considers economy.
-
-SOLVE_WEIGHT_BETA = 0.5
-'''
-The weight of the deviations from target in the objective function.
- - if approaching 0, the model will ignore the deviations from target.
- - if approaching 1, the model will try harder to meet the target.
-'''
 
 
 # Water use yield and parameters *******************************
@@ -961,11 +940,6 @@ WATER_CLIMATE_CHANGE_IMPACT = 'on'      # 'on' or 'off'. 'off' will turn off cli
        solver infeasibility. The inside-LUTO target = relaxed_target - wny_outside_LUTO.
        Otherwise, the standard target applies: wny_hist_target - wny_outside_LUTO.
 '''
-
-WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
-# WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)
-# NOTE: 'soft' mode is planned to be decommissioned so the objective only considers economy.
-
 
 # Regionalisation to enforce water use limits by
 WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
@@ -1042,8 +1016,6 @@ GBF2_TARGETS_DICT = {
 }
 
 
-GBF2_CONSTRAINT_TYPE = 'hard' # Adds biodiversity limits as a constraint in the solver (linear programming approach)
-# GBF2_CONSTRAINT_TYPE = 'soft'  # Adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
 '''
 The constraint type for the biodiversity target.
 - 'hard' adds biodiversity limits as a constraint in the solver (linear programming approach)

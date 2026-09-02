@@ -88,14 +88,12 @@ grid_search = {
     # --------------- GHG settings ---------------
     'GHG_EMISSIONS_LIMITS': ['low'],                                        # 'low'=core 1.8C 67% (LUF Report 2026); 'high'=higher ambition 1.5C 50% (lower priority sensitivity)
     'CARBON_PRICES_FIELD': ['CONSTANT'],
-    'GHG_CONSTRAINT_TYPE': ['hard'],                                        # 'hard' or 'soft'
     'USE_GHG_SCOPE_1': [True],                                              # True or False
 
     
     # --------------- Water constraints ---------------
     'WATER_REGION_DEF':['Drainage Division'],                               # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
     'WATER_LIMITS': ['on'],                                                 # 'on' or 'off'
-    'WATER_CONSTRAINT_TYPE': ['hard'],                                      # 'hard' or 'soft'
     'WATER_STRESS': [0.6],                                                  # Water yield must be >= 60% of historical; aligns with 2023 Planetary Boundaries update
     'WATER_CLIMATE_CHANGE_IMPACT': ['on'],                                  # 'on' or 'off'; climate change impacts on water yields
     'LIVESTOCK_DRINKING_WATER': [1],                                        # 1=ON; include livestock drinking water in water balance
@@ -120,7 +118,6 @@ grid_search = {
     # --------------- Biodiversity settings - GBF 2 ---------------
     'GBF2_TARGET': ['high'],                                  # 'off', 'low', 'medium', 'high'
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [15],                    # Core: 20% central; test [15,30] alongside (Third iteration)
-    'GBF2_CONSTRAINT_TYPE': ['hard'],                                       # 'hard' or 'soft'
 
     # --------------- Biodiversity settings - GBF 3 ---------------
     'GBF3_NVIS_TARGET': ['high'],                             # 'off', 'medium', 'high', 'CSV_DEFINED'
@@ -157,7 +154,6 @@ grid_search = {
 
 
     # --------------- Objective function weights ---------------
-    'SOLVE_WEIGHT_BETA':  [0.5],
     
     # --------------- Ag management ---------------
     'AG_MANAGEMENTS': [{

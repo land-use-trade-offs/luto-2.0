@@ -694,9 +694,9 @@ def log_memory_usage(output_dir=settings.OUTPUT_DIR, mode='a', interval=1, stop_
 # shadow_price * real_RHS = Pi * scale['Economy'] * constr.RHS (the constraint scale
 # cancels since real_RHS = constr.RHS * scale[constraint]). Sign follows the binding
 # direction; take the absolute value to rank "which constraint costs the model most".
-# Both are only meaningful for HARD constraints, so the soft forms of Water/GHG/Demand
-# (``*_CONSTRAINT_TYPE == 'soft'``) are skipped entirely — a soft dual is just the
-# configured penalty weight, not a scarcity price.
+# All constraints are HARD (the soft forms of Water/GHG/Demand and their
+# ``*_CONSTRAINT_TYPE`` settings were removed 2026-09-02), so every dual here is a
+# true scarcity price.
 #
 # Each ``calc_shadow_price_*`` is a pure calculation returning a DataFrame (no
 # file IO, no try/except); ``record_shadow_prices`` orchestrates and writes.
@@ -795,9 +795,9 @@ def calc_shadow_price_Water(luto_solver, input_data, target_year) -> pd.DataFram
     """Per-region water-yield constraint shadow prices (AUD per real ML of target).
 
     Only the hard form gives a clean scarcity price; soft mode
-    (``WATER_CONSTRAINT_TYPE == 'soft'``) records nothing — its dual is just the slack penalty.
+    Water limits are hard-only (the soft variant was removed 2026-09-02).
     """
-    if settings.WATER_LIMITS != "on" or settings.WATER_CONSTRAINT_TYPE == "soft":
+    if settings.WATER_LIMITS != "on":
         return pd.DataFrame()
     So = float(input_data.scale_factors["Economy"])
     Ss = float(input_data.scale_factors["Water"])
@@ -816,10 +816,10 @@ def calc_shadow_price_GHG(luto_solver, input_data, target_year) -> pd.DataFrame:
     """GHG-emissions constraint shadow price (AUD per real tCO2e of target).
 
     Only the hard ``<=`` upper bound gives a clean scarcity price; soft mode
-    (``GHG_CONSTRAINT_TYPE == 'soft'``) records nothing — its dual is just the objective's
+    GHG limits are hard-only (the soft variant was removed 2026-09-02); the dual is the objective's
     penalty rate on the deviation var.
     """
-    if settings.GHG_EMISSIONS_LIMITS == "off" or settings.GHG_CONSTRAINT_TYPE == "soft":
+    if settings.GHG_EMISSIONS_LIMITS == "off":
         return pd.DataFrame()
     So = float(input_data.scale_factors["Economy"])
     Ss = float(input_data.scale_factors["GHG"])
@@ -837,13 +837,11 @@ def calc_shadow_price_GHG(luto_solver, input_data, target_year) -> pd.DataFrame:
 def calc_shadow_price_Demand(luto_solver, input_data, target_year) -> pd.DataFrame:
     """Per-commodity production/demand constraint shadow prices (AUD per real tonne of demand).
 
-    Only hard bounds (``DEMAND_CONSTRAINT_TYPE == 'hard'``) give a clean marginal price; soft mode
-    records nothing — its dual is just the commodity-price penalty rate on the deviation var
-    ``V[c]``. ``presence`` holds the bound kind (eq/lower/upper) so a commodity's paired hard bounds
-    stay distinguishable.
+    Demand is hard-only (the soft variant and DEMAND_CONSTRAINT_TYPE were removed
+    2026-09-02), so every row gives a clean marginal price. ``presence`` holds the
+    bound kind (eq/lower/upper) so a commodity's paired hard bounds stay
+    distinguishable.
     """
-    if settings.DEMAND_CONSTRAINT_TYPE == "soft":
-        return pd.DataFrame()
     So = float(input_data.scale_factors["Economy"])
     Ss = float(input_data.scale_factors["Demand"])
     commodities = input_data.commodity_names
@@ -923,7 +921,7 @@ def record_shadow_prices(luto_solver, input_data, target_year, out_dir) -> None:
         if probe is None and coll:
             probe = next(iter(coll.values()))
     for coll in (luto_solver.water_limit_constraints, luto_solver.regional_adoption_constrs,
-                 luto_solver.ghg_consts_soft, luto_solver.demand_penalty_constraints):
+                 luto_solver.demand_penalty_constraints):
         if probe is None and coll:
             probe = coll[0]
     probe = probe or luto_solver.ghg_consts_ub

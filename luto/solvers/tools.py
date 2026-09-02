@@ -745,3 +745,46 @@ def diagnose(model, time_limit: float | None = None, do_pairs: bool = True,
             print("  No single group restores feasibility: the conflict needs two or more "
                   "together. The IIS above names the specific rows.")
     return report
+
+
+def build_biodiv_contr_expr(luto_solver, val_vector, ind) -> "gp.LinExpr":
+    """LEGACY reference implementation: the per-term LinExpr build of one biodiversity
+    contribution expression (GBF3/4/8 shape). RETIRED from the production build path
+    2026-09-02 — the solver composes these rows array-based now (bio_family.py) — and
+    kept here as a validation/replay utility: it reproduces, term for term, what the
+    per-cell builder used to hand Gurobi, so comparison harnesses can rebuild legacy
+    rows against a live solver without reviving the old code path.
+
+    Each Gurobi coefficient is the cross-product val_vector[r] * biodiv_contr[j];
+    ``_qsum`` filters terms where ``|coeff| < SOLVER_COEFF_MIN``.
+    """
+    from luto.solvers.solver import _qsum       # local import — avoids a module cycle
+    d = luto_solver._input_data
+
+    ag_terms = []
+    for j in range(d.n_ag_lus):
+        c = d.biodiv_contr_ag_j[j]
+        if c == 0:
+            continue
+        ag_terms.append(
+            _qsum(val_vector[ind] * c, luto_solver.X_acct_dry_jr[j, ind])
+            + _qsum(val_vector[ind] * c, luto_solver.X_acct_irr_jr[j, ind])
+        )
+
+    ag_man_terms = []
+    for am, am_j_list in d.am2j.items():
+        for j_idx in range(len(am_j_list)):
+            c_arr = d.biodiv_contr_ag_man[am][j_idx]
+            ag_man_terms.append(
+                _qsum(val_vector[ind] * c_arr[ind], luto_solver.X_ag_man_dry_vars_jr[am][j_idx, ind])
+                + _qsum(val_vector[ind] * c_arr[ind], luto_solver.X_ag_man_irr_vars_jr[am][j_idx, ind])
+            )
+
+    non_ag_terms = []
+    for k in range(d.n_non_ag_lus):
+        c = d.biodiv_contr_non_ag_k[k]
+        if c == 0:
+            continue
+        non_ag_terms.append(_qsum(val_vector[ind] * c, luto_solver.X_non_ag_vars_kr[k, ind]))
+
+    return gp.quicksum(ag_terms) + gp.quicksum(ag_man_terms) + gp.quicksum(non_ag_terms)
