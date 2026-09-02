@@ -33,7 +33,7 @@ from gurobipy import GRB
 from scipy import sparse
 
 from luto import tools
-from luto.solvers.bio_family import extract_groups, compose_row, extract_structure
+from luto.solvers.row_builder import extract_groups, compose_row, extract_structure
 from luto.solvers.input_data import SolverInputData
 from luto.solvers.tools import check_constraint_names, reduce_forced_zero_rows
 from luto.settings import (

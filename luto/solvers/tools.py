@@ -750,7 +750,7 @@ def diagnose(model, time_limit: float | None = None, do_pairs: bool = True,
 def build_biodiv_contr_expr(luto_solver, val_vector, ind) -> "gp.LinExpr":
     """LEGACY reference implementation: the per-term LinExpr build of one biodiversity
     contribution expression (GBF3/4/8 shape). RETIRED from the production build path
-    2026-09-02 — the solver composes these rows array-based now (bio_family.py) — and
+    2026-09-02 — the solver composes these rows array-based now (row_builder.py) — and
     kept here as a validation/replay utility: it reproduces, term for term, what the
     per-cell builder used to hand Gurobi, so comparison harnesses can rebuild legacy
     rows against a live solver without reviving the old code path.
