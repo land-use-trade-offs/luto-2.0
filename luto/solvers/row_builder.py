@@ -32,7 +32,7 @@ input_data.get_obj_block + the solver's _setup_objective to the objective:
 ``keep_terms`` is steps 1–2; the callers do 3–4.
 
 Columns: a group's ``var`` values are Gurobi ``Var.index``, read from the variable tables
-(input_data.ag_var_table / ag_acct_table / nonag_var_table / am_var_table / flow_tables)
+(input_data.table_ag / table_ag_acct / table_nonag / table_am / table_flow)
 plus each block's column offset, so no ``model.update()`` is needed to build a row.
 Composed rows go to ``addMConstr`` against ``model.getVars()`` (order == Var.index).
 
@@ -47,7 +47,7 @@ import luto.settings as settings
 
 
 def ag_acct_terms_by_mj(acct_table: dict, var_offset: int) -> dict:
-    """(m, j) -> {cells, var, w} for the ACCOUNTING stream, read from input_data.ag_acct_table.
+    """(m, j) -> {cells, var, w} for the ACCOUNTING stream, read from input_data.table_ag_acct.
 
     Terms per (m, j) are ordered cell ascending, then the identity term before the fold
     terms (fold-map order); `compose_row` sums duplicates in this sequence.
@@ -72,7 +72,7 @@ def ag_acct_terms_by_mj(acct_table: dict, var_offset: int) -> dict:
 
 
 def nonag_terms_by_k(var_table: dict, var_offset: int) -> dict:
-    """k -> {cells, var, w=1} for the non-ag decision vars, read from input_data.nonag_var_table.
+    """k -> {cells, var, w=1} for the non-ag decision vars, read from input_data.table_nonag.
     Table rows for one k are cell-ascending."""
     k_col, r_col = var_table['k'], var_table['r']
     out = {}
@@ -88,7 +88,7 @@ def nonag_terms_by_k(var_table: dict, var_offset: int) -> dict:
 
 def am_terms_by_key(var_table: dict, var_offset: int) -> dict:
     """(am_idx, j_idx, m) -> {cells, var, w=1} for the ag-management decision vars, read from
-    input_data.am_var_table. Table rows for one key are cell-ascending."""
+    input_data.table_am. Table rows for one key are cell-ascending."""
     am_c, ji_c, m_c, r_c = var_table['am'], var_table['j_idx'], var_table['m'], var_table['r']
     out = {}
     if am_c.size:
@@ -124,7 +124,7 @@ def extract_groups(input_data) -> list[dict]:
         if c == 0:
             continue
         for m, lm in ((0, 'dry'), (1, 'irr')):
-            t = input_data.ag_acct_terms.get((m, j), _EMPTY)
+            t = input_data.term_ag_acct.get((m, j), _EMPTY)
             groups.append(dict(kind='ag', label=f'ag_j{j}_{lm}',
                                cells=t['cells'], var=t['var'], w=t['w'], c=c))
 
@@ -135,7 +135,7 @@ def extract_groups(input_data) -> list[dict]:
             if not np.any(c_arr):
                 continue
             for m, lm in ((0, 'dry'), (1, 'irr')):
-                t = input_data.am_terms.get((am_idx, j_idx, m), _EMPTY)
+                t = input_data.term_am.get((am_idx, j_idx, m), _EMPTY)
                 groups.append(dict(kind='am', label=f'am_{am}_{j_idx}_{lm}'.replace(' ', '_'),
                                    cells=t['cells'], var=t['var'], w=t['w'],
                                    c=np.asarray(c_arr)[t['cells']]))     # per-TERM c values
@@ -145,7 +145,7 @@ def extract_groups(input_data) -> list[dict]:
         c = input_data.biodiv_contr_non_ag_k[k]             # plain python float
         if c == 0:
             continue
-        t = input_data.nonag_terms.get(k, _EMPTY)
+        t = input_data.term_nonag.get(k, _EMPTY)
         groups.append(dict(kind='nonag', label=f'nonag_k{k}',
                            cells=t['cells'], var=t['var'], w=t['w'], c=float(c)))
     return groups
@@ -164,16 +164,16 @@ def extract_structure(input_data) -> list[dict]:
     out = []
     for j in range(input_data.n_ag_lus):
         for m in (0, 1):
-            t = input_data.ag_acct_terms.get((m, j), _EMPTY)
+            t = input_data.term_ag_acct.get((m, j), _EMPTY)
             out.append(dict(kind='ag', j=j, m=m, cells=t['cells'], var=t['var'], w=t['w']))
     for am_idx, (am, am_j_list) in enumerate(input_data.am2j.items()):
         for j_idx, j in enumerate(am_j_list):
             for m in (0, 1):
-                t = input_data.am_terms.get((am_idx, j_idx, m), _EMPTY)
+                t = input_data.term_am.get((am_idx, j_idx, m), _EMPTY)
                 out.append(dict(kind='am', am=am, j_idx=j_idx, j=j, m=m,
                                 cells=t['cells'], var=t['var'], w=t['w']))
     for k in range(input_data.n_non_ag_lus):
-        t = input_data.nonag_terms.get(k, _EMPTY)
+        t = input_data.term_nonag.get(k, _EMPTY)
         out.append(dict(kind='nonag', k=k, cells=t['cells'], var=t['var'], w=t['w']))
     return out
 

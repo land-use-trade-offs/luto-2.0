@@ -263,7 +263,7 @@ def get_ghg_transition_emissions(data: Data, from_m: int, from_j: int, cells=Non
     unallocated-natural→livestock-natural, unallocated-natural→modified). Returns (NLMS, len(cells),
     N_AG_LUS) or, separate=True, a {component: array} dict. NO carbon price, NO amortise — the
     priced+amortised $ version is the GHG component of the transition cost (base multiplies it); the
-    raw dict is also flow_ghg_ag2ag.
+    raw dict is also trans_ghg_ag2ag.
 
     This is the source-keyed per-cell emissions used by the delta GHG term (Σ flow_ghg·D).
     """
@@ -295,7 +295,7 @@ def get_ghg_transition_emissions(data: Data, from_m: int, from_j: int, cells=Non
 
 def get_ghg_transition_emissions_from_base_year(data: Data, base_year: int) -> dict:
     """Exact: the source's raw emissions on its source cells. Slices come from the SHARED folded
-    source map (get_base_dvar_mj_cell_map) so the leaves stay aligned with ag_source_cells and the
+    source map (get_base_dvar_mj_cell_map) so the leaves stay aligned with trans_source_ag and the
     solver's per-source delta vars — never re-derive the cell slices independently here."""
     # Lazy import to avoid the transitions <-> ghg import cycle.
     from luto.economics.agricultural.transitions import get_base_dvar_mj_cell_map

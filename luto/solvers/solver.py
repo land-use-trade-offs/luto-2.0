@@ -81,24 +81,24 @@ class LutoSolver:
         # For every block: the MVar, its global column offset (Var.index of element 0 — blocks are
         # created back to back, so offsets chain arithmetically, no model.update() needed), and the
         # column MAP from the model's natural indices to the block position (-1 = no variable).
-        # ag decision vars (folded stream; the accounting view is ag_acct_table's term list)
-        self.ag_mvar = None                 # over input_data.ag_var_table
+        # ag decision vars (folded stream; the accounting view is table_ag_acct's term list)
+        self.ag_mvar = None                 # over input_data.table_ag
         self.ag_offset = None
         self.ag_col = None                  # (NLMS, N_AG_LUS, ncells)
         # non-ag
-        self.nonag_mvar = None              # over input_data.nonag_var_table
+        self.nonag_mvar = None              # over input_data.table_nonag
         self.nonag_offset = None
         self.nonag_col = None               # (N_NON_AG_LUS, ncells)
         # ag-management
-        self.am_mvar = None                 # over input_data.am_var_table
+        self.am_mvar = None                 # over input_data.table_am
         self.am_offset = None
         self.am_col = None                  # {am: (NLMS, len(am_j_list), ncells)}
         # transition-flow deltas — edge lists, addressed by table row (no map needed)
-        self.a2a_mvar = None                # over input_data.flow_tables['a2a'] (ag → ag)
+        self.a2a_mvar = None                # over input_data.table_flow['a2a'] (ag → ag)
         self.a2a_offset = None
-        self.a2n_mvar = None                # over input_data.flow_tables['a2n'] (ag → non-ag)
+        self.a2n_mvar = None                # over input_data.table_flow['a2n'] (ag → non-ag)
         self.a2n_offset = None
-        self.n2a_mvar = None                # over input_data.flow_tables['n2a'] (non-ag → ag)
+        self.n2a_mvar = None                # over input_data.table_flow['n2a'] (non-ag → ag)
         self.n2a_offset = None
 
         # --- constraint handles ---
@@ -189,16 +189,16 @@ class LutoSolver:
         self._add_node_balance_constraints()                # X = base + Σin − Σout
 
     def _setup_ag_vars(self):
-        """The ag block: ONE addMVar over input_data.ag_var_table (one row per variable).
+        """The ag block: ONE addMVar over input_data.table_ag (one row per variable).
 
-        Bounds come from the table (dvar_lb_ag/dvar_ub_ag, already cleaned in input_data:
+        Bounds come from the table (trans_lb_ag_mrj/trans_ub_ag_mrj, already cleaned in input_data:
         0 ≤ lb ≤ base ≤ ub); the node-balance/cap constant is the (cleaned, in-box) base
         dvar, so the all-delta=0 stay point is feasible by construction. Var.index = block
         offset + table row. `col_ag[m, j, r]` maps a variable to its position in the block
         (-1 = no variable).
         """
         print("│   ├── setting up decision variables for agricultural land uses...")
-        tab = self._input_data.ag_var_table
+        tab = self._input_data.table_ag
         n   = tab['r'].size
         # global column offset of the block: the model is fresh here, so 0 — recorded rather than
         # assumed so later blocks can chain offsets arithmetically (no model.update() needed)
@@ -214,7 +214,7 @@ class LutoSolver:
         self.const_ag = self._input_data.dvar_base_ag_mrj
 
     def _setup_non_ag_vars(self):
-        """The non-ag block: ONE addMVar over input_data.nonag_var_table (one row per variable).
+        """The non-ag block: ONE addMVar over input_data.table_nonag (one row per variable).
 
         Bounds (collapse rule applied) come from the table; Var.index = block offset + table
         row. `col_nonag[k, r]` maps a variable to its position in the block (-1 = no variable).
@@ -222,7 +222,7 @@ class LutoSolver:
         back to back; pending vars are not yet in NumVars, so offsets chain arithmetically).
         """
         print("│   ├── setting up decision variables for non-agricultural land uses...")
-        tab = self._input_data.nonag_var_table
+        tab = self._input_data.table_nonag
         n   = tab['r'].size
         self.nonag_offset = self._input_data.var_layout['nonag']
         self.nonag_mvar = self.gurobi_model.addMVar(n, lb=tab['lb'], ub=tab['ub'], name="X_non_ag")
@@ -233,7 +233,7 @@ class LutoSolver:
         self.const_nonag = self._input_data.dvar_base_non_ag_rk
 
     def _setup_ag_management_variables(self):
-        """The ag-management block: ONE addMVar over input_data.am_var_table (one row per variable).
+        """The ag-management block: ONE addMVar over input_data.table_am (one row per variable).
 
         Bounds and cell selection (GBF2 exclusion for renewables, savanna eligibility) come from
         the table; Var.index = block offset + table row. The block's global column offset
@@ -241,7 +241,7 @@ class LutoSolver:
         in the block (-1 = no variable).
         """
         print("│   ├── setting up decision variables for agricultural management options...")
-        tab = self._input_data.am_var_table
+        tab = self._input_data.table_am
         n   = tab['r'].size
         self.am_offset = self._input_data.var_layout['am']
         self.am_mvar = self.gurobi_model.addMVar(n, lb=tab['lb'], ub=tab['ub'], name="X_ag_man")
@@ -254,7 +254,7 @@ class LutoSolver:
         self.am_col = tab['col']
 
     def _setup_flow_vars(self):
-        """The flow blocks: ONE addMVar per sub-block (a2a, a2n, n2a) over input_data.flow_tables.
+        """The flow blocks: ONE addMVar per sub-block (a2a, a2n, n2a) over input_data.table_flow.
 
         Rows are the edge-table order (source in dict order, argwhere C-order within a
         source); Var.index = block offset + row; names are generated from the columns.
@@ -262,7 +262,7 @@ class LutoSolver:
         """
         print("│   └── setting up transition flow delta variables (D)...")
         model = self.gurobi_model
-        ft = self._input_data.flow_tables
+        ft = self._input_data.table_flow
         a2a, a2n, n2a = ft['a2a'], ft['a2n'], ft['n2a']
 
         lay = self._input_data.var_layout
@@ -337,12 +337,12 @@ class LutoSolver:
 
         # Precompute max feasible allocation per cell.
         # A cell with any ag var can always cover ag_mask (its sources can at least "stay" — conservation,
-        # dvar_ub_ag ≥ x_old). Cells with no ag var are limited by the sum of their non-ag UBs.
+        # trans_ub_ag_mrj ≥ x_old). Cells with no ag var are limited by the sum of their non-ag UBs.
         has_any_ag_r = (
-            (self._input_data.dvar_ub_ag[0] > 0).any(axis=1) |
-            (self._input_data.dvar_ub_ag[1] > 0).any(axis=1)
+            (self._input_data.trans_ub_ag_mrj[0] > 0).any(axis=1) |
+            (self._input_data.trans_ub_ag_mrj[1] > 0).any(axis=1)
         )
-        max_nonag_r = self._input_data.dvar_ub_nonag.sum(axis=1)
+        max_nonag_r = self._input_data.trans_ub_nonag_rk.sum(axis=1)
         max_alloc_r  = np.where(has_any_ag_r, 1.0, max_nonag_r)
         # Cells where max_alloc < ag_mask cannot satisfy the equality and must be skipped.
         # This covers: (a) cells with no variables at all (max=0), and (b) cells whose only
@@ -376,7 +376,7 @@ class LutoSolver:
         # group-by cell: ag table rows + non-ag table rows landing on their cell's row
         row_of_cell = np.full(self._input_data.ncells, -1, dtype=np.int64)
         row_of_cell[row_cells] = np.arange(n_rows)
-        ag_tab, nonag_tab = self._input_data.ag_var_table, self._input_data.nonag_var_table
+        ag_tab, nonag_tab = self._input_data.table_ag, self._input_data.table_nonag
         rows = np.concatenate([row_of_cell[ag_tab['r']], row_of_cell[nonag_tab['r']], np.arange(n_rows)])
         cols = np.concatenate([self.ag_offset + np.arange(ag_tab['r'].size),
                                self.nonag_offset + np.arange(nonag_tab['r'].size),
@@ -407,7 +407,7 @@ class LutoSolver:
         print("│   ├── Adding constraints for agricultural management options...")
         model = self.gurobi_model
         x_all = self._all_vars()
-        ag_tab = self._input_data.ag_var_table
+        ag_tab = self._input_data.table_ag
         ag_pos = {}                                                   # (m, j) -> ag table rows
         key = ag_tab['m'].astype(np.int64) * ag_tab['col'].shape[1] + ag_tab['j']
         for kk in np.unique(key):
@@ -454,7 +454,7 @@ class LutoSolver:
         print("│   ├── Adding constraints for agricultural management adoption limits...")
         model = self.gurobi_model
         x_all = self._all_vars()
-        ag_tab, am_tab = self._input_data.ag_var_table, self._input_data.am_var_table
+        ag_tab, am_tab = self._input_data.table_ag, self._input_data.table_am
         rows, cols, vals, names = [], [], [], []
         n = 0
         for am_idx, (am, am_j_list) in enumerate(self._input_data.am2j.items()):
@@ -487,7 +487,7 @@ class LutoSolver:
         block's own columns (a group-by (am, r) over the am table).
         """
         print("│   ├── Adding renewable capacity ceilings (existing + simulated ≤ cell space)...")
-        tab = self._input_data.am_var_table
+        tab = self._input_data.table_am
         n = tab['r'].size
         am_vars = self.am_mvar.tolist()
         ag_mask = self._input_data.ag_mask_proportion_r
@@ -592,12 +592,12 @@ class LutoSolver:
         # ... plus the transition-delta stream: one group per ag source (float32 gather).
         # Delta groups carry cells=0 placeholders — valid only under the all-ones
         # val_row below (the GHG row is global).
-        a2a = self._input_data.flow_tables['a2a']   # table gather
+        a2a = self._input_data.table_flow['a2a']   # table gather
         for si, src in enumerate(a2a['sources']):
             a, b = int(a2a['src_ptr'][si]), int(a2a['src_ptr'][si + 1])
             if a == b:
                 continue
-            carr = self._input_data.flow_ghg_ag2ag[src]             # [to_m, local_r, to_j]
+            carr = self._input_data.trans_ghg_ag2ag[src]             # [to_m, local_r, to_j]
             coeffs = carr[a2a['to_m'][a:b], a2a['local_r'][a:b], a2a['to_j'][a:b]]
             var_idx = (self.a2a_offset + np.arange(a, b)).astype(np.int32)
             groups.append(dict(cells=np.zeros(b - a, dtype=np.int32),
@@ -853,7 +853,7 @@ class LutoSolver:
         model = self.gurobi_model
         x_all = self._all_vars()
         real_area = self._input_data.real_area
-        ag_tab, nonag_tab = self._input_data.ag_var_table, self._input_data.nonag_var_table
+        ag_tab, nonag_tab = self._input_data.table_ag, self._input_data.table_nonag
 
         def _add_family(rows, names, rhs):
             if not rows:
@@ -1009,8 +1009,8 @@ class LutoSolver:
                 # Cell-set row-inclusion rule (NOT a coefficient test)
                 has_cells = False
                 for j in self._input_data.am2j[am]:
-                    j_cells = np.union1d(self._input_data.feasible_ag_cells_mrj[0, j],
-                                         self._input_data.feasible_ag_cells_mrj[1, j])
+                    j_cells = np.union1d(self._input_data.trans_feasible_ag[0, j],
+                                         self._input_data.trans_feasible_ag[1, j])
                     rc = np.intersect1d(j_cells, reg_idx)
                     if settings.EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS == True:
                         rc = np.setdiff1d(rc, gbf2_mask_idx)            # no renewables in GBF2-masked cells
@@ -1068,7 +1068,7 @@ class LutoSolver:
         model     = self.gurobi_model
         const_ag  = self.const_ag
         const_non = self.const_nonag
-        ft        = self._input_data.flow_tables
+        ft        = self._input_data.table_flow
         a2a, a2n, n2a = ft['a2a'], ft['a2n'], ft['n2a']
         stride    = self._input_data.ncells                        # local_r < ncells
         x_all     = self._all_vars()
@@ -1127,9 +1127,9 @@ class LutoSolver:
         model     = self.gurobi_model
         const_ag  = self.const_ag
         const_non = self.const_nonag
-        ft        = self._input_data.flow_tables
+        ft        = self._input_data.table_flow
         a2a, a2n, n2a = ft['a2a'], ft['a2n'], ft['n2a']
-        ag_tab = self._input_data.ag_var_table
+        ag_tab = self._input_data.table_ag
         col_ag, col_nonag = self.ag_col, self.nonag_col
         n_ag = ag_tab['r'].size
         x_all     = self._all_vars()
@@ -1138,7 +1138,7 @@ class LutoSolver:
         # non-ag rows: one per (k, feasible cell) for EVERY non-ag land use k — including
         # disabled ones that own no X var: their rows are pure inflow guards,
         # −Σin + Σout = const, with no X column.
-        feas = self._input_data.feasible_non_ag_cells
+        feas = self._input_data.trans_feasible_nonag
         k_b = np.concatenate([np.full(len(feas[k]), k, dtype=np.int64) for k in range(self._input_data.n_non_ag_lus)])
         r_b = np.concatenate([np.asarray(feas[k], dtype=np.int64) for k in range(self._input_data.n_non_ag_lus)])
         n_non = r_b.size
@@ -1291,7 +1291,7 @@ class LutoSolver:
 
         # Agricultural results: ONE .X read of the ag block, scattered through the table
         # (float64 -> float32)
-        tab = self._input_data.ag_var_table
+        tab = self._input_data.table_ag
         x_ag = np.asarray(self.ag_mvar.X, dtype=np.float64)
         dry = tab['m'] == 0
         X_dry_sol_rj[tab['r'][dry],  tab['j'][dry]]  = x_ag[dry]
@@ -1299,14 +1299,14 @@ class LutoSolver:
 
         # Get non-agricultural results: ONE .X read of the block, scattered through the table
         # (disabled land uses have no rows and stay at the array's zeros)
-        tab = self._input_data.nonag_var_table
+        tab = self._input_data.table_nonag
         non_ag_X_sol_rk[tab['r'], tab['k']] = np.asarray(self.nonag_mvar.X, dtype=np.float64)
 
         # Ag-management results: ONE .X read of the block, scattered through the table.
         # Savanna eligibility is applied to BOTH lm here, while variable creation applied it
-        # to dry only (get_am_var_table): irr savanna vars outside savanna_eligible_r are
+        # to dry only (get_table_am): irr savanna vars outside savanna_eligible_r are
         # reported as 0.
-        tab = self._input_data.am_var_table
+        tab = self._input_data.table_am
         x_am = np.asarray(self.am_mvar.X, dtype=np.float64)
         keep = np.ones(x_am.size, dtype=bool)
         if "Savanna Burning" in tab['am_list']:
@@ -1328,17 +1328,17 @@ class LutoSolver:
         # attribute a flow to its source LU). Leaf axes mirror the flow_cost dicts — [to_m, local_r,
         # to_j] for ag targets, [local_r, k] for non-ag targets — where local_r indexes the source's
         # cell list (recover global cells via get_base_dvar_mj_cell_map / get_base_nonag_dvar_k_cell_map
-        # at the base year, the same maps that built ag_source_cells / nonag_source_cells).
+        # at the base year, the same maps that built trans_source_ag / trans_source_nonag).
         dvar_D_ag2ag_mrj    = {}   # (from_m, from_j) -> (NLMS, ncells_src, N_AG_LUS)
         dvar_D_ag2nonag_rk  = {}   # (from_m, from_j) -> (ncells_src, N_NON_AG_LUS)
         dvar_D_nonag2ag_mrj = {}   # from_k           -> (NLMS, ncells_k, N_AG_LUS)
         # one .X read per block, scattered per source slice through the edge tables
-        ft = self._input_data.flow_tables
+        ft = self._input_data.table_flow
         a2a, a2n, n2a = ft['a2a'], ft['a2n'], ft['n2a']
         x_a2a = np.asarray(self.a2a_mvar.X, dtype=np.float32) if a2a['n'] else np.zeros(0, np.float32)
         x_a2n = np.asarray(self.a2n_mvar.X, dtype=np.float32) if a2n['n'] else np.zeros(0, np.float32)
         x_n2a = np.asarray(self.n2a_mvar.X, dtype=np.float32) if n2a['n'] else np.zeros(0, np.float32)
-        for si, ((fm, fj), cells) in enumerate(self._input_data.ag_source_cells.items()):
+        for si, ((fm, fj), cells) in enumerate(self._input_data.trans_source_ag.items()):
             arr = np.zeros((self._input_data.nlms, len(cells), self._input_data.n_ag_lus), dtype=np.float32)
             a, b = int(a2a['src_ptr'][si]), int(a2a['src_ptr'][si + 1])
             arr[a2a['to_m'][a:b], a2a['local_r'][a:b], a2a['to_j'][a:b]] = x_a2a[a:b]
@@ -1348,7 +1348,7 @@ class LutoSolver:
             a, b = int(a2n['src_ptr'][si]), int(a2n['src_ptr'][si + 1])
             arr[a2n['local_r'][a:b], a2n['k'][a:b]] = x_a2n[a:b]
             dvar_D_ag2nonag_rk[(fm, fj)] = arr
-        for si, (fk, cells) in enumerate(self._input_data.nonag_source_cells.items()):
+        for si, (fk, cells) in enumerate(self._input_data.trans_source_nonag.items()):
             arr = np.zeros((self._input_data.nlms, len(cells), self._input_data.n_ag_lus), dtype=np.float32)
             a, b = int(n2a['src_ptr'][si]), int(n2a['src_ptr'][si + 1])
             arr[n2a['to_m'][a:b], n2a['local_r'][a:b], n2a['to_j'][a:b]] = x_n2a[a:b]
