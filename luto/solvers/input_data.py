@@ -20,10 +20,9 @@
 
 
 import numpy as np
-import pandas as pd
 import xarray as xr
 
-from collections import defaultdict
+from scipy import sparse
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Any, Optional
@@ -31,10 +30,7 @@ from typing import Any, Optional
 from luto.data import Data
 from luto import settings
 import luto.tools as tools
-# from luto.economics import land_use_culling   # DECOMMISSIONED: land-use culling is incompatible with
-#   the per-source (from→to) flow transition model — it pruned the exclude matrix using a single
-#   dominant-LU-per-cell transition cost, whereas costs/deltas are now keyed per (from_m, from_j) source,
-#   and pruning after the flow-feasibility dicts are built would leave deltas targeting cells with no X var.
+from luto.solvers.row_builder import ag_acct_terms_by_mj, am_terms_by_key, nonag_terms_by_k, keep_terms
 
 import luto.economics.agricultural.cost as ag_cost
 import luto.economics.agricultural.ghg as ag_ghg
@@ -53,34 +49,31 @@ import luto.economics.non_agricultural.transitions as non_ag_transition
 import luto.economics.non_agricultural.revenue as non_ag_revenue
 
 
+OBJ_BLOCKS = ('ag', 'am', 'nonag', 'trans_ag', 'trans_nonag')   # rows of SolverInputData.obj_block
+
+
 @dataclass
 class SolverInputData:
-    """
-    An object that collects and stores all relevant data for solver.py.
-    """   
-    base_year: int                                                      # The base year of this solving process
-    target_year: int                                                    # The target year of this solving process
+    """Everything the solver needs for one (base_year -> target_year) step: coefficient streams
+    (raw units, float32), targets, the decision-variable tables and the objective block."""
+    base_year: int                                                      # Base year of this solve step.
+    target_year: int                                                    # Target year of this solve step.
 
-    ag_g_mrj: np.ndarray                                                # Agricultural greenhouse gas emissions matrices.
-    ag_w_mrj: np.ndarray                                                # Agricultural water yields matrices.
-    ag_b_mrj: np.ndarray                                                # Agricultural biodiversity matrices based on bio-quality layer.
-    ag_x_mrj: np.ndarray                                                # Agricultural exclude matrices.
-    ag_q_mrp: np.ndarray                                                # Agricultural yield matrices -- note the `p` (product) index instead of `j` (land-use).
+    ag_g_mrj: np.ndarray                                                # Agricultural GHG emissions [m, r, j].
+    ag_w_mrj: np.ndarray                                                # Agricultural water net yield [m, r, j].
+    ag_q_mrp: np.ndarray                                                # Agricultural production quantity [m, r, p] (p = product, not land use).
 
-    non_ag_g_rk: np.ndarray                                             # Non-agricultural greenhouse gas emissions matrix.
-    non_ag_w_rk: np.ndarray                                             # Non-agricultural water yields matrix.
-    non_ag_b_rk: np.ndarray                                             # Non-agricultural biodiversity matrix.
-    non_ag_q_crk: np.ndarray                                            # Non-agricultural yield matrix.
+    non_ag_g_rk: np.ndarray                                             # Non-agricultural GHG emissions [r, k].
+    non_ag_w_rk: np.ndarray                                             # Non-agricultural water net yield [r, k].
+    non_ag_q_crk: np.ndarray                                            # Non-agricultural production quantity [c, r, k].
 
-    ag_man_g_mrj: dict                                                  # Agricultural Management options' GHG emission effects.
-    ag_man_w_mrj: dict                                                  # Agricultural Management options' water yield effects.
-    ag_man_b_mrj: dict                                                  # Agricultural Management options' biodiversity effects.
-    ag_man_q_mrp: dict                                                  # Agricultural Management options' quantity effects.
-    ag_man_limits: dict                                                 # Agricultural Management options' adoption limits.
-    ag_man_lb_mrj: dict                                                 # Agricultural Management options' lower bounds.
+    ag_man_g_mrj: dict                                                  # {am: GHG emission effect [m, r, j_idx]}.
+    ag_man_w_mrj: dict                                                  # {am: water net-yield effect [m, r, j_idx]}.
+    ag_man_q_mrp: dict                                                  # {am: production quantity effect [m, r, p]}.
+    ag_man_limits: dict                                                 # {am: {j: adoption limit}}.
 
-    dvar_base_ag_mrj: np.ndarray                                        # Agricultural base year decision variable values.
-    dvar_base_non_ag_rk: np.ndarray                                     # Non-agricultural base year decision variable values.
+    dvar_base_ag_mrj: np.ndarray                                        # Base-year ag decision variables [m, r, j], clipped into [lb, ub] (the node-balance constant).
+    dvar_base_non_ag_rk: np.ndarray                                     # Base-year non-ag decision variables [r, k], clipped into [lb, ub].
 
     renewable_solar_r: np.ndarray                                       # Renewable energy - solar yield matrix.
     renewable_wind_r: np.ndarray                                        # Renewable energy - wind yield matrix.
@@ -91,73 +84,65 @@ class SolverInputData:
     region_state_name2idx: dict[str, int]                               # Map of region state names to indices.
     region_NRM_names_r: np.ndarray                                      # Region NRM names for each cell.
     
-    water_region_indices: dict[int, np.ndarray]                         # Water region indices -> dict. Key: region.
-    water_region_names: dict[int, str]                                  # Water yield for the BASE_YR based on historical water yield layers.
-      
-    biodiv_contr_ag_j: np.ndarray                                       # Biodiversity contribution scale from agricultural land uses.
-    ag_fold_map: dict                                                   # θ-fold sliver bookkeeping; consumed in solver.py to build the accounting stream X_acct.
-    acct_cells_mrj: dict                                                # {(m,j): cells} = feasible_ag_cells_mrj ∪ folded-sliver cells — the accounting needs to iterate over.
-    biodiv_contr_non_ag_k: dict[int, float]                             # Biodiversity contribution scale from non-agricultural land uses.
-    biodiv_contr_ag_man: dict[str, dict[int, np.ndarray]]               # Biodiversity contribution scale from agricultural management options.
+    water_region_indices: dict[int, np.ndarray]                         # {region id: cell indices} of the water regions.
+    water_region_names: dict[int, str]                                  # {region id: region name}.
+
+    biodiv_contr_ag_j: np.ndarray                                       # Biodiversity contribution scale per agricultural land use (j).
+    biodiv_contr_non_ag_k: dict[int, float]                             # Biodiversity contribution scale per non-agricultural land use (k).
+    biodiv_contr_ag_man: dict[str, dict[int, np.ndarray]]               # Biodiversity contribution scale per ag-management option and land use, per cell.
     
-    GBF2_mask_area_r: np.ndarray                                        # Raw areas (GBF2) from priority degrade areas - indexed by cell (r).
-    GBF3_NVIS_pre_1750_area_vr: np.ndarray                              # Raw areas (GBF3) from NVIS vegetation - indexed by group (v) and cell (r)
-    GBF3_NVIS_region_group: dict[int, str]                              # GBF3 NVIS vegetation group names - indexed by group (v).
-    GBF4_SNES_pre_1750_area_sr: xr.DataArray                            # Areas (GBF4) SNES - xr.DataArray[layer, cell], layer coord is MultiIndex(species, presence). No region dim — region masking applied in solver.
+    GBF2_mask_area_r: np.ndarray                                        # GBF2 priority-degraded-area mask × real area, per cell (r).
+    GBF3_NVIS_pre_1750_area_vr: np.ndarray                              # GBF3 pre-1750 NVIS vegetation area, per group (v) and cell (r).
+    GBF3_NVIS_region_group: list                                        # GBF3 constraint pairs - list[(region, group)].
+    GBF4_SNES_pre_1750_area_sr: xr.DataArray                            # GBF4 SNES pre-1750 area [layer=(species, presence), cell]; region masking happens in the solver.
     GBF4_SNES_region_species: list                                      # GBF4 SNES constraint triplets - list[(region, species, presence)].
-    GBF4_ECNES_pre_1750_area_sr: xr.DataArray                           # Areas (GBF4) ECNES - xr.DataArray[layer, cell], layer coord is MultiIndex(species, presence). No region dim — region masking applied in solver.
+    GBF4_ECNES_pre_1750_area_sr: xr.DataArray                           # GBF4 ECNES pre-1750 area [layer=(community, presence), cell]; region masking happens in the solver.
     GBF4_ECNES_region_species: list                                     # GBF4 ECNES constraint triplets - list[(region, community, presence)].
-    GBF8_pre_1750_area_sr: xr.DataArray                                 # Areas (GBF8) - xr.DataArray[species, cell], species coord = species name strings.
+    GBF8_pre_1750_area_sr: xr.DataArray                                 # GBF8 pre-1750 species area [species, cell].
     GBF8_region_species: list                                           # GBF8 constraint pairs - list[(region, species)].
 
-    savanna_eligible_r: np.ndarray                                      # Cells that are eligible for savanna burnining land use.
-    GBF2_mask_idx: np.ndarray                                           # Index of the mask of priority degraded areas.
+    savanna_eligible_r: np.ndarray                                      # Cells eligible for savanna burning.
     renewable_GBF2_mask_solar_idx: np.ndarray                           # Index of GBF2 mask for solar renewable exclusion.
     renewable_GBF2_mask_wind_idx: np.ndarray                            # Index of GBF2 mask for wind renewable exclusion.
     renewable_MNES_mask_solar_idx: np.ndarray                           # Index of EPBC MNES mask for solar renewable exclusion.
     renewable_MNES_mask_wind_idx: np.ndarray                            # Index of EPBC MNES mask for wind renewable exclusion.
 
-    base_yr_prod: dict[str, tuple]                                      # Base year production of each commodity.
-    scale_factors: dict[float]                                          # Scale factors for each input layer.
-    commodity_names: list[str]                                          # Commodity names (data.COMMODITIES order, alphabetical).
+    commodity_names: list[str]                                          # Commodity names (data.COMMODITIES order).
 
-    economic_contr_mrj: float                                           # base year economic contribution matrix.
-    economic_prices: np.ndarray                                         # base year commodity prices.
-    economic_target_yr_carbon_price: float                              # target year carbon price.
-    
-    offland_ghg: np.ndarray                                             # GHG emissions from off-land commodities.
+    offland_ghg: np.ndarray                                             # Target-year GHG emissions from off-land commodities (tCO2e); 0.0 when GHG limits are off.
 
-    lu2pr_pj: np.ndarray                                                # Conversion matrix: land-use to product(s).
-    pr2cm_cp: np.ndarray                                                # Conversion matrix: product(s) to commodity.
-    limits: dict                                                        # Targets to use.
-    desc2aglu: dict                                                     # Map of agricultural land use descriptions to codes.
-    real_area: np.ndarray                                               # Area of each cell, indexed by cell (r)
-    ag_mask_proportion_r: np.ndarray                                    # Initial (2010) total agricultural land proportion per cell (r).
+    lu2pr_pj: np.ndarray                                                # Conversion matrix: product (p) × land use (j).
+    pr2cm_cp: np.ndarray                                                # Conversion matrix: commodity (c) × product (p).
+    limits: dict                                                        # Raw constraint targets for the target year (see get_limits).
+    desc2aglu: dict                                                     # {agricultural land-use description: code}.
+    real_area: np.ndarray                                               # Area of each cell (ha), per cell (r).
+    ag_mask_proportion_r: np.ndarray                                    # Base-year (2010) agricultural proportion of each cell (r).
 
-    # ── FROM-view: the cells of each (from_m, from_j) source; local_r in the dicts below indexes into these ──
-    ag_source_cells: dict                                               # {(from_m,from_j): cell_idx}   — anchors ag2ag AND ag2nonag flow families (exact only).
-    nonag_source_cells: dict                                            # {from_k: cell_idx}            — anchors nonag2ag AND nonag2nonag flow families (exact only).
+    # ── FROM-view: the cells of each source; local_r in the dicts below indexes into these ──
+    ag_source_cells: dict                                               # {(from_m, from_j): cell indices} of the ag sources.
+    nonag_source_cells: dict                                            # {from_k: cell indices} of the non-ag sources.
 
-    # ── FROM-view: cost of (from_m, from_j) -> (to_m, to_j); economy-rescaled ──
-    flow_cost_ag2ag: dict                                               # dict[(from_m,from_j)] → ndarray(NLMS, ncells_src, N_AG_LUS).
-    flow_cost_ag2nonag: dict                                            # dict[(from_m,from_j)] → dict[k → ndarray(ncells_src,)].
-    flow_cost_nonag2ag: dict                                            # dict[k] → ndarray(NLMS, ncells_k, N_AG_LUS).
-    flow_ghg_ag2ag: dict                                                # dict[(from_m,from_j)] → ndarray(NLMS, ncells_src, N_AG_LUS) raw t CO2, GHG-rescaled. Physical parallel of flow_cost_ag2ag; the GHG constraint sums Σ flow_ghg·D (source-correct transition emissions).
+    flow_ghg_ag2ag: dict                                                # {(from_m, from_j): ndarray[to_m, local_r, to_j]} transition emissions, raw tCO2e, float32.
 
-    # ── FROM-view: feasibility of (from_m, from_j) -> (to_m, to_j); True if a delta var may be created ──
-    feasible_ag2ag_mrj: dict                                            # {(from_m,from_j): bool (NLMS, ncells_src, N_AG_LUS) [to_m, local_r, to_j]}.
-    feasible_nonag2ag_mrj: dict                                         # {from_k: bool (NLMS, ncells_k, N_AG_LUS) [to_m, local_r, to_j]}.
-    feasible_ag2nonag_rk: dict                                          # {(from_m,from_j): bool (ncells_src, N_NON_AG_LUS) [local_r, k]}.
+    # ── TO-view: ag targets (which ag land use a cell may become, and its bounds) ──
+    dvar_ub_ag: np.ndarray                                              # Ag upper bound [m, r, j]: reachable share from ag2ag + nonag2ag sources.
+    feasible_ag_cells_mrj: dict                                         # {(m, j): cell indices} that get an ag decision var.
+    ag_var_table: dict                                                  # Ag decision vars, one row per var (m, j, r, lb, ub) + col[m, j, r] -> row; see get_ag_var_table.
+    ag_acct_table: dict                                                 # Accounting stream X_acct = M · X_ag as a term table (term_row, term_col, term_w); see get_ag_acct_table.
 
-    # ── TO-view: Target-keyed bounds (which target a cell may become, and its lb..ub) ──
-    dvar_ub_ag: np.ndarray                                              # Ag target upper bound (NLMS, NCELLS, N_AG_LUS): ag2ag + nonag2ag reachable share (fractional).
-    dvar_lb_ag: np.ndarray                                              # Ag target lower bound (NLMS, NCELLS, N_AG_LUS) — zeros for now.
-    feasible_ag_cells_mrj: dict                                         # {(to_m,to_j): cell_idx} — cells with a routable >θ source (per-source, from ag_x_mrj>0) get an ag target var (was ag_lu2cells).
+    # ── TO-view: non-ag targets (which non-ag land use a cell may become, and its bounds) ──
+    dvar_ub_nonag: np.ndarray                                           # Non-ag upper bound [r, k]: reachability, reversibility lock-in, RP/destock caps.
+    feasible_non_ag_cells: dict                                         # {k: cell indices} with dvar_ub_nonag > 0 (these get a non-ag decision var).
+    nonag_var_table: dict                                               # Non-ag decision vars, one row per var (k, r, lb, ub) + col[k, r] -> row; see get_nonag_var_table.
+    flow_tables: dict                                                   # Transition-flow edge tables {'a2a', 'a2n', 'n2a'}, one row per delta var; see get_flow_tables.
+    am_var_table: dict                                                  # Ag-management decision vars, one row per var (am, j_idx, j, m, r, lb, ub) + col[am][m, j_idx, r] -> row; see get_am_var_table.
+    var_layout: dict                                                    # Column offsets of the MVar blocks in Var.index order (ag, nonag, am, a2a, a2n, n2a) and n_dec.
 
-    # ── TO-view: Target-keyed bounds (which non-ag k a cell may become, and its lb..ub) ──
-    dvar_ub_nonag: np.ndarray                                           # Non-ag TARGET upper bound (NCELLS, N_NON_AG_LUS); reachability + reversibility lock-in + RP/destock caps.
-    dvar_lb_nonag: np.ndarray                                           # Non-ag TARGET lower bound (NCELLS, N_NON_AG_LUS); irreversible LU lock-in floor (0 for reversible).
-    feasible_non_ag_cells: dict                                         # {k: cell_idx} — cells whose dvar_ub_nonag > 0 get a non-ag target var (was non_ag_lu2cells).
+    # ── Per-variable TERM dicts over global Var.index (built once; every constraint family and the objective read them) ──
+    ag_acct_terms: dict                                                 # {(m, j): {cells, var, w}} accounting-stream terms; see row_builder.ag_acct_terms_by_mj.
+    am_terms: dict                                                      # {(am_idx, j_idx, m): {cells, var, w=1}}; see row_builder.am_terms_by_key.
+    nonag_terms: dict                                                   # {k: {cells, var, w=1}}; see row_builder.nonag_terms_by_k.
+    obj_block: sparse.csr_matrix                                        # Economy coefficients, raw AUD, (5 × n_dec) float32, one row per OBJ_BLOCKS component; see get_obj_block.
 
     @property
     def ncms(self):
@@ -191,19 +176,7 @@ class SolverInputData:
     @cached_property
     def am2j(self):
         # Map of agricultural management options to land use codes
-        return {
-            am: [self.desc2aglu[lu] for lu in am_lus]
-            for am, am_lus in settings.AG_MANAGEMENTS_TO_LAND_USES.items()
-            if settings.AG_MANAGEMENTS[am]
-        }
-
-    @cached_property
-    def j2am(self):
-        _j2am = defaultdict(list)
-        for am, am_j_list in self.am2j.items():
-            for j in am_j_list:
-                _j2am[j].append(am)
-        return _j2am
+        return get_am2j(self.desc2aglu)
 
 
 def get_ag_c_mrj(data: Data, target_index):
@@ -258,12 +231,6 @@ def get_w_region_names(data: Data):
         return {}
     print('Getting water region names...', flush = True)
     return data.WATER_REGION_NAMES
-
-
-def get_ag_b_mrj(data: Data):
-    print('Getting agricultural biodiversity requirement matrices...', flush = True)
-    output = ag_biodiversity.get_bio_quality_score_mrj(data)
-    return output.astype(np.float32)
 
 
 def get_ag_biodiv_contr_j(data: Data) -> dict[int, float]:
@@ -351,12 +318,6 @@ def get_non_ag_w_rk(
     return output.astype(np.float32)
 
 
-def get_non_ag_b_rk(data: Data, ag_b_mrj: np.ndarray, base_year):
-    print('Getting non-agricultural biodiversity requirement matrices...', flush = True)
-    output = non_ag_biodiversity.get_breq_matrix(data, ag_b_mrj, data.lumaps[base_year])
-    return output.astype(np.float32)
-
-
 def get_ag_q_mrp(data: Data, target_index):
     print('Getting agricultural production quantity matrices...', flush = True)
     output = ag_quantity.get_quantity_matrices(data, target_index)
@@ -373,8 +334,8 @@ def get_ag_t_mrj(data: Data, target_index, base_year):
     print('Getting agricultural transition cost matrices...', flush = True)
     # From-based flow-cost dict[(from_m, from_j)] -> ndarray(NLMS, ncells_src, N_AG_LUS), sliced per
     # source over each source's dvar>θ cells (the same cells `ag_source_cells` uses, so the solver
-    # delta's local_r aligns with this dict's cell axis). Leaves are cast to float32 during the economy
-    # rescale in get_input_data (no premature .astype on the dict).
+    # delta's local_r aligns with this dict's cell axis). Leaves are cast to float32 in get_input_data
+    # with the other coefficient streams.
     mj_cell_map = ag_transition.get_base_dvar_mj_cell_map(data, base_year)
     return {
         (from_m, from_j): ag_transition.get_transition_matrices_ag2ag(data, target_index, from_m, from_j, cell_idx)
@@ -405,6 +366,136 @@ def get_feasible_ag_cells_mrj(ag_x_mrj: np.ndarray, dvar_lb_ag: np.ndarray) -> d
         for j in range(n_lus)
         for m in range(n_lms)
     }
+
+
+def get_ag_var_table(feasible_ag_cells_mrj: dict, dvar_lb_ag: np.ndarray, dvar_ub_ag: np.ndarray) -> dict:
+    """The ag decision variables as ONE LONG TABLE — one row per variable (select primitive).
+
+    Row order is j outer, dry cells then irr cells; the solver's single ``addMVar`` over this
+    table makes the row index the variable's position in the ag block. ``col[m, j, r]`` is the
+    inverse of the select: the table row holding that variable, or -1 where no variable exists.
+    """
+    print('Building the ag decision-variable table...', flush = True)
+    n_lms, ncells, n_lus = dvar_lb_ag.shape
+    m_parts, j_parts, r_parts = [], [], []
+    for j in range(n_lus):
+        for m in range(n_lms):
+            cells = np.asarray(feasible_ag_cells_mrj[m, j], dtype=np.int32)
+            m_parts.append(np.full(cells.size, m, dtype=np.int32))
+            j_parts.append(np.full(cells.size, j, dtype=np.int32))
+            r_parts.append(cells)
+    m_col = np.concatenate(m_parts); j_col = np.concatenate(j_parts); r_col = np.concatenate(r_parts)
+    col = np.full((n_lms, n_lus, ncells), -1, dtype=np.int32)
+    col[m_col, j_col, r_col] = np.arange(r_col.size, dtype=np.int32)
+    return dict(
+        m=m_col, j=j_col, r=r_col,
+        lb=dvar_lb_ag[m_col, r_col, j_col].astype(np.float64),   # exact widen, same doubles addVar received
+        ub=dvar_ub_ag[m_col, r_col, j_col].astype(np.float64),
+        col=col,
+    )
+
+
+def get_ag_acct_table(ag_var_table: dict, ag_fold_map: dict) -> dict:
+    """The accounting stream X_acct as an explicit TERM TABLE over the ag block (the fold operator M).
+
+    Starting from X_acct = X_ag (identity), each folded sliver k (cell r, sliver (from_m, from_j),
+    receiver dominant (to_m, to_j), share c_k = slivers[k] / dominant_frac[k]) contributes
+
+        X_acct[sliver]   += c_k · X_ag[dominant]     (sliver gains the live share)
+        X_acct[dominant] -= c_k · X_ag[dominant]     (dominant loses it)
+
+    and is skipped when the dominant has no ag var. As terms (acct_row, ag_col, w): one identity
+    term per ag var, then per k in fold-map order a (+c_k) term on the sliver's row and a (-c_k)
+    term on the dominant's row. Terms are NOT merged (a dominant with two slivers keeps
+    [1, -c_1, -c_2] as three terms) so the sub-floor drop test downstream (|coefficient| <
+    SOLVER_COEFF_MIN, tested before the fold weight — see ``row_builder.keep_terms``) runs on a
+    single term's coefficient. `col[m, j, r]` is the acct row of an entry, -1 where it has no terms (no var and
+    not a sliver of a var-holding dominant). Acct rows = the ag table rows in order, then
+    sliver-only rows in first-appearance order. All size-0 fold arrays ⇒ pure identity
+    (X_acct == X_ag).
+    """
+    print('Building the ag accounting-stream term table...', flush = True)
+    col_ag = ag_var_table['col']
+    n_lms, n_lus, ncells = col_ag.shape
+    n_ag = ag_var_table['r'].size
+
+    cells  = np.asarray(ag_fold_map['cells'], dtype=np.int64)
+    from_m = np.asarray(ag_fold_map['from_m'], dtype=np.int64)
+    from_j = np.asarray(ag_fold_map['from_j'], dtype=np.int64)
+    to_m   = np.asarray(ag_fold_map['to_m'], dtype=np.int64)
+    to_j   = np.asarray(ag_fold_map['to_j'], dtype=np.int64)
+    slivers       = np.asarray(ag_fold_map['vals']).astype(np.float64)
+    dominant_frac = np.asarray(ag_fold_map['folded_dom']).astype(np.float64)
+
+    # identity block: acct row i == ag col i
+    acct_m = [ag_var_table['m']]; acct_j = [ag_var_table['j']]; acct_r = [ag_var_table['r']]
+    col = col_ag.copy()                                            # acct row of every ag var
+    t_row = [np.arange(n_ag, dtype=np.int32)]
+    t_col = [np.arange(n_ag, dtype=np.int32)]
+    t_w   = [np.ones(n_ag, dtype=np.float64)]
+
+    if cells.size:
+        dom_col = col_ag[to_m, to_j, cells]                        # -1 ⇒ dominant has no var ⇒ skip k
+        keep = dom_col >= 0
+        cells, from_m, from_j, dom_col = cells[keep], from_m[keep], from_j[keep], dom_col[keep]
+        c = slivers[keep] / dominant_frac[keep]                    # sliver's share of the dominant's live area (float64)
+
+        # sliver acct rows: the sliver's own ag row, or a NEW acct row (first-appearance order)
+        s_row = col[from_m, from_j, cells].astype(np.int64)
+        new = s_row < 0
+        if new.any():
+            key = (from_m[new] * n_lus + from_j[new]) * ncells + cells[new]
+            uniq, first = np.unique(key, return_index=True)
+            order = np.argsort(first, kind='stable')               # first-appearance order
+            uniq = uniq[order]
+            new_rows = n_ag + np.arange(uniq.size, dtype=np.int64)
+            um, rem = np.divmod(uniq, n_lus * ncells); uj, ur = np.divmod(rem, ncells)
+            col[um, uj, ur] = new_rows
+            acct_m.append(um.astype(np.int32)); acct_j.append(uj.astype(np.int32)); acct_r.append(ur.astype(np.int32))
+            s_row[new] = col[from_m[new], from_j[new], cells[new]]
+
+        t_row += [s_row.astype(np.int32),  dom_col.astype(np.int32)]   # sliver gains, dominant loses
+        t_col += [dom_col.astype(np.int32), dom_col.astype(np.int32)]
+        t_w   += [c, -c]
+
+    return dict(
+        m=np.concatenate(acct_m), j=np.concatenate(acct_j), r=np.concatenate(acct_r),
+        col=col,
+        term_row=np.concatenate(t_row), term_col=np.concatenate(t_col), term_w=np.concatenate(t_w).astype(np.float32),
+        n_ag=n_ag,
+    )
+
+
+def get_nonag_var_table(feasible_non_ag_cells: dict, dvar_lb_nonag: np.ndarray,
+                        dvar_ub_nonag: np.ndarray, dvar_base_non_ag_rk: np.ndarray) -> dict:
+    """The non-ag decision variables as ONE LONG TABLE — one row per variable (select primitive).
+
+    Row order is enabled non-ag land uses in NON_AG_LAND_USES order, cells ascending within
+    each; the solver's single ``addMVar`` makes the row index the variable's position in the
+    non-ag block. Bounds apply the collapse rule (lb/ub within 1 % of a positive lb collapse to
+    the base), computed in the arrays' own dtype and widened exactly. ``col[k, r]`` = table row
+    or -1.
+    """
+    print('Building the non-ag decision-variable table...', flush = True)
+    lb_n, ub_n = dvar_lb_nonag, dvar_ub_nonag
+    collapse = (lb_n > 0) & (np.abs(ub_n - lb_n) / np.where(lb_n > 0, lb_n, 1.0) < 0.01)
+    lb_eff = np.where(collapse, dvar_base_non_ag_rk, lb_n)
+    ub_eff = np.where(collapse, dvar_base_non_ag_rk, ub_n)
+    ncells, n_k = lb_n.shape
+    k_parts, r_parts = [], []
+    for k, k_name in enumerate(settings.NON_AG_LAND_USES):
+        if not settings.NON_AG_LAND_USES[k_name]:
+            continue
+        cells = np.asarray(feasible_non_ag_cells[k], dtype=np.int32)
+        k_parts.append(np.full(cells.size, k, dtype=np.int32)); r_parts.append(cells)
+    k_col = np.concatenate(k_parts) if k_parts else np.array([], dtype=np.int32)
+    r_col = np.concatenate(r_parts) if r_parts else np.array([], dtype=np.int32)
+    col = np.full((n_k, ncells), -1, dtype=np.int32)
+    col[k_col, r_col] = np.arange(r_col.size, dtype=np.int32)
+    return dict(k=k_col, r=r_col,
+                lb=lb_eff[r_col, k_col].astype(np.float64),
+                ub=ub_eff[r_col, k_col].astype(np.float64),
+                col=col)
 
 
 def get_feasible_non_ag_cells(dvar_ub_nonag: np.ndarray, threshold: float = 0.0) -> dict:
@@ -479,6 +570,68 @@ def get_feasible_ag2nonag_rk(dvar_ub_nonag: np.ndarray, ag_source_cells: dict, T
         (fm, fj): eligible[cells, :] & T_ag2nonag_reach_jk[fj][None, :]         # (ncells_src, N_NONAG)
         for (fm, fj), cells in ag_source_cells.items()
     }
+
+
+def get_flow_tables(ag_source_cells: dict, nonag_source_cells: dict, feasible_ag2ag_mrj: dict,
+                    feasible_ag2nonag_rk: dict, feasible_nonag2ag_mrj: dict) -> dict:
+    """The transition-flow system as EDGE TABLES — one row per delta variable (select primitive).
+
+    Wide → long: the from-keyed dicts {(fm, fj): bool block[to_m, local_r, to_j]}
+    become one table per sub-block whose every key is a column. Row order is sources in the
+    feasibility dicts' insertion order (== ``ag_source_cells`` order), arcs in ``np.argwhere``
+    C-order within a source; one ``addMVar`` per sub-block makes the row index the delta var's
+    position in its block, and the variable names are generated from the columns.
+    ``local_r`` is kept so the source-keyed ``flow_cost_*`` / ``flow_ghg_*``
+    dicts gather unchanged; ``r`` = ``source_cells[local_r]`` is the global cell (the node key).
+    ``src_ptr[s]:src_ptr[s+1]`` is source s's row range. Land never crosses cells: the
+    destinations of an arc are land uses at the SAME cell.
+    """
+    print('Building the transition-flow edge tables...', flush = True)
+    i32 = np.int32
+
+    def cat(parts, dt=i32):
+        return np.concatenate(parts).astype(dt) if parts else np.array([], dtype=dt)
+
+    # ── ag → ag: keys (to_m, local_r, to_j) ─────────────────────────────────────
+    src_c, fm_c, fj_c, lr_c, r_c, tm_c, tj_c, ptr = [], [], [], [], [], [], [], [0]
+    for src, ((fm, fj), valid) in enumerate(feasible_ag2ag_mrj.items()):
+        idx = np.argwhere(valid)                                    # (n, 3) C-order: to_m, local_r, to_j
+        cells = np.asarray(ag_source_cells[(fm, fj)])
+        src_c.append(np.full(len(idx), src)); fm_c.append(np.full(len(idx), fm)); fj_c.append(np.full(len(idx), fj))
+        tm_c.append(idx[:, 0]); lr_c.append(idx[:, 1]); tj_c.append(idx[:, 2]); r_c.append(cells[idx[:, 1]])
+        ptr.append(ptr[-1] + len(idx))
+    a2a = dict(src=cat(src_c), fm=cat(fm_c), fj=cat(fj_c), local_r=cat(lr_c), r=cat(r_c),
+               to_m=cat(tm_c), to_j=cat(tj_c), src_ptr=np.asarray(ptr, dtype=np.int64),
+               sources=list(feasible_ag2ag_mrj))
+    a2a['n'] = a2a['r'].size
+
+    # ── ag → non-ag: keys (k, local_r), argwhere over (local_r, k) ──────────────
+    src_c, fm_c, fj_c, lr_c, r_c, k_c, ptr = [], [], [], [], [], [], [0]
+    for src, ((fm, fj), valid) in enumerate(feasible_ag2nonag_rk.items()):
+        idx = np.argwhere(valid)                                    # (n, 2) C-order: local_r, k
+        cells = np.asarray(ag_source_cells[(fm, fj)])
+        src_c.append(np.full(len(idx), src)); fm_c.append(np.full(len(idx), fm)); fj_c.append(np.full(len(idx), fj))
+        lr_c.append(idx[:, 0]); k_c.append(idx[:, 1]); r_c.append(cells[idx[:, 0]])
+        ptr.append(ptr[-1] + len(idx))
+    a2n = dict(src=cat(src_c), fm=cat(fm_c), fj=cat(fj_c), local_r=cat(lr_c), r=cat(r_c),
+               k=cat(k_c), src_ptr=np.asarray(ptr, dtype=np.int64),
+               sources=list(feasible_ag2nonag_rk))
+    a2n['n'] = a2n['r'].size
+
+    # ── non-ag → ag: keys (to_m, local_r, to_j) ─────────────────────────────────
+    src_c, fk_c, lr_c, r_c, tm_c, tj_c, ptr = [], [], [], [], [], [], [0]
+    for src, (fk, valid) in enumerate(feasible_nonag2ag_mrj.items()):
+        idx = np.argwhere(valid)                                    # (n, 3): to_m, local_r, to_j
+        cells = np.asarray(nonag_source_cells[fk])
+        src_c.append(np.full(len(idx), src)); fk_c.append(np.full(len(idx), fk))
+        tm_c.append(idx[:, 0]); lr_c.append(idx[:, 1]); tj_c.append(idx[:, 2]); r_c.append(cells[idx[:, 1]])
+        ptr.append(ptr[-1] + len(idx))
+    n2a = dict(src=cat(src_c), fk=cat(fk_c), local_r=cat(lr_c), r=cat(r_c),
+               to_m=cat(tm_c), to_j=cat(tj_c), src_ptr=np.asarray(ptr, dtype=np.int64),
+               sources=list(feasible_nonag2ag_mrj))
+    n2a['n'] = n2a['r'].size
+    print(f'    ag2ag {a2a["n"]:,} | ag2nonag {a2n["n"]:,} | nonag2ag {n2a["n"]:,} arcs', flush = True)
+    return dict(a2a=a2a, a2n=a2n, n2a=n2a)
 
 
 def get_dvar_ub_ag(data: Data, base_year: int) -> np.ndarray:
@@ -611,12 +764,6 @@ def get_ag_man_w_mrj(data: Data, target_index):
     return output
 
 
-def get_ag_man_b_mrj(data: Data, target_index, ag_b_mrj: np.ndarray):
-    print('Getting agricultural management options\' biodiversity effects...', flush = True)
-    output = ag_biodiversity.get_ag_mgt_biodiversity_matrices(data, ag_b_mrj, target_index)
-    return output
-
-
 def get_ag_man_limits(data: Data, target_index):
     print('Getting agricultural management options\' adoption limits...', flush = True)
     output = ag_transition.get_agricultural_management_adoption_limits(data, target_index)
@@ -673,103 +820,8 @@ def get_economic_mrj(
     return [ag_obj_mrj, non_ag_obj_rk, ag_man_objs]
 
 
-def get_commodity_prices_target_yr(data: Data, yr_cal) -> np.ndarray:
-    """
-    Get the commodity prices for the target year.
-    """
-    print('Getting commodity prices...', flush = True)
-    return ag_revenue.get_commodity_prices(data, yr_cal)
-
-
-def get_target_yr_carbon_price(data: Data, target_year: int) -> float:
-    return data.CARBON_PRICES[target_year]
-
-
-def get_BASE_YR_economic_value(data: Data):
-    """
-    Calculate the economic value of the agricultural sector.
-    """
-    if data.BASE_YR_economic_value is not None:
-        return data.BASE_YR_economic_value
-    
-    # Get the revenue and cost matrices
-    r_mrj = ag_revenue.get_rev_matrices(data, 0)
-    c_mrj = ag_cost.get_cost_matrices(data, 0)
-    # Calculate the economic value
-    if settings.OBJECTIVE == 'maxprofit':
-        e_mrj = (r_mrj - c_mrj)
-    elif settings.OBJECTIVE == 'mincost':
-        e_mrj = c_mrj
-    else:
-        raise ValueError("Invalid `settings.OBJECTIVE`. Use 'maxprofit' or 'maxcost'.")
-    
-    data.BASE_YR_economic_value = np.einsum('mrj,mrj->', e_mrj, data.AG_L_MRJ)
-    return data.BASE_YR_economic_value
-
-def get_BASE_YR_production_t(data: Data):
-    """
-    Calculate the production of each commodity in the base year.
-    """
-    # Get the revenue and cost matrices
-    return data.BASE_YR_production_t
-
-def get_BASE_YR_GHG_t(data: Data):
-    """
-    Calculate the GHG emissions of the agricultural sector.
-    """
-    if data.BASE_YR_GHG_t is not None:
-        return data.BASE_YR_GHG_t
-    # Get the GHG matrices
-    ag_g_mrj = get_ag_g_mrj(data, 0)
-    data.BASE_YR_GHG_t = np.einsum('mrj,mrj->', ag_g_mrj, data.AG_L_MRJ)
-    return data.BASE_YR_GHG_t
-    
-def get_BASE_YR_bio_quality_value(data: Data):
-    """
-    Calculate the economic value of the agricultural sector.
-    """
-    if data.BASE_YR_overall_bio_value is not None:
-        return data.BASE_YR_overall_bio_value
-    # Get the revenue and cost matrices
-    ag_b_mrj = ag_biodiversity.get_bio_quality_score_mrj(data)
-    data.BASE_YR_overall_bio_value = np.einsum('mrj,mrj->', ag_b_mrj, data.AG_L_MRJ)
-    return data.BASE_YR_overall_bio_value
-
-def get_BASE_YR_GBF2_score(data: Data) -> np.ndarray:
-    if settings.GBF2_TARGET == "off":
-        return np.empty(0)
-    if data.BASE_YR_GBF2_score is not None:
-        return data.BASE_YR_GBF2_score
-    print('Getting priority degrade area base year score...', flush = True)
-    data.BASE_YR_GBF2_score = data.BIO_GBF2_BASE_YR.sum()
-
-def get_BASE_YR_water_ML(data: Data) -> np.ndarray:
-    """
-    Calculate the water net yield of the agricultural sector.
-    """
-    if data.BASE_YR_water_ML is not None:
-        return data.BASE_YR_water_ML
-    # Get the water matrices
-    ag_w_mrj = get_ag_w_mrj(data, 0)
-    ag_w_index = get_w_region_indices(data)
-    
-    water_ML = []
-    for _,idx in ag_w_index.items():
-        water_ML.append(
-            np.einsum('mrj, mrj->', ag_w_mrj[:, idx, :], data.AG_L_MRJ[:, idx, :])
-        )
-    data.BASE_YR_water_ML = np.array(water_ML)
-    return data.BASE_YR_water_ML
-    
-
 def get_savanna_eligible_r(data: Data) -> np.ndarray:
     return np.where(data.SAVBURN_ELIGIBLE == 1)[0]
-
-
-def get_GBF2_mask_idx(data: Data) -> np.ndarray:
-    if settings.GBF2_TARGET == "off":
-        return np.empty(0)
-    return np.where(data.BIO_GBF2_MASK_LDS)[0]
 
 
 def get_renewable_GBF2_mask_solar_idx(data: Data) -> np.ndarray:
@@ -807,8 +859,8 @@ def get_limits(data: Data, yr_cal: int) -> dict[str, Any]:
       'GBF2', 'GBF3_NVIS', 'GBF4_SNES', 'GBF4_ECNES', 'GBF8',
       'ag_regional_adoption', 'non_ag_regional_adoption', 'non_ag_regional_adoption_sum'
 
-    All values are raw (unscaled); the solver divides each by the appropriate
-    ``scale_factors[key]`` entry inline when building constraints.
+    All values are raw (unscaled); the solver rescales each constraint row together with its
+    target (``row_builder.scale_rows``).
     """
     print('Getting environmental limits...', flush = True)
     
@@ -857,197 +909,131 @@ def get_limits(data: Data, yr_cal: int) -> dict[str, Any]:
     return limits
 
 
-def calc_geomean_scale(lhs_max: float, rhs_max: float) -> float:
+def get_am2j(desc2aglu: dict) -> dict:
+    """{am: [land-use codes]} for the ENABLED ag-management options, in settings order."""
+    return {
+        am: [desc2aglu[lu] for lu in am_lus]
+        for am, am_lus in settings.AG_MANAGEMENTS_TO_LAND_USES.items()
+        if settings.AG_MANAGEMENTS[am]
+    }
+
+
+def get_am_var_table(am2j: dict, nlms: int, ncells: int, feasible_ag_cells_mrj: dict,
+                     renewable_GBF2_mask_solar_idx: np.ndarray, renewable_GBF2_mask_wind_idx: np.ndarray,
+                     savanna_eligible_r: np.ndarray, ag_man_lb_mrj: dict) -> dict:
+    """LONG table of the ag-management decision vars — one row per variable.
+
+    Row order is am in ``am2j`` order (enabled only), j_idx, dry cells then irr cells.
+    Cell selection: renewables drop the GBF2-exclusion cells from BOTH lm; savanna burning
+    intersects ``savanna_eligible_r`` on DRY only (the post-solve read in ``solve()`` masks
+    irr as well — keep the two in step). lb = 0 if the am is reversible else ``ag_man_lb_mrj[am][m, r, j]``
+    (widened exactly); ub = 1. ``col[am][m, j_idx, r]`` = table row or -1; ``am_list`` =
+    the am order; ``am`` column = index into it.
     """
-    Compute a single scale factor as the geometric mean of LHS and RHS magnitudes,
-    normalised by ``settings.RESCALE_FACTOR`` (RF)::
+    print('Building the ag-management decision-variable table...', flush = True)
+    am_list = list(am2j)
+    am_c, ji_c, j_c, m_c, r_c, lb_c = [], [], [], [], [], []
+    col = {}
+    for am_idx, (am, am_j_list) in enumerate(am2j.items()):
+        col[am] = np.full((nlms, len(am_j_list), ncells), -1, dtype=np.int32)
+        excl = None
+        if am in settings.RENEWABLES_OPTIONS:
+            excl = (renewable_GBF2_mask_solar_idx if am == "Utility Solar PV"
+                    else renewable_GBF2_mask_wind_idx)
+        for j_idx, j in enumerate(am_j_list):
+            dry = feasible_ag_cells_mrj[0, j]
+            irr = feasible_ag_cells_mrj[1, j]
+            if excl is not None:
+                if excl.size:
+                    dry = np.setdiff1d(dry, excl); irr = np.setdiff1d(irr, excl)
+            elif tools.am_name_snake_case(am) == "savanna_burning":
+                dry = np.intersect1d(dry, savanna_eligible_r)               # dry only (see docstring)
+            for m, cells in ((0, dry), (1, irr)):
+                cells = np.asarray(cells, dtype=np.int32)
+                am_c.append(np.full(cells.size, am_idx, dtype=np.int32))
+                ji_c.append(np.full(cells.size, j_idx, dtype=np.int32))
+                j_c.append(np.full(cells.size, j, dtype=np.int32))
+                m_c.append(np.full(cells.size, m, dtype=np.int32))
+                r_c.append(cells)
+                lb_c.append(np.zeros(cells.size, dtype=np.float64) if settings.AG_MANAGEMENTS_REVERSIBLE[am]
+                            else np.asarray(ag_man_lb_mrj[am])[m, cells, j].astype(np.float64))
+    cat = lambda parts, dt: np.concatenate(parts) if parts else np.array([], dtype=dt)
+    tab = dict(am=cat(am_c, np.int32), j_idx=cat(ji_c, np.int32), j=cat(j_c, np.int32),
+               m=cat(m_c, np.int32), r=cat(r_c, np.int32), lb=cat(lb_c, np.float64),
+               col=col, am_list=am_list)
+    tab['ub'] = np.ones(tab['r'].size, dtype=np.float64)
+    for am_idx, am in enumerate(am_list):
+        sel = np.flatnonzero(tab['am'] == am_idx)
+        col[am][tab['m'][sel], tab['j_idx'][sel], tab['r'][sel]] = sel.astype(np.int32)
+    return tab
 
-        scale = sqrt(lhs_max * rhs_max) / RF
 
-    After dividing both sides by this scale:
-      - LHS_max_scaled = RF * sqrt(lhs_max / rhs_max)
-      - RHS_scaled     = RF * sqrt(rhs_max / lhs_max)
+def get_var_layout(ag_var_table: dict, nonag_var_table: dict, am_var_table: dict, flow_tables: dict) -> dict:
+    """Column layout of the decision-variable vector, in the order the solver creates its
+    MVar blocks (= Var.index): ag, nonag, am, a2a, a2n, n2a. Offsets chain by table size;
+    ``n_dec`` is the total. The solver's range slacks come AFTER these and carry no objective."""
+    ag = 0
+    nonag = ag + ag_var_table['r'].size
+    am = nonag + nonag_var_table['r'].size
+    a2a = am + am_var_table['r'].size
+    a2n = a2a + flow_tables['a2a']['n']
+    n2a = a2n + flow_tables['a2n']['n']
+    n_dec = n2a + flow_tables['n2a']['n']
+    return dict(ag=ag, nonag=nonag, am=am, a2a=a2a, a2n=a2n, n2a=n2a, n_dec=n_dec)
 
-    Both land symmetrically around RF in log space.
-    Falls back to LHS-only (``lhs_max / RF``) when ``rhs_max`` is zero.
+
+def get_obj_block(ag_obj_mrj: np.ndarray, non_ag_obj_rk: np.ndarray, ag_man_objs: dict,
+                  ag_acct_terms: dict, am_terms: dict, am_list: list, nonag_terms: dict,
+                  flow_tables: dict, flow_cost_ag2ag: dict, flow_cost_ag2nonag: dict,
+                  flow_cost_nonag2ag: dict, var_layout: dict) -> sparse.csr_matrix:
+    """The economy coefficients (raw AUD) as a (5 x n_dec) sparse block, one row per component
+    (``OBJ_BLOCKS``: ag, am, nonag, trans_ag, trans_nonag), over ``var_layout``.
+
+    Same coefficient contract as ``row_builder.compose_row`` (described on
+    ``row_builder.keep_terms``): a per-cell coefficient is dropped when |q| < SOLVER_COEFF_MIN,
+    tested BEFORE the fold weight; the survivors are multiplied by the fold weight in float32;
+    a variable repeated by fold terms is merged into one coefficient with ``sum_duplicates``;
+    the final floor of the merged coefficient happens in the solver, after scaling
+    (``_setup_objective``). Transition costs are the negated flow costs on the
+    positive-increment delta vars. The solver sums the rows, scales and floors them into the
+    objective; ``solve()`` reads the per-block economy breakdown as ``obj_block @ x``.
     """
-    if lhs_max > 0.0 and rhs_max > 0.0:
-        return float(np.sqrt(lhs_max * rhs_max) / settings.RESCALE_FACTOR)
-    ref = lhs_max if lhs_max > 0.0 else settings.RESCALE_FACTOR
-    return float(ref / settings.RESCALE_FACTOR)
+    lay = var_layout
+    AG, AM, NONAG, TRANS_AG, TRANS_NONAG = (OBJ_BLOCKS.index(b) for b in OBJ_BLOCKS)
+    terms = []                                       # (block row, var, value) — every term goes through keep_terms
 
+    # ag ACCOUNTING stream: raw coeff × X_acct terms over the accounting support
+    for (m, j), t in ag_acct_terms.items():
+        terms.append((AG, *keep_terms(t['var'], ag_obj_mrj[m, t['cells'], j], t['w'])))
+    for (am_idx, j_idx, m), t in am_terms.items():
+        terms.append((AM, *keep_terms(t['var'], ag_man_objs[am_list[am_idx]][m, t['cells'], j_idx])))
+    for k, t in nonag_terms.items():
+        terms.append((NONAG, *keep_terms(t['var'], non_ag_obj_rk[t['cells'], k])))
 
-def rescale_lhs(arrays: list) -> tuple[list, float]:
-    """
-    Rescale arrays using LHS-only scaling: ``scale = max(|LHS|) / RF``.
+    # transition costs: per source slice of each edge table, gathered from the source-keyed cost dicts
+    ft = flow_tables
+    for tab, offset, cost in ((ft['a2a'], lay['a2a'], flow_cost_ag2ag),
+                              (ft['n2a'], lay['n2a'], flow_cost_nonag2ag)):
+        for si, src in enumerate(tab['sources']):
+            a, b = int(tab['src_ptr'][si]), int(tab['src_ptr'][si + 1])
+            c = cost[src][tab['to_m'][a:b], tab['local_r'][a:b], tab['to_j'][a:b]]
+            terms.append((TRANS_AG, *keep_terms(offset + np.arange(a, b), -c)))
+    a2n = ft['a2n']
+    for si, src in enumerate(a2n['sources']):
+        a, b = int(a2n['src_ptr'][si]), int(a2n['src_ptr'][si + 1])
+        cdict = flow_cost_ag2nonag[src]                                  # {k: array(ncells_src)}
+        k, lr = a2n['k'][a:b], a2n['local_r'][a:b]
+        c = np.empty(b - a, dtype=np.float32)
+        for kk in np.unique(k):
+            c[k == kk] = cdict[int(kk)][lr[k == kk]]
+        terms.append((TRANS_NONAG, *keep_terms(lay['a2n'] + np.arange(a, b), -c)))
 
-    All arrays in the group share one scale factor to preserve their relative
-    magnitudes (e.g. ag, non-ag, and ag-management variants of the same quantity).
-    Returns ``(scaled_arrays, scale_factor)``.
-    """
-    ref = 0.0
-    for arr in arrays:
-        if isinstance(arr, np.ndarray):
-            ref = max(ref, float(np.abs(arr).max()))
-        elif isinstance(arr, dict):
-            for v in arr.values():
-                ref = max(ref, float(np.abs(v).max()))
-
-    scale = np.float32(calc_geomean_scale(ref, 0.0))  # rhs_max=0 → LHS-only path
-
-    scaled = []
-    for arr in arrays:
-        if isinstance(arr, np.ndarray):
-            scaled.append((arr / scale).astype(np.float32))
-        elif isinstance(arr, dict):
-            scaled.append({k: (v / scale).astype(np.float32) for k, v in arr.items()})
-        else:
-            scaled.append(arr)
-
-    return scaled, float(scale)
-
-
-def rescale_lhs_rhs(arrays: list, rhs_target) -> tuple[list, float]:
-    """
-    Rescale arrays using the geometric mean of max(|LHS|) and max(|RHS|)::
-
-        scale = sqrt(max_lhs * max_rhs) / RF
-
-    Both LHS coefficients and the RHS target land symmetrically around RF in log
-    space, keeping both sides within Gurobi's recommended [1e-3, 1e6] band as long
-    as ``max_rhs / max_lhs < 1e9`` (holds for all LUTO constraint types).
-
-    Use this for aggregate constraints (GHG, Water, GBF2, Demand, Renewable) where
-    per-cell LHS values and a national/regional RHS total would otherwise diverge.
-
-    Args:
-        arrays:     List of ``np.ndarray`` or ``dict[str, np.ndarray]``.
-        rhs_target: Scalar float, ``dict[key, float]``, or ``np.ndarray``.
-                    Representative magnitude is ``max(|rhs_target|)``.
-
-    Returns:
-        ``(scaled_arrays, scale_factor)``
-    """
-    lhs_max = 0.0
-    for arr in arrays:
-        if isinstance(arr, np.ndarray):
-            lhs_max = max(lhs_max, float(np.abs(arr).max()))
-        elif isinstance(arr, dict):
-            for v in arr.values():
-                lhs_max = max(lhs_max, float(np.abs(v).max()))
-
-    if isinstance(rhs_target, dict):
-        rhs_max = max((abs(v) for v in rhs_target.values()), default=0.0)
-    elif isinstance(rhs_target, np.ndarray):
-        rhs_max = float(np.abs(rhs_target).max()) if rhs_target.size else 0.0
-    else:
-        rhs_max = abs(float(rhs_target))
-
-    scale = np.float32(calc_geomean_scale(lhs_max, rhs_max))
-    if scale == 0.0:
-        scale = np.float32(1.0)
-
-    scaled = []
-    for arr in arrays:
-        if isinstance(arr, np.ndarray):
-            scaled.append((arr / scale).astype(np.float32))
-        elif isinstance(arr, dict):
-            scaled.append({k: (v / scale).astype(np.float32) for k, v in arr.items()})
-        else:
-            scaled.append(arr)
-
-    return scaled, float(scale)
-
-
-def rescale_lhs_rhs_region_species(
-    arr: xr.DataArray,
-    constraint_list: list[tuple],
-    region_NRM_names_r: np.ndarray,
-    targets: xr.DataArray | None = None,
-    layer_coord_names: tuple[str, ...] = ('region', 'species'),
-    matrix_key_fn=None,
-) -> tuple[xr.DataArray, xr.DataArray]:
-    """
-    Rescale a biodiversity matrix per constraint tuple using the geometric mean
-    of max(|LHS|) and the tuple's RHS target.
-
-    Calls :func:`calc_geomean_scale` for each constraint::
-
-        scale = calc_geomean_scale(region_max, abs(target_val))
-
-    When ``targets`` is ``None``, falls back to LHS-only scaling.
-
-    Supports two matrix layouts:
-    - ``row_coord = 'layer'`` (GBF4 ECNES): constraint tuples are (region, species);
-      the matrix row key equals the full tuple.
-    - ``row_coord = 'layer'`` with ``matrix_key_fn`` (GBF4 SNES): constraint tuples
-      are (region, species, presence); ``matrix_key_fn`` extracts (species, presence)
-      as the matrix row key, while region[0] drives the cell mask.
-    - ``row_coord = 'group'`` or ``'species'`` (GBF3 NVIS, GBF8): constraint tuples
-      are (region, species); the matrix row key is the last element (species/group).
-
-    Region masking: first element of each constraint tuple is the region.
-    ``'AUSTRALIA'`` → all cells; any other value → ``region_NRM_names_r == region``.
-    In-place scaling is safe because NRM regions are non-overlapping — each cell
-    belongs to at most one NRM region.
-
-    ``layer_coord_names`` sets the MultiIndex level names on the returned
-    ``scale_factors`` DataArray. The scale_factors MultiIndex mirrors
-    ``constraint_list`` so callers can use ``scale_factors.sel(layer=constraint_tuple)``.
-
-    Returns:
-        scaled_arr: xr.DataArray, same shape as ``arr``.
-        scale_factors: xr.DataArray with ``layer`` MultiIndex matching constraint_list.
-    """
-    arr_np = arr.values.copy().astype(np.float32)
-    row_coord = arr.dims[0]
-    row_names = arr.coords[row_coord].values
-    row_name_to_idx = {name: i for i, name in enumerate(row_names)}
-    use_tuple_key = (row_coord == 'layer')  # GBF4: row key is a tuple
-
-    layers: list[tuple] = []
-    sf_values: list[float] = []
-
-    for constraint_tuple in constraint_list:
-        region = constraint_tuple[0]
-
-        if matrix_key_fn is not None:
-            row_key = matrix_key_fn(constraint_tuple)
-        elif use_tuple_key:
-            row_key = constraint_tuple
-        else:
-            row_key = constraint_tuple[-1]
-
-        row_idx = row_name_to_idx[row_key]
-
-        cell_mask = (
-            np.ones(arr_np.shape[1], dtype=bool)
-            if region == "AUSTRALIA"
-            else region_NRM_names_r == region
-        )
-
-        region_max = float(np.abs(arr_np[row_idx, cell_mask]).max()) if cell_mask.any() else 0.0
-
-        if targets is not None:
-            target_val = abs(float(targets.sel(layer=constraint_tuple).item()))
-        else:
-            target_val = 0.0
-
-        scale_factor = np.float32(calc_geomean_scale(region_max, target_val))
-
-        arr_np[row_idx, cell_mask] = arr_np[row_idx, cell_mask] / scale_factor
-
-        layers.append(constraint_tuple)
-        sf_values.append(float(scale_factor))
-
-    scaled_arr = xr.DataArray(arr_np, dims=arr.dims, coords=arr.coords, name=arr.name)
-    scale_factors = xr.DataArray(
-        np.array(sf_values, dtype=np.float32),
-        dims=["layer"],
-        coords={"layer": pd.MultiIndex.from_tuples(layers, names=list(layer_coord_names))},
-    )
-    return scaled_arr, scale_factors
-
+    rows = np.concatenate([np.full(v.size, r, dtype=np.int32) for r, _, v in terms])
+    cols = np.concatenate([c for _, c, _ in terms])
+    vals = np.concatenate([v for _, _, v in terms])
+    block = sparse.csr_matrix((vals, (rows, cols)), shape=(len(OBJ_BLOCKS), lay['n_dec']))
+    block.sum_duplicates()                                                # merge repeated variables (fold terms)
+    return block
 
 
 def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputData:
@@ -1069,7 +1055,6 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
 
     # ag→ag transition GHG EMISSIONS (raw t CO2), source-keyed — the physical parallel of
     # flow_cost_ag2ag. The GHG constraint sums Σ flow_ghg·D (source-correct transition emissions).
-    # GHG-rescaled below.
     flow_ghg_ag2ag = ag_ghg.get_ghg_transition_emissions_from_base_year(data, base_year)
 
     # Per-source transition reachability (T_MAT finite ⇒ allowed) — decides which delta vars exist.
@@ -1122,8 +1107,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         get_ag_w_mrj(data, target_index) if settings.WATER_CLIMATE_CHANGE_IMPACT == 'on' 
         else get_ag_w_mrj(data, target_index, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)
     )
-    ag_b_mrj                        = get_ag_b_mrj(data)
-    ag_x_mrj                        = get_ag_x_mrj(data, base_year)
+    ag_x_mrj                        = get_ag_x_mrj(data, base_year)          # exclude matrix: which (m, j) a cell may become
     dvar_ub_ag                      = get_dvar_ub_ag(data, base_year)        # TO-view ag target upper bound (ag2ag + nonag2ag)
     dvar_lb_ag                      = get_dvar_lb_ag(data, base_year)        # TO-view ag target lower bound (zeros for now)
     ag_source_cells                 = get_ag_source_cells(data, base_year)   # FROM-view: cells holding each ag (from_m,from_j) source
@@ -1132,21 +1116,19 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
 
     non_ag_g_rk                     = get_non_ag_g_rk(data, ag_g_mrj, base_year)
     non_ag_w_rk                     = (
-        get_non_ag_w_rk(data, ag_w_mrj, base_year, target_year)   
-        if settings.WATER_CLIMATE_CHANGE_IMPACT == 'on' 
+        get_non_ag_w_rk(data, ag_w_mrj, base_year, target_year)
+        if settings.WATER_CLIMATE_CHANGE_IMPACT == 'on'
         else get_non_ag_w_rk(data, ag_w_mrj, base_year, target_year, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)
     )
-    non_ag_b_rk                     = get_non_ag_b_rk(data, ag_b_mrj, base_year)
     dvar_ub_nonag                    = get_dvar_ub_nonag(data, base_year)
     feasible_non_ag_cells          = get_feasible_non_ag_cells(dvar_ub_nonag) # cells that get a target non-ag var (ub > 0)
     non_ag_q_crk                    = get_non_ag_q_crk(data, ag_q_mrp, base_year)
     dvar_lb_nonag                    = get_dvar_lb_nonag(data, base_year)
-    
+
     ag_man_g_mrj                    = get_ag_man_g_mrj(data, target_index)
     ag_man_w_mrj                    = get_ag_man_w_mrj(data, target_index)
-    ag_man_b_mrj                    = get_ag_man_b_mrj(data, target_index, ag_b_mrj)
     ag_man_q_mrp                    = get_ag_man_q_mrj(data, target_index, ag_q_mrp)
-    ag_man_limits                   = get_ag_man_limits(data, target_index)                            
+    ag_man_limits                   = get_ag_man_limits(data, target_index)
     ag_man_lb_mrj                   = get_ag_man_lb_mrj(data, base_year)
     
     renewable_solar_r               = get_potential_renewable_solar_r(data, target_index)
@@ -1176,279 +1158,147 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     GBF8_region_species             = get_GBF8_region_species(data)
 
     savanna_eligible_r              = get_savanna_eligible_r(data)
-    GBF2_mask_idx                   = get_GBF2_mask_idx(data)
     renewable_GBF2_mask_solar_idx   = get_renewable_GBF2_mask_solar_idx(data)
     renewable_GBF2_mask_wind_idx    = get_renewable_GBF2_mask_wind_idx(data)
     renewable_MNES_mask_solar_idx   = get_renewable_MNES_mask_solar_idx(data)
     renewable_MNES_mask_wind_idx    = get_renewable_MNES_mask_wind_idx(data)
 
-    # Fetch all raw limit targets once — reused in both rescaling and get_limits below.
     limits = get_limits(data, target_year)
 
     # Derive target eligibility from ag_x_mrj so it matches the mask the solver reads (per-source θ;
     # was ag_lu2cells). Stay-floor cells (dvar_lb_ag>0, sub-θ slivers locked in) are unioned in so
     # their var exists.
     feasible_ag_cells_mrj          = get_feasible_ag_cells_mrj(ag_x_mrj, dvar_lb_ag)  # cells that get a target ag var
+    ag_var_table                   = get_ag_var_table(feasible_ag_cells_mrj, dvar_lb_ag, dvar_ub_ag)  # the ag block as a long table
 
     # Per-source delta-var feasibility — keyed/shaped like the flow_cost dicts; the solver adds one
     # delta var per True entry.
     feasible_ag2ag_mrj    = get_feasible_ag2ag_mrj(ag_x_mrj, ag_source_cells, T_ag2ag_reach_jj)
     feasible_nonag2ag_mrj = get_feasible_nonag2ag_mrj(ag_x_mrj, nonag_source_cells, T_nonag2ag_reach_kj)
     feasible_ag2nonag_rk  = get_feasible_ag2nonag_rk(dvar_ub_nonag, ag_source_cells, T_ag2nonag_reach_jk)
+    flow_tables           = get_flow_tables(ag_source_cells, nonag_source_cells, feasible_ag2ag_mrj, feasible_ag2nonag_rk, feasible_nonag2ag_mrj)   # the flow system as edge tables
 
-    # Rescale solver input data
-    [ag_obj_mrj, non_ag_obj_rk, ag_man_objs], economy_scale = rescale_lhs([ag_obj_mrj, non_ag_obj_rk, ag_man_objs])
+    # The coefficient streams leave here raw and float32 (the DTYPE POLICY in row_builder):
+    # every constraint block is row-rescaled in the solver (row_builder.scale_rows, per-row
+    # factor kept there) and the objective is raw AUD / 1e6.
+    ag_obj_mrj, non_ag_obj_rk = ag_obj_mrj.astype(np.float32), non_ag_obj_rk.astype(np.float32)
+    ag_man_objs = {am: v.astype(np.float32) for am, v in ag_man_objs.items()}
+    flow_cost_ag2ag    = {s: v.astype(np.float32)     for s, v in flow_cost_ag2ag.items()}
+    flow_cost_ag2nonag = {s: {k: a.astype(np.float32) for k, a in p.items()} for s, p in flow_cost_ag2nonag.items()}
+    flow_cost_nonag2ag = {k: v.astype(np.float32)     for k, v in flow_cost_nonag2ag.items()}
+    ag_q_mrp, non_ag_q_crk = ag_q_mrp.astype(np.float32), non_ag_q_crk.astype(np.float32)
+    ag_man_q_mrp = {am: v.astype(np.float32) for am, v in ag_man_q_mrp.items()}
+    ag_g_mrj, non_ag_g_rk = ag_g_mrj.astype(np.float32), non_ag_g_rk.astype(np.float32)
+    ag_man_g_mrj = {am: v.astype(np.float32) for am, v in ag_man_g_mrj.items()}
+    flow_ghg_ag2ag = {s: v.astype(np.float32) for s, v in flow_ghg_ag2ag.items()}
+    ag_w_mrj, non_ag_w_rk = ag_w_mrj.astype(np.float32), non_ag_w_rk.astype(np.float32)
+    ag_man_w_mrj = {am: v.astype(np.float32) for am, v in ag_man_w_mrj.items()}
+    renewable_solar_r, renewable_wind_r = renewable_solar_r.astype(np.float32), renewable_wind_r.astype(np.float32)
 
-    # Put the source-keyed flow-cost dicts on the same economy band as the flat arrays above
-    # (rescale_lhs only walks one dict level; these are 1–2 levels deep, so do it explicitly).
-    # Leaves become float32, matching the flat-array convention.
-    flow_cost_ag2ag    = {s: (v / economy_scale).astype(np.float32)     for s, v in flow_cost_ag2ag.items()}
-    flow_cost_ag2nonag = {s: {k: (a / economy_scale).astype(np.float32) for k, a in p.items()} for s, p in flow_cost_ag2nonag.items()}
-    flow_cost_nonag2ag = {k: (v / economy_scale).astype(np.float32)     for k, v in flow_cost_nonag2ag.items()}
-
-    [ag_q_mrp, non_ag_q_crk, ag_man_q_mrp],   demand_scale = rescale_lhs_rhs([ag_q_mrp, non_ag_q_crk, ag_man_q_mrp], limits['demand'])
-    [ag_b_mrj, non_ag_b_rk, ag_man_b_mrj],    biodiv_scale = rescale_lhs([ag_b_mrj, non_ag_b_rk, ag_man_b_mrj])
-
-    [ag_g_mrj, non_ag_g_rk, ag_man_g_mrj], ghg_scale = (
-        rescale_lhs_rhs([ag_g_mrj, non_ag_g_rk, ag_man_g_mrj], limits['ghg'])
-        if settings.GHG_EMISSIONS_LIMITS != 'off' else
-        ([ag_g_mrj, non_ag_g_rk, ag_man_g_mrj], 1.0)
-    )
-    # Put the source-keyed transition-GHG dict on the same GHG rescale band as ag_g_mrj
-    # (the GHG constraint sums Σ flow_ghg·D — the source-correct transition emissions).
-    flow_ghg_ag2ag = {s: (v / ghg_scale).astype(np.float32) for s, v in flow_ghg_ag2ag.items()}
-
-    [renewable_solar_r], renewable_solar_scale = (
-        rescale_lhs_rhs([renewable_solar_r], limits['renewable_Utility Solar PV'])
-        if any(settings.RENEWABLES_OPTIONS.values()) else
-        ([renewable_solar_r], 1.0)
-    )
-    
-    [renewable_wind_r], renewable_wind_scale = (
-        rescale_lhs_rhs([renewable_wind_r], limits['renewable_Onshore Wind'])
-        if any(settings.RENEWABLES_OPTIONS.values()) else
-        ([renewable_wind_r], 1.0)
-    )
-    
-    [ag_w_mrj, non_ag_w_rk, ag_man_w_mrj], water_scale = (
-        rescale_lhs_rhs([ag_w_mrj, non_ag_w_rk, ag_man_w_mrj], limits['water'])
-        if settings.WATER_LIMITS == 'on' else
-        ([ag_w_mrj, non_ag_w_rk, ag_man_w_mrj], 1.0)
-    )
-    
-    [GBF2_mask_area_r], gbf2_scale = (
-        rescale_lhs_rhs([GBF2_mask_area_r], limits['GBF2'])
-        if settings.GBF2_TARGET != "off" else
-        ([GBF2_mask_area_r], 1.0)
-    )
-    
-    GBF3_NVIS_pre_1750_area_vr, gbf3_nvis_scale = (
-        rescale_lhs_rhs_region_species(
-            GBF3_NVIS_pre_1750_area_vr, GBF3_NVIS_region_group, region_NRM_names_r,
-            targets=limits['GBF3_NVIS'],
-        )
-        if settings.GBF3_NVIS_TARGET != "off" else
-        (GBF3_NVIS_pre_1750_area_vr, 1.0)
-    )
-    
-    GBF4_SNES_pre_1750_area_sr, gbf4_snes_scale = (
-        rescale_lhs_rhs_region_species(
-            GBF4_SNES_pre_1750_area_sr, GBF4_SNES_region_species, region_NRM_names_r,
-            targets=limits['GBF4_SNES'],
-            layer_coord_names=('region', 'species', 'presence'),
-            matrix_key_fn=lambda t: (t[1], t[2]),
-        )
-        if settings.GBF4_TARGET_SNES != 'off' else
-        (GBF4_SNES_pre_1750_area_sr, 1.0)
-    )
-    
-    GBF4_ECNES_pre_1750_area_sr, gbf4_ecnes_scale = (
-        rescale_lhs_rhs_region_species(
-            GBF4_ECNES_pre_1750_area_sr, GBF4_ECNES_region_species, region_NRM_names_r,
-            targets=limits['GBF4_ECNES'],
-            layer_coord_names=('region', 'species', 'presence'),
-            matrix_key_fn=lambda t: (t[1], t[2]),
-        )
-        if settings.GBF4_TARGET_ECNES != 'off' else
-        (GBF4_ECNES_pre_1750_area_sr, 1.0)
-    )
-    
-    GBF8_pre_1750_area_sr, gbf8_scale = (
-        rescale_lhs_rhs_region_species(
-            GBF8_pre_1750_area_sr, GBF8_region_species, region_NRM_names_r,
-            targets=limits['GBF8'],
-        )
-        if settings.GBF8_TARGET != "off" else
-        (GBF8_pre_1750_area_sr, 1.0)
-    )
-
-    scale_factors = {
-        "Economy":                      economy_scale,
-        "Demand":                       demand_scale,
-        "Biodiversity":                 biodiv_scale,
-        "GHG":                          ghg_scale,
-        "Water":                        water_scale,
-        "GBF2":                         gbf2_scale,
-        "GBF3_NVIS":                    gbf3_nvis_scale,
-        "GBF4_SNES":                    gbf4_snes_scale,
-        "GBF4_ECNES":                   gbf4_ecnes_scale,
-        "GBF8":                         gbf8_scale,
-        "Utility Solar PV":             renewable_solar_scale,
-        "Onshore Wind":                 renewable_wind_scale,
-    }
-
-    base_yr_prod = {
-        "BASE_YR Economy(AUD)":         get_BASE_YR_economic_value(data),
-        "BASE_YR Production (t)":       get_BASE_YR_production_t(data),
-        "BASE_YR GHG (tCO2e)":          get_BASE_YR_GHG_t(data),
-        "BASE_YR Water (ML)":           get_BASE_YR_water_ML(data),
-        "BASE_YR Bio quality (score)":  get_BASE_YR_bio_quality_value(data),
-        "BASE_YR GBF_2 (score)":        get_BASE_YR_GBF2_score(data),
-    }
-
-    commodity_names = data.COMMODITIES
-
-    # Bookkeeping for which under theta sliver are folded into which domain cells.  
-    ag_fold_map = ag_transition.get_ag_dvar_fold_map(data, base_year)   
-
-    # Accounting support: X_acct is nonzero at EXACTLY feasible_ag_cells ∪ {folded-sliver cells}.
-    # A folded sliver has folded base 0, so it is absent from feasible_ag_cells; the per-j accounting builders
-    # (economy/GHG/GBF2/demand) must iterate THIS union or they'd drop its (slivers/fd)·Xf[d] term and silently
-    # collapse the two-stream back to the folded stream. The sliver cells come straight from the fold map.
-    acct_cells_mrj = {}
-    for m in range(data.NLMS):
-        for j in range(data.N_AG_LUS):
-            feas = feasible_ag_cells_mrj[m, j]
-            if ag_fold_map['cells'].size:
-                extra = ag_fold_map['cells'][(ag_fold_map['from_m'] == m) & (ag_fold_map['from_j'] == j)]
-                acct_cells_mrj[m, j] = np.union1d(feas, extra) if extra.size else feas
-            else:
-                acct_cells_mrj[m, j] = feas
-
-    economic_contr_mrj=(ag_obj_mrj, non_ag_obj_rk,  ag_man_objs)
-    economic_prices=get_commodity_prices_target_yr(data, target_year)
-    economic_target_yr_carbon_price=get_target_yr_carbon_price(data, target_year)
-    
-    offland_ghg=(
-        data.OFF_LAND_GHG_EMISSION_C[target_index] / scale_factors["GHG"] 
-        if settings.GHG_EMISSIONS_LIMITS != 'off' 
+    offland_ghg = (
+        data.OFF_LAND_GHG_EMISSION_C[target_index]                       # raw tCO2e (row-rescaled in the solver)
+        if settings.GHG_EMISSIONS_LIMITS != 'off'
         else 0.0
     )
 
-    lu2pr_pj=data.LU2PR
-    pr2cm_cp=data.PR2CM
-    desc2aglu=data.DESC2AGLU
-    real_area=data.REAL_AREA
-    ag_mask_proportion_r=data.AG_MASK_PROPORTION_R
-    
-    # Base year dvars
+    # ── The decision-variable tables ────────────────────────────────────────────────────────
     # Base dvars are the node-balance "stay" constant; clip them into the cleaned [lb, ub] box so the
     # all-delta=0 stay point is feasible by construction (fixes base's own float noise, e.g. -1e-8<lb=0).
     # Bounds were already clamped so lb ≤ base ≤ ub for real values — this only bites on noise. Reported.
     dvar_base_ag_mrj    = tools.clamp_dvar_bound(ag_transition.get_folded_base_ag_dvar(data, base_year), dvar_lb_ag, dvar_ub_ag, 'Ag base clipped to [lb,ub]')
     dvar_base_non_ag_rk = tools.clamp_dvar_bound(data.non_ag_dvars[base_year], dvar_lb_nonag, dvar_ub_nonag, 'NonAg base clipped to [lb,ub]')
 
+    ag_fold_map     = ag_transition.get_ag_dvar_fold_map(data, base_year)                  # which sub-θ slivers fold into which dominant
+    ag_acct_table   = get_ag_acct_table(ag_var_table, ag_fold_map)                          # X_acct = M · X_ag as a term table
+    nonag_var_table = get_nonag_var_table(feasible_non_ag_cells, dvar_lb_nonag, dvar_ub_nonag, dvar_base_non_ag_rk)
+    am_var_table    = get_am_var_table(get_am2j(data.DESC2AGLU), data.NLMS, data.NCELLS, feasible_ag_cells_mrj,
+                                       renewable_GBF2_mask_solar_idx, renewable_GBF2_mask_wind_idx, savanna_eligible_r, ag_man_lb_mrj)
+    var_layout      = get_var_layout(ag_var_table, nonag_var_table, am_var_table, flow_tables)
+
+    # Per-variable term dicts over global Var.index — built once, read by every constraint family
+    # (row_builder.extract_groups / extract_structure) and by the objective block.
+    ag_acct_terms = ag_acct_terms_by_mj(ag_acct_table, var_layout['ag'])
+    am_terms      = am_terms_by_key(am_var_table, var_layout['am'])
+    nonag_terms   = nonag_terms_by_k(nonag_var_table, var_layout['nonag'])
+    obj_block     = get_obj_block(ag_obj_mrj, non_ag_obj_rk, ag_man_objs, ag_acct_terms, am_terms, am_var_table['am_list'],
+                                  nonag_terms, flow_tables, flow_cost_ag2ag, flow_cost_ag2nonag, flow_cost_nonag2ag, var_layout)
 
     return SolverInputData(
-        base_year,
-        target_year,
+        base_year=base_year,
+        target_year=target_year,
 
-        ag_g_mrj,
-        ag_w_mrj,
-        ag_b_mrj,
-        ag_x_mrj,
-        ag_q_mrp,
+        ag_g_mrj=ag_g_mrj,
+        ag_w_mrj=ag_w_mrj,
+        ag_q_mrp=ag_q_mrp,
+        non_ag_g_rk=non_ag_g_rk,
+        non_ag_w_rk=non_ag_w_rk,
+        non_ag_q_crk=non_ag_q_crk,
+        ag_man_g_mrj=ag_man_g_mrj,
+        ag_man_w_mrj=ag_man_w_mrj,
+        ag_man_q_mrp=ag_man_q_mrp,
+        ag_man_limits=ag_man_limits,
 
-        non_ag_g_rk,
-        non_ag_w_rk,
-        non_ag_b_rk,
-        non_ag_q_crk,
+        dvar_base_ag_mrj=dvar_base_ag_mrj,
+        dvar_base_non_ag_rk=dvar_base_non_ag_rk,
 
-        ag_man_g_mrj,
-        ag_man_w_mrj,
-        ag_man_b_mrj,
-        ag_man_q_mrp,
-        ag_man_limits,
-        ag_man_lb_mrj,
+        renewable_solar_r=renewable_solar_r,
+        renewable_wind_r=renewable_wind_r,
+        exist_renewable_solar_r=exist_renewable_solar_r,
+        exist_renewable_wind_r=exist_renewable_wind_r,
 
-        dvar_base_ag_mrj,
-        dvar_base_non_ag_rk,
-        
-        renewable_solar_r,
-        renewable_wind_r,
-        exist_renewable_solar_r,
-        exist_renewable_wind_r,
+        region_state_r=region_state_r,
+        region_state_name2idx=region_state_name2idx,
+        region_NRM_names_r=region_NRM_names_r,
+        water_region_indices=water_region_indices,
+        water_region_names=water_region_names,
 
-        region_state_r,
-        region_state_name2idx,
-        region_NRM_names_r,
-        
-        water_region_indices,
-        water_region_names,
-        
-        biodiv_contr_ag_j,
-        ag_fold_map,
-        acct_cells_mrj,
-        biodiv_contr_non_ag_k,
-        biodiv_contr_ag_man,
-        
-        GBF2_mask_area_r,
-        GBF3_NVIS_pre_1750_area_vr,
-        GBF3_NVIS_region_group,
-        GBF4_SNES_pre_1750_area_sr,
-        GBF4_SNES_region_species,
-        GBF4_ECNES_pre_1750_area_sr,
-        GBF4_ECNES_region_species,
-        GBF8_pre_1750_area_sr,
-        GBF8_region_species,
-        
-        savanna_eligible_r,
-        GBF2_mask_idx,
-        renewable_GBF2_mask_solar_idx,
-        renewable_GBF2_mask_wind_idx,
-        renewable_MNES_mask_solar_idx,
-        renewable_MNES_mask_wind_idx,
+        biodiv_contr_ag_j=biodiv_contr_ag_j,
+        biodiv_contr_non_ag_k=biodiv_contr_non_ag_k,
+        biodiv_contr_ag_man=biodiv_contr_ag_man,
 
-        base_yr_prod,
-        scale_factors,
-        commodity_names,
+        GBF2_mask_area_r=GBF2_mask_area_r,
+        GBF3_NVIS_pre_1750_area_vr=GBF3_NVIS_pre_1750_area_vr,
+        GBF3_NVIS_region_group=GBF3_NVIS_region_group,
+        GBF4_SNES_pre_1750_area_sr=GBF4_SNES_pre_1750_area_sr,
+        GBF4_SNES_region_species=GBF4_SNES_region_species,
+        GBF4_ECNES_pre_1750_area_sr=GBF4_ECNES_pre_1750_area_sr,
+        GBF4_ECNES_region_species=GBF4_ECNES_region_species,
+        GBF8_pre_1750_area_sr=GBF8_pre_1750_area_sr,
+        GBF8_region_species=GBF8_region_species,
 
-        economic_contr_mrj,
-        economic_prices,
-        economic_target_yr_carbon_price,
-        
-        offland_ghg,
-        
-        lu2pr_pj,
-        pr2cm_cp,
-        limits,
-        desc2aglu,
-        real_area,
-        ag_mask_proportion_r,
+        savanna_eligible_r=savanna_eligible_r,
+        renewable_GBF2_mask_solar_idx=renewable_GBF2_mask_solar_idx,
+        renewable_GBF2_mask_wind_idx=renewable_GBF2_mask_wind_idx,
+        renewable_MNES_mask_solar_idx=renewable_MNES_mask_solar_idx,
+        renewable_MNES_mask_wind_idx=renewable_MNES_mask_wind_idx,
 
-        # FROM-view source-cell maps (anchor the per-source flow vars).
-        ag_source_cells,
-        nonag_source_cells,
+        commodity_names=data.COMMODITIES,
+        offland_ghg=offland_ghg,
+        lu2pr_pj=data.LU2PR,
+        pr2cm_cp=data.PR2CM,
+        limits=limits,
+        desc2aglu=data.DESC2AGLU,
+        real_area=data.REAL_AREA,
+        ag_mask_proportion_r=data.AG_MASK_PROPORTION_R,
 
-        # Source-keyed flow transition costs.
-        flow_cost_ag2ag,
-        flow_cost_ag2nonag,
-        flow_cost_nonag2ag,
-        flow_ghg_ag2ag,
+        ag_source_cells=ag_source_cells,
+        nonag_source_cells=nonag_source_cells,
+        flow_ghg_ag2ag=flow_ghg_ag2ag,
 
-        # Per-source delta-var feasibility (keyed/shaped like the flow_cost dicts).
-        feasible_ag2ag_mrj,
-        feasible_nonag2ag_mrj,
-        feasible_ag2nonag_rk,
+        dvar_ub_ag=dvar_ub_ag,
+        feasible_ag_cells_mrj=feasible_ag_cells_mrj,
+        ag_var_table=ag_var_table,
+        ag_acct_table=ag_acct_table,
+        dvar_ub_nonag=dvar_ub_nonag,
+        feasible_non_ag_cells=feasible_non_ag_cells,
+        nonag_var_table=nonag_var_table,
+        flow_tables=flow_tables,
+        am_var_table=am_var_table,
+        var_layout=var_layout,
 
-        # TO-view ag target bounds + eligibility.
-        dvar_ub_ag,
-        dvar_lb_ag,
-        feasible_ag_cells_mrj,
-
-        # TO-view non-ag target bounds + eligibility.
-        dvar_ub_nonag,
-        dvar_lb_nonag,
-        feasible_non_ag_cells,
+        ag_acct_terms=ag_acct_terms,
+        am_terms=am_terms,
+        nonag_terms=nonag_terms,
+        obj_block=obj_block,
     )
 

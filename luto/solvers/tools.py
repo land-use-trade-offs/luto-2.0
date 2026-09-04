@@ -24,8 +24,9 @@ Everything here works on a COPY of a `gurobipy.Model` and answers with the solve
 a hand-derived bound. That matters for two reasons:
 
   * **Exactness.** A bound computed outside the model has to reproduce the model's own coefficients,
-    and every such reproduction is a chance to drift — the accounting stream (`X_acct`), `_qsum`
-    flooring, the ag-management fold. Deleting rows from the real model cannot drift.
+    and every such reproduction is a chance to drift — the accounting stream (`X_acct`), the
+    coefficient floor, the row rescale, the ag-management fold. Deleting rows from the real model
+    cannot drift.
   * **Extensibility.** A new constraint family needs one line in `CONSTRAINT_GROUPS`. No new maths,
     no new value function, nothing to keep in sync with `solver.py`.
 
@@ -46,7 +47,7 @@ Two entry points, one implementation:
 `simulation.py` writes that MPS before every solve, so the second form always has something to read.
 NOTE the MPS is only useful if constraint names survive it: MPS is whitespace-delimited, and a
 single name containing a space makes Gurobi discard EVERY name in the file and emit `c0, c1, ...`.
-`check_constraint_names` exists to catch that before it costs you a diagnosis.
+`LutoSolver` therefore sanitises every free-text name with `.replace(" ", "_")` at the setAttr site.
 
 `resolve_infeasibility` is the production entry point: `simulation.py` calls it after `formulate()`
 and before the retry ladder, so a year that cannot solve is identified in seconds rather than after
@@ -133,76 +134,12 @@ def group_counts(model) -> pd.Series:
     return counts.rename(index={np.nan: '<ungrouped>'})
 
 
-def check_constraint_names(model, limit: int = 10) -> list[str]:
-    """Names that would be destroyed by an MPS round-trip.
-
-    MPS is whitespace-delimited. Gurobi's response to ONE name containing a space is to discard
-    every name in the file and write `c0, c1, c2 ...`, which silently turns the saved model into an
-    artefact you cannot attribute anything to. Worth asserting rather than discovering later.
-    """
-    bad = [c.ConstrName for c in model.getConstrs() if any(ch.isspace() for ch in c.ConstrName)]
-    if bad:
-        print(f"WARNING: {len(bad):,} constraint name(s) contain whitespace — an MPS round-trip "
-              f"will discard ALL names. First {min(limit, len(bad))}:")
-        for n in bad[:limit]:
-            print(f"    {n!r}")
-    return bad
-
-
 # ---------------------------------------------------------------------------- #
 # Feasibility probes (always on copies — the caller's model is never touched)  #
 # ---------------------------------------------------------------------------- #
 
-def reduce_forced_zero_rows(m, verbose: bool = False) -> int:
-    """Delete equality rows that force their own variables to zero, and fix those variables.
-
-    EXACT, not an approximation. A row `Σ aᵢxᵢ = 0` in which every coefficient is positive and every
-    variable has `lb ≥ 0` admits exactly one solution: all those variables are zero. Fixing them and
-    deleting the row therefore changes nothing about the feasible set.
-
-    Why it is worth doing: the transition-flow system emits an enormous number of these. Measured on
-    R2_SNES_T1525_cap15's 2045 model (2026-08-10), 1,393,366 of the 1,760,948 `flow_in` rows — 79 % —
-    have RHS exactly 0, between them pinning 4,369,481 variables (60 % of the model). They are
-    variable-fixings written as constraints, and each is a degenerate basis position.
-
-    The consequence is not slowness but UNDECIDABILITY: with them present the full model returns
-    NUMERIC — Gurobi cannot say feasible or infeasible — and `resolve_infeasibility` reads
-    "computeIIS says feasible" as feasible, so a genuinely infeasible year is diagnosed as fine and
-    the retry ladder grinds for a day. With them removed the SAME model returns INFEASIBLE in 85 s
-    and 22 barrier iterations. Presolve would normally clear this, but LUTO runs the barrier with
-    Presolve=0 by design.
-
-    A row whose variables cannot all be zero — any `lb > 0` — is NOT touched: that row is genuinely
-    infeasible and must stay visible to the diagnosis rather than be quietly removed.
-    """
-    doomed, fix = [], set()
-    for c in m.getConstrs():
-        if c.Sense != GRB.EQUAL or c.RHS != 0.0:
-            continue
-        row = m.getRow(c)
-        vs = [row.getVar(k) for k in range(row.size())]
-        if not vs:
-            continue
-        if any(row.getCoeff(k) <= 0 for k in range(row.size())):
-            continue                        # a negative coefficient permits a non-zero solution
-        if any(v.LB > 0 for v in vs):
-            continue                        # genuinely infeasible row — leave it for the IIS to name
-        doomed.append(c)
-        fix.update(vs)
-    if not doomed:
-        return 0
-    for v in fix:
-        v.UB = 0.0
-    m.remove(doomed)
-    m.update()
-    if verbose:
-        print(f"│   │   ├── reduced: {len(doomed):,} forced-zero row(s) removed, "
-              f"{len(fix):,} variable(s) fixed at 0 (exact)")
-    return len(doomed)
-
-
 def _feasibility_copy(model, time_limit: float | None = None, keep_groups=None,
-                      verbose: bool = False, reduce_forced_zero: bool = True):
+                      verbose: bool = False):
     """A copy set up to answer feasibility only: zero objective, no dual reductions, quiet.
 
     `keep_groups` restricts the copy to those groups plus STRUCTURAL, discarding the rest. That is
@@ -217,6 +154,7 @@ def _feasibility_copy(model, time_limit: float | None = None, keep_groups=None,
     transition-flow system roughly halves the model and took one measured feasibility solve from
     417 s to 13 s. Worth it when you already know which constraints bind; misleading if you do not.
     """
+    model.update()                      # copy() does NOT carry pending rows/attrs — flush first
     m = model.copy()
     if keep_groups:
         keep = set(keep_groups) | set(STRUCTURAL)
@@ -227,12 +165,6 @@ def _feasibility_copy(model, time_limit: float | None = None, keep_groups=None,
             if verbose:
                 print(f"│   │   ├── restricted to {sorted(keep)}: dropped {len(discard):,} row(s), "
                       f"{m.NumConstrs:,} remain")
-
-    # Exact reduction — see reduce_forced_zero_rows. Without it a probe that includes the
-    # transition-flow system is UNDECIDABLE (status NUMERIC), which the callers cannot distinguish
-    # from feasible. Costs seconds; buys a verdict.
-    if reduce_forced_zero:
-        reduce_forced_zero_rows(m, verbose=verbose)
 
     m.setObjective(0, GRB.MINIMIZE)     # feasibility, not optimality — far cheaper
     m.Params.OutputFlag = 0             # NB: silences the probe, so an idle gurobi.log during a
@@ -745,46 +677,3 @@ def diagnose(model, time_limit: float | None = None, do_pairs: bool = True,
             print("  No single group restores feasibility: the conflict needs two or more "
                   "together. The IIS above names the specific rows.")
     return report
-
-
-def build_biodiv_contr_expr(luto_solver, val_vector, ind) -> "gp.LinExpr":
-    """LEGACY reference implementation: the per-term LinExpr build of one biodiversity
-    contribution expression (GBF3/4/8 shape). RETIRED from the production build path
-    2026-09-02 — the solver composes these rows array-based now (row_builder.py) — and
-    kept here as a validation/replay utility: it reproduces, term for term, what the
-    per-cell builder used to hand Gurobi, so comparison harnesses can rebuild legacy
-    rows against a live solver without reviving the old code path.
-
-    Each Gurobi coefficient is the cross-product val_vector[r] * biodiv_contr[j];
-    ``_qsum`` filters terms where ``|coeff| < SOLVER_COEFF_MIN``.
-    """
-    from luto.solvers.solver import _qsum       # local import — avoids a module cycle
-    d = luto_solver._input_data
-
-    ag_terms = []
-    for j in range(d.n_ag_lus):
-        c = d.biodiv_contr_ag_j[j]
-        if c == 0:
-            continue
-        ag_terms.append(
-            _qsum(val_vector[ind] * c, luto_solver.X_acct_dry_jr[j, ind])
-            + _qsum(val_vector[ind] * c, luto_solver.X_acct_irr_jr[j, ind])
-        )
-
-    ag_man_terms = []
-    for am, am_j_list in d.am2j.items():
-        for j_idx in range(len(am_j_list)):
-            c_arr = d.biodiv_contr_ag_man[am][j_idx]
-            ag_man_terms.append(
-                _qsum(val_vector[ind] * c_arr[ind], luto_solver.X_ag_man_dry_vars_jr[am][j_idx, ind])
-                + _qsum(val_vector[ind] * c_arr[ind], luto_solver.X_ag_man_irr_vars_jr[am][j_idx, ind])
-            )
-
-    non_ag_terms = []
-    for k in range(d.n_non_ag_lus):
-        c = d.biodiv_contr_non_ag_k[k]
-        if c == 0:
-            continue
-        non_ag_terms.append(_qsum(val_vector[ind] * c, luto_solver.X_non_ag_vars_kr[k, ind]))
-
-    return gp.quicksum(ag_terms) + gp.quicksum(ag_man_terms) + gp.quicksum(non_ag_terms)

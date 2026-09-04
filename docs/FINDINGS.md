@@ -684,8 +684,9 @@ the per-step progress logs.
 - **Per-source feasibility dicts** (`get_feasible_ag2ag_mrj` / `_nonag2ag_mrj` / `_ag2nonag_rk`) —
   keyed/shaped like the flow_cost dicts, `= (target ub>0) ∧ (source T_MAT row) ∧ (¬diagonal)`. The
   solver's `_setup_flow_vars` is now pure materialisation (the opaque dense `ag_exists` rebuild is
-  gone). Culling is decommissioned (incompatible with per-source flow; module kept for reference,
-  nothing imports it).
+  gone). Culling is decommissioned (incompatible with per-source flow: it pruned the exclude matrix
+  by a single dominant-LU transition cost, whereas deltas are keyed per source); the module
+  `luto/economics/land_use_culling.py` and its settings were removed on 2026-09-04.
 - **Solution now carries source-keyed delta dicts**: `dvar_D_ag2ag_mrj` / `_ag2nonag_rk` /
   `_nonag2ag_mrj`, extracted from the SOLVED `F_*` vars (not `max(0,X_new−x_old)` — an X-diff can
   neither split ag2ag from nonag2ag inflows nor attribute a flow to its source). Stored per year on

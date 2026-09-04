@@ -16,9 +16,9 @@ This document describes the core architecture, modules, and data flow of LUTO2.
   - `input_data.py`: Prepares optimization model input data
     - Biodiversity data attributes use `*_pre_1750_area_*` naming (e.g., `GBF3_NVIS_pre_1750_area_vr`, `GBF4_SNES_pre_1750_area_sr`). IBRA reuses the NVIS attribute — there is no `GBF3_IBRA_pre_1750_area_vr`.
     - Renewable energy data: `renewable_solar_r`, `renewable_wind_r` yield arrays; `region_state_r` mapping
-    - `rescale_solver_input_data()`: Rescales arrays in-place to magnitude 0–1e3 for numerical stability. Each category (Economy, Demand, Biodiversity-quality, GHG, Water, GBF2/3/4/8, Renewable) is rescaled separately. **No post-rescale zeroing** — tiny cross-products are handled by `_qsum` in `solver.py`.
-    - `SOLVER_COEFF_MIN` (1e-4): Universal minimum coefficient threshold. `_qsum(coeffs, gurobi_vars)` in `solver.py` is called by **all** constraint and objective builders; any term whose absolute coefficient falls below this value is dropped before entering Gurobi. A post-build sweep, `_floor_assembled_matrix()`, runs after `_setup_objective()` and re-applies the floor to the assembled constraint matrix **and** objective vector, catching sub-floor coefficients created downstream by the folded-sliver accounting re-expression. Chosen empirically: 1e-3 caused ~3% economic loss; 1e-4 keeps the matrix ratio at 1e8.
-    - Separate rescaling for: Economy, Demand, Biodiversity, GHG, Renewable_Solar, Renewable_Wind, Water, GBF2, GBF3_NVIS, GBF4_SNES, GBF4_ECNES, GBF8 (12 scale factors; IBRA shares the GBF3_NVIS factor)
+    - **No input rescaling** (2026-09-03): the coefficient streams reach the solver raw (float32). Every constraint block is row-rescaled in the solver by `row_builder.scale_rows` — per row, scale = geometric mean of max|row| and |RHS| over `RESCALE_FACTOR` (`calc_geomean_scale`), row and RHS divided by it, stage-4 floor on the scaled row — and the factor is kept on the solver (`demand_scales`, `water_scales`, `ghg_scale`, `renewable_scales`, `bio_GBF2_scale`, `bio_*_scales`) for the post-solve breakdown and `tools.calc_shadow_price_*` (So = 1e6: the objective is raw AUD / 1e6). Row scaling is an exact LP transformation; the gate compares models in RESTORED space (rows × their factor).
+    - `SOLVER_COEFF_MIN` (1e-4): Universal minimum coefficient threshold, applied by the array-path builders as a four-stage contract (`row_builder.compose_row` for every constraint family, `_setup_objective` for the objective vector): (1) the per-cell coefficient is dropped when `|q| < SOLVER_COEFF_MIN`, tested BEFORE the fold weight; (2) kept terms get `q × w` in double; (3) duplicate variables (fold terms only) are merged with `sum_duplicates`; (4) the merged coefficient is floored again (the objective is scaled `× scale × (1/1e6)` after the merge, before its floor). Chosen empirically: 1e-3 caused ~3% economic loss; 1e-4 retains meaningful small coefficients while keeping the matrix ratio at 1e8.
+    - No per-family scale factors: `input_data.scale_factors` was removed with the input rescaling; every factor is per constraint row, on the solver.
 
 ## Economic Modules
 
@@ -107,14 +107,16 @@ This document describes the core architecture, modules, and data flow of LUTO2.
 
 4. **Solver Input**: `solvers/input_data.py` prepares optimization model data
    - Biodiversity matrices: GBF2 mask areas, GBF3 NVIS layers (NVIS or IBRA, per `GBF3_NVIS_REGION_MODE`), GBF4 SNES/ECNES matrices, GBF8 species data
-   - Renewable energy: Solar/wind yield arrays (`renewable_solar_r`, `renewable_wind_r`), state region mapping, rescaled targets
-   - Data rescaling: Arrays rescaled in-place to 0-1e3 magnitude for numerical stability (12 separate scale factors; IBRA shares GBF3_NVIS)
+   - Renewable energy: Solar/wind yield arrays (`renewable_solar_r`, `renewable_wind_r`), state region mapping, raw targets
+   - No input rescaling: constraint blocks are row-rescaled in the solver (`row_builder.scale_rows`, factor kept per row); the objective is raw AUD / 1e6
+   - Per-variable term dicts (`ag_acct_terms`, `am_terms`, `nonag_terms`, global Var.index) are built once in `get_input_data` and shared by every constraint family (`row_builder.extract_groups` / `extract_structure` + `attach_coeffs`) and the objective block
+   - `LutoSolver` method order follows `formulate()`: variables → spine rows (cell usage, ag-mgt link, adoption, renewable ceilings) → policy rows (demand, GHG) → bio rows (GBF2/3/4/8) → regional adoption → water, renewables → flow rows (source cap, node balance) → objective; then `remove_constraints_by_name` and `solve()`. Constraint handles: `demand_constraints`, `water_limit_constraints`, `renewable_constraints`, `ghg_constr`, `bio_GBF2_constr` (single `Constr` or `None`), `bio_*_constrs` dicts, `regional_adoption_constraints`, `ag_mgt_adoption_constraints`, `ag_mgt_link_constraints_r`, `cell_usage_constraint_r`
 
 5. **Optimization**: `solvers/solver.py` runs GUROBI optimization with biodiversity, renewable energy, and environmental constraints
    - Hard/soft constraint flexibility for GHG, water, GBF2
    - Soft constraints add deviation penalties (`_setup_deviation_penalties()`): demand, GHG, water, biodiversity
    - Objective: `obj_economy × (1 - SOLVE_WEIGHT_BETA) ± obj_penalties × SOLVE_WEIGHT_BETA`. `SOLVE_WEIGHT_BETA` is the **only** economy-vs-penalty knob — the former per-target `SOLVER_WEIGHT_DEMAND/GHG/WATER` weights were removed.
-   - After `_setup_objective()`, `_floor_assembled_matrix()` drops sub-`SOLVER_COEFF_MIN` coefficients from the assembled matrix and objective vector.
+   - The sub-`SOLVER_COEFF_MIN` floor on merged coefficients is stage 4 of every family's `compose_row` and of the objective vector; no post-build sweep exists.
 
 6. **Output Generation**: `tools/write.py` writes results to `/output/`
    - **Two-stage writing process**: Decision variables and mosaic maps written first (stage 1), then all other outputs (stage 2)
@@ -193,7 +195,7 @@ Renewable energy types (Utility Solar PV, Onshore Wind) are implemented as non-r
 `_add_renewable_energy_constraints()` in `solver.py` enforces state-level generation targets:
 - Separate constraints for solar and wind per state (ACT excluded)
 - Uses `renewable_solar_r` / `renewable_wind_r` yield arrays from `input_data.py`
-- Separate rescaling: `Renewable_Solar` and `Renewable_Wind` scale factors
+- Per-row rescaling: each (type, state) row carries its own factor (`renewable_scales`)
 
 ### Data Loading (`data.py`)
 
@@ -211,7 +213,7 @@ Transition costs use a **fold-into-dominant (θ)** model with a **two-stream** f
 
 **Mental model** — a cell is a fixed-composition bundle scaled by one scalar. If a cell is 0.7 Beef + 0.3 Apple, folding merges Apple into the dominant Beef so one variable `X_Beef` (mass 1.0) represents the whole cell; each land use is then a constant ratio of it (`Apple = 0.3/1.0 · X_Beef`). Reducing `X_Beef` shrinks both fractions proportionally — the 7:3 composition ratio is preserved, only the scale changes.
 
-**Coefficient-floor consequence**: because accounting terms are `coeff × X_acct` where `X_acct` is a `LinExpr` with `~1/RESFACTOR²` weights, a floored-and-kept `coeff` can distribute into a *sub-floor* product on the dominant var. `_floor_assembled_matrix()` sweeps the assembled matrix and objective vector post-build to drop these (see `docs/FINDINGS.md`, 20260721).
+**Coefficient-floor consequence**: because accounting terms are `coeff × X_acct` where a folded-sliver `X_acct` entry is a weighted sum of the dominant's variable (weights ~1/RESFACTOR²), a floored-and-kept `coeff` can distribute into a *sub-floor* product on the dominant var. Stage 4 of the coefficient contract floors the MERGED coefficient in every composed row (`row_builder.compose_row`) and in the objective vector (`_setup_objective`), which drops these (see `docs/FINDINGS.md`, 20260721, for the original diagnosis).
 
 Transition **reporting** (`write.py`) is rebuilt on the solved per-source delta flows (`data.delta_dvars_ag2ag[yr_cal]` etc.), giving exact from→to attribution.
 
@@ -227,8 +229,7 @@ run(data) → solve_timeseries(data, years=sorted(SIM_YEARS))   # default 2020, 
         ├── LutoSolver(input_data).formulate()
         │   ├── _setup_vars()             # incl. _setup_ag_accounting_vars() (accounting stream)
         │   ├── _setup_constraints()
-        │   ├── _setup_objective()
-        │   └── _floor_assembled_matrix() # post-build sub-SOLVER_COEFF_MIN sweep
+        │   └── _setup_objective()       # _setup_economy_objective() -> obj_block (5 x n_vars); summed, scaled, floored (stage 4)
         ├── solve() → SolverSolution
         ├── record_shadow_prices(...) → out_<year>/ (per-constraint duals)
         └── Store results: lumaps, lmmaps, ag_dvars, non_ag_dvars, ag_man_dvars, delta_dvars_ag2ag

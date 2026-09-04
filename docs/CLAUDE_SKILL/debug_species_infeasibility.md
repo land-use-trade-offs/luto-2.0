@@ -22,13 +22,15 @@ area) and numerical breakdown (ill-conditioned coefficient rows).
 For each `(region, species/community, presence)` triplet:
 - Build the full model with GBF4 disabled (all other constraints: GHG, water, GBF2/3,
   land budget, renewables, etc. remain active)
-- Add **one** constraint: `sum(val_vector × dvar) >= lb_rescale`
+- Add **one** constraint: `sum(val_vector × dvar) >= lb_raw` (composed with
+  `row_builder.compose_row` over the solver's shared bio groups, exactly as the family
+  method would build it)
 - Solve with barrier (15-min cap per worker)
 - Record: `status`, `tightness`, `coeff_ratio`, `n_cells`, solve time
 
-**Tightness** = `avail / lb_rescale` where `avail = val_vector[ind].sum()` (rescaled
-available area) and `lb_rescale = lb_raw / scale_factor`. Both are in rescaled solver
-space.
+**Tightness** = `avail / lb_raw` where `avail = val_vector[ind].sum()` (available area,
+ha). Both are raw: the layers and targets reach the solver unscaled, and the solver
+rescales each row at build time (`row_builder.scale_rows`).
 - `tightness < 1` → structurally infeasible (available area < target even if every
   eligible cell is fully converted)
 - `tightness ≥ 1` but solver returns NUMERIC/TIME_LIMIT → numerically ill-conditioned
@@ -460,20 +462,14 @@ model.Params.BarConvTol   = 1e-4
 model.Params.TimeLimit    = 900     # 15-min cap per test
 model.Params.OutputFlag   = 1
 
-# Compute constraint row metrics
+# Compute constraint row metrics (raw units — the layers and targets reach the solver unscaled;
+# the solver rescales each ROW at build time and keeps the factor in bio_GBF4_*_scales)
 reg_matrix = input_data.region_NRM_names_r
 if typ == "SNES":
     val_matrix    = input_data.GBF4_SNES_pre_1750_area_sr
-    scale_factors = input_data.scale_factors["GBF4_SNES"]
-    val_vector    = val_matrix.sel(dict(layer=(name, presence)), drop=True).values
-    sf            = scale_factors.sel(dict(layer=(region, name, presence))).item()
 else:
     val_matrix    = input_data.GBF4_ECNES_pre_1750_area_sr
-    scale_factors = input_data.scale_factors["GBF4_ECNES"]
-    val_vector    = val_matrix.sel(dict(layer=(name, presence)), drop=True).values
-    sf            = scale_factors.sel(dict(layer=(region, name, presence))).item()
-
-lb_rescale = lb_raw / sf
+val_vector = val_matrix.sel(dict(layer=(name, presence)), drop=True).values
 
 if region == "Australia":
     ind = np.where(val_vector > 0)[0]
@@ -482,7 +478,7 @@ else:
 
 n_cells     = ind.size
 avail_ha    = float(val_vector[ind].sum()) if n_cells > 0 else 0.0
-tightness   = avail_ha / lb_rescale if lb_rescale > 0 else float("inf")  # <1 infeasible, ≥1 feasible
+tightness   = avail_ha / lb_raw if lb_raw > 0 else float("inf")  # <1 infeasible, ≥1 feasible
 bare_min    = float(val_vector[ind].min()) if n_cells > 0 else 0.0
 bare_max    = float(val_vector[ind].max()) if n_cells > 0 else 0.0
 coeff_ratio = bare_max / bare_min if bare_min > 0 else float("inf")  # ill-conditioning indicator
@@ -503,7 +499,7 @@ result = dict(
     idx=idx, type=typ, region=region, name=name, presence=presence,
     n_cells=n_cells, target_ha=lb_raw, avail_ha=avail_ha,
     tightness=tightness, bare_coeff_min=bare_min, bare_coeff_max=bare_max,
-    coeff_ratio=coeff_ratio, lb_rescale=lb_rescale, scale_factor=sf,
+    coeff_ratio=coeff_ratio,
     status=None, status_str=None, solve_s=None,
 )
 
@@ -515,10 +511,14 @@ else:
     if tightness < 1.0:
         print(f"[idx={idx}] WARNING: tightness < 1 ({tightness:.4f}) — target exceeds available area!", flush=True)
 
-    model.addConstr(
-        solver._build_biodiv_contr_expr(val_vector, ind) >= lb_rescale,
-        name=f"test_{typ}_{region}_{name}_{presence}".replace(" ", "_"),
-    )
+    # One row, built the way _add_GBF4_*_constraints builds it: region-masked layer as the
+    # weighting row over the shared bio groups, then row-rescaled with the target.
+    from luto.solvers.row_builder import compose_row, scale_rows
+    masked = val_vector if region == "Australia" else np.where(reg_matrix == region, val_vector, 0)
+    row = compose_row(solver._get_bio_groups(), masked, len(solver._all_vars()))
+    row, rhs, _scale = scale_rows(row, [lb_raw])
+    constr = model.addMConstr(row, solver._all_vars(), '>', rhs).tolist()
+    model.setAttr('ConstrName', constr, [f"test_{typ}_{region}_{name}_{presence}".replace(" ", "_")])
     model.update()
 
     print(f"[idx={idx}] Solving ...", flush=True)
@@ -562,7 +562,7 @@ fieldnames = [
     "idx", "type", "region", "name", "presence",
     "n_cells", "target_ha", "avail_ha", "tightness",
     "bare_coeff_min", "bare_coeff_max", "coeff_ratio",
-    "lb_rescale", "scale_factor", "status", "status_str", "solve_s",
+    "status", "status_str", "solve_s",
 ]
 with open(OUT_CSV, "w", newline="") as f:
     writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
@@ -593,10 +593,10 @@ if non_opt:
 
 ### Tightness formula
 
-`tightness = avail / lb_rescale` — **both in rescaled solver space**.
-`val_vector` comes from `input_data.GBF4_SNES_pre_1750_area_sr` which is already
-rescaled by `rescale_solver_input_data()`. Do **not** use `lb_raw / avail` — that
-mixes raw and rescaled units and gives inverted results.
+`tightness = avail / lb_raw` — both raw hectares. `val_vector` comes from
+`input_data.GBF4_SNES_pre_1750_area_sr`, which is unscaled (there is no input
+rescaling; the solver rescales each row at build time and keeps the factor in
+`solver.bio_GBF4_SNES_scales`). Do **not** use `lb_raw / avail` — that inverts the ratio.
 
 ### Exclusions not applied from checkpoints
 

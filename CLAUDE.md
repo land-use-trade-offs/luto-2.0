@@ -118,8 +118,8 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
     - Renewable energy constraint method: `_add_renewable_energy_constraints()` — enforces state-level solar and wind generation targets
   - `input_data.py`: Prepares optimization model input data
     - Biodiversity data attributes use `*_pre_1750_area_*` naming (e.g., `GBF3_NVIS_pre_1750_area_vr`, `GBF4_SNES_pre_1750_area_sr`)
-    - `rescale_solver_input_data()`: Rescales arrays in-place to magnitude 0–1e3 for numerical stability. Each category (Economy, Demand, Biodiversity-quality, GHG, Water, GBF2/3/4/8, Renewable) is rescaled separately. **No post-rescale zeroing** — tiny cross-products are handled by `_qsum` in `solver.py`.
-    - `SOLVER_COEFF_MIN` (1e-4): Universal minimum coefficient threshold. `_qsum(coeffs, gurobi_vars)` in `solver.py` is called by **all** constraint and objective builders; any term whose absolute coefficient falls below this value is dropped before entering Gurobi. Chosen empirically: 1e-3 caused ~3% economic loss; 1e-4 retains meaningful small coefficients while keeping the matrix ratio at 1e8.
+    - **No input rescaling** (2026-09-03): the coefficient streams reach the solver raw (float32). Every constraint block is row-rescaled in the solver by `row_builder.scale_rows` — per row, scale = geometric mean of max|row| and |RHS| over `RESCALE_FACTOR` (`calc_geomean_scale`), row and RHS divided by it, stage-4 floor on the scaled row — and the factor is kept on the solver (`demand_scales`, `water_scales`, `ghg_scale`, `renewable_scales`, `bio_GBF2_scale`, `bio_*_scales`) for the post-solve breakdown and `tools.calc_shadow_price_*` (So = 1e6: the objective is raw AUD / 1e6). Row scaling is an exact LP transformation; the gate compares models in RESTORED space (rows × their factor).
+    - `SOLVER_COEFF_MIN` (1e-4): Universal minimum coefficient threshold, applied by the array-path builders as a four-stage contract (`row_builder.compose_row` for every constraint family, `_setup_objective` for the objective vector): (1) the per-cell coefficient is dropped when `|q| < SOLVER_COEFF_MIN`, tested BEFORE the fold weight; (2) kept terms get `q × w` in double; (3) duplicate variables (fold terms only) are merged with `sum_duplicates`; (4) the merged coefficient is floored again (the objective is scaled `× scale × (1/1e6)` after the merge, before its floor). Chosen empirically: 1e-3 caused ~3% economic loss; 1e-4 retains meaningful small coefficients while keeping the matrix ratio at 1e8.
 
 ### Economic Modules
 
@@ -230,8 +230,8 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 - `FEASIBILITY_TOLERANCE`: Primal feasibility tolerance (1e-6). Also the precision granule: `ROUND_DECIMALS` is derived from it, and the near-zero bound snap threshold is `FEASIBILITY_TOLERANCE * 10`
 - `OPTIMALITY_TOLERANCE`: Optimality tolerance (default: 1e-2)
 - `BARRIER_CONVERGENCE_TOLERANCE`: Barrier method convergence (default: 1e-5)
-- `RESCALE_FACTOR`: Rescaling magnitude for numerical stability (default: 1e3)
-- `SOLVER_COEFF_MIN`: Universal minimum coefficient threshold (default: 1e-4). The `_qsum(coeffs, gurobi_vars)` helper in `solver.py` is called by **all** constraint and objective builders; any term whose absolute value falls below this threshold is dropped before entering Gurobi. Applies to Economy, Biodiversity-quality, GHG, Water, Renewable, GBF2/3/4/8, Demand/Quantity, and Regional Adoption limits. Chosen empirically: 1e-3 caused ~3% economic loss; 1e-4 retains meaningful small coefficients while keeping the matrix range ratio at 1e8 (well within Gurobi's safe zone). `RESCALE_ZERO_THRESHOLD` was removed — post-rescale zeroing is superseded by this universal filter.
+- `RESCALE_FACTOR`: Target magnitude of the per-row rescale (default: 1e3) — `row_builder.scale_rows` lands max|row| and |RHS| symmetrically around it
+- `SOLVER_COEFF_MIN`: Universal minimum coefficient threshold (default: 1e-4). Applied by the array-path builders (`row_builder.compose_row` for every constraint family, `_setup_objective` for the objective vector) as a four-stage contract: per-cell coefficient dropped when `|q| < SOLVER_COEFF_MIN` before the fold weight, `q × w` in double, duplicates merged with `sum_duplicates`, merged coefficient floored again. Applies to Economy, Biodiversity-quality, GHG, Water, Renewable, GBF2/3/4/8, Demand/Quantity, and Regional Adoption limits. Chosen empirically: 1e-3 caused ~3% economic loss; 1e-4 retains meaningful small coefficients while keeping the matrix range ratio at 1e8 (well within Gurobi's safe zone). `RESCALE_ZERO_THRESHOLD` was removed — post-rescale zeroing is superseded by this universal filter.
 
 ### Output Writing Configuration
 
@@ -256,8 +256,9 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
    - Elasticity multipliers computed as: `1 + (demand_delta / demand_elasticity)`
 4. **Solver Input**: `solvers/input_data.py` prepares optimization model data
    - Biodiversity matrices: GBF2 mask areas, GBF3 NVIS layers (NVIS or IBRA, per `GBF3_NVIS_REGION_MODE`), GBF4 SNES/ECNES matrices, GBF8 species data
-   - Renewable energy: Solar/wind yield arrays (`renewable_solar_r`, `renewable_wind_r`), state region mapping, rescaled targets
-   - Data rescaling: All arrays rescaled to 0–1e3 magnitude via `rescale_lhs`/`rescale_lhs_rhs` in `input_data.py` (no post-rescale zeroing). Inside every constraint and objective builder in `solver.py`, the `_qsum()` helper drops any term with `|coeff| < SOLVER_COEFF_MIN` (1e-4) before it enters Gurobi — giving a matrix range ratio of ~1e8.
+   - Renewable energy: Solar/wind yield arrays (`renewable_solar_r`, `renewable_wind_r`), state region mapping, raw targets
+   - No input rescaling: the streams reach the solver raw; every constraint block is row-rescaled by `row_builder.scale_rows` (factor kept on the solver) and the objective is raw AUD / 1e6. Every constraint family is composed by `row_builder.compose_row` and the objective by `input_data.get_obj_block`; both drop `|coeff| < SOLVER_COEFF_MIN` on the pre-fold coefficient (`row_builder.keep_terms`) and floor the merged/scaled coefficient.
+   - The per-variable term dicts over global Var.index (`ag_acct_terms`, `am_terms`, `nonag_terms`) are built once in `get_input_data`; `row_builder.extract_groups` (bio families) and `extract_structure` + `attach_coeffs` (water/GHG/demand/renewables) read them, as does `get_obj_block`. `SolverInputData` carries only what the solver reads: the bio-quality matrices, lower bounds, exclude matrix, flow costs and feasibility dicts are locals of `get_input_data` (consumed by the table builders).
 5. **Optimization**: `solvers/solver.py` runs GUROBI optimization with biodiversity and renewable energy constraints
 6. **Output Generation**: `tools/write.py` writes results to `/output/`
    - Biodiversity outputs: GBF2/3/4/8 scores, species impacts, vegetation group restoration
@@ -360,7 +361,7 @@ Renewable energy types (Utility Solar PV, Onshore Wind) are implemented as agric
 - Separate constraints for solar and wind per state
 - Uses `renewable_solar_r` / `renewable_wind_r` yield arrays from `input_data.py`
 - Targets from `RENEWABLE_TARGETS` CSV, filtered by year and scenario
-- Rescaled for numerical stability (same pattern as biodiversity constraints)
+- Row-rescaled in the solver like every other family (`row_builder.scale_rows`; factor per (type, state) row in `renewable_scales`)
 
 ### Data Loading (`data.py`)
 
@@ -393,7 +394,7 @@ Renewable energy types (Utility Solar PV, Onshore Wind) are implemented as agric
 - State-level pricing: electricity revenue uses state-specific prices mapped via `REGION_STATE_CODE`
 - Effects follow standard pattern: `base_value × (multiplier - 1)` for additive impacts
 - **GHG effects return zeros**: No direct on-farm GHG impact; displacement benefits handled externally via AusTIMES energy model
-- **Separate rescaling**: Solar and wind yield arrays are rescaled independently (`Renewable_Solar` / `Renewable_Wind` scale factors)
+- **Per-row rescaling**: each (type, state) target row carries its own factor (`renewable_scales`); the yield arrays themselves are raw
 - **ACT excluded**: Australian Capital Territory skipped in state-level constraints
 - **`write_renewable_economics` deleted**: Superseded by xarray injection in `write_economics` (cost/revenue/profit) and `write_renewable_production` (MWh). Old function had a broken parallel task-list call and patched DataFrames post-hoc, causing `KeyError` in `xr.stack(...).sel(layer=valid_layers)`.
 - **Existing capacity injection pattern**: Patch the result xarray of `dvar × mat` (after multiplication) with `lu='Existing Capacity'` **before** `add_all` — never patch the dvar arrays or the DataFrame. `lm='dry'` carries real values; `lm='irr'` is zeros to avoid double-counting. See skill: [patch_existing_renewable_capacity.md](docs/CLAUDE_SKILL/patch_existing_renewable_capacity.md).

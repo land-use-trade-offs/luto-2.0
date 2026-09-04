@@ -116,9 +116,9 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 - `FEASIBILITY_TOLERANCE`: Solver feasibility tolerance (default: 1e-6)
 - `OPTIMALITY_TOLERANCE`: Optimality tolerance (default: 1e-2)
 - `BARRIER_CONVERGENCE_TOLERANCE`: Barrier method convergence (default: 1e-5)
-- `RESCALE_FACTOR`: Rescaling magnitude for numerical stability (default: 1e3)
-- `SOLVER_COEFF_MIN`: Universal minimum coefficient threshold (default: 1e-4). The `_qsum(coeffs, gurobi_vars)` helper in `solver.py` is called by **all** constraint and objective builders; any term whose absolute value falls below this threshold is dropped before entering Gurobi. Applies to Economy, Biodiversity-quality, GHG, Water, Renewable, GBF2/3/4/8, Demand/Quantity, and Regional Adoption limits. Chosen empirically: 1e-3 caused ~3% economic loss; 1e-4 retains meaningful small coefficients while keeping the matrix range ratio at 1e8 (well within Gurobi's safe zone). `RESCALE_ZERO_THRESHOLD` was removed — post-rescale zeroing is superseded by this universal filter.
-  - `_qsum` floors coefficients as each term is *built*, but some coefficients are created **downstream** — e.g. the accounting term `coeff × X_acct`, where a folded-sliver `X_acct` is a `LinExpr` with `~1/RESFACTOR²` weights, distributes a kept `coeff` into sub-floor products. A single post-build sweep, `_floor_assembled_matrix(model)`, runs after `_setup_objective()` and drops `|coeff| < SOLVER_COEFF_MIN` from both the assembled constraint matrix (`getA()`) **and** the objective vector (`v.Obj`), which `getA()` can't reach. See `docs/FINDINGS.md` (20260721).
+- `RESCALE_FACTOR`: Target magnitude of the per-row rescale (default: 1e3) — `row_builder.scale_rows` lands max|row| and |RHS| symmetrically around it
+- `SOLVER_COEFF_MIN`: Universal minimum coefficient threshold (default: 1e-4). Applied by the array-path builders (`row_builder.compose_row` for every constraint family, `_setup_objective` for the objective vector) as a four-stage contract: per-cell coefficient dropped when `|q| < SOLVER_COEFF_MIN` before the fold weight, `q × w` in double, duplicates merged with `sum_duplicates`, merged coefficient floored again. Applies to Economy, Biodiversity-quality, GHG, Water, Renewable, GBF2/3/4/8, Demand/Quantity, and Regional Adoption limits. Chosen empirically: 1e-3 caused ~3% economic loss; 1e-4 retains meaningful small coefficients while keeping the matrix range ratio at 1e8 (well within Gurobi's safe zone). `RESCALE_ZERO_THRESHOLD` was removed — post-rescale zeroing is superseded by this universal filter.
+  - Why stage 4 exists: the accounting term `coeff × X_acct` on a folded-sliver cell distributes a kept `coeff` into sub-floor `coeff × w` products (w ~ 1/RESFACTOR²); flooring the MERGED coefficient (stage 4) catches those, in the constraint blocks and in the objective vector alike. See `docs/FINDINGS.md` (20260721) for the original diagnosis.
 
 ### Output Writing Configuration
 - `WRITE_REPORT_MAX_MEM_MB`: Max memory (MB) for report generation (default: `64 * 1024` = 65536). Parallel-write `n_jobs` is budgeted from this: `get_n_jobs(peak_mb)` subtracts the parent `Data` object's live RSS, then divides the remaining budget by each worker's `peak_mb + ~500 MB` overhead (true per-worker cost, not a plain floor-division).
@@ -131,11 +131,6 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 - `REGIONAL_ADOPTION_NON_AG_CAP`: uniform sum-of-non-ag cap % per region (only under `NON_AG_CAP`)
 - `REGIONAL_ADOPTION_NON_AG_CAP_REGIONS`: scope of the cap — `[]` caps all regions (default); a list of region names caps only those, leaving the rest uncapped
 - `REGIONAL_ADOPTION_NON_AG_CAP_OVERRIDE`: dict of per-region cap % that override the uniform `REGIONAL_ADOPTION_NON_AG_CAP` for named regions (applied within the `_REGIONS` scope)
-
-### Land-Use Culling
-- `CULL_MODE`: Land-use culling mode ('absolute', 'percentage', 'none')
-- `MAX_LAND_USES_PER_CELL`: Max land uses per cell if absolute culling (default: 12)
-- `LAND_USAGE_CULL_PERCENTAGE`: Culling percentage if percentage mode (default: 0.15)
 
 ## Memory and Performance
 
