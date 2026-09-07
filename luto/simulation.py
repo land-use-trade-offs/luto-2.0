@@ -238,11 +238,11 @@ def solve_timeseries(
         print( "-------------------------------------------------\n", flush=True)
 
         start_time = time.time()
-        space = get_cols(data, base_year)                       # the unknowns of this step
-        rows = get_rows(data, base_year, target_year, space)             # the coefficient streams and targets
+        cols = get_cols(data, base_year)                       # the unknowns of this step
+        rows = get_rows(data, base_year, target_year, cols)    # the coefficient streams and targets
         data.last_year = target_year
 
-        luto_solver = LutoSolver(space, rows)
+        luto_solver = LutoSolver(cols, rows)
         luto_solver.formulate()
 
         # Save the model to disk BEFORE solving (see save_model_to_disk for why).

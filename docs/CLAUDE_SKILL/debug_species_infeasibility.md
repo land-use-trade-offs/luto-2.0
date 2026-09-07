@@ -328,8 +328,8 @@ print(f"Loading {CHECKPOINT} ...", flush=True)
 data = joblib.load(os.path.join(DATA_DIR, CHECKPOINT))
 
 print(f"Building input_data for {BASE_YEAR}→{TARGET_YEAR} ...", flush=True)
-space = get_cols(data, BASE_YEAR)
-input_data = get_rows(data, BASE_YEAR, TARGET_YEAR, space)
+cols = get_cols(data, BASE_YEAR)
+input_data = get_rows(data, BASE_YEAR, TARGET_YEAR, cols)
 
 all_targets = []
 for region, species, presence in input_data.GBF4_SNES_region_species:
@@ -429,8 +429,8 @@ print(f"[idx={idx}] Loading {CHECKPOINT} ...", flush=True)
 data = joblib.load(os.path.join(DATA_DIR, CHECKPOINT))
 
 print(f"[idx={idx}] Building input_data for {BASE_YEAR}→{TARGET_YEAR} ...", flush=True)
-space = get_cols(data, BASE_YEAR)
-input_data = get_rows(data, BASE_YEAR, TARGET_YEAR, space)
+cols = get_cols(data, BASE_YEAR)
+input_data = get_rows(data, BASE_YEAR, TARGET_YEAR, cols)
 
 # Build flat targets list (GBF4 must be enabled in settings so triplets are populated)
 all_targets = []
@@ -455,7 +455,7 @@ settings.GBF4_TARGET_SNES  = "off"
 settings.GBF4_TARGET_ECNES = "off"
 
 print(f"[idx={idx}] Formulating base model ...", flush=True)
-solver = LutoSolver(space, input_data)
+solver = LutoSolver(cols, input_data)
 solver.formulate()
 model  = solver.gurobi_model
 
@@ -520,7 +520,7 @@ else:
     # row-rescaled with the target.
     from luto.solvers.row_builder import compose_rows, scale_rows
     masked = val_vector if region == "Australia" else np.where(reg_matrix == region, val_vector, 0)
-    row = compose_rows(space['terms'], input_data.bio_coeffs(space), [masked], space['layout']['n_all'])
+    row = compose_rows(cols['terms'], input_data.bio_coeffs(cols), [masked], cols['layout']['n_all'])
     row, rhs, _scale = scale_rows(row, [lb_raw])
     constr = model.addMConstr(row, solver._all_vars(), '>', rhs).tolist()
     model.setAttr('ConstrName', constr, [f"test_{typ}_{region}_{name}_{presence}".replace(" ", "_")])
@@ -733,8 +733,8 @@ print(f"Loading data_{BASE_YEAR}.lz4 ...", flush=True)
 data = joblib.load(os.path.join(DATA_DIR, f"data_{BASE_YEAR}.lz4"))
 
 print(f"Building input_data for {BASE_YEAR}->{TARGET_YEAR} ...", flush=True)
-space = get_cols(data, BASE_YEAR)
-input_data = get_rows(data, BASE_YEAR, TARGET_YEAR, space)
+cols = get_cols(data, BASE_YEAR)
+input_data = get_rows(data, BASE_YEAR, TARGET_YEAR, cols)
 
 all_targets = []
 for region, species, presence in input_data.GBF4_SNES_region_species:

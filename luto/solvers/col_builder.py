@@ -439,11 +439,11 @@ def get_cols(data: Data, base_year: int) -> dict:
     model as a labelled Dataset per block (``block_order``) with global Var.index ids, plus what
     the rows and the post-solve read need about the columns —
 
-        space['layout']    block offsets in Var.index order, n_dec (decision columns) and n_all (+ slacks)
-        space['terms']     the coefficient support: one term per accounting entry / ag-mgt column / non-ag column
-        space['sources']   {'ag': {(from_m, from_j): cells}, 'nonag': {k: cells}} — the base-year holders of land
-        space['masks']     the renewable exclusion cell indices (GBF2 / MNES, solar / wind)
-        space['am'].attrs  'agman2lu', 'savanna_eligible_r'
+        cols['layout']    block offsets in Var.index order, n_dec (decision columns) and n_all (+ slacks)
+        cols['terms']     the coefficient support: one term per accounting entry / ag-mgt column / non-ag column
+        cols['sources']   {'ag': {(from_m, from_j): cells}, 'nonag': {k: cells}} — the base-year holders of land
+        cols['masks']     the renewable exclusion cell indices (GBF2 / MNES, solar / wind)
+        cols['am'].attrs  'agman2lu', 'savanna_eligible_r'
     """
 
     # ── 1. transition bounds and the base (TO-view) ──
@@ -483,7 +483,7 @@ def get_cols(data: Data, base_year: int) -> dict:
 
     # ── 5. the blocks, with block-local ids ──
     ag = ag_space(data, ag_eligible_mrj, trans_ub_ag_mrj, dvar_base_ag_mrj)
-    space = dict(
+    cols = dict(
         ag         = ag,
         nonag      = nonag_space(data, trans_lb_nonag_rk, trans_ub_nonag_rk, dvar_base_non_ag_rk),
         am         = am_space(data, ag['exists'].values, masks['gbf2_solar'], masks['gbf2_wind'], ag_man_lb_mrj),
@@ -494,12 +494,12 @@ def get_cols(data: Data, base_year: int) -> dict:
         table = table_flow[name]
         fields = {field: (('arc',), values) for field, values in table['fields'].items()}
         fields['col'] = (('arc',), np.arange(table['n'], dtype=np.int32))
-        space[name] = xr.Dataset(fields, coords=dict(arc=np.arange(table['n'])),
+        cols[name] = xr.Dataset(fields, coords=dict(arc=np.arange(table['n'])),
                                  attrs=dict(n=table['n'], block=name, src_ptr=table['src_ptr'], sources=table['sources']))
 
     # ── 6. layout: the offset of every block in Var.index order; every block-local id shifted to its global Var.index, in place ──
     block_order = ('ag', 'nonag', 'am', 'ag2ag', 'ag2nonag', 'nonag2ag', 'accounting', 'cell_usage')   # the Var.index order of the blocks
-    n_cols = {block: space[block].attrs['n_new' if block == 'accounting' else 'n'] for block in block_order}
+    n_cols = {block: cols[block].attrs['n_new' if block == 'accounting' else 'n'] for block in block_order}
     layout = {}
     next_col = 0
     for block in block_order:
@@ -508,8 +508,8 @@ def get_cols(data: Data, base_year: int) -> dict:
         if block == 'accounting':
             layout['n_dec'] = next_col                                    # the decision columns, accounting block included
     layout['n_all'] = next_col                                            # + the cell-usage range slacks
-    accounting = space['accounting']
-    shifts = [(space[block]['col'].values, layout[block]) for block in block_order if block != 'accounting']
+    accounting = cols['accounting']
+    shifts = [(cols[block]['col'].values, layout[block]) for block in block_order if block != 'accounting']
     shifts += [(accounting[fold_col].values, layout['ag']) for fold_col in ('sliver_dom_ag_col', 'sliver_ag_col', 'dom_ag_col')]
     shifts += [(accounting[fold_col].values, layout['accounting']) for fold_col in ('sliver_accounting_col', 'dom_accounting_col')]
     for col, offset in shifts:
@@ -534,7 +534,7 @@ def get_cols(data: Data, base_year: int) -> dict:
                     j=np.concatenate([ag_lu, accounting['sliver_from_j'].values[~owns_ag_col]]).astype(np.int32),
                     r=np.concatenate([ag_cell, accounting['sliver_cell'].values[~owns_ag_col]]).astype(np.int32),
                     col=np.concatenate([ag_term_col, accounting['sliver_accounting_col'].values[~owns_ag_col]]).astype(np.int32))
-    am = space['am']
+    am = cols['am']
     am_slot, am_lm, am_cell = np.nonzero(am['exists'].values)                                         # column order: slot, lm, cell
     am_list = list(am.attrs['am_list'])
     am_idx_of_slot = np.array([am_list.index(name) for name in am['am'].values], dtype=np.int32)      # slot -> index into am_list
@@ -544,7 +544,7 @@ def get_cols(data: Data, base_year: int) -> dict:
         j_idx_of_slot[slots_of_option] = np.arange(slots_of_option.size, dtype=np.int32)
     am_terms = dict(am_idx=am_idx_of_slot[am_slot], j_idx=j_idx_of_slot[am_slot], j=am['j'].values[am_slot],
                     m=am_lm.astype(np.int32), r=am_cell.astype(np.int32), col=am['col'].values[am_slot, am_lm, am_cell])
-    nonag = space['nonag']
+    nonag = cols['nonag']
     nonag_k, nonag_cell = np.nonzero(nonag['exists'].values)                                           # column order: k, cell
     nonag_terms = dict(k=nonag_k.astype(np.int32), r=nonag_cell.astype(np.int32), col=nonag['col'].values[nonag_k, nonag_cell])
     term_cell = np.concatenate([ag_terms['r'], am_terms['r'], nonag_terms['r']]).astype(np.int32)   # the term order: ag | am | nonag
@@ -553,8 +553,8 @@ def get_cols(data: Data, base_year: int) -> dict:
     by_cell_ptr = np.searchsorted(term_cell[by_cell_order], np.arange(data.NCELLS + 1))
 
     # ── 8. what the rows and the post-solve read need besides the columns ──
-    space['layout']   = layout
-    space['terms']    = dict(
+    cols['layout']   = layout
+    cols['terms']    = dict(
         ag=ag_terms, 
         am=am_terms, 
         nonag=nonag_terms, 
@@ -564,7 +564,7 @@ def get_cols(data: Data, base_year: int) -> dict:
         ncells=int(data.NCELLS), 
         by_cell=(by_cell_order, by_cell_ptr)
     )
-    space['sources']  = dict(ag=trans_source_ag, nonag=trans_source_nonag)
-    space['masks']    = masks
+    cols['sources']  = dict(ag=trans_source_ag, nonag=trans_source_nonag)
+    cols['masks']    = masks
     
-    return space
+    return cols
