@@ -18,42 +18,6 @@
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
 
-"""Why is this year infeasible? Ask Gurobi, by deleting constraint groups until it isn't.
-
-Everything here works on a COPY of a `gurobipy.Model` and answers with the solver rather than with
-a hand-derived bound. That matters for two reasons:
-
-  * **Exactness.** A bound computed outside the model has to reproduce the model's own coefficients,
-    and every such reproduction is a chance to drift — the accounting stream (`X_acct`), the
-    coefficient floor, the row rescale, the ag-management fold. Deleting rows from the real model
-    cannot drift.
-  * **Extensibility.** A new constraint family needs one line in `CONSTRAINT_GROUPS`. No new maths,
-    no new value function, nothing to keep in sync with `solver.py`.
-
-The logic is deletion filtering, the same idea an IIS uses:
-
-    remove group G -> model becomes feasible   =>  G is implicated
-    remove group G -> still infeasible         =>  G alone is not the cause
-
-Removing constraints is a RELAXATION, so the inference runs one way: a reduced model that is still
-INFEASIBLE proves the full model infeasible. A reduced model that turns FEASIBLE proves only that
-the removed group was necessary for the conflict.
-
-Two entry points, one implementation:
-
-    diagnose(luto_solver.gurobi_model)          in-run, no I/O — the model is already in memory
-    diagnose(gp.read("debug_model_*.mps"))      post-mortem, days later
-
-`simulation.py` writes that MPS before every solve, so the second form always has something to read.
-NOTE the MPS is only useful if constraint names survive it: MPS is whitespace-delimited, and a
-single name containing a space makes Gurobi discard EVERY name in the file and emit `c0, c1, ...`.
-`LutoSolver` therefore sanitises every free-text name with `.replace(" ", "_")` at the setAttr site.
-
-`resolve_infeasibility` is the production entry point: `simulation.py` calls it after `formulate()`
-and before the retry ladder, so a year that cannot solve is identified in seconds rather than after
-hours of barrier iterations ending in "INFEASIBLE OR UNBOUNDED".
-"""
-
 import time
 
 import gurobipy as gp
@@ -94,6 +58,7 @@ CONSTRAINT_GROUPS = {
     'renewable':    ('renewable_',),
     'flow_out':     ('srccap_a_', 'srccap_n_'),
     'flow_in':      ('bal_a_', 'bal_n_'),
+    'acct_link':    ('acct_link_',),                    # X_acct = (fold share) · X_ag; structural, never droppable
 }
 
 # Prefixes overlap: 'const_' would swallow every const_* group, and 'reg_adopt_limit_non_ag_'
@@ -108,7 +73,7 @@ _GROUP_EXCLUDE = {
 # all. `cell_usage` is the equality that makes per-cell share scarce — remove it and every cell can
 # hold one unit of every land use at once, so almost anything becomes "feasible" and the answer is
 # meaningless. The ag-management links (X_ag_man <= X_ag[j]) are structural in the same way.
-STRUCTURAL = ('cell_usage', 'ag_mgt_link')
+STRUCTURAL = ('cell_usage', 'ag_mgt_link', 'acct_link')
 
 STATUS = {
     GRB.OPTIMAL: 'OPTIMAL', GRB.INFEASIBLE: 'INFEASIBLE', GRB.INF_OR_UNBD: 'INF_OR_UNBD',

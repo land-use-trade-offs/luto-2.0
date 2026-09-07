@@ -1683,7 +1683,12 @@ class Data:
         self.BECCS_TCO2E_HA_YR = beccs_df['BECCS_TCO2E_HA_YR'].to_numpy()
         self.BECCS_MWH_HA_YR = beccs_df['BECCS_MWH_HA_YR'].to_numpy()
 
- 
+
+    @property
+    def AGMAN2LU(self) -> dict[str, list[int]]:
+        """{ag-management option: [land-use codes]} for the ENABLED options, in settings order
+        (the code view of AG_MAN_LU_DESC). A property, so a Data pickled before it existed has it too."""
+        return {am: [self.DESC2AGLU[lu] for lu in lus] for am, lus in self.AG_MAN_LU_DESC.items()}
 
     def get_NVIS_sparse_array(self) -> xr.DataArray:
         """

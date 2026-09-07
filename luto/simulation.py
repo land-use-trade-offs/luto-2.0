@@ -38,7 +38,8 @@ from gurobipy import GRB
 
 from luto import settings
 from luto.data import Data
-from luto.solvers.input_data import get_input_data
+from luto.solvers.col_builder import get_cols
+from luto.solvers.row_builder import get_rows
 from luto.solvers.solver import LutoSolver
 from luto.solvers.tools import feasibility_spectrum, resolve_infeasibility, group_of
 from luto.tools.write import write_outputs
@@ -237,10 +238,11 @@ def solve_timeseries(
         print( "-------------------------------------------------\n", flush=True)
 
         start_time = time.time()
-        input_data = get_input_data(data, base_year, target_year)
+        space = get_cols(data, base_year)                       # the unknowns of this step
+        rows = get_rows(data, base_year, target_year, space)             # the coefficient streams and targets
         data.last_year = target_year
 
-        luto_solver = LutoSolver(input_data)
+        luto_solver = LutoSolver(space, rows)
         luto_solver.formulate()
 
         # Save the model to disk BEFORE solving (see save_model_to_disk for why).
@@ -253,7 +255,7 @@ def solve_timeseries(
 
         if accepted:
             store_solution(data, target_year, solution)
-            record_shadow_prices(luto_solver, input_data, target_year, f"{data.path}/out_{target_year}")
+            record_shadow_prices(luto_solver, rows, target_year, f"{data.path}/out_{target_year}")
             if checkpoint_path is not None:
                 save_checkpoint(data, checkpoint_path, target_year)
 

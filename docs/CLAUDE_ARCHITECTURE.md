@@ -13,12 +13,13 @@ This document describes the core architecture, modules, and data flow of LUTO2.
     - Renewable energy constraint method: `_add_renewable_energy_constraints()` — enforces state-level solar and wind generation targets
     - Hard/soft constraint flexibility: `GHG_CONSTRAINT_TYPE`, `WATER_CONSTRAINT_TYPE`, `GBF2_CONSTRAINT_TYPE`
     - Two-stream transition/accounting model (see "Theta-Fold Transition Model" below): `_setup_ag_accounting_vars()` re-expresses the folded decision vars for correct accounting.
-  - `input_data.py`: Prepares optimization model input data
+  - `col_builder.py`: the COLUMN side — `get_cols(data, base_year)` builds the column space (every unknown as a labelled `xr.Dataset` per block) from the base-year state
+  - `row_builder.py`: the ROW side — `get_rows(data, base_year, target_year, space)` prepares the coefficient streams and targets (`RowInputs`); one generator per constraint family returns its keyed row block (`FAMILIES`, in model order); `get_obj_block` is the objective
     - Biodiversity data attributes use `*_pre_1750_area_*` naming (e.g., `GBF3_NVIS_pre_1750_area_vr`, `GBF4_SNES_pre_1750_area_sr`). IBRA reuses the NVIS attribute — there is no `GBF3_IBRA_pre_1750_area_vr`.
     - Renewable energy data: `renewable_solar_r`, `renewable_wind_r` yield arrays; `region_state_r` mapping
     - **No input rescaling** (2026-09-03): the coefficient streams reach the solver raw (float32). Every constraint block is row-rescaled in the solver by `row_builder.scale_rows` — per row, scale = geometric mean of max|row| and |RHS| over `RESCALE_FACTOR` (`calc_geomean_scale`), row and RHS divided by it, stage-4 floor on the scaled row — and the factor is kept on the solver (`demand_scales`, `water_scales`, `ghg_scale`, `renewable_scales`, `bio_GBF2_scale`, `bio_*_scales`) for the post-solve breakdown and `tools.calc_shadow_price_*` (So = 1e6: the objective is raw AUD / 1e6). Row scaling is an exact LP transformation; the gate compares models in RESTORED space (rows × their factor).
-    - `SOLVER_COEFF_MIN` (1e-4): Universal minimum coefficient threshold, applied by the array-path builders as a four-stage contract (`row_builder.compose_row` for every constraint family, `_setup_objective` for the objective vector): (1) the per-cell coefficient is dropped when `|q| < SOLVER_COEFF_MIN`, tested BEFORE the fold weight; (2) kept terms get `q × w` in double; (3) duplicate variables (fold terms only) are merged with `sum_duplicates`; (4) the merged coefficient is floored again (the objective is scaled `× scale × (1/1e6)` after the merge, before its floor). Chosen empirically: 1e-3 caused ~3% economic loss; 1e-4 retains meaningful small coefficients while keeping the matrix ratio at 1e8.
-    - No per-family scale factors: `input_data.scale_factors` was removed with the input rescaling; every factor is per constraint row, on the solver.
+    - `SOLVER_COEFF_MIN` (1e-4): Universal minimum coefficient threshold, applied by the builders as a two-step contract (`row_builder.compose_rows` for every constraint family, `row_builder.get_obj_block` + `_setup_objective` for the objective vector): (1) a coefficient `q = V[cell] · c` (float32) is dropped when `|q| < SOLVER_COEFF_MIN` (`row_builder.drop`); (2) after row rescaling the scaled coefficient is floored again (the objective is scaled `× (1/1e6)` before its floor). The θ fold is NOT part of the contract any more: a folded entry of the accounting view is its own Gurobi column tied to X_ag by an exact, unfloored linking row (`acct_link_*`), so no fold weight ever multiplies a policy coefficient. Chosen empirically: 1e-3 caused ~3% economic loss; 1e-4 retains meaningful small coefficients while keeping the matrix ratio at 1e8.
+    - No per-family scale factors: every factor is per constraint row, carried on the row block (`scale`) and published on the solver.
 
 ## Economic Modules
 
@@ -105,18 +106,18 @@ This document describes the core architecture, modules, and data flow of LUTO2.
    - Elasticity multipliers computed as: `1 + (demand_delta / demand_elasticity)`
    - Renewable energy: electricity yield, revenue, cost, biodiversity effects across all economics modules
 
-4. **Solver Input**: `solvers/input_data.py` prepares optimization model data
+4. **Solver Input**: `col_builder.get_cols` (unknowns) and `row_builder.get_rows` (coefficient streams, targets) prepare the model data; the solver takes `(space, rows)`
    - Biodiversity matrices: GBF2 mask areas, GBF3 NVIS layers (NVIS or IBRA, per `GBF3_NVIS_REGION_MODE`), GBF4 SNES/ECNES matrices, GBF8 species data
    - Renewable energy: Solar/wind yield arrays (`renewable_solar_r`, `renewable_wind_r`), state region mapping, raw targets
    - No input rescaling: constraint blocks are row-rescaled in the solver (`row_builder.scale_rows`, factor kept per row); the objective is raw AUD / 1e6
-   - Per-variable term dicts (`term_ag_acct`, `term_am`, `term_nonag`, global Var.index) are built once in `get_input_data` and shared by every constraint family (`row_builder.extract_groups` / `extract_structure` + `attach_coeffs`) and the objective block
+   - The column space (`col_builder.py`: one labelled `xr.Dataset` per block — ag, nonag, am, ag2ag/ag2nonag/nonag2ag, acct, cell_usage — with `exists`, `col` = global Var.index, bounds/base) and its coefficient support (`space['terms']`) are built once in `get_cols` (getters first, then the block builders, then one sectioned `get_cols`) and shared by every constraint family (`row_builder.gather_coeffs` / `compose_rows`) and the objective block. Folded entries of the accounting view are real columns (`X_acct_*`) tied to X_ag by exact linking rows (`acct_link_*`); everywhere else X_acct IS the ag column.
    - `LutoSolver` method order follows `formulate()`: variables → spine rows (cell usage, ag-mgt link, adoption, renewable ceilings) → policy rows (demand, GHG) → bio rows (GBF2/3/4/8) → regional adoption → water, renewables → flow rows (source cap, node balance) → objective; then `remove_constraints_by_name` and `solve()`. Constraint handles: `demand_constraints`, `water_limit_constraints`, `renewable_constraints`, `ghg_constr`, `bio_GBF2_constr` (single `Constr` or `None`), `bio_*_constrs` dicts, `regional_adoption_constraints`, `ag_mgt_adoption_constraints`, `ag_mgt_link_constraints_r`, `cell_usage_constraint_r`
 
 5. **Optimization**: `solvers/solver.py` runs GUROBI optimization with biodiversity, renewable energy, and environmental constraints
    - Hard/soft constraint flexibility for GHG, water, GBF2
    - Soft constraints add deviation penalties (`_setup_deviation_penalties()`): demand, GHG, water, biodiversity
    - Objective: `obj_economy × (1 - SOLVE_WEIGHT_BETA) ± obj_penalties × SOLVE_WEIGHT_BETA`. `SOLVE_WEIGHT_BETA` is the **only** economy-vs-penalty knob — the former per-target `SOLVER_WEIGHT_DEMAND/GHG/WATER` weights were removed.
-   - The sub-`SOLVER_COEFF_MIN` floor on merged coefficients is stage 4 of every family's `compose_row` and of the objective vector; no post-build sweep exists.
+   - The sub-`SOLVER_COEFF_MIN` floor on scaled coefficients is the last step of every family's `compose_rows` + `scale_rows` and of the objective vector; no post-build sweep exists. The accounting linking rows are exempt (exact ±1 / ±c_k, never floored or rescaled).
 
 6. **Output Generation**: `tools/write.py` writes results to `/output/`
    - **Two-stage writing process**: Decision variables and mosaic maps written first (stage 1), then all other outputs (stage 2)
@@ -194,7 +195,7 @@ Renewable energy types (Utility Solar PV, Onshore Wind) are implemented as non-r
 
 `_add_renewable_energy_constraints()` in `solver.py` enforces state-level generation targets:
 - Separate constraints for solar and wind per state (ACT excluded)
-- Uses `renewable_solar_r` / `renewable_wind_r` yield arrays from `input_data.py`
+- Uses `renewable_solar_r` / `renewable_wind_r` yield arrays from `row_builder.get_rows`
 - Per-row rescaling: each (type, state) row carries its own factor (`renewable_scales`)
 
 ### Data Loading (`data.py`)
@@ -209,11 +210,11 @@ Renewable energy types (Utility Solar PV, Onshore Wind) are implemented as non-r
 Transition costs use a **fold-into-dominant (θ)** model with a **two-stream** formulation in `solver.py`:
 
 - **Decision / flow stream (`dvar_flow`)** carries the *folded* composition: within each cell, every sub-θ land-use sliver is merged into that cell's **dominant** land use, so a single scalar variable represents "how much of this cell stays in its original composition". This keeps the transition matrix small and well-conditioned.
-- **Accounting stream (`dvar_account`)**, built by `_setup_ag_accounting_vars()`, **un-folds** that scalar back into each true land use as a constant-ratio `LinExpr`, so profit / water / GHG / GBF / production are scored against the real per-land-use fractions rather than the folded dominant.
+- **Accounting view (`X_acct`, `space['acct']`)** **un-folds** that scalar back into each true land use: a folded sliver entry and its receiving dominant get their own Gurobi column (`X_acct_{lm}_{j}_{r}`) tied to the flow variable by one exact linking row (`acct_link_*`: `X_acct[sliver] = c_k·X_ag[dom] (+ X_ag[sliver])`, `X_acct[dom] = (1 − Σc_k)·X_ag[dom]`), every other entry's accounting column IS its flow column. Profit / water / GHG / GBF / production are scored on the accounting columns, i.e. against the real per-land-use fractions rather than the folded dominant. The flow model (source caps, node balance) still runs on the folded stream: the accounting view changes how folded land is scored, never how it moves.
 
 **Mental model** — a cell is a fixed-composition bundle scaled by one scalar. If a cell is 0.7 Beef + 0.3 Apple, folding merges Apple into the dominant Beef so one variable `X_Beef` (mass 1.0) represents the whole cell; each land use is then a constant ratio of it (`Apple = 0.3/1.0 · X_Beef`). Reducing `X_Beef` shrinks both fractions proportionally — the 7:3 composition ratio is preserved, only the scale changes.
 
-**Coefficient-floor consequence**: because accounting terms are `coeff × X_acct` where a folded-sliver `X_acct` entry is a weighted sum of the dominant's variable (weights ~1/RESFACTOR²), a floored-and-kept `coeff` can distribute into a *sub-floor* product on the dominant var. Stage 4 of the coefficient contract floors the MERGED coefficient in every composed row (`row_builder.compose_row`) and in the objective vector (`_setup_objective`), which drops these (see `docs/FINDINGS.md`, 20260721, for the original diagnosis).
+**Coefficient-floor consequence (historical)**: while the accounting view was substituted into every row as `coeff × w × X_ag`, a kept `coeff` could distribute into a sub-floor product on the dominant variable, and the merged coefficient had to be floored again (see `docs/FINDINGS.md`, 20260721). With the accounting columns explicit, the policy coefficient sits on `X_acct` unweighted and the fold share lives only in the (unfloored) linking row — the fold is exact by construction.
 
 Transition **reporting** (`write.py`) is rebuilt on the solved per-source delta flows (`data.delta_dvars_ag2ag[yr_cal]` etc.), giving exact from→to attribution.
 
@@ -225,8 +226,8 @@ load_data() → Data() initialization
 run(data) → solve_timeseries(data, years=sorted(SIM_YEARS))   # default 2020, 2025, …, 2050
     ↓
     For each year pair (base→target):
-        ├── get_input_data(data, base_yr, target_yr) → SolverInputData
-        ├── LutoSolver(input_data).formulate()
+        ├── col_builder.get_cols(data, base_yr) → space;  row_builder.get_rows(data, base_yr, target_yr, space) → rows
+        ├── LutoSolver(space, rows).formulate()      # addMVar per block of the space; one addMConstr per row block of row_builder.FAMILIES
         │   ├── _setup_vars()             # incl. _setup_ag_accounting_vars() (accounting stream)
         │   ├── _setup_constraints()
         │   └── _setup_objective()       # _setup_economy_objective() -> obj_block (5 x n_vars); summed, scaled, floored (stage 4)

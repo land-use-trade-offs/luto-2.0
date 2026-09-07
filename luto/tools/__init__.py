@@ -75,7 +75,7 @@ def amortise(cost, rate=settings.DISCOUNT_RATE, horizon=settings.AMORTISATION_PE
 def clamp_dvar_bound(arr: np.ndarray, lo, hi, name: str) -> np.ndarray:
     """Return clip(arr, lo, hi) as float32, REPORTING entries changed beyond the ROUND_DECIMALS
     noise threshold. `lo`/`hi` may be scalars or same-shape arrays. Shared by the dvar bound/base
-    builders in solvers/input_data.py and the ag/non-ag transition lb builders — all dvar-bound
+    builders in solvers/col_builder.py and the ag/non-ag transition lb builders — all dvar-bound
     cleaning goes through here, explicitly and logged, rather than silently min/max'd."""
     out = np.clip(arr, lo, hi).astype(np.float32)
     thr = 10 ** (-settings.ROUND_DECIMALS)
@@ -702,7 +702,7 @@ def log_memory_usage(output_dir=settings.OUTPUT_DIR, mode='a', interval=1, stop_
 # file IO, no try/except); ``record_shadow_prices`` orchestrates and writes.
 # ---------------------------------------------------------------------------
 
-def calc_shadow_price_GBF2(luto_solver, input_data, target_year) -> pd.DataFrame:
+def calc_shadow_price_GBF2(luto_solver, rows, target_year) -> pd.DataFrame:
     """GBF2 priority-degraded-area constraint shadow price (AUD per real ha of target)."""
     if settings.GBF2_TARGET == "off":
         return pd.DataFrame()
@@ -719,7 +719,7 @@ def calc_shadow_price_GBF2(luto_solver, input_data, target_year) -> pd.DataFrame
     }])
 
 
-def calc_shadow_price_GBF3_NVIS(luto_solver, input_data, target_year) -> pd.DataFrame:
+def calc_shadow_price_GBF3_NVIS(luto_solver, rows, target_year) -> pd.DataFrame:
     """GBF3 NVIS vegetation-group constraint shadow prices (AUD per real ha of target)."""
     if settings.GBF3_NVIS_TARGET == "off":
         return pd.DataFrame()
@@ -737,7 +737,7 @@ def calc_shadow_price_GBF3_NVIS(luto_solver, input_data, target_year) -> pd.Data
     return pd.DataFrame(rows)
 
 
-def calc_shadow_price_GBF4_SNES(luto_solver, input_data, target_year) -> pd.DataFrame:
+def calc_shadow_price_GBF4_SNES(luto_solver, rows, target_year) -> pd.DataFrame:
     """GBF4 SNES species constraint shadow prices (AUD per real ha of target)."""
     if settings.GBF4_TARGET_SNES == "off":
         return pd.DataFrame()
@@ -755,7 +755,7 @@ def calc_shadow_price_GBF4_SNES(luto_solver, input_data, target_year) -> pd.Data
     return pd.DataFrame(rows)
 
 
-def calc_shadow_price_GBF4_ECNES(luto_solver, input_data, target_year) -> pd.DataFrame:
+def calc_shadow_price_GBF4_ECNES(luto_solver, rows, target_year) -> pd.DataFrame:
     """GBF4 ECNES ecological-community constraint shadow prices (AUD per real ha of target)."""
     if settings.GBF4_TARGET_ECNES == "off":
         return pd.DataFrame()
@@ -773,7 +773,7 @@ def calc_shadow_price_GBF4_ECNES(luto_solver, input_data, target_year) -> pd.Dat
     return pd.DataFrame(rows)
 
 
-def calc_shadow_price_GBF8(luto_solver, input_data, target_year) -> pd.DataFrame:
+def calc_shadow_price_GBF8(luto_solver, rows, target_year) -> pd.DataFrame:
     """GBF8 species-conservation constraint shadow prices (AUD per real ha of target)."""
     if settings.GBF8_TARGET == "off":
         return pd.DataFrame()
@@ -791,7 +791,7 @@ def calc_shadow_price_GBF8(luto_solver, input_data, target_year) -> pd.DataFrame
     return pd.DataFrame(rows)
 
 
-def calc_shadow_price_Water(luto_solver, input_data, target_year) -> pd.DataFrame:
+def calc_shadow_price_Water(luto_solver, rows, target_year) -> pd.DataFrame:
     """Per-region water-yield constraint shadow prices (AUD per real ML of target)."""
     if settings.WATER_LIMITS != "on":
         return pd.DataFrame()
@@ -807,7 +807,7 @@ def calc_shadow_price_Water(luto_solver, input_data, target_year) -> pd.DataFram
     return pd.DataFrame(rows)
 
 
-def calc_shadow_price_GHG(luto_solver, input_data, target_year) -> pd.DataFrame:
+def calc_shadow_price_GHG(luto_solver, rows, target_year) -> pd.DataFrame:
     """GHG-emissions constraint shadow price (AUD per real tCO2e of target)."""
     if settings.GHG_EMISSIONS_LIMITS == "off":
         return pd.DataFrame()
@@ -824,14 +824,14 @@ def calc_shadow_price_GHG(luto_solver, input_data, target_year) -> pd.DataFrame:
     }])
 
 
-def calc_shadow_price_Demand(luto_solver, input_data, target_year) -> pd.DataFrame:
+def calc_shadow_price_Demand(luto_solver, rows, target_year) -> pd.DataFrame:
     """Per-commodity production/demand constraint shadow prices (AUD per real tonne of demand).
 
     ``presence`` holds the bound kind (eq/lower/upper) so a commodity's paired bounds stay
     distinguishable.
     """
     So = 1e6                                    # the objective is in million AUD
-    commodities = input_data.commodity_names
+    commodities = rows.commodity_names
     rows = []
     for constr, Ss in zip(luto_solver.demand_constraints, luto_solver.demand_scales):
         name = constr.ConstrName                        # e.g. demand_hard_bound_lower[3]
@@ -847,7 +847,7 @@ def calc_shadow_price_Demand(luto_solver, input_data, target_year) -> pd.DataFra
     return pd.DataFrame(rows)
 
 
-def calc_shadow_price_Renewable(luto_solver, input_data, target_year) -> pd.DataFrame:
+def calc_shadow_price_Renewable(luto_solver, rows, target_year) -> pd.DataFrame:
     """State-level renewable-generation-target shadow prices (AUD per real MWh of target).
 
     Every (type, state) row carries its own row scale (row_builder.scale_rows).
@@ -870,7 +870,7 @@ def calc_shadow_price_Renewable(luto_solver, input_data, target_year) -> pd.Data
     return pd.DataFrame(rows)
 
 
-def calc_shadow_price_Regional_Adoption(luto_solver, input_data, target_year) -> pd.DataFrame:
+def calc_shadow_price_Regional_Adoption(luto_solver, rows, target_year) -> pd.DataFrame:
     """Regional adoption area-cap shadow prices (AUD per real ha of cap).
 
     These rows are not rescaled, so scale = 1 and shadow_price = Pi * So.
@@ -889,7 +889,7 @@ def calc_shadow_price_Regional_Adoption(luto_solver, input_data, target_year) ->
     return pd.DataFrame(rows)
 
 
-def record_shadow_prices(luto_solver, input_data, target_year, out_dir) -> None:
+def record_shadow_prices(luto_solver, rows, target_year, out_dir) -> None:
     """Compute every active constraint's shadow prices and write one CSV for the year.
 
     Probes the simplex basis once (barrier-only solves have unreliable duals → skip the year),
@@ -926,7 +926,7 @@ def record_shadow_prices(luto_solver, input_data, target_year, out_dir) -> None:
 
     # Each calculator returns rows for its active constraints, or a column-less empty frame.
     df = pd.concat(
-        [calc(luto_solver, input_data, target_year) for calc in (
+        [calc(luto_solver, rows, target_year) for calc in (
             calc_shadow_price_GBF2,
             calc_shadow_price_GBF3_NVIS,
             calc_shadow_price_GBF4_SNES,
