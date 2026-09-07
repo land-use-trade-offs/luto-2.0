@@ -97,10 +97,10 @@ class LutoSolver:
         self.nonag2ag_mvar = None           # over space['nonag2ag'] (non-ag → ag)
         self.nonag2ag_offset = None
         # accounting columns of the folded entries (X_acct where it differs from X_ag); None when nothing folds
-        self.acct_mvar = None
-        self.acct_offset = None
-        self.acct_link_constrs = []         # one exact equality per accounting column
-        self.acct_link_block = None
+        self.accounting_mvar = None
+        self.accounting_offset = None
+        self.accounting_link_constrs = []         # one exact equality per accounting column
+        self.accounting_link_block = None
         self.cell_usage_slack_mvar = None   # the cell-usage range slacks (the last variables before any row)
 
         # --- constraint handles ---
@@ -171,7 +171,7 @@ class LutoSolver:
         self._setup_non_ag_vars()
         self._setup_ag_management_variables()
         self._setup_flow_vars()
-        self._setup_acct_vars()
+        self._setup_accounting_vars()
         self._setup_cell_usage_slack_vars()
 
     def _setup_constraints(self):
@@ -192,7 +192,7 @@ class LutoSolver:
 
     def _setup_ag_vars(self):
         """The ag block: ONE addMVar over the existing entries of space['ag'], in column order (lu,
-        lm, cell). Bounds come from the cube (cleaned in col_builder: 0 ≤ lb ≤ base ≤ ub);
+        lm, cell). lb = 0, ub from the cube (cleaned in col_builder: 0 ≤ base ≤ ub);
         ``space['ag'].col`` maps (lm, lu, cell) to Var.index (-1 = no variable)."""
         print("│   ├── setting up decision variables for agricultural land uses...")
         ag = self._space['ag']
@@ -202,7 +202,7 @@ class LutoSolver:
         lu_idx, lm_idx, cell_idx = np.nonzero(ag['exists'].transpose('lu', 'lm', 'cell').values)   # column order: lu, lm, cell
         self.ag_mvar = self.gurobi_model.addMVar(
             cell_idx.size,
-            lb=ag['lb'].values[lm_idx, lu_idx, cell_idx].astype(np.float64),
+            lb=0.0,
             ub=ag['ub'].values[lm_idx, lu_idx, cell_idx].astype(np.float64),
             name="X_ag")
         self.gurobi_model.setAttr(
@@ -259,9 +259,15 @@ class LutoSolver:
         names come from the arc fields. A delta is a positive increment: no stay/diagonal var, the
         node-balance constant carries the base."""
         print("│   ├── setting up transition flow delta variables (D)...")
-        ag2ag, ag2nonag, nonag2ag = self._space['ag2ag'], self._space['ag2nonag'], self._space['nonag2ag']
-        self.ag2ag_offset, self.ag2nonag_offset, self.nonag2ag_offset = (self._layout[name] for name in ('ag2ag', 'ag2nonag', 'nonag2ag'))
-        n_ag2ag, n_ag2nonag, n_nonag2ag = ag2ag.attrs['n'], ag2nonag.attrs['n'], nonag2ag.attrs['n']
+        ag2ag = self._space['ag2ag']
+        ag2nonag = self._space['ag2nonag']
+        nonag2ag = self._space['nonag2ag']
+        self.ag2ag_offset = self._layout['ag2ag']
+        self.ag2nonag_offset = self._layout['ag2nonag']
+        self.nonag2ag_offset = self._layout['nonag2ag']
+        n_ag2ag = ag2ag.attrs['n']
+        n_ag2nonag = ag2nonag.attrs['n']
+        n_nonag2ag = nonag2ag.attrs['n']
 
         self.ag2ag_mvar = self.gurobi_model.addMVar(n_ag2ag, lb=0.0, name="F_a2a")
         self.ag2nonag_mvar = self.gurobi_model.addMVar(n_ag2nonag, lb=0.0, name="F_a2n")
@@ -291,25 +297,25 @@ class LutoSolver:
         print(f"│   │   ├── nonag2ag : {n_nonag2ag:,} delta vars")
         print(f"│   │   └── total    : {n_ag2ag + n_ag2nonag + n_nonag2ag:,} delta vars")
 
-    def _setup_acct_vars(self):
+    def _setup_accounting_vars(self):
         """The accounting block: one column per entry of the accounting view X_acct that the θ fold
         makes different from its flow variable (a folded sliver and its receiving dominant); tied
-        to X_ag by the exact linking rows (``row_builder.acct_link_rows``). Everywhere else X_acct
+        to X_ag by the exact linking rows (``row_builder.accounting_link_rows``). Everywhere else X_acct
         IS X_ag and no variable is created. Column order: dominants, then slivers."""
         print("│   └── setting up accounting variables for folded entries...")
-        acct = self._space['acct']
-        self.acct_offset = self._layout['acct']
-        n_new = acct.attrs['n_new']
+        accounting = self._space['accounting']
+        self.accounting_offset = self._layout['accounting']
+        n_new = accounting.attrs['n_new']
         if n_new == 0:
             print("│       └── nothing folded: the accounting view is the flow stream")
             return
         lu_code = {name: j for j, name in enumerate(self._space['ag'].lu.values)}
-        names = ([f"X_acct_{lm}_{lu_code[lu]}_{r}" for lm, lu, r in zip(acct['dom_lm'].values, acct['dom_lu'].values, acct['dom_cell'].values)]
+        names = ([f"X_acct_{lm}_{lu_code[lu]}_{r}" for lm, lu, r in zip(accounting['dom_lm'].values, accounting['dom_lu'].values, accounting['dom_cell'].values)]
                  + [f"X_acct_{lm}_{lu_code[lu]}_{r}" for lm, lu, r in
-                    zip(acct['sliver_from_lm'].values, acct['sliver_from_lu'].values, acct['sliver_cell'].values)])
-        self.acct_mvar = self.gurobi_model.addMVar(n_new, lb=0.0, ub=1.0, name="X_acct")
-        self.gurobi_model.setAttr('VarName', self.acct_mvar.tolist(), names)
-        print(f"│       └── {n_new:,} accounting vars ({acct.attrs['n_dom']:,} dominants + {acct.attrs['n_sliver']:,} slivers)")
+                    zip(accounting['sliver_from_lm'].values, accounting['sliver_from_lu'].values, accounting['sliver_cell'].values)])
+        self.accounting_mvar = self.gurobi_model.addMVar(n_new, lb=0.0, ub=1.0, name="X_acct")
+        self.gurobi_model.setAttr('VarName', self.accounting_mvar.tolist(), names)
+        print(f"│       └── {n_new:,} accounting vars ({accounting.attrs['n_dom']:,} dominants + {accounting.attrs['n_sliver']:,} slivers)")
 
     def _all_vars(self):
         """The model's Var list in Var.index order (materialised once), for addMConstr."""
@@ -360,13 +366,16 @@ class LutoSolver:
 
         self.cell_usage_constraint_r = dict(zip(level('cell_usage', 'cell'), constrs('cell_usage')))
         self.cell_usage_block = A('cell_usage')
-        self.acct_link_constrs, self.acct_link_block = constrs('acct_link'), A('acct_link')
+        self.accounting_link_constrs = constrs('accounting_link')
+        self.accounting_link_block = A('accounting_link')
         self.ag_mgt_link_constraints_r = defaultdict(list)
         for c, r in zip(constrs('ag_mgt_link'), level('ag_mgt_link', 'cell')):
             self.ag_mgt_link_constraints_r[r].append(c)
         self.ag_mgt_link_block = A('ag_mgt_link')
-        self.ag_mgt_adoption_constraints, self.ag_mgt_adopt_block = constrs('ag_mgt_adoption'), A('ag_mgt_adoption')
-        self.demand_constraints, self.demand_scales = constrs('demand'), scale('demand').tolist()
+        self.ag_mgt_adoption_constraints = constrs('ag_mgt_adoption')
+        self.ag_mgt_adopt_block = A('ag_mgt_adoption')
+        self.demand_constraints = constrs('demand')
+        self.demand_scales = scale('demand').tolist()
         self.demand_q_block = B['demand'].attrs['q_block'] if 'demand' in B else None
         self.ghg_constr = constrs('ghg')[0] if constrs('ghg') else None
         self.ghg_scale = float(scale('ghg')[0]) if 'ghg' in B and B['ghg'].sizes['row'] else 1.0
@@ -381,8 +390,10 @@ class LutoSolver:
             setattr(self, f'bio_{fam}_block_pairs', keys(fam))
         self.regional_adoption_constraints = (constrs('regional_adoption_ag') + constrs('regional_adoption_nonag')
                                               + constrs('regional_adoption_nonag_sum'))
-        self.water_limit_constraints, self.water_scales = constrs('water'), scale('water').tolist()
-        self.water_block, self.water_block_regids = A('water'), level('water', 'region')
+        self.water_limit_constraints = constrs('water')
+        self.water_scales = scale('water').tolist()
+        self.water_block = A('water')
+        self.water_block_regids = level('water', 'region')
         ren_keys = [f'{am}_{state}' for am, state in keys('renewable')]
         self.renewable_constraints = dict(zip(ren_keys, constrs('renewable')))
         self.renewable_scales = dict(zip(ren_keys, scale('renewable').tolist()))
@@ -473,21 +484,22 @@ class LutoSolver:
 
         # agricultural: ONE .X read of the ag block
         lu_idx, lm_idx, cell_idx = np.nonzero(self._space['ag']['exists'].transpose('lu', 'lm', 'cell').values)   # column order
-        x_ag = np.asarray(self.ag_mvar.X, dtype=np.float64)
+        x_ag = self.ag_mvar.X                                            # float64 ndarray
         is_dry = lm_idx == 0
         X_dry_sol_rj[cell_idx[is_dry],  lu_idx[is_dry]]  = x_ag[is_dry]
         X_irr_sol_rj[cell_idx[~is_dry], lu_idx[~is_dry]] = x_ag[~is_dry]
 
         # non-agricultural: ONE .X read of the block (disabled land uses have no columns and stay at zero)
         k_idx, cell_idx = np.nonzero(self._space['nonag']['exists'].values)
-        non_ag_X_sol_rk[cell_idx, k_idx] = np.asarray(self.nonag_mvar.X, dtype=np.float64)
+        non_ag_X_sol_rk[cell_idx, k_idx] = self.nonag_mvar.X
 
         # ag-management: ONE .X read of the block. Savanna eligibility is applied to BOTH lm here,
         # while variable creation applied it to dry only: irr savanna vars outside the eligible cells report 0.
         am_ds = self._space['am']
         slot_idx, lm_idx, cell_idx = np.nonzero(am_ds['exists'].values)
-        am_of_col, j_of_col = am_ds['am'].values[slot_idx], am_ds['j'].values[slot_idx]
-        x_am = np.asarray(self.am_mvar.X, dtype=np.float64)
+        am_of_col = am_ds['am'].values[slot_idx]
+        j_of_col = am_ds['j'].values[slot_idx]
+        x_am = self.am_mvar.X
         reported = ~((am_of_col == "Savanna Burning") & (lm_idx == 1) & ~np.isin(cell_idx, am_ds.attrs['savanna_eligible_r']))
         for am in am_ds.attrs['am_list']:
             dry_cols = reported & (am_of_col == am) & (lm_idx == 0)
@@ -504,22 +516,27 @@ class LutoSolver:
         dvar_D_ag2ag_mrj    = {}   # (from_m, from_j) -> (NLMS, ncells_src, N_AG_LUS)
         dvar_D_ag2nonag_rk  = {}   # (from_m, from_j) -> (ncells_src, N_NON_AG_LUS)
         dvar_D_nonag2ag_mrj = {}   # from_k           -> (NLMS, ncells_k, N_AG_LUS)
-        ag2ag, ag2nonag, nonag2ag = self._space['ag2ag'], self._space['ag2nonag'], self._space['nonag2ag']
-        x_ag2ag = np.asarray(self.ag2ag_mvar.X, dtype=np.float32) if ag2ag.attrs['n'] else np.zeros(0, np.float32)
-        x_ag2nonag = np.asarray(self.ag2nonag_mvar.X, dtype=np.float32) if ag2nonag.attrs['n'] else np.zeros(0, np.float32)
-        x_nonag2ag = np.asarray(self.nonag2ag_mvar.X, dtype=np.float32) if nonag2ag.attrs['n'] else np.zeros(0, np.float32)
+        ag2ag = self._space['ag2ag']
+        ag2nonag = self._space['ag2nonag']
+        nonag2ag = self._space['nonag2ag']
+        x_ag2ag = self.ag2ag_mvar.X.astype(np.float32) if ag2ag.attrs['n'] else np.zeros(0, np.float32)
+        x_ag2nonag = self.ag2nonag_mvar.X.astype(np.float32) if ag2nonag.attrs['n'] else np.zeros(0, np.float32)
+        x_nonag2ag = self.nonag2ag_mvar.X.astype(np.float32) if nonag2ag.attrs['n'] else np.zeros(0, np.float32)
         for src_idx, ((from_m, from_j), cells) in enumerate(self._space['sources']['ag'].items()):
-            start, stop = int(ag2ag.attrs['src_ptr'][src_idx]), int(ag2ag.attrs['src_ptr'][src_idx + 1])
+            start = int(ag2ag.attrs['src_ptr'][src_idx])
+            stop = int(ag2ag.attrs['src_ptr'][src_idx + 1])
             deltas = np.zeros((self._nlms, len(cells), self._n_ag_lus), dtype=np.float32)
             deltas[ag2ag['to_m'].values[start:stop], ag2ag['local_r'].values[start:stop], ag2ag['to_j'].values[start:stop]] = x_ag2ag[start:stop]
             dvar_D_ag2ag_mrj[(from_m, from_j)] = deltas
 
-            start, stop = int(ag2nonag.attrs['src_ptr'][src_idx]), int(ag2nonag.attrs['src_ptr'][src_idx + 1])
+            start = int(ag2nonag.attrs['src_ptr'][src_idx])
+            stop = int(ag2nonag.attrs['src_ptr'][src_idx + 1])
             deltas = np.zeros((len(cells), self._n_non_ag_lus), dtype=np.float32)
             deltas[ag2nonag['local_r'].values[start:stop], ag2nonag['to_k'].values[start:stop]] = x_ag2nonag[start:stop]
             dvar_D_ag2nonag_rk[(from_m, from_j)] = deltas
         for src_idx, (from_k, cells) in enumerate(self._space['sources']['nonag'].items()):
-            start, stop = int(nonag2ag.attrs['src_ptr'][src_idx]), int(nonag2ag.attrs['src_ptr'][src_idx + 1])
+            start = int(nonag2ag.attrs['src_ptr'][src_idx])
+            stop = int(nonag2ag.attrs['src_ptr'][src_idx + 1])
             deltas = np.zeros((self._nlms, len(cells), self._n_ag_lus), dtype=np.float32)
             deltas[nonag2ag['to_m'].values[start:stop], nonag2ag['local_r'].values[start:stop], nonag2ag['to_j'].values[start:stop]] = x_nonag2ag[start:stop]
             dvar_D_nonag2ag_mrj[from_k] = deltas
@@ -632,8 +649,8 @@ class LutoSolver:
     def _block_lhs(block: sparse.csr_matrix, x_vals: np.ndarray, scales=None) -> np.ndarray:
         """Row values of a stored constraint block at the solution, in raw units: the stored
         (row-scaled) row times x, multiplied back by the row's scale factor when one is kept."""
-        lhs = np.asarray(block @ x_vals[:block.shape[1]], dtype=np.float64)
-        return lhs * np.asarray(scales, dtype=np.float64) if scales is not None else lhs
+        lhs = block @ x_vals[:block.shape[1]]                            # float64 ndarray
+        return lhs * np.asarray(scales, dtype=np.float64) if scales is not None else lhs   # scales: a list
 
     def _block_values(self, block, keys: list, scales: dict, x_vals: np.ndarray) -> dict:
         """{key: raw-unit LHS} for a keyed family block; {} when the family added no rows."""

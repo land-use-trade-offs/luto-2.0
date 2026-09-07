@@ -184,7 +184,7 @@ def get_base_dvar_mj_cell_map(data: Data, base_year: int) -> dict:
     so EVERY nonzero land-use is a source — the noise cutoff here only drops float dust, and no land
     is ever left without flow-to vars. θ's effect on model size acts through the folding, not through this
     slice. This map is the single source of truth for BOTH (a) the solver's per-source delta/cost
-    slices and (b) target eligibility (`get_to_ag_exclude_matrices`), and ghg.py's exact transition-
+    slices and (b) target eligibility (`get_ag_eligible_mrj`), and ghg.py's exact transition-
     emission slicing reuses it, so all stay aligned.
 
     Cached (maxsize=1): the exclude builder and all exact cost functions call this for the same
@@ -200,8 +200,8 @@ def get_base_dvar_mj_cell_map(data: Data, base_year: int) -> dict:
     }
 
 
-def get_to_ag_exclude_matrices(data: Data, base_year: int) -> np.ndarray:
-    """To-ag target-eligibility (exclude) matrix (NLMS, NCELLS, N_AG_LUS) via per-source reachability.
+def get_ag_eligible_mrj(data: Data, base_year: int) -> np.ndarray:
+    """To-ag target-eligibility mask, bool (NLMS, NCELLS, N_AG_LUS), via per-source reachability.
 
     Covers BOTH ag→ag and non-ag→ag reachability. A cell r is eligible for ag target tj iff:
 
@@ -218,8 +218,7 @@ def get_to_ag_exclude_matrices(data: Data, base_year: int) -> np.ndarray:
     - The present sources come from `get_base_dvar_mj_cell_map` (ag) and
       `get_base_nonag_dvar_k_cell_map` (nonag) — the SAME maps that drive the solver's per-source
       flow-out slices, so eligibility and the flow vars share one threshold.
-    - `ag_lu2cells` then derives straight from this matrix and cannot diverge from the solver's
-      direct `ag_x_mrj[m, r, j]` reads.
+    - The column space reads this mask directly (an ag X var exists exactly where it is True).
     """
     # Lazy import to avoid the agricultural <-> non_agricultural transitions import cycle.
     from luto.economics.non_agricultural.transitions import get_base_nonag_dvar_k_cell_map
@@ -244,17 +243,13 @@ def get_to_ag_exclude_matrices(data: Data, base_year: int) -> np.ndarray:
         if cells.size:
             reach_rj[cells] |= t_nonag2ag_kj[k]
 
-    t_rj = reach_rj.astype(np.int8)  # (NCELLS, N_AG_LUS)
-
-    # Spatial exclusion and no-go zones
-    x_mrj = data.EXCLUDE.copy().astype(np.int8)
-
-    no_go_x_mrj = np.ones_like(data.AG_L_MRJ)
+    # Spatial exclusion (EXCLUDE) and no-go zones
+    allowed_mrj = data.EXCLUDE.astype(bool)                                   # astype copies: EXCLUDE itself is not touched
     if settings.EXCLUDE_NO_GO_LU:
         for no_go_x_r, no_go_desc in zip(data.NO_GO_REGION_AG, data.NO_GO_LANDUSE_AG):
-            no_go_x_mrj[:, :, data.DESC2AGLU[no_go_desc]] = no_go_x_r
+            allowed_mrj[:, :, data.DESC2AGLU[no_go_desc]] &= np.asarray(no_go_x_r, dtype=bool)
 
-    return (x_mrj * t_rj[np.newaxis, :, :] * no_go_x_mrj).astype(np.int8)
+    return allowed_mrj & reach_rj[np.newaxis, :, :]
 
 
 def get_ag2ag_ub(data: Data, base_year: int) -> np.ndarray:
@@ -292,17 +287,6 @@ def get_ag2ag_ub(data: Data, base_year: int) -> np.ndarray:
     # Spatial exclusion (data.EXCLUDE): LU never present in the SA2 region in 2010 → banned there.
     x_mrj = data.EXCLUDE.astype(np.float32)
     return (x_mrj * reach_frac_rj[np.newaxis, :, :] * no_go).astype(np.float32)
-
-
-def get_ag2ag_lb(data: Data, base_year: int) -> np.ndarray:
-    """ag→ag TARGET lower bound (NLMS, NCELLS, N_AG_LUS): all zeros.
-
-    The old sub-θ sliver 'stay' pin is gone — fold-into-dominant (get_folded_base_ag_dvar) absorbs
-    every sub-θ land-use into the cell's dominant source BEFORE the solver world is built, so no
-    land-use is ever left without flow-to vars or without an X var, and nothing needs to be locked in place.
-    Kept as a function (rather than deleted) as the hook for any future genuine ag lower bound.
-    """
-    return np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
 
 
 def get_transition_matrices_ag2ag(data: Data, yr_idx: int, from_m: int, from_j: int, cells=None, separate=False):

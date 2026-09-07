@@ -58,22 +58,26 @@ def gather_coeffs(terms: dict, ag_c_mrj, am_c_mrj: dict, nonag_c_rk) -> np.ndarr
     """One family's per-cell coefficient at every term of the support, float32, in term order:
     ``ag_c_mrj[m, r, j]`` on the accounting entries, ``am_c_mrj[am][m, r, j_idx]`` on the ag-mgt
     columns, ``nonag_c_rk[r, k]`` on the non-ag columns."""
-    ag_terms, am_terms, nonag_terms = terms['ag'], terms['am'], terms['nonag']
-    c_ag = np.asarray(ag_c_mrj)[ag_terms['m'], ag_terms['r'], ag_terms['j']]
+    ag_terms = terms['ag']
+    am_terms = terms['am']
+    nonag_terms = terms['nonag']
+    c_ag = ag_c_mrj[ag_terms['m'], ag_terms['r'], ag_terms['j']]
     c_am = np.empty(am_terms['r'].size, dtype=np.float32)
     for am_idx, am_name in enumerate(terms['am_list']):
         in_option = am_terms['am_idx'] == am_idx
         if in_option.any():
-            c_am[in_option] = np.asarray(am_c_mrj[am_name])[am_terms['m'][in_option], am_terms['r'][in_option], am_terms['j_idx'][in_option]]
-    c_nonag = np.asarray(nonag_c_rk)[nonag_terms['r'], nonag_terms['k']]
+            c_am[in_option] = am_c_mrj[am_name][am_terms['m'][in_option], am_terms['r'][in_option], am_terms['j_idx'][in_option]]
+    c_nonag = nonag_c_rk[nonag_terms['r'], nonag_terms['k']]
     return np.concatenate([c_ag, c_am, c_nonag]).astype(np.float32, copy=False)
 
 
 def gather_bio_coeffs(terms: dict, contr_ag_j, contr_am: dict, contr_nonag_k: dict) -> np.ndarray:
     """The biodiversity contribution at every term: a scalar per ag land use, a per-cell array per
     (am, land use), a scalar per non-ag land use — the shared C of the GBF families."""
-    ag_terms, am_terms, nonag_terms = terms['ag'], terms['am'], terms['nonag']
-    c_ag = np.asarray(contr_ag_j, dtype=np.float32)[ag_terms['j']]
+    ag_terms = terms['ag']
+    am_terms = terms['am']
+    nonag_terms = terms['nonag']
+    c_ag = contr_ag_j[ag_terms['j']]                                             # float32 per land use
     c_am = np.zeros(am_terms['r'].size, dtype=np.float32)
     for am_idx, am_name in enumerate(terms['am_list']):
         in_option = am_terms['am_idx'] == am_idx
@@ -91,14 +95,19 @@ def compose_rows(terms: dict, c: np.ndarray, val_rows, nvars: int) -> sparse.csr
     over cells). Row i, term t: ``q = V_i[cell_t] · c_t`` (float32), dropped when |q| <
     SOLVER_COEFF_MIN. Terms of a row with a small support are gathered through the per-cell index
     of the support (cost ∝ the row's nonzero cells, not the model)."""
-    term_cell, term_col, ncells = terms['r'], terms['col'], terms['ncells']
+    term_cell = terms['r']
+    term_col = terms['col']
+    ncells = terms['ncells']
     by_cell_order, by_cell_ptr = terms['by_cell']
-    indptr, indices, data = [0], [], []
+    indptr = [0]
+    indices = []
+    data = []
     for val_row in val_rows:
         val_row = np.asarray(val_row, dtype=np.float32)
         cells = np.flatnonzero(val_row)
         if cells.size * 2 < ncells:                                   # sparse support: gather only its terms
-            starts, counts = by_cell_ptr[cells], by_cell_ptr[cells + 1] - by_cell_ptr[cells]
+            starts = by_cell_ptr[cells]
+            counts = by_cell_ptr[cells + 1] - by_cell_ptr[cells]
             positions = np.repeat(starts - (np.cumsum(counts) - counts), counts) + np.arange(int(counts.sum()))
             term_idx = by_cell_order[positions]
             kept_cols, kept_vals = drop(term_col[term_idx], val_row[term_cell[term_idx]] * c[term_idx])
@@ -579,27 +588,36 @@ def get_obj_block(space: dict, terms: dict, ag_obj_mrj: np.ndarray, non_ag_obj_r
 
     # ── operating economics: one gather over the coefficient support, split by stream ──
     coeff = gather_coeffs(terms, ag_obj_mrj, ag_man_objs, non_ag_obj_rk)   # float32, term order ag | am | nonag
-    n_ag, n_am = terms['ag']['r'].size, terms['am']['r'].size
+    n_ag = terms['ag']['r'].size
+    n_am = terms['am']['r'].size
     for block_row, stream in ((AG, slice(0, n_ag)), (AM, slice(n_ag, n_ag + n_am)), (NONAG, slice(n_ag + n_am, None))):
         parts.append((block_row, *drop(terms['col'][stream], coeff[stream])))
 
     # ── transition costs on the arcs with an ag target: per source slice, gathered from the source-keyed cost dicts ──
     for name, flow_cost, block_row in (('ag2ag', flow_cost_ag2ag, TRANS_AG), ('nonag2ag', flow_cost_nonag2ag, TRANS_AG)):
         arcs = space[name]
-        src_ptr, arc_col = arcs.attrs['src_ptr'], arcs['col'].values
-        to_m, local_r, to_j = arcs['to_m'].values, arcs['local_r'].values, arcs['to_j'].values
+        src_ptr = arcs.attrs['src_ptr']
+        arc_col = arcs['col'].values
+        to_m = arcs['to_m'].values
+        local_r = arcs['local_r'].values
+        to_j = arcs['to_j'].values
         for src_idx, src in enumerate(arcs.attrs['sources']):
-            start, stop = int(src_ptr[src_idx]), int(src_ptr[src_idx + 1])
+            start = int(src_ptr[src_idx])
+            stop = int(src_ptr[src_idx + 1])
             parts.append((block_row, *drop(arc_col[start:stop], -flow_cost[src][to_m[start:stop], local_r[start:stop], to_j[start:stop]])))
 
     # ── transition costs on the ag → non-ag arcs: the cost dict is keyed by target land use k ──
     arcs = space['ag2nonag']
-    src_ptr, arc_col = arcs.attrs['src_ptr'], arcs['col'].values
-    to_k_all, local_r_all = arcs['to_k'].values, arcs['local_r'].values
+    src_ptr = arcs.attrs['src_ptr']
+    arc_col = arcs['col'].values
+    to_k_all = arcs['to_k'].values
+    local_r_all = arcs['local_r'].values
     for src_idx, src in enumerate(arcs.attrs['sources']):
-        start, stop = int(src_ptr[src_idx]), int(src_ptr[src_idx + 1])
+        start = int(src_ptr[src_idx])
+        stop = int(src_ptr[src_idx + 1])
         cost_by_k = flow_cost_ag2nonag[src]                               # {k: array(ncells_src)}
-        to_k, local_r = to_k_all[start:stop], local_r_all[start:stop]
+        to_k = to_k_all[start:stop]
+        local_r = local_r_all[start:stop]
         arc_cost = np.empty(stop - start, dtype=np.float32)
         for k in np.unique(to_k):
             arc_cost[to_k == k] = cost_by_k[int(k)][local_r[to_k == k]]
@@ -720,19 +738,24 @@ def get_rows(data: Data, base_year: int, target_year: int, space: dict) -> RowIn
     # The coefficient streams leave here raw and float32 (the DTYPE POLICY in row_builder):
     # every constraint block is row-rescaled in the solver (row_builder.scale_rows, per-row
     # factor kept there) and the objective is raw AUD / 1e6.
-    ag_obj_mrj, non_ag_obj_rk = ag_obj_mrj.astype(np.float32), non_ag_obj_rk.astype(np.float32)
+    ag_obj_mrj = ag_obj_mrj.astype(np.float32)
+    non_ag_obj_rk = non_ag_obj_rk.astype(np.float32)
     ag_man_objs = {am: arr.astype(np.float32) for am, arr in ag_man_objs.items()}
     flow_cost_ag2ag    = {src: arr.astype(np.float32) for src, arr in flow_cost_ag2ag.items()}
     flow_cost_ag2nonag = {src: {k: arr.astype(np.float32) for k, arr in per_k.items()} for src, per_k in flow_cost_ag2nonag.items()}
     flow_cost_nonag2ag = {k: arr.astype(np.float32) for k, arr in flow_cost_nonag2ag.items()}
-    ag_q_mrp, non_ag_q_crk = ag_q_mrp.astype(np.float32), non_ag_q_crk.astype(np.float32)
+    ag_q_mrp = ag_q_mrp.astype(np.float32)
+    non_ag_q_crk = non_ag_q_crk.astype(np.float32)
     ag_man_q_mrp = {am: arr.astype(np.float32) for am, arr in ag_man_q_mrp.items()}
-    ag_g_mrj, non_ag_g_rk = ag_g_mrj.astype(np.float32), non_ag_g_rk.astype(np.float32)
+    ag_g_mrj = ag_g_mrj.astype(np.float32)
+    non_ag_g_rk = non_ag_g_rk.astype(np.float32)
     ag_man_g_mrj = {am: arr.astype(np.float32) for am, arr in ag_man_g_mrj.items()}
     trans_ghg_ag2ag = {src: arr.astype(np.float32) for src, arr in trans_ghg_ag2ag.items()}
-    ag_w_mrj, non_ag_w_rk = ag_w_mrj.astype(np.float32), non_ag_w_rk.astype(np.float32)
+    ag_w_mrj = ag_w_mrj.astype(np.float32)
+    non_ag_w_rk = non_ag_w_rk.astype(np.float32)
     ag_man_w_mrj = {am: arr.astype(np.float32) for am, arr in ag_man_w_mrj.items()}
-    renewable_solar_r, renewable_wind_r = renewable_solar_r.astype(np.float32), renewable_wind_r.astype(np.float32)
+    renewable_solar_r = renewable_solar_r.astype(np.float32)
+    renewable_wind_r = renewable_wind_r.astype(np.float32)
 
     offland_ghg = (
         data.OFF_LAND_GHG_EMISSION_C[target_index]                       # raw tCO2e (row-rescaled in the solver)
@@ -840,9 +863,14 @@ def renewable_ceiling_rows(rows: RowInputs, space: dict):
     data years, so the ceiling never decreases between periods (lb(t) ≤ ceiling always holds)."""
     n_all = space['layout']['n_all']
     am_ds = space['am']
-    am_col, am_of_slot = am_ds['col'].values, am_ds['am'].values
+    am_col = am_ds['col'].values
+    am_of_slot = am_ds['am'].values
     ag_mask = rows.ag_mask_proportion_r
-    parts, names, key_am, key_cell, rhs = [], [], [], [], []
+    parts = []
+    names = []
+    key_am = []
+    key_cell = []
+    rhs = []
     for am in am_ds.attrs['agman2lu']:
         if am not in settings.RENEWABLES_OPTIONS:
             continue
@@ -905,48 +933,51 @@ def cell_usage_rows(rows: RowInputs, space: dict):
                       [f"const_cell_usage_{cell}" for cell in row_cells], n_skipped=int(space['ag'].sizes['cell'] - n_rows))
 
 
-def acct_link_rows(rows: RowInputs, space: dict):
+def accounting_link_rows(rows: RowInputs, space: dict):
     """The θ fold, written down once: one exact equality per accounting column.
 
-        sliver   (from_m, from_j, r):  X_acct − c_k · X_ag[dom] − X_ag[sliver] = 0   (the last term only if the
+        sliver   (from_m, from_j, r):  X_acct − fold_share · X_ag[dom] − X_ag[sliver] = 0   (the last term only if the
                                        sliver land use owns an ag var at that cell)
-        dominant (to_m, to_j, r):      X_acct − (1 − Σ_k c_k) · X_ag[dom] = 0
+        dominant (to_m, to_j, r):      X_acct − (1 − Σ fold_share) · X_ag[dom] = 0
 
-    c_k = sliver / dominant_frac (float32). NOT rescaled and NOT floored — the fold is exact by
-    construction and stays so; ``min |c_k| > 0`` is asserted. Row order = column order of the
+    fold_share = the sliver's base fraction / its dominant's folded fraction (float32). NOT rescaled and NOT floored — the fold is exact by
+    construction and stays so; ``min |fold_share| > 0`` is asserted. Row order = column order of the
     accounting block (dominants, then slivers)."""
-    acct = space['acct']
-    n_dom, n_slivers = acct.attrs['n_dom'], acct.attrs['n_sliver']
+    accounting = space['accounting']
+    n_dom = accounting.attrs['n_dom']
+    n_slivers = accounting.attrs['n_sliver']
     if n_dom + n_slivers == 0:
         return None
     n_all = space['layout']['n_all']
-    fold_share = acct['sliver_fold_share'].values.astype(np.float64)
+    fold_share = accounting['sliver_fold_share'].values.astype(np.float64)
     assert fold_share.size == 0 or np.abs(fold_share).min() > 0.0, 'a fold share of exactly zero cannot be linked'
-    row_idx, cols, vals = [], [], []
-    # dominant rows: X_acct[dom] − (1 − Σ c_k) · X_ag[dom] = 0
+    row_idx = []
+    cols = []
+    vals = []
+    # dominant rows: X_acct[dom] − (1 − Σ fold_share) · X_ag[dom] = 0
     dom_row = np.arange(n_dom)
     row_idx += [dom_row, dom_row]
-    cols += [acct['dom_acct_col'].values, acct['dom_ag_col'].values]
-    vals += [np.ones(n_dom), -(1.0 - acct['dom_fold_share_sum'].values)]
-    # sliver rows: X_acct[sliver] − c_k · X_ag[dom] (− X_ag[sliver] where the sliver owns an ag column) = 0
+    cols += [accounting['dom_accounting_col'].values, accounting['dom_ag_col'].values]
+    vals += [np.ones(n_dom), -(1.0 - accounting['dom_fold_share_sum'].values)]
+    # sliver rows: X_acct[sliver] − fold_share · X_ag[dom] (− X_ag[sliver] where the sliver owns an ag column) = 0
     sliver_row = n_dom + np.arange(n_slivers)
     row_idx += [sliver_row, sliver_row]
-    cols += [acct['sliver_acct_col'].values, acct['sliver_dom_ag_col'].values]
+    cols += [accounting['sliver_accounting_col'].values, accounting['sliver_dom_ag_col'].values]
     vals += [np.ones(n_slivers), -fold_share]
-    owns_ag_col = acct['sliver_ag_col'].values >= 0
+    owns_ag_col = accounting['sliver_ag_col'].values >= 0
     row_idx.append(sliver_row[owns_ag_col])
-    cols.append(acct['sliver_ag_col'].values[owns_ag_col])
+    cols.append(accounting['sliver_ag_col'].values[owns_ag_col])
     vals.append(-np.ones(int(owns_ag_col.sum())))
     A = sparse.csr_matrix((np.concatenate(vals), (np.concatenate(row_idx).astype(np.int64), np.concatenate(cols).astype(np.int64))),
                           shape=(n_dom + n_slivers, n_all))
     # keys and names: (lm, lu code, cell) of the accounting entry, dominants then slivers
     lu_code = {name: j for j, name in enumerate(space['ag'].lu.values)}
-    lm = np.concatenate([acct['dom_lm'].values, acct['sliver_from_lm'].values])
-    lu = np.array([lu_code[name] for name in np.concatenate([acct['dom_lu'].values, acct['sliver_from_lu'].values])], dtype=np.int32)
-    cell = np.concatenate([acct['dom_cell'].values, acct['sliver_cell'].values])
+    lm = np.concatenate([accounting['dom_lm'].values, accounting['sliver_from_lm'].values])
+    lu = np.array([lu_code[name] for name in np.concatenate([accounting['dom_lu'].values, accounting['sliver_from_lu'].values])], dtype=np.int32)
+    cell = np.concatenate([accounting['dom_cell'].values, accounting['sliver_cell'].values])
     names = [f"acct_link_{lm_name}_{j}_{r}" for lm_name, j, r in zip(lm, lu, cell)]
     lm_code = (lm == 'irr').astype(np.int8)                              # integer key levels: cheap MultiIndex on millions of rows
-    return make_block('acct_link', 'acct_link', dict(lm=lm_code, lu=lu, cell=cell), A, np.zeros(n_dom + n_slivers), '=', names)
+    return make_block('accounting_link', 'accounting_link', dict(lm=lm_code, lu=lu, cell=cell), A, np.zeros(n_dom + n_slivers), '=', names)
 
 
 def ag_mgt_link_rows(rows: RowInputs, space: dict):
@@ -958,16 +989,27 @@ def ag_mgt_link_rows(rows: RowInputs, space: dict):
     n_all = space['layout']['n_all']
     ag_col = space['ag']['col'].values
     am_ds = space['am']
-    am_col, am_of_slot, j_of_slot = am_ds['col'].values, am_ds['am'].values, am_ds['j'].values
+    am_col = am_ds['col'].values
+    am_of_slot = am_ds['am'].values
+    j_of_slot = am_ds['j'].values
     am_list = list(am_ds.attrs['am_list'])
-    row_idx, cols, vals, senses, names = [], [], [], [], []
-    key_am, key_lu, key_lm, key_cell = [], [], [], []
+    row_idx = []
+    cols = []
+    vals = []
+    senses = []
+    names = []
+    key_am = []
+    key_lu = []
+    key_lm = []
+    key_cell = []
     n_rows = 0
     for slot in range(am_ds.sizes['slot']):
-        am, j = am_of_slot[slot], int(j_of_slot[slot])
+        am = am_of_slot[slot]
+        j = int(j_of_slot[slot])
         for m, lm in ((0, 'dry'), (1, 'irr')):
             cells = np.flatnonzero(ag_col[m, j] >= 0)                    # the ag columns of (m, j), cells ascending
-            ag_cols, am_cols = ag_col[m, j, cells], am_col[slot, m, cells]
+            ag_cols = ag_col[m, j, cells]
+            am_cols = am_col[slot, m, cells]
             has_am = am_cols >= 0
             slot_rows = n_rows + np.arange(cells.size)
             # X_ag: −1 on the '<' rows (X_am − X_ag ≤ 0), +1 on the '>' rows (X_ag ≥ 0)
@@ -997,10 +1039,18 @@ def ag_mgt_adoption_rows(rows: RowInputs, space: dict):
     n_all = space['layout']['n_all']
     ag_col = space['ag']['col'].values
     am_ds = space['am']
-    am_col, am_of_slot, j_of_slot = am_ds['col'].values, am_ds['am'].values, am_ds['j'].values
-    row_idx, cols, vals, names, key_am, key_lu = [], [], [], [], [], []
+    am_col = am_ds['col'].values
+    am_of_slot = am_ds['am'].values
+    j_of_slot = am_ds['j'].values
+    row_idx = []
+    cols = []
+    vals = []
+    names = []
+    key_am = []
+    key_lu = []
     for row, slot in enumerate(range(am_ds.sizes['slot'])):
-        am, j = am_of_slot[slot], int(j_of_slot[slot])
+        am = am_of_slot[slot]
+        j = int(j_of_slot[slot])
         adoption_limit = float(np.float64(rows.ag_man_limits[am][j]))
         am_cols = am_col[slot][am_col[slot] >= 0]                        # both lm, every cell with an am column
         ag_cols = ag_col[:, j][ag_col[:, j] >= 0]                        # dry + irr feasible cells
@@ -1031,7 +1081,9 @@ def demand_rows(rows: RowInputs, space: dict):
     terms = space['terms']
     n_all = space['layout']['n_all']
     ncms = rows.ncms
-    row_idx, cols, vals = [], [], []
+    row_idx = []
+    cols = []
+    vals = []
 
     def put(commodity_coeffs: np.ndarray, term_cols: np.ndarray):
         """One (commodity × column) coefficient block into the COO lists, dropped by the contract."""
@@ -1042,7 +1094,9 @@ def demand_rows(rows: RowInputs, space: dict):
             vals.append(kept_vals)
 
     # ── the per-commodity LHS (q_block): ag entries per (m, land use), ag-mgt columns per (option, land use, m), non-ag per k ──
-    ag_terms, am_terms, nonag_terms = terms['ag'], terms['am'], terms['nonag']
+    ag_terms = terms['ag']
+    am_terms = terms['am']
+    nonag_terms = terms['nonag']
     for j in range(space['ag'].sizes['lu']):
         active_p = np.where(rows.lu2pr_pj[:, j])[0]
         if not active_p.size:
@@ -1070,7 +1124,12 @@ def demand_rows(rows: RowInputs, space: dict):
     q_block.sort_indices()
 
     # ── the bound rows: the LHS row once under '=' where lb == ub, else twice under '>' lb and '<' ub ──
-    lhs_row, senses, rhs, names, key_commodity, key_bound = [], [], [], [], [], []
+    lhs_row = []
+    senses = []
+    rhs = []
+    names = []
+    key_commodity = []
+    key_bound = []
     for c_idx, c_name in enumerate(rows.commodity_names):
         lb, ub = settings.DEMAND_BOUNDS[c_name]
         demand = rows.limits['demand'][c_idx]
@@ -1100,19 +1159,25 @@ def ghg_rows(rows: RowInputs, space: dict):
     # land-use, ag-management and non-ag emissions on the coefficient support
     coeff = gather_coeffs(terms, rows.ag_g_mrj, rows.ag_man_g_mrj, rows.non_ag_g_rk)
     kept_cols, kept_vals = drop(terms['col'], coeff)
-    cols, vals = [kept_cols], [kept_vals]
+    cols = [kept_cols]
+    vals = [kept_vals]
     # transition emissions on the ag → ag arcs: per ag source, a float32 gather of the delta emissions
     arcs = space['ag2ag']
-    src_ptr, arc_col = arcs.attrs['src_ptr'], arcs['col'].values
-    to_m, local_r, to_j = arcs['to_m'].values, arcs['local_r'].values, arcs['to_j'].values
+    src_ptr = arcs.attrs['src_ptr']
+    arc_col = arcs['col'].values
+    to_m = arcs['to_m'].values
+    local_r = arcs['local_r'].values
+    to_j = arcs['to_j'].values
     for src_idx, src in enumerate(arcs.attrs['sources']):
-        start, stop = int(src_ptr[src_idx]), int(src_ptr[src_idx + 1])
+        start = int(src_ptr[src_idx])
+        stop = int(src_ptr[src_idx + 1])
         if start == stop:
             continue
         kept_cols, kept_vals = drop(arc_col[start:stop], rows.trans_ghg_ag2ag[src][to_m[start:stop], local_r[start:stop], to_j[start:stop]])
         cols.append(kept_cols)
         vals.append(kept_vals)
-    cols, vals = np.concatenate(cols), np.concatenate(vals)
+    cols = np.concatenate(cols)
+    vals = np.concatenate(vals)
     row = sparse.csr_matrix((vals, (np.zeros(cols.size, dtype=np.int32), cols)), shape=(1, n_all))
     row.sum_duplicates()
     row.sort_indices()
@@ -1127,10 +1192,14 @@ def _bio_block(family, group, key_names, rows: RowInputs, space: dict, pairs, v_
     ``layer_of(key)`` returns the layer over cells; ``skip_nonpositive`` = skip when the raw target
     is <= 0 (GBF4/8) vs < 0 (GBF3: a ZERO target still adds a row); rows whose region-masked
     layer has no positive cell are skipped."""
-    terms, bio_c = space['terms'], rows.bio_coeffs(space)
+    terms = space['terms']
+    bio_c = rows.bio_coeffs(space)
     n_all = space['layout']['n_all']
     reg_matrix = rows.region_NRM_names_r
-    val_rows, names, rhs, kept = [], [], [], []
+    val_rows = []
+    names = []
+    rhs = []
+    kept = []
     for key in pairs:
         lb_raw = v_limits.sel(dict(layer=key)).item()
         if (lb_raw <= 0) if skip_nonpositive else (lb_raw < 0):
@@ -1214,7 +1283,10 @@ def _regional_adoption_family(family, group, key_names, caps, cols_all, r_all, s
     """One regional-adoption block: Σ real_area[r] · X over the region's cells ≤ cap per (region, land use)."""
     n_all = space['layout']['n_all']
     real_area = rows.real_area
-    parts, names, rhs, keys = [], [], [], []
+    parts = []
+    names = []
+    rhs = []
+    keys = []
     for cap in caps:
         region_cells = cap[-2]
         if len(region_cells) == 0:
@@ -1291,7 +1363,10 @@ def water_rows(rows: RowInputs, space: dict):
     terms = space['terms']
     n_all = space['layout']['n_all']
     coeff = gather_coeffs(terms, rows.ag_w_mrj, rows.ag_man_w_mrj, rows.non_ag_w_rk)
-    val_rows, names, rhs, region_ids = [], [], [], []
+    val_rows = []
+    names = []
+    rhs = []
+    region_ids = []
     for region_id, water_limit_raw in rows.limits["water"].items():
         region_name = rows.water_region_names[region_id]
         print(f"│   │   ├── target (inside LUTO study area) is {water_limit_raw:15,.0f} ML for {region_name}")
@@ -1327,7 +1402,8 @@ def renewable_rows(rows: RowInputs, space: dict):
     terms = space['terms']
     n_all = space['layout']['n_all']
     ncells = space['ag'].sizes['cell']
-    n_ag_terms, am_terms = terms['ag']['r'].size, terms['am']
+    n_ag_terms = terms['ag']['r'].size
+    am_terms = terms['am']
 
     # ── the coefficient per type: energy_r on that type's ag-mgt columns, 0 on every other term ──
     coeff_of_type = {}
@@ -1335,12 +1411,17 @@ def renewable_rows(rows: RowInputs, space: dict):
         if am_name in re_types:
             coeff = np.zeros(terms['r'].size, dtype=np.float32)
             type_terms = np.flatnonzero(am_terms['am_idx'] == am_idx)
-            coeff[n_ag_terms + type_terms] = np.asarray(re_types[am_name]['energy_r'], dtype=np.float32)[am_terms['r'][type_terms]]
+            coeff[n_ag_terms + type_terms] = re_types[am_name]['energy_r'][am_terms['r'][type_terms]]   # float32 yield per cell
             coeff_of_type[am_name] = coeff
 
     # ── one row per (state, type) with eligible cells ──
-    feasible_ag, agman2lu = space['feasible']['ag'], space['am'].attrs['agman2lu']
-    parts, names, rhs, key_am, key_state = [], [], [], [], []
+    ag_exists = space['ag']['exists'].values   # (lm, lu, cell)
+    agman2lu = space['am'].attrs['agman2lu']
+    parts = []
+    names = []
+    rhs = []
+    key_am = []
+    key_state = []
     for state_name, state_code in region_state_name2idx.items():
         state_cells = np.where(rows.region_state_r == state_code)[0]
         if state_name == 'New South Wales':                              # ACT counts toward the NSW+ACT target
@@ -1355,7 +1436,7 @@ def renewable_rows(rows: RowInputs, space: dict):
             # cell-set row-inclusion rule (NOT a coefficient test): some compatible land use must have eligible cells
             has_cells = False
             for j in agman2lu[am]:
-                eligible_cells = np.intersect1d(np.union1d(feasible_ag[0, j], feasible_ag[1, j]), state_cells)
+                eligible_cells = np.intersect1d(np.flatnonzero(ag_exists[:, j, :].any(axis=0)), state_cells)
                 if settings.EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS == True:
                     eligible_cells = np.setdiff1d(eligible_cells, re_data['gbf2_mask_idx'])
                 if settings.EXCLUDE_RENEWABLES_IN_EPBC_MNES_MASK == True:
@@ -1392,7 +1473,8 @@ def source_cap_ag_rows(rows: RowInputs, space: dict):
     group-by over (source, cell) of the ag2ag ∪ ag2nonag arcs; a (source, cell) with no arcs has no row."""
     print("│   ├── Adding source-cap (Σ out ≤ base) constraints...")
     n_all = space['layout']['n_all']
-    ag2ag, ag2nonag = space['ag2ag'], space['ag2nonag']
+    ag2ag = space['ag2ag']
+    ag2nonag = space['ag2nonag']
     assert ag2ag.attrs['sources'] == ag2nonag.attrs['sources'], 'ag2ag / ag2nonag must share the ag source order'
     base_ag = np.ascontiguousarray(space['ag']['base'].values.transpose(0, 2, 1))   # (m, r, j), contiguous after the transpose
     # the two arc lists concatenated, keyed by (source, local cell)
@@ -1421,11 +1503,13 @@ def source_cap_nonag_rows(rows: RowInputs, space: dict):
         return None
     base_nonag = np.ascontiguousarray(space['nonag']['base'].values.T)   # (r, k), contiguous after the transpose
     stride = space['ag'].sizes['cell']
-    src, local_r = nonag2ag['src'].values, nonag2ag['local_r'].values
+    src = nonag2ag['src'].values
+    local_r = nonag2ag['local_r'].values
     key = src.astype(np.int64) * stride + local_r
     unique_keys, first_arc, row_of_arc = np.unique(key, return_index=True, return_inverse=True)
     A = sparse.csr_matrix((np.ones(key.size), (row_of_arc, nonag2ag['col'].values.astype(np.int64))), shape=(unique_keys.size, n_all))
-    from_k, cell = nonag2ag['from_k'].values[first_arc], nonag2ag['cell'].values[first_arc]
+    from_k = nonag2ag['from_k'].values[first_arc]
+    cell = nonag2ag['cell'].values[first_arc]
     rhs = base_nonag[cell, from_k].astype(np.float64)
     names = [f"srccap_n_{k}_{r}" for k, r in zip(from_k, local_r[first_arc])]
     return make_block('source_cap_nonag', 'flow_out', dict(from_k=from_k, local_r=local_r[first_arc]), A, rhs, '<', names)
@@ -1443,7 +1527,9 @@ def node_balance_rows(rows: RowInputs, space: dict):
     row, so its outflow arcs are dropped."""
     print("│   └── Adding node-balance (X = base + Σin − Σout) constraints...")
     n_all = space['layout']['n_all']
-    ag2ag, ag2nonag, nonag2ag = space['ag2ag'], space['ag2nonag'], space['nonag2ag']
+    ag2ag = space['ag2ag']
+    ag2nonag = space['ag2nonag']
+    nonag2ag = space['nonag2ag']
     ag_j, ag_m, ag_r, ag_cols = col_builder.columns(space['ag'], ('lu', 'lm', 'cell'), ('lu', 'lm', 'cell'))
     col_ag = space['ag']['col'].values                                   # (lm, lu, cell) -> global column = ag row of the block
     col_nonag = space['nonag']['col'].values                             # (k, cell) -> global column
@@ -1452,10 +1538,9 @@ def node_balance_rows(rows: RowInputs, space: dict):
 
     # ── the rows: one per ag column, then one per (non-ag land use, feasible cell) ──
     n_ag = ag_cols.size
-    feasible_nonag = space['feasible']['nonag']
-    n_k = space['nonag'].sizes['nonag_lu']
-    nonag_k = np.concatenate([np.full(len(feasible_nonag[k]), k, dtype=np.int64) for k in range(n_k)])
-    nonag_r = np.concatenate([np.asarray(feasible_nonag[k], dtype=np.int64) for k in range(n_k)])
+    nonag_k, nonag_r = np.nonzero(space['nonag']['feasible'].values)     # every land use, k then cell
+    nonag_k = nonag_k.astype(np.int64)
+    nonag_r = nonag_r.astype(np.int64)
     n_nonag = nonag_r.size
     row_of_nonag = np.full(col_nonag.shape, -1, dtype=np.int64)         # (k, r) -> balance row
     row_of_nonag[nonag_k, nonag_r] = n_ag + np.arange(n_nonag)
@@ -1464,7 +1549,9 @@ def node_balance_rows(rows: RowInputs, space: dict):
     row_sign[n_ag:] = np.where(x_col_nonag >= 0, 1.0, -1.0)
 
     # ── the entries: X on its own row, inflows −1 on the target's row, outflows +1 on the source's row ──
-    row_idx, cols, vals = [], [], []
+    row_idx = []
+    cols = []
+    vals = []
 
     def add(row, col, value):
         in_model = row >= 0                                              # no row (banned source / no X var): entry dropped
@@ -1474,7 +1561,9 @@ def node_balance_rows(rows: RowInputs, space: dict):
 
     add(np.arange(n_ag), ag_cols, 1.0)
     add(np.where(x_col_nonag >= 0, n_ag + np.arange(n_nonag), -1), x_col_nonag, 1.0)
-    ag2ag_col, ag2nonag_col, nonag2ag_col = ag2ag['col'].values, ag2nonag['col'].values, nonag2ag['col'].values
+    ag2ag_col = ag2ag['col'].values
+    ag2nonag_col = ag2nonag['col'].values
+    nonag2ag_col = nonag2ag['col'].values
     add(col_ag[ag2ag['to_m'].values, ag2ag['to_j'].values, ag2ag['cell'].values], ag2ag_col, -1.0)
     add(col_ag[nonag2ag['to_m'].values, nonag2ag['to_j'].values, nonag2ag['cell'].values], nonag2ag_col, -1.0)
     add(col_ag[ag2ag['from_m'].values, ag2ag['from_j'].values, ag2ag['cell'].values], ag2ag_col, 1.0)
@@ -1505,7 +1594,7 @@ def biodiversity_rows(rows: RowInputs, space: dict):
 FAMILIES = (
     renewable_ceiling_rows,
     cell_usage_rows,
-    acct_link_rows,
+    accounting_link_rows,
     ag_mgt_link_rows,
     ag_mgt_adoption_rows,
     demand_rows,
