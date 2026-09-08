@@ -54,14 +54,14 @@ def drop(col: np.ndarray, q: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return col[keep], q[keep]
 
 
-def am_slots(cols: dict) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """The (am, lu) slots of the ag-mgt block: per slot its option, its land use's position within the
-    option (the last axis of the per-option effect arrays [m, r, j_idx]) and — the block being sorted by
-    slot, so each slot is one run of table rows — the bounds of that run (``slot_ptr``)."""
-    table, am = cols['table'], cols['am']
-    rows = block_slice(table, 'am')
-    slot_ptr = rows.start + np.searchsorted(table['slot'].values[rows], np.arange(am.sizes['slot'] + 1))
-    return am['am'].values, am['j_idx'].values, slot_ptr
+def am_runs(table: xr.Dataset, by: str) -> list:
+    """The am block grouped by ``by`` — ``'am_idx'`` (the option) or ``'slot'`` (the (am, lu) slot) — as runs
+    of table rows: the block is sorted by slot and the slots by option, so every group present is one run.
+    Returns the (start, stop) of each run; a group's fields are those of its first row."""
+    am = block_slice(table, 'am')
+    _, first = np.unique(table[by].values[am], return_index=True)
+    bounds = am.start + np.append(first, am.stop - am.start)
+    return list(zip(bounds[:-1].tolist(), bounds[1:].tolist()))
 
 
 def gather_coeffs(cols: dict, ag_c_mrj, am_c_mrj: dict, nonag_c_rk) -> np.ndarray:
@@ -69,16 +69,14 @@ def gather_coeffs(cols: dict, ag_c_mrj, am_c_mrj: dict, nonag_c_rk) -> np.ndarra
     the array is indexed by column — float32: ``ag_c_mrj[m, r, j]`` on the ag columns,
     ``nonag_c_rk[r, k]`` on the non-ag columns, ``am_c_mrj[am][m, r, j_idx]`` on the ag-mgt columns."""
     table = cols['table']
-    m, j, k, cell = (table[field].values for field in ('m', 'j', 'k', 'cell'))
+    m, j, k, cell, am_idx, j_idx = (table[field].values for field in ('m', 'j', 'k', 'cell', 'am_idx', 'j_idx'))
     ag, nonag = block_slice(table, 'ag'), block_slice(table, 'nonag')
-    option_of_slot, j_idx_of_slot, slot_ptr = am_slots(cols)
     c = np.empty(table.attrs['n_terms'], dtype=np.float32)
     c[ag] = ag_c_mrj[m[ag], cell[ag], j[ag]]
     c[nonag] = nonag_c_rk[cell[nonag], k[nonag]]
-    for slot, (option, j_idx) in enumerate(zip(option_of_slot, j_idx_of_slot)):
-        run = slice(slot_ptr[slot], slot_ptr[slot + 1])
-        if run.stop > run.start:
-            c[run] = am_c_mrj[option][m[run], cell[run], j_idx]
+    for start, stop in am_runs(table, 'am_idx'):
+        run = slice(start, stop)
+        c[run] = am_c_mrj[table.attrs['options'][am_idx[start]]][m[run], cell[run], j_idx[run]]
     return c
 
 
@@ -86,19 +84,17 @@ def gather_bio_coeffs(cols: dict, contr_ag_j, contr_am: dict, contr_nonag_k: dic
     """The biodiversity contribution at every scored column: a scalar per ag land use, a per-cell array
     per (am, land use), a scalar per non-ag land use — the shared C of the GBF families."""
     table = cols['table']
-    j, k, cell = (table[field].values for field in ('j', 'k', 'cell'))
+    j, k, cell, am_idx, j_idx = (table[field].values for field in ('j', 'k', 'cell', 'am_idx', 'j_idx'))
     ag, nonag = block_slice(table, 'ag'), block_slice(table, 'nonag')
-    option_of_slot, j_idx_of_slot, slot_ptr = am_slots(cols)
     c = np.zeros(table.attrs['n_terms'], dtype=np.float32)
     c[ag] = contr_ag_j[j[ag]]                                                    # float32 per land use
     n_k = max(contr_nonag_k) + 1 if len(contr_nonag_k) else 0
     contr_by_k = np.array([contr_nonag_k.get(lu, 0.0) for lu in range(n_k)], dtype=np.float32)
     if nonag.stop > nonag.start:
         c[nonag] = contr_by_k[k[nonag]]
-    for slot, (option, j_idx) in enumerate(zip(option_of_slot, j_idx_of_slot)):
-        run = slice(slot_ptr[slot], slot_ptr[slot + 1])
-        if run.stop > run.start:
-            c[run] = np.asarray(contr_am[option][int(j_idx)], dtype=np.float32)[cell[run]]
+    for start, stop in am_runs(table, 'slot'):
+        run = slice(start, stop)
+        c[run] = np.asarray(contr_am[table.attrs['options'][am_idx[start]]][int(j_idx[start])], dtype=np.float32)[cell[run]]
     return c
 
 
@@ -1033,10 +1029,8 @@ def demand_rows(rows: RowInputs, cols: dict):
     print("│   ├── Adding <hard> demand constraints (equality where lb==ub, else lower + upper)...")
     table = cols['table']
     n_all = table.attrs['n_all']
-    m, j, k, cell = (table[field].values for field in ('m', 'j', 'k', 'cell'))
+    m, j, k, cell, am_idx = (table[field].values for field in ('m', 'j', 'k', 'cell', 'am_idx'))
     ag, nonag = block_slice(table, 'ag'), block_slice(table, 'nonag')
-    option_of_slot, _, slot_ptr = am_slots(cols)
-    j_of_slot = cols['am']['j'].values
     ncms = rows.ncms
     row_idx = []
     col_idx = []
@@ -1059,10 +1053,11 @@ def demand_rows(rows: RowInputs, cols: dict):
             group = ag.start + np.flatnonzero((m[ag] == lm) & (j[ag] == lu))
             if group.size:
                 put(rows.pr2cm_cp[:, active_p] @ rows.ag_q_mrp[lm, cell[group], :][:, active_p].T, group)
-    for slot, option in enumerate(option_of_slot):
-        run = slice(slot_ptr[slot], slot_ptr[slot + 1])
-        active_p = np.where(rows.lu2pr_pj[:, j_of_slot[slot]])[0]
-        if not active_p.size or run.stop == run.start:
+    for start, stop in am_runs(table, 'slot'):
+        run = slice(start, stop)
+        option = table.attrs['options'][am_idx[start]]
+        active_p = np.where(rows.lu2pr_pj[:, j[start]])[0]
+        if not active_p.size:
             continue
         for lm in (0, 1):
             group = run.start + np.flatnonzero(m[run] == lm)
@@ -1351,17 +1346,16 @@ def renewable_rows(rows: RowInputs, cols: dict):
     region_state_name2idx = dict(rows.region_state_name2idx)                # local copy: pop() must not mutate data's dict
     act_code = region_state_name2idx.pop('Australian Capital Territory')
     table = cols['table']
-    cell = table['cell'].values
+    cell, am_idx = table['cell'].values, table['am_idx'].values
     ncells = cols['ag'].sizes['cell']
-    option_of_slot, _, slot_ptr = am_slots(cols)
 
-    # ── the coefficient per type: energy_r on that type's ag-mgt columns (its slots' runs of the table), 0 on every other scored column ──
+    # ── the coefficient per type: energy_r on that type's ag-mgt columns (the option's run of the table), 0 on every other scored column ──
     coeff_of_type = {}
-    for slot, option in enumerate(option_of_slot):
+    for start, stop in am_runs(table, 'am_idx'):
+        option = table.attrs['options'][am_idx[start]]
         if option in re_types:
-            run = slice(slot_ptr[slot], slot_ptr[slot + 1])
-            coeff = coeff_of_type.setdefault(option, np.zeros(table.attrs['n_terms'], dtype=np.float32))
-            coeff[run] = re_types[option]['energy_r'][cell[run]]         # float32 yield per cell
+            coeff_of_type[option] = np.zeros(table.attrs['n_terms'], dtype=np.float32)
+            coeff_of_type[option][start:stop] = re_types[option]['energy_r'][cell[start:stop]]   # float32 yield per cell
 
     # ── one row per (state, type) with eligible cells ──
     ag_has_col_mjr = cols['ag']['col'].values >= 0

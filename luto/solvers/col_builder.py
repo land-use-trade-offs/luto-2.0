@@ -31,8 +31,9 @@ whole space as ONE long table on ``col`` = Var.index: one row per column in bloc
 its fields the attributes of that column (-1 where a field does not apply), ``attrs['block_ptr']``
 marking where each block's run of rows starts and ends. The row families read the table: the policy
 families score its first three blocks (ag | nonag | am, the ``n_terms`` scored columns), the flow rows
-are group-bys over its arc blocks, and the wide ``col`` grids of ag / nonag / am / cell_usage stay for
-the lookups "which column is (m, j, r)" (the ag-mgt link and adoption rows, the source-cap base).
+are group-bys over its arc blocks, and the wide ``col`` grids of ag / nonag / am stay for the lookups
+"which column is (m, j, r)" (the ag-mgt link and adoption rows, the source-cap base, the disabled non-ag
+land uses of the node-balance rows).
 """
 
 import numpy as np
@@ -259,12 +260,14 @@ def am_space(data: Data, ag_col_mjr: np.ndarray, mask_gbf2_solar: np.ndarray, ma
 
     slot_index = pd.MultiIndex.from_arrays([[am for am, _ in pairs], [data.AGRICULTURAL_LANDUSES[j] for _, j in pairs]], names=['am', 'lu'])
     coords = xr.Coordinates.from_pandas_multiindex(slot_index, 'slot').assign(lm=list(data.LANDMANS), cell=np.arange(data.NCELLS))
+    am_idx = [option for option, lu_codes in enumerate(data.AGMAN2LU.values()) for _ in lu_codes]        # the slot's option, in pairs order
     j_idx = [position for lu_codes in data.AGMAN2LU.values() for position in range(len(lu_codes))]   # the slot's land use within its option, in pairs order
 
     return xr.Dataset(
         dict(col  =(('slot', 'lm', 'cell'), col_smr),                              # column id (-1 = no column); col >= 0 is the select for gp.Var creation, grid order = column order
              lb   =(('slot', 'lm', 'cell'), lb_smr),                               # attribute: the base-year adoption for non-reversible options, else 0 (ub = 1 for every column)
              j    =(('slot',), np.array([j for _, j in pairs], dtype=np.int32)),   # the land-use code of each (am, lu) slot
+             am_idx=(('slot',), np.array(am_idx, dtype=np.int32)),                 # the option of each slot, as an index into agman2lu
              j_idx=(('slot',), np.array(j_idx, dtype=np.int32))                    # the land use's position within its option: the last axis of the per-option effect arrays [m, r, j_idx]
         ),
         coords=coords,
@@ -398,7 +401,8 @@ def table_space(blocks: dict, ag_mask_r: np.ndarray) -> xr.Dataset:
     k, r = np.nonzero(nonag['col'].values >= 0)                                             # column order: k, cell
     nonag_rows = dict(k=k, cell=r, lb=nonag['lb'].values[k, r], ub=nonag['ub'].values[k, r], base=nonag['base'].values[k, r])
     slot, m, r = np.nonzero(am['col'].values >= 0)                                          # column order: slot, lm, cell
-    am_rows = dict(slot=slot, m=m, j=am['j'].values[slot], cell=r, lb=am['lb'].values[slot, m, r], ub=1.0)
+    am_rows = dict(slot=slot, am_idx=am['am_idx'].values[slot], j_idx=am['j_idx'].values[slot], m=m, j=am['j'].values[slot], cell=r,
+                   lb=am['lb'].values[slot, m, r], ub=1.0)
     ag2ag_rows = dict(from_m=ag2ag['from_m'].values, from_j=ag2ag['from_j'].values, m=ag2ag['to_m'].values, j=ag2ag['to_j'].values,
                       local_r=ag2ag['local_r'].values, cell=ag2ag['cell'].values, ub=np.inf)
     ag2nonag_rows = dict(from_m=ag2nonag['from_m'].values, from_j=ag2nonag['from_j'].values, k=ag2nonag['to_k'].values,
@@ -432,7 +436,9 @@ def table_space(blocks: dict, ag_mask_r: np.ndarray) -> xr.Dataset:
              m      =(('col',), field('m', np.int32, -1)),                                   # the ag (lm, lu) the column lands on: own (ag), host (am), TO fields (ag2ag, nonag2ag)
              j      =(('col',), field('j', np.int32, -1)),
              k      =(('col',), field('k', np.int32, -1)),                                   # the non-ag land use it lands on: own (nonag), TO field (ag2nonag)
-             slot   =(('col',), field('slot', np.int32, -1)),                                # the (am, lu) slot of an ag-mgt column
+             slot   =(('col',), field('slot', np.int32, -1)),                                # the (am, lu) slot of an ag-mgt column ...
+             am_idx =(('col',), field('am_idx', np.int32, -1)),                              # ... its option (attrs['options'][am_idx] is the name) ...
+             j_idx  =(('col',), field('j_idx', np.int32, -1)),                               # ... and its land use's position within the option (the last axis of the per-option effect arrays)
              from_m =(('col',), field('from_m', np.int32, -1)),                              # where an arc comes from
              from_j =(('col',), field('from_j', np.int32, -1)),
              from_k =(('col',), field('from_k', np.int32, -1)),
@@ -444,6 +450,7 @@ def table_space(blocks: dict, ag_mask_r: np.ndarray) -> xr.Dataset:
         ),
         coords=dict(col=np.arange(block_ptr[-1])),
         attrs=dict(blocks=list(BLOCKS), block_ptr=block_ptr,
+                   options=list(am.attrs['agman2lu']),                                       # the ag-management options, in am_idx order
                    n_terms=n_terms,                                                          # the scored columns: ag | nonag | am, the first rows of the table
                    n_dec=int(block_ptr[-2]),                                                 # the decision columns end with the last nonag2ag arc: the objective is built at this width (the slacks carry no cost)
                    n_all=int(block_ptr[-1]),                                                 # every column: the rows are built at this width
@@ -456,7 +463,7 @@ def table_space(blocks: dict, ag_mask_r: np.ndarray) -> xr.Dataset:
 # ═══════════════════════════ get_cols: the column space of one step ═══════════════════════════
 
 def get_cols(data: Data, base_year: int) -> dict:
-    """The column space of one solve step: every unknown as one row of the long table (``table``), the wide id grids of ag / nonag / am / cell_usage holding their actual Var.index ids, the sources and the masks."""
+    """The column space of one solve step: every unknown as one row of the long table (``table``), the wide id grids of ag / nonag / am holding their actual Var.index ids, the sources and the masks."""
 
     # ── 1. sources (FROM-view): the base-year holders of land ──
     trans_source_ag         = get_trans_source_ag(data, base_year)              # (from_m, from_j): global cell indices
@@ -520,7 +527,6 @@ def get_cols(data: Data, base_year: int) -> dict:
         ag=blocks['ag'],
         nonag=blocks['nonag'],
         am=blocks['am'],
-        cell_usage=blocks['cell_usage'],
         sources=dict(ag=trans_source_ag, nonag=trans_source_nonag),
         mask_gbf2_solar=mask_gbf2_solar,
         mask_gbf2_wind=mask_gbf2_wind,

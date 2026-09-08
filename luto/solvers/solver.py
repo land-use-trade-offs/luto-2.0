@@ -347,7 +347,7 @@ class LutoSolver:
         table = self._cols['table']
         ptr = table.attrs['block_ptr']
         rows_of = {block: slice(int(a), int(b)) for block, a, b in zip(table.attrs['blocks'], ptr[:-1], ptr[1:])}
-        m, j, k, slot, local_r, cell = (table[field].values for field in ('m', 'j', 'k', 'slot', 'local_r', 'cell'))
+        m, j, k, am_idx, local_r, cell = (table[field].values for field in ('m', 'j', 'k', 'am_idx', 'local_r', 'cell'))
         x_vals = self.x.X                                                # every column, float64
 
         X_dry_sol_rj = np.zeros((self._ncells, self._n_ag_lus), dtype=np.float32)
@@ -368,11 +368,11 @@ class LutoSolver:
 
         # ag-management. Savanna eligibility is applied to BOTH lm here, while variable creation applied
         # it to dry only: irr savanna vars outside the eligible cells report 0.
-        am_ds = self._cols['am']
         am = rows_of['am']
-        am_of_col = am_ds['am'].values[slot[am]]
-        reported = ~((am_of_col == "Savanna Burning") & (m[am] == 1) & ~np.isin(cell[am], am_ds.attrs['savanna_eligible_r']))
-        for option in am_ds.attrs['agman2lu']:
+        options = table.attrs['options']
+        am_of_col = np.asarray(options, dtype=object)[am_idx[am]]
+        reported = ~((am_of_col == "Savanna Burning") & (m[am] == 1) & ~np.isin(cell[am], self._cols['am'].attrs['savanna_eligible_r']))
+        for option in options:
             dry_cols = reported & (am_of_col == option) & (m[am] == 0)
             irr_cols = reported & (am_of_col == option) & (m[am] == 1)
             am_X_dry_sol_rj[option][cell[am][dry_cols], j[am][dry_cols]] = x_vals[am][dry_cols]
