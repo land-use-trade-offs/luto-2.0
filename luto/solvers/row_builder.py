@@ -27,7 +27,6 @@ from typing import Any, Optional
 
 from luto.data import Data
 from luto import settings
-from luto.solvers.col_builder import block_slice
 import luto.tools as tools
 
 import luto.economics.agricultural.cost as ag_cost
@@ -52,6 +51,12 @@ def drop(col: np.ndarray, q: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     dropped). Returns (column, coefficient) of the kept terms."""
     keep = np.abs(q) >= settings.SOLVER_COEFF_MIN
     return col[keep], q[keep]
+
+
+def block_slice(table: xr.Dataset, block: str) -> slice:
+    """The rows of one block of the column table — its Var.index range (``attrs['block_ptr']`` holds the bounds)."""
+    code = table.attrs['blocks'].index(block)
+    return slice(int(table.attrs['block_ptr'][code]), int(table.attrs['block_ptr'][code + 1]))
 
 
 def am_runs(table: xr.Dataset, by: str) -> list:
