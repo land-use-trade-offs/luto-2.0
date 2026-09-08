@@ -174,7 +174,7 @@ class Data:
             lu_mask_fullres[settings.RESFACTOR//2::settings.RESFACTOR, settings.RESFACTOR//2::settings.RESFACTOR] = have_lu_cell_downsampled
 
             # Get the coords (row, col) of the cells that are the center of a res*res neighbourhood having >=1 land-use cells
-            self.COORD_ROW_COL_FULLRES = np.argwhere(rf_mask & lu_mask_fullres).T
+            self.COORD_ROW_COL_FULLRES = np.vstack(np.nonzero(rf_mask & lu_mask_fullres))   # (2, n): the row and col index of every hit
             self.COORD_ROW_COL_RESFACTORED = (self.COORD_ROW_COL_FULLRES - (settings.RESFACTOR//2)) // settings.RESFACTOR
             
             # Get the 1D MASK for resfactoring all input datasets
@@ -190,7 +190,7 @@ class Data:
             self.MASK = self.LUMASK
             self.GEO_META = self.GEO_META_FULLRES
             self.LUMAP_2D_RESFACTORED = self.LUMAP_2D_FULLRES
-            self.COORD_ROW_COL_FULLRES = np.argwhere(self.NLUM_MASK == 1).T
+            self.COORD_ROW_COL_FULLRES = np.vstack(np.nonzero(self.NLUM_MASK == 1))       # (2, n): the row and col index of every hit
             self.COORD_ROW_COL_RESFACTORED = self.COORD_ROW_COL_FULLRES
         else:
             raise KeyError("Resfactor setting invalid")

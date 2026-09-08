@@ -863,7 +863,7 @@ def renewable_ceiling_rows(rows: RowInputs, cols: dict):
     data years, so the ceiling never decreases between periods (lb(t) ≤ ceiling always holds)."""
     n_all = cols['layout']['n_all']
     am_ds = cols['am']
-    am_col = am_ds['col'].values
+    am_col_smr = am_ds['col_smr'].values
     am_of_slot = am_ds['am'].values
     ag_mask = rows.ag_mask_proportion_r
     parts = []
@@ -877,7 +877,7 @@ def renewable_ceiling_rows(rows: RowInputs, cols: dict):
         am_name = tools.am_name_snake_case(am)
         exist_r = rows.exist_renewable_solar_r if am == "Utility Solar PV" else rows.exist_renewable_wind_r
         # the option's columns, grouped by cell
-        option_col = am_col[am_of_slot == am]                            # (slots of the option, lm, cell)
+        option_col = am_col_smr[am_of_slot == am]                            # (slots of the option, lm, cell)
         _, _, col_cell = np.nonzero(option_col >= 0)
         col_idx = option_col[option_col >= 0]
         cells, cell_of_col = np.unique(col_cell, return_inverse=True)    # the option's cells, ascending
@@ -903,11 +903,11 @@ def renewable_ceiling_rows(rows: RowInputs, cols: dict):
 
 def cell_usage_band(rows: RowInputs, cols: dict):
     """The cell-usage rows' cells, lower and upper bound: Σ(ag + non-ag shares) ∈ [ag_mask − band,
-    ag_mask + band] on the cells that can meet it (``cols['cell_usage'].exists``). Ranged, not ==:
+    ag_mask + band] on the cells that can meet it (``cols['cell_usage'].col_r >= 0``). Ranged, not ==:
     presolve folds the node-balance rows into this one and compares two constants summed along
     different float32 paths (up to ~1.75x FeasibilityTol apart) with NO tolerance. The ±10x Ftol
     band absorbs that; conservation still pins the cell total, so the band is not exploitable."""
-    row_cells = np.flatnonzero(cols['cell_usage']['exists'].values)
+    row_cells = np.flatnonzero(cols['cell_usage']['col_r'].values >= 0)
     band = 10 * settings.FEASIBILITY_TOLERANCE
     ag_mask = rows.ag_mask_proportion_r[row_cells].astype(np.float64)   # widen before the band is applied
     return row_cells, ag_mask - band, ag_mask + band
@@ -923,61 +923,63 @@ def cell_usage_rows(rows: RowInputs, cols: dict):
     n_rows = row_cells.size
     row_of_cell = np.full(cols['ag'].sizes['cell'], -1, dtype=np.int64)
     row_of_cell[row_cells] = np.arange(n_rows)
-    ag_cell, ag_cols = col_builder.columns(cols['ag'], ('lu', 'lm', 'cell'))
-    nonag_cell, nonag_cols = col_builder.columns(cols['nonag'], ('nonag_lu', 'cell'))
+    ag_cell, ag_cols = col_builder.columns(cols['ag']['col_mjr'])
+    nonag_cell, nonag_cols = col_builder.columns(cols['nonag']['col_kr'])
     row_idx = np.concatenate([row_of_cell[ag_cell], row_of_cell[nonag_cell], np.arange(n_rows)])
-    col_idx = np.concatenate([ag_cols, nonag_cols, cols['cell_usage']['col'].values[row_cells]])
+    col_idx = np.concatenate([ag_cols, nonag_cols, cols['cell_usage']['col_r'].values[row_cells]])
     in_row = row_idx >= 0
     A = sparse.csr_matrix((np.ones(int(in_row.sum())), (row_idx[in_row], col_idx[in_row])), shape=(n_rows, n_all))
     return make_block('cell_usage', 'cell_usage', dict(cell=row_cells), A, hi, '=',
                       [f"const_cell_usage_{cell}" for cell in row_cells], n_skipped=int(cols['ag'].sizes['cell'] - n_rows))
 
 
-def accounting_link_rows(rows: RowInputs, cols: dict):
-    """The θ fold, written down once: one exact equality per accounting column.
+def fold_link_rows(rows: RowInputs, cols: dict):
+    """The θ fold, written down once: one exact equality per fold column.
 
-        sliver   (from_m, from_j, r):  X_acct − fold_share · X_ag[dom] − X_ag[sliver] = 0   (the last term only if the
-                                       sliver land use owns an ag var at that cell)
-        dominant (to_m, to_j, r):      X_acct − (1 − Σ fold_share) · X_ag[dom] = 0
+        emitter   (from_m, from_j, r):  X_acct − fold_share · X_ag[receiver] − X_ag[emitter] = 0   (the last term only if the
+                                       emitter land use owns an ag var at that cell)
+        receiver (to_m, to_j, r):      X_acct − (1 − Σ fold_share) · X_ag[receiver] = 0
 
-    fold_share = the sliver's base fraction / its dominant's folded fraction (float32). NOT rescaled and NOT floored — the fold is exact by
+    fold_share = the emitter's base fraction / its receiver's folded fraction (float32). NOT rescaled and NOT floored — the fold is exact by
     construction and stays so; ``min |fold_share| > 0`` is asserted. Row order = column order of the
-    accounting block (dominants, then slivers)."""
-    accounting = cols['accounting']
-    n_dom = accounting.attrs['n_dom']
-    n_slivers = accounting.attrs['n_sliver']
-    if n_dom + n_slivers == 0:
+    fold block (receivers, then emitters)."""
+    fold = cols['fold']
+    n_receiver = fold.attrs['n_receiver']
+    n_emitter = fold.attrs['n_emitter']
+    if n_receiver + n_emitter == 0:
         return None
     n_all = cols['layout']['n_all']
-    fold_share = accounting['sliver_fold_share'].values.astype(np.float64)
+    fold_share = fold['emitter_fold_share'].values.astype(np.float64)
     assert fold_share.size == 0 or np.abs(fold_share).min() > 0.0, 'a fold share of exactly zero cannot be linked'
+    fold_share_sum = np.zeros(n_receiver, dtype=np.float64)                 # Σ fold_share over the emitters of each receiver
+    np.add.at(fold_share_sum, fold['emitter_receiver'].values, fold_share)
     row_idx = []
     col_idx = []
     vals = []
-    # dominant rows: X_acct[dom] − (1 − Σ fold_share) · X_ag[dom] = 0
-    dom_row = np.arange(n_dom)
-    row_idx += [dom_row, dom_row]
-    col_idx += [accounting['dom_accounting_col'].values, accounting['dom_ag_col'].values]
-    vals += [np.ones(n_dom), -(1.0 - accounting['dom_fold_share_sum'].values)]
-    # sliver rows: X_acct[sliver] − fold_share · X_ag[dom] (− X_ag[sliver] where the sliver owns an ag column) = 0
-    sliver_row = n_dom + np.arange(n_slivers)
-    row_idx += [sliver_row, sliver_row]
-    col_idx += [accounting['sliver_accounting_col'].values, accounting['sliver_dom_ag_col'].values]
-    vals += [np.ones(n_slivers), -fold_share]
-    owns_ag_col = accounting['sliver_ag_col'].values >= 0
-    row_idx.append(sliver_row[owns_ag_col])
-    col_idx.append(accounting['sliver_ag_col'].values[owns_ag_col])
+    # receiver rows: X_acct[receiver] − (1 − Σ fold_share) · X_ag[receiver] = 0
+    receiver_row = np.arange(n_receiver)
+    row_idx += [receiver_row, receiver_row]
+    col_idx += [fold['receiver_fold_col'].values, fold['receiver_ag_col'].values]
+    vals += [np.ones(n_receiver), -(1.0 - fold_share_sum)]
+    # emitter rows: X_acct[emitter] − fold_share · X_ag[receiver] (− X_ag[emitter] where the emitter owns an ag column) = 0
+    emitter_row = n_receiver + np.arange(n_emitter)
+    row_idx += [emitter_row, emitter_row]
+    col_idx += [fold['emitter_fold_col'].values, fold['emitter_receiver_ag_col'].values]
+    vals += [np.ones(n_emitter), -fold_share]
+    owns_ag_col = fold['emitter_ag_col'].values >= 0
+    row_idx.append(emitter_row[owns_ag_col])
+    col_idx.append(fold['emitter_ag_col'].values[owns_ag_col])
     vals.append(-np.ones(int(owns_ag_col.sum())))
     A = sparse.csr_matrix((np.concatenate(vals), (np.concatenate(row_idx).astype(np.int64), np.concatenate(col_idx).astype(np.int64))),
-                          shape=(n_dom + n_slivers, n_all))
-    # keys and names: (lm, lu code, cell) of the accounting entry, dominants then slivers
-    lu_code = {name: j for j, name in enumerate(cols['ag'].lu.values)}
-    lm = np.concatenate([accounting['dom_lm'].values, accounting['sliver_from_lm'].values])
-    lu = np.array([lu_code[name] for name in np.concatenate([accounting['dom_lu'].values, accounting['sliver_from_lu'].values])], dtype=np.int32)
-    cell = np.concatenate([accounting['dom_cell'].values, accounting['sliver_cell'].values])
+                          shape=(n_receiver + n_emitter, n_all))
+    # keys and names: (lm, lu code, cell) of the accounting entry, receivers then emitters
+    lu_code = {name: j for j, name in enumerate(cols['ag']['lu'].values)}
+    lm = np.concatenate([fold['receiver_lm'].values, fold['emitter_lm'].values])
+    lu = np.array([lu_code[name] for name in np.concatenate([fold['receiver_lu'].values, fold['emitter_lu'].values])], dtype=np.int32)
+    cell = np.concatenate([fold['receiver_cell'].values, fold['emitter_cell'].values])
     names = [f"acct_link_{lm_name}_{j}_{r}" for lm_name, j, r in zip(lm, lu, cell)]
     lm_code = (lm == 'irr').astype(np.int8)                              # integer key levels: cheap MultiIndex on millions of rows
-    return make_block('accounting_link', 'accounting_link', dict(lm=lm_code, lu=lu, cell=cell), A, np.zeros(n_dom + n_slivers), '=', names)
+    return make_block('fold_link', 'fold_link', dict(lm=lm_code, lu=lu, cell=cell), A, np.zeros(n_receiver + n_emitter), '=', names)
 
 
 def ag_mgt_link_rows(rows: RowInputs, cols: dict):
@@ -987,12 +989,12 @@ def ag_mgt_link_rows(rows: RowInputs, cols: dict):
     savanna-ineligible cell) the row is X_ag ≥ 0 (sense '>'). Row order: (am, land use) slot, dry
     then irr, cells ascending."""
     n_all = cols['layout']['n_all']
-    ag_col = cols['ag']['col'].values
+    ag_col_mjr = cols['ag']['col_mjr'].values
     am_ds = cols['am']
-    am_col = am_ds['col'].values
+    am_col_smr = am_ds['col_smr'].values
     am_of_slot = am_ds['am'].values
     j_of_slot = am_ds['j'].values
-    am_list = list(am_ds.attrs['am_list'])
+    am_list = list(am_ds.attrs['agman2lu'])
     row_idx = []
     col_idx = []
     vals = []
@@ -1007,9 +1009,9 @@ def ag_mgt_link_rows(rows: RowInputs, cols: dict):
         am = am_of_slot[slot]
         j = int(j_of_slot[slot])
         for m, lm in ((0, 'dry'), (1, 'irr')):
-            cells = np.flatnonzero(ag_col[m, j] >= 0)                    # the ag columns of (m, j), cells ascending
-            ag_cols = ag_col[m, j, cells]
-            am_cols = am_col[slot, m, cells]
+            cells = np.flatnonzero(ag_col_mjr[m, j] >= 0)                # the ag columns of (m, j), cells ascending
+            ag_cols = ag_col_mjr[m, j, cells]
+            am_cols = am_col_smr[slot, m, cells]
             has_am = am_cols >= 0
             slot_rows = n_rows + np.arange(cells.size)
             # X_ag: −1 on the '<' rows (X_am − X_ag ≤ 0), +1 on the '>' rows (X_ag ≥ 0)
@@ -1037,9 +1039,9 @@ def ag_mgt_adoption_rows(rows: RowInputs, cols: dict):
     """Adoption limits: one row per (am, land use), Σ am columns − limit · Σ ag columns ≤ 0
     (Σam ≤ limit · Σag with the RHS moved to the LHS); zero coefficients (limit = 0) are dropped."""
     n_all = cols['layout']['n_all']
-    ag_col = cols['ag']['col'].values
+    ag_col_mjr = cols['ag']['col_mjr'].values
     am_ds = cols['am']
-    am_col = am_ds['col'].values
+    am_col_smr = am_ds['col_smr'].values
     am_of_slot = am_ds['am'].values
     j_of_slot = am_ds['j'].values
     row_idx = []
@@ -1052,8 +1054,8 @@ def ag_mgt_adoption_rows(rows: RowInputs, cols: dict):
         am = am_of_slot[slot]
         j = int(j_of_slot[slot])
         adoption_limit = float(np.float64(rows.ag_man_limits[am][j]))
-        am_cols = am_col[slot][am_col[slot] >= 0]                        # both lm, every cell with an am column
-        ag_cols = ag_col[:, j][ag_col[:, j] >= 0]                        # dry + irr feasible cells
+        am_cols = am_col_smr[slot][am_col_smr[slot] >= 0]                # both lm, every cell with an am column
+        ag_cols = ag_col_mjr[:, j][ag_col_mjr[:, j] >= 0]                # dry + irr feasible cells
         row_idx += [np.full(am_cols.size, row), np.full(ag_cols.size, row)]
         col_idx += [am_cols, ag_cols]
         vals += [np.ones(am_cols.size), np.full(ag_cols.size, -adoption_limit)]
@@ -1312,7 +1314,7 @@ def regional_adoption_ag_rows(rows: RowInputs, cols: dict):
     if settings.REGIONAL_ADOPTION_CONSTRAINTS == "off":
         print("│   │   └── TURNING OFF constraints for regional adoption ...")
         return None
-    ag_j, ag_r, ag_cols = col_builder.columns(cols['ag'], ('lu', 'lm', 'cell'), ('lu', 'cell'))
+    ag_j, ag_r, ag_cols = col_builder.columns(cols['ag']['col_mjr'], ('lu', 'cell'))
     return _regional_adoption_family(
         'regional_adoption_ag', 'adopt_ag', ('region', 'lu'), rows.limits["ag_regional_adoption"], ag_cols, ag_r,
         lambda cap, reg_ind: (ag_j == cap[1]) & np.isin(ag_r, reg_ind),
@@ -1332,7 +1334,7 @@ def regional_adoption_nonag_rows(rows: RowInputs, cols: dict):
     """Per-(region, non-ag land use) caps ('on' mode), with the per-year relaxation."""
     if settings.REGIONAL_ADOPTION_CONSTRAINTS == "off":
         return None
-    na_k, na_r, na_cols = col_builder.columns(cols['nonag'], ('nonag_lu', 'cell'), ('nonag_lu', 'cell'))
+    na_k, na_r, na_cols = col_builder.columns(cols['nonag']['col_kr'], ('nonag_lu', 'cell'))
     relax = _nonag_cap_relax(rows)
     return _regional_adoption_family(
         'regional_adoption_nonag', 'adopt_nonag', ('region', 'lu'), rows.limits.get("non_ag_regional_adoption") or [], na_cols, na_r,
@@ -1344,7 +1346,7 @@ def regional_adoption_nonag_sum_rows(rows: RowInputs, cols: dict):
     """SUM-of-non-ag caps ('NON_AG_CAP' mode): all non-ag land uses in a region together."""
     if settings.REGIONAL_ADOPTION_CONSTRAINTS == "off":
         return None
-    na_k, na_r, na_cols = col_builder.columns(cols['nonag'], ('nonag_lu', 'cell'), ('nonag_lu', 'cell'))
+    na_k, na_r, na_cols = col_builder.columns(cols['nonag']['col_kr'], ('nonag_lu', 'cell'))
     relax = _nonag_cap_relax(rows)
     return _regional_adoption_family(
         'regional_adoption_nonag_sum', 'nonag_cap', ('region',), rows.limits.get("non_ag_regional_adoption_sum") or [], na_cols, na_r,
@@ -1392,10 +1394,9 @@ def renewable_rows(rows: RowInputs, cols: dict):
         print("│   ├── TURNING OFF renewable energy constraints ...")
         return None
     print("│   ├── Adding constraints for renewable energy production targets ...")
-    masks = cols['masks']
     re_types = {
-        'Utility Solar PV': dict(energy_r=rows.renewable_solar_r, gbf2_mask_idx=masks['gbf2_solar'], mnes_mask_idx=masks['mnes_solar']),
-        'Onshore Wind':     dict(energy_r=rows.renewable_wind_r,  gbf2_mask_idx=masks['gbf2_wind'],  mnes_mask_idx=masks['mnes_wind']),
+        'Utility Solar PV': dict(energy_r=rows.renewable_solar_r, gbf2_mask_idx=cols['mask_gbf2_solar'], mnes_mask_idx=cols['mask_mnes_solar']),
+        'Onshore Wind':     dict(energy_r=rows.renewable_wind_r,  gbf2_mask_idx=cols['mask_gbf2_wind'],  mnes_mask_idx=cols['mask_mnes_wind']),
     }
     region_state_name2idx = dict(rows.region_state_name2idx)                # local copy: pop() must not mutate data's dict
     act_code = region_state_name2idx.pop('Australian Capital Territory')
@@ -1415,7 +1416,7 @@ def renewable_rows(rows: RowInputs, cols: dict):
             coeff_of_type[am_name] = coeff
 
     # ── one row per (state, type) with eligible cells ──
-    ag_exists = cols['ag']['exists'].values   # (lm, lu, cell)
+    ag_has_col_mjr = cols['ag']['col_mjr'].values >= 0
     agman2lu = cols['am'].attrs['agman2lu']
     parts = []
     names = []
@@ -1436,7 +1437,7 @@ def renewable_rows(rows: RowInputs, cols: dict):
             # cell-set row-inclusion rule (NOT a coefficient test): some compatible land use must have eligible cells
             has_cells = False
             for j in agman2lu[am]:
-                eligible_cells = np.intersect1d(np.flatnonzero(ag_exists[:, j, :].any(axis=0)), state_cells)
+                eligible_cells = np.intersect1d(np.flatnonzero(ag_has_col_mjr[:, j, :].any(axis=0)), state_cells)
                 if settings.EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS == True:
                     eligible_cells = np.setdiff1d(eligible_cells, re_data['gbf2_mask_idx'])
                 if settings.EXCLUDE_RENEWABLES_IN_EPBC_MNES_MASK == True:
@@ -1476,7 +1477,7 @@ def source_cap_ag_rows(rows: RowInputs, cols: dict):
     ag2ag = cols['ag2ag']
     ag2nonag = cols['ag2nonag']
     assert ag2ag.attrs['sources'] == ag2nonag.attrs['sources'], 'ag2ag / ag2nonag must share the ag source order'
-    base_ag = np.ascontiguousarray(cols['ag']['base'].values.transpose(0, 2, 1))   # (m, r, j), contiguous after the transpose
+    base_ag = np.ascontiguousarray(cols['ag']['base_mjr'].values.transpose(0, 2, 1))   # (m, j, r) -> (m, r, j), contiguous after the transpose
     # the two arc lists concatenated, keyed by (source, local cell)
     stride = cols['ag'].sizes['cell']                                   # local_r < ncells
     key = np.concatenate([ag2ag['src'].values.astype(np.int64) * stride + ag2ag['local_r'].values,
@@ -1501,7 +1502,7 @@ def source_cap_nonag_rows(rows: RowInputs, cols: dict):
     nonag2ag = cols['nonag2ag']
     if not nonag2ag.attrs['n']:
         return None
-    base_nonag = np.ascontiguousarray(cols['nonag']['base'].values.T)   # (r, k), contiguous after the transpose
+    base_nonag = np.ascontiguousarray(cols['nonag']['base_kr'].values.T)   # (r, k), contiguous after the transpose
     stride = cols['ag'].sizes['cell']
     src = nonag2ag['src'].values
     local_r = nonag2ag['local_r'].values
@@ -1523,28 +1524,28 @@ def node_balance_rows(rows: RowInputs, cols: dict):
 
     One row per ag column (column order), then one per (non-ag land use, feasible cell) — every
     non-ag land use, enabled or not: a disabled one's row is a pure inflow guard with no X column,
-    stored with the opposite sign (``row_sign``). A source with no X var (banned dominant) has no
+    stored with the opposite sign (``row_sign``). A source with no X var (banned receiver) has no
     row, so its outflow arcs are dropped."""
     print("│   └── Adding node-balance (X = base + Σin − Σout) constraints...")
     n_all = cols['layout']['n_all']
     ag2ag = cols['ag2ag']
     ag2nonag = cols['ag2nonag']
     nonag2ag = cols['nonag2ag']
-    ag_j, ag_m, ag_r, ag_cols = col_builder.columns(cols['ag'], ('lu', 'lm', 'cell'), ('lu', 'lm', 'cell'))
-    col_ag = cols['ag']['col'].values                                   # (lm, lu, cell) -> global column = ag row of the block
-    col_nonag = cols['nonag']['col'].values                             # (k, cell) -> global column
-    base_ag = np.ascontiguousarray(cols['ag']['base'].values.transpose(0, 2, 1))   # (m, r, j), contiguous after the transpose
-    base_nonag = np.ascontiguousarray(cols['nonag']['base'].values.T)             # (r, k)
+    ag_j, ag_m, ag_r, ag_cols = col_builder.columns(cols['ag']['col_mjr'], ('lu', 'lm', 'cell'))
+    ag_col_mjr = cols['ag']['col_mjr'].values                           # (lm, lu, cell) -> global column = ag row of the block
+    nonag_col_kr = cols['nonag']['col_kr'].values                       # (k, cell) -> global column
+    base_ag = np.ascontiguousarray(cols['ag']['base_mjr'].values.transpose(0, 2, 1))   # (m, j, r) -> (m, r, j), contiguous after the transpose
+    base_nonag = np.ascontiguousarray(cols['nonag']['base_kr'].values.T)             # (r, k)
 
     # ── the rows: one per ag column, then one per (non-ag land use, feasible cell) ──
     n_ag = ag_cols.size
-    nonag_k, nonag_r = np.nonzero(cols['nonag']['feasible'].values)     # every land use, k then cell
+    nonag_k, nonag_r = np.nonzero(cols['nonag']['ub_kr'].values > 0)       # every feasible entry, enabled land use or not: k then cell
     nonag_k = nonag_k.astype(np.int64)
     nonag_r = nonag_r.astype(np.int64)
     n_nonag = nonag_r.size
-    row_of_nonag = np.full(col_nonag.shape, -1, dtype=np.int64)         # (k, r) -> balance row
+    row_of_nonag = np.full(nonag_col_kr.shape, -1, dtype=np.int64)         # (k, r) -> balance row
     row_of_nonag[nonag_k, nonag_r] = n_ag + np.arange(n_nonag)
-    x_col_nonag = col_nonag[nonag_k, nonag_r]
+    x_col_nonag = nonag_col_kr[nonag_k, nonag_r]
     row_sign = np.ones(n_ag + n_nonag, dtype=np.float64)                 # rows without an X var: Σin − Σout = −base
     row_sign[n_ag:] = np.where(x_col_nonag >= 0, 1.0, -1.0)
 
@@ -1564,10 +1565,10 @@ def node_balance_rows(rows: RowInputs, cols: dict):
     ag2ag_col = ag2ag['col'].values
     ag2nonag_col = ag2nonag['col'].values
     nonag2ag_col = nonag2ag['col'].values
-    add(col_ag[ag2ag['to_m'].values, ag2ag['to_j'].values, ag2ag['cell'].values], ag2ag_col, -1.0)
-    add(col_ag[nonag2ag['to_m'].values, nonag2ag['to_j'].values, nonag2ag['cell'].values], nonag2ag_col, -1.0)
-    add(col_ag[ag2ag['from_m'].values, ag2ag['from_j'].values, ag2ag['cell'].values], ag2ag_col, 1.0)
-    add(col_ag[ag2nonag['from_m'].values, ag2nonag['from_j'].values, ag2nonag['cell'].values], ag2nonag_col, 1.0)
+    add(ag_col_mjr[ag2ag['to_m'].values, ag2ag['to_j'].values, ag2ag['cell'].values], ag2ag_col, -1.0)
+    add(ag_col_mjr[nonag2ag['to_m'].values, nonag2ag['to_j'].values, nonag2ag['cell'].values], nonag2ag_col, -1.0)
+    add(ag_col_mjr[ag2ag['from_m'].values, ag2ag['from_j'].values, ag2ag['cell'].values], ag2ag_col, 1.0)
+    add(ag_col_mjr[ag2nonag['from_m'].values, ag2nonag['from_j'].values, ag2nonag['cell'].values], ag2nonag_col, 1.0)
     add(row_of_nonag[ag2nonag['to_k'].values, ag2nonag['cell'].values], ag2nonag_col, -1.0)
     add(row_of_nonag[nonag2ag['from_k'].values, nonag2ag['cell'].values], nonag2ag_col, 1.0)
     A = sparse.csr_matrix((np.concatenate(vals), (np.concatenate(row_idx), np.concatenate(col_idx))), shape=(n_ag + n_nonag, n_all))
@@ -1594,7 +1595,7 @@ def biodiversity_rows(rows: RowInputs, cols: dict):
 FAMILIES = (
     renewable_ceiling_rows,
     cell_usage_rows,
-    accounting_link_rows,
+    fold_link_rows,
     ag_mgt_link_rows,
     ag_mgt_adoption_rows,
     demand_rows,

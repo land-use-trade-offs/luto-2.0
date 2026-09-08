@@ -611,7 +611,7 @@ def write_dvar_and_mosaic_map(data: Data, yr_cal, path):
         exist_re_irr  = xr.zeros_like(exist_re_dry).assign_coords(lm=['irr'])
         exist_re_full = (
             xr.concat([exist_re_dry, exist_re_irr], dim='lm')
-            .reindex(am=am_map.am.values, fill_value=0.0)
+            .reindex(am=am_map['am'].values, fill_value=0.0)
         )
         am_map = xr.concat([am_map, exist_re_full], dim='lu')
 
@@ -1283,15 +1283,15 @@ def write_economics(data: Data, yr_cal, path):
             wind_dvar_delta  = wind_dvar_now  - am_dvar_xr_pre.sel(am='Onshore Wind')
 
         solar_potential = xr.concat([
-            (solar_dvar_now * solar_opex_xr).reindex(lu=xr_cost_am.lu.values, fill_value=0.0).expand_dims(am=['Utility Solar PV']).expand_dims(Cost_type=['Operating Cost']),
-            (solar_dvar_delta * solar_capex_xr / gap).reindex(lu=xr_cost_am.lu.values, fill_value=0.0).expand_dims(am=['Utility Solar PV']).expand_dims(Cost_type=['Capital expenditure']),
+            (solar_dvar_now * solar_opex_xr).reindex(lu=xr_cost_am['lu'].values, fill_value=0.0).expand_dims(am=['Utility Solar PV']).expand_dims(Cost_type=['Operating Cost']),
+            (solar_dvar_delta * solar_capex_xr / gap).reindex(lu=xr_cost_am['lu'].values, fill_value=0.0).expand_dims(am=['Utility Solar PV']).expand_dims(Cost_type=['Capital expenditure']),
         ], dim='Cost_type')
         wind_potential = xr.concat([
-            (wind_dvar_now * wind_opex_xr).reindex(lu=xr_cost_am.lu.values, fill_value=0.0).expand_dims(am=['Onshore Wind']).expand_dims(Cost_type=['Operating Cost']),
-            (wind_dvar_delta * wind_capex_xr / gap).reindex(lu=xr_cost_am.lu.values, fill_value=0.0).expand_dims(am=['Onshore Wind']).expand_dims(Cost_type=['Capital expenditure']),
+            (wind_dvar_now * wind_opex_xr).reindex(lu=xr_cost_am['lu'].values, fill_value=0.0).expand_dims(am=['Onshore Wind']).expand_dims(Cost_type=['Operating Cost']),
+            (wind_dvar_delta * wind_capex_xr / gap).reindex(lu=xr_cost_am['lu'].values, fill_value=0.0).expand_dims(am=['Onshore Wind']).expand_dims(Cost_type=['Capital expenditure']),
         ], dim='Cost_type')
 
-        re_reindexed = xr.concat([solar_potential, wind_potential], dim='am').reindex(am=xr_cost_am.am.values, lu=xr_cost_am.lu.values, fill_value=0.0)
+        re_reindexed = xr.concat([solar_potential, wind_potential], dim='am').reindex(am=xr_cost_am['am'].values, lu=xr_cost_am['lu'].values, fill_value=0.0)
         xr_cost_am = xr.concat([
             (xr_cost_am.sel(Cost_type='Operating Cost') + re_reindexed.sel(Cost_type='Operating Cost')).expand_dims(Cost_type=['Operating Cost']),
             re_reindexed.sel(Cost_type='Capital expenditure').expand_dims(Cost_type=['Capital expenditure']),
@@ -1300,8 +1300,8 @@ def write_economics(data: Data, yr_cal, path):
         solar_rev_opt = ag_revenue.get_utility_solar_pv_effect_r_mrj(data, ag_rev_mrj, yr_idx)
         wind_rev_opt  = ag_revenue.get_onshore_wind_effect_r_mrj(data, ag_rev_mrj, yr_idx)
         re_rev = xr.concat([
-            (solar_dvar_now * xr.DataArray(solar_rev_opt, dims=['lm', 'cell', 'lu'], coords={'lu': solar_lu})).reindex(lu=xr_revenue_am.lu.values, fill_value=0.0).expand_dims(am=['Utility Solar PV']),
-            (wind_dvar_now  * xr.DataArray(wind_rev_opt,  dims=['lm', 'cell', 'lu'], coords={'lu': wind_lu})).reindex(lu=xr_revenue_am.lu.values, fill_value=0.0).expand_dims(am=['Onshore Wind']),
+            (solar_dvar_now * xr.DataArray(solar_rev_opt, dims=['lm', 'cell', 'lu'], coords={'lu': solar_lu})).reindex(lu=xr_revenue_am['lu'].values, fill_value=0.0).expand_dims(am=['Utility Solar PV']),
+            (wind_dvar_now  * xr.DataArray(wind_rev_opt,  dims=['lm', 'cell', 'lu'], coords={'lu': wind_lu})).reindex(lu=xr_revenue_am['lu'].values, fill_value=0.0).expand_dims(am=['Onshore Wind']),
         ], dim='am')
         xr_revenue_am = xr_revenue_am + re_rev.reindex_like(xr_revenue_am, fill_value=0.0)
 
@@ -1341,7 +1341,7 @@ def write_economics(data: Data, yr_cal, path):
         def _expand_exist(da, cost_type_label):
             return (
                 xr.concat([da, xr.zeros_like(da).assign_coords(lm=['irr'])], dim='lm')
-                .reindex(am=xr_cost_am.am.values, fill_value=0.0)
+                .reindex(am=xr_cost_am['am'].values, fill_value=0.0)
                 .expand_dims(Cost_type=[cost_type_label])
             )
 
@@ -1362,7 +1362,7 @@ def write_economics(data: Data, yr_cal, path):
                     'region_state': ('cell', data.REGION_STATE_NAME),
                     'region_NRM': ('cell', data.REGION_NRM_NAME)},
         ).expand_dims(lm=['dry'], lu=['Existing Capacity'])
-        exist_rev_full = xr.concat([exist_rev_da, xr.zeros_like(exist_rev_da).assign_coords(lm=['irr'])], dim='lm').reindex(am=xr_revenue_am.am.values, fill_value=0.0)
+        exist_rev_full = xr.concat([exist_rev_da, xr.zeros_like(exist_rev_da).assign_coords(lm=['irr'])], dim='lm').reindex(am=xr_revenue_am['am'].values, fill_value=0.0)
         xr_revenue_am  = xr.concat([xr_revenue_am, exist_rev_full], dim='lu')
 
     del am_dvar_mrj, am_revenue_mat, am_cost_mat
