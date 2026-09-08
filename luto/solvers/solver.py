@@ -70,8 +70,7 @@ class LutoSolver:
     def __init__(self, cols: dict, rows: row_builder.RowInputs):
         """``cols``: the column space of the step (col_builder.get_cols) — every unknown;
         ``rows``: the row side (row_builder.get_rows) — every coefficient stream and target."""
-        self._cols = cols                         # the unified column space: every unknown as a labelled cube
-        self._layout = cols['layout']              # the widths: n_dec (decision columns), n_all (every column incl. the cell-usage slacks)
+        self._cols = cols                         # the column space: every unknown as one row of cols['table'], the wide id grids beside it
         self._rows = rows
         self._ncells = int(cols['ag'].sizes['cell'])
         self._nlms = int(cols['ag'].sizes['lm'])
@@ -117,7 +116,7 @@ class LutoSolver:
 
         # --- the row blocks (row_builder.FAMILIES, keyed xr.Datasets with the Gurobi handles attached) ---
         self.blocks = {}                        # {family: block}; the flat attributes below are views published from these
-        self._vars = None                       # _all_vars(): model.getVars() in Var.index order
+        self._vars = None                       # model.getVars() in Var.index order (materialised once, for addMConstr)
         self._bio_index = {}                    # bio_constraint_index(): name -> {family, region, item, presence}, recorded when a bio block is added
 
         # --- constraint blocks (CSR over Var.index columns; row-scaled where a scale is kept:
@@ -194,20 +193,13 @@ class LutoSolver:
         model = self.gurobi_model
         model.update()                       # the ONE update before the first row: every variable exists
         self._vars = model.getVars()
-        assert len(self._vars) == self._layout['n_all'], 'the model must hold exactly the columns of the space'
+        assert len(self._vars) == self._cols['table'].attrs['n_all'], 'the model must hold exactly the columns of the space'
         for family in row_builder.FAMILIES:
             out = family(self._rows, self._cols)
             for block in (out if isinstance(out, list) else [out]):
                 if block is not None:
                     self._add_block(block)
         self._publish()
-
-    def _all_vars(self):
-        """The model's Var list in Var.index order (materialised once), for addMConstr."""
-        if self._vars is None:
-            self.gurobi_model.update()
-            self._vars = self.gurobi_model.getVars()
-        return self._vars
 
     def _add_block(self, block) -> None:
         """One row block -> one ``addMConstr`` (against the full Var list, in Var.index order), the
@@ -296,7 +288,7 @@ class LutoSolver:
         obj[np.abs(obj) < settings.SOLVER_COEFF_MIN] = 0.0                      # floor the merged, scaled coefficient
         self.obj_vec = obj
 
-        X = gp.MVar.fromlist(self._all_vars()[:obj.size])                  # the decision vars (Var.index order); the range slacks after them carry no objective
+        X = self.x[:obj.size]                                              # the decision columns; the range slacks after them carry no objective
         if settings.OBJECTIVE == "mincost":
             self.gurobi_model.setObjective(obj @ X, GRB.MINIMIZE)
         elif settings.OBJECTIVE == "maxprofit":
@@ -399,8 +391,8 @@ class LutoSolver:
         x_arcs = x_vals.astype(np.float32)
 
         def src_rows(block, src_idx):
-            src_ptr = self._cols[block].attrs['src_ptr']
-            return slice(rows_of[block].start + int(src_ptr[src_idx]), rows_of[block].start + int(src_ptr[src_idx + 1]))
+            src_ptr = table.attrs['src_ptr'][block]
+            return slice(int(src_ptr[src_idx]), int(src_ptr[src_idx + 1]))
 
         for src_idx, ((from_m, from_j), cells) in enumerate(self._cols['sources']['ag'].items()):
             arcs = src_rows('ag2ag', src_idx)
