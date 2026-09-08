@@ -26,8 +26,11 @@ column-id grid over the block's dims (``col``, -1 = no column, the grid order is
 order) with the attributes of each column (ub, lb, base) as grids of the same shape. The arc
 blocks (``ag2ag``, ``ag2nonag``, ``nonag2ag``) are LONG tables: one row per arc column, its fields
 the attributes of that column (from, to, local_r, cell, col), the rows sorted by source with
-``attrs['src_ptr']`` marking where each source's run starts and ends. ``cols['terms']`` is the
-long-table view of the grid blocks: one row per ag / ag-mgt / non-ag column with its attributes.
+``attrs['src_ptr']`` marking where each source's run starts and ends. ``cols['table']`` is the
+whole space as ONE long table on ``col`` = Var.index: one row per column in block order (``BLOCKS``),
+its fields the attributes of that column (-1 where a field does not apply), ``attrs['block_ptr']``
+marking where each block's run of rows starts and ends. ``cols['terms']`` is the table's first three
+blocks (ag, non-ag, ag-mgt) in the order the policy families score them.
 """
 
 import numpy as np
@@ -39,6 +42,15 @@ import luto.tools as tools
 from luto.data import Data
 import luto.economics.agricultural.transitions as ag_transition
 import luto.economics.non_agricultural.transitions as non_ag_transition
+
+
+BLOCKS = ('ag', 'nonag', 'am', 'ag2ag', 'ag2nonag', 'nonag2ag', 'cell_usage')   # the blocks of the space, in Var.index order
+
+
+def block_slice(table: xr.Dataset, block: str) -> slice:
+    """The rows of one block of the column table — its Var.index range (``attrs['block_ptr']`` holds the bounds)."""
+    code = table.attrs['blocks'].index(block)
+    return slice(int(table.attrs['block_ptr'][code]), int(table.attrs['block_ptr'][code + 1]))
 
 
 # ═══════════════════════════ data: what decides existence, bounds and base (from the base-year state) ═══════════════════════════
@@ -372,10 +384,65 @@ def cell_usage_space(feasible_cell_usage_r) -> xr.Dataset:
     )
 
 
+def table_space(blocks: dict, ag_mask_r: np.ndarray) -> xr.Dataset:
+    """The whole space as ONE long table on (col = Var.index): the blocks' rows back to back in ``BLOCKS`` order, the fields of each column (-1 where n/a), its lb / ub / base."""
+    ag, nonag, am, ag2ag, ag2nonag, nonag2ag, cell_usage = (blocks[name] for name in BLOCKS)
+
+    # one dict of field arrays per block, in the block's column order (the grid order of a wide table, the row order of an arc table)
+    m, j, r = np.nonzero(ag['col'].values >= 0)                                             # column order: lm, lu, cell
+    ag_rows = dict(m=m, j=j, cell=r, ub=ag['ub'].values[m, j, r], base=ag['base'].values[m, j, r])
+    k, r = np.nonzero(nonag['col'].values >= 0)                                             # column order: k, cell
+    nonag_rows = dict(k=k, cell=r, lb=nonag['lb'].values[k, r], ub=nonag['ub'].values[k, r], base=nonag['base'].values[k, r])
+    slot, m, r = np.nonzero(am['col'].values >= 0)                                          # column order: slot, lm, cell
+    am_rows = dict(slot=slot, m=m, j=am['j'].values[slot], cell=r, lb=am['lb'].values[slot, m, r], ub=1.0)
+    ag2ag_rows = dict(from_m=ag2ag['from_m'].values, from_j=ag2ag['from_j'].values, m=ag2ag['to_m'].values, j=ag2ag['to_j'].values,
+                      local_r=ag2ag['local_r'].values, cell=ag2ag['cell'].values, ub=np.inf)
+    ag2nonag_rows = dict(from_m=ag2nonag['from_m'].values, from_j=ag2nonag['from_j'].values, k=ag2nonag['to_k'].values,
+                         local_r=ag2nonag['local_r'].values, cell=ag2nonag['cell'].values, ub=np.inf)
+    nonag2ag_rows = dict(from_k=nonag2ag['from_k'].values, m=nonag2ag['to_m'].values, j=nonag2ag['to_j'].values,
+                         local_r=nonag2ag['local_r'].values, cell=nonag2ag['cell'].values, ub=np.inf)
+    slack_cells = np.flatnonzero(cell_usage['col'].values >= 0)
+    band = 10 * settings.FEASIBILITY_TOLERANCE                                              # the cell-usage row is ranged: Σ shares ∈ [ag_mask − band, ag_mask + band]
+    ag_mask = ag_mask_r[slack_cells].astype(np.float64)                                     # widened before the band is applied
+    cell_usage_rows = dict(cell=slack_cells, ub=(ag_mask + band) - (ag_mask - band))        # the slack of a ranged row: lb 0, ub = hi − lo
+
+    parts = [ag_rows, nonag_rows, am_rows, ag2ag_rows, ag2nonag_rows, nonag2ag_rows, cell_usage_rows]
+    widths = [part['cell'].size for part in parts]
+    block_ptr = np.concatenate([[0], np.cumsum(widths)]).astype(np.int64)                   # where each block's run of rows starts / ends
+    for name, block, width, start in zip(BLOCKS, blocks.values(), widths, block_ptr):
+        ids = block['col'].values
+        assert block.attrs['n'] == width and np.array_equal(ids[ids >= 0], np.arange(start, start + width)), f'{name}: the ids must be its run of the table'
+
+    def field(name, dtype, fill):
+        """One field over the whole table: the block's array where it has the field, else the fill value."""
+        return np.concatenate([np.broadcast_to(np.asarray(part.get(name, fill), dtype=dtype), width) for part, width in zip(parts, widths)])
+
+    return xr.Dataset(
+        dict(block  =(('col',), np.repeat(np.arange(len(BLOCKS), dtype=np.int8), widths)),  # the block code (attrs['blocks'] = names)
+             m      =(('col',), field('m', np.int32, -1)),                                   # the ag (lm, lu) the column lands on: own (ag), host (am), TO fields (ag2ag, nonag2ag)
+             j      =(('col',), field('j', np.int32, -1)),
+             k      =(('col',), field('k', np.int32, -1)),                                   # the non-ag land use it lands on: own (nonag), TO field (ag2nonag)
+             slot   =(('col',), field('slot', np.int32, -1)),                                # the (am, lu) slot of an ag-mgt column
+             from_m =(('col',), field('from_m', np.int32, -1)),                              # where an arc comes from
+             from_j =(('col',), field('from_j', np.int32, -1)),
+             from_k =(('col',), field('from_k', np.int32, -1)),
+             local_r=(('col',), field('local_r', np.int32, -1)),                             # the arc's cell in its source's cell list
+             cell   =(('col',), field('cell', np.int32, -1)),                                # the cell (every column has one)
+             lb     =(('col',), field('lb', np.float64, 0.0)),                               # the bounds of the column (gurobi stores double)
+             ub     =(('col',), field('ub', np.float64, np.inf)),
+             base   =(('col',), field('base', np.float32, 0.0))                              # the node-balance constant of an ag / non-ag column
+        ),
+        coords=dict(col=np.arange(block_ptr[-1])),
+        attrs=dict(blocks=list(BLOCKS), block_ptr=block_ptr,
+                   n_dec=int(block_ptr[-2]),                                                 # the decision columns end with the last nonag2ag arc: the objective is built at this width (the slacks carry no cost)
+                   n_all=int(block_ptr[-1]))                                                 # every column: the rows are built at this width
+    )
+
+
 # ═══════════════════════════ get_cols: the column space of one step ═══════════════════════════
 
 def get_cols(data: Data, base_year: int) -> dict:
-    """The column space of one solve step: every unknown as a labelled Dataset per block (wide grid or long arc table) holding its actual Var.index ids, plus the widths (layout), terms, sources and masks."""
+    """The column space of one solve step: every unknown as a labelled Dataset per block (wide grid or long arc table) holding its actual Var.index ids, the whole space as one long table, plus the widths (layout), terms, sources and masks."""
 
     # ── 1. sources (FROM-view): the base-year holders of land ──
     trans_source_ag         = get_trans_source_ag(data, base_year)              # (from_m, from_j): global cell indices
@@ -420,37 +487,34 @@ def get_cols(data: Data, base_year: int) -> dict:
     }
 
     # ── 6. the blocks placed back to back: per block, its ids shifted in place to the actual Var.index (-1 never shifts),
-    #       then the running count advanced by the block's width; layout keeps the two widths the rows are built at ──
-    layout = {}
+    #       then the running count advanced by the block's width ──
     n_cols = 0                                                                      # the next free Var.index
-    for name, block in cols.items():
+    for block in cols.values():
         ids = block['col'].values
         ids[ids >= 0] += n_cols
         n_cols += block.attrs['n']
-        # the decision columns (ag, nonag, am and the three flow blocks) end with the last nonag2ag arc;
-        # the objective block is built at this width since the cell-usage slacks that follow carry no cost
-        if name == 'nonag2ag':
-            layout['n_dec'] = n_cols
 
-    # every column: every constraint block (the rows) is built at this width
-    layout['n_all'] = n_cols
+    # ── 7. the table: the whole space as one long table in Var.index order, the block bounds and widths as its attrs ──
+    table = table_space(cols, data.AG_MASK_PROPORTION_R)
+    layout = dict(n_dec=table.attrs['n_dec'], n_all=table.attrs['n_all'])
 
     print(f"Column space: {layout['n_all']:,} columns = {layout['n_dec']:,} decision (n_dec) + {cols['cell_usage'].attrs['n']:,} cell-usage slacks", flush=True)
     for block in cols:
         print(f"{'└──' if block == 'cell_usage' else '├──'} {block:<10s} {cols[block].attrs['n']:>12,}", flush=True)
 
-    # ── 7. terms: the long-table view of the grid blocks — one row per ag / ag-mgt / non-ag column with its attributes (m, j, r, ...) and
-    #       its global col — read by every policy family (row_builder.gather_coeffs / compose_rows) and by the objective (row_builder.get_obj_block) ──
-    ag_lm, ag_lu, ag_cell = np.nonzero(ag['col'].values >= 0)                                          # column order: lm, lu, cell
+    # ── 8. terms: the table's ag / ag-mgt / non-ag rows — one row per column with its attributes (m, j, r, ...) and its col —
+    #       read by every policy family (row_builder.gather_coeffs / compose_rows) and by the objective (row_builder.get_obj_block) ──
+    ag_rows = block_slice(table, 'ag')
     ag_terms = dict(
-        m=ag_lm.astype(np.int32), 
-        j=ag_lu.astype(np.int32), 
-        r=ag_cell.astype(np.int32),
-        col=ag['col'].values[ag_lm, ag_lu, ag_cell].astype(np.int32)
+        m=table['m'].values[ag_rows],
+        j=table['j'].values[ag_rows],
+        r=table['cell'].values[ag_rows],
+        col=table['col'].values[ag_rows].astype(np.int32)
     )
 
     am = cols['am']
-    am_slot, am_lm, am_cell = np.nonzero(am['col'].values >= 0)                                         # column order: slot, lm, cell
+    am_rows = block_slice(table, 'am')
+    am_slot = table['slot'].values[am_rows]
     am_list = list(am.attrs['agman2lu'])
     am_idx_of_slot = np.array([am_list.index(name) for name in am['am'].values], dtype=np.int32)            # slot -> index into am_list
     j_idx_of_slot = np.zeros(am.sizes['slot'], dtype=np.int32)                                              # slot -> position of its land use within the option
@@ -458,32 +522,32 @@ def get_cols(data: Data, base_year: int) -> dict:
         slots_of_option = np.flatnonzero(am_idx_of_slot == am_idx)
         j_idx_of_slot[slots_of_option] = np.arange(slots_of_option.size, dtype=np.int32)
     am_terms = dict(
-        am_idx=am_idx_of_slot[am_slot], 
-        j_idx=j_idx_of_slot[am_slot], 
-        j=am['j'].values[am_slot],
-        m=am_lm.astype(np.int32), 
-        r=am_cell.astype(np.int32), 
-        col=am['col'].values[am_slot, am_lm, am_cell]
+        am_idx=am_idx_of_slot[am_slot],
+        j_idx=j_idx_of_slot[am_slot],
+        j=table['j'].values[am_rows],
+        m=table['m'].values[am_rows],
+        r=table['cell'].values[am_rows],
+        col=table['col'].values[am_rows].astype(np.int32)
     )
-    
-    nonag = cols['nonag']
-    nonag_k, nonag_cell = np.nonzero(nonag['col'].values >= 0)                                           # column order: k, cell
-    nonag_terms = dict(k=nonag_k.astype(np.int32), r=nonag_cell.astype(np.int32), col=nonag['col'].values[nonag_k, nonag_cell])
+
+    nonag_rows = block_slice(table, 'nonag')
+    nonag_terms = dict(k=table['k'].values[nonag_rows], r=table['cell'].values[nonag_rows], col=table['col'].values[nonag_rows].astype(np.int32))
     term_cell = np.concatenate([ag_terms['r'], am_terms['r'], nonag_terms['r']]).astype(np.int32)           # the row order of the terms table: ag | am | nonag
     term_col = np.concatenate([ag_terms['col'], am_terms['col'], nonag_terms['col']]).astype(np.int32)
     by_cell_order = np.argsort(term_cell, kind='stable')                                                    # the terms table re-sorted by cell ...
     by_cell_ptr = np.searchsorted(term_cell[by_cell_order], np.arange(data.NCELLS + 1))                     # ... and where each cell's run of rows starts / ends
 
-    # ── 8. what the rows and the post-solve read need besides the columns ──
+    # ── 9. what the rows and the post-solve read need besides the columns ──
+    cols['table']    = table
     cols['layout']   = layout
     cols['terms']    = dict(
-        ag=ag_terms, 
-        am=am_terms, 
-        nonag=nonag_terms, 
-        am_list=am_list, 
-        r=term_cell, 
+        ag=ag_terms,
+        am=am_terms,
+        nonag=nonag_terms,
+        am_list=am_list,
+        r=term_cell,
         col=term_col,
-        ncells=int(data.NCELLS), 
+        ncells=int(data.NCELLS),
         by_cell=(by_cell_order, by_cell_ptr)
     )
     cols['sources']  = dict(ag=trans_source_ag, nonag=trans_source_nonag)
