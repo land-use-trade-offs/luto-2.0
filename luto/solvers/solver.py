@@ -71,7 +71,7 @@ class LutoSolver:
         """``cols``: the column space of the step (col_builder.get_cols) — every unknown;
         ``rows``: the row side (row_builder.get_rows) — every coefficient stream and target."""
         self._cols = cols                         # the unified column space: every unknown as a labelled cube
-        self._layout = cols['layout']              # block offsets in Var.index order, n_dec, n_all
+        self._layout = cols['layout']              # the widths: n_dec (decision columns), n_all (every column incl. the cell-usage slacks)
         self._rows = rows
         self._ncells = int(cols['ag'].sizes['cell'])
         self._nlms = int(cols['ag'].sizes['lm'])
@@ -81,21 +81,12 @@ class LutoSolver:
         self.gurobi_model = gp.Model(f"LUTO {settings.VERSION}", env=gurenv)
 
         # --- decision-variable BLOCKS (one MVar per block of the column space) ---
-        # For every block: the MVar and its global column offset (Var.index of element 0 — blocks
-        # are created back to back in the space's layout order, so offsets chain arithmetically,
-        # no model.update() needed). The column ids live in the space (`cols[block].col_<dims>`, `col` per arc).
         self.ag_mvar = None                 # over cols['ag']: the ag land-use shares X_ag
-        self.ag_offset = None
         self.nonag_mvar = None              # over cols['nonag']
-        self.nonag_offset = None
         self.am_mvar = None                 # over cols['am']
-        self.am_offset = None
-        self.ag2ag_mvar = None              # over cols['ag2ag'] (ag → ag), an arc list
-        self.ag2ag_offset = None
+        self.ag2ag_mvar = None              # over cols['ag2ag'] (ag → ag), an arc table
         self.ag2nonag_mvar = None           # over cols['ag2nonag'] (ag → non-ag)
-        self.ag2nonag_offset = None
         self.nonag2ag_mvar = None           # over cols['nonag2ag'] (non-ag → ag)
-        self.nonag2ag_offset = None
         self.cell_usage_slack_mvar = None   # the cell-usage range slacks (the last variables before any row)
 
         # --- constraint handles ---
@@ -187,17 +178,15 @@ class LutoSolver:
     def _setup_ag_vars(self):
         """The ag block: ONE addMVar over the existing entries of cols['ag'], in column order (lm,
         lu, cell). lb = 0, ub from the cube (cleaned in col_builder: 0 ≤ base ≤ ub);
-        ``cols['ag'].col_mjr`` maps (lm, lu, cell) to Var.index (-1 = no variable)."""
+        ``cols['ag'].col`` maps (lm, lu, cell) to Var.index (-1 = no variable)."""
         print("│   ├── setting up decision variables for agricultural land uses...")
         ag = self._cols['ag']
-        self.ag_offset = self._layout['ag']                              # recorded, not assumed: later blocks chain from it
-        assert self.ag_offset == 0, 'the ag block must be the first block created'
 
-        lm_idx, lu_idx, cell_idx = np.nonzero(ag['col_mjr'].values >= 0)     # column order: lm, lu, cell
+        lm_idx, lu_idx, cell_idx = np.nonzero(ag['col'].values >= 0)     # column order: lm, lu, cell
         self.ag_mvar = self.gurobi_model.addMVar(
             cell_idx.size,
             lb=0.0,
-            ub=ag['ub_mjr'].values[lm_idx, lu_idx, cell_idx],
+            ub=ag['ub'].values[lm_idx, lu_idx, cell_idx],
             name="X_ag")
         self.gurobi_model.setAttr(
             'VarName',
@@ -210,13 +199,12 @@ class LutoSolver:
         order (k, cell). Bounds (collapse rule applied) come from the cube."""
         print("│   ├── setting up decision variables for non-agricultural land uses...")
         nonag = self._cols['nonag']
-        self.nonag_offset = self._layout['nonag']
 
-        k_idx, cell_idx = np.nonzero(nonag['col_kr'].values >= 0)           # column order: k, cell
+        k_idx, cell_idx = np.nonzero(nonag['col'].values >= 0)           # column order: k, cell
         self.nonag_mvar = self.gurobi_model.addMVar(
             cell_idx.size,
-            lb=nonag['lb_kr'].values[k_idx, cell_idx],
-            ub=nonag['ub_kr'].values[k_idx, cell_idx],
+            lb=nonag['lb'].values[k_idx, cell_idx],
+            ub=nonag['ub'].values[k_idx, cell_idx],
             name="X_non_ag")
         self.gurobi_model.setAttr(
             'VarName',
@@ -230,12 +218,11 @@ class LutoSolver:
         renewables, savanna eligibility) come from the cube."""
         print("│   ├── setting up decision variables for agricultural management options...")
         am = self._cols['am']
-        self.am_offset = self._layout['am']
 
-        slot_idx, lm_idx, cell_idx = np.nonzero(am['col_smr'].values >= 0)   # column order: (am, lu) slot, lm, cell
+        slot_idx, lm_idx, cell_idx = np.nonzero(am['col'].values >= 0)   # column order: (am, lu) slot, lm, cell
         self.am_mvar = self.gurobi_model.addMVar(
             cell_idx.size,
-            lb=am['lb_smr'].values[slot_idx, lm_idx, cell_idx],
+            lb=am['lb'].values[slot_idx, lm_idx, cell_idx],
             ub=np.ones(cell_idx.size, dtype=np.float64),
             name="X_ag_man")
         snake_of_slot = np.array([tools.am_name_snake_case(name) for name in am['am'].values], dtype=object)
@@ -258,10 +245,6 @@ class LutoSolver:
         ag2ag = self._cols['ag2ag']
         ag2nonag = self._cols['ag2nonag']
         nonag2ag = self._cols['nonag2ag']
-        
-        self.ag2ag_offset = self._layout['ag2ag']
-        self.ag2nonag_offset = self._layout['ag2nonag']
-        self.nonag2ag_offset = self._layout['nonag2ag']
         
         n_ag2ag = ag2ag.attrs['n']
         n_ag2nonag = ag2nonag.attrs['n']
@@ -459,20 +442,20 @@ class LutoSolver:
         am_X_irr_sol_rj = {am: np.zeros((self._ncells, self._n_ag_lus), dtype=np.float32) for am in self._agman2lu}
 
         # agricultural: ONE .X read of the ag block
-        lm_idx, lu_idx, cell_idx = np.nonzero(self._cols['ag']['col_mjr'].values >= 0)   # column order: lm, lu, cell
+        lm_idx, lu_idx, cell_idx = np.nonzero(self._cols['ag']['col'].values >= 0)   # column order: lm, lu, cell
         x_ag = self.ag_mvar.X                                            # float64 ndarray
         is_dry = lm_idx == 0
         X_dry_sol_rj[cell_idx[is_dry],  lu_idx[is_dry]]  = x_ag[is_dry]
         X_irr_sol_rj[cell_idx[~is_dry], lu_idx[~is_dry]] = x_ag[~is_dry]
 
         # non-agricultural: ONE .X read of the block (disabled land uses have no columns and stay at zero)
-        k_idx, cell_idx = np.nonzero(self._cols['nonag']['col_kr'].values >= 0)
+        k_idx, cell_idx = np.nonzero(self._cols['nonag']['col'].values >= 0)
         non_ag_X_sol_rk[cell_idx, k_idx] = self.nonag_mvar.X
 
         # ag-management: ONE .X read of the block. Savanna eligibility is applied to BOTH lm here,
         # while variable creation applied it to dry only: irr savanna vars outside the eligible cells report 0.
         am_ds = self._cols['am']
-        slot_idx, lm_idx, cell_idx = np.nonzero(am_ds['col_smr'].values >= 0)
+        slot_idx, lm_idx, cell_idx = np.nonzero(am_ds['col'].values >= 0)
         am_of_col = am_ds['am'].values[slot_idx]
         j_of_col = am_ds['j'].values[slot_idx]
         x_am = self.am_mvar.X

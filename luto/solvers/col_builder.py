@@ -20,6 +20,14 @@
 """
 The COLUMN side of the model: every unknown of one solve step as a labelled ``xr.Dataset`` per
 block, built from the base-year state alone (``get_cols``). The row side is ``row_builder``.
+
+Two table shapes. The grid blocks (``ag``, ``nonag``, ``am``, ``cell_usage``) are WIDE tables: a
+column-id grid over the block's dims (``col``, -1 = no column, the grid order is the column
+order) with the attributes of each column (ub, lb, base) as grids of the same shape. The arc
+blocks (``ag2ag``, ``ag2nonag``, ``nonag2ag``) are LONG tables: one row per arc column, its fields
+the attributes of that column (from, to, local_r, cell, col), the rows sorted by source with
+``attrs['src_ptr']`` marking where each source's run starts and ends. ``cols['terms']`` is the
+long-table view of the grid blocks: one row per ag / ag-mgt / non-ag column with its attributes.
 """
 
 import numpy as np
@@ -99,8 +107,8 @@ def get_feasible_ag2ag_mrj(feasible_ag_mrj: np.ndarray, trans_source_ag: dict, T
     print('Getting feasible ag2ag delta-var targets...', flush = True)
     feasible_targets = {}
     for (from_m, from_j), source_cells in trans_source_ag.items():
-        is_target_feasible = feasible_ag_mrj[:, source_cells, :] & T_ag2ag_reach_jj[from_j][None, None, :]   # (NLMS, ncells_src, N_AG)
-        is_target_feasible[from_m, :, from_j] = False                                                   # staying is not a transition
+        is_target_feasible = feasible_ag_mrj[:, source_cells, :] & T_ag2ag_reach_jj[from_j][None, None, :]      # (NLMS, ncells_src, N_AG)
+        is_target_feasible[from_m, :, from_j] = False                                                           # staying is not a transition
         feasible_targets[(from_m, from_j)] = is_target_feasible
     return feasible_targets
 
@@ -108,7 +116,7 @@ def get_feasible_nonag2ag_mrj(feasible_ag_mrj: np.ndarray, trans_source_nonag: d
     """{from_k: bool (to_m, local_r, to_j)} — the ag targets each non-ag source may transition to (feasible and T_MAT-reachable)."""
     print('Getting feasible nonag2ag delta-var targets...', flush = True)
     return {
-        from_k: feasible_ag_mrj[:, source_cells, :] & T_nonag2ag_reach_kj[from_k][None, None, :]   # (NLMS, ncells_k, N_AG)
+        from_k: feasible_ag_mrj[:, source_cells, :] & T_nonag2ag_reach_kj[from_k][None, None, :]                # (NLMS, ncells_k, N_AG)
         for from_k, source_cells in trans_source_nonag.items()
     }
 
@@ -117,7 +125,7 @@ def get_feasible_ag2nonag_rk(trans_ub_nonag_rk: np.ndarray, trans_source_ag: dic
     print('Getting feasible ag2nonag delta-var targets...', flush = True)
     feasible_nonag_rk = trans_ub_nonag_rk > 0
     return {
-        (from_m, from_j): feasible_nonag_rk[source_cells, :] & T_ag2nonag_reach_jk[from_j][None, :]   # (ncells_src, N_NONAG)
+        (from_m, from_j): feasible_nonag_rk[source_cells, :] & T_ag2nonag_reach_jk[from_j][None, :]             # (ncells_src, N_NONAG)
         for (from_m, from_j), source_cells in trans_source_ag.items()
     }
 
@@ -157,11 +165,11 @@ def get_mask_mnes_wind(data: Data) -> np.ndarray:
     return np.where(data.RENEWABLE_MNES_MASK_WIND)[0]
 
 
-# ═══════════════════════════ the column blocks: one Dataset per block, block-LOCAL ids (get_cols shifts them) ═══════════════════════════
+# ═══════════════════════════ the column blocks: one Dataset per block, wide (grid) or long (arc) tables, block-LOCAL ids (get_cols shifts them) ═══════════════════════════
 
 def ag_space(data: Data, feasible_ag_mrj: np.ndarray, trans_ub_ag_mrj: np.ndarray, dvar_base_ag_mrj: np.ndarray) -> xr.Dataset:
-    """X_ag on (lm, lu, cell) = the column order: a column where the cell may become that (lm, lu); lb = 0, ub = the transition upper bound."""
-    # the (m, r, j) cubes laid out on (m, j, r), contiguous so downstream gathers read whole rows
+    """The ag columns as a wide table on (lm, lu, cell): a column where the cell may become that (lm, lu), its ub and base on the same grid; lb = 0."""
+    # the (m, r, j) inputs laid out on the table's (m, j, r) grid, contiguous so downstream gathers read whole rows
     has_col  = np.ascontiguousarray(feasible_ag_mrj.transpose(0, 2, 1))
     ub_mjr   = np.ascontiguousarray(trans_ub_ag_mrj.transpose(0, 2, 1))
     base_mjr = np.ascontiguousarray(dvar_base_ag_mrj.transpose(0, 2, 1))
@@ -170,9 +178,9 @@ def ag_space(data: Data, feasible_ag_mrj: np.ndarray, trans_ub_ag_mrj: np.ndarra
     col_mjr[has_col] = np.arange(has_col.sum(), dtype=np.int32)
 
     return xr.Dataset(
-        dict(col_mjr =(('lm', 'lu', 'cell'), col_mjr),      # column id (-1 = no column); col_mjr >= 0 is the select for gp.Var creation
-             ub_mjr  =(('lm', 'lu', 'cell'), ub_mjr),       # the transition upper bound (lb = 0 by default in gurobi)
-             base_mjr=(('lm', 'lu', 'cell'), base_mjr)      # the node-balance constant (X = base + flow-in - flow-out); the flow-out sum has to be <= the base
+        dict(col =(('lm', 'lu', 'cell'), col_mjr),      # column id (-1 = no column); col >= 0 is the select for gp.Var creation, grid order = column order
+             ub  =(('lm', 'lu', 'cell'), ub_mjr),       # attribute: the transition upper bound (lb = 0 by default in gurobi)
+             base=(('lm', 'lu', 'cell'), base_mjr)      # attribute: the node-balance constant (X = base + flow-in - flow-out); the flow-out sum has to be <= the base
         ),
         coords=dict(
             lm=list(data.LANDMANS),
@@ -184,8 +192,8 @@ def ag_space(data: Data, feasible_ag_mrj: np.ndarray, trans_ub_ag_mrj: np.ndarra
 
 
 def nonag_space(data: Data, trans_lb_nonag_rk: np.ndarray, trans_ub_nonag_rk: np.ndarray, dvar_base_nonag_rk: np.ndarray) -> xr.Dataset:
-    """X_non_ag on (nonag_lu, cell): a column where ub > 0 and the land use is enabled; column order nonag_lu, cell."""
-    # the (r, k) cubes laid out on (k, r), contiguous after the transpose
+    """The non-ag columns as a wide table on (nonag_lu, cell): a column where ub > 0 and the land use is enabled, its lb / ub / base on the same grid."""
+    # the (r, k) inputs laid out on the table's (k, r) grid, contiguous after the transpose
     lb_kr   = np.ascontiguousarray(trans_lb_nonag_rk.T)
     ub_kr   = np.ascontiguousarray(trans_ub_nonag_rk.T)
     base_kr = np.ascontiguousarray(dvar_base_nonag_rk.T)
@@ -196,10 +204,10 @@ def nonag_space(data: Data, trans_lb_nonag_rk: np.ndarray, trans_ub_nonag_rk: np
     col_kr[has_col] = np.arange(has_col.sum(), dtype=np.int32)
 
     return xr.Dataset(
-        dict(col_kr =(('nonag_lu', 'cell'), col_kr),        # column id (-1 = no column); col_kr >= 0 is the select for gp.Var creation
-             lb_kr  =(('nonag_lu', 'cell'), lb_kr),         # the transition lower bound
-             ub_kr  =(('nonag_lu', 'cell'), ub_kr),         # the transition upper bound (> 0 = feasible, for EVERY land use, enabled or not: the node-balance rows need the disabled ones too)
-             base_kr=(('nonag_lu', 'cell'), base_kr)        # the node-balance constant (X = base + flow-in - flow-out); the flow-out sum has to be <= the base
+        dict(col =(('nonag_lu', 'cell'), col_kr),        # column id (-1 = no column); col >= 0 is the select for gp.Var creation, grid order = column order
+             lb  =(('nonag_lu', 'cell'), lb_kr),         # attribute: the transition lower bound
+             ub  =(('nonag_lu', 'cell'), ub_kr),         # attribute: the transition upper bound (> 0 = feasible, for EVERY land use, enabled or not: the node-balance rows need the disabled ones too)
+             base=(('nonag_lu', 'cell'), base_kr)        # attribute: the node-balance constant (X = base + flow-in - flow-out); the flow-out sum has to be <= the base
         ),
         coords=dict(
             nonag_lu=list(data.NON_AGRICULTURAL_LANDUSES),
@@ -210,7 +218,7 @@ def nonag_space(data: Data, trans_lb_nonag_rk: np.ndarray, trans_ub_nonag_rk: np
 
 
 def am_space(data: Data, ag_col_mjr: np.ndarray, mask_gbf2_solar: np.ndarray, mask_gbf2_wind: np.ndarray, trans_lb_ag_man_mrj: dict) -> xr.Dataset:
-    """X_ag_man on (slot = (am, lu), lm, cell): a column where the ag column exists minus the renewable / savanna exclusions; column order slot, lm, cell."""
+    """The ag-management columns as a wide table on (slot = (am, lu), lm, cell): a column where the ag column exists minus the renewable / savanna exclusions, its lb on the same grid."""
     pairs = [(am, lu_code) for am, lu_codes in data.AGMAN2LU.items() for lu_code in lu_codes]
 
     has_col = np.zeros((len(pairs), data.NLMS, data.NCELLS), dtype=bool)
@@ -239,9 +247,9 @@ def am_space(data: Data, ag_col_mjr: np.ndarray, mask_gbf2_solar: np.ndarray, ma
     coords = xr.Coordinates.from_pandas_multiindex(slot_index, 'slot').assign(lm=list(data.LANDMANS), cell=np.arange(data.NCELLS))
     
     return xr.Dataset(
-        dict(col_smr=(('slot', 'lm', 'cell'), col_smr),                                # column id (-1 = no column); col_smr >= 0 is the select for gp.Var creation
-             lb_smr =(('slot', 'lm', 'cell'), lb_smr),                                 # the base-year adoption for non-reversible options, else 0 (ub = 1 for every column)
-             j      =(('slot',), np.array([j for _, j in pairs], dtype=np.int32))      # the land-use code of each (am, lu) slot
+        dict(col=(('slot', 'lm', 'cell'), col_smr),                                # column id (-1 = no column); col >= 0 is the select for gp.Var creation, grid order = column order
+             lb =(('slot', 'lm', 'cell'), lb_smr),                                 # attribute: the base-year adoption for non-reversible options, else 0 (ub = 1 for every column)
+             j  =(('slot',), np.array([j for _, j in pairs], dtype=np.int32))      # the land-use code of each (am, lu) slot
         ),
         coords=coords,
         attrs=dict(
@@ -253,34 +261,33 @@ def am_space(data: Data, ag_col_mjr: np.ndarray, mask_gbf2_solar: np.ndarray, ma
 
 
 def ag2ag_space(trans_source_ag: dict, feasible_ag2ag_mrj: dict) -> xr.Dataset:
-    """The ag → ag arcs on (arc): one per feasible (source (from_m, from_j) → target (to_m, to_j)) at a cell, sources in trans_source_ag order (src_ptr bounds each)."""
+    """The ag → ag arc columns as a long table on (arc): one row per feasible (from_m, from_j) → (to_m, to_j) transition at a cell, rows sorted by source in trans_source_ag order."""
     print('Building the ag2ag arc block...', flush = True)
-    arc_rows = []
-    src_ptr = [0]
-    for src_idx, ((from_m, from_j), is_target_feasible) in enumerate(feasible_ag2ag_mrj.items()):
+    arc_rows = []                                            # one chunk of rows per source
+    src_ptr = [0]                                            # where each source's run of rows starts / ends
+    for (from_m, from_j), is_target_feasible in feasible_ag2ag_mrj.items():
         to_m, local_r, to_j = np.nonzero(is_target_feasible)
-        cell = trans_source_ag[(from_m, from_j)][local_r]
+        cell = trans_source_ag[(from_m, from_j)][local_r]   # index of the cell in the global cell list
         arc_rows.append(np.column_stack([
-            np.full(cell.size, src_idx), 
-            np.full(cell.size, from_m), 
+            np.full(cell.size, from_m),
             np.full(cell.size, from_j),
-            local_r, 
-            cell, 
-            to_m, 
-            to_j]
-        ))
+            to_m,
+            to_j,
+            local_r,
+            cell
+        ]))
+        
         src_ptr.append(src_ptr[-1] + cell.size)
-    
-    table = np.concatenate(arc_rows).astype(np.int32) if arc_rows else np.empty((0, 7), dtype=np.int32)   # one arc per row; the fields are its columns
-    
+
+    table = np.concatenate(arc_rows).astype(np.int32) if arc_rows else np.empty((0, 6), dtype=np.int32)   # one arc per row; the fields are its columns
+
     return xr.Dataset(
-        dict(src    =(('arc',), table[:, 0]),
-             from_m =(('arc',), table[:, 1]),
-             from_j =(('arc',), table[:, 2]),
-             local_r=(('arc',), table[:, 3]),
-             cell   =(('arc',), table[:, 4]),
-             to_m   =(('arc',), table[:, 5]),
-             to_j   =(('arc',), table[:, 6]),
+        dict(from_m =(('arc',), table[:, 0]),
+             from_j =(('arc',), table[:, 1]),
+             to_m   =(('arc',), table[:, 2]),
+             to_j   =(('arc',), table[:, 3]),
+             local_r=(('arc',), table[:, 4]),
+             cell   =(('arc',), table[:, 5]),
              col    =(('arc',), np.arange(table.shape[0], dtype=np.int32))
         ),
         coords=dict(arc=np.arange(table.shape[0])),
@@ -289,32 +296,31 @@ def ag2ag_space(trans_source_ag: dict, feasible_ag2ag_mrj: dict) -> xr.Dataset:
 
 
 def ag2nonag_space(trans_source_ag: dict, feasible_ag2nonag_rk: dict) -> xr.Dataset:
-    """The ag → non-ag arcs on (arc): one per feasible (source (from_m, from_j) → target to_k) at a cell, sources in trans_source_ag order."""
+    """The ag → non-ag arc columns as a long table on (arc): one row per feasible (from_m, from_j) → to_k transition at a cell, rows sorted by source in trans_source_ag order."""
     print('Building the ag2nonag arc block...', flush = True)
-    arc_rows = []
-    src_ptr = [0]
-    for src_idx, ((from_m, from_j), is_target_feasible) in enumerate(feasible_ag2nonag_rk.items()):
+    arc_rows = []                                            # one chunk of rows per source
+    src_ptr = [0]                                            # where each source's run of rows starts / ends
+    for (from_m, from_j), is_target_feasible in feasible_ag2nonag_rk.items():
         local_r, to_k = np.nonzero(is_target_feasible)
-        cell = trans_source_ag[(from_m, from_j)][local_r]
+        cell = trans_source_ag[(from_m, from_j)][local_r]   # index of the cell in the global cell list
         arc_rows.append(np.column_stack([
-            np.full(cell.size, src_idx), 
-            np.full(cell.size, from_m), 
+            np.full(cell.size, from_m),
             np.full(cell.size, from_j),
-            local_r, 
-            cell, 
-            to_k]
-        ))
+            to_k,
+            local_r,
+            cell
+        ]))
+        
         src_ptr.append(src_ptr[-1] + cell.size)
-    
-    table = np.concatenate(arc_rows).astype(np.int32) if arc_rows else np.empty((0, 6), dtype=np.int32)   # one arc per row; the fields are its columns
-    
+
+    table = np.concatenate(arc_rows).astype(np.int32) if arc_rows else np.empty((0, 5), dtype=np.int32)   # one arc per row; the fields are its columns
+
     return xr.Dataset(
-        dict(src    =(('arc',), table[:, 0]),
-             from_m =(('arc',), table[:, 1]),
-             from_j =(('arc',), table[:, 2]),
+        dict(from_m =(('arc',), table[:, 0]),
+             from_j =(('arc',), table[:, 1]),
+             to_k   =(('arc',), table[:, 2]),
              local_r=(('arc',), table[:, 3]),
              cell   =(('arc',), table[:, 4]),
-             to_k   =(('arc',), table[:, 5]),
              col    =(('arc',), np.arange(table.shape[0], dtype=np.int32))
         ),
         coords=dict(arc=np.arange(table.shape[0])),
@@ -323,32 +329,31 @@ def ag2nonag_space(trans_source_ag: dict, feasible_ag2nonag_rk: dict) -> xr.Data
 
 
 def nonag2ag_space(trans_source_nonag: dict, feasible_nonag2ag_mrj: dict) -> xr.Dataset:
-    """The non-ag → ag arcs on (arc): one per feasible (source from_k → target (to_m, to_j)) at a cell, sources in trans_source_nonag order."""
+    """The non-ag → ag arc columns as a long table on (arc): one row per feasible from_k → (to_m, to_j) transition at a cell, rows sorted by source in trans_source_nonag order."""
     print('Building the nonag2ag arc block...', flush = True)
-    arc_rows = []
-    src_ptr = [0]
-    for src_idx, (from_k, is_target_feasible) in enumerate(feasible_nonag2ag_mrj.items()):
+    arc_rows = []                                            # one chunk of rows per source
+    src_ptr = [0]                                            # where each source's run of rows starts / ends
+    for from_k, is_target_feasible in feasible_nonag2ag_mrj.items():
         to_m, local_r, to_j = np.nonzero(is_target_feasible)
-        cell = trans_source_nonag[from_k][local_r]
+        cell = trans_source_nonag[from_k][local_r]   # index of the cell in the global cell list
         arc_rows.append(np.column_stack([
-            np.full(cell.size, src_idx), 
-            np.full(cell.size, from_k), 
-            local_r, 
-            cell, 
-            to_m, 
-            to_j]
-        ))
+            np.full(cell.size, from_k),
+            to_m,
+            to_j,
+            local_r,
+            cell
+        ]))
+        
         src_ptr.append(src_ptr[-1] + cell.size)
-    
-    table = np.concatenate(arc_rows).astype(np.int32) if arc_rows else np.empty((0, 6), dtype=np.int32)   # one arc per row; the fields are its columns
-    
+
+    table = np.concatenate(arc_rows).astype(np.int32) if arc_rows else np.empty((0, 5), dtype=np.int32)   # one arc per row; the fields are its columns
+
     return xr.Dataset(
-        dict(src    =(('arc',), table[:, 0]),
-             from_k =(('arc',), table[:, 1]),
-             local_r=(('arc',), table[:, 2]),
-             cell   =(('arc',), table[:, 3]),
-             to_m   =(('arc',), table[:, 4]),
-             to_j   =(('arc',), table[:, 5]),
+        dict(from_k =(('arc',), table[:, 0]),
+             to_m   =(('arc',), table[:, 1]),
+             to_j   =(('arc',), table[:, 2]),
+             local_r=(('arc',), table[:, 3]),
+             cell   =(('arc',), table[:, 4]),
              col    =(('arc',), np.arange(table.shape[0], dtype=np.int32))
         ),
         coords=dict(arc=np.arange(table.shape[0])),
@@ -357,111 +362,95 @@ def nonag2ag_space(trans_source_nonag: dict, feasible_nonag2ag_mrj: dict) -> xr.
 
 
 def cell_usage_space(feasible_cell_usage_r) -> xr.Dataset:
-    """The cell-usage range slacks on (cell): one per cell that gets a cell-usage row."""
-    has_col = feasible_cell_usage_r
-    col_r = np.full(has_col.shape, -1, dtype=np.int32)
-    col_r[has_col] = np.arange(has_col.sum(), dtype=np.int32)
+    """The cell-usage slack columns as a wide table on (cell): a column per cell that gets a cell-usage row."""
+    col_r = np.full(feasible_cell_usage_r.shape, -1, dtype=np.int32)
+    col_r[feasible_cell_usage_r] = np.arange(feasible_cell_usage_r.sum(), dtype=np.int32)
     return xr.Dataset(
-        dict(col_r=(('cell',), col_r)),                                        # slack column id (-1 = no row, no slack); col_r >= 0 is the select for gp.Var creation
-        coords=dict(cell=np.arange(has_col.size)),
-        attrs=dict(n=int(has_col.sum()))
+        dict(col=(('cell',), col_r)),                                          # slack column id (-1 = no row, no slack); col >= 0 is the select for gp.Var creation
+        coords=dict(cell=np.arange(feasible_cell_usage_r.size)),
+        attrs=dict(n=int(feasible_cell_usage_r.sum()))
     )
-
-
-def columns(col_grid: xr.DataArray, want: tuple | None = None) -> tuple:
-    """A block's columns in column order from its column grid: the index arrays of the dims in ``want`` (default: the last dim) followed by the global column ids."""
-    idx = dict(zip(col_grid.dims, np.nonzero(col_grid.values >= 0)))
-    col = col_grid.values[tuple(idx.values())]
-    return (*[idx[dim].astype(np.int32) for dim in (want or col_grid.dims[-1:])], col)
 
 
 # ═══════════════════════════ get_cols: the column space of one step ═══════════════════════════
 
 def get_cols(data: Data, base_year: int) -> dict:
-    """The column space of one solve step: every unknown as a labelled Dataset per block with global Var.index ids, plus layout, terms, sources and masks."""
+    """The column space of one solve step: every unknown as a labelled Dataset per block (wide grid or long arc table) holding its actual Var.index ids, plus the widths (layout), terms, sources and masks."""
 
     # ── 1. sources (FROM-view): the base-year holders of land ──
-    trans_source_ag    = get_trans_source_ag(data, base_year)             # cells holding each ag (from_m, from_j) source
-    trans_source_nonag = get_trans_source_nonag(data, base_year)          # cells holding each non-ag source k
+    trans_source_ag         = get_trans_source_ag(data, base_year)              # (from_m, from_j): global cell indices
+    trans_source_nonag      = get_trans_source_nonag(data, base_year)           # from_k: global cell indices
 
     # ── 2. transition bounds and the base (TO-view) ──
-    trans_ub_ag_mrj     = get_trans_ub_ag_mrj(data, base_year)            # ag target upper bound (ag2ag + nonag2ag); ag has no lower bound
-    trans_ub_nonag_rk   = get_trans_ub_nonag_rk(data, base_year)
-    trans_lb_nonag_rk   = get_trans_lb_nonag_rk(data, base_year)
-    trans_lb_ag_man_mrj = get_trans_lb_ag_man_mrj(data, base_year)        # non-reversible options lock in last step's adoption
-    dvar_base_ag_mrj   = tools.clamp_dvar_bound(data.ag_dvars[base_year], 0.0, trans_ub_ag_mrj, 'Ag base clipped to [0,ub]')
-    dvar_base_nonag_rk = tools.clamp_dvar_bound(data.non_ag_dvars[base_year], trans_lb_nonag_rk, trans_ub_nonag_rk, 'NonAg base clipped to [lb,ub]')
+    trans_ub_ag_mrj         = get_trans_ub_ag_mrj(data, base_year)              # upper bound of every ag target (ag2ag + nonag2ag), raised to the base; ag has no lower bound
+    trans_ub_nonag_rk       = get_trans_ub_nonag_rk(data, base_year)            # upper bound of every non-ag target, raised to the base
+    trans_lb_nonag_rk       = get_trans_lb_nonag_rk(data, base_year)            # lower bound of every non-ag target: irreversible non-ag land uses lock in their base-year holding
+    trans_lb_ag_man_mrj     = get_trans_lb_ag_man_mrj(data, base_year)          # lower bound of every ag-mgt entry: non-reversible options lock in last step's adoption
+
+    dvar_base_ag_mrj        = tools.clamp_dvar_bound(data.ag_dvars[base_year], 0.0, trans_ub_ag_mrj, 'Ag base clipped to [0,ub]')
+    dvar_base_nonag_rk      = tools.clamp_dvar_bound(data.non_ag_dvars[base_year], trans_lb_nonag_rk, trans_ub_nonag_rk, 'NonAg base clipped to [lb,ub]')
 
     # ── 3. feasibility: target entries (feasible_ag_mrj, trans_ub_nonag_rk > 0), transition arcs, cell-usage rows ──
-    feasible_ag_mrj = get_feasible_ag_mrj(data, base_year)                # bool: which (m, j) a cell may become
-    T_ag2ag_reach_jj    = ~np.isnan(data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES,     to_lu=data.AGRICULTURAL_LANDUSES).values)
-    T_ag2nonag_reach_jk = ~np.isnan(data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES,     to_lu=data.NON_AGRICULTURAL_LANDUSES).values)
-    T_nonag2ag_reach_kj = ~np.isnan(data.T_MAT.sel(from_lu=data.NON_AGRICULTURAL_LANDUSES, to_lu=data.AGRICULTURAL_LANDUSES).values)
-    feasible_ag2ag_mrj    = get_feasible_ag2ag_mrj(feasible_ag_mrj, trans_source_ag, T_ag2ag_reach_jj)
-    feasible_nonag2ag_mrj = get_feasible_nonag2ag_mrj(feasible_ag_mrj, trans_source_nonag, T_nonag2ag_reach_kj)
-    feasible_ag2nonag_rk  = get_feasible_ag2nonag_rk(trans_ub_nonag_rk, trans_source_ag, T_ag2nonag_reach_jk)
-    feasible_cell_usage_r = get_feasible_cell_usage_r(trans_ub_ag_mrj, trans_ub_nonag_rk, data.AG_MASK_PROPORTION_R)
+    T_ag2ag_reach_jj        = ~np.isnan(data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES,     to_lu=data.AGRICULTURAL_LANDUSES).values)       # T_MAT reachability: finite = the transition is allowed
+    T_ag2nonag_reach_jk     = ~np.isnan(data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES,     to_lu=data.NON_AGRICULTURAL_LANDUSES).values)
+    T_nonag2ag_reach_kj     = ~np.isnan(data.T_MAT.sel(from_lu=data.NON_AGRICULTURAL_LANDUSES, to_lu=data.AGRICULTURAL_LANDUSES).values)
+
+    feasible_ag_mrj         = get_feasible_ag_mrj(data, base_year)                # bool: which (m, j) a cell may become
+    feasible_ag2ag_mrj      = get_feasible_ag2ag_mrj(feasible_ag_mrj, trans_source_ag, T_ag2ag_reach_jj)
+    feasible_nonag2ag_mrj   = get_feasible_nonag2ag_mrj(feasible_ag_mrj, trans_source_nonag, T_nonag2ag_reach_kj)
+    feasible_ag2nonag_rk    = get_feasible_ag2nonag_rk(trans_ub_nonag_rk, trans_source_ag, T_ag2nonag_reach_jk)
+    feasible_cell_usage_r   = get_feasible_cell_usage_r(trans_ub_ag_mrj, trans_ub_nonag_rk, data.AG_MASK_PROPORTION_R)
 
     # ── 4. masks: the cell sets that restrict ag-management options ──
-    mask_gbf2_solar = get_mask_gbf2_solar(data)
-    mask_gbf2_wind  = get_mask_gbf2_wind(data)
-    mask_mnes_solar = get_mask_mnes_solar(data)
-    mask_mnes_wind  = get_mask_mnes_wind(data)
+    mask_gbf2_solar         = get_mask_gbf2_solar(data)
+    mask_gbf2_wind          = get_mask_gbf2_wind(data)
+    mask_mnes_solar         = get_mask_mnes_solar(data)
+    mask_mnes_wind          = get_mask_mnes_wind(data)
 
-    # ── 5. the blocks in Var.index order, with block-local ids ──
+    # ── 5. the blocks in Var.index order, each built with block-local ids ──
     ag = ag_space(data, feasible_ag_mrj, trans_ub_ag_mrj, dvar_base_ag_mrj)
     cols = {
         'ag':         ag,
         'nonag':      nonag_space(data, trans_lb_nonag_rk, trans_ub_nonag_rk, dvar_base_nonag_rk),
-        'am':         am_space(data, ag['col_mjr'].values, mask_gbf2_solar, mask_gbf2_wind, trans_lb_ag_man_mrj),
+        'am':         am_space(data, ag['col'].values, mask_gbf2_solar, mask_gbf2_wind, trans_lb_ag_man_mrj),
         'ag2ag':      ag2ag_space(trans_source_ag, feasible_ag2ag_mrj),
         'ag2nonag':   ag2nonag_space(trans_source_ag, feasible_ag2nonag_rk),
         'nonag2ag':   nonag2ag_space(trans_source_nonag, feasible_nonag2ag_mrj),
         'cell_usage': cell_usage_space(feasible_cell_usage_r),
     }
 
-    # ── 6. layout: the first Var.index of every block, in the order of `cols` ──
+    # ── 6. the blocks placed back to back: per block, its ids shifted in place to the actual Var.index (-1 never shifts),
+    #       then the running count advanced by the block's width; layout keeps the two widths the rows are built at ──
     layout = {}
-    layout['ag']         = 0
-    layout['nonag']      = layout['ag']         + cols['ag'].attrs['n']
-    layout['am']         = layout['nonag']      + cols['nonag'].attrs['n']
-    layout['ag2ag']      = layout['am']         + cols['am'].attrs['n']
-    layout['ag2nonag']   = layout['ag2ag']      + cols['ag2ag'].attrs['n']
-    layout['nonag2ag']   = layout['ag2nonag']   + cols['ag2nonag'].attrs['n']
-    layout['cell_usage'] = layout['nonag2ag']   + cols['nonag2ag'].attrs['n']
+    n_cols = 0                                                                      # the next free Var.index
+    for name, block in cols.items():
+        ids = block['col'].values
+        ids[ids >= 0] += n_cols
+        n_cols += block.attrs['n']
+        # the decision columns (ag, nonag, am and the three flow blocks) end with the last nonag2ag arc;
+        # the objective block is built at this width since the cell-usage slacks that follow carry no cost
+        if name == 'nonag2ag':
+            layout['n_dec'] = n_cols
 
-    layout['n_dec']      = layout['cell_usage']                                    # the decision columns: the objective block is built at this width (the slacks carry no cost)
-    layout['n_all']      = layout['n_dec']      + cols['cell_usage'].attrs['n']    # the total columns: every constraint block (the rows) is built at this width
-
-    # ── 7. every block-local id shifted to its global Var.index, in place ──
-    def shift(col, offset):                                                         # -1 (no column) never shifts
-        col[col >= 0] += offset
-
-    shift(cols['ag']['col_mjr'].values,           layout['ag'])
-    shift(cols['nonag']['col_kr'].values,         layout['nonag'])
-    shift(cols['am']['col_smr'].values,           layout['am'])
-    shift(cols['ag2ag']['col'].values,            layout['ag2ag'])
-    shift(cols['ag2nonag']['col'].values,         layout['ag2nonag'])
-    shift(cols['nonag2ag']['col'].values,         layout['nonag2ag'])
-    shift(cols['cell_usage']['col_r'].values,     layout['cell_usage'])
+    # every column: every constraint block (the rows) is built at this width
+    layout['n_all'] = n_cols
 
     print(f"Column space: {layout['n_all']:,} columns = {layout['n_dec']:,} decision (n_dec) + {cols['cell_usage'].attrs['n']:,} cell-usage slacks", flush=True)
-    blocks = ['ag', 'nonag', 'am', 'ag2ag', 'ag2nonag', 'nonag2ag', 'cell_usage']
-    for block in blocks:
-        print(f"{'└──' if block == blocks[-1] else '├──'} {block:<10s} {cols[block].attrs['n']:>12,}", flush=True)
+    for block in cols:
+        print(f"{'└──' if block == 'cell_usage' else '├──'} {block:<10s} {cols[block].attrs['n']:>12,}", flush=True)
 
-    # ── 8. the coefficient support: one term per ag column, per ag-mgt column and per non-ag column, with its cell — read by
-    #       every policy family (row_builder.gather_coeffs / compose_rows) and by the objective (row_builder.get_obj_block) ──
-    ag_lm, ag_lu, ag_cell = np.nonzero(ag['col_mjr'].values >= 0)                                          # column order: lm, lu, cell
+    # ── 7. terms: the long-table view of the grid blocks — one row per ag / ag-mgt / non-ag column with its attributes (m, j, r, ...) and
+    #       its global col — read by every policy family (row_builder.gather_coeffs / compose_rows) and by the objective (row_builder.get_obj_block) ──
+    ag_lm, ag_lu, ag_cell = np.nonzero(ag['col'].values >= 0)                                          # column order: lm, lu, cell
     ag_terms = dict(
         m=ag_lm.astype(np.int32), 
         j=ag_lu.astype(np.int32), 
         r=ag_cell.astype(np.int32),
-        col=ag['col_mjr'].values[ag_lm, ag_lu, ag_cell].astype(np.int32)
+        col=ag['col'].values[ag_lm, ag_lu, ag_cell].astype(np.int32)
     )
 
     am = cols['am']
-    am_slot, am_lm, am_cell = np.nonzero(am['col_smr'].values >= 0)                                         # column order: slot, lm, cell
+    am_slot, am_lm, am_cell = np.nonzero(am['col'].values >= 0)                                         # column order: slot, lm, cell
     am_list = list(am.attrs['agman2lu'])
     am_idx_of_slot = np.array([am_list.index(name) for name in am['am'].values], dtype=np.int32)            # slot -> index into am_list
     j_idx_of_slot = np.zeros(am.sizes['slot'], dtype=np.int32)                                              # slot -> position of its land use within the option
@@ -474,18 +463,18 @@ def get_cols(data: Data, base_year: int) -> dict:
         j=am['j'].values[am_slot],
         m=am_lm.astype(np.int32), 
         r=am_cell.astype(np.int32), 
-        col=am['col_smr'].values[am_slot, am_lm, am_cell]
+        col=am['col'].values[am_slot, am_lm, am_cell]
     )
     
     nonag = cols['nonag']
-    nonag_k, nonag_cell = np.nonzero(nonag['col_kr'].values >= 0)                                           # column order: k, cell
-    nonag_terms = dict(k=nonag_k.astype(np.int32), r=nonag_cell.astype(np.int32), col=nonag['col_kr'].values[nonag_k, nonag_cell])
-    term_cell = np.concatenate([ag_terms['r'], am_terms['r'], nonag_terms['r']]).astype(np.int32)           # the term order: ag | am | nonag
+    nonag_k, nonag_cell = np.nonzero(nonag['col'].values >= 0)                                           # column order: k, cell
+    nonag_terms = dict(k=nonag_k.astype(np.int32), r=nonag_cell.astype(np.int32), col=nonag['col'].values[nonag_k, nonag_cell])
+    term_cell = np.concatenate([ag_terms['r'], am_terms['r'], nonag_terms['r']]).astype(np.int32)           # the row order of the terms table: ag | am | nonag
     term_col = np.concatenate([ag_terms['col'], am_terms['col'], nonag_terms['col']]).astype(np.int32)
-    by_cell_order = np.argsort(term_cell, kind='stable')                                                    # terms sorted by cell + CSR pointer over cells
-    by_cell_ptr = np.searchsorted(term_cell[by_cell_order], np.arange(data.NCELLS + 1))
+    by_cell_order = np.argsort(term_cell, kind='stable')                                                    # the terms table re-sorted by cell ...
+    by_cell_ptr = np.searchsorted(term_cell[by_cell_order], np.arange(data.NCELLS + 1))                     # ... and where each cell's run of rows starts / ends
 
-    # ── 9. what the rows and the post-solve read need besides the columns ──
+    # ── 8. what the rows and the post-solve read need besides the columns ──
     cols['layout']   = layout
     cols['terms']    = dict(
         ag=ag_terms, 

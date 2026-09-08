@@ -28,7 +28,6 @@ from typing import Any, Optional
 from luto.data import Data
 from luto import settings
 import luto.tools as tools
-from luto.solvers import col_builder
 
 import luto.economics.agricultural.cost as ag_cost
 import luto.economics.agricultural.ghg as ag_ghg
@@ -863,7 +862,7 @@ def renewable_ceiling_rows(rows: RowInputs, cols: dict):
     data years, so the ceiling never decreases between periods (lb(t) ≤ ceiling always holds)."""
     n_all = cols['layout']['n_all']
     am_ds = cols['am']
-    am_col_smr = am_ds['col_smr'].values
+    am_col_smr = am_ds['col'].values
     am_of_slot = am_ds['am'].values
     ag_mask = rows.ag_mask_proportion_r
     parts = []
@@ -903,30 +902,34 @@ def renewable_ceiling_rows(rows: RowInputs, cols: dict):
 
 def cell_usage_band(rows: RowInputs, cols: dict):
     """The cell-usage rows' cells, lower and upper bound: Σ(ag + non-ag shares) ∈ [ag_mask − band,
-    ag_mask + band] on the cells that can meet it (``cols['cell_usage'].col_r >= 0``). Ranged, not ==:
+    ag_mask + band] on the cells that can meet it (``cols['cell_usage'].col >= 0``). Ranged, not ==:
     presolve folds the node-balance rows into this one and compares two constants summed along
     different float32 paths (up to ~1.75x FeasibilityTol apart) with NO tolerance. The ±10x Ftol
     band absorbs that; conservation still pins the cell total, so the band is not exploitable."""
-    row_cells = np.flatnonzero(cols['cell_usage']['col_r'].values >= 0)
+    row_cells = np.flatnonzero(cols['cell_usage']['col'].values >= 0)
     band = 10 * settings.FEASIBILITY_TOLERANCE
     ag_mask = rows.ag_mask_proportion_r[row_cells].astype(np.float64)   # widen before the band is applied
     return row_cells, ag_mask - band, ag_mask + band
 
 
 def cell_usage_rows(rows: RowInputs, cols: dict):
-    """Every cell's ag + non-ag shares sum to its base-year agricultural proportion, stored as
-    Gurobi stores an addRange row: Σ X + slack = hi, the range slack a column of the space (lb 0,
-    ub = hi − lo). One row per cell of ``cols['cell_usage']``: a group-by cell over every ag
-    column, every non-ag column and the slack."""
+    """Every cell's ag + non-ag shares sum to its base-year agricultural proportion: group every ag
+    column and every non-ag column by cell, plus the cell's range slack. Stored the way Gurobi
+    stores an addRange row, Σ X + slack = hi, the slack a column of the space (lb 0, ub = hi − lo).
+    One row per cell of ``cols['cell_usage']``."""
     n_all = cols['layout']['n_all']
     row_cells, lo, hi = cell_usage_band(rows, cols)
     n_rows = row_cells.size
     row_of_cell = np.full(cols['ag'].sizes['cell'], -1, dtype=np.int64)
     row_of_cell[row_cells] = np.arange(n_rows)
-    ag_cell, ag_cols = col_builder.columns(cols['ag']['col_mjr'])
-    nonag_cell, nonag_cols = col_builder.columns(cols['nonag']['col_kr'])
+    ag_col_mjr = cols['ag']['col'].values
+    nonag_col_kr = cols['nonag']['col'].values
+    _, _, ag_cell = np.nonzero(ag_col_mjr >= 0)                            # column order: lm, lu, cell
+    _, nonag_cell = np.nonzero(nonag_col_kr >= 0)                          # column order: k, cell
+    ag_cols = ag_col_mjr[ag_col_mjr >= 0]
+    nonag_cols = nonag_col_kr[nonag_col_kr >= 0]
     row_idx = np.concatenate([row_of_cell[ag_cell], row_of_cell[nonag_cell], np.arange(n_rows)])
-    col_idx = np.concatenate([ag_cols, nonag_cols, cols['cell_usage']['col_r'].values[row_cells]])
+    col_idx = np.concatenate([ag_cols, nonag_cols, cols['cell_usage']['col'].values[row_cells]])
     in_row = row_idx >= 0
     A = sparse.csr_matrix((np.ones(int(in_row.sum())), (row_idx[in_row], col_idx[in_row])), shape=(n_rows, n_all))
     return make_block('cell_usage', 'cell_usage', dict(cell=row_cells), A, hi, '=',
@@ -940,9 +943,9 @@ def ag_mgt_link_rows(rows: RowInputs, cols: dict):
     savanna-ineligible cell) the row is X_ag ≥ 0 (sense '>'). Row order: (am, land use) slot, dry
     then irr, cells ascending."""
     n_all = cols['layout']['n_all']
-    ag_col_mjr = cols['ag']['col_mjr'].values
+    ag_col_mjr = cols['ag']['col'].values
     am_ds = cols['am']
-    am_col_smr = am_ds['col_smr'].values
+    am_col_smr = am_ds['col'].values
     am_of_slot = am_ds['am'].values
     j_of_slot = am_ds['j'].values
     am_list = list(am_ds.attrs['agman2lu'])
@@ -990,9 +993,9 @@ def ag_mgt_adoption_rows(rows: RowInputs, cols: dict):
     """Adoption limits: one row per (am, land use), Σ am columns − limit · Σ ag columns ≤ 0
     (Σam ≤ limit · Σag with the RHS moved to the LHS); zero coefficients (limit = 0) are dropped."""
     n_all = cols['layout']['n_all']
-    ag_col_mjr = cols['ag']['col_mjr'].values
+    ag_col_mjr = cols['ag']['col'].values
     am_ds = cols['am']
-    am_col_smr = am_ds['col_smr'].values
+    am_col_smr = am_ds['col'].values
     am_of_slot = am_ds['am'].values
     j_of_slot = am_ds['j'].values
     row_idx = []
@@ -1265,7 +1268,9 @@ def regional_adoption_ag_rows(rows: RowInputs, cols: dict):
     if settings.REGIONAL_ADOPTION_CONSTRAINTS == "off":
         print("│   │   └── TURNING OFF constraints for regional adoption ...")
         return None
-    ag_j, ag_r, ag_cols = col_builder.columns(cols['ag']['col_mjr'], ('lu', 'cell'))
+    ag_col_mjr = cols['ag']['col'].values
+    _, ag_j, ag_r = np.nonzero(ag_col_mjr >= 0)                            # column order: lm, lu, cell
+    ag_cols = ag_col_mjr[ag_col_mjr >= 0]
     return _regional_adoption_family(
         'regional_adoption_ag', 'adopt_ag', ('region', 'lu'), rows.limits["ag_regional_adoption"], ag_cols, ag_r,
         lambda cap, reg_ind: (ag_j == cap[1]) & np.isin(ag_r, reg_ind),
@@ -1285,7 +1290,9 @@ def regional_adoption_nonag_rows(rows: RowInputs, cols: dict):
     """Per-(region, non-ag land use) caps ('on' mode), with the per-year relaxation."""
     if settings.REGIONAL_ADOPTION_CONSTRAINTS == "off":
         return None
-    na_k, na_r, na_cols = col_builder.columns(cols['nonag']['col_kr'], ('nonag_lu', 'cell'))
+    nonag_col_kr = cols['nonag']['col'].values
+    na_k, na_r = np.nonzero(nonag_col_kr >= 0)                             # column order: k, cell
+    na_cols = nonag_col_kr[nonag_col_kr >= 0]
     relax = _nonag_cap_relax(rows)
     return _regional_adoption_family(
         'regional_adoption_nonag', 'adopt_nonag', ('region', 'lu'), rows.limits.get("non_ag_regional_adoption") or [], na_cols, na_r,
@@ -1297,7 +1304,9 @@ def regional_adoption_nonag_sum_rows(rows: RowInputs, cols: dict):
     """SUM-of-non-ag caps ('NON_AG_CAP' mode): all non-ag land uses in a region together."""
     if settings.REGIONAL_ADOPTION_CONSTRAINTS == "off":
         return None
-    na_k, na_r, na_cols = col_builder.columns(cols['nonag']['col_kr'], ('nonag_lu', 'cell'))
+    nonag_col_kr = cols['nonag']['col'].values
+    _, na_r = np.nonzero(nonag_col_kr >= 0)                                # column order: k, cell
+    na_cols = nonag_col_kr[nonag_col_kr >= 0]
     relax = _nonag_cap_relax(rows)
     return _regional_adoption_family(
         'regional_adoption_nonag_sum', 'nonag_cap', ('region',), rows.limits.get("non_ag_regional_adoption_sum") or [], na_cols, na_r,
@@ -1367,7 +1376,7 @@ def renewable_rows(rows: RowInputs, cols: dict):
             coeff_of_type[am_name] = coeff
 
     # ── one row per (state, type) with eligible cells ──
-    ag_has_col_mjr = cols['ag']['col_mjr'].values >= 0
+    ag_has_col_mjr = cols['ag']['col'].values >= 0
     agman2lu = cols['am'].attrs['agman2lu']
     parts = []
     names = []
@@ -1416,28 +1425,30 @@ def renewable_rows(rows: RowInputs, cols: dict):
                       block, rhs, '>', names, scale)
 
 
-# ── the transition-flow rows ───────────────────────────────────────────────────────────────────
+# ── the transition-flow rows: group-bys over the arc tables (ag2ag ∪ ag2nonag ∪ nonag2ag) ──────
+#    group by the FROM fields + cell  →  source cap:    Σ out ≤ base                 (a ≤ row per source node)
+#    group by the node in BOTH roles  →  node balance:  X = base + Σ in − Σ out      (an = row per target column)
+#    the inflow cap is not a row: X's own ub (the transition upper bound) and the cell-usage row bound it.
 
 def source_cap_ag_rows(rows: RowInputs, cols: dict):
-    """Source cap, ag sources: a source cannot export more land than it holds,
-    Σ_to D_ag2ag[(from_m, from_j)][·, r, ·] + Σ_k D_ag2nonag[(from_m, from_j)][k, r] ≤ base[from_m, r, from_j].
-    This BOUNDS the delta vars (some flow costs are negative) and rules out pass-through. ONE
-    group-by over (source, cell) of the ag2ag ∪ ag2nonag arcs; a (source, cell) with no arcs has no row."""
+    """Source cap, ag sources: group the ag2ag ∪ ag2nonag arc tables by (from_m, from_j, cell); the
+    group's arcs sum to at most the source's base share, Σ out ≤ base[from_m, r, from_j]. Every arc
+    of the group gets +1; a (from, cell) group with no arcs has no row. This BOUNDS the arc columns
+    (some flow costs are negative) and rules out pass-through."""
     print("│   ├── Adding source-cap (Σ out ≤ base) constraints...")
     n_all = cols['layout']['n_all']
     ag2ag = cols['ag2ag']
     ag2nonag = cols['ag2nonag']
     assert ag2ag.attrs['sources'] == ag2nonag.attrs['sources'], 'ag2ag / ag2nonag must share the ag source order'
-    base_ag = np.ascontiguousarray(cols['ag']['base_mjr'].values.transpose(0, 2, 1))   # (m, j, r) -> (m, r, j), contiguous after the transpose
-    # the two arc lists concatenated, keyed by (source, local cell)
-    stride = cols['ag'].sizes['cell']                                   # local_r < ncells
-    key = np.concatenate([ag2ag['src'].values.astype(np.int64) * stride + ag2ag['local_r'].values,
-                          ag2nonag['src'].values.astype(np.int64) * stride + ag2nonag['local_r'].values])
+    base_ag = np.ascontiguousarray(cols['ag']['base'].values.transpose(0, 2, 1))   # (m, j, r) -> (m, r, j), contiguous after the transpose
+    # the two arc lists concatenated, keyed by (source (from_m, from_j), local cell)
     arc_col = np.concatenate([ag2ag['col'].values, ag2nonag['col'].values]).astype(np.int64)
     from_m = np.concatenate([ag2ag['from_m'].values, ag2nonag['from_m'].values])
     from_j = np.concatenate([ag2ag['from_j'].values, ag2nonag['from_j'].values])
     cell = np.concatenate([ag2ag['cell'].values, ag2nonag['cell'].values])
     local_r = np.concatenate([ag2ag['local_r'].values, ag2nonag['local_r'].values])
+    n_lu, stride = cols['ag'].sizes['lu'], cols['ag'].sizes['cell']     # local_r < ncells
+    key = (from_m.astype(np.int64) * n_lu + from_j) * stride + local_r
     # one row per distinct key; every arc of the key gets a +1
     unique_keys, first_arc, row_of_arc = np.unique(key, return_index=True, return_inverse=True)
     A = sparse.csr_matrix((np.ones(key.size), (row_of_arc, arc_col)), shape=(unique_keys.size, n_all))
@@ -1448,16 +1459,15 @@ def source_cap_ag_rows(rows: RowInputs, cols: dict):
 
 
 def source_cap_nonag_rows(rows: RowInputs, cols: dict):
-    """Source cap, non-ag sources: Σ_to D_nonag2ag[k][·, r, ·] ≤ base_nonag[r, k]."""
+    """Source cap, non-ag sources: group the nonag2ag arc table by (from_k, cell); Σ out ≤ base_nonag[r, from_k]."""
     n_all = cols['layout']['n_all']
     nonag2ag = cols['nonag2ag']
     if not nonag2ag.attrs['n']:
         return None
-    base_nonag = np.ascontiguousarray(cols['nonag']['base_kr'].values.T)   # (r, k), contiguous after the transpose
-    stride = cols['ag'].sizes['cell']
-    src = nonag2ag['src'].values
+    base_nonag = np.ascontiguousarray(cols['nonag']['base'].values.T)   # (r, k), contiguous after the transpose
+    stride = cols['ag'].sizes['cell']                                   # local_r < ncells
     local_r = nonag2ag['local_r'].values
-    key = src.astype(np.int64) * stride + local_r
+    key = nonag2ag['from_k'].values.astype(np.int64) * stride + local_r  # (source from_k, local cell)
     unique_keys, first_arc, row_of_arc = np.unique(key, return_index=True, return_inverse=True)
     A = sparse.csr_matrix((np.ones(key.size), (row_of_arc, nonag2ag['col'].values.astype(np.int64))), shape=(unique_keys.size, n_all))
     from_k = nonag2ag['from_k'].values[first_arc]
@@ -1468,29 +1478,32 @@ def source_cap_nonag_rows(rows: RowInputs, cols: dict):
 
 
 def node_balance_rows(rows: RowInputs, cols: dict):
-    """Node-balance equality: each land use's final area = base + inflows − outflows,
+    """Node balance: every target column is a node (m, j, cell) or (k, cell); group the arc tables by
+    the node in both roles — the arcs whose TO fields hit the node (−1 each, inflow) and the arcs
+    whose FROM fields hit it (+1 each, outflow) — and add the node's own X column (+1):
 
-        X_ag[m, r, j]  = base_ag[m, r, j]  + Σ_in D[· → (m, j)] − Σ_out D[(m, j) → ·]
-        X_nonag[r, k]  = base_nonag[r, k]  + Σ_in D_ag2nonag[· → k] − Σ_out D_nonag2ag[k → ·]
+        X_ag[m, r, j]  = base_ag[m, r, j]  + Σ in (ag2ag ∪ nonag2ag → (m, j)) − Σ out ((m, j) → ag2ag ∪ ag2nonag)
+        X_nonag[r, k]  = base_nonag[r, k]  + Σ in (ag2nonag → k)              − Σ out (k → nonag2ag)
 
     One row per ag column (column order), then one per (non-ag land use, feasible cell) — every
     non-ag land use, enabled or not: a disabled one's row is a pure inflow guard with no X column,
     stored with the opposite sign (``row_sign``). A source with no X var (banned receiver) has no
-    row, so its outflow arcs are dropped."""
+    row, so its outflow arcs are dropped. The inflow cap is X's own ub, not a row."""
     print("│   └── Adding node-balance (X = base + Σin − Σout) constraints...")
     n_all = cols['layout']['n_all']
     ag2ag = cols['ag2ag']
     ag2nonag = cols['ag2nonag']
     nonag2ag = cols['nonag2ag']
-    ag_j, ag_m, ag_r, ag_cols = col_builder.columns(cols['ag']['col_mjr'], ('lu', 'lm', 'cell'))
-    ag_col_mjr = cols['ag']['col_mjr'].values                           # (lm, lu, cell) -> global column = ag row of the block
-    nonag_col_kr = cols['nonag']['col_kr'].values                       # (k, cell) -> global column
-    base_ag = np.ascontiguousarray(cols['ag']['base_mjr'].values.transpose(0, 2, 1))   # (m, j, r) -> (m, r, j), contiguous after the transpose
-    base_nonag = np.ascontiguousarray(cols['nonag']['base_kr'].values.T)             # (r, k)
+    ag_col_mjr = cols['ag']['col'].values                           # (lm, lu, cell) -> global column = ag row of the block
+    ag_m, ag_j, ag_r = np.nonzero(ag_col_mjr >= 0)                      # column order: lm, lu, cell
+    ag_cols = ag_col_mjr[ag_col_mjr >= 0]
+    nonag_col_kr = cols['nonag']['col'].values                       # (k, cell) -> global column
+    base_ag = np.ascontiguousarray(cols['ag']['base'].values.transpose(0, 2, 1))   # (m, j, r) -> (m, r, j), contiguous after the transpose
+    base_nonag = np.ascontiguousarray(cols['nonag']['base'].values.T)             # (r, k)
 
     # ── the rows: one per ag column, then one per (non-ag land use, feasible cell) ──
     n_ag = ag_cols.size
-    nonag_k, nonag_r = np.nonzero(cols['nonag']['ub_kr'].values > 0)       # every feasible entry, enabled land use or not: k then cell
+    nonag_k, nonag_r = np.nonzero(cols['nonag']['ub'].values > 0)       # every feasible entry, enabled land use or not: k then cell
     nonag_k = nonag_k.astype(np.int64)
     nonag_r = nonag_r.astype(np.int64)
     n_nonag = nonag_r.size
