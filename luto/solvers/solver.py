@@ -84,7 +84,7 @@ class LutoSolver:
         # For every block: the MVar and its global column offset (Var.index of element 0 — blocks
         # are created back to back in the space's layout order, so offsets chain arithmetically,
         # no model.update() needed). The column ids live in the space (`cols[block].col_<dims>`, `col` per arc).
-        self.ag_mvar = None                 # over cols['ag']: the folded flow stream X_ag
+        self.ag_mvar = None                 # over cols['ag']: the ag land-use shares X_ag
         self.ag_offset = None
         self.nonag_mvar = None              # over cols['nonag']
         self.nonag_offset = None
@@ -96,11 +96,6 @@ class LutoSolver:
         self.ag2nonag_offset = None
         self.nonag2ag_mvar = None           # over cols['nonag2ag'] (non-ag → ag)
         self.nonag2ag_offset = None
-        # fold columns: the folded entries of the accounting view (X_acct where it differs from X_ag); None when nothing folds
-        self.fold_mvar = None
-        self.fold_offset = None
-        self.fold_link_constrs = []         # one exact equality per fold column
-        self.fold_link_block = None
         self.cell_usage_slack_mvar = None   # the cell-usage range slacks (the last variables before any row)
 
         # --- constraint handles ---
@@ -171,7 +166,6 @@ class LutoSolver:
         self._setup_non_ag_vars()
         self._setup_ag_management_variables()
         self._setup_flow_vars()
-        self._setup_fold_vars()
         self._setup_cell_usage_slack_vars()
 
     def _setup_constraints(self):
@@ -259,7 +253,7 @@ class LutoSolver:
         names come from the arc fields. A delta is a positive increment: no stay/diagonal var, the
         node-balance constant carries the base."""
         
-        print("│   ├── setting up transition flow delta variables (D)...")
+        print("│   └── setting up transition flow delta variables (D)...")
         
         ag2ag = self._cols['ag2ag']
         ag2nonag = self._cols['ag2nonag']
@@ -296,30 +290,10 @@ class LutoSolver:
              zip(nonag2ag['from_k'].values, nonag2ag['to_m'].values, nonag2ag['local_r'].values, nonag2ag['to_j'].values)]
         )
 
-        print(f"│   │   ├── ag2ag    : {n_ag2ag:,} delta vars")
-        print(f"│   │   ├── ag2nonag : {n_ag2nonag:,} delta vars")
-        print(f"│   │   ├── nonag2ag : {n_nonag2ag:,} delta vars")
-        print(f"│   │   └── total    : {n_ag2ag + n_ag2nonag + n_nonag2ag:,} delta vars")
-
-    def _setup_fold_vars(self):
-        """The fold block: one column per entry of the accounting view X_acct that the θ fold
-        makes different from its flow variable (a folded emitter and its receiver); tied
-        to X_ag by the exact linking rows (``row_builder.fold_link_rows``). Everywhere else X_acct
-        IS X_ag and no variable is created. Column order: receivers, then emitters."""
-        print("│   └── setting up fold variables (the folded entries of the accounting view)...")
-        fold = self._cols['fold']
-        self.fold_offset = self._layout['fold']
-        n_fold = fold.attrs['n']
-        if n_fold == 0:
-            print("│       └── nothing folded: the accounting view is the flow stream")
-            return
-        lu_code = {name: j for j, name in enumerate(self._cols['ag']['lu'].values)}
-        names = ([f"X_acct_{lm}_{lu_code[lu]}_{r}" for lm, lu, r in zip(fold['receiver_lm'].values, fold['receiver_lu'].values, fold['receiver_cell'].values)]
-                 + [f"X_acct_{lm}_{lu_code[lu]}_{r}" for lm, lu, r in
-                    zip(fold['emitter_lm'].values, fold['emitter_lu'].values, fold['emitter_cell'].values)])
-        self.fold_mvar = self.gurobi_model.addMVar(n_fold, lb=0.0, ub=1.0, name="X_acct")
-        self.gurobi_model.setAttr('VarName', self.fold_mvar.tolist(), names)
-        print(f"│       └── {n_fold:,} fold vars ({fold.attrs['n_receiver']:,} receivers + {fold.attrs['n_emitter']:,} emitters)")
+        print(f"│       ├── ag2ag    : {n_ag2ag:,} delta vars")
+        print(f"│       ├── ag2nonag : {n_ag2nonag:,} delta vars")
+        print(f"│       ├── nonag2ag : {n_nonag2ag:,} delta vars")
+        print(f"│       └── total    : {n_ag2ag + n_ag2nonag + n_nonag2ag:,} delta vars")
 
     def _all_vars(self):
         """The model's Var list in Var.index order (materialised once), for addMConstr."""
@@ -370,8 +344,6 @@ class LutoSolver:
 
         self.cell_usage_constraint_r = dict(zip(level('cell_usage', 'cell'), constrs('cell_usage')))
         self.cell_usage_block = A('cell_usage')
-        self.fold_link_constrs = constrs('fold_link')
-        self.fold_link_block = A('fold_link')
         self.ag_mgt_link_constraints_r = defaultdict(list)
         for c, r in zip(constrs('ag_mgt_link'), level('ag_mgt_link', 'cell')):
             self.ag_mgt_link_constraints_r[r].append(c)

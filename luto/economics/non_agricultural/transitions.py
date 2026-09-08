@@ -34,23 +34,13 @@ from luto.economics.agricultural.transitions import (
 
 
 # TODO: Ag to Non-Ag GHG transition costs are omitted; 
-#   Need to think about whether to include them, and if so, how to calculate them (e.g., using ag_ghg.get_ghg_costs_from_ag_to_nonag()).
+#   Need to think about whether to include them, and if so, 
+#   how to calculate them (e.g., using ag_ghg.get_ghg_costs_from_ag_to_nonag()).
 def get_env_plant_transitions_from_ag(
     data: Data, target_year: int, mj_cell_map: dict, separate=False
 ) -> dict:
-    """Per-source EP transition costs per-(from_m, from_j) combo over cells with ag dvar > threshold.
-
-    Parameters
-    ----------
-    mj_cell_map : dict returned by get_base_dvar_mj_cell_map(data, base_year)
-
-    Returns
-    -------
-    dict[(from_m, from_j)] → ndarray (len(cell_idx),) in $/cell/yr
-    OR, if separate=True:
-    dict[(from_m, from_j)] → {'Establishment cost (Ag2Non-Ag)', 'Transition cost (Ag2Non-Ag)',
-                               'Remove irrigation cost (Ag2Non-Ag)'} each ndarray (len(cell_idx),)
-    """
+    """{(from_m, from_j): $/cell/yr over that source's cells} to Environmental Plantings: amortised establishment + T_MAT
+    transition + irrigation removal (from_m = irr); separate=True → {component: array} per source."""
 
     # Hoist invariants outside the per-combo loop
     t_j        = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Environmental Plantings').values  # (N_AG_LUS,), NaN = prohibited
@@ -82,7 +72,7 @@ def get_env_plant_transitions_from_ag(
 def get_rip_plant_transitions_from_ag(
     data: Data, target_year: int, mj_cell_map: dict, separate=False
 ) -> dict:
-    """Per-source RP transition costs per-(from_m, from_j) combo."""
+    """{(from_m, from_j): $/cell/yr} to Riparian Plantings: establishment + T_MAT transition + irrigation removal + fencing."""
     t_j        = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Riparian Plantings').values
     est_mults  = data.EST_COST_MULTS[target_year]
     irr_scalar = settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[target_year]
@@ -113,7 +103,8 @@ def get_rip_plant_transitions_from_ag(
 def get_sheep_agroforestry_transitions_from_ag(
     data: Data, target_year: int, mj_cell_map: dict, separate=False
 ) -> dict:
-    """Per-source Sheep AF transition costs per-(from_m, from_j) combo."""
+    """{(from_m, from_j): $/cell/yr} to Sheep Agroforestry: AF_PROPORTION of (establishment + T_MAT to AF) plus the rest as
+    T_MAT to Sheep - modified land, + irrigation removal + fencing."""
     t_af_j       = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Sheep Agroforestry').values
     t_sheep_j    = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Sheep - modified land').values
     est_mults    = data.EST_COST_MULTS[target_year]
@@ -147,7 +138,8 @@ def get_sheep_agroforestry_transitions_from_ag(
 def get_beef_agroforestry_transitions_from_ag(
     data: Data, target_year: int, mj_cell_map: dict, separate=False
 ) -> dict:
-    """Per-source Beef AF transition costs per-(from_m, from_j) combo."""
+    """{(from_m, from_j): $/cell/yr} to Beef Agroforestry: AF_PROPORTION of (establishment + T_MAT to AF) plus the rest as
+    T_MAT to Beef - modified land, + irrigation removal + fencing."""
     t_af_j       = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Beef Agroforestry').values
     t_beef_j     = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Beef - modified land').values
     est_mults    = data.EST_COST_MULTS[target_year]
@@ -181,7 +173,7 @@ def get_beef_agroforestry_transitions_from_ag(
 def get_carbon_plantings_block_from_ag(
     data: Data, target_year: int, mj_cell_map: dict, separate=False
 ) -> dict:
-    """Per-source CP Block transition costs per-(from_m, from_j) combo."""
+    """{(from_m, from_j): $/cell/yr} to Carbon Plantings (Block): establishment + T_MAT transition + irrigation removal."""
     t_j        = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Carbon Plantings (Block)').values
     est_mults  = data.EST_COST_MULTS[target_year]
     irr_scalar = settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[target_year]
@@ -209,7 +201,8 @@ def get_carbon_plantings_block_from_ag(
 def get_sheep_carbon_plantings_belt_from_ag(
     data: Data, target_year: int, mj_cell_map: dict, separate=False
 ) -> dict:
-    """Per-source Sheep CP Belt transition costs per-(from_m, from_j) combo."""
+    """{(from_m, from_j): $/cell/yr} to Sheep Carbon Plantings (Belt): CP_BELT_PROPORTION of (establishment + T_MAT to CP)
+    plus the rest as T_MAT to Sheep - modified land, + irrigation removal + fencing."""
     t_cp_j       = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Sheep Carbon Plantings (Belt)').values
     t_sheep_j    = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Sheep - modified land').values
     est_mults    = data.EST_COST_MULTS[target_year]
@@ -243,7 +236,8 @@ def get_sheep_carbon_plantings_belt_from_ag(
 def get_beef_carbon_plantings_belt_from_ag(
     data: Data, target_year: int, mj_cell_map: dict, separate=False
 ) -> dict:
-    """Per-source Beef CP Belt transition costs per-(from_m, from_j) combo."""
+    """{(from_m, from_j): $/cell/yr} to Beef Carbon Plantings (Belt): CP_BELT_PROPORTION of (establishment + T_MAT to CP)
+    plus the rest as T_MAT to Beef - modified land, + irrigation removal + fencing."""
     t_cp_j       = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Beef Carbon Plantings (Belt)').values
     t_beef_j     = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Beef - modified land').values
     est_mults    = data.EST_COST_MULTS[target_year]
@@ -277,7 +271,8 @@ def get_beef_carbon_plantings_belt_from_ag(
 def get_destocked_from_ag(
     data: Data, target_year: int, mj_cell_map: dict, separate=False
 ) -> dict:
-    """Per-source Destocked transition costs per-(from_m, from_j) combo."""
+    """{(from_m, from_j): $/cell/yr} to Destocked - natural land: T_MAT transition + HCAS-weighted removal cost (livestock-natural
+    sources only, else 0) + irrigation removal."""
     t_j_raw      = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Destocked - natural land').values
     irr_scalar   = settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[target_year]
     HCAS_benefit_mult = {lu: 1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[lu] for lu in data.LU_LVSTK_NATURAL}
@@ -307,13 +302,8 @@ def get_destocked_from_ag(
 
 
 def get_transition_matrix_ag2nonag(data: Data, base_year: int, target_year: int, separate: bool = False) -> dict:
-    """Assemble ag→non-ag transition costs in flow format: dict[lu_name -> dict[(from_m, from_j) -> ndarray]].
-
-    Owns the shared per-source cell map: `mj_cell_map = get_base_dvar_mj_cell_map(data, base_year)` is
-    built ONCE here and passed to every per-lever builder (each keys its result by (from_m, from_j)
-    over that source's dvar>θ cells). input_data selects the per-source diagonal `dict[k]` for each
-    lu_name. BECCS reuses the EP builder (identical transition costs).
-    """
+    """{non-ag lu: {(from_m, from_j): $/cell/yr over the source's cells}} — every ag→non-ag lever on ONE shared source map
+    (get_base_dvar_mj_cell_map), so the cost slices and the solver's per-source flow vars agree; BECCS reuses the EP costs."""
     mj_cell_map = get_base_dvar_mj_cell_map(data, base_year)
     return {
         'Environmental Plantings':       get_env_plant_transitions_from_ag(data, target_year, mj_cell_map, separate),
@@ -331,28 +321,8 @@ def get_transition_matrix_ag2nonag(data: Data, base_year: int, target_year: int,
 
 @lru_cache(maxsize=1)
 def get_base_nonag_dvar_k_cell_map(data: Data, base_year: int, threshold: float = None) -> dict:
-    """Slice the base-year non-ag dvar by each source k, returning {k: cell_idx} for every nonag LU
-    whose dvar fraction exceeds `threshold`.
-
-    ★ THIS IS THE KEY DESIGN FOR THE DELTA TRANSITION COST (non-ag source side). We slice the base-year
-    dvar by the same source k. All cells in one slice share the same transition costs (the cost of
-    leaving source k for each target). The solver then creates, for each slice, the same number of
-    delta variables (delta >= 0, positive-increment Gurobi vars) — one per sliced cell — that
-    represent the TRUE transition flow out of source k on those cells. Transition cost is then
-    trans_cost = delta_cells * cost_cells, and the objective minimises sum(trans_cost). This is the 
-    per-source basis of the delta transition model (no single dominant-LU cost per cell).
-
-    `threshold` defaults to the ROUND_DECIMALS noise floor, NOT θ (EXACT_REACHABILITY_MIN_FRACTION):
-    the non-ag side is ALWAYS EXACT — there is no fold-into-dominant here (folding would fake-delete
-    permanent commitments or grant free destocked→ag reversion), so every nonzero non-ag land-use
-    must keep its own flow delta variables at any θ. Decoupled from θ so that raising θ for the ag
-    exact↔crisp dial cannot strand reversible non-ag land (e.g. Destocked) without a reversion path.
-    Cheap by nature: only 9 non-ag LUs, present only where the solver placed them (~188k nonag2ag
-    delta vars at 2050 vs ~2.5M ag2ag).
-
-    Cached (maxsize=1): all nonag→ag cost functions call this for the same (data, base_year)
-    pair within one solve step, so subsequent calls are free.
-    """
+    """{k: cells} — the source cells of every base-year non-ag land use above `threshold` (default the ROUND_DECIMALS noise
+    floor, the ag side's cutoff); every nonzero non-ag holding keeps its own flow vars (cached per (data, base_year))."""
     threshold = 10 ** (-settings.ROUND_DECIMALS) if threshold is None else threshold
     base_dvar_rk = data.non_ag_dvars[base_year]
     return {
@@ -363,12 +333,8 @@ def get_base_nonag_dvar_k_cell_map(data: Data, base_year: int, threshold: float 
 
 
 def get_nonag2ag_ub(data: Data, base_year: int) -> np.ndarray:
-    """nonag→ag TARGET upper bound (NLMS, NCELLS, N_AG_LUS), FRACTIONAL — non-ag-source component.
-
-    ub[to_m, r, to_j] = (fraction of cell r's non-ag land that may reach to_j) × data.EXCLUDE × no-go,
-    where the reachable fraction = Σ_{k : T_MAT[k→to_j] finite} base_nonag_dvar[r, k]. ag-source share
-    is added separately in the combined ag ub (later step).
-    """
+    """nonag→ag target upper bound (NLMS, NCELLS, N_AG_LUS), fractional: the base-year share of every non-ag source that can
+    reach to_j (T_MAT finite), × no-go × EXCLUDE. Non-ag-source component only; the combined ag ub adds the ag share."""
     non_ag_dvar = data.non_ag_dvars[base_year]                          # (NCELLS, N_NON_AG_LUS)
     
     # Transition exclusion (T_MAT): binary allow per (nonag k → to_j).
@@ -391,26 +357,15 @@ def get_nonag2ag_ub(data: Data, base_year: int) -> np.ndarray:
 
 
 def get_nonag2ag_lb(data: Data, base_year: int) -> np.ndarray:
-    """nonag→ag TARGET lower bound (NLMS, NCELLS, N_AG_LUS) — all zeros for now (placeholder)."""
+    """nonag→ag target lower bound (NLMS, NCELLS, N_AG_LUS): all zeros (placeholder)."""
     return np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
 
 
 def get_env_plantings_to_ag(
     data: Data, target_year: int, k_cell_map: dict, separate=False
 ) -> dict:
-    """EP→ag costs per nonag LU k, indexed to dvar-active cells only.
-
-    Parameters
-    ----------
-    k_cell_map : dict returned by get_base_nonag_dvar_k_cell_map(data, base_year)
-
-    Returns
-    -------
-    dict[k] → ndarray (NLMS, len(cell_idx), N_AG_LUS) in $/cell/yr
-    OR, if separate=True:
-    dict[k] → {'Transition cost (Non-Ag2Ag)', 'Water license cost (Non-Ag2Ag)'}
-               each ndarray (NLMS, len(cell_idx), N_AG_LUS)
-    """
+    """{k: (NLMS, ncells_k, N_AG_LUS) $/cell/yr} from every non-ag source k over its cells: amortised T_MAT transition + water
+    licence (dryland source → full target requirement, plus irrigation setup on lm = irr); separate=True → {component: array}."""
 
     # Hoist invariants outside the per-k loop
     base_ep_to_ag_t = data.EP2AG_TRANSITION_COSTS_HA * data.TRANS_COST_MULTS[target_year]  # (N_AG_LUS,)
@@ -447,27 +402,20 @@ def get_env_plantings_to_ag(
 
 
 def get_rip_plantings_to_ag(data: Data, base_year: int, target_year: int, separate=False):
-    # Same as EP — get_transition_matrix_nonag2ag assigns ep_to_ag directly; this stub is unused.
+    """Unused stub: Riparian Plantings → ag reuses the EP costs in get_transition_matrix_nonag2ag."""
     pass
 
 
 def get_agroforestry_to_ag_base(data: Data, base_year: int, target_year: int, separate=False):
-    # Same as EP — callers now call get_env_plantings_to_ag directly; this stub is unused.
+    """Unused stub: the agroforestry levers call get_env_plantings_to_ag directly."""
     pass
 
 
 def get_sheep_agroforestry_to_ag(
     data: Data, target_year: int, k_cell_map: dict, separate=False
 ) -> dict:
-    """Sheep AF→ag costs: {sheep_af_k: array(NLMS, ncells_k, N_AG_LUS)} over this source's cells
-    (`k_cell_map[sheep_af_k]`, from get_base_nonag_dvar_k_cell_map; empty if the source is absent).
-
-    Weighted mix (AF_PROPORTION) of the agroforestry portion (EP→ag primitive) and the sheep portion
-    (ag2ag from dry-Sheep). The single source `cell_idx` is pulled from `k_cell_map` and passed to BOTH
-    cost components so they align on the cell axis — the agroforestry portion comes from the per-k,
-    dvar-based get_env_plantings_to_ag (NOT a lumap-based cost, which would zero cells by the dominant
-    lumap).
-    """
+    """{sheep_af_k: (NLMS, ncells_k, N_AG_LUS)} from Sheep Agroforestry over its source cells: AF_PROPORTION of the EP→ag cost
+    plus the rest as the ag2ag cost from dry Sheep, both evaluated on the same cells."""
     sheep_af_k = data.NON_AGRICULTURAL_LANDUSES.index('Sheep Agroforestry')
     cell_idx   = k_cell_map.get(sheep_af_k, np.array([], dtype=int))
     yr_idx     = target_year - data.YR_CAL_BASE
@@ -487,11 +435,8 @@ def get_sheep_agroforestry_to_ag(
 def get_beef_agroforestry_to_ag(
     data: Data, target_year: int, k_cell_map: dict, separate=False
 ) -> dict:
-    """Beef AF→ag costs: {beef_af_k: array(NLMS, ncells_k, N_AG_LUS)} over this source's cells
-    (`k_cell_map[beef_af_k]`). Weighted mix (AF_PROPORTION) of the agroforestry portion (EP→ag
-    primitive, per-k dvar-based) and the beef portion (ag2ag from dry-Beef); the single source cell_idx
-    is pulled from k_cell_map and passed to BOTH cost components so they align on the cell axis.
-    """
+    """{beef_af_k: (NLMS, ncells_k, N_AG_LUS)} from Beef Agroforestry over its source cells: AF_PROPORTION of the EP→ag cost
+    plus the rest as the ag2ag cost from dry Beef, both evaluated on the same cells."""
     beef_af_k = data.NON_AGRICULTURAL_LANDUSES.index('Beef Agroforestry')
     cell_idx  = k_cell_map.get(beef_af_k, np.array([], dtype=int))
     yr_idx    = target_year - data.YR_CAL_BASE
@@ -509,23 +454,20 @@ def get_beef_agroforestry_to_ag(
 
 
 def get_carbon_plantings_block_to_ag(data: Data, base_year: int, target_year: int, separate=False):
-    # Same as EP — get_transition_matrix_nonag2ag assigns ep_to_ag directly; this stub is unused.
+    """Unused stub: Carbon Plantings (Block) → ag reuses the EP costs in get_transition_matrix_nonag2ag."""
     pass
 
 
 def get_carbon_plantings_belt_to_ag_base(data: Data, base_year: int, target_year: int, separate=False) -> np.ndarray|dict:
-    # Same as EP — callers now call get_env_plantings_to_ag directly; this stub is unused.
+    """Unused stub: the carbon-plantings belt levers call get_env_plantings_to_ag directly."""
     pass
 
 
 def get_sheep_carbon_plantings_belt_to_ag(
     data: Data, target_year: int, k_cell_map: dict, separate=False
 ) -> dict:
-    """Sheep CP Belt→ag costs: {sheep_cpb_k: array(NLMS, ncells_k, N_AG_LUS)} over this source's
-    cells (`k_cell_map[sheep_cpb_k]`). Weighted mix (CP_BELT_PROPORTION) of the CP-belt portion (EP→ag
-    primitive, per-k dvar-based) and the sheep portion (ag2ag from dry-Sheep); the single source
-    cell_idx is pulled from k_cell_map and passed to BOTH cost components so they align on the cell axis.
-    """
+    """{sheep_cpb_k: (NLMS, ncells_k, N_AG_LUS)} from Sheep Carbon Plantings (Belt) over its source cells: CP_BELT_PROPORTION
+    of the EP→ag cost plus the rest as the ag2ag cost from dry Sheep, both evaluated on the same cells."""
     sheep_cpb_k = data.NON_AGRICULTURAL_LANDUSES.index('Sheep Carbon Plantings (Belt)')
     cell_idx    = k_cell_map.get(sheep_cpb_k, np.array([], dtype=int))
     yr_idx      = target_year - data.YR_CAL_BASE
@@ -545,11 +487,8 @@ def get_sheep_carbon_plantings_belt_to_ag(
 def get_beef_carbon_plantings_belt_to_ag(
     data: Data, target_year: int, k_cell_map: dict, separate=False
 ) -> dict:
-    """Beef CP Belt→ag costs: {beef_cpb_k: array(NLMS, ncells_k, N_AG_LUS)} over this source's
-    cells (`k_cell_map[beef_cpb_k]`). Weighted mix (CP_BELT_PROPORTION) of the CP-belt portion (EP→ag
-    primitive, per-k dvar-based) and the beef portion (ag2ag from dry-Beef); the single source cell_idx
-    is pulled from k_cell_map and passed to BOTH cost components so they align on the cell axis.
-    """
+    """{beef_cpb_k: (NLMS, ncells_k, N_AG_LUS)} from Beef Carbon Plantings (Belt) over its source cells: CP_BELT_PROPORTION
+    of the EP→ag cost plus the rest as the ag2ag cost from dry Beef, both evaluated on the same cells."""
     beef_cpb_k = data.NON_AGRICULTURAL_LANDUSES.index('Beef Carbon Plantings (Belt)')
     cell_idx   = k_cell_map.get(beef_cpb_k, np.array([], dtype=int))
     yr_idx     = target_year - data.YR_CAL_BASE
@@ -567,35 +506,15 @@ def get_beef_carbon_plantings_belt_to_ag(
 
 
 def get_beccs_to_ag(data: Data, target_year, lumap, lmmap, separate=False) -> np.ndarray|dict:
-    # Same as EP — get_transition_matrix_nonag2ag assigns ep_to_ag directly; this stub is unused.
+    """Unused stub: BECCS → ag reuses the EP costs in get_transition_matrix_nonag2ag."""
     pass
     
 
 def get_destocked_to_ag_base(
     data: Data, target_year: int, cell_idx: np.ndarray, separate: bool = False
 ) -> dict:
-    """Per-cell Destocked→ag transition cost over `cell_idx` (the Destocked source cells).
-
-    Components (all $/cell/yr, amortised), mirroring the EP→ag structure plus a carbon-release term:
-      - Transition cost: reverting destocked land to ag LU to_j, from Destocked's OWN
-        T_MAT[Destocked→to_j] row (NaN/prohibited → 0). The source is dryland, so both target lm
-        slices share it.
-      - Water license cost: destocked source is dryland (req 0) → delta = full target req; plus the
-        new-irrigation setup on the irrigated (lm=1) slice. Same as EP→ag.
-      - Carbon release: destocked land is natural-equivalent (holds carbon); reverting to modified /
-        livestock-natural land releases it. Reuses the ag2ag transition-emissions for a synthetic
-        all-Unallocated-natural source, UNMASKED — the solver's nonag2ag eligibility (keyed on
-        T_MAT[Destocked→to_j]) gates which flows exist.
-
-    Fixes the previous model, which borrowed the whole ag2ag-from-Unallocated-natural cost: that used
-    Unallocated-natural's T_MAT row AND its transition-exclude, which zeroed every component for
-    Destocked→Unallocated-modified (Unalloc-nat→Unalloc-mod is prohibited) even though
-    Destocked→Unalloc-mod is allowed (T_MAT=10390) and the cells hold carbon.
-
-    Cell-agnostic: the caller selects which cells to evaluate. Non-ag→ag cost is per-unit (the
-    solver's delta var supplies the fraction), so there is no fractional weighting.
-    Returns {component: ndarray(NLMS, len(cell_idx), N_AG_LUS)} if separate else the summed array.
-    """
+    """Destocked→ag cost (NLMS, len(cell_idx), N_AG_LUS) $/cell/yr, amortised, unmasked: Destocked's own T_MAT row + water licence
+    (dryland source, irrigation setup on lm = irr) + carbon release of natural-equivalent land (the ag2ag emissions of an Unallocated-natural source)."""
     yr_idx = target_year - data.YR_CAL_BASE
 
     # --- Transition cost: Destocked's OWN T_MAT row; dryland source (both target lm equal) ---
@@ -634,8 +553,7 @@ def get_destocked_to_ag_base(
 def get_destocked_to_ag(
     data: Data, target_year: int, k_cell_map: dict, separate: bool = False
 ) -> dict:
-    """Destocked→ag cost {destocked_k: ...} over this source's cells (`k_cell_map[destocked_k]`, from
-    get_base_nonag_dvar_k_cell_map so the cost dict and the exact source map agree)."""
+    """{destocked_k: get_destocked_to_ag_base(...)} over the Destocked source cells of `k_cell_map`."""
     destocked_k = data.NON_AGRICULTURAL_LANDUSES.index('Destocked - natural land')
     cell_idx    = k_cell_map.get(destocked_k, np.array([], dtype=int))
     return {destocked_k: get_destocked_to_ag_base(data, target_year, cell_idx, separate)}
@@ -644,14 +562,8 @@ def get_destocked_to_ag(
 
 
 def get_transition_matrix_nonag2ag(data: Data, base_year: int, target_year: int, separate=False) -> dict:
-    """Assemble non-ag→ag transition costs in flow format: dict[lu_name -> dict[k -> ndarray(NLMS, ncells_k, N_AG_LUS)]].
-
-    Owns the shared per-source cell map: `k_cell_map = get_base_nonag_dvar_k_cell_map(data, base_year)`
-    is built ONCE here and passed to every per-lever builder (each pulls its own source's cell_idx
-    from it and passes those cells to every cost component, so the source slices and the solver's
-    per-source flow vars agree on one threshold). EP/RP/CP-block/BECCS share the EP cost dict;
-    input_data selects the per-source diagonal `dict[k]` for each lu_name.
-    """
+    """{non-ag lu: {k: (NLMS, ncells_k, N_AG_LUS)}} — every non-ag→ag lever on ONE shared source map (get_base_nonag_dvar_k_cell_map);
+    EP / RP / CP-block / BECCS share the EP costs, and row_builder selects the per-source diagonal dict[k] for each lu."""
     k_cell_map = get_base_nonag_dvar_k_cell_map(data, base_year)
     ep_to_ag   = get_env_plantings_to_ag(data, target_year, k_cell_map, separate)
     return {
@@ -668,36 +580,15 @@ def get_transition_matrix_nonag2ag(data: Data, base_year: int, target_year: int,
 
 
 def get_nonag2nonag_transition_matrix(data: Data) -> np.ndarray:
-    """
-    Get the matrix that contains transition costs for non-agricultural land uses. 
-    Currently, nonag is not allowed to transition to other nonag land uses, so the matrix is filled with zeros.
-    
-    Parameters
-        data (object): The data object containing information about the model.
-    
-    Returns
-        np.ndarray: The transition cost matrix, filled with zeros.
-    """
+    """Non-ag → non-ag transition costs (NCELLS, N_NON_AG_LUS): all zeros, such transitions are not allowed."""
     return np.zeros((data.NCELLS, data.N_NON_AG_LUS)).astype(np.float32)
 
 
 
 
 def get_non_ag_ub_matrices(data: Data, base_dvar_nonag_rk, base_dvar_ag_mrj) -> np.ndarray:
-    """
-    Non-ag TARGET upper bound, shape (NCELLS, N_NON_AG_LUS), FRACTIONAL.
-
-    Five rules; rule 1 (transition eligibility) is the fractional reachable share of the cell —
-    mirroring get_ag2ag_ub / get_nonag2ag_ub. For target non-ag LU k at cell r:
-
-        reach[r,k] = Σ_{ag from_j : T_MAT[from_j→k] finite} Σ_m frac_ag[m,r,from_j]   (ag2nonag)
-                   + Σ_{nonag k'  : T_MAT[k'→k]      finite}      frac_nonag[r,k']      (nonag2nonag)
-
-    i.e. the proportion of the cell currently held by *any* source LU that may legally become k.
-    Bounded by 1 because per-cell ag + non-ag fractions sum to ≤ 1. Rules 2–5: no-go zones,
-    irreversible lock-in override, Destocked physical cap, RP physical cap; the two physical caps
-    use np.minimum on the fractional reach.
-    """
+    """Non-ag target upper bound (NCELLS, N_NON_AG_LUS), fractional: the base-year share of every ag / non-ag source that can reach k
+    (T_MAT finite), then no-go, the irreversible lock-in override, and the Destocked / Riparian physical caps (np.minimum)."""
     # 1. Transition exclusion (T_MAT), FRACTIONAL: reachable land share per non-ag target.
     t_jk = (~np.isnan(
         data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu=data.NON_AGRICULTURAL_LANDUSES).values
@@ -737,20 +628,8 @@ def get_non_ag_ub_matrices(data: Data, base_dvar_nonag_rk, base_dvar_ag_mrj) -> 
 
 
 def get_non_ag_lb_matrices(data: Data, base_year) -> np.ndarray:
-    """
-    Returns the lower-bound (LB) matrix for non-agricultural land uses,
-    shape (NCELLS, N_NON_AG_LUS).  Each entry is the minimum cell proportion
-    the solver must maintain — i.e. the lock-in floor for irreversible LUs.
-
-    At the base year (or before any allocation exists) the matrix is all zeros.
-    For subsequent years, the LB for each irreversible LU is set to the
-    floor-truncated dvar value from the previous period, preventing the solver
-    from reducing already-committed irreversible land.
-
-    This function has no knowledge of the transition matrix or UB.  The pairing
-    with get_non_ag_ub_matrices (which forces UB=1 for existing irreversible
-    cells) ensures Gurobi always receives a valid lb <= ub.
-    """
+    """Non-ag target lower bound (NCELLS, N_NON_AG_LUS): the floor-truncated base-year holding of every irreversible non-ag land
+    use (zeros at the base year / before any allocation) — the lock-in floor the solver may not reduce."""
 
     if base_year == data.YR_CAL_BASE or base_year not in data.non_ag_dvars:
         return np.zeros((data.NCELLS, len(settings.NON_AG_LAND_USES))).astype(np.float32)

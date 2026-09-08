@@ -294,7 +294,7 @@ def get_ghg_transition_emissions(data: Data, from_m: int, from_j: int, cells=Non
 
 
 def get_ghg_transition_emissions_from_base_year(data: Data, base_year: int) -> dict:
-    """Exact: the source's raw emissions on its source cells. Slices come from the SHARED folded
+    """Exact: the source's raw emissions on its source cells. Slices come from the SHARED
     source map (get_base_dvar_mj_cell_map) so the leaves stay aligned with trans_source_ag and the
     solver's per-source delta vars — never re-derive the cell slices independently here."""
     # Lazy import to avoid the transitions <-> ghg import cycle.

@@ -51,11 +51,10 @@ def get_trans_source_nonag(data: Data, base_year: int) -> dict:
 # ── transition bounds: the ub / lb of every target entry (TO-view) ──
 
 def get_trans_ub_ag_mrj(data: Data, base_year: int) -> np.ndarray:
-    """Ag target upper bound (ag2ag + nonag2ag), raised to the folded base so a cell can always keep its base land use."""
+    """Ag target upper bound (ag2ag + nonag2ag), raised to the base so a cell can always keep its base land use."""
     print('Getting agricultural target upper bounds...', flush = True)
     ub = (ag_transition.get_ag2ag_ub(data, base_year) + non_ag_transition.get_nonag2ag_ub(data, base_year)).astype(np.float32)
-    base = ag_transition.get_folded_base_ag_dvar(data, base_year)
-    return tools.clamp_dvar_bound(ub, np.maximum(base, 0.0), np.inf, 'Ag ub raised to base')
+    return tools.clamp_dvar_bound(ub, np.maximum(data.ag_dvars[base_year], 0.0), np.inf, 'Ag ub raised to base')
 
 def get_trans_ub_nonag_rk(data: Data, base_year: int) -> np.ndarray:
     """Non-ag target upper bound, raised to the base so a cell can always keep its base land use."""
@@ -67,7 +66,7 @@ def get_trans_ub_nonag_rk(data: Data, base_year: int) -> np.ndarray:
     ub = non_ag_transition.get_non_ag_ub_matrices(
         data,
         base_dvar_nonag_rk=base_dvar_nonag,
-        base_dvar_ag_mrj=ag_transition.get_folded_base_ag_dvar(data, base_year),   # solver-world identity
+        base_dvar_ag_mrj=data.ag_dvars[base_year],
     )
     return tools.clamp_dvar_bound(ub, np.maximum(base_dvar_nonag, 0.0), np.inf, 'NonAg ub raised to base')
 
@@ -357,65 +356,6 @@ def nonag2ag_space(trans_source_nonag: dict, feasible_nonag2ag_mrj: dict) -> xr.
     )
 
 
-def fold_space(ag: xr.Dataset, ag_fold_map: dict) -> xr.Dataset:
-    """The fold columns — one per receiver and per kept emitter — as two fold tables on (fold_receiver) / (fold_emitter); receivers numbered first."""
-    ag_col_mjr = ag['col_mjr'].values   # (lm, lu, cell) -> ag-local id (-1 = no ag column)
-    lm_names   = ag['lm'].values
-    lu_names   = ag['lu'].values
-
-    # ── the receivers: every entry that received an emitter AND owns an ag column (without one its land use is banned at that
-    #    cell in the target year: no X_ag[receiver] to link to, so its emitters are dropped); ids in C-order over (lm, lu, cell) ──
-    fold_applied_mjr = np.ascontiguousarray(ag_fold_map['fold_applied_mrj'].transpose(0, 2, 1)) & (ag_col_mjr >= 0)
-    receiver_m, receiver_j, receiver_cell = np.nonzero(fold_applied_mjr)
-    n_receiver = receiver_m.size
-    receiver_row_mjr = np.full(fold_applied_mjr.shape, -1, dtype=np.int64)   # (lm, lu, cell) -> receiver row (-1 = not a kept receiver)
-    receiver_row_mjr[fold_applied_mjr] = np.arange(n_receiver)
-
-    # ── the emitters: those whose receiver is kept, in fold-map order ──
-    receiver_of_emitter = receiver_row_mjr[ag_fold_map['to_m'], ag_fold_map['to_j'], ag_fold_map['cells']]
-    keep                = receiver_of_emitter >= 0
-    receiver_of_emitter = receiver_of_emitter[keep]
-    emitter_m           = ag_fold_map['from_m'][keep]
-    emitter_j           = ag_fold_map['from_j'][keep]
-    to_m                = ag_fold_map['to_m'][keep]
-    to_j                = ag_fold_map['to_j'][keep]
-    cells               = ag_fold_map['cells'][keep]
-    fold_share          = ag_fold_map['vals'][keep] / ag_fold_map['folded_dom'][keep]   # the emitter's share of its receiver's folded area (float32)
-    n_emitter           = cells.size
-
-    return xr.Dataset(
-        dict(# one row per receiver
-             receiver_lm=(('fold_receiver',), lm_names[receiver_m]),
-             receiver_lu=(('fold_receiver',), lu_names[receiver_j]),
-             receiver_cell=(('fold_receiver',), receiver_cell),
-             receiver_ag_col=(('fold_receiver',), ag_col_mjr[receiver_m, receiver_j, receiver_cell]),
-             receiver_fold_col=(('fold_receiver',), np.arange(n_receiver, dtype=np.int32)),   # fold-local ids: receivers 0..n_receiver-1 ...
-             # the fold table: one row per kept emitter
-             emitter_lm=(('fold_emitter',), lm_names[emitter_m]),
-             emitter_lu=(('fold_emitter',), lu_names[emitter_j]),
-             emitter_m=(('fold_emitter',), emitter_m.astype(np.int32)),
-             emitter_j=(('fold_emitter',), emitter_j.astype(np.int32)),
-             emitter_cell=(('fold_emitter',), cells),
-             emitter_receiver_lm=(('fold_emitter',), lm_names[to_m]),
-             emitter_receiver_lu=(('fold_emitter',), lu_names[to_j]),
-             emitter_fold_share=(('fold_emitter',), fold_share),
-             emitter_receiver=(('fold_emitter',), receiver_of_emitter),   # the row of its receiver
-             emitter_receiver_ag_col=(('fold_emitter',), ag_col_mjr[to_m, to_j, cells]),
-             emitter_ag_col=(('fold_emitter',), ag_col_mjr[emitter_m, emitter_j, cells]),   # -1 = the emitter owns no ag column
-             emitter_fold_col=(('fold_emitter',), (n_receiver + np.arange(n_emitter)).astype(np.int32))   # ... then the emitters
-        ),
-        coords=dict(
-            fold_emitter=np.arange(n_emitter), 
-            fold_receiver=np.arange(n_receiver)
-        ),
-        attrs=dict(
-            n=int(n_receiver + n_emitter), 
-            n_receiver=int(n_receiver), 
-            n_emitter=int(n_emitter)
-        )
-    )
-
-
 def cell_usage_space(feasible_cell_usage_r) -> xr.Dataset:
     """The cell-usage range slacks on (cell): one per cell that gets a cell-usage row."""
     has_col = feasible_cell_usage_r
@@ -449,9 +389,8 @@ def get_cols(data: Data, base_year: int) -> dict:
     trans_ub_nonag_rk   = get_trans_ub_nonag_rk(data, base_year)
     trans_lb_nonag_rk   = get_trans_lb_nonag_rk(data, base_year)
     trans_lb_ag_man_mrj = get_trans_lb_ag_man_mrj(data, base_year)        # non-reversible options lock in last step's adoption
-    dvar_base_ag_mrj   = tools.clamp_dvar_bound(ag_transition.get_folded_base_ag_dvar(data, base_year), 0.0, trans_ub_ag_mrj, 'Ag base clipped to [0,ub]')
+    dvar_base_ag_mrj   = tools.clamp_dvar_bound(data.ag_dvars[base_year], 0.0, trans_ub_ag_mrj, 'Ag base clipped to [0,ub]')
     dvar_base_nonag_rk = tools.clamp_dvar_bound(data.non_ag_dvars[base_year], trans_lb_nonag_rk, trans_ub_nonag_rk, 'NonAg base clipped to [lb,ub]')
-    ag_fold_map        = ag_transition.get_ag_dvar_fold_map(data, base_year)   # which sub-θ emitters fold into which receiver
 
     # ── 3. feasibility: target entries (feasible_ag_mrj, trans_ub_nonag_rk > 0), transition arcs, cell-usage rows ──
     feasible_ag_mrj = get_feasible_ag_mrj(data, base_year)                # bool: which (m, j) a cell may become
@@ -478,7 +417,6 @@ def get_cols(data: Data, base_year: int) -> dict:
         'ag2ag':      ag2ag_space(trans_source_ag, feasible_ag2ag_mrj),
         'ag2nonag':   ag2nonag_space(trans_source_ag, feasible_ag2nonag_rk),
         'nonag2ag':   nonag2ag_space(trans_source_nonag, feasible_nonag2ag_mrj),
-        'fold':       fold_space(ag, ag_fold_map),
         'cell_usage': cell_usage_space(feasible_cell_usage_r),
     }
 
@@ -490,17 +428,15 @@ def get_cols(data: Data, base_year: int) -> dict:
     layout['ag2ag']      = layout['am']         + cols['am'].attrs['n']
     layout['ag2nonag']   = layout['ag2ag']      + cols['ag2ag'].attrs['n']
     layout['nonag2ag']   = layout['ag2nonag']   + cols['ag2nonag'].attrs['n']
-    layout['fold']       = layout['nonag2ag']   + cols['nonag2ag'].attrs['n']
-    layout['cell_usage'] = layout['fold']       + cols['fold'].attrs['n']          # fold.n = n_receiver + n_emitter; this mean only create vars on cells fold really happened
-    
-    layout['n_dec']      = layout['fold']       + cols['fold'].attrs['n']          # the decision columns: the objective block is built at this width (the slacks carry no cost)
+    layout['cell_usage'] = layout['nonag2ag']   + cols['nonag2ag'].attrs['n']
+
+    layout['n_dec']      = layout['cell_usage']                                    # the decision columns: the objective block is built at this width (the slacks carry no cost)
     layout['n_all']      = layout['n_dec']      + cols['cell_usage'].attrs['n']    # the total columns: every constraint block (the rows) is built at this width
 
     # ── 7. every block-local id shifted to its global Var.index, in place ──
     def shift(col, offset):                                                         # -1 (no column) never shifts
         col[col >= 0] += offset
 
-    fold = cols['fold']
     shift(cols['ag']['col_mjr'].values,           layout['ag'])
     shift(cols['nonag']['col_kr'].values,         layout['nonag'])
     shift(cols['am']['col_smr'].values,           layout['am'])
@@ -508,37 +444,22 @@ def get_cols(data: Data, base_year: int) -> dict:
     shift(cols['ag2nonag']['col'].values,         layout['ag2nonag'])
     shift(cols['nonag2ag']['col'].values,         layout['nonag2ag'])
     shift(cols['cell_usage']['col_r'].values,     layout['cell_usage'])
-    shift(fold['receiver_ag_col'].values,         layout['ag'])                     # the fold tables' ag ids shift with the ag block ...
-    shift(fold['emitter_ag_col'].values,          layout['ag'])
-    shift(fold['emitter_receiver_ag_col'].values, layout['ag'])
-    shift(fold['receiver_fold_col'].values,       layout['fold'])                   # ... their own ids with the fold block
-    shift(fold['emitter_fold_col'].values,        layout['fold'])
-    
-    print(
-        f"Column space: {layout['n_all']:,} columns = {layout['n_dec']:,} decision (n_dec) + {cols['cell_usage'].attrs['n']:,} cell-usage slacks\n"
-        f"├── ag         {cols['ag'].attrs['n']:>12,}\n"
-        f"├── nonag      {cols['nonag'].attrs['n']:>12,}\n"
-        f"├── am         {cols['am'].attrs['n']:>12,}\n"
-        f"├── ag2ag      {cols['ag2ag'].attrs['n']:>12,}\n"
-        f"├── ag2nonag   {cols['ag2nonag'].attrs['n']:>12,}\n"
-        f"├── nonag2ag   {cols['nonag2ag'].attrs['n']:>12,}\n"
-        f"├── fold       {fold.attrs['n']:>12,}   ({fold.attrs['n_receiver']:,} receivers + {fold.attrs['n_emitter']:,} emitters)\n"
-        f"└── cell_usage {cols['cell_usage'].attrs['n']:>12,}",
-        flush=True
+
+    print(f"Column space: {layout['n_all']:,} columns = {layout['n_dec']:,} decision (n_dec) + {cols['cell_usage'].attrs['n']:,} cell-usage slacks", flush=True)
+    blocks = ['ag', 'nonag', 'am', 'ag2ag', 'ag2nonag', 'nonag2ag', 'cell_usage']
+    for block in blocks:
+        print(f"{'└──' if block == blocks[-1] else '├──'} {block:<10s} {cols[block].attrs['n']:>12,}", flush=True)
+
+    # ── 8. the coefficient support: one term per ag column, per ag-mgt column and per non-ag column, with its cell — read by
+    #       every policy family (row_builder.gather_coeffs / compose_rows) and by the objective (row_builder.get_obj_block) ──
+    ag_lm, ag_lu, ag_cell = np.nonzero(ag['col_mjr'].values >= 0)                                          # column order: lm, lu, cell
+    ag_terms = dict(
+        m=ag_lm.astype(np.int32), 
+        j=ag_lu.astype(np.int32), 
+        r=ag_cell.astype(np.int32),
+        col=ag['col_mjr'].values[ag_lm, ag_lu, ag_cell].astype(np.int32)
     )
 
-    # ── 8. the coefficient support: one term per accounting entry, per ag-mgt column and per non-ag column — every
-    ag_lm, ag_lu, ag_cell = np.nonzero(ag['col_mjr'].values >= 0)
-    ag_term_col = ag['col_mjr'].values[ag_lm, ag_lu, ag_cell].copy()
-    ag_term_col[fold['receiver_ag_col'].values - layout['ag']] = fold['receiver_fold_col'].values
-    owns_ag_col = fold['emitter_ag_col'].values >= 0
-    ag_term_col[fold['emitter_ag_col'].values[owns_ag_col] - layout['ag']] = fold['emitter_fold_col'].values[owns_ag_col]
-    # an emitter without an ag column is an accounting entry of its own: appended to the stream
-    ag_terms = dict(m=np.concatenate([ag_lm, fold['emitter_m'].values[~owns_ag_col]]).astype(np.int32),
-                    j=np.concatenate([ag_lu, fold['emitter_j'].values[~owns_ag_col]]).astype(np.int32),
-                    r=np.concatenate([ag_cell, fold['emitter_cell'].values[~owns_ag_col]]).astype(np.int32),
-                    col=np.concatenate([ag_term_col, fold['emitter_fold_col'].values[~owns_ag_col]]).astype(np.int32))
-    
     am = cols['am']
     am_slot, am_lm, am_cell = np.nonzero(am['col_smr'].values >= 0)                                         # column order: slot, lm, cell
     am_list = list(am.attrs['agman2lu'])
@@ -547,8 +468,14 @@ def get_cols(data: Data, base_year: int) -> dict:
     for am_idx in range(len(am_list)):
         slots_of_option = np.flatnonzero(am_idx_of_slot == am_idx)
         j_idx_of_slot[slots_of_option] = np.arange(slots_of_option.size, dtype=np.int32)
-    am_terms = dict(am_idx=am_idx_of_slot[am_slot], j_idx=j_idx_of_slot[am_slot], j=am['j'].values[am_slot],
-                    m=am_lm.astype(np.int32), r=am_cell.astype(np.int32), col=am['col_smr'].values[am_slot, am_lm, am_cell])
+    am_terms = dict(
+        am_idx=am_idx_of_slot[am_slot], 
+        j_idx=j_idx_of_slot[am_slot], 
+        j=am['j'].values[am_slot],
+        m=am_lm.astype(np.int32), 
+        r=am_cell.astype(np.int32), 
+        col=am['col_smr'].values[am_slot, am_lm, am_cell]
+    )
     
     nonag = cols['nonag']
     nonag_k, nonag_cell = np.nonzero(nonag['col_kr'].values >= 0)                                           # column order: k, cell

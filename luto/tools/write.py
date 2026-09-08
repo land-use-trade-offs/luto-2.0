@@ -1053,7 +1053,7 @@ def write_economics(data: Data, yr_cal, path):
     Transition costs are the TRUE per-source flow costs `Σ_src cost[src]·D[src]` — the exact
     quantities the solver charged — computed from the solved delta dicts
     (`data.delta_dvars_ag2ag[yr_cal]` / `data.delta_dvars_ag2nonag[yr_cal]`, source-keyed with leaves
-    over each source's dvar>θ cells at the previous simulated year). They are absolute $ paid,
+    over each source's cells at the previous simulated year). They are absolute $ paid,
     so they are NOT multiplied by any dvar downstream."""
     yr_idx = yr_cal - data.YR_CAL_BASE
     gap = get_year_gap(data, yr_cal)  # annualise: divide period value matrices by this
@@ -1079,7 +1079,7 @@ def write_economics(data: Data, yr_cal, path):
     ag_rev_df.columns.names = ag_cost_df.columns.names = ['lu', 'lm', 'source']
 
     # TRUE ag→ag transition cost paid: Σ_src cost[src]·D[src] per cost component, scattered to
-    # global cells. Both dicts share the (from_m, from_j) keys and each source's dvar>θ cell axis
+    # global cells. Both dicts share the (from_m, from_j) keys and each source's cell axis
     # (get_base_dvar_mj_cell_map at the previous simulated year), so the product is exact.
     if yr_cal_sim_pre is not None:
         ag2ag_paid   = {}   # {cost_type: dense (NLMS, NCELLS, N_AG_LUS) of $ paid on [to_m, r, to_j]}
@@ -1701,7 +1701,7 @@ def write_transition_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 
     Every quantity is the TRUE flow `Σ_src leaf[src]·D[src]` over the solved delta dict
     `data.delta_dvars_ag2ag[yr_cal]` ({(from_m, from_j): [to_m, local_r, to_j]} over each source's
-    dvar>θ cells at the previous simulated year) — the exact per-source from→to attribution the
+    cells at the previous simulated year) — the exact per-source from→to attribution the
     solver priced, replacing the old `dvar_base × dvar_target × per-unit-matrix` compositional
     approximation:
       - Area  : D × REAL_AREA                          ha moved from → to
@@ -1927,7 +1927,7 @@ def write_transition_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     """Ag→non-ag transition reporting from the solved per-source flow deltas.
 
     Every quantity is the TRUE flow `Σ_src leaf[src]·D[src]` over the solved delta dict
-    `data.delta_dvars_ag2nonag[yr_cal]` ({(from_m, from_j): [local_r, k]} over each source's dvar>θ
+    `data.delta_dvars_ag2nonag[yr_cal]` ({(from_m, from_j): [local_r, k]} over each source's
     cells at the previous simulated year) — exact per-source from→to attribution, replacing the old
     `base-composition × target-dvar × per-unit` approximation (which also double-weighted GHG/water:
     per-unit × delta AND × target dvar):
@@ -2220,7 +2220,7 @@ def write_transition_nonag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     # ==================== Transitions - Cost ====================
     # TRUE per-source flow cost: Σ_k cost[k]·D[k] — the exact quantity the solver charged for
     # nonag→ag conversions (e.g. reversible Destocked land back to ag). Both dicts are keyed by the
-    # non-ag source k with leaves [to_m, local_r, to_j] over that source's dvar>θ cells at the
+    # non-ag source k with leaves [to_m, local_r, to_j] over that source's cells at the
     # previous simulated year; local_r decodes to global cells via get_base_nonag_dvar_k_cell_map.
     non_ag_transitions_flat = {}
     if dvar_D_nonag2ag:

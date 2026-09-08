@@ -58,7 +58,6 @@ CONSTRAINT_GROUPS = {
     'renewable':    ('renewable_',),
     'flow_out':     ('srccap_a_', 'srccap_n_'),
     'flow_in':      ('bal_a_', 'bal_n_'),
-    'accounting_link':    ('acct_link_',),                    # X_acct = (fold share) · X_ag; structural, never droppable
 }
 
 # Prefixes overlap: 'const_' would swallow every const_* group, and 'reg_adopt_limit_non_ag_'
@@ -73,7 +72,7 @@ _GROUP_EXCLUDE = {
 # all. `cell_usage` is the equality that makes per-cell share scarce — remove it and every cell can
 # hold one unit of every land use at once, so almost anything becomes "feasible" and the answer is
 # meaningless. The ag-management links (X_ag_man <= X_ag[j]) are structural in the same way.
-STRUCTURAL = ('cell_usage', 'ag_mgt_link', 'accounting_link')
+STRUCTURAL = ('cell_usage', 'ag_mgt_link')
 
 STATUS = {
     GRB.OPTIMAL: 'OPTIMAL', GRB.INFEASIBLE: 'INFEASIBLE', GRB.INF_OR_UNBD: 'INF_OR_UNBD',

@@ -5,6 +5,72 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20260908 — the θ fold is gone: the exact per-source transition model is the only model
+
+### TL;DR
+
+`EXACT_REACHABILITY_MIN_FRACTION` (θ, default 0.01) merged every sub-θ land-use fraction of a cell into the
+cell's dominant land use before the transition model was built, and a second "accounting" layer (the fold
+block `cols['fold']`, the `X_acct_*` columns, the exact `acct_link_*` rows, the term aliasing in
+`col_builder.get_cols` §8) undid the merge so that every policy row scored the true composition. A census of
+the solved RES5 2020→2050 trajectory (`Array_based_solver/output/sim_mjr`, baseline `5abe9691`) showed the
+fold touching 12–69 of ~350k nonzero (m, j, r) entries per year (≤ 0.02 %): the exact model was the model
+already being solved, to within ~1,000 arcs of 2.5 M. Decision (owner, 2026-09-08): keep ONLY the exact
+model. One source per nonzero (m, j) entry above the `ROUND_DECIMALS` noise floor, policy coefficients on
+the ag columns directly, no fold block, no linking rows, no aliasing. Study: `jinzhu_inspect_code/Only_exact/`.
+
+| year | nonzero (m, j, r) entries | ≤ 0.01 (folded at θ = 0.01) | ≤ 0.05 | ≤ 0.10 | cells with 2+ land uses |
+|---|---|---|---|---|---|
+| 2010 (input map) | 376,388 | 0 | 58,279 | 94,147 | 95,069 of 186,648 |
+| 2020 | 371,525 | 46 | 56,295 | 91,338 | 94,548 |
+| 2030 | 356,341 | 51 | 51,467 | 83,866 | 92,296 |
+| 2050 | 327,696 | 12 | 43,436 | 71,153 | 85,833 |
+
+A crisp mode (θ = 1) would not have been a simplification either: half the cells hold two or more land uses
+in the 2010 input itself, so crisp-folding would merge ~190k entries and every policy row would still need
+the accounting layer to score the true composition.
+
+### What changed
+
+- `economics/agricultural/transitions.py`: `_fold_ag_dvar`, `get_folded_base_ag_dvar` and `get_ag_dvar_fold_map`
+  deleted; every caller (`get_base_dvar_mj_cell_map`, `get_ag2ag_ub`, the ag-management lower bounds, the
+  non-ag ub via `base_dvar_ag_mrj`, `col_builder`) reads `data.ag_dvars[base_year]` directly (owner: no wrapper).
+- `solvers/col_builder.py`: `fold_space` and the `'fold'` block are gone; the column space is
+  `ag | nonag | am | ag2ag | ag2nonag | nonag2ag | cell_usage`, `n_dec` = end of `nonag2ag`; the coefficient
+  support (§8) is three plain `np.nonzero` gathers (no aliasing).
+- `solvers/row_builder.py` / `solvers/solver.py`: `fold_link_rows` and its `FAMILIES` entry, the fold MVar,
+  `fold_link` handles and prints removed; `tools.CONSTRAINT_GROUPS` / `STRUCTURAL` lose `accounting_link`.
+- `settings.py`: `EXACT_REACHABILITY_MIN_FRACTION` and its comment block removed (task-run templates that
+  still carry the key are harmless: `write_settings` emits unknown keys as plain constants).
+- Docs: CLAUDE.md, docs/CLAUDE_ARCHITECTURE.md ("Transition Flow Model (exact)"), docs/CLAUDE_SETUP.md,
+  README.md, DataFlow.md.
+
+### Gates (all against baseline `5abe9691`, RES5)
+
+| gate | script | result |
+|---|---|---|
+| E1–E3, step 2010→2020 (the base never folds) | `Array_based_solver/script/va1_build_model.py e3` + `va2 mjr e3` | **bitwise**: 6,014,225 rows × 8,283,785 cols, 40,058,479 coefficients exact, RHS / senses / bounds / objective exact, identical names and order; formulate 96 s → 92 s, peak 19.2 GB both |
+| E4, step 2020→2025 from the baseline's 2020 state (45 entries fold at θ = 0.01) | `Only_exact/script/s1_folded_step_gate.py build mjr / build e3 / compare mjr e3` | outside the 45 folded cells: **bitwise** (4,648,107 rows, 7,440,851 cols, 33,913,373 coefficients, RHS, scale, bounds, objective all identical by name). Only in `mjr`: 90 `X_acct_*` + 90 `acct_link_*`. Only in exact: 45 `srccap_a_*` + 63 `bal_n_*` rows, 689 arcs + 54 `X_non_ag_*` columns, every one at a folded cell. Solve: objective 8,727.464 vs 8,727.512 M AUD (rel gap 5.5e-6), every economy component within 3.7e-5, lumap 99.997 % (5 of 186,648 cells), lmmap 100 %, ag area per land use within 261 ha, 69 cells with any ag dvar diff > 1e-3 |
+| E6, trajectory 2020→2030 vs `sim_mjr` | `Only_exact/script/s2_full_run.py exact` + `s3_compare_runs.py mjr exact` | 2020 step (same 2010 base, no fold): 4,654,391 × 7,496,463 both; objective 10,641.862 vs 10,641.868 M AUD (rel 6e-7); step time 482 s vs 493 s. The run is 2020→2030 (owner's choice); its water targets differ from `sim_mjr`'s because `data.py` derives the drainage-division relaxation from `settings.SIM_YEARS` (2030 vs 2050 horizon), so the 2020 model has +914 nnz from a different row rescale — a scenario difference, not a code one. Full per-year comparison: `Only_exact/log/s3_compare_mjr_vs_exact.log` (written when the run completes). Closed by the owner on the strength of E4 and the 2020 step. |
+
+E1–E3 were gated together: `col_builder` imports the fold functions, so E1 alone does not import, and the
+fold block is empty at the 2010 step anyway (`va1 mjr` was built with 90 fold columns = 0).
+
+The E4 comparison aligns rows and columns by NAME; the arc (`F_a2a_m_j[to_m,local_r,to_j]`, `F_a2n`, `F_n2a`)
+and source-cap (`srccap_a_m_j_local_r`) names carry the source-LOCAL cell index, which shifts by one for
+every cell a source gains — and the exact model gives the 45 former emitters their own source cells. The
+gate therefore rewrites those names with the global cell (saved per row / column at build time) before
+aligning; without that, ~134k arcs looked "only in one side" and 4.2 M untouched entries "differed".
+
+### Why the two solves are not identical
+
+The LPs are different models at the 45 folded cells (in the fold model a sliver could only move with its
+receiver and paid the receiver's transition costs; in the exact model it is a source with its own arcs and
+costs), so the optima differ by the sliver land (≤ 542 ha in 2020) plus whatever alternative optima the
+barrier picks within `OPTIMALITY_TOLERANCE` = 1e-2. A 5.5e-6 objective gap and 5 differing cells is that band.
+
+---
+
 ## 20260810 (later) — the blind spot WAS the flow system: widening the diagnosis scope unstalled all five runs
 
 ### TL;DR

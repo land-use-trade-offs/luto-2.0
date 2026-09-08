@@ -56,7 +56,7 @@ def drop(col: np.ndarray, q: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
 
 def gather_coeffs(terms: dict, ag_c_mrj, am_c_mrj: dict, nonag_c_rk) -> np.ndarray:
     """One family's per-cell coefficient at every term of the support, float32, in term order:
-    ``ag_c_mrj[m, r, j]`` on the accounting entries, ``am_c_mrj[am][m, r, j_idx]`` on the ag-mgt
+    ``ag_c_mrj[m, r, j]`` on the ag columns, ``am_c_mrj[am][m, r, j_idx]`` on the ag-mgt
     columns, ``nonag_c_rk[r, k]`` on the non-ag columns."""
     ag_terms = terms['ag']
     am_terms = terms['am']
@@ -376,7 +376,7 @@ def get_non_ag_q_crk(data: Data, ag_q_mrp: np.ndarray, base_year: int):
 def get_ag_t_mrj(data: Data, target_index, base_year):
     print('Getting agricultural transition cost matrices...', flush = True)
     # From-based flow-cost dict[(from_m, from_j)] -> ndarray(NLMS, ncells_src, N_AG_LUS), sliced per
-    # source over each source's dvar>θ cells (the same cells `trans_source_ag` uses, so the solver
+    # source over each source's cells (the same cells `trans_source_ag` uses, so the solver
     # delta's local_r aligns with this dict's cell axis). Leaves are cast to float32 in get_input_data
     # with the other coefficient streams.
     mj_cell_map = ag_transition.get_base_dvar_mj_cell_map(data, base_year)
@@ -580,7 +580,7 @@ def get_obj_block(cols: dict, terms: dict, ag_obj_mrj: np.ndarray, non_ag_obj_rk
                   flow_cost_ag2ag: dict, flow_cost_ag2nonag: dict, flow_cost_nonag2ag: dict) -> sparse.csr_matrix:
     """The economy coefficients (raw AUD) as a (5 x n_dec) sparse block, one row per ``OBJ_BLOCKS``
     component. Same contract as ``compose_rows`` (drop |q| < SOLVER_COEFF_MIN; the solver floors the
-    scaled coefficient): the ag stream on the accounting entries, the ag-mgt and non-ag streams on
+    scaled coefficient): the ag stream on the ag columns, the ag-mgt and non-ag streams on
     their columns, the transition costs negated on the delta vars. ``solve()`` reads the economy
     breakdown as ``obj_block @ x``."""
     AG, AM, NONAG, TRANS_AG, TRANS_NONAG = (OBJ_BLOCKS.index(name) for name in OBJ_BLOCKS)
@@ -640,8 +640,8 @@ def get_rows(data: Data, base_year: int, target_year: int, cols: dict) -> RowInp
     ag_r_mrj     = get_ag_r_mrj(data, target_index)
 
     # ── Transition costs — SOURCE-KEYED flow-cost dicts ──────────────
-    # Sliced by base-year source ("(from_m, from_j)" for ag, "k" for non-ag) over each source's dvar>θ
-    # cells; the solver creates a matching delta var per (source, cell, target) and charges
+    # Sliced by base-year source ("(from_m, from_j)" for ag, "k" for non-ag) over each source's
+    # base-year cells; the solver creates a matching delta var per (source, cell, target) and charges
     # Σ flow_cost·D in the objective. get_economic_mrj bakes no land-use transition cost.
 
     # ag→ag: dict[(from_m, from_j)] → ndarray(NLMS, ncells_src, N_AG_LUS)
@@ -933,55 +933,6 @@ def cell_usage_rows(rows: RowInputs, cols: dict):
                       [f"const_cell_usage_{cell}" for cell in row_cells], n_skipped=int(cols['ag'].sizes['cell'] - n_rows))
 
 
-def fold_link_rows(rows: RowInputs, cols: dict):
-    """The θ fold, written down once: one exact equality per fold column.
-
-        emitter   (from_m, from_j, r):  X_acct − fold_share · X_ag[receiver] − X_ag[emitter] = 0   (the last term only if the
-                                       emitter land use owns an ag var at that cell)
-        receiver (to_m, to_j, r):      X_acct − (1 − Σ fold_share) · X_ag[receiver] = 0
-
-    fold_share = the emitter's base fraction / its receiver's folded fraction (float32). NOT rescaled and NOT floored — the fold is exact by
-    construction and stays so; ``min |fold_share| > 0`` is asserted. Row order = column order of the
-    fold block (receivers, then emitters)."""
-    fold = cols['fold']
-    n_receiver = fold.attrs['n_receiver']
-    n_emitter = fold.attrs['n_emitter']
-    if n_receiver + n_emitter == 0:
-        return None
-    n_all = cols['layout']['n_all']
-    fold_share = fold['emitter_fold_share'].values.astype(np.float64)
-    assert fold_share.size == 0 or np.abs(fold_share).min() > 0.0, 'a fold share of exactly zero cannot be linked'
-    fold_share_sum = np.zeros(n_receiver, dtype=np.float64)                 # Σ fold_share over the emitters of each receiver
-    np.add.at(fold_share_sum, fold['emitter_receiver'].values, fold_share)
-    row_idx = []
-    col_idx = []
-    vals = []
-    # receiver rows: X_acct[receiver] − (1 − Σ fold_share) · X_ag[receiver] = 0
-    receiver_row = np.arange(n_receiver)
-    row_idx += [receiver_row, receiver_row]
-    col_idx += [fold['receiver_fold_col'].values, fold['receiver_ag_col'].values]
-    vals += [np.ones(n_receiver), -(1.0 - fold_share_sum)]
-    # emitter rows: X_acct[emitter] − fold_share · X_ag[receiver] (− X_ag[emitter] where the emitter owns an ag column) = 0
-    emitter_row = n_receiver + np.arange(n_emitter)
-    row_idx += [emitter_row, emitter_row]
-    col_idx += [fold['emitter_fold_col'].values, fold['emitter_receiver_ag_col'].values]
-    vals += [np.ones(n_emitter), -fold_share]
-    owns_ag_col = fold['emitter_ag_col'].values >= 0
-    row_idx.append(emitter_row[owns_ag_col])
-    col_idx.append(fold['emitter_ag_col'].values[owns_ag_col])
-    vals.append(-np.ones(int(owns_ag_col.sum())))
-    A = sparse.csr_matrix((np.concatenate(vals), (np.concatenate(row_idx).astype(np.int64), np.concatenate(col_idx).astype(np.int64))),
-                          shape=(n_receiver + n_emitter, n_all))
-    # keys and names: (lm, lu code, cell) of the accounting entry, receivers then emitters
-    lu_code = {name: j for j, name in enumerate(cols['ag']['lu'].values)}
-    lm = np.concatenate([fold['receiver_lm'].values, fold['emitter_lm'].values])
-    lu = np.array([lu_code[name] for name in np.concatenate([fold['receiver_lu'].values, fold['emitter_lu'].values])], dtype=np.int32)
-    cell = np.concatenate([fold['receiver_cell'].values, fold['emitter_cell'].values])
-    names = [f"acct_link_{lm_name}_{j}_{r}" for lm_name, j, r in zip(lm, lu, cell)]
-    lm_code = (lm == 'irr').astype(np.int8)                              # integer key levels: cheap MultiIndex on millions of rows
-    return make_block('fold_link', 'fold_link', dict(lm=lm_code, lu=lu, cell=cell), A, np.zeros(n_receiver + n_emitter), '=', names)
-
-
 def ag_mgt_link_rows(rows: RowInputs, cols: dict):
     """Ag-management variables cannot exceed the value of the agricultural variable: one row per
     (am, land use, lm, cell) with an ag column — the ag cube and the am cube aligned on (lm, cell).
@@ -1075,7 +1026,7 @@ def demand_rows(rows: RowInputs, cols: dict):
     """Hard demand constraints: per-commodity quantity rows over the coefficient support;
     equality where the DEMAND_BOUNDS lb==ub, else the SAME LHS row twice under '>' lb and '<' ub.
 
-    Per (m, land use) group of the accounting entries and per (am, land use, m) group of the
+    Per (m, land use) group of the ag columns and per (am, land use, m) group of the
     ag-mgt columns, the commodity coefficients are ``jc[c, cell] = Σ_p pr2cm[c, p] · q[m, cell, p]``
     over the land use's active products; non-ag columns carry ``non_ag_q_crk[c, cell, k]``.
     ``attrs['q_block']`` keeps the unscaled per-commodity LHS (production reporting)."""
@@ -1595,7 +1546,6 @@ def biodiversity_rows(rows: RowInputs, cols: dict):
 FAMILIES = (
     renewable_ceiling_rows,
     cell_usage_rows,
-    fold_link_rows,
     ag_mgt_link_rows,
     ag_mgt_adoption_rows,
     demand_rows,

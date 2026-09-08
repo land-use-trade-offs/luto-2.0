@@ -237,8 +237,7 @@ The transition system is **source-keyed**: costs and feasibility are sliced per 
 | `ag_source_cells` / `nonag_source_cells` | 416 / 421 | `ag_transition.get_base_dvar_mj_cell_map`, `non_ag_transition.get_base_nonag_dvar_k_cell_map` | base-year dvars | — (runtime state) |
 | `ag_man_limits` | `get_ag_man_limits` 620 | `ag_transition.get_agricultural_management_adoption_limits` | AM bundles | AM bundle `.xlsx` |
 | `ag_man_lb_mrj` | `get_ag_man_lb_mrj` 533 | `ag_transition.get_lower_bound_agricultural_management_matrices` | base-year AM dvars | — (runtime state) |
-| `dvar_base_ag_mrj` / `dvar_base_non_ag_rk` | inline 1346-1347 | `ag_transition.get_folded_base_ag_dvar`, `data.non_ag_dvars` | `lumaps`, `lmmaps` | `lumap.h5`, `lmmap.h5` (base year only; later years are runtime state) |
-| `ag_fold_map`, `acct_cells_mrj` | 1310, 1316-1324 | `ag_transition.get_ag_dvar_fold_map` | θ-fold bookkeeping | — (runtime) |
+| `dvar_base_ag_mrj` / `dvar_base_non_ag_rk` | `get_cols` §2 | `data.ag_dvars`, `data.non_ag_dvars` | `lumaps`, `lmmaps` | `lumap.h5`, `lmmap.h5` (base year only; later years are runtime state) |
 
 ### 4.8 Renewable energy
 

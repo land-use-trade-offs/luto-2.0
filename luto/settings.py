@@ -107,20 +107,6 @@ Mean FIRE_RISK cell values (%)
 AMORTISE_UPFRONT_COSTS = False
 
 
-# θ — the EXACT ↔ CRISP dial of the transition flow model (fold-into-dominant, per cell).
-# Essentially: COLLAPSE each cell's small dvar fractions (≤ θ) into its dominant fraction, so the
-# solver sets up delta variables only for the collapsed base — every (source, cell) pair removed
-# saves one full row of delta vars (~28 targets × 2 lms), while the collapsed land stays in the
-# model (mobile, conserved) under the dominant's identity.
-# Example, θ = 0.10, one dry cell:
-#
-#     true base:    Beef 0.55 | Winter cereals 0.35 | Hay 0.06 | Citrus 0.04
-#     folded base:  Beef 0.65 | Winter cereals 0.35                            (Hay+Citrus -> Beef)
-# θ→0: pure exact per-source model (at RESFACTOR=5 nothing folds below 0.04, the min block fraction).
-# θ→1: one source per cell carrying the whole cell = the old crisp dominant-LU model.
-# θ only applies to AG land-uses; non-ag sources are always exact (noise-floor cutoff, no folding).
-EXACT_REACHABILITY_MIN_FRACTION = 0.01
-
 # Discount rate for amortisation
 DISCOUNT_RATE = 0.07     # 0.05 = 5% pa.
 

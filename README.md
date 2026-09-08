@@ -376,9 +376,7 @@ LUTO2 behavior can be customized through the `luto.settings` module. Key paramet
 - `TECH_ADOPT_MULT`: Scenario multiplier on technical adoption ceilings (Asparagopsis, Precision Ag, AgTech EI, Biochar)
 
 ### Transition Flow Model
-Transitions are modelled as explicit per-source delta flows: each cell's land is tracked back to the land uses it came from, and only the land that actually moves is charged.
-
-- `EXACT_REACHABILITY_MIN_FRACTION` (θ): The exact ↔ crisp dial. Each cell's dvar fractions at or below θ are folded into that cell's dominant fraction before delta variables are built, trading resolution for model size. θ→0 is the pure exact per-source model; θ→1 reproduces the old crisp dominant-land-use model. Applies to agricultural sources only — non-agricultural sources are always exact
+Transitions are modelled as explicit per-source delta flows: each cell's land is tracked back to the land uses it came from, and only the land that actually moves is charged. The model is exact: every nonzero land-use fraction of a cell in the base year (above the `ROUND_DECIMALS` noise floor) is its own source with its own flow variables, for agricultural and non-agricultural land uses alike. There is no dial that merges small fractions into a cell's dominant land use.
 
 ### Solver Configuration
 - `THREADS`: Number of parallel threads for optimization (default: 32)
