@@ -13,7 +13,7 @@ This document describes the core architecture, modules, and data flow of LUTO2.
     - Renewable energy constraint method: `_add_renewable_energy_constraints()` — enforces state-level solar and wind generation targets
     - Hard/soft constraint flexibility: `GHG_CONSTRAINT_TYPE`, `WATER_CONSTRAINT_TYPE`, `GBF2_CONSTRAINT_TYPE`
     - Exact transition flow model (see "Transition Flow Model" below): one source per nonzero base-year (lm, lu, cell) entry, per-source delta variables, node-balance and source-cap rows.
-  - `col_builder.py`: the COLUMN side — `get_cols(data, base_year)` builds the column space (every unknown as a labelled `xr.Dataset` per block) from the base-year state
+  - `col_builder.py`: the COLUMN side — `get_cols(data, base_year)` builds the column space (every unknown as one row of the long table `cols['table']`, beside the wide id grids) from the base-year state
   - `row_builder.py`: the ROW side — `get_rows(data, base_year, target_year, space)` prepares the coefficient streams and targets (`RowInputs`); one generator per constraint family returns its keyed row block (`FAMILIES`, in model order); `get_obj_block` is the objective
     - Biodiversity data attributes use `*_pre_1750_area_*` naming (e.g., `GBF3_NVIS_pre_1750_area_vr`, `GBF4_SNES_pre_1750_area_sr`). IBRA reuses the NVIS attribute — there is no `GBF3_IBRA_pre_1750_area_vr`.
     - Renewable energy data: `renewable_solar_r`, `renewable_wind_r` yield arrays; `region_state_r` mapping
