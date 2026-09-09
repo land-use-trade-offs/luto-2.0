@@ -30,7 +30,7 @@ For each `(region, species/community, presence)` triplet:
 
 **Tightness** = `avail / lb_raw` where `avail = val_vector[ind].sum()` (available area,
 ha). Both are raw: the layers and targets reach the solver unscaled, and the solver
-rescales each row at build time (`row_builder.scale_rows`).
+rescales each row at build time (`row_builder.contract` with `rescale=True`).
 - `tightness < 1` → structurally infeasible (available area < target even if every
   eligible cell is fully converted)
 - `tightness ≥ 1` but solver returns NUMERIC/TIME_LIMIT → numerically ill-conditioned
@@ -322,7 +322,7 @@ for attr in dir(run_settings):
         setattr(settings, attr, getattr(run_settings, attr))
 
 from luto.solvers.col_builder import get_cols
-from luto.solvers.row_builder import get_rows
+from luto.solvers.row_inputs import get_rows
 
 print(f"Loading {CHECKPOINT} ...", flush=True)
 data = joblib.load(os.path.join(DATA_DIR, CHECKPOINT))
@@ -422,7 +422,7 @@ for attr in dir(run_settings):
         setattr(settings, attr, getattr(run_settings, attr))
 
 from luto.solvers.col_builder import get_cols
-from luto.solvers.row_builder import get_rows
+from luto.solvers.row_inputs import get_rows
 from luto.solvers.solver import LutoSolver
 
 print(f"[idx={idx}] Loading {CHECKPOINT} ...", flush=True)
@@ -518,11 +518,11 @@ else:
     # One row, built the way _add_GBF4_*_constraints builds it: region-masked layer as the
     # weighting row over the coefficient support with the shared bio coefficients, then
     # row-rescaled with the target.
-    from luto.solvers.row_builder import compose_rows, scale_rows
+    from luto.solvers.row_builder import bio_streams, compose_rows, contract, gather
     masked = val_vector if region == "Australia" else np.where(reg_matrix == region, val_vector, 0)
-    row = compose_rows(cols['terms'], input_data.bio_coeffs(cols), [masked], cols['layout']['n_all'])
-    row, rhs, _scale = scale_rows(row, [lb_raw])
-    constr = model.addMConstr(row, solver._all_vars(), '>', rhs).tolist()
+    row = compose_rows(cols, gather(cols['table'], *bio_streams(rows, cols)), [masked])
+    row, rhs, _scale = contract(row, [lb_raw], rescale=True)
+    constr = model.addMConstr(row, solver._vars, '>', rhs).tolist()
     model.setAttr('ConstrName', constr, [f"test_{typ}_{region}_{name}_{presence}".replace(" ", "_")])
     model.update()
 
@@ -727,7 +727,7 @@ for attr in dir(run_settings):
         setattr(settings, attr, getattr(run_settings, attr))
 
 from luto.solvers.col_builder import get_cols
-from luto.solvers.row_builder import get_rows
+from luto.solvers.row_inputs import get_rows
 
 print(f"Loading data_{BASE_YEAR}.lz4 ...", flush=True)
 data = joblib.load(os.path.join(DATA_DIR, f"data_{BASE_YEAR}.lz4"))

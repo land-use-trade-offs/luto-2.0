@@ -18,7 +18,6 @@
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
-import pandas as pd
 import xarray as xr
 
 import luto.settings as settings
@@ -161,17 +160,14 @@ def get_mask_mnes_wind(data: Data) -> np.ndarray:
 # ═══════════════════════════ the column blocks: one Dataset per block, wide (grid) or long (arc) tables, block-LOCAL ids (get_cols shifts them) ═══════════════════════════
 
 def ag_space(data: Data, feasible_ag_mrj: np.ndarray, trans_ub_ag_mrj: np.ndarray, dvar_base_ag_mrj: np.ndarray) -> tuple[xr.Dataset, dict]:
-    """The ag columns: the wide id grid on (lm, lu, cell) the model indexes by (m, j, r), and the block's rows — its (lm, lu), cell, ub and base; lb = 0."""
+    """The ag columns: the block's rows — its (lm, lu), cell, ub and base; lb = 0 — in (lm, lu, cell) order, and the wide base grid the source-cap rows read by (m, j, r)."""
     # the (m, r, j) inputs laid out on the table's (m, j, r) grid, contiguous so downstream gathers read whole rows
     has_col  = np.ascontiguousarray(feasible_ag_mrj.transpose(0, 2, 1))
     ub_mjr   = np.ascontiguousarray(trans_ub_ag_mrj.transpose(0, 2, 1))
     base_mjr = np.ascontiguousarray(dvar_base_ag_mrj.transpose(0, 2, 1))
 
-    col_mjr = np.full(has_col.shape, -1, dtype=np.int32)
-    col_mjr[has_col] = np.arange(has_col.sum(), dtype=np.int32)                    # grid order = column order
-
     # the column (gp.Var) view: where the ag exists
-    m, j, r = np.nonzero(has_col)                                                  # the block's columns, in the order the ids were given
+    m, j, r = np.nonzero(has_col)                                                  # the block's columns: grid order = column order
     rows = dict(
         m=m,
         j=j,
@@ -179,11 +175,10 @@ def ag_space(data: Data, feasible_ag_mrj: np.ndarray, trans_ub_ag_mrj: np.ndarra
         ub=ub_mjr[m, j, r],                                                        # attribute: the transition upper bound (lb = 0 by default in gurobi)
         base=base_mjr[m, j, r]                                                     # attribute: the node-balance constant (X = base + flow-in - flow-out)
     )
-    
-    # the row (constraint) view: cells of -1 are skipped since they are not attached to any gp.Var
+
+    # the row (constraint) view: only what is read by grid position — a source with no column still caps its outflow by its base
     grid = xr.Dataset(
-        dict(col =(('lm', 'lu', 'cell'), col_mjr),      # column id (-1 = no column); col >= 0 is the select for gp.Var creation, grid order = column order
-             base=(('lm', 'lu', 'cell'), base_mjr)      # the source-cap rows read the base by (from_m, from_j, cell)
+        dict(base=(('lm', 'lu', 'cell'), base_mjr)      # the source-cap rows read the base by (from_m, from_j, cell)
         ),
         coords=dict(
             lm=list(data.LANDMANS),
@@ -195,7 +190,7 @@ def ag_space(data: Data, feasible_ag_mrj: np.ndarray, trans_ub_ag_mrj: np.ndarra
 
 
 def nonag_space(data: Data, trans_lb_nonag_rk: np.ndarray, trans_ub_nonag_rk: np.ndarray, dvar_base_nonag_rk: np.ndarray) -> tuple[xr.Dataset, dict]:
-    """The non-ag columns: the wide id grid on (nonag_lu, cell) the model indexes by (k, r), and the block's rows — its land use, cell, lb, ub and base."""
+    """The non-ag columns: the block's rows — its land use, cell, lb, ub and base — in (lu, cell) order, and the wide ub / base grids the flow rows read by (k, r) for the entries with no column."""
     # the (r, k) inputs laid out on the table's (k, r) grid, contiguous after the transpose
     lb_kr   = np.ascontiguousarray(trans_lb_nonag_rk.T)
     ub_kr   = np.ascontiguousarray(trans_ub_nonag_rk.T)
@@ -203,11 +198,8 @@ def nonag_space(data: Data, trans_lb_nonag_rk: np.ndarray, trans_ub_nonag_rk: np
     enabled = np.array([settings.NON_AG_LAND_USES[lu_name] for lu_name in data.NON_AGRICULTURAL_LANDUSES], dtype=bool)
     has_col = (ub_kr > 0) & enabled[:, None]
 
-    col_kr = np.full(has_col.shape, -1, dtype=np.int32)
-    col_kr[has_col] = np.arange(has_col.sum(), dtype=np.int32)                     # grid order = column order
-
     # the column (gp.Var) view: where the non-ag land use exists
-    k, r = np.nonzero(has_col)                                                     # the block's columns, in the order the ids were given
+    k, r = np.nonzero(has_col)                                                     # the block's columns: grid order = column order
     rows = dict(
         k=k,
         cell=r,
@@ -216,10 +208,9 @@ def nonag_space(data: Data, trans_lb_nonag_rk: np.ndarray, trans_ub_nonag_rk: np
         base=base_kr[k, r]                                                         # attribute: the node-balance constant (X = base + flow-in - flow-out)
     )
 
-    # the row (constraint) view: cells of -1 are skipped since they are not attached to any gp.Var
+    # the row (constraint) view: only what is read by grid position — the feasible entries of a DISABLED land use have no column but still get a node-balance row
     grid = xr.Dataset(
-        dict(col =(('nonag_lu', 'cell'), col_kr),        # column id (-1 = no column); col >= 0 is the select for gp.Var creation, grid order = column order
-             ub  =(('nonag_lu', 'cell'), ub_kr),         # > 0 = feasible, for EVERY land use, enabled or not: the node-balance rows need the disabled ones too
+        dict(ub  =(('nonag_lu', 'cell'), ub_kr),         # > 0 = feasible, for EVERY land use, enabled or not: the node-balance rows need the disabled ones too
              base=(('nonag_lu', 'cell'), base_kr)        # the source-cap rows read the base by (from_k, cell)
         ),
         coords=dict(
@@ -230,8 +221,8 @@ def nonag_space(data: Data, trans_lb_nonag_rk: np.ndarray, trans_ub_nonag_rk: np
     return grid, rows
 
 
-def am_space(data: Data, ag_col_mjr: np.ndarray, mask_gbf2_solar: np.ndarray, mask_gbf2_wind: np.ndarray, trans_lb_ag_man_mrj: dict) -> tuple[xr.Dataset, dict]:
-    """The ag-management columns: the wide id grid on (slot = (am, lu), lm, cell), and the block's rows — its slot, option, land use, the ag (lm, lu) it sits on, cell and lb; ub = 1."""
+def am_space(data: Data, feasible_ag_mrj: np.ndarray, mask_gbf2_solar: np.ndarray, mask_gbf2_wind: np.ndarray, trans_lb_ag_man_mrj: dict) -> dict:
+    """The ag-management columns: the block's rows — its slot, option, land use, the ag (lm, lu) it sits on, cell and lb; ub = 1 — in (slot = (am, lu), lm, cell) order."""
     pairs = [(am, lu_code) for am, lu_codes in data.AGMAN2LU.items() for lu_code in lu_codes]
 
     has_col = np.zeros((len(pairs), data.NLMS, data.NCELLS), dtype=bool)
@@ -239,7 +230,7 @@ def am_space(data: Data, ag_col_mjr: np.ndarray, mask_gbf2_solar: np.ndarray, ma
     savanna_mask = data.SAVBURN_ELIGIBLE == 1                                          # cells eligible for savanna burning
 
     for slot, (am, j) in enumerate(pairs):
-        slot_has_col = ag_col_mjr[:, j, :] >= 0                                        # (lm, cell): where the ag column exists
+        slot_has_col = feasible_ag_mrj[:, :, j].copy()                                 # (lm, cell): where the ag column exists
         # exclude cells for renewable options
         if am in settings.RENEWABLES_OPTIONS:
             excluded_cells = mask_gbf2_solar if am == "Utility Solar PV" else mask_gbf2_wind
@@ -253,16 +244,13 @@ def am_space(data: Data, ag_col_mjr: np.ndarray, mask_gbf2_solar: np.ndarray, ma
         # assign the slot's column existence
         has_col[slot] = slot_has_col
 
-    col_smr = np.full(has_col.shape, -1, dtype=np.int32)
-    col_smr[has_col] = np.arange(has_col.sum(), dtype=np.int32)                        # grid order = column order
-
     j_of_slot      = np.array([j for _, j in pairs], dtype=np.int32)                   # the land-use code of each (am, lu) slot
     am_idx_of_slot = np.array([option for option, lu_codes in enumerate(data.AGMAN2LU.values()) for _ in lu_codes], dtype=np.int32)     # the slot's option, as an index into agman2lu
     j_idx_of_slot  = np.array([position for lu_codes in data.AGMAN2LU.values() for position in range(len(lu_codes))], dtype=np.int32)   # the land use's position within its option: the last axis of the per-option effect arrays [m, r, j_idx]
 
-    # the column (gp.Var) view: where the ag-mgt slot exists
-    slot, m, r = np.nonzero(has_col)                                                   # the block's columns, in the order the ids were given
-    rows = dict(
+    # the column (gp.Var) view: where the ag-mgt slot exists; nothing reads an am column by grid position
+    slot, m, r = np.nonzero(has_col)                                                   # the block's columns: grid order = column order
+    return dict(
         slot=slot,
         am_idx=am_idx_of_slot[slot],
         j_idx=j_idx_of_slot[slot],
@@ -272,22 +260,6 @@ def am_space(data: Data, ag_col_mjr: np.ndarray, mask_gbf2_solar: np.ndarray, ma
         lb=lb_smr[slot, m, r],                                                         # attribute: the base-year adoption for non-reversible options, else 0
         ub=1.0
     )
-
-    slot_index = pd.MultiIndex.from_arrays([[am for am, _ in pairs], [data.AGRICULTURAL_LANDUSES[j] for _, j in pairs]], names=['am', 'lu'])
-    coords = xr.Coordinates.from_pandas_multiindex(slot_index, 'slot').assign(lm=list(data.LANDMANS), cell=np.arange(data.NCELLS))
-
-    # the row (constraint) view: cells of -1 are skipped since they are not attached to any gp.Var
-    grid = xr.Dataset(
-        dict(col=(('slot', 'lm', 'cell'), col_smr),                                # column id (-1 = no column); col >= 0 is the select for gp.Var creation, grid order = column order
-             j  =(('slot',), j_of_slot)                                            # the land-use code of each (am, lu) slot
-        ),
-        coords=coords,
-        attrs=dict(
-            agman2lu=data.AGMAN2LU,                                                    # {option: [land-use codes]}: the slot order
-            savanna_eligible_r=np.flatnonzero(savanna_mask)                            # the solve read-back zeroes irr savanna columns outside these cells
-        )
-    )
-    return grid, rows
 
 
 def ag2ag_space(feasible_ag2ag_mrj: dict) -> tuple[dict, np.ndarray]:
@@ -450,6 +422,8 @@ def table_space(data: Data, blocks: dict, src_ptr: dict) -> xr.Dataset:
         ),
         attrs=dict(block_range=block_range,                                                  # {block: (start, stop)} — the rows each block owns, in the table's block order
                    options=list(data.AGMAN2LU),                                              # the ag-management options, in am_idx order
+                   agman2lu=data.AGMAN2LU,                                                   # {option: [land-use codes]}: the (option, lu) slot order
+                   savanna_eligible_r=np.flatnonzero(data.SAVBURN_ELIGIBLE == 1),            # the solve read-back zeroes irr savanna columns outside these cells
                    n_terms=n_terms,                                                          # the scored group: the table's first rows, the width a demand / GHG / water / biodiversity / renewable coefficient array is allocated at
                    n_dec=n_dec,                                                              # everything before the slack group: the objective is built at this width (a slack carries no cost)
                    n_all=n_all,                                                              # every column: the rows are built at this width
@@ -462,7 +436,7 @@ def table_space(data: Data, blocks: dict, src_ptr: dict) -> xr.Dataset:
 # ═══════════════════════════ get_cols: the column space of one step ═══════════════════════════
 
 def get_cols(data: Data, base_year: int) -> dict:
-    """The column space of one solve step: every unknown as one row of the long table (``table``), the wide id grids of ag / nonag / am holding their actual Var.index ids, the sources and the masks."""
+    """The column space of one solve step: every unknown as one row of the long table (``table``), the wide ag / nonag grids of what the flow rows read by (m, j, r) / (k, r) for entries with no column (base, ub), the sources and the masks."""
 
     # ── 1. sources (FROM-view): the base-year holders of land ──
     trans_source_ag         = get_trans_source_ag(data, base_year)              # (from_m, from_j): global cell indices
@@ -494,10 +468,10 @@ def get_cols(data: Data, base_year: int) -> dict:
     mask_mnes_solar         = get_mask_mnes_solar(data)
     mask_mnes_wind          = get_mask_mnes_wind(data)
 
-    # ── 5. the blocks and the table: every block's rows, plus the wide grids the model indexes, laid back to back in Var.index order ──
+    # ── 5. the blocks and the table: every block's rows laid back to back in Var.index order, plus the wide base / ub grids the flow rows read for entries with no column ──
     ag_grid,    ag_rows     = ag_space(data, feasible_ag_mrj, trans_ub_ag_mrj, dvar_base_ag_mrj)
     nonag_grid, nonag_rows  = nonag_space(data, trans_lb_nonag_rk, trans_ub_nonag_rk, dvar_base_nonag_rk)
-    am_grid,    am_rows     = am_space(data, ag_grid['col'].values, mask_gbf2_solar, mask_gbf2_wind, trans_lb_ag_man_mrj)
+    am_rows                 = am_space(data, feasible_ag_mrj, mask_gbf2_solar, mask_gbf2_wind, trans_lb_ag_man_mrj)
 
     ag2ag_rows,    ag2ag_src_ptr    = ag2ag_space(feasible_ag2ag_mrj)                # each source carries its own cells: local_r -> the global cell
     ag2nonag_rows, ag2nonag_src_ptr = ag2nonag_space(feasible_ag2nonag_rk)
@@ -518,25 +492,17 @@ def get_cols(data: Data, base_year: int) -> dict:
 
     table = table_space(data, blocks, src_ptr)                                      # the block bounds and widths land in its attrs
 
-    # ── 6. the grids' ids raised in place to the actual Var.index (-1 never shifts): each grid's block is one run of the table ──
-    for name, grid in (('ag', ag_grid), ('nonag', nonag_grid), ('am', am_grid)):
-        start, stop = table.attrs['block_range'][name]
-        ids = grid['col'].values
-        ids[ids >= 0] += start
-        assert np.array_equal(ids[ids >= 0], np.arange(start, stop)), f'{name}: the grid ids must be its run of the table'
-
     block_range = table.attrs['block_range']
     print(f"Column space: {table.attrs['n_all']:,} columns = {table.attrs['n_dec']:,} decision (n_dec) + "
           f"{table.attrs['n_all'] - table.attrs['n_dec']:,} cell-usage slacks", flush=True)
     for name, (start, stop) in block_range.items():
         print(f"{'└──' if name == list(block_range)[-1] else '├──'} {name:<10s} {stop - start:>12,}", flush=True)
 
-    # ── 7. the space: the table, the wide grids the rows still index by (m, j, r) / (k, r) / (slot, m, r), the sources, the masks ──
+    # ── 6. the space: the table, the wide grids the flow rows still read by (m, j, r) / (k, r), the sources, the masks ──
     return dict(
         table=table,
         ag=ag_grid,
         nonag=nonag_grid,
-        am=am_grid,
         sources=dict(ag=trans_source_ag, nonag=trans_source_nonag),
         mask_gbf2_solar=mask_gbf2_solar,
         mask_gbf2_wind=mask_gbf2_wind,

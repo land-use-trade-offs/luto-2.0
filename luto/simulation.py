@@ -39,7 +39,8 @@ from gurobipy import GRB
 from luto import settings
 from luto.data import Data
 from luto.solvers.col_builder import get_cols
-from luto.solvers.row_builder import get_rows
+from luto.solvers.row_inputs import get_economics, get_rows
+from luto.solvers.row_builder import get_obj_block
 from luto.solvers.solver import LutoSolver
 from luto.solvers.tools import feasibility_spectrum, resolve_infeasibility, group_of
 from luto.tools.write import write_outputs
@@ -238,11 +239,12 @@ def solve_timeseries(
         print( "-------------------------------------------------\n", flush=True)
 
         start_time = time.time()
-        cols = get_cols(data, base_year)                       # the unknowns of this step
-        rows = get_rows(data, base_year, target_year, cols)    # the coefficient streams and targets
+        cols = get_cols(data, base_year)                    # the unknowns of this step
+        rows = get_rows(data, base_year, target_year)       # the coefficient streams and targets
+        obj_block = get_obj_block(get_economics(data, base_year, target_year), cols)   # the objective; the economy streams (~300 MB at RES5) die with the call
         data.last_year = target_year
 
-        luto_solver = LutoSolver(cols, rows)
+        luto_solver = LutoSolver(cols, rows, obj_block)
         luto_solver.formulate()
 
         # Save the model to disk BEFORE solving (see save_model_to_disk for why).
