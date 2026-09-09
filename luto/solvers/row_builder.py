@@ -54,9 +54,8 @@ def drop(col: np.ndarray, q: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
 
 
 def block_slice(table: xr.Dataset, block: str) -> slice:
-    """The rows of one block of the column table — its Var.index range (``attrs['block_ptr']`` holds the bounds)."""
-    code = table.attrs['blocks'].index(block)
-    return slice(int(table.attrs['block_ptr'][code]), int(table.attrs['block_ptr'][code + 1]))
+    """The rows of one block of the column table — its Var.index range (``attrs['block_range']`` holds the bounds)."""
+    return slice(*table.attrs['block_range'][block])
 
 
 def am_runs(table: xr.Dataset, by: str) -> list:

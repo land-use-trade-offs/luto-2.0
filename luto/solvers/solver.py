@@ -176,9 +176,8 @@ class LutoSolver:
         }
         mvar_of = dict(ag='ag_mvar', nonag='nonag_mvar', am='am_mvar', ag2ag='ag2ag_mvar', ag2nonag='ag2nonag_mvar',
                        nonag2ag='nonag2ag_mvar', cell_usage='cell_usage_slack_mvar')
-        ptr = table.attrs['block_ptr']
-        for code, block in enumerate(table.attrs['blocks']):
-            rows = slice(int(ptr[code]), int(ptr[code + 1]))
+        for block, block_rows in table.attrs['block_range'].items():
+            rows = slice(*block_rows)
             fields = {field: table[field].values[rows] for field in ('m', 'j', 'k', 'slot', 'from_m', 'from_j', 'from_k', 'local_r', 'cell')}
             mvar = self.x[rows]
             setattr(self, mvar_of[block], mvar)
@@ -345,8 +344,7 @@ class LutoSolver:
 
         # ── 1. the decision variables: ONE .X read of the table, scattered back through its fields (float64 -> float32) ──
         table = self._cols['table']
-        ptr = table.attrs['block_ptr']
-        rows_of = {block: slice(int(a), int(b)) for block, a, b in zip(table.attrs['blocks'], ptr[:-1], ptr[1:])}
+        rows_of = {block: slice(*block_rows) for block, block_rows in table.attrs['block_range'].items()}
         m, j, k, am_idx, local_r, cell = (table[field].values for field in ('m', 'j', 'k', 'am_idx', 'local_r', 'cell'))
         x_vals = self.x.X                                                # every column, float64
 
