@@ -34,7 +34,7 @@ ls -la output/*/data_*.lz4
 
 # 2. patch whatever setting was wrong. This has NO effect on a running process —
 #    Python imported settings.py at startup — so it only matters for the relaunch.
-sed -i "s|^INFEASIBILITY_DIAGNOSIS_GROUPS=.*|INFEASIBILITY_DIAGNOSIS_GROUPS=[...]|" luto/settings.py
+sed -i "s|^GBF4_TARGET_SNES = .*|GBF4_TARGET_SNES = 'medium'|" luto/settings.py
 
 # 3. if the job is still in the queue, kill it FIRST and wait for it to leave
 qdel <jobid>; while qstat <jobid> >/dev/null 2>&1; do sleep 15; done
@@ -275,4 +275,3 @@ Edge case — fails on the very first target year (e.g. 2020 on a fresh run):
 | `run_all.py` classifies run as `finished` | `Run_Archive.zip` present in the unzipped dir | Old archive created a zip-inside-zip; remove `Run_Archive.zip` from `TASK_DIR/Run_G*` |
 | Patched `luto/settings.py` but behaviour unchanged | The process imported settings at startup; editing the file mid-run does nothing | `qdel` and `bash cmd.sh` — see Path A |
 | Relaunch starts from the base year, losing solved years | No `data_<year>.lz4` in `output/*/` when it was relaunched | Nothing to recover. Always `ls output/*/data_*.lz4` **before** `qdel` |
-| `NO_CONFLICT_FOUND — nothing droppable`, then a simplex stall with the objective frozen near 1e36 | The real conflict involves a group **not** in `INFEASIBILITY_DIAGNOSIS_GROUPS`, so the pre-solve spectrum certified the model feasible. The log says so: *"the cause involves a group excluded by keep_groups"* | Add the missing group(s) and resume. `flow_in`/`flow_out` (the transition-flow rows) are the usual omission — targets unreachable *through land movement* are invisible without them. Compare against the repo default rather than a hardcoded list |

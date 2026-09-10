@@ -17,627 +17,193 @@
 # You should have received a copy of the GNU General Public License along with
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
-
-import time
-
 import gurobipy as gp
 import numpy as np
 import pandas as pd
 
-from gurobipy import GRB
-
-try:
-    from luto import settings
-except ImportError:     # this module is also loaded STANDALONE by file path (post-mortem scripts
-    settings = None     # read a saved MPS without importing the package); fall back to defaults
+from luto.solvers import row_table
 
 
 # ---------------------------------------------------------------------------- #
-# Constraint groups and naming                                                 #
+# Shadow prices (called by simulation.py after an ACCEPTED solve)              #
 # ---------------------------------------------------------------------------- #
 
-# Constraint-name prefixes per group, taken from the `name=` arguments in solver.py. Grouping by
-# name (rather than by a registry of builder methods) is what lets this work on a model read back
-# from MPS, where the builders are long gone.
-CONSTRAINT_GROUPS = {
-    'cell_usage':   ('const_cell_usage_',),
-    'ag_mgt_link':  ('const_ag_mam_dry_usage_', 'const_ag_mam_irr_usage_'),
-    'ag_mgt_ub':    ('const_', ),                       # const_<am>_solvable_ub_<r>; see _GROUP_EXCLUDE
-    'ag_mgt_adopt': ('const_ag_mam_adoption_limit_',),
-    'demand':       ('demand_hard_bound_', 'demand_soft_bound_'),
-    'ghg':          ('ghg_emissions_limit_',),
-    'water':        ('water_yield_limit_',),
-    'nonag_cap':    ('reg_adopt_limit_non_ag_sum_',),
-    'adopt_ag':     ('reg_adopt_limit_ag_',),
-    'adopt_nonag':  ('reg_adopt_limit_non_ag_',),       # excludes the _sum_ rows; see _GROUP_EXCLUDE
-    'bio_gbf2':     ('bio_GBF2_',),
-    'bio_nvis':     ('bio_GBF3_NVIS_limit_',),
-    'bio_snes':     ('bio_GBF4_SNES_limit_',),
-    'bio_ecnes':    ('bio_GBF4_ECNES_limit_',),
-    'bio_gbf8':     ('bio_GBF8_limit_',),
-    'renewable':    ('renewable_',),
-    'flow_out':     ('srccap_a_', 'srccap_n_'),
-    'flow_in':      ('bal_a_', 'bal_n_'),
-}
-
-# Prefixes overlap: 'const_' would swallow every const_* group, and 'reg_adopt_limit_non_ag_'
-# would swallow the _sum_ rows. Longest-prefix-wins resolves it, but state the exclusions so the
-# intent is readable rather than implied by string lengths.
-_GROUP_EXCLUDE = {
-    'ag_mgt_ub':   ('const_cell_usage_', 'const_ag_mam_'),
-    'adopt_nonag': ('reg_adopt_limit_non_ag_sum_',),
-}
-
-# Never delete these when hunting for a cause: without them the model is not a land-use model at
-# all. `cell_usage` is the equality that makes per-cell share scarce — remove it and every cell can
-# hold one unit of every land use at once, so almost anything becomes "feasible" and the answer is
-# meaningless. The ag-management links (X_ag_man <= X_ag[j]) are structural in the same way.
-STRUCTURAL = ('cell_usage', 'ag_mgt_link')
-
-STATUS = {
-    GRB.OPTIMAL: 'OPTIMAL', GRB.INFEASIBLE: 'INFEASIBLE', GRB.INF_OR_UNBD: 'INF_OR_UNBD',
-    GRB.UNBOUNDED: 'UNBOUNDED', GRB.TIME_LIMIT: 'TIME_LIMIT', GRB.SUBOPTIMAL: 'SUBOPTIMAL',
-}
+def _active_rows(T, family: str) -> np.ndarray:
+    """The ACTIVE rows one family holds on the row table, as row indices in table order — empty where the
+    family was not built or every row was dropped (``LutoSolver.remove_constraints_by_name``)."""
+    span = row_table.family_rows(T, family)
+    if span is None:
+        return np.empty(0, dtype=np.int64)
+    return np.arange(span.start, span.stop)[T['active'].values[span]]
 
 
-def group_of(name: str) -> str | None:
-    """Which group a constraint belongs to, longest matching prefix wins."""
-    best, best_len = None, -1
-    for group, prefixes in CONSTRAINT_GROUPS.items():
-        if any(name.startswith(x) for x in _GROUP_EXCLUDE.get(group, ())):
-            continue
-        for p in prefixes:
-            if name.startswith(p) and len(p) > best_len:
-                best, best_len = group, len(p)
-    return best
+def _labels(T, field: str, rows: np.ndarray) -> np.ndarray:
+    """One coded key field of the row table at ``rows``, as labels."""
+    return row_table.decode(T, field, rows)
 
 
-def group_counts(model) -> pd.Series:
-    """How many rows each group holds — the first thing to check on a model read from disk."""
-    counts = pd.Series([group_of(c.ConstrName) for c in model.getConstrs()]).value_counts(dropna=False)
-    return counts.rename(index={np.nan: '<ungrouped>'})
+def _price(constr, scale, unit: str) -> dict:
+    """The numeric columns of one shadow-price record, from a row's Gurobi handle and its row scale."""
+    So = 1e6                                    # the objective is in million AUD
+    Ss = float(scale)
+    pi = float(constr.Pi)
+    return {"pi_rescaled": pi, "scale": Ss, "shadow_price": pi * So / Ss,
+            "shadow_price_AUD": pi * So * float(constr.RHS), "unit": unit}
 
 
-# ---------------------------------------------------------------------------- #
-# Feasibility probes (always on copies — the caller's model is never touched)  #
-# ---------------------------------------------------------------------------- #
+def calc_shadow_price_GBF2(luto_solver, inputs, target_year) -> pd.DataFrame:
+    """GBF2 priority-degraded-area constraint shadow price (AUD per real ha of target)."""
+    T = luto_solver.rows
+    r = _active_rows(T, 'GBF2')
+    return pd.DataFrame([
+        {"year": target_year, "constraint": "GBF2", "region": "Australia", "item": "", "presence": "", **_price(constr, scale, "ha")}
+        for constr, scale in zip(T['constr'].values[r], T['scale'].values[r])
+    ])
 
-def _feasibility_copy(model, time_limit: float | None = None, keep_groups=None,
-                      verbose: bool = False):
-    """A copy set up to answer feasibility only: zero objective, no dual reductions, quiet.
 
-    `keep_groups` restricts the copy to those groups plus STRUCTURAL, discarding the rest. That is
-    a RELAXATION, so the inference is one-directional and worth stating plainly:
+def calc_shadow_price_GBF3_NVIS(luto_solver, inputs, target_year) -> pd.DataFrame:
+    """GBF3 NVIS vegetation-group constraint shadow prices (AUD per real ha of target)."""
+    T = luto_solver.rows
+    r = _active_rows(T, 'GBF3_NVIS')
+    return pd.DataFrame([
+        {"year": target_year, "constraint": "GBF3_NVIS", "region": region, "item": group, "presence": "", **_price(constr, scale, "ha")}
+        for constr, scale, region, group in zip(T['constr'].values[r], T['scale'].values[r], _labels(T, 'region', r), _labels(T, 'item', r))
+    ])
 
-        restricted model INFEASIBLE  =>  the FULL model is infeasible too, and the conflict lies
-                                         entirely within the groups kept.
-        restricted model FEASIBLE    =>  says NOTHING about the full model. A conflict involving a
-                                         discarded group is invisible.
 
-    It exists because it is dramatically cheaper — dropping demand, GHG, water, renewables and the
-    transition-flow system roughly halves the model and took one measured feasibility solve from
-    417 s to 13 s. Worth it when you already know which constraints bind; misleading if you do not.
+def calc_shadow_price_GBF4_SNES(luto_solver, inputs, target_year) -> pd.DataFrame:
+    """GBF4 SNES species constraint shadow prices (AUD per real ha of target)."""
+    T = luto_solver.rows
+    r = _active_rows(T, 'GBF4_SNES')
+    return pd.DataFrame([
+        {"year": target_year, "constraint": "GBF4_SNES", "region": region, "item": species, "presence": presence, **_price(constr, scale, "ha")}
+        for constr, scale, region, species, presence in zip(T['constr'].values[r], T['scale'].values[r],
+                                                            _labels(T, 'region', r), _labels(T, 'item', r), _labels(T, 'presence', r))
+    ])
+
+
+def calc_shadow_price_GBF4_ECNES(luto_solver, inputs, target_year) -> pd.DataFrame:
+    """GBF4 ECNES ecological-community constraint shadow prices (AUD per real ha of target)."""
+    T = luto_solver.rows
+    r = _active_rows(T, 'GBF4_ECNES')
+    return pd.DataFrame([
+        {"year": target_year, "constraint": "GBF4_ECNES", "region": region, "item": community, "presence": presence, **_price(constr, scale, "ha")}
+        for constr, scale, region, community, presence in zip(T['constr'].values[r], T['scale'].values[r],
+                                                              _labels(T, 'region', r), _labels(T, 'item', r), _labels(T, 'presence', r))
+    ])
+
+
+def calc_shadow_price_GBF8(luto_solver, inputs, target_year) -> pd.DataFrame:
+    """GBF8 species-conservation constraint shadow prices (AUD per real ha of target)."""
+    T = luto_solver.rows
+    r = _active_rows(T, 'GBF8')
+    return pd.DataFrame([
+        {"year": target_year, "constraint": "GBF8", "region": region, "item": species, "presence": "", **_price(constr, scale, "ha")}
+        for constr, scale, region, species in zip(T['constr'].values[r], T['scale'].values[r], _labels(T, 'region', r), _labels(T, 'item', r))
+    ])
+
+
+def calc_shadow_price_Water(luto_solver, inputs, target_year) -> pd.DataFrame:
+    """Per-region water-yield constraint shadow prices (AUD per real ML of target); ``item`` is the row name."""
+    T = luto_solver.rows
+    r = _active_rows(T, 'water')
+    return pd.DataFrame([
+        {"year": target_year, "constraint": "Water", "region": "", "item": name, "presence": "", **_price(constr, scale, "ML")}
+        for constr, scale, name in zip(T['constr'].values[r], T['scale'].values[r], T['name'].values[r])
+    ])
+
+
+def calc_shadow_price_GHG(luto_solver, inputs, target_year) -> pd.DataFrame:
+    """GHG-emissions constraint shadow price (AUD per real tCO2e of target); ``item`` is the row name."""
+    T = luto_solver.rows
+    r = _active_rows(T, 'ghg')
+    return pd.DataFrame([
+        {"year": target_year, "constraint": "GHG", "region": "", "item": name, "presence": "", **_price(constr, scale, "tCO2e")}
+        for constr, scale, name in zip(T['constr'].values[r], T['scale'].values[r], T['name'].values[r])
+    ])
+
+
+def calc_shadow_price_Demand(luto_solver, inputs, target_year) -> pd.DataFrame:
+    """Per-commodity production/demand constraint shadow prices (AUD per real tonne of demand).
+
+    ``presence`` holds the bound kind (eq/lower/upper) so a commodity's paired bounds stay
+    distinguishable; ``inputs`` is the step's ``RowInputs`` (the commodity names).
     """
-    model.update()                      # copy() does NOT carry pending rows/attrs — flush first
-    m = model.copy()
-    if keep_groups:
-        keep = set(keep_groups) | set(STRUCTURAL)
-        discard = [c for c in m.getConstrs() if group_of(c.ConstrName) not in keep]
-        if discard:
-            m.remove(discard)
-            m.update()
-            if verbose:
-                print(f"│   │   ├── restricted to {sorted(keep)}: dropped {len(discard):,} row(s), "
-                      f"{m.NumConstrs:,} remain")
-
-    m.setObjective(0, GRB.MINIMIZE)     # feasibility, not optimality — far cheaper
-    m.Params.OutputFlag = 0             # NB: silences the probe, so an idle gurobi.log during a
-                                        # long computeIIS does NOT mean the solver is idle
-    m.Params.DualReductions = 0         # so INF_OR_UNBD cannot hide a definite INFEASIBLE
-
-    # PIN the probe's numerics. `model.copy()` inherits the source model's parameters (verified),
-    # so without this the diagnosis runs under whatever solver rung happened to fail last — and on
-    # knife-edge models the parameters DECIDE the verdict. Measured on R3_ECNES_T3050_cap20/25
-    # (2026-08-09): with the failed rung's inherited (Presolve=auto, BarHomogeneous=off) the probe
-    # certified the model feasible-within-tolerance and the diagnosis found nothing; under
-    # (Presolve=0, BarHomogeneous=1) the same probe produced clean IISs whose 6-8 dropped rows then
-    # made the year solve at a normal objective. Method is pinned too: BarHomogeneous only applies
-    # to barrier, so an inherited Method=1 would silently bypass the flag. Presolve stays OFF per
-    # the RETRY_PARAMS note (presolve + homogeneous barrier manufactures false infeasibility);
-    # Crossover is skipped — only the status is read, never a basis.
-    m.Params.Method = 2
-    m.Params.Crossover = 0
-    m.Params.Presolve = 0
-    m.Params.BarHomogeneous = 1
-    m.Params.NumericFocus = 0
-
-    # Tolerances come FROM SETTINGS, never hardcoded: a probe verdict must mean the same thing the
-    # production solve means, and the two cannot be allowed to drift. They are pinned rather than
-    # inherited for the same reason as the algorithm parameters above — the verdict must not depend
-    # on what a failed rung happened to leave on the model.
-    #
-    # (History, so the argument is not re-derived: these lines were once hardcoded to 1e-6 and
-    # justified as "stricter than production", on the belief that production ran at 1e-2. It does
-    # not — FEASIBILITY_TOLERANCE has always been 1e-6, so there is no tolerance gap to exploit.
-    # What actually finds rows satisfiable only by a hair is `knife_edge_rows`, which perturbs the
-    # RHS by RELATIVE margins and is independent of tolerance.)
-    m.Params.FeasibilityTol = getattr(settings, "FEASIBILITY_TOLERANCE", 1e-6)
-    m.Params.OptimalityTol  = getattr(settings, "OPTIMALITY_TOLERANCE", 1e-2)
-    m.Params.BarConvTol     = getattr(settings, "BARRIER_CONVERGENCE_TOLERANCE", 1e-5)
-
-    if time_limit:
-        m.Params.TimeLimit = time_limit
-    return m
+    T = luto_solver.rows
+    r = _active_rows(T, 'demand')
+    return pd.DataFrame([
+        {"year": target_year, "constraint": "Demand", "region": "", "item": inputs.commodity_names[commodity], "presence": bound, **_price(constr, scale, "t")}
+        for constr, scale, commodity, bound in zip(T['constr'].values[r], T['scale'].values[r], T['commodity'].values[r], _labels(T, 'bound', r))
+    ])
 
 
-def _remove_named(model, names) -> None:
-    """Remove constraints from `model` by name. No-op on an empty list."""
-    if not names:
+def calc_shadow_price_Renewable(luto_solver, inputs, target_year) -> pd.DataFrame:
+    """State-level renewable-generation-target shadow prices (AUD per real MWh of target); ``constraint``
+    is the renewable type, ``region`` the state. Every (type, state) row carries its own row scale."""
+    T = luto_solver.rows
+    r = _active_rows(T, 'renewable')
+    options = luto_solver.cols.attrs['options']
+    return pd.DataFrame([
+        {"year": target_year, "constraint": options[am_idx], "region": state, "item": "", "presence": "", **_price(constr, scale, "MWh")}
+        for constr, scale, am_idx, state in zip(T['constr'].values[r], T['scale'].values[r], T['am_idx'].values[r], _labels(T, 'state', r))
+    ])
+
+
+def calc_shadow_price_Regional_Adoption(luto_solver, inputs, target_year) -> pd.DataFrame:
+    """Regional adoption area-cap shadow prices (AUD per real ha of cap), the three families in row order
+    (ag, non-ag, non-ag sum); ``item`` is the row name. These rows are not rescaled, so scale = 1."""
+    T = luto_solver.rows
+    r = np.concatenate([_active_rows(T, family) for family in ('regional_adoption_ag', 'regional_adoption_nonag', 'regional_adoption_nonag_sum')])
+    return pd.DataFrame([
+        {"year": target_year, "constraint": "Regional_Adoption", "region": "", "item": name, "presence": "", **_price(constr, scale, "ha")}
+        for constr, scale, name in zip(T['constr'].values[r], T['scale'].values[r], T['name'].values[r])
+    ])
+
+
+PRICED_FAMILIES = ('GBF2', 'GBF3_NVIS', 'GBF4_SNES', 'GBF4_ECNES', 'GBF8', 'water', 'ghg', 'demand', 'renewable',
+                   'regional_adoption_ag', 'regional_adoption_nonag', 'regional_adoption_nonag_sum')   # the row-table families the readers above price
+
+
+def record_shadow_prices(luto_solver, inputs, target_year, out_dir) -> None:
+    """Compute every active constraint's shadow prices and write one CSV for the year.
+
+    ``inputs`` is the step's ``RowInputs`` (the commodity names). Probes the simplex basis once
+    (barrier-only solves have unreliable duals → skip the year), then concatenates the per-constraint
+    calculators into ``shadow_prices_{target_year}.csv``. The file is written fresh per year, so a
+    resume/re-run simply overwrites the year's file.
+    """
+    T = luto_solver.rows
+    priced = np.concatenate([_active_rows(T, family) for family in PRICED_FAMILIES])
+    if not priced.size:
+        print(f"No active constraints to record shadow prices for {target_year}.")
         return
-    doomed = set(names)
-    model.remove([c for c in model.getConstrs() if c.ConstrName in doomed])
-    model.update()
 
-
-def _probe(model, dropped, time_limit: float | None = None, keep_groups=None,
-           verbose: bool = False):
-    """Feasibility copy with the already-dropped rows removed — one diagnosis round's model."""
-    m = _feasibility_copy(model, time_limit, keep_groups, verbose)
-    _remove_named(m, dropped)
-    return m
-
-
-def _iis_rows(model) -> list[str]:
-    """Constraint names in the IIS. Call after `model.computeIIS()`."""
-    return [c.ConstrName for c in model.getConstrs() if c.IISConstr]
-
-
-def _by_group(names) -> dict[str, list[str]]:
-    """Bucket constraint names by family; unknown prefixes land in '<ungrouped>'."""
-    out = {}
-    for n in names:
-        out.setdefault(group_of(n) or '<ungrouped>', []).append(n)
-    return out
-
-
-def _droppable_rows(iis_names, droppable) -> list[str]:
-    """IIS rows that policy allows sacrificing, least-valued group first.
-
-    `droppable` is the caller's ordered list of groups, least-valued first; rows outside those
-    groups are not candidates at all. The sort is stable, so within a group the IIS order is kept —
-    the choice there is arbitrary anyway (a principled tie-break would need a per-row cost the
-    model does not carry).
-    """
-    order = {g: i for i, g in enumerate(droppable)}
-    rows = [n for n in iis_names if group_of(n) in order]
-    rows.sort(key=lambda n: order[group_of(n)])
-    return rows
-
-
-def knife_edge_rows(model, keep_groups=None, time_limit: float | None = None,
-                    rel_tighten: float = 1e-4) -> list[str]:
-    """Rows satisfiable only by a hair — relative headroom below `rel_tighten`.
-
-    A knife-edge row is FEASIBLE at every tolerance (its slack is positive), so no feasibility
-    verdict can find it. What finds it is a perturbation census: on the probe copy, tighten every
-    candidate row's RHS by `rel_tighten` of its magnitude (`>=` rows demand a fraction more, `<=`
-    rows allow a fraction less; equalities and zero-RHS rows are left alone). If the joint model
-    flips INFEASIBLE, the IIS names the rows whose relative headroom is below the perturbation —
-    the rows a relaxed production solve can crawl on for hours without ever refuting. 1e-4 is the
-    threshold the saturation analysis put on status-4 risk (the GB cap sat at 5e-6 when its runs
-    returned status 4; healthy rows sat above 0.17).
-
-    DETECTION ONLY — the caller's model is never touched and nothing is removed. simulation.py
-    records the names as KNIFE_EDGE in dropped_constraints_<year>.csv so a later stall is
-    pre-attributed and the analysis can see which targets are met only by a hair. Structural and
-    ungrouped rows are filtered from the result. Returns [] when every row has comfortable
-    headroom (or when there was nothing to perturb).
-    """
-    m = _feasibility_copy(model, time_limit, keep_groups)
-    n_perturbed = 0
-    for c in m.getConstrs():
-        g = group_of(c.ConstrName)
-        if g is None or g in STRUCTURAL:
-            continue
-        rhs = c.RHS
-        if rhs == 0.0:
-            continue
-        if c.Sense == GRB.GREATER_EQUAL:
-            c.RHS = rhs + rel_tighten * abs(rhs)
-        elif c.Sense == GRB.LESS_EQUAL:
-            c.RHS = rhs - rel_tighten * abs(rhs)
-        else:
-            continue
-        n_perturbed += 1
-    if n_perturbed == 0:
-        return []
-    m.update()
-
-    # Enumerate: an IIS is one minimal certificate, so remove its named rows from the perturbed
-    # copy and re-ask until it turns feasible — independent thin conflicts each get named. Rows
-    # that relax once a named row is gone are attributed through it (headroom is a JOINT property;
-    # one name per thin interaction is what the record needs).
-    edge = []
-    for _ in range(20):
-        try:
-            m.computeIIS()
-        except gp.GurobiError:
-            break                       # feasible under the tightening — census complete
-        named = [n for n in _iis_rows(m)
-                 if group_of(n) is not None and group_of(n) not in STRUCTURAL]
-        if not named:
-            break                       # conflict entirely among structural rows — nothing to name
-        edge.extend(named)
-        _remove_named(m, named)
-    return edge
-
-
-def feasibility_spectrum(model, keep_groups=None, droppable=None, time_limit: float | None = None,
-                         edge_levels=(1e-6, 1e-4, 1e-2), max_rounds: int = 20,
-                         verbose: bool = True) -> dict:
-    """ONE probe copy, one ladder — infeasibility detection and knife-edge detection are the same
-    process at different tightenings, so they are asked as one.
-
-        eps = 0    unperturbed. An IIS here is a PROOF of infeasibility; the least-valued
-                   droppable row is surrendered per round (resolve_infeasibility's policy) until
-                   the copy turns feasible → returned in 'dropped'. If a round's IIS contains no
-                   droppable row, the conflict is among scenario-defining rows → status
-                   'INFEASIBLE_UNRESOLVABLE', with the IIS attached.
-        eps > 0    candidate RHS tightened by eps·|RHS| (>= demands more, <= allows less;
-                   equalities and zero-RHS rows never perturbed). An IIS now names rows whose
-                   relative headroom is below eps → returned in 'edge' as {name: tier}. Tightest
-                   level first, named rows removed from the copy, so each row lands on the
-                   tightest tier that names it and independent thin conflicts all surface.
-
-    COST — `computeIIS` dominates, and it scales badly. Measured 2026-08-14 on a national
-    (AUSTRALIA-scope) model of 4.57M rows / 42.7M nonzeros: the copy took 42.5s, while a SINGLE
-    computeIIS ran >3h45m without finishing. The same phase costs ~65s end-to-end on an NRM-scope
-    model, and ~85 min on a lighter national one. IIS is a combinatorial search, so cost is driven
-    by model size and row density rather than by the number of levels or rounds.
-
-    Callers at national scope should either pass `time_limit` or skip this entirely (an unbounded
-    IIS can consume a whole PBS walltime before a single year is solved). Note `time_limit` bounds
-    each Gurobi call, so the worst case is roughly len(edge_levels) * max_rounds * time_limit.
-
-    This supersedes the production use of `feasible_solve` + a separate joint check +
-    `knife_edge_rows` — those remain for interactive diagnosis.
-
-    `droppable` (ordered, least-valued first) gates only what may be SURRENDERED at eps=0.
-    Non-droppable rows still land in 'edge' — the caller records them but must never remove them.
-    Returns {'status', 'dropped': [names], 'edge': {name: eps}} (+ 'iis' when unresolvable).
-    """
-    droppable = list(droppable or [])
-    m = _feasibility_copy(model, time_limit, keep_groups, verbose=verbose)
-
-    # Candidate rows (perturbable): non-structural grouped inequalities with non-zero RHS.
-    # Original RHS stored once; levels recompute from it.
-    orig_rhs = {}
-    for c in m.getConstrs():
-        g = group_of(c.ConstrName)
-        if g is None or g in STRUCTURAL:
-            continue
-        if c.Sense not in (GRB.GREATER_EQUAL, GRB.LESS_EQUAL) or c.RHS == 0.0:
-            continue
-        orig_rhs[c.ConstrName] = (c, c.RHS, c.Sense)
-
-    dropped, edge = [], {}
-
-    # ── eps = 0: provable infeasibility, one droppable row per round ──
-    for _ in range(max_rounds):
-        try:
-            m.computeIIS()
-        except gp.GurobiError:
-            break                                   # feasible — proof phase complete
-        iis = _iis_rows(m)
-        candidates = _droppable_rows(iis, droppable)
-        if not candidates:
-            return {'status': 'INFEASIBLE_UNRESOLVABLE', 'dropped': dropped, 'edge': edge,
-                    'iis': _by_group(iis)}
-        victim = candidates[0]
-        dropped.append(victim)
-        if verbose:
-            print(f"│   ├── provably infeasible — dropping [{group_of(victim)}] {victim}")
-        _remove_named(m, [victim])
-        orig_rhs.pop(victim, None)
-
-    # ── eps > 0: knife-edge tiers on the same copy, tightest first ──
-    for eps in sorted(edge_levels):
-        for name, (c, rhs, sense) in orig_rhs.items():
-            c.RHS = rhs + eps * abs(rhs) if sense == GRB.GREATER_EQUAL else rhs - eps * abs(rhs)
-        m.update()
-        for _ in range(max_rounds):
-            try:
-                m.computeIIS()
-            except gp.GurobiError:
-                break                               # feasible under this tightening — next level
-            named = [n for n in _iis_rows(m) if n in orig_rhs]
-            if not named:
-                break                               # defensively: no perturbed row implicated
-            for n in named:
-                edge[n] = eps
-            _remove_named(m, named)
-            for n in named:
-                orig_rhs.pop(n, None)
-
-    return {'status': 'OPTIMAL', 'dropped': dropped, 'edge': edge}
-
-
-def is_feasible(model, drop_groups=(), time_limit: float | None = None, keep_groups=None):
-    """Solve a copy with `drop_groups` removed. Returns (status_name, seconds).
-
-    The caller's model is never touched: every call works on `model.copy()`.
-    """
-    m = _feasibility_copy(model, time_limit, keep_groups)
-    if drop_groups:
-        m.remove([c for c in m.getConstrs() if group_of(c.ConstrName) in set(drop_groups)])
-        m.update()
-    t = time.time()
-    m.optimize()
-    return STATUS.get(m.Status, str(m.Status)), time.time() - t
-
-
-# ---------------------------------------------------------------------------- #
-# Production entry points (called by simulation.py around every year's solve)  #
-# ---------------------------------------------------------------------------- #
-
-def feasible_solve(model, groups=None, droppable=None, max_rounds: int = 20,
-                   time_limit: float | None = None, verbose: bool = True):
-    """Test each constraint group ALONE, before the real solve, and drop what cannot hold.
-
-    Catches a different failure class from `resolve_infeasibility`, and catches it cheaply:
-
-        this test        a group that is infeasible BY ITSELF — e.g. one ECNES community whose
-                         target exceeds anything its cells could reach, which then takes the whole
-                         year down with it.
-        post-failure IIS groups that are each fine but conflict TOGETHER — e.g. three SNES species
-                         that only become impossible once a regional land budget is imposed.
-
-    No single-group test can see the second kind, and the IIS on the union is far more expensive
-    than these, so the two are complements rather than alternatives.
-
-    Each group is solved with STRUCTURAL kept and everything else discarded — the smallest model in
-    which that group's rows still mean something. `cell_usage` must stay or land is not scarce;
-    `ag_mgt_link` must stay or an ag-management bonus can be claimed without the land use under it,
-    which would make rows look satisfiable when they are not.
-
-    Returns (dropped_names, DataFrame) — the frame is the record to write to disk.
-    """
-    groups = list(groups or CONSTRAINT_GROUPS)
-    droppable = list(droppable or [])
-    present = set(group_counts(model).index)
-    test_groups = [g for g in groups if g not in STRUCTURAL and g in present]
-    dropped, records = [], []
-
-    # Fast path: one solve with ALL tested groups kept together. Each single-group probe is a
-    # RELAXATION of this joint model (removing the other groups can only relax it), so joint
-    # OPTIMAL proves every group is feasible alone — the per-group sweep would find nothing.
-    # One ~13 s restricted solve instead of one per group, on every healthy year. Any other joint
-    # status (INFEASIBLE, or an unclassifiable one) falls through to per-group attribution.
-    if len(test_groups) > 1:
-        joint = _probe(model, dropped, time_limit, keep_groups=test_groups)
-        joint.optimize()
-        if joint.Status == GRB.OPTIMAL:
-            if verbose:
-                print(f"│   │   ├── all groups feasible together — per-group test skipped")
-            return dropped, pd.DataFrame(records)
-        if verbose:
-            print(f"│   │   ├── joint probe {STATUS.get(joint.Status, joint.Status)} — "
-                  f"testing each group alone")
-
-    for group in test_groups:
-        for rnd in range(1, max_rounds + 1):
-            probe = _probe(model, dropped, time_limit, keep_groups=[group])
-            probe.optimize()
-
-            if probe.Status == GRB.OPTIMAL:
-                if verbose and rnd == 1:
-                    print(f"│   │   ├── {group:12s} feasible alone")
-                break
-            if probe.Status != GRB.INFEASIBLE:
-                if verbose:
-                    print(f"│   │   ├── {group:12s} {STATUS.get(probe.Status, probe.Status)} — skipped")
-                break
-
-            probe.computeIIS()
-            iis = _iis_rows(probe)
-            candidates = _droppable_rows(iis, droppable)
-            if not candidates:
-                if verbose:
-                    print(f"│   │   ├── {group:12s} INFEASIBLE alone, but nothing droppable in it")
-                records.append({'group': group, 'round': rnd, 'constraint': None,
-                                'iis_size': len(iis), 'action': 'UNRESOLVABLE'})
-                break
-
-            victim = candidates[0]
-            dropped.append(victim)
-            records.append({'group': group, 'round': rnd, 'constraint': victim,
-                            'iis_size': len(iis), 'action': 'DROPPED'})
-            if verbose:
-                print(f"│   │   ├── {group:12s} INFEASIBLE alone -> dropping {victim}")
-
-    return dropped, pd.DataFrame(records)
-
-
-def resolve_infeasibility(model, droppable=None, max_rounds: int = 20,
-                          time_limit: float | None = None, verbose: bool = True,
-                          keep_groups=None) -> dict:
-    """Find the rows that make this year infeasible, and which to drop so it solves.
-
-    `droppable` is the ordered list of constraint groups that may be sacrificed, least-valued first.
-    It is a POLICY supplied by the caller, not a fact this module can decide: an IIS names a SET of
-    rows that cannot all hold, and something has to choose which member to give up. Defaults to
-    None — detect and report, drop nothing — so a caller must opt in deliberately. `simulation.py`
-    passes `settings.DROP_UNREACHABLE_CONSTRAINTS`.
-
-    Strictly stronger than a closed-form "is this row reachable on its own?" screen. Such a screen
-    can only catch rows that are impossible ALONE: the three Goulburn Broken SNES species that broke
-    the capped runs each pass one comfortably (target/attainable 0.72-0.84) and are impossible only
-    in combination with the non-ag cap. An IIS sees that; a per-row bound cannot.
-
-    Iterates because an IIS is *an* irreducible set, not the only one — two independent conflicts
-    need two rounds. Detection runs entirely on copies; the caller applies the returned names to the
-    real model.
-
-    Returns {'dropped': [names], 'status': ..., 'rounds': [...]}.
-    """
-    dropped, rounds = [], []
-    droppable = list(droppable or [])
-
-    for rnd in range(1, max_rounds + 1):
-        probe = _probe(model, dropped, time_limit, keep_groups, verbose=(rnd == 1 and verbose))
-
-        # Straight to the IIS — no separate feasibility solve. The caller only reaches here because
-        # the real solve already failed, so paying for a second optimize() to re-learn that would be
-        # wasted. computeIIS runs its own analysis.
-        #
-        # It DOES raise if the model turns out to be feasible, and that is a real possibility rather
-        # than a defensive nicety: this copy is restricted to `keep_groups`, so a conflict involving
-        # an excluded group is absent from it, and a failure that was numerical rather than
-        # infeasible leaves nothing to find either. Both cases mean "nothing here to drop".
-        try:
-            probe.computeIIS()
-        except gp.GurobiError as exc:
-            if verbose:
-                print(f"│   ├── no conflict among the included groups ({exc}). Either the cause "
-                      f"involves a group excluded by keep_groups, or the failure was numerical "
-                      f"rather than infeasible.")
-            return {'dropped': dropped, 'status': 'NO_CONFLICT_FOUND', 'rounds': rounds}
-
-        iis = _iis_rows(probe)
-        by_group = _by_group(iis)
-        candidates = _droppable_rows(iis, droppable)
-        rounds.append({'round': rnd, 'iis_size': len(iis),
-                       'by_group': {g: len(v) for g, v in by_group.items()},
-                       'candidates': len(candidates)})
-        if verbose:
-            print(f"│   ├── round {rnd}: IIS spans { {g: len(v) for g, v in by_group.items()} }")
-
-        if not candidates:
-            # The conflict lies entirely among rows we refuse to give up. Report it rather than
-            # quietly relaxing something that defines the scenario.
-            if verbose:
-                print("│   │   └── no droppable row in the IIS: the conflict is between constraints "
-                      "that define the scenario, so nothing can be relaxed without changing it.")
-            return {'dropped': dropped, 'status': 'INFEASIBLE_UNRESOLVABLE',
-                    'rounds': rounds, 'iis': by_group}
-
-        # Give up the least-preferred group present, ONE row per round, so we never drop more than
-        # the conflict actually requires.
-        victim = candidates[0]
-        dropped.append(victim)
-        if verbose:
-            print(f"│   │   └── dropping [{group_of(victim)}] {victim}")
-
-    return {'dropped': dropped, 'status': 'MAX_ROUNDS', 'rounds': rounds}
-
-
-# ---------------------------------------------------------------------------- #
-# Post-mortem diagnosis (interactive; typically on a model read back from MPS) #
-# ---------------------------------------------------------------------------- #
-
-def find_blocking_groups(model, candidates=None, time_limit: float | None = None,
-                         verbose: bool = True) -> pd.DataFrame:
-    """Remove one group at a time; whichever removals restore feasibility are implicated.
-
-    If NO single removal helps, the conflict needs two or more groups together — the pair sweep in
-    `diagnose` picks that up. Structural groups are never removed: dropping `cell_usage` makes
-    almost everything feasible and tells you nothing.
-    """
-    groups = [g for g in (candidates or CONSTRAINT_GROUPS)
-              if g not in STRUCTURAL and g in set(group_counts(model).index)]
-    rows = []
-    for g in groups:
-        status, secs = is_feasible(model, drop_groups=(g,), time_limit=time_limit)
-        rows.append({'dropped': g, 'status': status, 'restores_feasibility': status == 'OPTIMAL',
-                     'seconds': round(secs, 1)})
-        if verbose:
-            flag = '  <<< implicated' if status == 'OPTIMAL' else ''
-            print(f"    drop {g:14s} -> {status:12s} ({secs:5.1f}s){flag}")
-    return pd.DataFrame(rows)
-
-
-def blocking_rows(model, time_limit: float | None = None) -> dict:
-    """The individual rows Gurobi certifies as jointly unsatisfiable, grouped by family.
-
-    An IIS is IRREDUCIBLE: removing any member makes the subsystem feasible. So an IIS containing
-    one biodiversity row and one cap row is a certificate that those two conflict — no separate
-    pairwise experiment needed. It returns *an* irreducible set, not the only one, so a second
-    conflict elsewhere may be reported on a later pass.
-    """
-    m = _feasibility_copy(model, time_limit)
-    m.optimize()
-    if m.Status != GRB.INFEASIBLE:
-        return {'status': STATUS.get(m.Status, str(m.Status)), 'rows': {}, 'bounds': {}}
-    m.computeIIS()
-
-    # Variable BOUNDS matter as much as rows here. An irreversibility lock-in is exactly a variable
-    # whose LOWER bound cannot be given back — `get_non_ag_lb_matrices` pins it to last year's
-    # allocation — so a lower bound appearing in the IIS names the locked lever, and the variable
-    # name carries the cell. That is what turns "this row is unreachable" into "because cell R is
-    # already committed to lever K".
-    bounds = {'lower': [], 'upper': []}
-    for v in m.getVars():
-        if v.IISLB:
-            bounds['lower'].append((v.VarName, v.LB))
-        if v.IISUB:
-            bounds['upper'].append((v.VarName, v.UB))
-    return {'status': 'INFEASIBLE', 'rows': _by_group(_iis_rows(m)), 'bounds': bounds}
-
-
-def diagnose(model, time_limit: float | None = None, do_pairs: bool = True,
-             verbose: bool = True) -> dict:
-    """Full report: is it infeasible, which groups are implicated, which rows.
-
-    Order matters for cost. The IIS is cheap (~5 s on a 2.5 M-row model) and often answers outright,
-    so it runs first; the group sweep is one solve per group and only earns its keep when the IIS
-    result needs corroborating or when several conflicts coexist.
-    """
-    report = {}
-    if verbose:
-        print(f"\n=== diagnosing model: {model.NumVars:,} vars, {model.NumConstrs:,} constrs ===")
-        print(group_counts(model).to_string())
-
-    status, secs = is_feasible(model, time_limit=time_limit)
-    report['status'] = status
-    if verbose:
-        print(f"\nfeasibility (zero objective, DualReductions=0): {status}  ({secs:.1f}s)")
-    if status == 'OPTIMAL':
-        if verbose:
-            print("  Model is feasible — the failure was not infeasibility. Look at the objective, "
-                  "the retry ladder, or numerics.")
-        return report
-
-    iis = blocking_rows(model, time_limit=time_limit)
-    report['iis'] = iis
-    if verbose and iis['rows']:
-        print("\nIIS — irreducible set of jointly unsatisfiable rows:")
-        for g, names in sorted(iis['rows'].items(), key=lambda kv: len(kv[1])):
-            print(f"  {g:14s} {len(names):>6,} row(s)")
-            for n in names[:8]:
-                print(f"      {n}")
-            if len(names) > 8:
-                print(f"      ... and {len(names) - 8:,} more")
-        implicated = [g for g in iis['rows'] if g not in STRUCTURAL]
-        if len(implicated) > 1:
-            print(f"\n  => the conflict spans {implicated}: each is satisfiable alone, and removing "
-                  f"any one of these rows restores feasibility.")
-
-    lower = iis.get('bounds', {}).get('lower', [])
-    if verbose and lower:
-        # A non-zero lower bound in the IIS is a LOCK-IN: share the model is forced to keep. The
-        # variable name carries the cell, so this is what pinpoints "which cell, which lever".
-        pinned = [(n, lb) for n, lb in lower if lb > 0]
-        print(f"\nvariable bounds in the IIS: {len(lower):,} lower, "
-              f"{len(iis['bounds']['upper']):,} upper; {len(pinned):,} lower bounds are NON-ZERO "
-              f"(forced share — irreversibility lock-in):")
-        for n, lb in sorted(pinned, key=lambda x: -x[1])[:10]:
-            print(f"      {n:44s} lb={lb:.6f}")
-
-    if do_pairs:
-        if verbose:
-            print("\ngroup sweep — remove one group at a time:")
-        report['groups'] = find_blocking_groups(model, time_limit=time_limit, verbose=verbose)
-        if verbose and not report['groups']['restores_feasibility'].any():
-            print("  No single group restores feasibility: the conflict needs two or more "
-                  "together. The IIS above names the specific rows.")
-    return report
+    # Constr.Pi is a clean basic dual only when the accepted solve left a simplex basis; CBasis
+    # raises GurobiError on a barrier-only solve (no basis) → duals unreliable, skip the year.
+    # One handle off the table probes it — never `model.getConstrs()`, a Python list of every row of the model.
+    try:
+        _ = T['constr'].values[priced[0]].CBasis
+    except gp.GurobiError:
+        print(f"Skipping shadow prices for {target_year}: accepted solve has no simplex basis "
+              f"(barrier-only) — duals would be unreliable.")
+        return
+
+    # Each calculator returns rows for its active constraints, or a column-less empty frame.
+    df = pd.concat(
+        [calc(luto_solver, inputs, target_year) for calc in (
+            calc_shadow_price_GBF2,
+            calc_shadow_price_GBF3_NVIS,
+            calc_shadow_price_GBF4_SNES,
+            calc_shadow_price_GBF4_ECNES,
+            calc_shadow_price_GBF8,
+            calc_shadow_price_Water,
+            calc_shadow_price_GHG,
+            calc_shadow_price_Demand,
+            calc_shadow_price_Renewable,
+            calc_shadow_price_Regional_Adoption,
+        )],
+        ignore_index=True,
+    )
+
+    df.to_csv(f"{out_dir}/shadow_prices_{target_year}.csv", index=False)
+    print(f"Recorded {len(df)} shadow prices for {target_year} -> {out_dir}/shadow_prices_{target_year}.csv")

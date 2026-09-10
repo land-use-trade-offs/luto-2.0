@@ -120,7 +120,7 @@ class LutoSolver:
 
     def remove_constraints_by_name(self, names) -> None:
         """Drop rows: flagged inactive on the row table (it never shrinks, so a dropped row stays
-        describable), then removed from the Gurobi model. The infeasibility flow in `simulation.py` drops rows this way."""
+        describable), then removed from the Gurobi model."""
         if not names:
             return
         T = self.rows

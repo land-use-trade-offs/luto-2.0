@@ -124,16 +124,3 @@ def keys_of(table: xr.Dataset, family: str, rows=None) -> list:
     columns = [decode(table, field, rows) for field in table.attrs['keys'][family]]
     n = table[table.attrs['keys'][family][0]].values[rows].size if columns else table['name'].values[rows].size
     return list(zip(*columns)) if columns else [()] * n
-
-
-def bio_index(table: xr.Dataset) -> dict:
-    """{constraint name: {family, region, item, presence}} for every biodiversity row built — read off the
-    row table, which keeps its rows whether the infeasibility flow has dropped them or not."""
-    index = {}
-    for family in ('GBF2', 'GBF3_NVIS', 'GBF4_SNES', 'GBF4_ECNES', 'GBF8'):
-        span = family_rows(table, family)
-        if span is None:
-            continue
-        for name, region, item, presence in zip(table['name'].values[span], *(decode(table, field, span) for field in ('region', 'item', 'presence'))):
-            index[name] = {'family': family, 'region': region, 'item': item, 'presence': presence}
-    return index

@@ -30,7 +30,6 @@ import re
 import time
 import threading
 import joblib
-import pandas as pd
 
 from contextlib import contextmanager
 from pathlib import Path
@@ -41,10 +40,9 @@ from luto.data import Data
 from luto.solvers.col_builder import get_cols
 from luto.solvers.row_inputs import get_economics, get_row_inputs
 from luto.solvers.row_builder import get_rows, get_obj
-from luto.solvers.row_table import bio_index
 from luto.solvers.solver import LutoSolver
 from luto.solvers.post_solve import post_solve
-from luto.solvers.tools import feasibility_spectrum, resolve_infeasibility, group_of
+from luto.solvers.tools import record_shadow_prices
 from luto.tools.write import write_outputs
 from luto.tools import (
     LogToFile,
@@ -52,7 +50,6 @@ from luto.tools import (
     set_path,
     write_timestamp,
     read_timestamp,
-    record_shadow_prices,
 )
 
 
@@ -252,11 +249,7 @@ def solve_timeseries(
 
         # Save the model to disk BEFORE solving (see save_model_to_disk for why).
         save_model_to_disk(luto_solver.gurobi_model, data.path, base_year, target_year)
-        # Drop constraints that cannot hold even alone, BEFORE solving. Dropped rows
-        # are recorded in out_<year>/dropped_constraints_<year>.csv.
-        drop_unreachable_before_solve(luto_solver, data, target_year)
-
-        accepted, x, status = solve_with_retries(luto_solver, data, target_year)
+        accepted, x, status = solve_with_retries(luto_solver, target_year)
 
         if accepted:
             solution = post_solve(x, cols, col_side, rows, row_side, inputs)                # the LUTO 1-D format
@@ -275,26 +268,15 @@ def solve_timeseries(
             break
 
 
-def solve_with_retries(luto_solver: LutoSolver, data: Data, target_year: int):
-    """Run the RETRY_PARAMS ladder against the current model. Returns (accepted, solution, status).
+def solve_with_retries(luto_solver: LutoSolver, target_year: int):
+    """Run the RETRY_PARAMS ladder against the current model. Returns (accepted, x, status).
 
     settings.RETRY_PARAMS is a list of (NumericFocus, Method, Crossover, Presolve,
     BarHomogeneous) tuples tried in order; only GRB.OPTIMAL is accepted.
-
-    A failed attempt is treated as a CONFLICT first and a numerical problem second: diagnose
-    and drop, then re-solve with the same configuration. Only when nothing more can be
-    dropped does the next RETRY_PARAMS entry get tried.
-
-    That ordering matters in wall-clock. Falling straight through to the next configuration
-    sends a genuinely infeasible model into the dual-simplex rung, which has been measured
-    diverging for 35 min+ without terminating — so the diagnosis that would have explained
-    the failure in minutes never gets reached. Diagnosing first costs one restricted IIS.
     """
     accepted, x, status = False, None, None
     for params in settings.RETRY_PARAMS:
         accepted, x, status = solve_attempt(luto_solver, target_year, *params)
-        while not accepted and diagnose_and_drop_conflict(luto_solver, data, target_year):
-            accepted, x, status = solve_attempt(luto_solver, target_year, *params)
         if accepted:
             break
     return accepted, x, status
@@ -335,148 +317,6 @@ def store_solution(data: Data, target_year: int, solution, obj_val: float) -> No
 
     for data_type, prod_data in solution.prod_data.items():
         data.add_production_data(target_year, data_type, prod_data)
-
-
-# ---------------------------------------------------------------------------- #
-# Infeasibility handling                                                       #
-# ---------------------------------------------------------------------------- #
-
-def drop_unreachable_before_solve(luto_solver: LutoSolver, data: Data, target_year: int) -> list:
-    """One pre-solve feasibility SPECTRUM: provable infeasibility and knife-edge thinness are the
-    same question at different tightenings, asked on one shared probe copy (tools.py).
-
-        eps = 0      an IIS is a PROOF — the least-valued droppable row is surrendered per round
-                     until feasible. Catches rows impossible alone (NE Buloke) AND joint conflicts
-                     (SNES × cap) before any production rung runs. Termination guarantee, not an
-                     optimisation: a jointly-infeasible model can send a rung into `Numerical
-                     trouble` → Gurobi's internal simplex fallback → divergence that never
-                     terminates, so the post-failure IIS is unreachable (R2_SNES_T1525_cap10,
-                     2026-08-09, deterministic to the digit).
-        eps > 0      rows with relative headroom below 1e-6/1e-4/1e-2. Below
-                     KNIFE_EDGE_DROP_BELOW (droppable groups only) they are removed — inside that
-                     margin the production solve cannot distinguish them from infeasible, and both
-                     observed stall classes trace to exactly such rows. The 1e-2 band is recorded
-                     as early warning (lock-in ratchets: under-1% today is thinner next year).
-
-    Non-droppable groups (the cap, GBF2, ...) are NEVER removed however thin — when the cap
-    itself is the thin row, the IIS names its droppable partner, and dropping the partner
-    relieves the edge. Analysis note: filter dropped_constraints CSVs on `action` — 'DROPPED'
-    (proven) and 'DROPPED_KNIFE_EDGE' (inside numerical noise, margin in `headroom_lt`) left the
-    model; 'KNIFE_EDGE' rows stayed in.
-    """
-    if not (settings.DROP_UNREACHABLE_CONSTRAINTS and settings.INFEASIBILITY_DIAGNOSIS_GROUPS):
-        return []
-
-    print("├── Pre-solve feasibility spectrum (provable infeasibility → knife-edge census)...", flush=True)
-    spec = feasibility_spectrum(
-        luto_solver.gurobi_model,
-        keep_groups=settings.INFEASIBILITY_DIAGNOSIS_GROUPS,
-        droppable=settings.DROP_UNREACHABLE_CONSTRAINTS)
-
-    # Proven drops. Removal goes through the solver so the row table's active flags stay in sync —
-    # `record_shadow_prices` reads the ACTIVE rows after the accepted solve. Records are
-    # written BEFORE the solve on purpose: they matter most when the year still goes on to fail.
-    if spec['dropped']:
-        luto_solver.remove_constraints_by_name(spec['dropped'])
-        record_dropped([{'group': group_of(n), 'constraint': n, 'action': 'DROPPED'}
-                        for n in spec['dropped']],
-                       luto_solver, data, target_year, 'pre_solve')
-
-    if spec['status'] == 'INFEASIBLE_UNRESOLVABLE':
-        print("├── conflict among non-droppable rows — nothing more can be given up; the ladder "
-              "will run and the year will fail loudly if it cannot solve", flush=True)
-        record_dropped([{'group': None, 'constraint': None, 'action': 'UNRESOLVABLE'}],
-                       luto_solver, data, target_year, 'pre_solve')
-        return spec['dropped']
-
-    threshold = getattr(settings, 'KNIFE_EDGE_DROP_BELOW', 1e-4)
-    droppable = set(settings.DROP_UNREACHABLE_CONSTRAINTS)
-    to_drop = {n: eps for n, eps in spec['edge'].items()
-               if eps <= threshold and group_of(n) in droppable}
-    to_keep = {n: eps for n, eps in spec['edge'].items() if n not in to_drop}
-
-    if to_drop:
-        print(f"├── dropping {len(to_drop)} knife-edge row(s) with relative headroom "
-              f"<= {threshold:g} (numerically indistinguishable from infeasible):", flush=True)
-        for n, eps in sorted(to_drop.items(), key=lambda kv: kv[1]):
-            print(f"│       [{group_of(n)}] headroom<{eps:g}  {n}", flush=True)
-        luto_solver.remove_constraints_by_name(list(to_drop))
-        record_dropped([{'group': group_of(n), 'constraint': n,
-                         'action': 'DROPPED_KNIFE_EDGE', 'headroom_lt': eps}
-                        for n, eps in to_drop.items()],
-                       luto_solver, data, target_year, 'pre_solve')
-    if to_keep:
-        print(f"├── {len(to_keep)} thin row(s) recorded as knife-edge, kept in the model:", flush=True)
-        for n, eps in sorted(to_keep.items(), key=lambda kv: kv[1]):
-            print(f"│       [{group_of(n)}] headroom<{eps:g}  {n}", flush=True)
-        record_dropped([{'group': group_of(n), 'constraint': n, 'action': 'KNIFE_EDGE',
-                         'headroom_lt': eps}
-                        for n, eps in to_keep.items()],
-                       luto_solver, data, target_year, 'pre_solve')
-
-    return spec['dropped'] + list(to_drop)
-
-
-def diagnose_and_drop_conflict(luto_solver: LutoSolver, data: Data, target_year: int) -> bool:
-    """After the ladder fails: ask the IIS what conflicts, drop it, and say whether to retry.
-
-    Returns True when something was dropped — the caller should put the ladder back on the reduced
-    model — and False when there is nothing left to give up, which ends the year.
-    """
-    if not settings.INFEASIBILITY_DIAGNOSIS_GROUPS:
-        return False
-
-    print("├── Not optimal — diagnosing the conflict...", flush=True)
-    resolution = resolve_infeasibility(
-        luto_solver.gurobi_model,
-        droppable=settings.DROP_UNREACHABLE_CONSTRAINTS,
-        keep_groups=settings.INFEASIBILITY_DIAGNOSIS_GROUPS)
-
-    if not resolution['dropped']:
-        print(f"├── {resolution['status']} — nothing droppable in the conflict; "
-              f"giving up on {target_year}", flush=True)
-        return False
-
-    print(f"├── dropping {len(resolution['dropped'])} row(s) and re-solving {target_year}:", flush=True)
-    for n in resolution['dropped']:
-        print(f"│       [{group_of(n)}] {n}", flush=True)
-
-    # Removes from the model AND flags the rows inactive on the row table — `record_shadow_prices`
-    # reads the active rows after the accepted solve.
-    luto_solver.remove_constraints_by_name(resolution['dropped'])
-    record_dropped([{'group': group_of(n), 'constraint': n, 'action': 'DROPPED'}
-                     for n in resolution['dropped']],
-                    luto_solver, data, target_year, 'post_solve')
-    return True
-
-
-def record_dropped(records, luto_solver, data, target_year, stage) -> None:
-    """Append dropped-constraint records to out_<year>/dropped_constraints_<year>.csv.
-
-    Re-attaches family / region / item / presence from the row table (``row_table.bio_index``),
-    because the constraint name cannot be parsed back into them (spaces became underscores, and the
-    arity differs by family). Appends rather than overwrites: a year can drop rows in BOTH the pre-solve
-    per-group test and the post-failure IIS, and the first record must survive the second.
-    """
-    if records is None or (hasattr(records, 'empty') and records.empty) or len(records) == 0:
-        return
-    df = pd.DataFrame(records)
-    index = bio_index(luto_solver.rows)
-    parts = pd.DataFrame(
-        [index.get(n, {'family': None, 'region': None, 'item': None, 'presence': None})
-         for n in df['constraint']],
-        index=df.index)
-    df = pd.concat([df, parts], axis=1).assign(year=target_year, stage=stage)
-    # Canonical column set: appends from different stages carry different keys (feasible_solve has
-    # round/iis_size, the knife-edge census has headroom_lt) and a CSV append with a different
-    # column set from the existing header silently misaligns the file. Absent keys become blanks.
-    df = df.reindex(columns=['year', 'stage', 'group', 'constraint', 'action', 'round',
-                             'iis_size', 'headroom_lt', 'family', 'region', 'item', 'presence'])
-
-    out_dir = f"{data.path}/out_{target_year}"
-    os.makedirs(out_dir, exist_ok=True)
-    path = f"{out_dir}/dropped_constraints_{target_year}.csv"
-    df.to_csv(path, mode='a' if os.path.exists(path) else 'w', header=not os.path.exists(path), index=False)
 
 
 # ---------------------------------------------------------------------------- #
