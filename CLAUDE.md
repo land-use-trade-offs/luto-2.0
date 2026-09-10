@@ -236,6 +236,8 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 - `RESCALE_FACTOR`: Target magnitude of the per-row rescale (default: 1e3) — `row_builder.contract` lands max|row| and |RHS| symmetrically around it
 - `SOLVER_COEFF_MIN`: Universal minimum coefficient threshold (default: 1e-4). Applied by `row_builder.contract` to every family's stacked block and to the objective block (`_setup_objective` scales it to million AUD and floors again) as a two-step contract: an entry dropped when `|a| < SOLVER_COEFF_MIN`, the scaled coefficient floored again after the row rescale. Applies to Economy, Biodiversity-quality, GHG, Water, Renewable, GBF2/3/4/8, Demand/Quantity, and Regional Adoption limits. Chosen empirically: 1e-3 caused ~3% economic loss; 1e-4 retains meaningful small coefficients while keeping the matrix range ratio at 1e8 (well within Gurobi's safe zone). `RESCALE_ZERO_THRESHOLD` was removed — post-rescale zeroing is superseded by this universal filter.
 
+**CPLEX (planned)**: CPLEX is planned as an alternative solving engine alongside GUROBI — a run would be able to solve with either. The `cplex` / `docplex` bindings are already in `requirements.yml` (a licensed IBM ILOG CPLEX Optimization Studio 22.2 installation supplies the native runtime), but no model code reads them yet: `LutoSolver` is GUROBI-only, there is no engine setting, and every solve goes through `gurobipy`. Since the row / column tables are plain arrays (`cols`, `rows`, `attrs['A']` as one CSR), a second engine would plug in at `solvers/solver.py` alone — `row_builder` / `col_builder` / `post_solve` stay solver-agnostic. Keep them that way.
+
 ### Output Writing Configuration
 
 - `WRITE_REPORT_MAX_MEM_GB`: Max memory for report generation (default: 64)

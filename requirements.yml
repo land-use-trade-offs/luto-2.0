@@ -35,3 +35,6 @@ dependencies:
       - gurobipy==13.0.0
       - numpy_financial==1.0.0
       - tables==3.9.2
+      # CPLEX: planned alternative solving engine (needs IBM ILOG CPLEX Optimization Studio 22.2)
+      - cplex==22.2.0.1
+      - docplex==2.32.264

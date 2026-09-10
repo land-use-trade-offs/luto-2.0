@@ -185,6 +185,7 @@ result = my_expensive_function(my_data)
 - 16 GB RAM at `RESFACTOR >= 10`; 32 GB or more for `RESFACTOR = 5`. Full resolution (`RESFACTOR = 1`) is an HPC workload — budget several hundred GB and expect the write/report phase to dominate peak memory.
 - 50 GB available disk space for input data and outputs
 - GUROBI optimization solver license (academic licenses available); `gurobipy` is pinned to 13.0.0
+- CPLEX is **planned** as an alternative solving engine. The `cplex` / `docplex` Python bindings ship in `requirements.yml`; using them additionally requires a licensed IBM ILOG CPLEX Optimization Studio 22.2 installation. GUROBI remains the only engine the model solves with today
 
 **Supported Operating Systems:**
 - Windows 10/11
@@ -207,12 +208,18 @@ conda env create -f requirements.yml
 conda activate luto
 ```
 
-### 3. Configure GUROBI Solver
-LUTO2 requires GUROBI for optimization. Follow these steps:
+### 3. Configure the Solver
+LUTO2 currently solves with GUROBI. Follow these steps:
 ```bash
 # 1) Set up your GUROBI license (academic license available at gurobi.com)
 # 2) Place your gurobi.lic file in the appropriate directory
 ```
+
+**CPLEX (planned).** We plan to support CPLEX as a second solving engine, so that a run can be
+solved with either engine. The `cplex` and `docplex` packages are already part of
+`requirements.yml`; a licensed IBM ILOG CPLEX Optimization Studio 22.2 installation is needed to
+provide the native solver runtime. Nothing in the model reads CPLEX yet — no settings switch
+exists, and every run goes through GUROBI.
 
 ### 4. Obtain Input Data
 The LUTO2 input database is approximately 40 GB and contains sensitive data. 
