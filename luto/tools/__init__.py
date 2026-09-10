@@ -683,9 +683,10 @@ def log_memory_usage(output_dir=settings.OUTPUT_DIR, mode='a', interval=1, stop_
 #
 # Real shadow price = Pi * So / Ss:
 #   - So = 1e6 un-scales the objective (million AUD) back to AUD.
-#   - Ss is the row's own scale factor from ``row_builder.scale_rows`` (kept on the
-#     solver per family: ``bio_*_scales``, ``water_scales``, ``ghg_scale``,
-#     ``demand_scales``); it un-scales the stored RHS back to its real unit.
+#   - Ss is the row's own scale factor from ``row_builder.contract`` (the ``scale`` column
+#     of the solver's row table; ``_shadow_price_views`` hands it to the readers per family
+#     as ``bio_*_scales``, ``water_scales``, ``ghg_scale``, ``demand_scales``); it
+#     un-scales the stored RHS back to its real unit.
 # Model sense is MAXIMIZE: a binding ``>=`` target gives Pi <= 0 (relaxing it by
 # one unit costs objective); a binding ``<=`` cap (GHG, regional adoption) gives
 # Pi >= 0. Regional-adoption constraints are not rescaled, so Ss = 1.
@@ -889,13 +890,56 @@ def calc_shadow_price_Regional_Adoption(luto_solver, rows, target_year) -> pd.Da
     return pd.DataFrame(rows)
 
 
+def _shadow_price_views(luto_solver):
+    """BRIDGE, until the shadow prices move to the array path: the flat handle / scale collections the
+    ``calc_shadow_price_*`` readers walk, built from the solver's row table (``luto_solver.rows`` — the
+    ACTIVE rows of each family, in table order) as one namespace with the attribute names the readers use."""
+    from types import SimpleNamespace
+    from luto.solvers import row_builder                # local: row_builder imports luto.tools
+    T = luto_solver.rows
+    options = luto_solver.cols.attrs['options']
+
+    def active(family):
+        span = row_builder.family_rows(T, family)
+        if span is None:
+            return None
+        mask = np.zeros(T.sizes['row'], dtype=bool)
+        mask[span] = T['active'].values[span]
+        return mask
+
+    def constrs(f): r = active(f); return list(T['constr'].values[r]) if r is not None else []
+    def keys(f): r = active(f); return row_builder.keys_of(T, f, r) if r is not None else []
+    def scale(f): r = active(f); return T['scale'].values[r] if r is not None else np.array([])
+
+    v = SimpleNamespace()
+    v.demand_constraints = constrs('demand')
+    v.demand_scales = scale('demand').tolist()
+    v.ghg_constr = constrs('ghg')[0] if constrs('ghg') else None
+    v.ghg_scale = float(scale('ghg')[0]) if scale('ghg').size else 1.0
+    v.bio_GBF2_constr = constrs('GBF2')[0] if constrs('GBF2') else None
+    v.bio_GBF2_scale = float(scale('GBF2')[0]) if scale('GBF2').size else 1.0
+    for fam in ('GBF3_NVIS', 'GBF4_SNES', 'GBF4_ECNES', 'GBF8'):
+        setattr(v, f'bio_{fam}_constrs', dict(zip(keys(fam), constrs(fam))))
+        setattr(v, f'bio_{fam}_scales', dict(zip(keys(fam), scale(fam))))
+    v.regional_adoption_constraints = (constrs('regional_adoption_ag') + constrs('regional_adoption_nonag')
+                                       + constrs('regional_adoption_nonag_sum'))
+    v.water_limit_constraints = constrs('water')
+    v.water_scales = scale('water').tolist()
+    ren_keys = [f'{options[am_idx]}_{state}' for am_idx, state in keys('renewable')]
+    v.renewable_constraints = dict(zip(ren_keys, constrs('renewable')))
+    v.renewable_scales = dict(zip(ren_keys, scale('renewable').tolist()))
+    return v
+
+
 def record_shadow_prices(luto_solver, rows, target_year, out_dir) -> None:
     """Compute every active constraint's shadow prices and write one CSV for the year.
 
-    Probes the simplex basis once (barrier-only solves have unreliable duals → skip the year),
-    then concatenates the per-constraint calculators into ``shadow_prices_{target_year}.csv``.
-    The file is written fresh per year, so a resume/re-run simply overwrites the year's file.
+    ``rows`` is the step's ``RowInputs`` (the commodity names). Probes the simplex basis once
+    (barrier-only solves have unreliable duals → skip the year), then concatenates the per-constraint
+    calculators into ``shadow_prices_{target_year}.csv``. The file is written fresh per year, so a
+    resume/re-run simply overwrites the year's file.
     """
+    luto_solver = _shadow_price_views(luto_solver)      # the readers walk the flat views of the row table's active rows
     # Grab one constraint we already hold to probe the basis — avoids `model.getConstrs()`, which
     # builds a Python list of *every* constraint (millions of per-cell constraints at full res).
     probe = luto_solver.bio_GBF2_constr                 # the single Constr once GBF2 is on

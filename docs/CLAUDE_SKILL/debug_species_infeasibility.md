@@ -206,7 +206,8 @@ in `simulation.py`'s `solve_timeseries()`:
 ```python
 from luto.simulation import save_data_to_disk
 
-solution = solver.solve()   # NOT model.optimize() — solve() returns SolverSolution
+x = solver.solve()   # NOT model.optimize() — solve() returns the raw x over the column table
+solution = post_solve(x, cols, col_side, rows, row_side, inputs) if x is not None else None   # the LUTO format (luto.solvers.post_solve)
 
 if solution is not None and model.Status == GRB.OPTIMAL:
     data.add_lumap(target_year, solution.lumap)
@@ -215,7 +216,7 @@ if solution is not None and model.Status == GRB.OPTIMAL:
     data.add_ag_dvars(target_year, solution.ag_X_mrj)
     data.add_non_ag_dvars(target_year, solution.non_ag_X_rk)
     data.add_ag_man_dvars(target_year, solution.ag_man_X_mrj)
-    data.add_obj_vals(target_year, solution.obj_val)
+    data.add_obj_vals(target_year, model.ObjVal)
     for data_type, prod_data in solution.prod_data.items():
         data.add_production_data(target_year, data_type, prod_data)
     data.last_year = target_year
@@ -237,7 +238,8 @@ for attempt, (numeric_focus, method, crossover, presolve, bar_homogeneous) in en
     model.Params.Presolve       = presolve
     model.Params.BarHomogeneous = bar_homogeneous
 
-    solution = solver.solve()
+    x = solver.solve()
+    solution = post_solve(x, cols, col_side, rows, row_side, inputs)
     if model.Status == GRB.OPTIMAL:
         break
     elif model.Status in (GRB.INFEASIBLE, GRB.INF_OR_UNBD):
@@ -455,7 +457,7 @@ settings.GBF4_TARGET_SNES  = "off"
 settings.GBF4_TARGET_ECNES = "off"
 
 print(f"[idx={idx}] Formulating base model ...", flush=True)
-solver = LutoSolver(cols, input_data)
+solver = LutoSolver(cols, rows)        # cols with cols['obj'] set (row_builder.get_obj); rows from row_builder.get_rows(inputs, cols, col_side)
 solver.formulate()
 model  = solver.gurobi_model
 

@@ -158,10 +158,11 @@ def get_limits(data: Data, yr_cal: int) -> dict[str, Any]:
     return limits
 
 
-# ═══════════════════════════ get_rows: the row side of one step ═══════════════════════════
+# ═══════════════════════════ get_row_inputs: the row side's input data of one step ═══════════════════════════
 
-def get_rows(data: Data, base_year: int, target_year: int) -> RowInputs:
-    """Every coefficient stream and target the row families read, loaded as one ``RowInputs``."""
+def get_row_inputs(data: Data, base_year: int, target_year: int) -> RowInputs:
+    """Every coefficient stream and target the row families read, loaded as one ``RowInputs`` — purely
+    downstream of the economics modules and ``Data``; the column space is never seen here."""
 
     target_index = target_year - data.YR_CAL_BASE
     base_lumap = data.lumaps[base_year]
@@ -324,8 +325,8 @@ def get_rows(data: Data, base_year: int, target_year: int) -> RowInputs:
 # ═══════════════════════════ EconomicInputs: what the objective is built from ═══════════════════════════
 #
 # Raw AUD, float32: operating economics per column, and the transition cost of every arc keyed by its
-# base-year source. ~300 MB at RES5, and wanted only while row_builder.get_obj_block turns it into the
-# objective block — so it is loaded on its own and dropped, never carried on a RowInputs through the solve.
+# base-year source. ~300 MB at RES5, and wanted only while row_builder.get_obj turns it into the objective
+# coefficient of every column — so it is loaded on its own and dropped, never carried on a RowInputs through the solve.
 
 @dataclass
 class EconomicInputs:
