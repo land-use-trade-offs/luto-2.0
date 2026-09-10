@@ -40,7 +40,7 @@ class RowSide:
 
 
 def get_rows(inputs: RowInputs, cols: xr.Dataset, side: ColSide) -> tuple[xr.Dataset, RowSide]:
-    """The row space of one solve step: every constraint as one row of the long table ``rows`` (on ``row`` = Constr.index), and beside it the ``RowSide`` the post-solve reads. This body IS the model's row order."""
+    """The row space of one solve step"""
 
     # ── 1. what the rows join on: the node every column lands on / leaves, and the runs of the accounting blocks ──
     to_node, from_node  = node_ids(cols)                                        # (m, j, cell) or (k, cell) per column, -1 where n/a

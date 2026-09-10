@@ -24,10 +24,6 @@ from scipy import sparse
 
 
 # ═══════════════════════════ the row table: how the rows are stored, and how they are asked ═══════════════════════════
-#
-# Every family of `row_builder` returns its rows as a PART (``make_part``) over ONE fixed schema; ``stack_rows``
-# lays the parts back to back into the table the Gurobi model is built over. This module is the storage and the
-# queries only — the rows themselves are built next door.
 
 ROW_FIELDS_INT = ('cell', 'm', 'j', 'k', 'am_idx', 'from_m', 'from_j', 'from_k', 'local_r', 'commodity')   # -1 where n/a
 ROW_FIELDS_CODED = ('family', 'group', 'region', 'item', 'presence', 'bound', 'state')                     # codes into attrs['vocab'][field]
