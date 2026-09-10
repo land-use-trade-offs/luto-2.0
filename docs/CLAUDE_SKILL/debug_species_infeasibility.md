@@ -23,7 +23,7 @@ For each `(region, species/community, presence)` triplet:
 - Build the full model with GBF4 disabled (all other constraints: GHG, water, GBF2/3,
   land budget, renewables, etc. remain active)
 - Add **one** constraint: `sum(val_vector × dvar) >= lb_raw` (composed with
-  `row_builder.compose_rows` over the coefficient support and the solver's shared bio
+  `row_builder.compose` over the coefficient support and the solver's shared bio
   coefficients, exactly as the family method would build it)
 - Solve with barrier (15-min cap per worker)
 - Record: `status`, `tightness`, `coeff_ratio`, `n_cells`, solve time
@@ -520,9 +520,9 @@ else:
     # One row, built the way _add_GBF4_*_constraints builds it: region-masked layer as the
     # weighting row over the coefficient support with the shared bio coefficients, then
     # row-rescaled with the target.
-    from luto.solvers.row_builder import bio_streams, compose_rows, contract, gather
+    from luto.solvers.row_builder import bio_coeff, compose, contract
     masked = val_vector if region == "Australia" else np.where(reg_matrix == region, val_vector, 0)
-    row = compose_rows(cols, gather(cols['table'], *bio_streams(rows, cols)), [masked])
+    row = compose(cols, bio_coeff(rows, cols), [masked])
     row, rhs, _scale = contract(row, [lb_raw], rescale=True)
     constr = model.addMConstr(row, solver._vars, '>', rhs).tolist()
     model.setAttr('ConstrName', constr, [f"test_{typ}_{region}_{name}_{presence}".replace(" ", "_")])

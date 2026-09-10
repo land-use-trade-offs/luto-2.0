@@ -109,7 +109,7 @@ class RowInputs:
 
 def get_limits(data: Data, yr_cal: int) -> dict[str, Any]:
     """The raw (unscaled) constraint targets of one calendar year — which keys are present depends on the
-    active settings. The solver rescales each row together with its target (``row_builder.scale_rows``)."""
+    active settings. The solver rescales each row together with its target (``row_builder.contract``)."""
     print('Getting environmental limits...', flush = True)
 
     limits = {}

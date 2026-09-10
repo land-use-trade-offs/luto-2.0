@@ -725,7 +725,7 @@ def calc_shadow_price_GBF3_NVIS(luto_solver, rows, target_year) -> pd.DataFrame:
     if settings.GBF3_NVIS_TARGET == "off":
         return pd.DataFrame()
     So = 1e6                                    # the objective is in million AUD
-    ss = luto_solver.bio_GBF3_NVIS_scales                     # per-row scale from scale_rows
+    ss = luto_solver.bio_GBF3_NVIS_scales                     # per-row scale from contract
     rows = []
     for (region, group), constr in luto_solver.bio_GBF3_NVIS_constrs.items():
         Ss = float(ss[(region, group)])
@@ -743,7 +743,7 @@ def calc_shadow_price_GBF4_SNES(luto_solver, rows, target_year) -> pd.DataFrame:
     if settings.GBF4_TARGET_SNES == "off":
         return pd.DataFrame()
     So = 1e6                                    # the objective is in million AUD
-    ss = luto_solver.bio_GBF4_SNES_scales                     # per-row scale from scale_rows
+    ss = luto_solver.bio_GBF4_SNES_scales                     # per-row scale from contract
     rows = []
     for (region, species, presence), constr in luto_solver.bio_GBF4_SNES_constrs.items():
         Ss = float(ss[(region, species, presence)])
@@ -761,7 +761,7 @@ def calc_shadow_price_GBF4_ECNES(luto_solver, rows, target_year) -> pd.DataFrame
     if settings.GBF4_TARGET_ECNES == "off":
         return pd.DataFrame()
     So = 1e6                                    # the objective is in million AUD
-    ss = luto_solver.bio_GBF4_ECNES_scales                     # per-row scale from scale_rows
+    ss = luto_solver.bio_GBF4_ECNES_scales                     # per-row scale from contract
     rows = []
     for (region, community, presence), constr in luto_solver.bio_GBF4_ECNES_constrs.items():
         Ss = float(ss[(region, community, presence)])
@@ -779,7 +779,7 @@ def calc_shadow_price_GBF8(luto_solver, rows, target_year) -> pd.DataFrame:
     if settings.GBF8_TARGET == "off":
         return pd.DataFrame()
     So = 1e6                                    # the objective is in million AUD
-    ss = luto_solver.bio_GBF8_scales                     # per-row scale from scale_rows
+    ss = luto_solver.bio_GBF8_scales                     # per-row scale from contract
     rows = []
     for (region, species), constr in luto_solver.bio_GBF8_constrs.items():
         Ss = float(ss[(region, species)])
@@ -851,7 +851,7 @@ def calc_shadow_price_Demand(luto_solver, rows, target_year) -> pd.DataFrame:
 def calc_shadow_price_Renewable(luto_solver, rows, target_year) -> pd.DataFrame:
     """State-level renewable-generation-target shadow prices (AUD per real MWh of target).
 
-    Every (type, state) row carries its own row scale (row_builder.scale_rows).
+    Every (type, state) row carries its own row scale (row_builder.contract).
     """
     if not any(settings.RENEWABLES_OPTIONS.values()):
         return pd.DataFrame()
@@ -895,12 +895,12 @@ def _shadow_price_views(luto_solver):
     ``calc_shadow_price_*`` readers walk, built from the solver's row table (``luto_solver.rows`` — the
     ACTIVE rows of each family, in table order) as one namespace with the attribute names the readers use."""
     from types import SimpleNamespace
-    from luto.solvers import row_builder                # local: row_builder imports luto.tools
+    from luto.solvers import row_table                 # local: keeps luto.tools free of solver imports at module load
     T = luto_solver.rows
     options = luto_solver.cols.attrs['options']
 
     def active(family):
-        span = row_builder.family_rows(T, family)
+        span = row_table.family_rows(T, family)
         if span is None:
             return None
         mask = np.zeros(T.sizes['row'], dtype=bool)
@@ -908,7 +908,7 @@ def _shadow_price_views(luto_solver):
         return mask
 
     def constrs(f): r = active(f); return list(T['constr'].values[r]) if r is not None else []
-    def keys(f): r = active(f); return row_builder.keys_of(T, f, r) if r is not None else []
+    def keys(f): r = active(f); return row_table.keys_of(T, f, r) if r is not None else []
     def scale(f): r = active(f); return T['scale'].values[r] if r is not None else np.array([])
 
     v = SimpleNamespace()

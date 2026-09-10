@@ -40,7 +40,8 @@ from luto import settings
 from luto.data import Data
 from luto.solvers.col_builder import get_cols
 from luto.solvers.row_inputs import get_economics, get_row_inputs
-from luto.solvers.row_builder import get_rows, get_obj, bio_index
+from luto.solvers.row_builder import get_rows, get_obj
+from luto.solvers.row_table import bio_index
 from luto.solvers.solver import LutoSolver
 from luto.solvers.post_solve import post_solve
 from luto.solvers.tools import feasibility_spectrum, resolve_infeasibility, group_of
@@ -452,7 +453,7 @@ def diagnose_and_drop_conflict(luto_solver: LutoSolver, data: Data, target_year:
 def record_dropped(records, luto_solver, data, target_year, stage) -> None:
     """Append dropped-constraint records to out_<year>/dropped_constraints_<year>.csv.
 
-    Re-attaches family / region / item / presence from the row table (``row_builder.bio_index``),
+    Re-attaches family / region / item / presence from the row table (``row_table.bio_index``),
     because the constraint name cannot be parsed back into them (spaces became underscores, and the
     arity differs by family). Appends rather than overwrites: a year can drop rows in BOTH the pre-solve
     per-group test and the post-failure IIS, and the first record must survive the second.

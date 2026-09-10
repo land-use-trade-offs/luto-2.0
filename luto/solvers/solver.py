@@ -44,12 +44,7 @@ gurenv.start()
 
 
 class LutoSolver:
-    """The Gurobi model of one step, built from the two tables of the LP: ``cols`` (col_builder.get_cols) —
-    every unknown as one row, its ``lb`` / ``ub`` and, from the row side, its objective coefficient ``obj`` —
-    and ``rows`` (row_builder.get_rows) — every constraint as one row, its ``rhs`` / ``sense`` / ``name``, the
-    one sparse A in its attrs. The model IS the two tables: ONE ``addMVar`` over ``cols`` (``x``), ONE
-    ``addMConstr`` over ``rows``, the Gurobi handles kept on ``rows`` (``constr``) so rows can be dropped and
-    restored by name; ``solve`` returns the raw x over ``cols`` — ``post_solve`` turns it into the LUTO format."""
+    """The Gurobi model of one step, returns the raw x."""
 
     def __init__(self, cols: xr.Dataset, rows: xr.Dataset):
         self.cols = cols
@@ -75,8 +70,10 @@ class LutoSolver:
         self.x = self.gurobi_model.addMVar(cols.attrs['n_all'], lb=cols['lb'].values, ub=cols['ub'].values, name="X")
 
         names_of = {                                                                # the name of every column of a block, from its fields
-            'ag':         lambda t: [f"X_ag_{lm_name[m]}_{j}_{r}" for m, j, r in zip(t['m'], t['j'], t['cell'])],
-            'nonag':      lambda t: [f"X_non_ag_{k}_{r}" for k, r in zip(t['k'], t['cell'])],
+            'ag':         lambda t: [f"X_ag_{lm_name[m]}_{j}_{r}" 
+                                     for m, j, r in zip(t['m'], t['j'], t['cell'])],
+            'nonag':      lambda t: [f"X_non_ag_{k}_{r}" 
+                                     for k, r in zip(t['k'], t['cell'])],
             'am':         lambda t: [f"X_ag_man_{lm_name[m]}_{snake_of_slot[slot]}_{j}_{r}".replace(" ", "_")
                                      for slot, m, j, r in zip(t['slot'], t['m'], t['j'], t['cell'])],
             'ag2ag':      lambda t: [f"F_a2a_{from_m}_{from_j}[{m},{local_r},{j}]"
@@ -85,8 +82,10 @@ class LutoSolver:
                                      for from_m, from_j, k, local_r in zip(t['from_m'], t['from_j'], t['k'], t['local_r'])],
             'nonag2ag':   lambda t: [f"F_n2a_{from_k}[{m},{local_r},{j}]"
                                      for from_k, m, local_r, j in zip(t['from_k'], t['m'], t['local_r'], t['j'])],
-            'cell_usage': lambda t: [f"Rgconst_cell_usage_{cell}" for cell in t['cell']],
+            'cell_usage': lambda t: [f"Rgconst_cell_usage_{cell}" 
+                                     for cell in t['cell']],
         }
+     
         for block, block_rows in cols.attrs['block_range'].items():
             span = slice(*block_rows)
             fields = {field: cols[field].values[span] for field in ('m', 'j', 'k', 'slot', 'from_m', 'from_j', 'from_k', 'local_r', 'cell')}

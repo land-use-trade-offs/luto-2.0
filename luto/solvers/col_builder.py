@@ -24,17 +24,12 @@ from dataclasses import dataclass
 
 import luto.settings as settings
 import luto.tools as tools
-from luto.data import Data
 import luto.economics.agricultural.transitions as ag_transition
 import luto.economics.non_agricultural.transitions as non_ag_transition
 
+from luto.data import Data
 
 # ═══════════════════════════ get_cols: the column space of one step ═══════════════════════════
-#
-# The column side of the LP is ONE long table, ``cols`` — every unknown as one row, with its fields and its
-# lb / ub / base (the objective coefficient ``obj`` is added by the row side, which prices the columns). What the
-# row side reads BESIDE the table — the base-year state the table was built from, for the entries that have no
-# column — comes back separately as a ``ColSide``, so the table stays the pure block the Gurobi model is built over.
 
 @dataclass
 class ColSide:
@@ -468,9 +463,9 @@ def table_space(data: Data, blocks: dict, src_ptr: dict) -> xr.Dataset:
     bounds = np.cumsum([0, *widths])
     block_range = {block: (int(start), int(stop)) for block, start, stop in zip(parts, bounds[:-1], bounds[1:])}
 
-    n_all   = int(bounds[-1])                                    # every column: the rows are built at this width
-    n_terms = group_width['accounting']                          # the accounting group leads, so its width IS the prefix a demand / GHG / water / biodiversity / renewable coefficient array is allocated at
-    n_dec   = n_all - group_width['cell_use']                    # the cell-use group trails, so the objective stops where it starts
+    n_all   = int(bounds[-1])                         # every column: the rows are built at this width
+    n_terms = group_width['accounting']               # the accounting group leads, so its width IS the prefix a demand / GHG / water / biodiversity / renewable coefficient array is allocated at
+    n_dec   = n_all - group_width['cell_use']         # the cell-use group trails, so the objective stops where it starts
 
     # Ag block has no slot/am_idx/j_idx, fill -1 for those fields. Do the same for other blocks.
     def field(field_name, dtype, fill):
@@ -505,7 +500,10 @@ def table_space(data: Data, blocks: dict, src_ptr: dict) -> xr.Dataset:
              base   =(('col',), field('base', np.float32, 0.0))                              # the node-balance constant of an ag / non-ag column
         ),
         attrs=dict(block_range=block_range,                                                  # {block: (start, stop)} — the rows each block owns, in the table's block order
-                   nlms=data.NLMS, n_ag_lus=data.N_AG_LUS, n_nonag_lus=data.N_NON_AG_LUS, ncells=data.NCELLS,   # the extent of the space: what the fields m / j / k / cell index into
+                   nlms=data.NLMS, 
+                   n_ag_lus=data.N_AG_LUS, 
+                   n_nonag_lus=data.N_NON_AG_LUS, 
+                   ncells=data.NCELLS,                                                       # the extent of the space: what the fields m / j / k / cell index into
                    options=list(data.AGMAN2LU),                                              # the ag-management options, in am_idx order
                    agman2lu=data.AGMAN2LU,                                                   # {option: [land-use codes]}: the (option, lu) slot order
                    savanna_eligible_r=np.flatnonzero(data.SAVBURN_ELIGIBLE == 1),            # the solve read-back zeroes irr savanna columns outside these cells
@@ -516,3 +514,8 @@ def table_space(data: Data, blocks: dict, src_ptr: dict) -> xr.Dataset:
                    by_cell_ptr=by_cell_ptr,
                    src_ptr={name: block_range[name][0] + ptr for name, ptr in src_ptr.items()})    # per arc block, the group bounds of its rows sorted by source, as table rows
     )
+
+
+def block_slice(cols: xr.Dataset, block: str) -> slice:
+    """The rows of one block of the column table — its Var.index range (``attrs['block_range']`` holds the bounds)."""
+    return slice(*cols.attrs['block_range'][block])
