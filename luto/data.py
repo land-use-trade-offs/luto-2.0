@@ -87,32 +87,6 @@ def lumap2non_ag_l_mk(lumap, num_non_ag_land_uses: int):
     return x_rk.astype(bool)
 
 
-def _match_gbf8_block(raw_path: str, dim: str, block: slice, lon: np.ndarray, lat: np.ndarray, out_path: str, ncells: int) -> None:
-    """One file of the GBF8 spatial-match cache (``Data.match_GBF8_bio_layers``): the raw layers of ``block``
-    (a run of species / groups) interpolated to the cell centroids, written one species per chunk via a temp
-    file + atomic rename. Runs in a joblib worker process: dask stays synchronous inside it, so the processes
-    are the parallelism and each stays at a few hundred MB (one year x 128-species raw chunk at a time)."""
-    import dask
-    if os.path.exists(out_path):                                            # another task run finished this file already
-        return
-    with dask.config.set(scheduler='synchronous'):
-        raw = xr.open_dataset(raw_path, chunks={'year': 1, dim: 128})['data'].isel({dim: block})
-        matched = raw.interp(                                               # Spatial interpolation and masking
-            x=xr.DataArray(lon, dims='cell'),
-            y=xr.DataArray(lat, dims='cell'),
-            method='linear'                                                 # Use LINEAR interpolation
-        ).astype(np.float32)
-        tmp_path = f'{out_path}.tmp{os.getpid()}'
-        matched.to_netcdf(
-            tmp_path,
-            encoding={'data': {
-                'zlib': True, 'complevel': 4, 'dtype': 'float32',
-                'chunksizes': (1, 1, ncells),                               # one species (group) per chunk: a random subset reads only its own
-            }},
-        )
-    os.replace(tmp_path, out_path)                                          # atomic: a reader never sees a partial file
-
-
 @dataclass
 class Data:
     """
@@ -2607,7 +2581,7 @@ class Data:
         The raw biodiversity suitability score [2D (shape, 808*978), (dtype, uint8, 0-100)] represents the
         suitability of each cell for each species/group. The spatial LINEAR interpolation to the cell
         centroids is precomputed once per (SSP, RESFACTOR) by `match_GBF8_bio_layers` and read from the
-        `_cache` dir; here only the LINEAR year interpolation runs.
+        `_cache` file; here only the LINEAR year interpolation runs.
 
         Because the coordinates are the controid of the `self.MASK` array, so the spatial interpolation is
         simultaneously a masking process.
@@ -2628,91 +2602,63 @@ class Data:
             The biodiversity suitability score for each species at the given year.
         '''
         
-        # The expensive spatial interpolation lives in a per-(SSP, RESFACTOR) disk cache — one file per 512
-        # species, one species per chunk inside it, and a manifest saying which file holds each species (see
+        # The expensive spatial interpolation lives in a per-(SSP, RESFACTOR) disk cache (see
         # match_GBF8_bio_layers); here only the cheap year interpolation runs. Both steps are linear, so
         # cache-then-year-interp equals the original year-then-spatial order.
-        cache_dir = self.match_GBF8_bio_layers(level)
-        manifest = pd.read_csv(os.path.join(cache_dir, 'manifest.csv')).set_index(level)
-        wanted = manifest.loc[self.BIO_GBF8_SEL_SPECIES] if level == 'species' else manifest    # the selection — any subset, any order; every group
+        with xr.open_dataarray(self.match_GBF8_bio_layers(level)) as layer:
+            if level == 'species':
+                layer = layer.sel(species=self.BIO_GBF8_SEL_SPECIES)    # the selection — any subset, any order
 
-        # File by file, each file's rows in ITS order: a random subset costs only its own species' chunks
-        parts = []
-        read_order = []
-        for chunk_file, rows in wanted.groupby('chunk', sort=True):
-            rows = rows.sort_values('position')
-            with xr.open_dataarray(os.path.join(cache_dir, chunk_file)) as layer:
-                parts.append(layer.isel({level: rows['position'].values}).interp(
-                    year=yr,
-                    method='linear',
-                    kwargs={'fill_value': 'extrapolate'}
-                ).drop_vars(['year']).values)
-            read_order += rows.index.tolist()
-        row_of = {name: i for i, name in enumerate(read_order)}
-        current_species_val = np.concatenate(parts)[[row_of[name] for name in wanted.index]]   # back in the selection's order
+            # The two years a linear interpolation to `yr` reads, and the weight on the upper one; outside
+            # the cached range the same two end points extrapolate (weight < 0 or > 1). Reading just the
+            # pair and blending in float32 is what xr.interp would do, minus its 3-year window and float64.
+            years = layer['year'].values
+            i = int(np.clip(np.searchsorted(years, yr, side='right') - 1, 0, years.size - 2))
+            w = np.float32((yr - years[i]) / (years[i + 1] - years[i]))
+            lo, hi = layer.isel(year=[i, i + 1]).transpose('year', level, 'cell').values
 
-        # Apply Savanna Burning penalties
-        current_species_val = np.where(
-            self.SAVBURN_ELIGIBLE,
-            current_species_val * settings.BIO_CONTRIBUTION_LDS,
-            current_species_val
-        )
+        out = lo * (np.float32(1) - w) + hi * w
 
-        return current_species_val.astype(np.float32)
+        # Apply Savanna Burning penalties (in place: one per-cell factor, broadcast over species)
+        out *= np.where(self.SAVBURN_ELIGIBLE, np.float32(settings.BIO_CONTRIBUTION_LDS), np.float32(1))
+
+        return out
 
 
     def match_GBF8_bio_layers(self, level: Literal['species', 'group'] = 'species') -> str:
         '''
-        Spatially match the raw GBF8 suitability rasters to the resfactored cells and cache
-        the result on disk. Returns the cache file path (building it on the first call).
-
-        The raw layers live on a ~5 km (y, x) raster; matching them to the cell centroids is
-        by far the expensive part of `get_GBF8_bio_layers_by_yr` and depends only on SSP and
-        RESFACTOR — never on the simulated year or the species selection. So it is done ONCE
-        over ALL species/groups and saved under `<INPUT_DIR>/_cache/cache_bio_GBF8_ssp<SSP>_
-        RES<RESFACTOR>_<level>/` as `chunk_000.nc, chunk_001.nc, ...` — 512 species per file, dims
-        (year, species|group, cell), ONE species per chunk inside the file (1 year x 1 species x every
-        cell, the raw input's own layout) — plus `manifest.csv` (species, chunk, position) saying
-        which file holds each species and where. Any later run (or concurrent task run) with the same
-        SSP and RESFACTOR reuses the directory.
-
-        Why files of 512 and chunks of 1: a read of any subset of species — the selection can be
-        random — opens only the files that hold them and pulls only their chunks; and the build writes
-        the files in parallel (one joblib process per file, `_match_gbf8_block`), where one file behind
-        one HDF5 write lock took ~12 min at RES5. Each file goes through a temp file + atomic rename,
-        and the manifest is written last, so a reader never sees a partial cache and concurrent task
-        runs racing to build the same cache cannot corrupt it.
+        Interpolate the raw GBF8 rasters onto the cell centroids and cache that on disk, returning the
+        cache path. It is the expensive part of `get_GBF8_bio_layers_by_yr` and turns only on SSP and
+        RESFACTOR, so it is built once, over every species/group, and reused by any later run.
         '''
-        cache_dir = os.path.join(
-            settings.INPUT_DIR, '_cache', f'cache_bio_GBF8_ssp{settings.SSP}_RES{settings.RESFACTOR}_{level}')
-        manifest_path = os.path.join(cache_dir, 'manifest.csv')
-        if os.path.exists(manifest_path):                                # written last: its presence means the cache is complete
-            return cache_dir
+        import dask
+
+        cache_path = os.path.join(
+            settings.INPUT_DIR, '_cache', f'cache_bio_GBF8_ssp{settings.SSP}_RES{settings.RESFACTOR}_{level}.nc')
+        if os.path.exists(cache_path):
+            return cache_path
 
         print(f"│   ├── Building GBF8 {level} spatial-match cache (one-off per SSP/RESFACTOR)", flush=True)
-        os.makedirs(cache_dir, exist_ok=True)
+        os.makedirs(os.path.dirname(cache_path), exist_ok=True)
         raw_path = (f'{settings.INPUT_DIR}/bio_GBF8_ssp{settings.SSP}_EnviroSuit.nc'
                     if level == 'species' else
                     f'{settings.INPUT_DIR}/bio_GBF8_ssp{settings.SSP}_EnviroSuit_group.nc')
-        dim = 'species' if level == 'species' else 'group'
-        with xr.open_dataset(raw_path) as raw:
-            names = raw['data'][dim].values
-        blocks = [(f'chunk_{i:03d}.nc', slice(start, min(start + 512, names.size)))
-                  for i, start in enumerate(range(0, names.size, 512))]
-
-        from joblib import Parallel, delayed
         lon, lat = self.COORD_LON_LAT
-        Parallel(n_jobs=min(16, settings.THREADS))(
-            delayed(_match_gbf8_block)(raw_path, dim, block, lon, lat, os.path.join(cache_dir, chunk_file), self.NCELLS)
-            for chunk_file, block in blocks)
 
-        manifest = pd.DataFrame([(names[i], chunk_file, i - block.start) for chunk_file, block in blocks for i in range(block.start, block.stop)],
-                                columns=[dim, 'chunk', 'position'])
-        tmp_path = f'{manifest_path}.tmp{os.getpid()}'
-        manifest.to_csv(tmp_path, index=False)
-        os.replace(tmp_path, manifest_path)                             # atomic, and last
-        print(f"│   │   └── saved {os.path.basename(cache_dir)}/ ({len(blocks)} files, {names.size:,} {dim})", flush=True)
-        return cache_dir
+        with dask.config.set(scheduler='synchronous'):                  # one chunk at a time: the raw stack is ~42 GB
+            matched = xr.open_dataset(raw_path, chunks={'year': 1, level: 128})['data'].interp(
+                x=xr.DataArray(lon, dims='cell'),
+                y=xr.DataArray(lat, dims='cell'),
+                method='linear'                                         # Use LINEAR interpolation
+            ).astype(np.float32)
+            tmp_path = f'{cache_path}.tmp{os.getpid()}'
+            matched.to_netcdf(tmp_path, encoding={'data': {
+                'zlib': True, 'complevel': 4, 'dtype': 'float32',
+                'chunksizes': (1, 1, self.NCELLS),                      # one species (group) per chunk: a subset reads only its own
+            }})
+        os.replace(tmp_path, cache_path)                                # atomic: a reader never sees a partial cache
+        print(f"│   │   └── saved {os.path.basename(cache_path)}", flush=True)
+        return cache_path
 
 
     def get_GBF8_target_inside_LUTO_by_yr(self, yr: int) -> xr.DataArray:
