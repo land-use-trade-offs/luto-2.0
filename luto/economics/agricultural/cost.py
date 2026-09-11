@@ -523,7 +523,10 @@ def get_sheep_hir_effect_c_mrj(data: Data, yr_idx: int):
 def get_utility_solar_pv_effect_c_mrj(data: Data, c_mrj, yr_idx, aggregate: bool = True):
     """
     Applies Utility Solar PV cost effects.
-    Calculates: (Base Ag Cost * Multiplier) + (Solar OPEX + amortised CAPEX)
+    Calculates: (Base Ag Cost * (Productivity * OM Multiplier - 1)) + (Solar OPEX + amortised CAPEX)
+
+    The farming left on the hosted fraction produces `Productivity` of the land use's output, so it
+    carries `Productivity` of its cost; `OM_Cost_Multiplier` applies to that remaining farming.
 
     Args:
         aggregate: If True (default), return combined cost array (nlm, ncells, nlu).
@@ -544,9 +547,11 @@ def get_utility_solar_pv_effect_c_mrj(data: Data, c_mrj, yr_idx, aggregate: bool
 
     for lu_idx, lu in enumerate(land_uses):
 
-        om_mult = data.RENEWABLE_BUNDLE_SOLAR.query('Year == @yr_cal and Commodity == @lu')['OM_Cost_Multiplier'].item()
+        bundle = data.RENEWABLE_BUNDLE_SOLAR.query('Year == @yr_cal and Commodity == @lu')
+        productivity = bundle['Productivity'].item()
+        om_mult = bundle['OM_Cost_Multiplier'].item()
         j = lu_codes[lu_idx]
-        ag_cost_delta = c_mrj[:, :, j] * (om_mult - 1)
+        ag_cost_delta = c_mrj[:, :, j] * (productivity * om_mult - 1)
 
         yr_lyr = max(yr_cal, int(data.RENEWABLE_LAYERS['year'].values[0]))
         re_lyr = data.RENEWABLE_LAYERS.sel(tech_name='Utility Solar PV', year=yr_lyr)
@@ -577,7 +582,10 @@ def get_utility_solar_pv_effect_c_mrj(data: Data, c_mrj, yr_idx, aggregate: bool
 def get_onshore_wind_effect_c_mrj(data: Data, c_mrj, yr_idx, aggregate: bool = True):
     """
     Applies Onshore Wind cost effects.
-    Calculates: (Base Ag Cost * Multiplier) + (Wind OPEX + amortised CAPEX)
+    Calculates: (Base Ag Cost * (Productivity * OM Multiplier - 1)) + (Wind OPEX + amortised CAPEX)
+
+    The farming left on the hosted fraction produces `Productivity` of the land use's output, so it
+    carries `Productivity` of its cost; `OM_Cost_Multiplier` applies to that remaining farming.
 
     Args:
         aggregate: If True (default), return combined cost array (nlm, ncells, nlu).
@@ -598,15 +606,16 @@ def get_onshore_wind_effect_c_mrj(data: Data, c_mrj, yr_idx, aggregate: bool = T
 
     for lu_idx, lu in enumerate(land_uses):
 
-        om_mult = data.RENEWABLE_BUNDLE_WIND.query('Year == @yr_cal and Commodity == @lu')
-        if om_mult.empty:
-            print(f"Warning: No operationg cost multiplier found for {lu} in year {yr_cal} for Onshore Wind. Using 1.0 as default.")
-            om_mult = 1.0
+        bundle = data.RENEWABLE_BUNDLE_WIND.query('Year == @yr_cal and Commodity == @lu')
+        if bundle.empty:
+            print(f"Warning: No bundle row found for {lu} in year {yr_cal} for Onshore Wind. Using 1.0 for Productivity and OM_Cost_Multiplier.")
+            productivity, om_mult = 1.0, 1.0
         else:
-            om_mult = om_mult['OM_Cost_Multiplier'].item()
+            productivity = bundle['Productivity'].item()
+            om_mult = bundle['OM_Cost_Multiplier'].item()
 
         j = lu_codes[lu_idx]
-        ag_cost_delta = c_mrj[:, :, j] * (om_mult - 1)
+        ag_cost_delta = c_mrj[:, :, j] * (productivity * om_mult - 1)
 
         yr_lyr = max(yr_cal, int(data.RENEWABLE_LAYERS['year'].values[0]))
         re_lyr = data.RENEWABLE_LAYERS.sel(tech_name='Onshore Wind', year=yr_lyr)

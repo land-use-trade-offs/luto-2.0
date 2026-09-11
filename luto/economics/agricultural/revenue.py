@@ -441,6 +441,9 @@ def get_utility_solar_pv_effect_r_mrj(data: Data, r_mrj, yr_idx):
     Applies the effects of Utility Solar PV to the revenue data
     for all relevant agricultural land uses.
     Adds: (Ag Revenue Change) + (New Electricity Revenue)
+
+    The farming left on the hosted fraction produces `Productivity` of the land use's output, so it
+    earns `Productivity × Revenue` of its revenue.
     """
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Utility Solar PV']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
@@ -453,10 +456,12 @@ def get_utility_solar_pv_effect_r_mrj(data: Data, r_mrj, yr_idx):
 
     for lu_idx, lu in enumerate(land_uses):
 
-        # Get Utility Solar PV's impact on electricity revenue.
-        revenue_multiplier = data.RENEWABLE_BUNDLE_SOLAR.query('Year == @yr_cal and Commodity == @lu')['Revenue'].item()
+        # Get Utility Solar PV's impact on agricultural revenue.
+        bundle = data.RENEWABLE_BUNDLE_SOLAR.query('Year == @yr_cal and Commodity == @lu')
+        productivity = bundle['Productivity'].item()
+        revenue_multiplier = bundle['Revenue'].item()
         j = lu_codes[lu_idx]
-        ag_revenue_delta = r_mrj[:, :, j] * (revenue_multiplier - 1)
+        ag_revenue_delta = r_mrj[:, :, j] * (productivity * revenue_multiplier - 1)
 
         quantity_mwh = get_quantity_renewable(data, 'Utility Solar PV', yr_idx)
 
@@ -474,6 +479,9 @@ def get_utility_solar_pv_effect_r_mrj(data: Data, r_mrj, yr_idx):
 def get_onshore_wind_effect_r_mrj(data: Data, r_mrj, yr_idx):
     """
     Applies the effects of Onshore Wind to the revenue data.
+
+    The farming left on the hosted fraction produces `Productivity` of the land use's output, so it
+    earns `Productivity × Revenue` of its revenue.
     """
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Onshore Wind']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
@@ -486,17 +494,18 @@ def get_onshore_wind_effect_r_mrj(data: Data, r_mrj, yr_idx):
 
     for lu_idx, lu in enumerate(land_uses):
 
-        # Get Onshore Wind's impact on electricity revenue.
-        revenue_multiplier = data.RENEWABLE_BUNDLE_WIND.query('Year == @yr_cal and Commodity == @lu')
-        
-        if revenue_multiplier.empty:
-            print(f"Warning: No revenue multiplier found for {lu} in year {yr_cal} for Onshore Wind. Using 1.0 as default.")
-            revenue_multiplier = 1.0
+        # Get Onshore Wind's impact on agricultural revenue.
+        bundle = data.RENEWABLE_BUNDLE_WIND.query('Year == @yr_cal and Commodity == @lu')
+
+        if bundle.empty:
+            print(f"Warning: No bundle row found for {lu} in year {yr_cal} for Onshore Wind. Using 1.0 for Productivity and Revenue.")
+            productivity, revenue_multiplier = 1.0, 1.0
         else:
-            revenue_multiplier = revenue_multiplier['Revenue'].item()
-            
+            productivity = bundle['Productivity'].item()
+            revenue_multiplier = bundle['Revenue'].item()
+
         j = lu_codes[lu_idx]
-        ag_revenue_delta = r_mrj[:, :, j] * (revenue_multiplier - 1)
+        ag_revenue_delta = r_mrj[:, :, j] * (productivity * revenue_multiplier - 1)
 
         quantity_mwh = get_quantity_renewable(data, 'Onshore Wind', yr_idx)
 
