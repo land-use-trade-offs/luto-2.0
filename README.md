@@ -417,7 +417,7 @@ Transitions are modelled as explicit per-source delta flows: each cell's land is
 
 ### Solver Configuration
 - `THREADS`: Number of parallel threads for optimization (default: 32)
-- `RETRY_PARAMS`: Ordered list of solve attempts, each a `(NumericFocus, Method, Crossover, Presolve, BarHomogeneous)` tuple. The algorithm is chosen here — there is no standalone `SOLVE_METHOD` setting. The default first attempt is barrier with presolve off; the fallback is dual simplex
+- `RETRY_PARAMS`: Ordered list of solve attempts, each a `(NumericFocus, Method, Crossover, Presolve, BarHomogeneous)` tuple. The algorithm is chosen here — there is no standalone `SOLVE_METHOD` setting. The default first attempt is barrier with presolve, crossover and the homogeneous algorithm left automatic (`-1`); the fallback is dual simplex
 - `FEASIBILITY_TOLERANCE` / `OPTIMALITY_TOLERANCE` / `BARRIER_CONVERGENCE_TOLERANCE`: Solver tolerances. `ROUND_DECIMALS` and the near-zero bound snapping threshold are derived from `FEASIBILITY_TOLERANCE`
 - `RESCALE_FACTOR`: Target magnitude (1e3) that solver input arrays are rescaled to for numerical stability
 - `SOLVER_COEFF_MIN`: Universal floor (1e-4) below which a term's coefficient is dropped before entering Gurobi, keeping the constraint matrix range within Gurobi's safe zone

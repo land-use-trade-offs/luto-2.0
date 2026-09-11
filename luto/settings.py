@@ -334,21 +334,24 @@ Crossover:
 
 Presolve:
     -1 = automatic, 0 = off, 1 = conservative, 2 = aggressive.
-    Keep OFF (0) for barrier (Method=2) — observed to introduce numerical
-    errors that cause the homogeneous barrier to declare false infeasibility.
+    The default barrier attempt leaves it automatic (-1). Presolve was observed
+    to introduce numerical errors that can make the homogeneous barrier declare
+    false infeasibility; 0 (off) avoids that, at the cost of the barrier
+    factorising the raw, degenerate flow equalities (docs/FINDINGS.md).
     Safe to enable for simplex (Method=0 or 1).
 
 BarHomogeneous:
     -1 = automatic, 0 = off, 1 = on.
-    Keep OFF (0): the homogeneous algorithm's tau parameter drifts toward zero
-    in highly degenerate problems, triggering false INFEASIBLE (status 3) even
-    with NumericFocus=3. With 0, the barrier reports NUMERIC (12) or SUBOPTIMAL
+    The default barrier attempt leaves it automatic (-1). 0 (off) avoids a known
+    failure: the homogeneous algorithm's tau parameter drifts toward zero in
+    highly degenerate problems, triggering false INFEASIBLE (status 3) even with
+    NumericFocus=3, whereas with 0 the barrier reports NUMERIC (12) or SUBOPTIMAL
     (13) instead — both handled by the retry loop. Set to 1 only when debugging
     to avoid ambiguous INF_OR_UNBD status.
 
 Default sequence:
-  (0, 2, -1, -1, -1) barrier, auto crossover, presolve off, homogeneous off  — fast first pass
-  (0, 1,  0, -1, 0)  dual simplex, presolve auto, homogeneous off            — fallback; simplex
+  (0, 2, -1, -1, -1) barrier, auto crossover, auto presolve, auto homogeneous  — fast first pass
+  (0, 1,  0, -1, 0)  dual simplex, auto presolve, homogeneous off              — fallback; simplex
                      walks the boundary so it cannot misdiagnose feasibility
                      from an interior-point argument; presolve safe with simplex
 '''
