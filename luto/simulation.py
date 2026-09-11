@@ -40,6 +40,7 @@ from luto.data import Data
 from luto.solvers.col_builder import get_cols
 from luto.solvers.row_inputs import get_economics, get_row_inputs
 from luto.solvers.row_builder import get_rows, get_obj
+from luto.solvers.row_bounds import STATUS, drop_redundant_rows, get_row_bounds, report_row_bounds
 from luto.solvers.solver import LutoSolver
 from luto.solvers.post_solve import post_solve
 from luto.solvers.tools import record_shadow_prices
@@ -242,6 +243,17 @@ def solve_timeseries(
         inputs = get_row_inputs(data, base_year, target_year)                               # the coefficient streams and targets
         cols['obj'] = get_obj(get_economics(data, base_year, target_year), cols, col_side)  # the objective coefficient of every column; the economy streams (~300 MB at RES5) die with the call
         rows, row_side = get_rows(inputs, cols, col_side)                                   # the constraints: the row table, and the production block beside it
+        bounds = get_row_bounds(rows, cols)                                                 # every row's interval over the column box, and its verdict
+        drop_redundant_rows(rows, bounds, settings.BOUND_PROP_DROP_FAMILIES)                # opt-in per family: rows every point of the box satisfies never reach the solver
+        report_row_bounds(rows, bounds, target_year, f"{data.path}/out_{target_year}")      # the log table, bound_report_<year>.csv, bound_preflight_<year>.csv
+
+        n_impossible = int(((bounds['status'].values == STATUS.index('impossible')) | (bounds['status_implied'].values == STATUS.index('impossible'))).sum())
+        if n_impossible and settings.BOUND_PROP_ON_IMPOSSIBLE == 'stop':
+            print('!' * 100, flush=True)
+            print(f"Year {target_year}: {n_impossible:,} row(s) cannot hold at any point the column box and the rows' own bounds allow, so no solve can succeed "
+                  f"(see {data.path}/out_{target_year}/bound_report_{target_year}.csv). Stopping before the model is built.", flush=True)
+            print('!' * 100, flush=True)
+            break
         data.last_year = target_year
 
         luto_solver = LutoSolver(cols, rows)                                                # A x T

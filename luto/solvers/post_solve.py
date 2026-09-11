@@ -150,12 +150,12 @@ def post_solve(x: np.ndarray, cols: xr.Dataset, col_side: ColSide, rows: xr.Data
 
     # ── 4. the production data the writers read: Production from the unscaled production block (raw t per
     #       commodity); GHG as the GHG row's raw-unit value (row × scale) plus the off-land constant the row
-    #       excludes — 0 when the row is off, or dropped by the infeasibility flow ──
+    #       excludes — read off the row table whether or not the row went into the model (a row dropped before
+    #       the build is still A[row]), 0 when the GHG limit is off ──
     prod_data = {"Production": (row_side.q_block @ x).tolist()}
     ghg = row_table.family_rows(rows, 'ghg')
-    ghg_active = rows['active'].values[ghg] if ghg is not None else np.zeros(0, dtype=bool)
-    if ghg_active.any():
-        row = ghg.start + int(np.flatnonzero(ghg_active)[0])              # the single GHG row
+    if ghg is not None and ghg.stop > ghg.start:
+        row = ghg.start                                                   # the single GHG row
         prod_data["GHG"] = float((rows.attrs['A'][row] @ x)[0] * rows['scale'].values[row]) + float(np.asarray(inputs.offland_ghg).ravel()[0])
     else:
         prod_data["GHG"] = 0

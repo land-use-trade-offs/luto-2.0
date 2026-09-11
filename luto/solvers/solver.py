@@ -93,19 +93,25 @@ class LutoSolver:
             print(f"│   {'└──' if block == 'cell_usage' else '├──'} {block:<10s} {span.stop - span.start:>12,} variables")
 
     def _setup_constraints(self):
-        """Every row of the row table as ONE addMConstr (Constr.index = table order), the rows named, the
-        handles kept on the table."""
+        """Every ACTIVE row of the row table as ONE addMConstr (in table order), the rows named, the handles kept on
+        the table — None on a row dropped before the build (a redundant row, ``row_bounds.drop_redundant_rows``)."""
         print("├── Adding the constraints...")
         model = self.gurobi_model
         model.update()                       # the ONE update before the first row: every variable exists
         self._vars = model.getVars()
         assert len(self._vars) == self.cols.attrs['n_all'], 'the model must hold exactly the columns of the space'
         T = self.rows
-        constrs = model.addMConstr(T.attrs['A'], self._vars, np.asarray(T['sense'].values, dtype='<U1'), T['rhs'].values).tolist()
-        model.setAttr('ConstrName', constrs, T['name'].values.tolist())
-        T['constr'] = (('row',), np.array(constrs, dtype=object))
+        active = T['active'].values
+        built = np.flatnonzero(active)
+        A = T.attrs['A'] if active.all() else T.attrs['A'][built]
+        constrs = model.addMConstr(A, self._vars, np.asarray(T['sense'].values[built], dtype='<U1'), T['rhs'].values[built]).tolist()
+        model.setAttr('ConstrName', constrs, T['name'].values[built].tolist())
+        handles = np.full(T.sizes['row'], None, dtype=object)
+        handles[built] = constrs
+        T['constr'] = (('row',), handles)
         for family, (start, stop) in T.attrs['family_range'].items():
-            print(f"│   │   {family}: {stop - start:,} row(s)")
+            n_built = int(active[start:stop].sum())
+            print(f"│   │   {family}: {n_built:,} row(s)" + (f", {stop - start - n_built:,} dropped before the build" if n_built < stop - start else ""))
 
     def _setup_objective(self):
         """Objective obj · x: the coefficient of every column as the column table carries it
@@ -146,6 +152,7 @@ class LutoSolver:
         handles[hit] = constrs
         T['constr'] = (('row',), handles)
         T['active'] = (('row',), T['active'].values | hit)
+        T['redundant'] = (('row',), T['redundant'].values & ~hit)             # a row put back is in the model, whatever dropped it
         self.gurobi_model.update()
 
     def solve(self) -> np.ndarray | None:

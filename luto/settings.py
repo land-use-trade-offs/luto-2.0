@@ -212,6 +212,32 @@ small production coefficients; 1e-4 retains those while keeping the matrix range
 ratio at 1e8 (well within Gurobi's safe zone).
 '''
 
+BOUND_PROP_REL_TOL = 1e-6
+'''
+Relative margin of the pre-solve bound propagation (solvers/row_bounds.py). Every row's activity interval [lo, hi]
+over the column box is compared with its rhs within a per-row margin
+    max(10 * FEASIBILITY_TOLERANCE, BOUND_PROP_REL_TOL * max(|rhs|, sum |a| * |bound|))
+— relative to the magnitude of the row's terms, because the rounding of the sum grows with them, and never under the
+solver's own tolerance, so a row called IMPOSSIBLE is beyond anything the engine could accept. A row inside the margin
+is TIGHT or NEAR_REDUNDANT and always kept.
+'''
+
+BOUND_PROP_DROP_FAMILIES = []
+'''
+The row families whose REDUNDANT rows are dropped before the model is built, e.g.
+['GBF3_NVIS', 'GBF4_SNES', 'GBF4_ECNES', 'GBF8']. A redundant row is satisfied by every point of the column box, so
+dropping it is exact: the solution does not change, and the dropped rows appear in shadow_prices_<year>.csv priced 0
+with dropped = True. Every row is classified and reported (bound_report_<year>.csv) whatever this list holds;
+impossible and tight rows are never dropped. Worth listing only families with many rows.
+'''
+
+BOUND_PROP_ON_IMPOSSIBLE = 'stop'
+'''
+What a year does when some row is IMPOSSIBLE over the column box (bound_report_<year>.csv names each with its shortfall):
+ - 'stop'  : stop before building the model — no solve can succeed — the way an infeasible year stops the run
+ - 'solve' : report it and solve anyway
+'''
+
 
 
 

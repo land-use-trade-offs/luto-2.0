@@ -52,7 +52,9 @@ def stack_rows(parts: list) -> xr.Dataset:
     ``attrs['vocab']``, the ONE A vstacked into ``attrs['A']`` (rows × n_all), ``attrs['family_range']`` =
     {family: (start, stop)} (the rows each family owns, as ``block_range`` does for the columns),
     ``attrs['keys']`` = {family: its key fields}, and ``active`` — a dropped row is flagged off, the table
-    never shrinks. The solver adds ``constr`` (the Gurobi handle) after ``addMConstr``."""
+    never shrinks — with ``redundant`` beside it, on where a row was dropped before the build because every point of
+    the column box satisfies it (``row_bounds.drop_redundant_rows``). The solver adds ``constr`` (the Gurobi handle)
+    after ``addMConstr``."""
     widths = [part.sizes['row'] for part in parts]
     bounds = np.cumsum([0, *widths])
     n_rows = int(bounds[-1])
@@ -82,7 +84,8 @@ def stack_rows(parts: list) -> xr.Dataset:
              sense=(('row',), field('sense', object, None)),
              name=(('row',), field('name', object, None)),
              scale=(('row',), field('scale', np.float64, 1.0)),
-             active=(('row',), np.ones(n_rows, dtype=bool))),
+             active=(('row',), np.ones(n_rows, dtype=bool)),
+             redundant=(('row',), np.zeros(n_rows, dtype=bool))),
         attrs=dict(A=sparse.vstack([part.attrs['A'] for part in parts], format='csr') if parts else None,
                    family_range=family_range,
                    keys={part.attrs['family']: part.attrs['keys'] for part in parts},
