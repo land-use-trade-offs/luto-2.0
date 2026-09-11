@@ -61,7 +61,12 @@ def post_solve(x: np.ndarray, cols: xr.Dataset, col_side: ColSide, rows: xr.Data
 
     # ── 1. the decision variables: x scattered back through the table's fields (float64 -> float32) ──
     rows_of = {block: slice(*block_rows) for block, block_rows in cols.attrs['block_range'].items()}
-    m, j, k, am_idx, local_r, cell = (cols[field].values for field in ('m', 'j', 'k', 'am_idx', 'local_r', 'cell'))
+    m = cols['m'].values
+    j = cols['j'].values
+    k = cols['k'].values
+    am_idx = cols['am_idx'].values
+    local_r = cols['local_r'].values
+    cell = cols['cell'].values
 
     X_dry_sol_rj = np.zeros((ncells, n_ag_lus), dtype=np.float32)
     X_irr_sol_rj = np.zeros((ncells, n_ag_lus), dtype=np.float32)

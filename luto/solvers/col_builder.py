@@ -21,6 +21,7 @@ import numpy as np
 import xarray as xr
 
 from dataclasses import dataclass
+from scipy import sparse
 
 import luto.settings as settings
 import luto.tools as tools
@@ -33,8 +34,14 @@ from luto.data import Data
 
 @dataclass
 class ColSide:
-    """What the row side reads beside the column table: the wide grids for the entries with NO column, the base-year
-    sources the arc blocks and the source-keyed cost / emission dicts share, and the cell masks of the renewable options."""
+    """What the row side reads beside the column table — the SUPPORT it multiplies with or looks up by grid position,
+    all derived from the table: the (cell × col) incidence every row that is a sum over cells multiplies with, the
+    column-id grids the join rows look up (-1 = no column), the wide value grids for the entries with NO column, the
+    base-year sources the arc blocks and the source-keyed cost / emission dicts share, and the cell masks of the
+    renewable options."""
+    support_rc: sparse.csr_matrix   # (cell, col) float32 CSR, 1 where column c sits in cell r — a row over cells W times this is a row over columns: A = W @ (support_rc @ diags(c))
+    col_ag_mjr: np.ndarray          # (lm, lu, cell) int32 — the ag column at (m, j, r), -1 none: what an am column's host is, what row an arc lands on / leaves
+    col_nonag_kr: np.ndarray        # (nonag_lu, cell) int32 — the non-ag column at (k, r), -1 none (a feasible entry of a DISABLED land use has ub > 0 here but no column)
     ag_base_mjr: np.ndarray         # (lm, lu, cell) float32 — the node-balance constant of every ag entry: a SOURCE with no column still caps its outflow by it (source cap)
     nonag_ub_kr: np.ndarray         # (nonag_lu, cell) float32 — > 0 = feasible, for EVERY non-ag land use, enabled or not: the feasible entries of a disabled land use get a node-balance row
     nonag_base_kr: np.ndarray       # (nonag_lu, cell) float32 — the node-balance constant of every non-ag entry
@@ -47,7 +54,7 @@ class ColSide:
 
 
 def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSide]:
-    """The column space of one solve step: every unknown as one row of the long table ``cols`` (on ``col`` = Var.index), and beside it the ``ColSide`` the row side reads for what has no column."""
+    """The column space of one solve step: every unknown as one row of the long table ``cols`` (on ``col`` = Var.index), and beside it the ``ColSide``: the support the row side reads by position (the cell × col incidence, the column-id grids) and the grids for what has no column."""
 
     # ── 1. sources (FROM-view): the base-year holders of land ──
     trans_source_ag         = get_trans_source_ag(data, base_year)              # (from_m, from_j): global cell indices
@@ -80,9 +87,9 @@ def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSide]:
     mask_mnes_wind          = get_mask_mnes_wind(data)
 
     # ── 5. the blocks and the table: every block's rows laid back to back in Var.index order, plus the wide base / ub grids the flow rows read for entries with no column ──
-    ag_base_mjr,   ag_rows                = ag_space(data, feasible_ag_mrj, trans_ub_ag_mrj, dvar_base_ag_mrj)
+    ag_base_mjr,   ag_rows                   = ag_space(data, feasible_ag_mrj, trans_ub_ag_mrj, dvar_base_ag_mrj)
     nonag_ub_kr,   nonag_base_kr, nonag_rows = nonag_space(data, trans_lb_nonag_rk, trans_ub_nonag_rk, dvar_base_nonag_rk)
-    am_rows                               = am_space(data, feasible_ag_mrj, mask_gbf2_solar, mask_gbf2_wind, trans_lb_ag_man_mrj)
+    am_rows                                  = am_space(data, feasible_ag_mrj, mask_gbf2_solar, mask_gbf2_wind, trans_lb_ag_man_mrj)
 
     ag2ag_rows,    ag2ag_src_ptr    = ag2ag_space(feasible_ag2ag_mrj)                # each source carries its own cells: local_r -> the global cell
     ag2nonag_rows, ag2nonag_src_ptr = ag2nonag_space(feasible_ag2nonag_rk)
@@ -109,8 +116,12 @@ def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSide]:
     for name, (start, stop) in block_range.items():
         print(f"{'└──' if name == list(block_range)[-1] else '├──'} {name:<10s} {stop - start:>12,}", flush=True)
 
-    # ── 6. the space: the table, and beside it what the row side reads for the entries with no column ──
+    # ── 6. the space: the table, and beside it the support the row side multiplies with / looks up, and the grids for the entries with no column ──
+    support_rc, col_ag_mjr, col_nonag_kr = col_support(table)
     return table, ColSide(
+        support_rc=support_rc,
+        col_ag_mjr=col_ag_mjr,
+        col_nonag_kr=col_nonag_kr,
         ag_base_mjr=ag_base_mjr,
         nonag_ub_kr=nonag_ub_kr,
         nonag_base_kr=nonag_base_kr,
@@ -477,12 +488,6 @@ def table_space(data: Data, blocks: dict, src_ptr: dict) -> xr.Dataset:
             per_block.append(np.broadcast_to(value, width))      # a scalar stretches to the block's width (the fill, or a constant like ub = 1.0)
         return np.concatenate(per_block)                         # the blocks back to back: one value per column of the table
 
-    # the accounting columns (the ones demand, GHG, water, biodiversity and renewable rows account over) re-sorted by cell, 
-    # and where each cell's run starts / ends
-    cell = field('cell', np.int32, -1)
-    by_cell_order = np.argsort(cell[:n_terms], kind='stable')
-    by_cell_ptr = np.searchsorted(cell[:n_terms][by_cell_order], np.arange(data.NCELLS + 1))
-
     return xr.Dataset(
         dict(m      =(('col',), field('m', np.int32, -1)),                                   # the ag (lm, lu) the column lands on: own (ag), host (am), TO fields (ag2ag, nonag2ag)
              j      =(('col',), field('j', np.int32, -1)),
@@ -494,7 +499,7 @@ def table_space(data: Data, blocks: dict, src_ptr: dict) -> xr.Dataset:
              from_j =(('col',), field('from_j', np.int32, -1)),
              from_k =(('col',), field('from_k', np.int32, -1)),
              local_r=(('col',), field('local_r', np.int32, -1)),                             # ... and the arc's cell in that SOURCE's frame (-1 off the arc blocks: only an arc lives in a source frame), where its cost / GHG coefficients are stored and its solved value is scattered back
-             cell   =(('col',), cell),                                                       # the cell in the GLOBAL frame — every column has one, and the demand / GHG / water / biodiversity / renewable rows weight by it
+             cell   =(('col',), field('cell', np.int32, -1)),                                # the cell in the GLOBAL frame — every column has one, and the demand / GHG / water / biodiversity / renewable rows weight by it
              lb     =(('col',), field('lb', np.float64, 0.0)),                               # the bounds of the column (gurobi stores double)
              ub     =(('col',), field('ub', np.float64, np.inf)),
              base   =(('col',), field('base', np.float32, 0.0))                              # the node-balance constant of an ag / non-ag column
@@ -510,12 +515,25 @@ def table_space(data: Data, blocks: dict, src_ptr: dict) -> xr.Dataset:
                    n_terms=n_terms,                                                          # the accounting group: the table's first rows, the width a demand / GHG / water / biodiversity / renewable coefficient array is allocated at
                    n_dec=n_dec,                                                              # everything before the cell-use group: the objective is built at this width (a slack carries no cost)
                    n_all=n_all,                                                              # every column: the rows are built at this width
-                   by_cell_order=by_cell_order, 
-                   by_cell_ptr=by_cell_ptr,
                    src_ptr={name: block_range[name][0] + ptr for name, ptr in src_ptr.items()})    # per arc block, the group bounds of its rows sorted by source, as table rows
     )
 
 
-def block_slice(cols: xr.Dataset, block: str) -> slice:
-    """The rows of one block of the column table — its Var.index range (``attrs['block_range']`` holds the bounds)."""
-    return slice(*cols.attrs['block_range'][block])
+def col_support(table: xr.Dataset) -> tuple[sparse.csr_matrix, np.ndarray, np.ndarray]:
+    """The support the row side reads, derived from the finished table: the (cell × col) incidence — 1 where
+    column c sits in cell r, so a family's weight rows over cells W become rows over columns as
+    ``W @ (support_rc @ diags(c))`` — and the ag / non-ag column-id grids, the table row of the column at each
+    (m, j, r) / (k, r), -1 where there is none."""
+    nlms, n_ag_lus, n_nonag_lus, ncells, n_all = (table.attrs[key] for key in ('nlms', 'n_ag_lus', 'n_nonag_lus', 'ncells', 'n_all'))
+    cell = table['cell'].values
+    ag = slice(*table.attrs['block_range']['ag'])
+    nonag = slice(*table.attrs['block_range']['nonag'])
+
+    support_rc = sparse.csr_matrix((np.ones(n_all, dtype=np.float32), (cell, np.arange(n_all, dtype=np.int32))), shape=(ncells, n_all))
+
+    col_ag_mjr = np.full((nlms, n_ag_lus, ncells), -1, dtype=np.int32)
+    col_ag_mjr[table['m'].values[ag], table['j'].values[ag], cell[ag]] = np.arange(ag.start, ag.stop, dtype=np.int32)
+
+    col_nonag_kr = np.full((n_nonag_lus, ncells), -1, dtype=np.int32)
+    col_nonag_kr[table['k'].values[nonag], cell[nonag]] = np.arange(nonag.start, nonag.stop, dtype=np.int32)
+    return support_rc, col_ag_mjr, col_nonag_kr
