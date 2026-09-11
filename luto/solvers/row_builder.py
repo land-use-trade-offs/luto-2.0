@@ -86,7 +86,8 @@ def get_rows(inputs: RowInputs, cols: xr.Dataset, side: ColSide) -> tuple[xr.Dat
     parts += [
         add_source_cap_ag(cols, side),
         add_source_cap_nonag(cols, side),
-        add_node_balance(cols, side),
+        add_node_balance_ag(cols, side),
+        add_node_balance_nonag(cols, side),
     ]
 
     # ── 5. the space: the parts back to back in the order above, and beside the table the unscaled production block ──
@@ -808,9 +809,8 @@ def add_renewable(inputs: RowInputs, cols: xr.Dataset, side: ColSide):
             on_type = am_idx == cols.attrs['options'].index(option)
             energy_of_type[option] = side.support_rc @ sparse.diags(np.where(on_type, re_data['energy_r'][cell], np.float32(0.0)).astype(np.float32))   # float32 yield per cell
 
-    # ── one row per (state, type) with eligible cells ──
+    # ── one row per (state, type) with an allowed cell that holds an ag column of a compatible land use ──
     has_ag_jr = (side.col_ag_mjr >= 0).any(axis=0)                       # (lu, cell): the cell has an ag column of the land use, either lm
-    cells_of_lu = {j: np.flatnonzero(has_ag_jr[j]) for j in range(cols.attrs['n_ag_lus'])}
     agman2lu = cols.attrs['agman2lu']
     blocks = []
     rhs = []
@@ -828,26 +828,16 @@ def add_renewable(inputs: RowInputs, cols: xr.Dataset, side: ColSide):
             target_raw = inputs.limits[f"renewable_{am}"][state_name]
             exist_power_mwh = inputs.limits[f"renewable_{am}_exist"][state_name]
             print(f"│   │   │   ├── target for {am} is {target_raw:5,.0f} MWh  (existing: {exist_power_mwh:5,.0f} MWh)")
-            # cell-set row-inclusion rule (NOT a coefficient test): a row exists iff some compatible land
-            # use has eligible cells — even if every coefficient there turns out to be sub-floor
-            has_cells = False
-            for j in agman2lu[am]:
-                eligible_cells = np.intersect1d(cells_of_lu[j], state_cells)
-                if settings.EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS == True:
-                    eligible_cells = np.setdiff1d(eligible_cells, re_data['gbf2_mask_idx'])
-                if settings.EXCLUDE_RENEWABLES_IN_EPBC_MNES_MASK == True:
-                    eligible_cells = np.setdiff1d(eligible_cells, re_data['mnes_mask_idx'])
-                if eligible_cells.size:
-                    has_cells = True
-                    break
-            if not has_cells:
-                continue
             allowed = np.zeros(ncells, dtype=np.float32)                 # the weighting row: 1 on the state's allowed cells
             allowed[state_cells] = 1.0
             if settings.EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS == True:
                 allowed[re_data['gbf2_mask_idx']] = 0.0
             if settings.EXCLUDE_RENEWABLES_IN_EPBC_MNES_MASK == True:
                 allowed[re_data['mnes_mask_idx']] = 0.0
+            # cell-set row-inclusion rule (NOT a coefficient test): the row exists iff an allowed cell holds an ag
+            # column of a compatible land use — even if every coefficient there turns out to be sub-floor
+            if not (has_ag_jr[agman2lu[am]].any(axis=0) & (allowed > 0)).any():
+                continue
             blocks.append(weight_rows([allowed], ncells) @ energy_of_type[am])
             rhs.append(target_raw - exist_power_mwh)                     # raw MWh; row-rescaled below
             names.append(f"renewable_{am}_target_{state_name}".replace(" ", "_"))
@@ -908,46 +898,31 @@ def add_source_cap_nonag(cols: xr.Dataset, side: ColSide):
     return make_part('source_cap_nonag', 'flow_out', dict(from_k=from_k[first_arc], local_r=local_r[first_arc]), A, rhs, '<', names)
 
 
-def add_node_balance(cols: xr.Dataset, side: ColSide):
-    """Node balance, X = base + Σ in − Σ out at every node (m, j, cell) or (k, cell): one row per ag
-    column, then one per (non-ag land use, feasible cell). Every column and arc finds the row of the node it lands
-    on / leaves by looking the node up on a grid — the ag column-id grid, the non-ag row grid — and an entry whose
-    node has no row (-1) is dropped. The inflow cap is X's own ub, not a row."""
-    print("│   └── Adding node-balance (X = base + Σin − Σout) constraints...")
+def add_node_balance_ag(cols: xr.Dataset, side: ColSide):
+    """Node balance at the ag nodes, one row per ag column (the ag block, in its order):
+    X_ag[m, r, j] = base_ag[m, r, j] + Σ in (ag2ag ∪ nonag2ag → (m, j)) − Σ out ((m, j) → ag2ag ∪ ag2nonag).
+    Every column and arc finds the row of the ag node it lands on / leaves on the ag column-id grid; an entry whose
+    node has no column (-1) is dropped. The inflow cap is X's own ub, not a row."""
+    print("│   ├── Adding node-balance (X = base + Σin − Σout) constraints at the ag nodes...")
     n_all = cols.attrs['n_all']
     m = cols['m'].values
     j = cols['j'].values
-    k = cols['k'].values
     from_m = cols['from_m'].values
     from_j = cols['from_j'].values
-    from_k = cols['from_k'].values
     cell = cols['cell'].values
     block_range = cols.attrs['block_range']
     ag = slice(*block_range['ag'])
-    nonag = slice(*block_range['nonag'])
 
-    # ── the rows: one per ag column (the ag block, in its order), then one per (non-ag land use, feasible cell) — X column or not ──
+    # ── the rows: one per ag column ──
     n_ag = ag.stop - ag.start
     ag_m, ag_j, ag_r = m[ag].astype(np.int64), j[ag].astype(np.int64), cell[ag].astype(np.int64)
-    nonag_k, nonag_r = np.nonzero(side.nonag_ub_kr > 0)       # every feasible entry, enabled land use or not: k then cell
-    nonag_k = nonag_k.astype(np.int64)
-    nonag_r = nonag_r.astype(np.int64)
-    n_nonag = nonag_r.size
 
     def ag_row(m_, j_, r_):
         """The row of the ag node (m, j, r): its column's place in the ag block, -1 where it has no column."""
         col = side.col_ag_mjr[m_, j_, r_]
         return np.where(col >= 0, col - ag.start, -1)
 
-    nonag_row_kr = np.full(side.nonag_ub_kr.shape, -1, dtype=np.int32)          # the row of the non-ag node (k, r), -1 where it is not feasible
-    nonag_row_kr[nonag_k, nonag_r] = n_ag + np.arange(n_nonag)
-
-    row_sign = np.ones(n_ag + n_nonag, dtype=np.float64)                         # a disabled land use has no X column: its row is a pure inflow guard, Σin − Σout = −base
-    row_sign[n_ag:] = np.where(side.col_nonag_kr[nonag_k, nonag_r] >= 0, 1.0, -1.0)
-
     # ── the entries: X on its own row, inflows −1 on the target's row, outflows +1 on the source's row ──
-    #     X_ag[m, r, j]  = base_ag[m, r, j]  + Σ in (ag2ag ∪ nonag2ag → (m, j)) − Σ out ((m, j) → ag2ag ∪ ag2nonag)
-    #     X_nonag[r, k]  = base_nonag[r, k]  + Σ in (ag2nonag → k)              − Σ out (k → nonag2ag)
     row_idx = []
     col_idx = []
     vals = []
@@ -956,30 +931,69 @@ def add_node_balance(cols: xr.Dataset, side: ColSide):
         in_model = row >= 0                                              # no row (banned source / no X var): entry dropped
         row_idx.append(row[in_model].astype(np.int64))
         col_idx.append(col[in_model].astype(np.int64))
-        vals.append(value * row_sign[row[in_model]])
+        vals.append(np.full(int(in_model.sum()), value))
 
-    columns = np.arange(ag.start, ag.stop)                               # X_ag on its own row
-    add(np.arange(n_ag), columns, 1.0)
-    columns = np.arange(nonag.start, nonag.stop)                         # X_nonag on its own row
-    add(nonag_row_kr[k[columns], cell[columns]], columns, 1.0)
+    add(np.arange(n_ag), np.arange(ag.start, ag.stop), 1.0)              # X_ag on its own row
     arcs = np.arange(*block_range['ag2ag'])                              # ag → ag: in on the target's row, out of the source's
     add(ag_row(m[arcs], j[arcs], cell[arcs]), arcs, -1.0)
     add(ag_row(from_m[arcs], from_j[arcs], cell[arcs]), arcs, 1.0)
-    arcs = np.arange(*block_range['ag2nonag'])                           # ag → non-ag
-    add(nonag_row_kr[k[arcs], cell[arcs]], arcs, -1.0)
+    arcs = np.arange(*block_range['ag2nonag'])                           # ag → non-ag: out of the source's row
     add(ag_row(from_m[arcs], from_j[arcs], cell[arcs]), arcs, 1.0)
-    arcs = np.arange(*block_range['nonag2ag'])                           # non-ag → ag
+    arcs = np.arange(*block_range['nonag2ag'])                           # non-ag → ag: in on the target's row
     add(ag_row(m[arcs], j[arcs], cell[arcs]), arcs, -1.0)
-    add(nonag_row_kr[from_k[arcs], cell[arcs]], arcs, 1.0)
-    A = sparse.csr_matrix((np.concatenate(vals), (np.concatenate(row_idx), np.concatenate(col_idx))), shape=(n_ag + n_nonag, n_all))
+    A = sparse.csr_matrix((np.concatenate(vals), (np.concatenate(row_idx), np.concatenate(col_idx))), shape=(n_ag, n_all))
 
     # ── rhs, names, keys ──
-    rhs = np.concatenate([cols['base'].values[ag].astype(np.float64),
-                          side.nonag_base_kr[nonag_k, nonag_r].astype(np.float64) * row_sign[n_ag:]])
-    names = ([f"bal_a_{m}_{j}_{r}" for m, j, r in zip(ag_m, ag_j, ag_r)] + [f"bal_n_{k}_{r}" for k, r in zip(nonag_k, nonag_r)])
-    keys = dict(m=np.concatenate([ag_m, np.full(n_nonag, -1, dtype=np.int64)]),                  # an ag row carries its (m, j) node ...
-                j=np.concatenate([ag_j, np.full(n_nonag, -1, dtype=np.int64)]),
-                k=np.concatenate([np.full(n_ag, -1, dtype=np.int64), nonag_k]),                  # ... a non-ag row its k
-                cell=np.concatenate([ag_r, nonag_r]))
-    A, rhs, _ = contract(A, rhs)
-    return make_part('node_balance', 'flow_in', keys, A, rhs, '=', names)
+    A, rhs, _ = contract(A, cols['base'].values[ag].astype(np.float64))
+    names = [f"bal_a_{m}_{j}_{r}" for m, j, r in zip(ag_m, ag_j, ag_r)]
+    return make_part('node_balance_ag', 'flow_in', dict(m=ag_m, j=ag_j, cell=ag_r), A, rhs, '=', names)
+
+
+def add_node_balance_nonag(cols: xr.Dataset, side: ColSide):
+    """Node balance at the non-ag nodes, one row per (non-ag land use, feasible cell), X column or not:
+    X_nonag[r, k] = base_nonag[r, k] + Σ in (ag2nonag → k) − Σ out (k → nonag2ag).
+    Every column and arc finds the row of the non-ag node it lands on / leaves on the non-ag row grid; an entry
+    whose node is not feasible (-1) is dropped."""
+    print("│   └── Adding node-balance (X = base + Σin − Σout) constraints at the non-ag nodes...")
+    n_all = cols.attrs['n_all']
+    k = cols['k'].values
+    from_k = cols['from_k'].values
+    cell = cols['cell'].values
+    block_range = cols.attrs['block_range']
+
+    # ── the rows: one per (non-ag land use, feasible cell) — every feasible entry, enabled land use or not: k then cell ──
+    nonag_k, nonag_r = np.nonzero(side.nonag_ub_kr > 0)
+    nonag_k = nonag_k.astype(np.int64)
+    nonag_r = nonag_r.astype(np.int64)
+    n_nonag = nonag_r.size
+    if not n_nonag:
+        return None
+
+    nonag_row_kr = np.full(side.nonag_ub_kr.shape, -1, dtype=np.int32)          # the row of the non-ag node (k, r), -1 where it is not feasible
+    nonag_row_kr[nonag_k, nonag_r] = np.arange(n_nonag)
+
+    row_sign = np.where(side.col_nonag_kr[nonag_k, nonag_r] >= 0, 1.0, -1.0)    # a disabled land use has no X column: its row is a pure inflow guard, Σin − Σout = −base
+
+    # ── the entries: X on its own row, inflows −1 on the target's row, outflows +1 on the source's row ──
+    row_idx = []
+    col_idx = []
+    vals = []
+
+    def add(row, col, value):
+        in_model = row >= 0                                              # no row (the node is not feasible): entry dropped
+        row_idx.append(row[in_model].astype(np.int64))
+        col_idx.append(col[in_model].astype(np.int64))
+        vals.append(value * row_sign[row[in_model]])
+
+    columns = np.arange(*block_range['nonag'])                           # X_nonag on its own row
+    add(nonag_row_kr[k[columns], cell[columns]], columns, 1.0)
+    arcs = np.arange(*block_range['ag2nonag'])                           # ag → non-ag: in on the target's row
+    add(nonag_row_kr[k[arcs], cell[arcs]], arcs, -1.0)
+    arcs = np.arange(*block_range['nonag2ag'])                           # non-ag → ag: out of the source's row
+    add(nonag_row_kr[from_k[arcs], cell[arcs]], arcs, 1.0)
+    A = sparse.csr_matrix((np.concatenate(vals), (np.concatenate(row_idx), np.concatenate(col_idx))), shape=(n_nonag, n_all))
+
+    # ── rhs, names, keys ──
+    A, rhs, _ = contract(A, side.nonag_base_kr[nonag_k, nonag_r].astype(np.float64) * row_sign)
+    names = [f"bal_n_{k}_{r}" for k, r in zip(nonag_k, nonag_r)]
+    return make_part('node_balance_nonag', 'flow_in', dict(k=nonag_k, cell=nonag_r), A, rhs, '=', names)
