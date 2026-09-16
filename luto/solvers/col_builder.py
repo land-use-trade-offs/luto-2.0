@@ -154,7 +154,7 @@ def get_trans_source_nonag(data: Data, base_year: int) -> dict:
 def get_trans_ub_ag_mrj(data: Data, base_year: int) -> np.ndarray:
     """Ag target upper bound (ag2ag + nonag2ag), raised to the base so a cell can always keep its base land use."""
     print('Getting agricultural target upper bounds...', flush = True)
-    ub = (ag_transition.get_ag2ag_ub(data, base_year) + non_ag_transition.get_nonag2ag_ub(data, base_year)).astype(np.float32)
+    ub = (ag_transition.get_ag2ag_ub(data, base_year) + non_ag_transition.get_nonag2ag_ub(data, base_year))
     return tools.clamp_dvar_bound(ub, np.maximum(data.ag_dvars[base_year], 0.0), np.inf, 'Ag ub raised to base')
 
 def get_trans_ub_nonag_rk(data: Data, base_year: int) -> np.ndarray:
