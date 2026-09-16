@@ -27,6 +27,8 @@ import luto.economics.agricultural.ghg as ag_ghg
 from luto import settings
 from luto.data import Data
 from luto.economics.agricultural.transitions import (
+    get_ag_allowed_mrj,
+    get_base_held,
     get_base_dvar_mj_cell_map,
     get_transition_matrices_ag2ag,
 )
@@ -332,28 +334,39 @@ def get_base_nonag_dvar_k_cell_map(data: Data, base_year: int, threshold: float 
     }
 
 
+def get_nonag2ag_ub_src(data: Data, base_year: int, from_k: int, cells: np.ndarray) -> np.ndarray:
+    """(NLMS, len(cells), N_AG_LUS): how much ONE non-ag source may move to every ag target, on its own cells — its base-year
+    share × its own T_MAT reach row × EXCLUDE × no-go. Summed over the sources this is get_nonag2ag_ub, and above zero it is
+    the arc: the column space creates a nonag2ag arc exactly where this is positive."""
+    # Transition exclusion (T_MAT): this source's own row — finite = the transition is allowed, NaN = it is not.
+    reach_j = (~np.isnan(
+        data.T_MAT.sel(from_lu=data.NON_AGRICULTURAL_LANDUSES, to_lu=data.AGRICULTURAL_LANDUSES).values[from_k]
+    )).astype(np.float32)                                               # (to_j,)
+
+    # EXCLUDE × no-go, on this source's cells.
+    allowed_mrj = get_ag_allowed_mrj(data, cells)
+
+    # What the source holds on those cells: nothing may move that is not there.
+    share_r = data.non_ag_dvars[base_year][cells, from_k].astype(np.float32)                 # (len(cells),)
+    return (allowed_mrj * share_r[np.newaxis, :, np.newaxis] * reach_j[np.newaxis, np.newaxis, :]).astype(np.float32)
+
+
 def get_nonag2ag_ub(data: Data, base_year: int) -> np.ndarray:
     """nonag→ag target upper bound (NLMS, NCELLS, N_AG_LUS), fractional: the base-year share of every non-ag source that can
-    reach to_j (T_MAT finite), × no-go × EXCLUDE. Non-ag-source component only; the combined ag ub adds the ag share."""
-    non_ag_dvar = data.non_ag_dvars[base_year]                          # (NCELLS, N_NON_AG_LUS)
-    
+    reach to_j (T_MAT finite), × EXCLUDE × no-go — get_nonag2ag_ub_src summed over the sources, the matmul doing the
+    summing. Non-ag-source component only; the combined ag ub adds the ag share."""
     # Transition exclusion (T_MAT): binary allow per (nonag k → to_j).
     t_kj = (~np.isnan(
         data.T_MAT.sel(from_lu=data.NON_AGRICULTURAL_LANDUSES, to_lu=data.AGRICULTURAL_LANDUSES).values
     )).astype(np.float32)                                               # (k, to_j)
-    
+
     # Reachable land share: sum base-year fractions of every non-ag source that can reach to_j.
-    reach_frac_rj = (non_ag_dvar @ t_kj).astype(np.float32)             # (NCELLS, to_j)
+    reach_frac_rj = (get_base_held(data.non_ag_dvars[base_year]) @ t_kj).astype(np.float32)   # (NCELLS, to_j)
 
-    # No-go exclusion: user-defined LUs banned in specific regions.
-    no_go = np.ones((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
-    if settings.EXCLUDE_NO_GO_LU:
-        for no_go_x_r, no_go_desc in zip(data.NO_GO_REGION_AG, data.NO_GO_LANDUSE_AG):
-            no_go[:, :, data.DESC2AGLU[no_go_desc]] = no_go_x_r
+    # EXCLUDE × no-go, over every cell.
+    allowed_mrj = get_ag_allowed_mrj(data)
 
-    # Spatial exclusion (data.EXCLUDE).
-    x_mrj = data.EXCLUDE.astype(np.float32)
-    return (x_mrj * reach_frac_rj[np.newaxis, :, :] * no_go).astype(np.float32)
+    return (allowed_mrj * reach_frac_rj[np.newaxis, :, :]).astype(np.float32)
 
 
 def get_nonag2ag_lb(data: Data, base_year: int) -> np.ndarray:

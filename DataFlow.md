@@ -227,13 +227,13 @@ The transition system is **source-keyed**: costs and feasibility are sliced per 
 
 | Field | Builder (line) | L5 entry | Key `data.` attributes | L3 files |
 |-------|----------------|----------|------------------------|----------|
-| `ag_eligible_mrj` | `col_builder.get_cols` | `ag_transition.get_ag_eligible_mrj` | `EXCLUDE` (← `x_mrj.npy`), `T_MAT`, `NO_GO_{LANDUSE,REGION}_AG` | `x_mrj.npy`, `ag_tmatrix.npy`, `no_go_areas/` |
+| `feasible_ag_mrj` | `col_builder.get_cols` | — (`dvar_ub_ag > 0`: an ag entry exists where its upper bound is above zero) | `EXCLUDE` (← `x_mrj.npy`), `T_MAT`, `NO_GO_{LANDUSE,REGION}_AG` | `x_mrj.npy`, `ag_tmatrix.npy`, `no_go_areas/` |
 | `flow_cost_ag2ag` | `get_ag_t_mrj` 372 | `ag_transition.get_transition_matrices_ag2ag` | `T_MAT`, `TRANS_COST_MULTS`, `AG_TMATRIX`, `WATER_LICENCE_PRICE`, `IRRIG_COST_MULTS`, `REGIONAL_ADOPTION_ZONES` | `ag_tmatrix.npy`, `transition_cost_clearing_forest.npz`, `cost_multipliers.xlsx`, `water_licence_price.h5`, `regional_adoption_zones.h5` |
 | `flow_cost_ag2nonag` | inline 1080-1086 | `non_ag_transition.get_transition_matrix_ag2nonag` | `EP_EST_COST_HA`, `RP_EST_COST_HA`, `AF_EST_COST_HA`, `CP_EST_COST_HA`, `AG2EP_TRANSITION_COSTS_HA`, `AG_TO_DESTOCKED_NATURAL_COSTS_HA`, `RP_FENCING_LENGTH`, `EST/FENCE/IRRIG_COST_MULTS` | `ep_est_cost_ha.h5`, `cp_est_cost_ha.h5`, `ag_to_ep_tmatrix.npy`, `ag_to_destock_tmatrix.npy`, `stream_length_m_cell.h5`, `cost_multipliers.xlsx` |
 | `flow_cost_nonag2ag` | inline 1090-1096 | `non_ag_transition.get_transition_matrix_nonag2ag` | `EP2AG_TRANSITION_COSTS_HA`, `T_MAT` | `ep_to_ag_tmatrix.npy` |
 | `dvar_ub_ag` / `dvar_lb_ag` | 484 / 517 | `ag_transition.get_ag2ag_{ub,lb}` + `non_ag_transition.get_nonag2ag_ub` | `T_MAT`, `EXCLUDE`, base dvars | `ag_tmatrix.npy`, `x_mrj.npy` |
 | `dvar_ub_nonag` / `dvar_lb_nonag` | 504 / 524 | `non_ag_transition.get_non_ag_{ub,lb}_matrices` | `RP_PROPORTION`, `LU_LVSTK_NATURAL`, `NO_GO_*_NON_AG`, reversibility flags | `stream_length_m_cell.h5`, `no_go_areas/` |
-| `feasible_*` (4 fields) | 399, 410, 426, 450, 466 | — (pure logic over `ag_x_mrj`, `dvar_ub_nonag`, `T_MAT` reach) | `T_MAT` | `ag_tmatrix.npy` |
+| `arc_*_src` (3 dicts) | `col_builder.get_arc_{ag2ag,nonag2ag,ag2nonag}_src` | `ag_transition.get_ag2ag_ub_src`, `non_ag_transition.get_nonag2ag_ub_src` | `T_MAT`, `EXCLUDE`, `NO_GO_*_AG`, base dvars | `ag_tmatrix.npy`, `x_mrj.npy`, `no_go_areas/` |
 | `ag_source_cells` / `nonag_source_cells` | 416 / 421 | `ag_transition.get_base_dvar_mj_cell_map`, `non_ag_transition.get_base_nonag_dvar_k_cell_map` | base-year dvars | — (runtime state) |
 | `ag_man_limits` | `get_ag_man_limits` 620 | `ag_transition.get_agricultural_management_adoption_limits` | AM bundles | AM bundle `.xlsx` |
 | `ag_man_lb_mrj` | `get_ag_man_lb_mrj` 533 | `ag_transition.get_lower_bound_agricultural_management_matrices` | base-year AM dvars | — (runtime state) |

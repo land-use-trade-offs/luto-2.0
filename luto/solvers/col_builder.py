@@ -69,15 +69,11 @@ def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSide]:
     dvar_base_ag_mrj        = tools.clamp_dvar_bound(data.ag_dvars[base_year], 0.0, trans_ub_ag_mrj, 'Ag base clipped to [0,ub]')
     dvar_base_nonag_rk      = tools.clamp_dvar_bound(data.non_ag_dvars[base_year], trans_lb_nonag_rk, trans_ub_nonag_rk, 'NonAg base clipped to [lb,ub]')
 
-    # ── 3. feasibility: target entries (feasible_ag_mrj, trans_ub_nonag_rk > 0), transition arcs, cell-usage rows ──
-    T_ag2ag_reach_jj        = ~np.isnan(data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES,     to_lu=data.AGRICULTURAL_LANDUSES).values)       # T_MAT reachability: finite = the transition is allowed
-    T_ag2nonag_reach_jk     = ~np.isnan(data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES,     to_lu=data.NON_AGRICULTURAL_LANDUSES).values)
-    T_nonag2ag_reach_kj     = ~np.isnan(data.T_MAT.sel(from_lu=data.NON_AGRICULTURAL_LANDUSES, to_lu=data.AGRICULTURAL_LANDUSES).values)
-
-    feasible_ag_mrj         = get_feasible_ag_mrj(data, base_year)                # bool: which (m, j) a cell may become
-    feasible_ag2ag_mrj      = get_feasible_ag2ag_mrj(feasible_ag_mrj, trans_source_ag, T_ag2ag_reach_jj)
-    feasible_nonag2ag_mrj   = get_feasible_nonag2ag_mrj(feasible_ag_mrj, trans_source_nonag, T_nonag2ag_reach_kj)
-    feasible_ag2nonag_rk    = get_feasible_ag2nonag_rk(trans_ub_nonag_rk, trans_source_ag, T_ag2nonag_reach_jk)
+    # ── 3. feasibility: an entry or an arc exists exactly where its upper bound is above zero ──
+    feasible_ag_mrj         = trans_ub_ag_mrj > 0                                 # which ag (m, j) a cell may hold: reachable from a source here, or already held (the ub is raised to the base)
+    arc_ag2ag_src           = get_arc_ag2ag_src(data, base_year, trans_source_ag)                            # per source, on its own cells
+    arc_nonag2ag_src        = get_arc_nonag2ag_src(data, base_year, trans_source_nonag)
+    arc_ag2nonag_src        = get_arc_ag2nonag_src(data, trans_source_ag, trans_ub_nonag_rk)
     feasible_cell_usage_r   = get_feasible_cell_usage_r(trans_ub_ag_mrj, trans_ub_nonag_rk, data.AG_MASK_PROPORTION_R)
 
     # ── 4. masks: the cell sets that restrict ag-management options ──
@@ -91,9 +87,9 @@ def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSide]:
     nonag_ub_kr,   nonag_base_kr, nonag_rows = nonag_space(data, trans_lb_nonag_rk, trans_ub_nonag_rk, dvar_base_nonag_rk)
     am_rows                                  = am_space(data, feasible_ag_mrj, mask_gbf2_solar, mask_gbf2_wind, trans_lb_ag_man_mrj)
 
-    ag2ag_rows,    ag2ag_src_ptr    = ag2ag_space(feasible_ag2ag_mrj)                # each source carries its own cells: local_r -> the global cell
-    ag2nonag_rows, ag2nonag_src_ptr = ag2nonag_space(feasible_ag2nonag_rk)
-    nonag2ag_rows, nonag2ag_src_ptr = nonag2ag_space(feasible_nonag2ag_mrj)
+    ag2ag_rows,    ag2ag_src_ptr    = ag2ag_space(arc_ag2ag_src)                    # each source carries its own cells: local_r -> the global cell
+    ag2nonag_rows, ag2nonag_src_ptr = ag2nonag_space(arc_ag2nonag_src)
+    nonag2ag_rows, nonag2ag_src_ptr = nonag2ag_space(arc_nonag2ag_src)
     
     cell_usage_rows                 = cell_usage_space(feasible_cell_usage_r, data.AG_MASK_PROPORTION_R)
 
@@ -155,7 +151,7 @@ def get_trans_ub_ag_mrj(data: Data, base_year: int) -> np.ndarray:
     """Ag target upper bound (ag2ag + nonag2ag), raised to the base so a cell can always keep its base land use."""
     print('Getting agricultural target upper bounds...', flush = True)
     ub = (ag_transition.get_ag2ag_ub(data, base_year) + non_ag_transition.get_nonag2ag_ub(data, base_year))
-    return tools.clamp_dvar_bound(ub, np.maximum(data.ag_dvars[base_year], 0.0), np.inf, 'Ag ub raised to base')
+    return tools.clamp_dvar_bound(ub, ag_transition.get_base_held(data.ag_dvars[base_year]), np.inf, 'Ag ub raised to base')
 
 def get_trans_ub_nonag_rk(data: Data, base_year: int) -> np.ndarray:
     """Non-ag target upper bound, raised to the base so a cell can always keep its base land use."""
@@ -169,7 +165,7 @@ def get_trans_ub_nonag_rk(data: Data, base_year: int) -> np.ndarray:
         base_dvar_nonag_rk=base_dvar_nonag,
         base_dvar_ag_mrj=data.ag_dvars[base_year],
     )
-    return tools.clamp_dvar_bound(ub, np.maximum(base_dvar_nonag, 0.0), np.inf, 'NonAg ub raised to base')
+    return tools.clamp_dvar_bound(ub, ag_transition.get_base_held(base_dvar_nonag), np.inf, 'NonAg ub raised to base')
 
 def get_trans_lb_nonag_rk(data: Data, base_year: int):
     """Non-ag target lower bound, clamped to [0, base]."""
@@ -188,44 +184,39 @@ def get_trans_lb_ag_man_mrj(data: Data, base_year: int):
 
 
 
-# ── feasibility: which target entries, transition arcs and cell-usage rows exist ──
+# ── the arcs: each source's own upper bound, above zero, on its own cells ──
 
-def get_feasible_ag_mrj(data: Data, base_year: int) -> np.ndarray:
-    """Bool (NLMS, NCELLS, N_AG_LUS): which ag (lm, lu) a cell may become (reachability × EXCLUDE × no-go)."""
-    print('Getting feasible agricultural targets...', flush = True)
-    return ag_transition.get_ag_eligible_mrj(data, base_year)
+def get_arc_ag2ag_src(data: Data, base_year: int, trans_source_ag: dict) -> dict:
+    """{(from_m, from_j): {'cells': the source's cells, 'arc': bool (to_m, local_r, to_j)}} — where ONE ag source's own upper bound is above zero: its base share × its T_MAT reach row × EXCLUDE × no-go, its own entry dropped because staying is not a transition; ``local_r`` indexes ``cells``."""
+    print('Getting ag2ag arc upper bounds...', flush = True)
+    arcs = {}
+    for (from_m, from_j), src_cells in trans_source_ag.items():
+        ub = ag_transition.get_ag2ag_ub_src(data, base_year, from_m, from_j, src_cells)   # (NLMS, ncells_src, N_AG)
+        ub[from_m, :, from_j] = 0                                                         # staying is not a transition
+        arcs[(from_m, from_j)] = dict(cells=src_cells, arc=ub > 0)
+    return arcs
 
-def get_feasible_ag2ag_mrj(feasible_ag_mrj: np.ndarray, trans_source_ag: dict, T_ag2ag_reach_jj: np.ndarray) -> dict:
-    """{(from_m, from_j): {'cells': the source's cells, 'feasible': bool (to_m, local_r, to_j)}} — the ag targets each ag source may transition to (feasible, T_MAT-reachable, not itself); ``local_r`` indexes ``cells``."""
-    print('Getting feasible ag2ag delta-var targets...', flush = True)
-    feasible_targets = {}
-    for (from_m, from_j), source_cells in trans_source_ag.items():
-        is_target_feasible = feasible_ag_mrj[:, source_cells, :] & T_ag2ag_reach_jj[from_j][None, None, :]      # (NLMS, ncells_src, N_AG)
-        is_target_feasible[from_m, :, from_j] = False                                                           # staying is not a transition
-        feasible_targets[(from_m, from_j)] = dict(cells=source_cells, feasible=is_target_feasible)
-    return feasible_targets
-
-def get_feasible_nonag2ag_mrj(feasible_ag_mrj: np.ndarray, trans_source_nonag: dict, T_nonag2ag_reach_kj: np.ndarray) -> dict:
-    """{from_k: {'cells': the source's cells, 'feasible': bool (to_m, local_r, to_j)}} — the ag targets each non-ag source may transition to (feasible and T_MAT-reachable); ``local_r`` indexes ``cells``."""
-    print('Getting feasible nonag2ag delta-var targets...', flush = True)
+def get_arc_nonag2ag_src(data: Data, base_year: int, trans_source_nonag: dict) -> dict:
+    """{from_k: {'cells': the source's cells, 'arc': bool (to_m, local_r, to_j)}} — where ONE non-ag source's own upper bound is above zero; ``local_r`` indexes ``cells``."""
+    print('Getting nonag2ag arc upper bounds...', flush = True)
     return {
         from_k: dict(
-            cells=source_cells,
-            feasible=feasible_ag_mrj[:, source_cells, :] & T_nonag2ag_reach_kj[from_k][None, None, :]
+            cells=src_cells,
+            arc=non_ag_transition.get_nonag2ag_ub_src(data, base_year, from_k, src_cells) > 0
         ) # (NLMS, ncells_k, N_AG)
-        for from_k, source_cells in trans_source_nonag.items()
+        for from_k, src_cells in trans_source_nonag.items()
     }
 
-def get_feasible_ag2nonag_rk(trans_ub_nonag_rk: np.ndarray, trans_source_ag: dict, T_ag2nonag_reach_jk: np.ndarray) -> dict:
-    """{(from_m, from_j): {'cells': the source's cells, 'feasible': bool (local_r, to_k)}} — the non-ag targets each ag source may transition to (ub > 0 and T_MAT-reachable); ``local_r`` indexes ``cells``."""
-    print('Getting feasible ag2nonag delta-var targets...', flush = True)
-    feasible_nonag_rk = trans_ub_nonag_rk > 0
+def get_arc_ag2nonag_src(data: Data, trans_source_ag: dict, trans_ub_nonag_rk: np.ndarray) -> dict:
+    """{(from_m, from_j): {'cells': the source's cells, 'arc': bool (local_r, to_k)}} — where the non-ag target upper bound survives an ag source's own T_MAT reach row on its cells; ``local_r`` indexes ``cells``."""
+    print('Getting ag2nonag arc upper bounds...', flush = True)
+    reach_jk = ~np.isnan(data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu=data.NON_AGRICULTURAL_LANDUSES).values)   # (from_j, to_k): finite = the transition is allowed
     return {
         (from_m, from_j): dict(
-            cells=source_cells,
-            feasible=feasible_nonag_rk[source_cells, :] & T_ag2nonag_reach_jk[from_j][None, :]
+            cells=src_cells,
+            arc=(trans_ub_nonag_rk[src_cells, :] * reach_jk[from_j][None, :]) > 0
         )  # (ncells_src, N_NONAG)
-        for (from_m, from_j), source_cells in trans_source_ag.items()
+        for (from_m, from_j), src_cells in trans_source_ag.items()
     }
 
 def get_feasible_cell_usage_r(trans_ub_ag_mrj: np.ndarray, trans_ub_nonag_rk: np.ndarray, ag_mask_r: np.ndarray) -> np.ndarray:
@@ -352,14 +343,14 @@ def am_space(data: Data, feasible_ag_mrj: np.ndarray, mask_gbf2_solar: np.ndarra
     )
 
 
-def ag2ag_space(feasible_ag2ag_mrj: dict) -> tuple[dict, np.ndarray]:
-    """The ag → ag arc columns as rows: one per feasible (from_m, from_j) → (to_m, to_j) transition at a cell, sorted by source in feasibility order; with the group bounds of each source's run."""
+def ag2ag_space(arc_ag2ag_src: dict) -> tuple[dict, np.ndarray]:
+    """The ag → ag arc columns as rows: one per (from_m, from_j) → (to_m, to_j) arc at a cell, sorted by source in source-map order; with the group bounds of each source's run."""
     print('Building the ag2ag arc block...', flush = True)
     arc_rows = []                                            # one chunk of rows per source
     src_ptr = [0]                                            # where each source's run of rows starts / ends
-    for (from_m, from_j), source in feasible_ag2ag_mrj.items():
-        to_m, local_r, to_j = np.nonzero(source['feasible'])
-        cell = source['cells'][local_r]                      # index of the cell in the global cell list
+    for (from_m, from_j), src in arc_ag2ag_src.items():
+        to_m, local_r, to_j = np.nonzero(src['arc'])
+        cell = src['cells'][local_r]                      # index of the cell in the global cell list
         arc_rows.append(np.column_stack([
             np.full(cell.size, from_m),
             np.full(cell.size, from_j),
@@ -373,7 +364,7 @@ def ag2ag_space(feasible_ag2ag_mrj: dict) -> tuple[dict, np.ndarray]:
 
     arcs = np.concatenate(arc_rows).astype(np.int32) if arc_rows else np.empty((0, 6), dtype=np.int32)   # one arc per row; the fields are its columns
 
-    # the column (gp.Var) view: one arc per feasible transition; no row view, nothing looks an arc up by its coordinates
+    # the column (gp.Var) view: one arc per positive upper bound; no row view, nothing looks an arc up by its coordinates
     rows = dict(
         from_m =arcs[:, 0],
         from_j =arcs[:, 1],
@@ -386,14 +377,14 @@ def ag2ag_space(feasible_ag2ag_mrj: dict) -> tuple[dict, np.ndarray]:
     return rows, np.asarray(src_ptr, dtype=np.int64)
 
 
-def ag2nonag_space(feasible_ag2nonag_rk: dict) -> tuple[dict, np.ndarray]:
-    """The ag → non-ag arc columns as rows: one per feasible (from_m, from_j) → to_k transition at a cell, sorted by source in feasibility order; with the group bounds of each source's run."""
+def ag2nonag_space(arc_ag2nonag_src: dict) -> tuple[dict, np.ndarray]:
+    """The ag → non-ag arc columns as rows: one per (from_m, from_j) → to_k arc at a cell, sorted by source in source-map order; with the group bounds of each source's run."""
     print('Building the ag2nonag arc block...', flush = True)
     arc_rows = []                                            # one chunk of rows per source
     src_ptr = [0]                                            # where each source's run of rows starts / ends
-    for (from_m, from_j), source in feasible_ag2nonag_rk.items():
-        local_r, to_k = np.nonzero(source['feasible'])
-        cell = source['cells'][local_r]                      # index of the cell in the global cell list
+    for (from_m, from_j), src in arc_ag2nonag_src.items():
+        local_r, to_k = np.nonzero(src['arc'])
+        cell = src['cells'][local_r]                      # index of the cell in the global cell list
         arc_rows.append(np.column_stack([
             np.full(cell.size, from_m),
             np.full(cell.size, from_j),
@@ -406,7 +397,7 @@ def ag2nonag_space(feasible_ag2nonag_rk: dict) -> tuple[dict, np.ndarray]:
 
     arcs = np.concatenate(arc_rows).astype(np.int32) if arc_rows else np.empty((0, 5), dtype=np.int32)   # one arc per row; the fields are its columns
 
-    # the column (gp.Var) view: one arc per feasible transition; no row view, nothing looks an arc up by its coordinates
+    # the column (gp.Var) view: one arc per positive upper bound; no row view, nothing looks an arc up by its coordinates
     rows = dict(
         from_m =arcs[:, 0],
         from_j =arcs[:, 1],
@@ -418,14 +409,14 @@ def ag2nonag_space(feasible_ag2nonag_rk: dict) -> tuple[dict, np.ndarray]:
     return rows, np.asarray(src_ptr, dtype=np.int64)
 
 
-def nonag2ag_space(feasible_nonag2ag_mrj: dict) -> tuple[dict, np.ndarray]:
-    """The non-ag → ag arc columns as rows: one per feasible from_k → (to_m, to_j) transition at a cell, sorted by source in feasibility order; with the group bounds of each source's run."""
+def nonag2ag_space(arc_nonag2ag_src: dict) -> tuple[dict, np.ndarray]:
+    """The non-ag → ag arc columns as rows: one per from_k → (to_m, to_j) arc at a cell, sorted by source in source-map order; with the group bounds of each source's run."""
     print('Building the nonag2ag arc block...', flush = True)
     arc_rows = []                                            # one chunk of rows per source
     src_ptr = [0]                                            # where each source's run of rows starts / ends
-    for from_k, source in feasible_nonag2ag_mrj.items():
-        to_m, local_r, to_j = np.nonzero(source['feasible'])
-        cell = source['cells'][local_r]                      # index of the cell in the global cell list
+    for from_k, src in arc_nonag2ag_src.items():
+        to_m, local_r, to_j = np.nonzero(src['arc'])
+        cell = src['cells'][local_r]                      # index of the cell in the global cell list
         arc_rows.append(np.column_stack([
             np.full(cell.size, from_k),
             to_m,
@@ -438,7 +429,7 @@ def nonag2ag_space(feasible_nonag2ag_mrj: dict) -> tuple[dict, np.ndarray]:
 
     arcs = np.concatenate(arc_rows).astype(np.int32) if arc_rows else np.empty((0, 5), dtype=np.int32)   # one arc per row; the fields are its columns
 
-    # the column (gp.Var) view: one arc per feasible transition; no row view, nothing looks an arc up by its coordinates
+    # the column (gp.Var) view: one arc per positive upper bound; no row view, nothing looks an arc up by its coordinates
     rows = dict(
         from_k =arcs[:, 0],
         m      =arcs[:, 1],                                  # the ag (lm, lu) the arc lands on
@@ -504,18 +495,20 @@ def table_space(data: Data, blocks: dict, src_ptr: dict) -> xr.Dataset:
              ub     =(('col',), field('ub', np.float64, np.inf)),
              base   =(('col',), field('base', np.float32, 0.0))                              # the node-balance constant of an ag / non-ag column
         ),
-        attrs=dict(block_range=block_range,                                                  # {block: (start, stop)} — the rows each block owns, in the table's block order
-                   nlms=data.NLMS, 
-                   n_ag_lus=data.N_AG_LUS, 
-                   n_nonag_lus=data.N_NON_AG_LUS, 
-                   ncells=data.NCELLS,                                                       # the extent of the space: what the fields m / j / k / cell index into
-                   options=list(data.AGMAN2LU),                                              # the ag-management options, in am_idx order
-                   agman2lu=data.AGMAN2LU,                                                   # {option: [land-use codes]}: the (option, lu) slot order
-                   savanna_eligible_r=np.flatnonzero(data.SAVBURN_ELIGIBLE == 1),            # the solve read-back zeroes irr savanna columns outside these cells
-                   n_terms=n_terms,                                                          # the accounting group: the table's first rows, the width a demand / GHG / water / biodiversity / renewable coefficient array is allocated at
-                   n_dec=n_dec,                                                              # everything before the cell-use group: the objective is built at this width (a slack carries no cost)
-                   n_all=n_all,                                                              # every column: the rows are built at this width
-                   src_ptr={name: block_range[name][0] + ptr for name, ptr in src_ptr.items()})    # per arc block, the group bounds of its rows sorted by source, as table rows
+        attrs=dict(
+            block_range=block_range,                                                         # {block: (start, stop)} — the rows each block owns, in the table's block order
+            nlms=data.NLMS, 
+            n_ag_lus=data.N_AG_LUS, 
+            n_nonag_lus=data.N_NON_AG_LUS, 
+            ncells=data.NCELLS,                                                              # the extent of the space: what the fields m / j / k / cell index into
+            options=list(data.AGMAN2LU),                                                     # the ag-management options, in am_idx order
+            agman2lu=data.AGMAN2LU,                                                          # {option: [land-use codes]}: the (option, lu) slot order
+            savanna_eligible_r=np.flatnonzero(data.SAVBURN_ELIGIBLE == 1),                   # the solve read-back zeroes irr savanna columns outside these cells
+            n_terms=n_terms,                                                                 # the accounting group: the table's first rows, the width a demand / GHG / water / biodiversity / renewable coefficient array is allocated at
+            n_dec=n_dec,                                                                     # everything before the cell-use group: the objective is built at this width (a slack carries no cost)
+            n_all=n_all,                                                                     # every column: the rows are built at this width
+            src_ptr={name: block_range[name][0] + ptr for name, ptr in src_ptr.items()}      # per arc block, the group bounds of its rows sorted by source, as table rows
+        )     
     )
 
 
