@@ -28,7 +28,6 @@ from luto import settings
 from luto.data import Data
 from luto.economics.agricultural.transitions import (
     get_ag_allowed_mrj,
-    get_base_held,
     get_base_dvar_mj_cell_map,
     get_transition_matrices_ag2ag,
 )
@@ -361,7 +360,7 @@ def get_nonag2ag_ub(data: Data, base_year: int) -> np.ndarray:
     )).astype(np.float32)                                               # (k, to_j)
 
     # Reachable land share: sum base-year fractions of every non-ag source that can reach to_j.
-    reach_frac_rj = (get_base_held(data.non_ag_dvars[base_year]) @ t_kj).astype(np.float32)   # (NCELLS, to_j)
+    reach_frac_rj = (tools.get_base_held(data.non_ag_dvars[base_year]) @ t_kj).astype(np.float32)   # (NCELLS, to_j)
 
     # EXCLUDE × no-go, over every cell.
     allowed_mrj = get_ag_allowed_mrj(data)

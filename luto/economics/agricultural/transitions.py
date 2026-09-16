@@ -50,13 +50,6 @@ def get_base_dvar_mj_cell_map(data: Data, base_year: int) -> dict:
     }
 
 
-def get_base_held(dvar: np.ndarray) -> np.ndarray:
-    """The base-year holding the model recognises: a share at or below the ROUND_DECIMALS noise floor is dropped,
-    exactly as the source maps drop it. Nothing under the floor is a source, so no arc can move it — and it must
-    not raise a target's upper bound or a node's base either. Negatives (never expected) go to zero with it."""
-    return np.where(dvar > 10 ** (-settings.ROUND_DECIMALS), dvar, 0).astype(np.float32)
-
-
 def get_ag_allowed_mrj(data: Data, cells=None) -> np.ndarray:
     """(NLMS, len(cells) or NCELLS, N_AG_LUS) float32, 1 or 0: where an ag (lm, lu) is permitted at all —
     EXCLUDE (a land use absent from its SA2 region in 2010 is banned there forever) × the user's no-go
@@ -97,7 +90,7 @@ def get_ag2ag_ub(data: Data, base_year: int) -> np.ndarray:
     )).astype(np.float32)                                                                              # (from_j, to_j)
 
     # Reachable land share: sum the base-year fractions of every source LU that can reach to_j.
-    ag_frac_rj    = get_base_held(data.ag_dvars[base_year]).sum(axis=0)                                # (NCELLS, from_j)
+    ag_frac_rj    = tools.get_base_held(data.ag_dvars[base_year]).sum(axis=0)                                # (NCELLS, from_j)
     reach_frac_rj = (ag_frac_rj @ t_ag2ag_jj).astype(np.float32)                                       # (NCELLS, to_j)
 
     # EXCLUDE × no-go, over every cell.

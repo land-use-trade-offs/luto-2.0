@@ -85,6 +85,17 @@ def clamp_dvar_bound(arr: np.ndarray, lo, hi, name: str) -> np.ndarray:
     return out
 
 
+def get_base_held(dvar: np.ndarray) -> np.ndarray:
+    """The base-year holding the model recognises: a share at or below the ROUND_DECIMALS noise floor is dropped,
+    exactly as the source maps drop it. Nothing under the floor is a source, so no arc can move it — and it must
+    not raise a target's upper bound or a node's base either. Negatives (never expected) go to zero with it.
+
+    A deadband, not a clip: clamp_dvar_bound above bounds a range and leaves a sliver where it is, this zeroes it.
+    Both key off the same ROUND_DECIMALS floor, and every dvar that reaches the column space passes through one
+    or the other."""
+    return np.where(dvar > 10 ** (-settings.ROUND_DECIMALS), dvar, 0).astype(np.float32)
+
+
 def lumap2ag_l_mrj(lumap, lmmap):
     """
     Return land-use maps in decision-variable (X_mrj) format.
