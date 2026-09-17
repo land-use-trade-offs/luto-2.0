@@ -66,16 +66,21 @@ class LutoSolver:
         print("├── Setting up decision variables...")
         cols = self.cols
         lm_name = np.array(['dry', 'irr'])
-        snake_of_slot = np.array([tools.am_name_snake_case(option) for option, lus in cols.attrs['agman2lu'].items() for _ in lus], dtype=object)   # the (option, lu) slots in slot order
-        self.x = self.gurobi_model.addMVar(cols.attrs['n_all'], lb=cols['lb'].values, ub=cols['ub'].values, name="X")
+        snake_of_option = np.array([tools.am_name_snake_case(option) for option in cols.attrs['options']], dtype=object)   # the options in am_idx order
+        self.x = self.gurobi_model.addMVar(
+            cols.attrs['n_all'], 
+            lb=cols['lb'].values, 
+            ub=cols['ub'].values, 
+            name="X"
+        )
 
         names_of = {                                                                # the name of every column of a block, from its fields
             'ag':         lambda t: [f"X_ag_{lm_name[m]}_{j}_{r}" 
                                      for m, j, r in zip(t['m'], t['j'], t['cell'])],
             'nonag':      lambda t: [f"X_non_ag_{k}_{r}" 
                                      for k, r in zip(t['k'], t['cell'])],
-            'am':         lambda t: [f"X_ag_man_{lm_name[m]}_{snake_of_slot[slot]}_{j}_{r}".replace(" ", "_")
-                                     for slot, m, j, r in zip(t['slot'], t['m'], t['j'], t['cell'])],
+            'am':         lambda t: [f"X_ag_man_{lm_name[m]}_{snake_of_option[am_idx]}_{j}_{r}".replace(" ", "_")
+                                     for am_idx, m, j, r in zip(t['am_idx'], t['m'], t['j'], t['cell'])],
             'ag2ag':      lambda t: [f"F_a2a_{from_m}_{from_j}[{m},{local_r},{j}]"
                                      for from_m, from_j, m, local_r, j in zip(t['from_m'], t['from_j'], t['m'], t['local_r'], t['j'])],
             'ag2nonag':   lambda t: [f"F_a2n_{from_m}_{from_j}[{k},{local_r}]"
@@ -88,7 +93,7 @@ class LutoSolver:
      
         for block, block_rows in cols.attrs['block_range'].items():
             span = slice(*block_rows)
-            fields = {field: cols[field].values[span] for field in ('m', 'j', 'k', 'slot', 'from_m', 'from_j', 'from_k', 'local_r', 'cell')}
+            fields = {field: cols[field].values[span] for field in ('m', 'j', 'k', 'am_idx', 'from_m', 'from_j', 'from_k', 'local_r', 'cell')}
             self.gurobi_model.setAttr('VarName', self.x[span].tolist(), names_of[block](fields))
             print(f"│   {'└──' if block == 'cell_usage' else '├──'} {block:<10s} {span.stop - span.start:>12,} variables")
 

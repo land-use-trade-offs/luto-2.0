@@ -39,16 +39,16 @@ from luto.solvers.row_inputs import RowInputs
 
 @dataclass
 class SolverSolution:
-    lumap: np.ndarray                                                     # the land use of every cell (non-ag codes offset by NON_AGRICULTURAL_LU_BASE_CODE)
-    lmmap: np.ndarray                                                     # the land management of every cell (0 = dry, 1 = irr; non-ag cells are dry)
-    ammaps: dict[str, np.ndarray]                                         # {option: 0/1 per cell} — 1 where the cell's chosen (lm, lu) carries the option at or above AGRICULTURAL_MANAGEMENT_USE_THRESHOLD
-    ag_X_mrj: np.ndarray                                                  # the ag shares, float32 (NLMS, NCELLS, N_AG_LUS), fractional values as solved
-    non_ag_X_rk: np.ndarray                                               # the non-ag shares, float32 (NCELLS, N_NON_AG_LUS); a disabled land use stays at zero
-    ag_man_X_mrj: dict[str, np.ndarray]                                   # {option: the ag-mgt shares, float32 (NLMS, NCELLS, N_AG_LUS)}
-    dvar_D_ag2ag_mrj: dict                                                # Solved ag->ag deltas, SOURCE-KEYED: {(from_m, from_j): ndarray(NLMS, ncells_src, N_AG_LUS) [to_m, local_r, to_j]} over the source's cells (get_base_dvar_mj_cell_map)
-    dvar_D_ag2nonag_rk: dict                                              # Solved ag->nonag deltas, SOURCE-KEYED: {(from_m, from_j): ndarray(ncells_src, N_NON_AG_LUS) [local_r, k]}
-    dvar_D_nonag2ag_mrj: dict                                             # Solved nonag->ag deltas, SOURCE-KEYED: {from_k: ndarray(NLMS, ncells_k, N_AG_LUS) [to_m, local_r, to_j]} (e.g. reversible Destocked back to ag; cells via get_base_nonag_dvar_k_cell_map)
-    prod_data: dict[str, Any]                                             # what the writers read: 'Production' (raw t per commodity, unscaled) and 'GHG' (raw tCO2e, the off-land constant included)
+    lumap: np.ndarray                               # the land use of every cell (non-ag codes offset by NON_AGRICULTURAL_LU_BASE_CODE)
+    lmmap: np.ndarray                               # the land management of every cell (0 = dry, 1 = irr; non-ag cells are dry)
+    ammaps: dict[str, np.ndarray]                   # {option: 0/1 per cell} — 1 where the cell's chosen (lm, lu) carries the option at or above AGRICULTURAL_MANAGEMENT_USE_THRESHOLD
+    ag_X_mrj: np.ndarray                            # the ag shares, float32 (NLMS, NCELLS, N_AG_LUS), fractional values as solved
+    non_ag_X_rk: np.ndarray                         # the non-ag shares, float32 (NCELLS, N_NON_AG_LUS); a disabled land use stays at zero
+    ag_man_X_mrj: dict[str, np.ndarray]             # {option: the ag-mgt shares, float32 (NLMS, NCELLS, N_AG_LUS)}
+    dvar_D_ag2ag_mrj: dict                          # Solved ag->ag deltas, SOURCE-KEYED: {(from_m, from_j): ndarray(NLMS, ncells_src, N_AG_LUS) [to_m, local_r, to_j]} over the source's cells (get_base_dvar_mj_cell_map)
+    dvar_D_ag2nonag_rk: dict                        # Solved ag->nonag deltas, SOURCE-KEYED: {(from_m, from_j): ndarray(ncells_src, N_NON_AG_LUS) [local_r, k]}
+    dvar_D_nonag2ag_mrj: dict                       # Solved nonag->ag deltas, SOURCE-KEYED: {from_k: ndarray(NLMS, ncells_k, N_AG_LUS) [to_m, local_r, to_j]} (e.g. reversible Destocked back to ag; cells via get_base_nonag_dvar_k_cell_map)
+    prod_data: dict[str, Any]                       # what the writers read: 'Production' (raw t per commodity, unscaled) and 'GHG' (raw tCO2e, the off-land constant included)
 
 
 def post_solve(x: np.ndarray, cols: xr.Dataset, col_side: ColSide, rows: xr.Dataset, row_side: RowSide, inputs: RowInputs) -> SolverSolution:
@@ -56,17 +56,18 @@ def post_solve(x: np.ndarray, cols: xr.Dataset, col_side: ColSide, rows: xr.Data
     what every entry of x is, the col side which source each arc belongs to, the row side and the row table
     give the production data."""
     print("Collecting results...\n", flush=True)
-    nlms, n_ag_lus, n_nonag_lus, ncells = (cols.attrs[key] for key in ('nlms', 'n_ag_lus', 'n_nonag_lus', 'ncells'))
-    agman2lu = cols.attrs['agman2lu']
+    n_ag_lus    = inputs.n_ag_lus
+    n_nonag_lus = inputs.n_nonag_lus
+    ncells      = inputs.ncells
+    agman2lu    = inputs.agman2lu
+    block_range = cols.attrs['block_range']
 
     # ── 1. the decision variables: x scattered back through the table's fields (float64 -> float32) ──
-    rows_of = {block: slice(*block_rows) for block, block_rows in cols.attrs['block_range'].items()}
-    m = cols['m'].values
-    j = cols['j'].values
-    k = cols['k'].values
-    am_idx = cols['am_idx'].values
-    local_r = cols['local_r'].values
-    cell = cols['cell'].values
+    m       = cols['m'].values
+    j       = cols['j'].values
+    k       = cols['k'].values
+    am_idx  = cols['am_idx'].values
+    cell    = cols['cell'].values
 
     X_dry_sol_rj = np.zeros((ncells, n_ag_lus), dtype=np.float32)
     X_irr_sol_rj = np.zeros((ncells, n_ag_lus), dtype=np.float32)
@@ -75,21 +76,21 @@ def post_solve(x: np.ndarray, cols: xr.Dataset, col_side: ColSide, rows: xr.Data
     am_X_irr_sol_rj = {am: np.zeros((ncells, n_ag_lus), dtype=np.float32) for am in agman2lu}
 
     # agricultural
-    ag = rows_of['ag']
+    ag = slice(*block_range['ag'])
     is_dry = m[ag] == 0
     X_dry_sol_rj[cell[ag][is_dry],  j[ag][is_dry]]  = x[ag][is_dry]
     X_irr_sol_rj[cell[ag][~is_dry], j[ag][~is_dry]] = x[ag][~is_dry]
 
-    # non-agricultural (disabled land uses have no columns and stay at zero)
-    nonag = rows_of['nonag']
+    # non-agricultural (a disabled land use's columns are fixed at zero)
+    nonag = slice(*block_range['nonag'])
     non_ag_X_sol_rk[cell[nonag], k[nonag]] = x[nonag]
 
     # ag-management. Savanna eligibility is applied to BOTH lm here, while variable creation applied
     # it to dry only: irr savanna vars outside the eligible cells report 0.
-    am = rows_of['am']
+    am = slice(*block_range['am'])
     options = cols.attrs['options']
     am_of_col = np.asarray(options, dtype=object)[am_idx[am]]
-    reported = ~((am_of_col == "Savanna Burning") & (m[am] == 1) & ~np.isin(cell[am], cols.attrs['savanna_eligible_r']))
+    reported = ~((am_of_col == "Savanna Burning") & (m[am] == 1) & ~np.isin(cell[am], inputs.savanna_eligible_r))
     for option in options:
         dry_cols = reported & (am_of_col == option) & (m[am] == 0)
         irr_cols = reported & (am_of_col == option) & (m[am] == 1)
@@ -102,31 +103,20 @@ def post_solve(x: np.ndarray, cols: xr.Dataset, col_side: ColSide, rows: xr.Data
     # ── 2. the transition deltas: the gross flows the objective charged, SOURCE-KEYED so reporting can
     #       attribute the true from → to flows. Leaf axes mirror the flow_cost dicts ([to_m, local_r, to_j]
     #       for ag targets, [local_r, k] for non-ag targets); local_r indexes the source's cell list.
-    #       Each source's arcs are one run of the block's rows (src_ptr = the group bounds of the block sorted by source).
+    #       Each source's arcs are one run of the block (<block>_range on the table) enumerated from one mask (the column
+    #       side): its run of x scattered back through its mask is its dense delta array.
     dvar_D_ag2ag_mrj    = {}   # (from_m, from_j) -> (NLMS, ncells_src, N_AG_LUS)
     dvar_D_ag2nonag_rk  = {}   # (from_m, from_j) -> (ncells_src, N_NON_AG_LUS)
     dvar_D_nonag2ag_mrj = {}   # from_k           -> (NLMS, ncells_k, N_AG_LUS)
     x_arcs = x.astype(np.float32)
 
-    def src_rows(block, src_idx):
-        src_ptr = cols.attrs['src_ptr'][block]
-        return slice(int(src_ptr[src_idx]), int(src_ptr[src_idx + 1]))
-
-    for src_idx, ((from_m, from_j), cells) in enumerate(col_side.sources_ag.items()):
-        arcs = src_rows('ag2ag', src_idx)
-        deltas = np.zeros((nlms, len(cells), n_ag_lus), dtype=np.float32)
-        deltas[m[arcs], local_r[arcs], j[arcs]] = x_arcs[arcs]
-        dvar_D_ag2ag_mrj[(from_m, from_j)] = deltas
-
-        arcs = src_rows('ag2nonag', src_idx)
-        deltas = np.zeros((len(cells), n_nonag_lus), dtype=np.float32)
-        deltas[local_r[arcs], k[arcs]] = x_arcs[arcs]
-        dvar_D_ag2nonag_rk[(from_m, from_j)] = deltas
-    for src_idx, (from_k, cells) in enumerate(col_side.sources_nonag.items()):
-        arcs = src_rows('nonag2ag', src_idx)
-        deltas = np.zeros((nlms, len(cells), n_ag_lus), dtype=np.float32)
-        deltas[m[arcs], local_r[arcs], j[arcs]] = x_arcs[arcs]
-        dvar_D_nonag2ag_mrj[from_k] = deltas
+    for block, masks, deltas_of in (('ag2ag',    col_side.valid_ag2ag,    dvar_D_ag2ag_mrj),
+                                    ('ag2nonag', col_side.valid_ag2nonag, dvar_D_ag2nonag_rk),
+                                    ('nonag2ag', col_side.valid_nonag2ag, dvar_D_nonag2ag_mrj)):
+        for src, mask in masks.items():
+            deltas = np.zeros(mask.shape, dtype=np.float32)
+            deltas[mask] = x_arcs[slice(*cols.attrs[f'{block}_range'][src])]
+            deltas_of[src] = deltas
 
     # ── 3. the maps: land use, land management, ag-management options ──
     non_ag_dominates_r = non_ag_X_sol_rk.max(axis=1) > ag_X_mrj.max(axis=(0, 2))   # used for lumap/lmmap only
