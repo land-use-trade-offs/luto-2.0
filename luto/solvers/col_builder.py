@@ -21,7 +21,6 @@ import numpy as np
 import xarray as xr
 
 from dataclasses import dataclass
-from scipy import sparse
 
 import luto.settings as settings
 import luto.tools as tools
@@ -39,17 +38,14 @@ class ColSide:
     an index: every subset comes as a PAIR of handles — one slices the input (``valid_*``, ``region2cell``), its twin 
     slices the column table (``block_range`` / ``*_range``, ``region2col``) — and a constraint is input[handle] · x[twin]."""
 
-    valid_ag_mrj: np.ndarray      # add the contributions from ag       : contr_ag = input_mrj[side.valid_ag_mrj] · table[slice(*cols.attrs['block_range']['ag'])]
-    valid_nonag_rk: np.ndarray    # add the contributions from non-ag   : contr_nonag = input_rk[side.valid_nonag_rk] · table[slice(*cols.attrs['block_range']['nonag'])]
-    valid_am: dict                # add the contributions from ag-mgt   : contr_am = input_am_smr[side.valid_am[slot]] · table[slice(*cols.attrs['am_range'][slot])]
-    valid_ag2ag: dict             # add the contributions from ag→ag    : contr_ag2ag = input_ag2ag_src[src][side.valid_ag2ag[src]] · table[slice(*cols.attrs['ag2ag_range'][src])] 
-    valid_ag2nonag: dict          # add the contributions from ag→nonag : contr_ag2nonag = input_ag2nonag_src[src][side.valid_ag2nonag[src]] · table[slice(*cols.attrs['ag2nonag_range'][src])]
-    valid_nonag2ag: dict          # add the contributions from nonag→ag : contr_nonag2ag = input_nonag2ag_src[src][side.valid_nonag2ag[src]] · table[slice(*cols.attrs['nonag2ag_range'][src])]
-    region2cell: xr.Dataset       # filter the INPUT by region          : region_r = side.region2cell['water_region'] == reg_id;  input_in_region = input_mrj[:, region_r, :][side.valid_ag_mrj[:, region_r, :]]
-    region2col: xr.Dataset        # filter the gp.Vars table by region  : region_c = side.region2col['water_region'] == reg_id;   ag_in_region = table[slice(*cols.attrs['block_range']['ag'])][region_c[ag]]  — the two line up: same cells, same C order
-    by_cell: sparse.csr_matrix    # count the contributions by cell for the rows whose weight is a layer over cells (a species' area, the GBF2 mask area, one cell): ``W @ (by_cell @ diags(c))``, by_cell = 1 at (cell, column)
-    col_ag_mjr: np.ndarray        # join columns by ag node: col_ag_mjr[m, j, r] is the ag column at (m, j, r), -1 none — the host of an am column (link), the X an arc enters / leaves (node balance), the base of a source (source cap)
-    col_nonag_kr: np.ndarray      # join columns by non-ag node: col_nonag_kr[k, r] is the non-ag column at (k, r), -1 none — the X an arc enters / leaves (node balance), the base of a source (source cap)
+    valid_ag_mrj: np.ndarray      # filter the INPUT to the ag entries that have a column, as a 1-D vector in column order     
+    valid_nonag_rk: np.ndarray    # filter the INPUT to the non-ag entries that have a column, as a 1-D vector in column order 
+    valid_am: dict                # filter an option's INPUT at one land use to the entries that have a column, per slot       
+    valid_ag2ag: dict             # filter a source's ag→ag INPUT to the arcs that have a column, per source                   
+    valid_ag2nonag: dict          # filter a source's ag→non-ag INPUT to the arcs that have a column, per source               
+    valid_nonag2ag: dict          # filter a source's non-ag→ag INPUT to the arcs that have a column, per source               
+    region2cell: xr.Dataset       # filter the INPUT by region                                                                 
+    region2col: xr.Dataset        # filter the gp.Vars table by region
 
 
 def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSide]:
@@ -120,8 +116,7 @@ def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSide]:
     for name, (start, stop) in block_range.items():
         print(f"{'└──' if name == list(block_range)[-1] else '├──'} {name:<10s} {stop - start:>12,}", flush=True)
 
-    # ── 7. the space: the table, and beside it the masks every block was enumerated from, the region label of every column, the incidence and the id grids ──
-    by_cell, col_ag_mjr, col_nonag_kr = col_support(table, valid_ag_mrj, valid_nonag_rk)
+    # ── 7. the space: the table, and beside it the handles — the mask every block was enumerated from, and the region pair ──
     region2cell = cell_regions(data)                                                # the region layers on cell: what filters an input
     region2col  = region2cell.isel(cell=table['cell'].values).rename(cell='col')    # the same layers read at every column's cell: what filters the table
     return table, ColSide(
@@ -133,9 +128,6 @@ def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSide]:
         valid_nonag2ag=valid_nonag2ag,
         region2cell=region2cell,
         region2col=region2col,
-        by_cell=by_cell,
-        col_ag_mjr=col_ag_mjr,
-        col_nonag_kr=col_nonag_kr,
     )
 
 
@@ -454,32 +446,6 @@ def table_space(blocks: dict, chunks: dict, options: list) -> xr.Dataset:
             n_all=n_all,                                                                     # every column: the rows are built at this width
         )
     )
-
-
-def col_support(table: xr.Dataset, valid_ag_mrj: np.ndarray, valid_nonag_rk: np.ndarray) -> tuple[sparse.csr_matrix, np.ndarray, np.ndarray]:
-    """The support the row side reads, derived from the finished table: the (cell × col) incidence — 1 where
-    column c sits in cell r, so a family's weight rows over cells W become rows over columns as
-    ``W @ (by_cell @ diags(c))`` — and the ag / non-ag column-id grids, the table row of the column at each
-    (m, j, r) / (k, r), -1 where there is none."""
-    nlms, ncells, n_ag_lus = valid_ag_mrj.shape                                  # the grids' extents, off the masks the blocks were enumerated from
-    n_nonag_lus            = valid_nonag_rk.shape[1]
-    n_all                  = table.attrs['n_all']
-
-    cell        = table['cell'].values
-    ag          = slice(*table.attrs['block_range']['ag'])
-    nonag       = slice(*table.attrs['block_range']['nonag'])
-
-    by_cell = sparse.csr_matrix(
-        (np.ones(n_all, dtype=np.float32), (cell, np.arange(n_all, dtype=np.int32))),
-        shape=(ncells, n_all)
-    )
-
-    col_ag_mjr = np.full((nlms, n_ag_lus, ncells), -1, dtype=np.int32)
-    col_ag_mjr[table['m'].values[ag], table['j'].values[ag], cell[ag]] = np.arange(ag.start, ag.stop, dtype=np.int32)
-
-    col_nonag_kr = np.full((n_nonag_lus, ncells), -1, dtype=np.int32)
-    col_nonag_kr[table['k'].values[nonag], cell[nonag]] = np.arange(nonag.start, nonag.stop, dtype=np.int32)
-    return by_cell, col_ag_mjr, col_nonag_kr
 
 
 def cell_regions(data: Data) -> xr.Dataset:
