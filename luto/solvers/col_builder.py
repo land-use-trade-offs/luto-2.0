@@ -21,6 +21,7 @@ import numpy as np
 import xarray as xr
 
 from dataclasses import dataclass
+from scipy import sparse
 
 import luto.settings as settings
 import luto.tools as tools
@@ -36,22 +37,28 @@ from luto.solvers.row_inputs import get_mask_gbf2_solar, get_mask_gbf2_wind
 class ColSide:
     """Supporting data that maps the SPARSE column variables onto the DENSE input arrays, so the row side never infers 
     an index: every subset comes as a PAIR of handles — one slices the input (``valid_*``, ``region2cell``), its twin 
-    slices the column table (``block_range`` / ``*_range``, ``region2col``) — and a constraint is input[handle] · x[twin]."""
+    slices the column table (``block_range`` / ``*_range``, ``region2col``) — and a constraint is input[handle] · x[twin].
+    Beside them, the same pairs vectorised for the rows that need them at once: ``cell2col`` (every cell's variables,
+    for the layer families) and ``ag_mrj2col`` / ``nonag_rk2col`` (the masks read backwards, position → column, for the
+    rows that join variables by node)."""
 
     valid_ag_mrj: np.ndarray      # filter the INPUT to the ag entries that have a column, as a 1-D vector in column order     
     valid_nonag_rk: np.ndarray    # filter the INPUT to the non-ag entries that have a column, as a 1-D vector in column order 
-    valid_am: dict                # filter an option's INPUT at one land use to the entries that have a column, per slot       
+    valid_am: dict                # filter an option's INPUT at one land use and one lm to the cells that have a column, per (option, j_idx, m)
     valid_ag2ag: dict             # filter a source's ag→ag INPUT to the arcs that have a column, per source                   
     valid_ag2nonag: dict          # filter a source's ag→non-ag INPUT to the arcs that have a column, per source               
     valid_nonag2ag: dict          # filter a source's non-ag→ag INPUT to the arcs that have a column, per source               
-    region2cell: xr.Dataset       # filter the INPUT by region                                                                 
+    region2cell: xr.Dataset       # filter the INPUT by region
     region2col: xr.Dataset        # filter the gp.Vars table by region
+    # the three below are read by get_rows only; simulation frees them before the solve
+    cell2col: sparse.csr_matrix   # (cell x col), 1 where a variable (ag/nonag/am/ag2ag/ag2nonag/nonag2ag/cell_usage) sits in the cell: for each cell, the variables in it
+    ag_mrj2col: np.ndarray        # (lm, cell, lu) int32: for each ag position, the column index of its variable, -1 where it has none (no arcs, no am)
+    nonag_rk2col: np.ndarray      # (cell, nonag_lu) int32: for each non-ag position, the column index of its variable, -1 where it has none
 
 
 def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSide]:
     """The column space of one solve step: every unknown as one row of the long table ``cols`` (on ``col`` =
-    Var.index), and beside it the ``ColSide``: the support the row side reads by position (the cell × col
-    incidence, the column-id grids) and the grids for what has no column."""
+    Var.index), and beside it the ``ColSide``: the handles the row side slices the inputs and the table with."""
 
     # ── 1. sources (FROM-view): the base-year holders of land ──
     trans_source_ag         = ag_transition.get_base_dvar_mj_cell_map(data, base_year)          # (from_m, from_j): global cell indices
@@ -98,11 +105,12 @@ def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSide]:
         'cell_use':   dict(cell_usage=cell_usage_rows),                                             # no cost at all: the objective stops where they start (n_dec)
     }
 
-    # the chunks inside the am and arc blocks — one per (option, land use) slot, one per source — by their widths: the
+    # the chunks inside the am and arc blocks — one per (option, land use, lm), one per source — by their widths: the
     # table lays them out as it lays the blocks out, and keeps their (start, stop) beside block_range
-    slots = [(option, j_idx) for option, lus in data.AGMAN2LU.items() for j_idx in range(len(lus))]
+    slots    = [(option, j_idx) for option, lus in data.AGMAN2LU.items() for j_idx in range(len(lus))]
+    valid_am = {(option, j_idx, m): valid_am_smr[s, m] for s, (option, j_idx) in enumerate(slots) for m in range(data.NLMS)}   # {(option, j_idx, m): bool (cell,)}, in the am block's (slot, lm) order
     chunks = {
-        'am':       {slot: int(n) for slot, n in zip(slots, valid_am_smr.sum(axis=(1, 2)))},
+        'am':       {key: int(mask.sum()) for key, mask in valid_am.items()},
         'ag2ag':    {src: int(mask.sum()) for src, mask in valid_ag2ag.items()},
         'ag2nonag': {src: int(mask.sum()) for src, mask in valid_ag2nonag.items()},
         'nonag2ag': {src: int(mask.sum()) for src, mask in valid_nonag2ag.items()},
@@ -116,18 +124,38 @@ def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSide]:
     for name, (start, stop) in block_range.items():
         print(f"{'└──' if name == list(block_range)[-1] else '├──'} {name:<10s} {stop - start:>12,}", flush=True)
 
-    # ── 7. the space: the table, and beside it the handles — the mask every block was enumerated from, and the region pair ──
+    # ── 7. the space: the table, and beside it the handles — the mask every block was enumerated from, the region pair,
+    #       the cell incidence and the position → column grids ──
     region2cell = cell_regions(data)                                                # the region layers on cell: what filters an input
     region2col  = region2cell.isel(cell=table['cell'].values).rename(cell='col')    # the same layers read at every column's cell: what filters the table
+
+    # for each cell, which variables sit in it: the table's ``cell`` field as a (cell x col) matrix, 1 where they do
+    cell     = table['cell'].values                                                 # the cell each gp Variable (column) sits in, one per column
+    n_all    = table.attrs['n_all']                                                 # num of gp Variables (columns)
+    cell2col = sparse.csr_matrix(
+        (np.ones(n_all, dtype=np.float32), (cell, np.arange(n_all, dtype=np.int32))),
+        shape=(data.NCELLS, n_all)
+    )
+
+    # for each mrj / rk position, which ag / non-ag variable it is: the column at a valid entry is its running count
+    # within the block (the mask read backwards), -1 where it has none (no arcs, no am)
+    ag           = slice(*block_range['ag'])
+    nonag        = slice(*block_range['nonag'])
+    ag_mrj2col   = np.where(valid_ag_mrj,   ag.start    + np.cumsum(valid_ag_mrj).reshape(valid_ag_mrj.shape)     - 1, -1).astype(np.int32)
+    nonag_rk2col = np.where(valid_nonag_rk, nonag.start + np.cumsum(valid_nonag_rk).reshape(valid_nonag_rk.shape) - 1, -1).astype(np.int32)
+
     return table, ColSide(
         valid_ag_mrj=valid_ag_mrj,
         valid_nonag_rk=valid_nonag_rk,
-        valid_am={slot: valid_am_smr[s] for s, slot in enumerate(slots)},
+        valid_am=valid_am,
         valid_ag2ag=valid_ag2ag,
         valid_ag2nonag=valid_ag2nonag,
         valid_nonag2ag=valid_nonag2ag,
         region2cell=region2cell,
         region2col=region2col,
+        cell2col=cell2col,
+        ag_mrj2col=ag_mrj2col,
+        nonag_rk2col=nonag_rk2col,
     )
 
 
@@ -439,7 +467,7 @@ def table_space(blocks: dict, chunks: dict, options: list) -> xr.Dataset:
         ),
         attrs=dict(
             block_range=block_range,                                                         # {block: (start, stop)} — the rows each block owns, in the table's block order
-            **chunk_range,                                                                   # am_range {(option, j_idx): (start, stop)}, ag2ag_range / ag2nonag_range / nonag2ag_range {source: (start, stop)} — the runs inside those blocks
+            **chunk_range,                                                                   # am_range {(option, j_idx, m): (start, stop)}, ag2ag_range / ag2nonag_range / nonag2ag_range {source: (start, stop)} — the runs inside those blocks
             options=options,                                                                 # the ag-management options, in am_idx order: what the am_idx field means
             n_terms=n_terms,                                                                 # the accounting group: the table's first rows, the width a demand / GHG / water / biodiversity / renewable coefficient array is allocated at
             n_dec=n_dec,                                                                     # everything before the cell-use group: the objective is built at this width (a slack carries no cost)
@@ -453,12 +481,19 @@ def cell_regions(data: Data) -> xr.Dataset:
     ``nrm`` codes and the ``water_region`` id — with the code → name maps in attrs. Read at the columns' cells it is
     ``region2col``; a region's cells are ``region2cell[layer] == code`` and its columns ``region2col[layer] == code``.
     (The regional-adoption caps carry their own cell set, because their region is whichever layer the settings pick,
-    so they are not a layer here.)"""
+    so they are not a layer here.) The ``ibra`` bioregion layer (-1 = no bioregion) is there only when the GBF3 targets
+    are set per IBRA bioregion, the one mode that loads it."""
+    ibra, ibra_name = {}, {}
+    if settings.GBF3_NVIS_TARGET != 'off' and settings.GBF3_NVIS_REGION_MODE == 'IBRA_REG':
+        ibra      = dict(ibra=(('cell',), np.asarray(data.REGION_IBRA_CODE).astype(np.int32)))
+        ibra_name = dict(ibra_name=dict(enumerate(data.REGION_IBRA_NAMES)))
     return xr.Dataset(
         dict(state        =(('cell',), np.asarray(data.REGION_STATE_CODE).astype(np.int16)),
              nrm          =(('cell',), np.asarray(data.REGION_NRM_CODE).astype(np.int32)),
-             water_region =(('cell',), np.asarray(data.WATER_REGION_ID).astype(np.int32))),
+             water_region =(('cell',), np.asarray(data.WATER_REGION_ID).astype(np.int32)),
+             **ibra),
         attrs=dict(state_name={code: name for name, code in data.REGION_STATE_NAME2CODE.items()},
                    nrm_name=dict(zip(np.asarray(data.REGION_NRM_CODE).tolist(), np.asarray(data.REGION_NRM_NAME).tolist())),
-                   water_region_name=dict(data.WATER_REGION_NAMES)),
+                   water_region_name=dict(data.WATER_REGION_NAMES),
+                   **ibra_name),
     )

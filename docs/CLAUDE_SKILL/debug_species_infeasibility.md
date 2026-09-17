@@ -470,7 +470,7 @@ model.Params.OutputFlag   = 1
 
 # Compute constraint row metrics (raw units — the layers and targets reach the solver unscaled;
 # the solver rescales each ROW at build time and keeps the factor in bio_GBF4_*_scales)
-reg_matrix = input_data.region_NRM_names_r
+reg_matrix = data.REGION_NRM_NAME              # the NRM name of every cell (RowInputs no longer carries it)
 if typ == "SNES":
     val_matrix    = input_data.GBF4_SNES_pre_1750_area_sr
 else:

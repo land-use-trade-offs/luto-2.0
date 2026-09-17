@@ -1538,6 +1538,14 @@ class Data:
                 nvis_layers_arr,
             ).astype(np.float32)
 
+            # IBRA_REG mode: the bioregion of every cell, so a (bioregion, group) target is masked to its own cells
+            # (sampled at the cell like the NRM / state labels). Code = position in REGION_IBRA_NAMES, -1 = no bioregion.
+            if settings.GBF3_NVIS_REGION_MODE == 'IBRA_REG':
+                with xr.open_dataset(os.path.join(settings.INPUT_DIR, 'bio_GBF3_IBRA_Regions.nc')) as ibra_ds:
+                    self.REGION_IBRA_NAMES = ibra_ds['region'].values.tolist()
+                    in_region_vr = ibra_ds['data'].values[:, self.MASK]                      # bool (region, cell): read whole, then masked (a lazy boolean index on the compressed variable crawls)
+                self.REGION_IBRA_CODE = np.where(in_region_vr.any(axis=0), in_region_vr.argmax(axis=0), -1).astype(np.int32)
+
 
 
         ##########################################################################
