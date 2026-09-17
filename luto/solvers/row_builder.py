@@ -60,7 +60,7 @@ def get_rows(inputs: RowInputs, cols: xr.Dataset, side: ColSide) -> tuple[xr.Dat
     print("│   ├── Adding constraints for biodiversity...")
     bio_on = any(target != 'off' for target in (settings.GBF2_TARGET, settings.GBF3_NVIS_TARGET,
                                                 settings.GBF4_TARGET_SNES, settings.GBF4_TARGET_ECNES, settings.GBF8_TARGET))
-    bio_S = side.cell2var @ sparse.diags(bio_coeff(inputs, cols, side)) if bio_on else None   # the biodiversity contribution laid on the support ONCE: every GBF family's rows are W @ bio_S
+    bio_S = side.by_cell @ sparse.diags(bio_coeff(inputs, cols, side)) if bio_on else None   # the biodiversity contribution laid on the support ONCE: every GBF family's rows are W @ bio_S
     parts += [
         add_GBF2(inputs, cols, bio_S),
         add_GBF3_NVIS(inputs, cols, bio_S),
@@ -99,10 +99,13 @@ def get_rows(inputs: RowInputs, cols: xr.Dataset, side: ColSide) -> tuple[xr.Dat
 # The model is one matrix, rows × cols. The columns are the column table; every family below produces ROWS of
 # that matrix, always the same way: GATHER a coefficient per column — a block's wide input array masked by the mask the
 # block was enumerated from is its run of the table, ``c[slice(*cols.attrs[<block>_range][key])] = input[mask]`` — lay
-# it on the SUPPORT (``side.cell2var @ diags(c)``: the coefficient at (cell, column)) and multiply by the family's WEIGHT
-# ROWS over cells (``W @ ...``: row i, column t = W[i, cell_t] · c_t, one float32 product per entry), and CONTRACT
-# the stacked block in one loop over its rows — the SOLVER_COEFF_MIN drop, then (policy families only) the
-# geomean row rescale and the floor again.
+# then pick the columns of each ROW: a regional family (water, renewable) by the column's region label,
+# ``side.region2col[layer] == code`` (the block-by-block union it stands for — the input filtered by ``region2cell``,
+# the block's run by ``region2col`` — is hoisted into the one gather); a layer family (GBF2/3/4/8, cell usage, the ceiling) by laying the
+# coefficient on the cell incidence and multiplying the family's WEIGHT ROWS over cells (``W @ (side.by_cell @
+# diags(c))``: row i, column t = W[i, cell_t] · c_t, one float32 product per entry) — and CONTRACT the stacked block
+# in one loop over its rows — the SOLVER_COEFF_MIN drop, then (policy families only) the geomean row rescale and
+# the floor again.
 
 def gather(cols: xr.Dataset, side: ColSide, ag_c_mrj, am_c_mrj: dict, nonag_c_rk) -> np.ndarray:
     """One family's coefficient at every column, float32 (zero off the accounting columns): the ag input (lm, cell, lu),
@@ -228,11 +231,11 @@ def add_renewable_ceiling(inputs: RowInputs, cols: xr.Dataset, side: ColSide):
         am_name = tools.am_name_snake_case(option)
         exist_r = inputs.exist_renewable_solar_r if option == "Utility Solar PV" else inputs.exist_renewable_wind_r   # the total across ALL data years: the ceiling never decreases between periods, so lb(t) <= ceiling always holds
         on_option = (am_idx == cols.attrs['options'].index(option)).astype(np.float32)          # 1 on the option's columns
-        has_option = side.cell2var @ on_option != 0                                            # the cells holding a column of the option ...
+        has_option = side.by_cell @ on_option != 0                                            # the cells holding a column of the option ...
         row_cells = np.flatnonzero(has_option & (exist_r != 0))                                  # ... and existing capacity (none -> no ceiling row): one row each, ascending
         if not row_cells.size:
             continue
-        blocks.append(side.cell2var[row_cells] @ sparse.diags(on_option))                     # the support at those cells, over the option's columns
+        blocks.append(side.by_cell[row_cells] @ sparse.diags(on_option))                     # the support at those cells, over the option's columns
         rhs.append(np.maximum(ag_mask[row_cells] - exist_r[row_cells], 0.0))                    # cell space left for simulated capacity
         names += [f"const_{am_name}_solvable_ub_{r}".replace(" ", "_") for r in row_cells]
         key_am += [cols.attrs['options'].index(option)] * row_cells.size
@@ -250,7 +253,7 @@ def add_cell_usage(inputs: RowInputs, cols: xr.Dataset, side: ColSide):
     takes_space = np.zeros(cols.attrs['n_all'], dtype=np.float32)        # 1 on the ag, non-ag and slack columns: what a cell's shares sum over
     for block in ('ag', 'nonag', 'cell_usage'):
         takes_space[slice(*block_range[block])] = 1.0
-    A = side.cell2var[row_cells] @ sparse.diags(takes_space)
+    A = side.by_cell[row_cells] @ sparse.diags(takes_space)
     # Ranged, not ==: presolve folds the node-balance rows into this one and compares two constants summed
     # along different float32 paths (up to ~1.75x FeasibilityTol apart) with NO tolerance. The +-10x Ftol band
     # absorbs that; conservation still pins the cell total, so the band is not exploitable.
@@ -614,19 +617,22 @@ def add_GBF8(inputs: RowInputs, cols: xr.Dataset, bio_S: sparse.csr_matrix):
 
 
 def add_regional_adoption_ag(inputs: RowInputs, cols: xr.Dataset, side: ColSide):
-    """Per-(region, ag land use) caps ('on' mode): Σ real_area[r] · X_ag over the region's cells ≤ cap — the
-    region's cell indicator as the weight row, times the land use's hectares laid on the support. Hectares are
-    NOT rescaled — the shadow-price reader assumes scale 1."""
+    """Per-(region, ag land use) caps ('on' mode): Σ real_area[r] · X_ag over the region's columns ≤ cap — the ag
+    columns of the land use sitting in the cap's cells (each cap carries its own cell set: its region is whichever
+    layer REGIONAL_ADOPTION_ZONE picks), each weighted by its cell's hectares. Hectares are NOT rescaled — the
+    shadow-price reader assumes scale 1."""
     if settings.REGIONAL_ADOPTION_CONSTRAINTS == "off":
         print("│   │   └── TURNING OFF constraints for regional adoption ...")
         return None
-    ncells = inputs.ncells
-    in_ag = np.zeros(cols.attrs['n_all'], dtype=bool)
+    n_all = cols.attrs['n_all']
+    in_ag = np.zeros(n_all, dtype=bool)
     in_ag[slice(*cols.attrs['block_range']['ag'])] = True
     j = cols['j'].values
-    hectares = inputs.real_area[cols['cell'].values].astype(np.float32)                 # the hectares a column's whole share stands for
-    hectares_on_lu = {}                                                                  # {lu: its ag columns' hectares laid on the support}, built on first use
-    blocks = []
+    cell = cols['cell'].values
+    hectares = inputs.real_area[cell].astype(np.float32)                 # the hectares a column's whole share stands for
+    row_idx = []
+    col_idx = []
+    vals = []
     rhs = []
     names = []
     keys = []
@@ -636,34 +642,38 @@ def add_regional_adoption_ag(inputs: RowInputs, cols: xr.Dataset, side: ColSide)
             print(f"│   │   │   ├── SKIPPING {name} (no cells at this resolution)")
             continue
         print(f"│   │   │   ├── Adding constraint {name} <= {area_limit_ha:,.0f} HA...")
-        if lu_code not in hectares_on_lu:
-            hectares_on_lu[lu_code] = side.cell2var @ sparse.diags(np.where(in_ag & (j == lu_code), hectares, np.float32(0.0)))
-        in_region = np.zeros(ncells, dtype=np.float32)
-        in_region[reg_cells] = 1.0
-        blocks.append(weight_rows([in_region], ncells) @ hectares_on_lu[lu_code])
+        in_region = np.zeros(inputs.ncells, dtype=bool)                                    # the cap's cells ...
+        in_region[reg_cells] = True
+        on = in_ag & (j == lu_code) & in_region[cell]                                    # ... and the land use's ag columns in them
+        row_idx.append(np.full(int(on.sum()), len(names)))
+        col_idx.append(np.flatnonzero(on))
+        vals.append(hectares[on])
         rhs.append(area_limit_ha)
         names.append(name)
         keys.append((reg_id, lu_code))
-    if not blocks:
+    if not names:
         return None
-    A, rhs, _ = contract(sparse.vstack(blocks, format='csr'), rhs)
+    A = sparse.csr_matrix((np.concatenate(vals), (np.concatenate(row_idx), np.concatenate(col_idx))), shape=(len(names), n_all))
+    A, rhs, _ = contract(A, rhs)
     return make_part('regional_adoption_ag', 'adopt_ag',
                      dict(region=[reg_id for reg_id, _ in keys], j=[lu_code for _, lu_code in keys]),
                      A, rhs, '<', names)
 
 
 def add_regional_adoption_nonag(inputs: RowInputs, cols: xr.Dataset, side: ColSide, relax: float):
-    """Per-(region, non-ag land use) caps ('on' mode), with the per-year relaxation on the RHS — the region's cell
-    indicator times the land use's hectares laid on the support."""
+    """Per-(region, non-ag land use) caps ('on' mode), with the per-year relaxation on the RHS — the non-ag columns
+    of the land use sitting in the cap's cells, each weighted by its cell's hectares."""
     if settings.REGIONAL_ADOPTION_CONSTRAINTS == "off":
         return None
-    ncells = inputs.ncells
-    in_nonag = np.zeros(cols.attrs['n_all'], dtype=bool)
+    n_all = cols.attrs['n_all']
+    in_nonag = np.zeros(n_all, dtype=bool)
     in_nonag[slice(*cols.attrs['block_range']['nonag'])] = True
     k = cols['k'].values
-    hectares = inputs.real_area[cols['cell'].values].astype(np.float32)                 # the hectares a column's whole share stands for
-    hectares_on_lu = {}                                                                  # {lu: its non-ag columns' hectares laid on the support}, built on first use
-    blocks = []
+    cell = cols['cell'].values
+    hectares = inputs.real_area[cell].astype(np.float32)                 # the hectares a column's whole share stands for
+    row_idx = []
+    col_idx = []
+    vals = []
     rhs = []
     names = []
     keys = []
@@ -673,17 +683,19 @@ def add_regional_adoption_nonag(inputs: RowInputs, cols: xr.Dataset, side: ColSi
             print(f"│   │   │   ├── SKIPPING {name} (no cells at this resolution)")
             continue
         print(f"│   │   │   ├── Adding constraint {name} <= {area_limit_ha:,.0f} HA...")
-        if lu_code not in hectares_on_lu:
-            hectares_on_lu[lu_code] = side.cell2var @ sparse.diags(np.where(in_nonag & (k == lu_code), hectares, np.float32(0.0)))
-        in_region = np.zeros(ncells, dtype=np.float32)
-        in_region[reg_cells] = 1.0
-        blocks.append(weight_rows([in_region], ncells) @ hectares_on_lu[lu_code])
+        in_region = np.zeros(inputs.ncells, dtype=bool)                                    # the cap's cells ...
+        in_region[reg_cells] = True
+        on = in_nonag & (k == lu_code) & in_region[cell]                                 # ... and the land use's non-ag columns in them
+        row_idx.append(np.full(int(on.sum()), len(names)))
+        col_idx.append(np.flatnonzero(on))
+        vals.append(hectares[on])
         rhs.append(area_limit_ha * relax)
         names.append(name)
         keys.append((reg_id, lu_code))
-    if not blocks:
+    if not names:
         return None
-    A, rhs, _ = contract(sparse.vstack(blocks, format='csr'), rhs)
+    A = sparse.csr_matrix((np.concatenate(vals), (np.concatenate(row_idx), np.concatenate(col_idx))), shape=(len(names), n_all))
+    A, rhs, _ = contract(A, rhs)
     return make_part('regional_adoption_nonag', 'adopt_nonag',
                      dict(region=[reg_id for reg_id, _ in keys], k=[lu_code for _, lu_code in keys]),
                      A, rhs, '<', names)
@@ -691,14 +703,18 @@ def add_regional_adoption_nonag(inputs: RowInputs, cols: xr.Dataset, side: ColSi
 
 def add_regional_adoption_nonag_sum(inputs: RowInputs, cols: xr.Dataset, side: ColSide, relax: float):
     """SUM-of-non-ag caps ('NON_AG_CAP' mode): every non-ag land use in a region together, with the relaxation —
-    the regions' cell indicators as the weight rows, times every non-ag column's hectares laid on the support."""
+    every non-ag column sitting in the cap's cells (an NRM region or a state, per REGIONAL_ADOPTION_NON_AG_REGION),
+    weighted by its cell's hectares."""
     if settings.REGIONAL_ADOPTION_CONSTRAINTS == "off":
         return None
-    ncells = inputs.ncells
-    in_nonag = np.zeros(cols.attrs['n_all'], dtype=bool)
+    n_all = cols.attrs['n_all']
+    in_nonag = np.zeros(n_all, dtype=bool)
     in_nonag[slice(*cols.attrs['block_range']['nonag'])] = True
-    hectares = inputs.real_area[cols['cell'].values].astype(np.float32)                 # the hectares a column's whole share stands for
-    regions = []
+    cell = cols['cell'].values
+    hectares = inputs.real_area[cell].astype(np.float32)                 # the hectares a column's whole share stands for
+    row_idx = []
+    col_idx = []
+    vals = []
     rhs = []
     names = []
     keys = []
@@ -708,49 +724,60 @@ def add_regional_adoption_nonag_sum(inputs: RowInputs, cols: xr.Dataset, side: C
             print(f"│   │   │   ├── SKIPPING {name} (no cells at this resolution)")
             continue
         print(f"│   │   │   ├── Adding constraint {name} <= {area_limit_ha:,.0f} HA...")
-        in_region = np.zeros(ncells, dtype=np.float32)
-        in_region[reg_cells] = 1.0
-        regions.append(in_region)
+        in_region = np.zeros(inputs.ncells, dtype=bool)                                    # the cap's cells ...
+        in_region[reg_cells] = True
+        on = in_nonag & in_region[cell]                                                  # ... and every non-ag column in them
+        row_idx.append(np.full(int(on.sum()), len(names)))
+        col_idx.append(np.flatnonzero(on))
+        vals.append(hectares[on])
         rhs.append(area_limit_ha * relax)
         names.append(name)
         keys.append(reg_id)
-    if not regions:
+    if not names:
         return None
-    hectares_on_nonag = side.cell2var @ sparse.diags(np.where(in_nonag, hectares, np.float32(0.0)))
-    A, rhs, _ = contract(weight_rows(regions, ncells) @ hectares_on_nonag, rhs)
+    A = sparse.csr_matrix((np.concatenate(vals), (np.concatenate(row_idx), np.concatenate(col_idx))), shape=(len(names), n_all))
+    A, rhs, _ = contract(A, rhs)
     return make_part('regional_adoption_nonag_sum', 'nonag_cap', dict(region=keys), A, rhs, '<', names)
 
 
 def add_water(inputs: RowInputs, cols: xr.Dataset, side: ColSide):
-    """Water net-yield limits: one row per water region, the region's 0/1 float32 indicator as the
-    weighting row over the accounting columns (off-region columns give q = 0 and are dropped)."""
+    """Water net-yield limits: one row per water region — the columns whose water-region label is the region, each
+    carrying its net yield (which can be NEGATIVE; the contract's drop sees the raw coefficient). The block-by-block
+    union behind this (the input filtered by ``region2cell``, the block's run by ``region2col``) is hoisted: gather the
+    six blocks once, then mask that vector by the label per region — same numbers, one gather."""
     if settings.WATER_LIMITS != "on":
         print("│   ├── TURNING OFF water usage constraints ...")
         return None
     print("│   ├── Adding constraints for water usage limits...")
+    n_all = cols.attrs['n_all']
     coeff = gather(cols, side, inputs.ag_w_mrj, inputs.ag_man_w_mrj, inputs.non_ag_w_rk)
-    weights = []
+    region_of_col = side.region2col['water_region'].values
+    row_idx = []
+    col_idx = []
+    vals = []
     rhs = []
     names = []
     region_ids = []
     for region_id, water_limit_raw in inputs.limits["water"].items():
         region_name = inputs.water_region_names[region_id]
         print(f"│   │   ├── target (inside LUTO study area) is {water_limit_raw:15,.0f} ML for {region_name}")
-        indicator = np.zeros(inputs.ncells, dtype=np.float32)   # 1.0f x c == c, so the drop test sees the raw coefficient — which can be NEGATIVE
-        indicator[inputs.water_region_indices[region_id]] = 1.0
-        weights.append(indicator)
+        on = (region_of_col == region_id) & (coeff != 0)                                  # the region's columns with a net yield
+        row_idx.append(np.full(int(on.sum()), len(names)))
+        col_idx.append(np.flatnonzero(on))
+        vals.append(coeff[on])
         rhs.append(water_limit_raw)
         names.append(f"water_yield_limit_{region_name}".replace(" ", "_"))
         region_ids.append(region_id)
-    if not weights:
+    if not names:
         return None
-    A, rhs, scale = contract(weight_rows(weights, inputs.ncells) @ (side.cell2var @ sparse.diags(coeff)), rhs, rescale=True)
+    A = sparse.csr_matrix((np.concatenate(vals), (np.concatenate(row_idx), np.concatenate(col_idx))), shape=(len(names), n_all))
+    A, rhs, scale = contract(A, rhs, rescale=True)
     return make_part('water', 'water', dict(region=region_ids), A, rhs, '>', names, scale)
 
 
 def add_renewable(inputs: RowInputs, cols: xr.Dataset, side: ColSide):
-    """State-level renewable generation targets: one row per (state, type) — the state's allowed-cells indicator
-    as the weight row, times the type's yield laid on the support; RHS = target − existing capacity."""
+    """State-level renewable generation targets: one row per (state, type) — the type's ag-mgt columns whose state
+    label is the state, outside the excluded cells, each carrying its cell's yield; RHS = target − existing capacity."""
     if not any(settings.RENEWABLES_OPTIONS.values()):
         print("│   ├── TURNING OFF renewable energy constraints ...")
         return None
@@ -761,29 +788,41 @@ def add_renewable(inputs: RowInputs, cols: xr.Dataset, side: ColSide):
     }
     region_state_name2idx = dict(inputs.region_state_name2idx)                # local copy: pop() must not mutate data's dict
     act_code = region_state_name2idx.pop('Australian Capital Territory')
-    cell     = cols['cell'].values
-    am_idx   = cols['am_idx'].values
-    ncells   = inputs.ncells
+    n_all        = cols.attrs['n_all']
+    cell         = cols['cell'].values
+    j            = cols['j'].values
+    am_idx       = cols['am_idx'].values
+    state_of_col = side.region2col['state'].values
+    in_ag        = np.zeros(n_all, dtype=bool)
+    in_ag[slice(*cols.attrs['block_range']['ag'])] = True
 
-    # ── the yield per type laid on the support: energy_r at that type's ag-mgt columns, 0 on every other column ──
+    # ── per type: its columns' yield, and the columns the exclusion masks keep out ──
     energy_of_type = {}
+    excluded_of_type = {}
     for option, re_data in re_types.items():
-        if option in cols.attrs['options']:
-            on_type = am_idx == cols.attrs['options'].index(option)
-            energy_of_type[option] = side.cell2var @ sparse.diags(np.where(on_type, re_data['energy_r'][cell], np.float32(0.0)).astype(np.float32))   # float32 yield per cell
+        if option not in cols.attrs['options']:
+            continue
+        on_type = am_idx == cols.attrs['options'].index(option)
+        energy_of_type[option] = np.where(on_type, re_data['energy_r'][cell], np.float32(0.0)).astype(np.float32)   # float32 yield per cell
+        excluded_r = np.zeros(inputs.ncells, dtype=bool)
+        if settings.EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS:
+            excluded_r[re_data['gbf2_mask_idx']] = True
+        if settings.EXCLUDE_RENEWABLES_IN_EPBC_MNES_MASK:
+            excluded_r[re_data['mnes_mask_idx']] = True
+        excluded_of_type[option] = excluded_r[cell]
 
-    # ── one row per (state, type) with an allowed cell that holds an ag column of a compatible land use ──
-    has_ag_jr = (side.col_ag_mjr >= 0).any(axis=0)                       # (lu, cell): the cell has an ag column of the land use, either lm
-    agman2lu = inputs.agman2lu
-    blocks = []
+    # ── one row per (state, type) with an allowed column of the type's host land uses ──
+    row_idx = []
+    col_idx = []
+    vals = []
     rhs = []
     names = []
     key_am = []
     key_state = []
     for state_name, state_code in region_state_name2idx.items():
-        state_cells = np.where(inputs.region_state_r == state_code)[0]
+        in_state = state_of_col == state_code
         if state_name == 'New South Wales':                              # ACT counts toward the NSW+ACT target
-            state_cells = np.union1d(state_cells, np.where(inputs.region_state_r == act_code)[0])
+            in_state |= state_of_col == act_code
         print(f"│   │   ├── Adding renewable energy constraints for {state_name} ...")
         for am, re_data in re_types.items():
             if not settings.AG_MANAGEMENTS[am]:
@@ -791,24 +830,23 @@ def add_renewable(inputs: RowInputs, cols: xr.Dataset, side: ColSide):
             target_raw = inputs.limits[f"renewable_{am}"][state_name]
             exist_power_mwh = inputs.limits[f"renewable_{am}_exist"][state_name]
             print(f"│   │   │   ├── target for {am} is {target_raw:5,.0f} MWh  (existing: {exist_power_mwh:5,.0f} MWh)")
-            allowed = np.zeros(ncells, dtype=np.float32)                 # the weighting row: 1 on the state's allowed cells
-            allowed[state_cells] = 1.0
-            if settings.EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS:
-                allowed[re_data['gbf2_mask_idx']] = 0.0
-            if settings.EXCLUDE_RENEWABLES_IN_EPBC_MNES_MASK:
-                allowed[re_data['mnes_mask_idx']] = 0.0
-            # cell-set row-inclusion rule (NOT a coefficient test): the row exists iff an allowed cell holds an ag
-            # column of a compatible land use — even if every coefficient there turns out to be sub-floor
-            if not (has_ag_jr[agman2lu[am]].any(axis=0) & (allowed > 0)).any():
+            allowed = in_state & ~excluded_of_type[am]                   # the state's columns outside the excluded cells
+            # row-inclusion rule (NOT a coefficient test): the row exists iff an allowed cell holds an ag column of a
+            # compatible land use — even if every coefficient there turns out to be sub-floor
+            if not (allowed & in_ag & np.isin(j, inputs.agman2lu[am])).any():
                 continue
-            blocks.append(weight_rows([allowed], ncells) @ energy_of_type[am])
+            on = allowed & (energy_of_type[am] != 0)                     # the type's columns in the state, with a yield
+            row_idx.append(np.full(int(on.sum()), len(names)))
+            col_idx.append(np.flatnonzero(on))
+            vals.append(energy_of_type[am][on])
             rhs.append(target_raw - exist_power_mwh)                     # raw MWh; row-rescaled below
             names.append(f"renewable_{am}_target_{state_name}".replace(" ", "_"))
             key_am.append(cols.attrs['options'].index(am))
             key_state.append(state_name)
-    if not blocks:
+    if not names:
         return None
-    A, rhs, scale = contract(sparse.vstack(blocks, format='csr'), rhs, rescale=True)
+    A = sparse.csr_matrix((np.concatenate(vals), (np.concatenate(row_idx), np.concatenate(col_idx))), shape=(len(names), n_all))
+    A, rhs, scale = contract(A, rhs, rescale=True)
     return make_part('renewable', 'renewable', dict(am_idx=key_am, state=key_state), A, rhs, '>', names, scale)
 
 

@@ -35,17 +35,21 @@ from luto.solvers.row_inputs import get_mask_gbf2_solar, get_mask_gbf2_wind
 
 @dataclass
 class ColSide:
-    """Supporting data that maps the SPARSE column variables onto the DENSE input arrays, so the row side never infers an index."""
+    """Supporting data that maps the SPARSE column variables onto the DENSE input arrays, so the row side never infers 
+    an index: every subset comes as a PAIR of handles — one slices the input (``valid_*``, ``region2cell``), its twin 
+    slices the column table (``block_range`` / ``*_range``, ``region2col``) — and a constraint is input[handle] · x[twin]."""
 
-    valid_ag_mrj: np.ndarray      # add the contributions from ag:        run = slice(*cols.attrs['block_range']['ag']);           contr_ag = input_mrj[side.valid_ag_mrj] · x[run]
-    valid_nonag_rk: np.ndarray    # ... from non-ag:                      run = slice(*cols.attrs['block_range']['nonag']);         contr_nonag = input_rk[side.valid_nonag_rk] · x[run]
-    valid_am: dict                # ... from ag-mgt, one (option, land use) slot at a time:   for (option, j_idx), mask in side.valid_am.items(): run = slice(*cols.attrs['am_range'][(option, j_idx)]); contr_am += input[option][:, :, j_idx][mask] · x[run]
-    valid_ag2ag: dict             # ... from the ag → ag arcs, one source at a time:          for src, mask in side.valid_ag2ag.items():          run = slice(*cols.attrs['ag2ag_range'][src]);          contr_ag2ag += input[src][mask] · x[run]
-    valid_ag2nonag: dict          # ... from the ag → non-ag arcs:                            for src, mask in side.valid_ag2nonag.items():       run = slice(*cols.attrs['ag2nonag_range'][src]);       contr_ag2nonag += input[src][mask] · x[run]
-    valid_nonag2ag: dict          # ... from the non-ag → ag arcs:                            for src, mask in side.valid_nonag2ag.items():       run = slice(*cols.attrs['nonag2ag_range'][src]);       contr_nonag2ag += input[src][mask] · x[run]
-    cell2var: sparse.csr_matrix     # count the contributions by WHERE a column sits (a water region, a state, a species layer, one cell):   row_i = Σ w_i[cell of the column] · contr   →   W @ (cell2var @ diags(c)), cell2var = 1 at (cell, column)
-    col_ag_mjr: np.ndarray          # join columns by ag node: col_ag_mjr[m, j, r] is the ag column at (m, j, r), -1 none — the host of an am column (link), the X an arc enters / leaves (node balance), the base of a source (source cap)
-    col_nonag_kr: np.ndarray        # join columns by non-ag node: col_nonag_kr[k, r] is the non-ag column at (k, r), -1 none — the X an arc enters / leaves (node balance), the base of a source (source cap)
+    valid_ag_mrj: np.ndarray      # add the contributions from ag       : contr_ag = input_mrj[side.valid_ag_mrj] · table[slice(*cols.attrs['block_range']['ag'])]
+    valid_nonag_rk: np.ndarray    # add the contributions from non-ag   : contr_nonag = input_rk[side.valid_nonag_rk] · table[slice(*cols.attrs['block_range']['nonag'])]
+    valid_am: dict                # add the contributions from ag-mgt   : contr_am = input_am_smr[side.valid_am[slot]] · table[slice(*cols.attrs['am_range'][slot])]
+    valid_ag2ag: dict             # add the contributions from ag→ag    : contr_ag2ag = input_ag2ag_src[src][side.valid_ag2ag[src]] · table[slice(*cols.attrs['ag2ag_range'][src])] 
+    valid_ag2nonag: dict          # add the contributions from ag→nonag : contr_ag2nonag = input_ag2nonag_src[src][side.valid_ag2nonag[src]] · table[slice(*cols.attrs['ag2nonag_range'][src])]
+    valid_nonag2ag: dict          # add the contributions from nonag→ag : contr_nonag2ag = input_nonag2ag_src[src][side.valid_nonag2ag[src]] · table[slice(*cols.attrs['nonag2ag_range'][src])]
+    region2cell: xr.Dataset       # filter the INPUT by region          : region_r = side.region2cell['water_region'] == reg_id;  input_in_region = input_mrj[:, region_r, :][side.valid_ag_mrj[:, region_r, :]]
+    region2col: xr.Dataset        # filter the gp.Vars table by region  : region_c = side.region2col['water_region'] == reg_id;   ag_in_region = table[slice(*cols.attrs['block_range']['ag'])][region_c[ag]]  — the two line up: same cells, same C order
+    by_cell: sparse.csr_matrix    # count the contributions by cell for the rows whose weight is a layer over cells (a species' area, the GBF2 mask area, one cell): ``W @ (by_cell @ diags(c))``, by_cell = 1 at (cell, column)
+    col_ag_mjr: np.ndarray        # join columns by ag node: col_ag_mjr[m, j, r] is the ag column at (m, j, r), -1 none — the host of an am column (link), the X an arc enters / leaves (node balance), the base of a source (source cap)
+    col_nonag_kr: np.ndarray      # join columns by non-ag node: col_nonag_kr[k, r] is the non-ag column at (k, r), -1 none — the X an arc enters / leaves (node balance), the base of a source (source cap)
 
 
 def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSide]:
@@ -116,8 +120,10 @@ def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSide]:
     for name, (start, stop) in block_range.items():
         print(f"{'└──' if name == list(block_range)[-1] else '├──'} {name:<10s} {stop - start:>12,}", flush=True)
 
-    # ── 7. the space: the table, and beside it the masks every block was enumerated from, the incidence and the id grids ──
-    cell2var, col_ag_mjr, col_nonag_kr = col_support(table, valid_ag_mrj, valid_nonag_rk)
+    # ── 7. the space: the table, and beside it the masks every block was enumerated from, the region label of every column, the incidence and the id grids ──
+    by_cell, col_ag_mjr, col_nonag_kr = col_support(table, valid_ag_mrj, valid_nonag_rk)
+    region2cell = cell_regions(data)                                                # the region layers on cell: what filters an input
+    region2col  = region2cell.isel(cell=table['cell'].values).rename(cell='col')    # the same layers read at every column's cell: what filters the table
     return table, ColSide(
         valid_ag_mrj=valid_ag_mrj,
         valid_nonag_rk=valid_nonag_rk,
@@ -125,7 +131,9 @@ def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSide]:
         valid_ag2ag=valid_ag2ag,
         valid_ag2nonag=valid_ag2nonag,
         valid_nonag2ag=valid_nonag2ag,
-        cell2var=cell2var,
+        region2cell=region2cell,
+        region2col=region2col,
+        by_cell=by_cell,
         col_ag_mjr=col_ag_mjr,
         col_nonag_kr=col_nonag_kr,
     )
@@ -451,7 +459,7 @@ def table_space(blocks: dict, chunks: dict, options: list) -> xr.Dataset:
 def col_support(table: xr.Dataset, valid_ag_mrj: np.ndarray, valid_nonag_rk: np.ndarray) -> tuple[sparse.csr_matrix, np.ndarray, np.ndarray]:
     """The support the row side reads, derived from the finished table: the (cell × col) incidence — 1 where
     column c sits in cell r, so a family's weight rows over cells W become rows over columns as
-    ``W @ (cell2var @ diags(c))`` — and the ag / non-ag column-id grids, the table row of the column at each
+    ``W @ (by_cell @ diags(c))`` — and the ag / non-ag column-id grids, the table row of the column at each
     (m, j, r) / (k, r), -1 where there is none."""
     nlms, ncells, n_ag_lus = valid_ag_mrj.shape                                  # the grids' extents, off the masks the blocks were enumerated from
     n_nonag_lus            = valid_nonag_rk.shape[1]
@@ -461,8 +469,8 @@ def col_support(table: xr.Dataset, valid_ag_mrj: np.ndarray, valid_nonag_rk: np.
     ag          = slice(*table.attrs['block_range']['ag'])
     nonag       = slice(*table.attrs['block_range']['nonag'])
 
-    cell2var = sparse.csr_matrix(
-        (np.ones(n_all, dtype=np.float32), (cell, np.arange(n_all, dtype=np.int32))), 
+    by_cell = sparse.csr_matrix(
+        (np.ones(n_all, dtype=np.float32), (cell, np.arange(n_all, dtype=np.int32))),
         shape=(ncells, n_all)
     )
 
@@ -471,4 +479,20 @@ def col_support(table: xr.Dataset, valid_ag_mrj: np.ndarray, valid_nonag_rk: np.
 
     col_nonag_kr = np.full((n_nonag_lus, ncells), -1, dtype=np.int32)
     col_nonag_kr[table['k'].values[nonag], cell[nonag]] = np.arange(nonag.start, nonag.stop, dtype=np.int32)
-    return cell2var, col_ag_mjr, col_nonag_kr
+    return by_cell, col_ag_mjr, col_nonag_kr
+
+
+def cell_regions(data: Data) -> xr.Dataset:
+    """Every cell labelled with the region it sits in — one variable per region layer on ``cell``: the ``state`` and
+    ``nrm`` codes and the ``water_region`` id — with the code → name maps in attrs. Read at the columns' cells it is
+    ``region2col``; a region's cells are ``region2cell[layer] == code`` and its columns ``region2col[layer] == code``.
+    (The regional-adoption caps carry their own cell set, because their region is whichever layer the settings pick,
+    so they are not a layer here.)"""
+    return xr.Dataset(
+        dict(state        =(('cell',), np.asarray(data.REGION_STATE_CODE).astype(np.int16)),
+             nrm          =(('cell',), np.asarray(data.REGION_NRM_CODE).astype(np.int32)),
+             water_region =(('cell',), np.asarray(data.WATER_REGION_ID).astype(np.int32))),
+        attrs=dict(state_name={code: name for name, code in data.REGION_STATE_NAME2CODE.items()},
+                   nrm_name=dict(zip(np.asarray(data.REGION_NRM_CODE).tolist(), np.asarray(data.REGION_NRM_NAME).tolist())),
+                   water_region_name=dict(data.WATER_REGION_NAMES)),
+    )

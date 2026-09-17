@@ -80,12 +80,9 @@ class RowInputs:
     exist_renewable_solar_r: np.ndarray                                 # existing solar capacity converted to annual MWh per cell
     exist_renewable_wind_r: np.ndarray                                  # existing wind capacity converted to annual MWh per cell
 
-    region_state_r: np.ndarray                                          # region state index for each cell
-    region_state_name2idx: dict[str, int]                               # map of region state names to indices
-    region_NRM_names_r: np.ndarray                                      # region NRM names for each cell
-
-    water_region_indices: dict[int, np.ndarray]                         # {region id: cell indices} of the water regions
-    water_region_names: dict[int, str]                                  # {region id: region name}
+    region_state_name2idx: dict[str, int]                               # {state name: code} — the states the renewable rows are written for (the code labels the columns on col_side.region2col)
+    region_NRM_names_r: np.ndarray                                      # region NRM name for each cell: the GBF layers are masked to a region before they weight the cells
+    water_region_names: dict[int, str]                                  # {region id: name} — the water regions with a target (the id labels the columns on col_side.region2col)
 
     biodiv_contr_ag_j: np.ndarray                                       # biodiversity contribution scale per agricultural land use (j)
     biodiv_contr_non_ag_k: dict[int, float]                             # biodiversity contribution scale per non-agricultural land use (k)
@@ -262,11 +259,9 @@ def get_row_inputs(data: Data, base_year: int, target_year: int) -> RowInputs:
     print('Getting existing wind capacity fraction (all years, solver ceiling)...', flush=True)
     exist_renewable_wind_r = ag_quantity.get_existing_renewable_dvar_fraction(data, 'Onshore Wind', 99999)
 
-    # ── 4. regions: what the renewable, biodiversity and water rows group cells by ──
-    region_state_r = data.REGION_STATE_CODE
+    # ── 4. regions: the names the renewable and water rows are written for, and the NRM name the GBF layers are masked by ──
     region_state_name2idx = data.REGION_STATE_NAME2CODE
     region_NRM_names_r = data.REGION_NRM_NAME
-    water_region_indices = data.WATER_REGION_INDEX_R if settings.WATER_LIMITS != 'off' else {}
     water_region_names = data.WATER_REGION_NAMES if settings.WATER_LIMITS != 'off' else {}
 
     # ── 5. biodiversity: the contribution scales every GBF family shares, then each family's layer and selection ──
@@ -339,10 +334,8 @@ def get_row_inputs(data: Data, base_year: int, target_year: int) -> RowInputs:
         exist_renewable_solar_r=exist_renewable_solar_r,
         exist_renewable_wind_r=exist_renewable_wind_r,
 
-        region_state_r=region_state_r,
         region_state_name2idx=region_state_name2idx,
         region_NRM_names_r=region_NRM_names_r,
-        water_region_indices=water_region_indices,
         water_region_names=water_region_names,
 
         biodiv_contr_ag_j=biodiv_contr_ag_j,
