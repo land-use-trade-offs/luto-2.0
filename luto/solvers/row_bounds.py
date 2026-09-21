@@ -61,13 +61,12 @@ UNIT = {                                                                        
 
 # ═══════════════════════════ get_row_bounds: the verdict of every row ═══════════════════════════
 
-def get_row_bounds(rows: xr.Dataset, cols: xr.Dataset) -> xr.Dataset:
+def get_row_bounds(A: sparse.csr_matrix, rows: xr.Dataset, cols: xr.Dataset) -> xr.Dataset:
     """Every row's interval and verdict, as a table on the row table's own ``row`` dim: over the column box (``lo`` /
     ``hi`` / ``status``) and under the bounds the rows imply (``lo_implied`` / ``hi_implied`` / ``status_implied``),
     with the ``margin`` both are judged within (all in the table's scaled row space) and ``empty``; attrs
     ``preflight`` = {block: counts of the columns no row can explain} and ``conservation`` = the cells with node-balance
     rows, and how many of them sum to a unit row."""
-    A = rows.attrs['A']
     lb = cols['lb'].values.astype(np.float64)                          # the column table keeps float32 bounds; the engine reads them as doubles, and so does this pass
     ub = cols['ub'].values.astype(np.float64)
     rhs = rows['rhs'].values
@@ -87,7 +86,7 @@ def get_row_bounds(rows: xr.Dataset, cols: xr.Dataset) -> xr.Dataset:
     #       their columns together (2b), and with them the sum of every cell's node-balance rows, Σ X = Σ base (2c: an
     #       all-ones row too, so it joins both); the margin rides on every implying rhs, so the bounds hold at anything the solver accepts ──
     source, unit = implying_rows(A, sense)
-    C, rhs_C, margin_C, conservation = conservation_rows(rows, margin)
+    C, rhs_C, margin_C, conservation = conservation_rows(A, rows, margin)
     source_rows, unit_rows = np.flatnonzero(source), np.flatnonzero(unit)
     ub_implied = implied_ub(sparse.vstack([A[source_rows], C], format='csr'), np.concatenate([rhs[source_rows], rhs_C]),
                             np.concatenate([margin[source_rows], margin_C]), lb, ub)
@@ -194,7 +193,7 @@ def implying_rows(A, sense: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return source, unit
 
 
-def conservation_rows(rows: xr.Dataset, margin: np.ndarray) -> tuple[sparse.csr_matrix, np.ndarray, np.ndarray, dict]:
+def conservation_rows(A: sparse.csr_matrix, rows: xr.Dataset, margin: np.ndarray) -> tuple[sparse.csr_matrix, np.ndarray, np.ndarray, dict]:
     """(2c) What a cell's node-balance rows say TOGETHER, one row per cell: the sum of its restored rows (row × scale).
     Every arc leaves one node of the cell (+1 on that row) and lands on another (−1 on that one), so the arcs cancel
     and the sum is Σ X = Σ base over the cell's ag and non-ag columns — the cell's total is what it held, an all-ones
@@ -202,7 +201,6 @@ def conservation_rows(rows: xr.Dataset, margin: np.ndarray) -> tuple[sparse.csr_
     sum of those margins. Returned: only the cells whose rows DO cancel to a unit row (an arc whose other end has no
     node row leaves a stray ±1, and that cell implies nothing here) and whose node rows are all active — (C, rhs,
     margin), and the counts."""
-    A = rows.attrs['A']
     node_rows = np.flatnonzero(row_table.rows_where(rows, family='node_balance_ag') | row_table.rows_where(rows, family='node_balance_nonag'))   # the node-balance rows, ag and non-ag: each carries its cell
     if not node_rows.size:
         return sparse.csr_matrix((0, A.shape[1])), np.empty(0), np.empty(0), dict(cells=0, unit=0)
@@ -308,7 +306,7 @@ def drop_redundant_rows(rows: xr.Dataset, bounds: xr.Dataset, families) -> np.nd
     redundant = bounds['status'].values == STATUS.index('redundant')
     hit = np.zeros(rows.sizes['row'], dtype=bool)
     for family in families:
-        span = row_table.family_rows(rows, family)
+        span = rows.attrs['family_range'].get(family)
         if span is not None:
             hit[span] = redundant[span]
     rows['active'] = (('row',), rows['active'].values & ~hit)

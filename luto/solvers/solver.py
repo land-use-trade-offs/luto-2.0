@@ -46,9 +46,10 @@ gurenv.start()
 class LutoSolver:
     """The Gurobi model of one step, returns the raw x."""
 
-    def __init__(self, cols: xr.Dataset, rows: xr.Dataset):
+    def __init__(self, cols: xr.Dataset, rows: xr.Dataset, A):
         self.cols = cols
         self.rows = rows
+        self.A = A                      # (row x n_all) scipy CSR: row i of A is row i of the row table
         self.gurobi_model = gp.Model(f"LUTO {settings.VERSION}", env=gurenv)
         self.x = None                           # ONE MVar over the column table: every column, in Var.index order
         self._vars = None                       # model.getVars() in Var.index order (materialised once, for addMConstr)
@@ -105,7 +106,7 @@ class LutoSolver:
         T = self.rows
         active = T['active'].values
         built = np.flatnonzero(active)
-        A = T.attrs['A'] if active.all() else T.attrs['A'][built]
+        A = self.A if active.all() else self.A[built]
         constrs = model.addMConstr(A, self._vars, np.asarray(T['sense'].values[built], dtype='<U1'), T['rhs'].values[built]).tolist()
         model.setAttr('ConstrName', constrs, T['name'].values[built].tolist())
         handles = np.full(T.sizes['row'], None, dtype=object)
@@ -149,7 +150,7 @@ class LutoSolver:
         hit = np.isin(T['name'].values, np.asarray(sorted(set(names)), dtype=object)) & ~T['active'].values
         if not hit.any():
             return
-        constrs = self.gurobi_model.addMConstr(T.attrs['A'][hit], self._vars, np.asarray(T['sense'].values[hit], dtype='<U1'), T['rhs'].values[hit]).tolist()
+        constrs = self.gurobi_model.addMConstr(self.A[hit], self._vars, np.asarray(T['sense'].values[hit], dtype='<U1'), T['rhs'].values[hit]).tolist()
         self.gurobi_model.setAttr('ConstrName', constrs, T['name'].values[hit].tolist())
         handles = T['constr'].values.copy()
         handles[hit] = constrs

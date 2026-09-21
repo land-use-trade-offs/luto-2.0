@@ -31,7 +31,6 @@ from typing import Any
 
 import luto.settings as settings
 from luto.settings import AG_MANAGEMENTS
-from luto.solvers import row_table
 from luto.solvers.col_builder import ColSide
 from luto.solvers.row_builder import RowSide
 from luto.solvers.row_inputs import RowInputs
@@ -51,7 +50,7 @@ class SolverSolution:
     prod_data: dict[str, Any]                       # what the writers read: 'Production' (raw t per commodity, unscaled) and 'GHG' (raw tCO2e, the off-land constant included)
 
 
-def post_solve(x: np.ndarray, cols: xr.Dataset, col_side: ColSide, rows: xr.Dataset, row_side: RowSide, inputs: RowInputs) -> SolverSolution:
+def post_solve(x: np.ndarray, cols: xr.Dataset, col_side: ColSide, A, rows: xr.Dataset, row_side: RowSide, inputs: RowInputs) -> SolverSolution:
     """The LUTO-format solution of one step from the raw ``x`` (``LutoSolver.solve``): the column table says
     what every entry of x is, the col side which source each arc belongs to, the row side and the row table
     give the production data."""
@@ -143,10 +142,10 @@ def post_solve(x: np.ndarray, cols: xr.Dataset, col_side: ColSide, rows: xr.Data
     #       excludes — read off the row table whether or not the row went into the model (a row dropped before
     #       the build is still A[row]), 0 when the GHG limit is off ──
     prod_data = {"Production": (row_side.q_block @ x).tolist()}
-    ghg = row_table.family_rows(rows, 'ghg')
+    ghg = rows.attrs['family_range'].get('ghg')
     if ghg is not None and ghg.stop > ghg.start:
         row = ghg.start                                                   # the single GHG row
-        prod_data["GHG"] = float((rows.attrs['A'][row] @ x)[0] * rows['scale'].values[row]) + float(np.asarray(inputs.offland_ghg).ravel()[0])
+        prod_data["GHG"] = float((A[row] @ x)[0] * rows['scale'].values[row]) + float(np.asarray(inputs.offland_ghg).ravel()[0])
     else:
         prod_data["GHG"] = 0
 

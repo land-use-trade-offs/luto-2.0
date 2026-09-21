@@ -32,7 +32,7 @@ def _priced_rows(T, family: str) -> np.ndarray:
     """The rows of one family the shadow prices cover, as row indices in table order: the ACTIVE rows, and the rows
     dropped before the build as redundant (priced 0) — empty where the family was not built. A row removed by name
     (``LutoSolver.remove_constraints_by_name``) is neither, and gets no price."""
-    span = row_table.family_rows(T, family)
+    span = T.attrs['family_range'].get(family)
     if span is None:
         return np.empty(0, dtype=np.int64)
     return np.arange(span.start, span.stop)[T['active'].values[span] | T['redundant'].values[span]]
