@@ -26,14 +26,17 @@ the row before any solver sees it: REDUNDANT (every point of the box satisfies i
 is in the model), IMPOSSIBLE (no point does: a diagnosis, never dropped), TIGHT (met only at the box's extreme),
 NEAR_REDUNDANT (satisfied everywhere but within the margin: kept), STRADDLE (nothing learned).
 
-The box alone overcounts: a policy row sums every column of a cell at its own ub while the cell-usage row caps their
-sum, and the arcs have no ub at all. So the rows are also judged under the bounds the rows themselves imply —
-(2a) a row whose entries are all positive, sense < or =, bounds each of its columns; (2b) a row whose entries are all
-exactly 1 bounds its columns TOGETHER, so a row reaches at most its best coefficient times that group's room. Those
+The box alone overcounts: a policy row sums every column of a cell at its own ub while the cell's shares can only
+sum to what the cell held, and the arcs have no ub at all. So the rows are also judged under the bounds the rows
+themselves imply — (2a) a row whose entries are all positive, sense < or =, bounds each of its columns; (2b) a row whose
+entries are all exactly 1 bounds its columns TOGETHER, so a row reaches at most its best coefficient times that group's
+room; (2c) the one fact no single row states: a cell's node-balance rows SUM to Σ X = Σ base (every arc leaves one node
+of the cell and lands on another, so it cancels) — the model carries no cell-usage row, because conservation already
+pins the cell's total, so that sum is formed here and joins (2a) and (2b) as one more implying row per cell. Those
 bounds hold at every feasible point, so IMPOSSIBLE under them is still a proof; a row that implies a bound keeps its box
-verdict, and only the BOX verdict licenses a drop. Everything reads A, rhs, sense and scale off the row table and
-lb / ub off the column table — no family, no engine — and the verdicts sit beside the row table on the same ``row``
-dim. What no bound here sees is rows competing for the same cells: "nothing proven" is not "feasible".
+verdict, and only the BOX verdict licenses a drop. Everything reads A, rhs, sense, scale and the node-balance rows'
+``cell`` key off the row table and lb / ub off the column table — no engine — and the verdicts sit beside the row table
+on the same ``row`` dim. What no bound here sees is rows competing for the same cells: "nothing proven" is not "feasible".
 """
 
 import os
@@ -41,6 +44,8 @@ import os
 import numpy as np
 import pandas as pd
 import xarray as xr
+
+from scipy import sparse
 
 from luto import settings
 from luto.solvers import row_table
@@ -60,7 +65,8 @@ def get_row_bounds(rows: xr.Dataset, cols: xr.Dataset) -> xr.Dataset:
     """Every row's interval and verdict, as a table on the row table's own ``row`` dim: over the column box (``lo`` /
     ``hi`` / ``status``) and under the bounds the rows imply (``lo_implied`` / ``hi_implied`` / ``status_implied``),
     with the ``margin`` both are judged within (all in the table's scaled row space) and ``empty``; attrs
-    ``preflight`` = {block: counts of the columns no row can explain}."""
+    ``preflight`` = {block: counts of the columns no row can explain} and ``conservation`` = the cells with node-balance
+    rows, and how many of them sum to a unit row."""
     A = rows.attrs['A']
     lb = cols['lb'].values
     ub = cols['ub'].values
@@ -78,10 +84,15 @@ def get_row_bounds(rows: xr.Dataset, cols: xr.Dataset) -> xr.Dataset:
     status = row_verdict(sense, rhs, lo, hi, margin)
 
     # ── 4. the bounds the rows imply: all-positive < / = rows bound each of their columns (2a), all-ones rows bound
-    #       their columns together (2b); the margin rides on every implying rhs, so the bounds hold at anything the solver accepts ──
+    #       their columns together (2b), and with them the sum of every cell's node-balance rows, Σ X = Σ base (2c: an
+    #       all-ones row too, so it joins both); the margin rides on every implying rhs, so the bounds hold at anything the solver accepts ──
     source, unit = implying_rows(A, sense)
-    ub_implied = implied_ub(A, rhs, lb, ub, margin, source)
-    group_of_col, room_of_group = unit_groups(A, rhs, lb, margin, unit)
+    C, rhs_C, margin_C, conservation = conservation_rows(rows, margin)
+    source_rows, unit_rows = np.flatnonzero(source), np.flatnonzero(unit)
+    ub_implied = implied_ub(sparse.vstack([A[source_rows], C], format='csr'), np.concatenate([rhs[source_rows], rhs_C]),
+                            np.concatenate([margin[source_rows], margin_C]), lb, ub)
+    group_of_col, room_of_group = unit_groups(sparse.vstack([A[unit_rows], C], format='csr'), np.concatenate([rhs[unit_rows], rhs_C]),
+                                              np.concatenate([margin[unit_rows], margin_C]), lb)
     lo_implied, hi_implied = grouped_intervals(A, lb, ub_implied, group_of_col, room_of_group)
 
     # ── 5. the verdict under them: a row that implied a bound keeps its box verdict — no row is judged by what it implied ──
@@ -107,7 +118,7 @@ def get_row_bounds(rows: xr.Dataset, cols: xr.Dataset) -> xr.Dataset:
              status_implied=(('row',), status_implied),
              margin=(('row',), margin),
              empty=(('row',), np.diff(A.indptr) == 0)),
-        attrs=dict(preflight=preflight))
+        attrs=dict(preflight=preflight, conservation=conservation))
 
 
 def row_intervals(A, lb: np.ndarray, ub: np.ndarray, chunk_nnz: int = 50_000_000) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -168,8 +179,8 @@ def row_verdict(sense: np.ndarray, rhs: np.ndarray, lo: np.ndarray, hi: np.ndarr
 
 
 def implying_rows(A, sense: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """The rows bounds are read off: ``source`` — every entry > 0, sense < or = (a cap: cell usage, source cap, a
-    regional cap, a demand ceiling) — and ``unit``, the source rows whose every entry is exactly 1."""
+    """The rows bounds are read off: ``source`` — every entry > 0, sense < or = (a cap: source cap, a regional cap,
+    a demand ceiling, a cell's conservation row) — and ``unit``, the source rows whose every entry is exactly 1."""
     n_rows = A.shape[0]
     min_a = np.full(n_rows, np.inf)
     max_a = np.full(n_rows, -np.inf)
@@ -184,38 +195,58 @@ def implying_rows(A, sense: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return source, unit
 
 
-def implied_ub(A, rhs: np.ndarray, lb: np.ndarray, ub: np.ndarray, margin: np.ndarray, source: np.ndarray) -> np.ndarray:
-    """(2a) Every column's ub tightened by the source rows that hold it: Σ a·x ≤ rhs + m with every other column at
-    least at its lb leaves x_j ≤ lb_j + (rhs + m − Σ a·lb) / a_j — the smallest over the rows, one round."""
-    rows_of_source = np.flatnonzero(source)
-    S = A[rows_of_source].tocsr()
+def conservation_rows(rows: xr.Dataset, margin: np.ndarray) -> tuple[sparse.csr_matrix, np.ndarray, np.ndarray, dict]:
+    """(2c) What a cell's node-balance rows say TOGETHER, one row per cell: the sum of its restored rows (row × scale).
+    Every arc leaves one node of the cell (+1 on that row) and lands on another (−1 on that one), so the arcs cancel
+    and the sum is Σ X = Σ base over the cell's ag and non-ag columns — the cell's total is what it held, an all-ones
+    = row no single row of the table states. Rows the solver meets within their margins sum to a row met within the
+    sum of those margins. Returned: only the cells whose rows DO cancel to a unit row (an arc whose other end has no
+    node row leaves a stray ±1, and that cell implies nothing here) and whose node rows are all active — (C, rhs,
+    margin), and the counts."""
+    A = rows.attrs['A']
+    node_rows = np.flatnonzero(row_table.rows_where(rows, group='flow_in'))                 # the node-balance rows, ag and non-ag: each carries its cell
+    if not node_rows.size:
+        return sparse.csr_matrix((0, A.shape[1])), np.empty(0), np.empty(0), dict(cells=0, unit=0)
+    cell = rows['cell'].values[node_rows]
+    G = sparse.csr_matrix((rows['scale'].values[node_rows], (cell, np.arange(node_rows.size))),
+                          shape=(int(cell.max()) + 1, node_rows.size))                      # (cell x node row) the row's scale where the row sits in the cell: G @ · sums a cell's restored rows
+    C = (G @ A[node_rows].astype(np.float64)).tocsr()
+    C.eliminate_zeros()                                                                     # the arcs: +1 and −1 on one column
+    _, unit = implying_rows(C, np.full(C.shape[0], '=', dtype=object))
+    whole = np.bincount(cell, weights=~rows['active'].values[node_rows], minlength=C.shape[0]) == 0   # no node row of the cell flagged off
+    keep = np.flatnonzero(unit & whole)
+    counts = dict(cells=int(np.unique(cell).size), unit=int(keep.size))
+    return C[keep], (G @ rows['rhs'].values[node_rows])[keep], (G @ margin[node_rows])[keep], counts
+
+
+def implied_ub(S, rhs: np.ndarray, margin: np.ndarray, lb: np.ndarray, ub: np.ndarray) -> np.ndarray:
+    """(2a) Every column's ub tightened by the source rows ``S`` that hold it (``rhs`` / ``margin`` theirs): Σ a·x ≤
+    rhs + m with every other column at least at its lb leaves x_j ≤ lb_j + (rhs + m − Σ a·lb) / a_j — the smallest
+    over the rows, one round."""
     local = np.repeat(np.arange(S.shape[0]), np.diff(S.indptr))
     a = S.data.astype(np.float64)
     col = S.indices
-    room = rhs[rows_of_source] + margin[rows_of_source] - np.bincount(local, weights=a * lb[col], minlength=S.shape[0])
+    room = rhs + margin - np.bincount(local, weights=a * lb[col], minlength=S.shape[0])
     tightened = ub.copy()
     np.minimum.at(tightened, col, lb[col] + room[local] / a)
     return tightened
 
 
-def unit_groups(A, rhs: np.ndarray, lb: np.ndarray, margin: np.ndarray, unit: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """(2b) The groups: a group row's room is rhs + m − Σ lb over the whole row — what its columns can rise above their
-    lb together — and every column belongs to the unit row holding it with the least room (−1 where none): any
-    assignment bounds validly, the least room bounds tightest."""
-    unit_rows = np.flatnonzero(unit)
-    U = A[unit_rows].tocsr()
+def unit_groups(U, rhs: np.ndarray, margin: np.ndarray, lb: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """(2b) The groups, one per unit row of ``U`` (``rhs`` / ``margin`` theirs; a group's id is its row in U): a group
+    row's room is rhs + m − Σ lb over the whole row — what its columns can rise above their lb together — and every
+    column belongs to the unit row holding it with the least room (−1 where none): any assignment bounds validly, the
+    least room bounds tightest."""
     local = np.repeat(np.arange(U.shape[0]), np.diff(U.indptr))
-    room = rhs[unit_rows] + margin[unit_rows] - np.bincount(local, weights=lb[U.indices], minlength=U.shape[0])
-    room_of_group = np.full(A.shape[0], np.inf)
-    room_of_group[unit_rows] = room
-    group_of_col = np.full(A.shape[1], -1, dtype=np.int64)
+    room = rhs + margin - np.bincount(local, weights=lb[U.indices], minlength=U.shape[0])
+    group_of_col = np.full(U.shape[1], -1, dtype=np.int64)
     if U.nnz:
-        order = np.lexsort((unit_rows[local], room[local], U.indices))    # by column, then the least room, then the row
+        order = np.lexsort((local, room[local], U.indices))               # by column, then the least room, then the row
         col_sorted = U.indices[order]
         first = np.ones(order.size, dtype=bool)
         first[1:] = col_sorted[1:] != col_sorted[:-1]
-        group_of_col[col_sorted[first]] = unit_rows[local[order[first]]]
-    return group_of_col, room_of_group
+        group_of_col[col_sorted[first]] = local[order[first]]
+    return group_of_col, room
 
 
 def grouped_intervals(A, lb: np.ndarray, ub: np.ndarray, group_of_col: np.ndarray, room_of_group: np.ndarray,
@@ -318,6 +349,8 @@ def report_row_bounds(rows: xr.Dataset, bounds: xr.Dataset, target_year: int, ou
         n_imp = int((status_implied[start:stop] == IMPOSSIBLE).sum())
         n_tight = int((status_implied[start:stop] == TIGHT).sum())
         print(f"│   │   {family:<30s} {stop - start:>10,} " + ' '.join(f'{count:>14,}' for count in counts) + f" {n_dropped:>9,} {n_imp:>12,} {n_tight:>14,}")
+    conservation = bounds.attrs['conservation']
+    print(f"│   │   conservation: the node-balance rows of {conservation['unit']:,} of {conservation['cells']:,} cells sum to Σ X = Σ base (the row that bounds a cell's columns together)")
     for block, counts in bounds.attrs['preflight'].items():
         hits = {what: count for what, count in counts.items() if what != 'columns' and count}
         if hits:

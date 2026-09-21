@@ -51,6 +51,7 @@ class RowInputs:
     base_year: int                                                      # base year of this solve step
     target_year: int                                                    # target year of this solve step
 
+    landmans: list                                                      # the land-management names in m order ('dry', 'irr'): how a row's name spells m
     nlms: int                                                           # the extents the dense inputs are laid out on: land managements ...
     n_ag_lus: int                                                       # ... ag land uses ...
     n_nonag_lus: int                                                    # ... non-ag land uses ...
@@ -303,6 +304,7 @@ def get_row_inputs(data: Data, base_year: int, target_year: int) -> RowInputs:
     return RowInputs(
         base_year=base_year,
         target_year=target_year,
+        landmans=data.LANDMANS,
         nlms=data.NLMS,
         n_ag_lus=data.N_AG_LUS,
         n_nonag_lus=data.N_NON_AG_LUS,

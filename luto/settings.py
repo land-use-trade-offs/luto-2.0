@@ -940,7 +940,7 @@ One of 'Suitability', 'ECNES_likely_may', 'ECNES_likely', 'SNES_likely_may', 'SN
 
 Essentially, the biodiversity quality layer determines how important (0-100) a cell is to the overall biodiversity value. 
     - By choosing 'Suitability' layer, you assume that the overal biodiversity is determined by considering all species (plants, 
-      mamals, amphibians, birds, reptiles, etc). 
+      mammals, amphibians, birds, reptiles, etc). 
     - If choosing one of the 'SNES_likely|may' layers, you assume that the overal biodiversity is determined by species 
       related to the Environment Protection and Biodiversity Conservation Act 1999 (EPBC Act). 
     - If choosing one of the 'ECNES_likely|may' layers, you assume that the overal biodiversity is determined by ecological

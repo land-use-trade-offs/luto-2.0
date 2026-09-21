@@ -62,10 +62,10 @@ class LutoSolver:
 
     def _setup_vars(self):
         """Every column of the space as ONE addMVar over the table — lb / ub per row, Var.index order =
-        table order (ag | nonag | am | ag2ag | ag2nonag | nonag2ag | cell_usage) — the names from the fields."""
+        table order (ag | nonag | am | ag2ag | ag2nonag | nonag2ag) — the names from the fields."""
         print("├── Setting up decision variables...")
         cols = self.cols
-        lm_name = np.array(['dry', 'irr'])
+        lm_name = np.array(cols.attrs['landmans'])                                  # the land managements in m order
         snake_of_option = np.array([tools.am_name_snake_case(option) for option in cols.attrs['options']], dtype=object)   # the options in am_idx order
         self.x = self.gurobi_model.addMVar(
             cols.attrs['n_all'], 
@@ -87,15 +87,13 @@ class LutoSolver:
                                      for from_m, from_j, k, local_r in zip(t['from_m'], t['from_j'], t['k'], t['local_r'])],
             'nonag2ag':   lambda t: [f"F_n2a_{from_k}[{m},{local_r},{j}]"
                                      for from_k, m, local_r, j in zip(t['from_k'], t['m'], t['local_r'], t['j'])],
-            'cell_usage': lambda t: [f"Rgconst_cell_usage_{cell}" 
-                                     for cell in t['cell']],
         }
      
         for block, block_rows in cols.attrs['block_range'].items():
             span = slice(*block_rows)
             fields = {field: cols[field].values[span] for field in ('m', 'j', 'k', 'am_idx', 'from_m', 'from_j', 'from_k', 'local_r', 'cell')}
             self.gurobi_model.setAttr('VarName', self.x[span].tolist(), names_of[block](fields))
-            print(f"│   {'└──' if block == 'cell_usage' else '├──'} {block:<10s} {span.stop - span.start:>12,} variables")
+            print(f"│   {'└──' if block == list(cols.attrs['block_range'])[-1] else '├──'} {block:<10s} {span.stop - span.start:>12,} variables")
 
     def _setup_constraints(self):
         """Every ACTIVE row of the row table as ONE addMConstr (in table order), the rows named, the handles kept on

@@ -49,7 +49,7 @@ print(ilp_text)   # small file — always print in full
 ```
 
 Key things to extract from the ILP:
-- The constraint(s) in `Subject To` — cell usage equalities, ag-mam inequalities, `bio_GBF2_*`
+- The constraint(s) in `Subject To` — cell usage equalities, ag-man inequalities, `bio_GBF2_*`
 - The bound(s) in `Bounds` — lower bounds on non-ag or ag-man variables
 - Count of `>=` lines to judge scale (1–2 = single-cell; thousands = GBF2)
 

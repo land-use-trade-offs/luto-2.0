@@ -761,18 +761,18 @@ def get_agricultural_management_cost_matrices(data: Data, c_mrj, target_year):
     """
 
     yr_idx = target_year - data.YR_CAL_BASE
-    ag_mam_c_mrj = {}
+    ag_man_c_mrj = {}
 
-    ag_mam_c_mrj['Asparagopsis taxiformis'] = get_asparagopsis_effect_c_mrj(data, yr_idx)           
-    ag_mam_c_mrj['Precision Agriculture'] = get_precision_agriculture_effect_c_mrj(data, yr_idx)    
-    ag_mam_c_mrj['Ecological Grazing'] = get_ecological_grazing_effect_c_mrj(data, yr_idx)          
-    ag_mam_c_mrj['Savanna Burning'] = get_savanna_burning_effect_c_mrj(data, yr_idx)                
-    ag_mam_c_mrj['AgTech EI'] = get_agtech_ei_effect_c_mrj(data, yr_idx)                            
-    ag_mam_c_mrj['Biochar'] = get_biochar_effect_c_mrj(data, yr_idx)                                
-    ag_mam_c_mrj['HIR - Beef'] = get_beef_hir_effect_c_mrj(data, yr_idx)                            
-    ag_mam_c_mrj['HIR - Sheep'] = get_sheep_hir_effect_c_mrj(data, yr_idx)   
-    ag_mam_c_mrj['Utility Solar PV'] = get_utility_solar_pv_effect_c_mrj(data, c_mrj, yr_idx)
-    ag_mam_c_mrj['Onshore Wind'] = get_onshore_wind_effect_c_mrj(data, c_mrj, yr_idx)
+    ag_man_c_mrj['Asparagopsis taxiformis'] = get_asparagopsis_effect_c_mrj(data, yr_idx)           
+    ag_man_c_mrj['Precision Agriculture'] = get_precision_agriculture_effect_c_mrj(data, yr_idx)    
+    ag_man_c_mrj['Ecological Grazing'] = get_ecological_grazing_effect_c_mrj(data, yr_idx)          
+    ag_man_c_mrj['Savanna Burning'] = get_savanna_burning_effect_c_mrj(data, yr_idx)                
+    ag_man_c_mrj['AgTech EI'] = get_agtech_ei_effect_c_mrj(data, yr_idx)                            
+    ag_man_c_mrj['Biochar'] = get_biochar_effect_c_mrj(data, yr_idx)                                
+    ag_man_c_mrj['HIR - Beef'] = get_beef_hir_effect_c_mrj(data, yr_idx)                            
+    ag_man_c_mrj['HIR - Sheep'] = get_sheep_hir_effect_c_mrj(data, yr_idx)   
+    ag_man_c_mrj['Utility Solar PV'] = get_utility_solar_pv_effect_c_mrj(data, c_mrj, yr_idx)
+    ag_man_c_mrj['Onshore Wind'] = get_onshore_wind_effect_c_mrj(data, c_mrj, yr_idx)
                         
 
-    return ag_mam_c_mrj
+    return ag_man_c_mrj

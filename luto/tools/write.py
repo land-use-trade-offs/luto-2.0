@@ -3093,7 +3093,7 @@ def write_biodiversity_quality_scores(data: Data, yr_cal, path):
     # Decision variables are the same for every backend layer — load once
     ag_dvar_mrj = chunk_unify_size(tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
         ).assign_coords(region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME))
-    ag_mam_dvar_mrj = chunk_unify_size(tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
+    ag_man_dvar_mrj = chunk_unify_size(tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
         ).assign_coords(region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME))
     non_ag_dvar_rk = chunk_unify_size(tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
         ).assign_coords(region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME))
@@ -3138,7 +3138,7 @@ def write_biodiversity_quality_scores(data: Data, yr_cal, path):
         # Weighted biodiversity scores
         xr_priority_ag = ag_dvar_mrj * bio_ag_priority_mrj
         xr_priority_non_ag = non_ag_dvar_rk * bio_non_ag_priority_rk
-        xr_priority_am = ag_mam_dvar_mrj * bio_am_priority_amrj
+        xr_priority_am = ag_man_dvar_mrj * bio_am_priority_amrj
         xr_priority_all = xr.concat(
             [
                 xr_priority_ag.sum(dim=['lm', 'lu']).expand_dims({'Type': ['ag']}),

@@ -51,7 +51,7 @@ class ColSide:
     region2cell: xr.Dataset       # filter the INPUT by region
     region2col: xr.Dataset        # filter the gp.Vars table by region
     # the three below are read by get_rows only; simulation frees them before the solve
-    cell2col: sparse.csr_matrix   # (cell x col), 1 where a variable (ag/nonag/am/ag2ag/ag2nonag/nonag2ag/cell_usage) sits in the cell: for each cell, the variables in it
+    cell2col: sparse.csr_matrix   # (cell x col), 1 where a variable (ag/nonag/am/ag2ag/ag2nonag/nonag2ag) sits in the cell: for each cell, the variables in it
     ag_mrj2col: np.ndarray        # (lm, cell, lu) int32: for each ag position, the column index of its variable, -1 where it has none (no arcs, no am)
     nonag_rk2col: np.ndarray      # (cell, nonag_lu) int32: for each non-ag position, the column index of its variable, -1 where it has none
 
@@ -75,7 +75,6 @@ def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSide]:
 
     # ── 3. feasibility: an entry gets a column exactly where its upper bound is above zero ──
     feasible_ag_mrj         = trans_ub_ag_mrj > 0                                               # which ag (m, j) a cell may hold: reachable from a source here, or already held (the ub is raised to the base)
-    feasible_cell_usage_r   = get_feasible_cell_usage_r(trans_ub_ag_mrj, trans_ub_nonag_rk, data.AG_MASK_PROPORTION_R)   # which cells can meet the cell-usage equality
 
     # ── 4. the arcs: each source's own upper bound, above zero, on its own cells ──
     valid_ag2ag           = get_arc_ag2ag_src(data, base_year, trans_source_ag)               # {source: bool (to_m, local_r, to_j)}
@@ -95,15 +94,10 @@ def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSide]:
     ag2nonag_rows                = ag2nonag_space(valid_ag2nonag, trans_source_ag)
     nonag2ag_rows                = nonag2ag_space(valid_nonag2ag, trans_source_nonag)
     
-    cell_usage_rows                 = cell_usage_space(feasible_cell_usage_r, data.AG_MASK_PROPORTION_R)
-
-    # the blocks, grouped by what they are FOR: the groups go into the table in this order, and n_terms / n_dec
-    # are the group widths — move a block to another group and every count downstream follows it
-    blocks = {
-        'accounting': dict(ag=ag_rows, nonag=nonag_rows, am=am_rows),                               # the demand, GHG, water, biodiversity and renewable rows account over these per cell (the first n_terms columns)
-        'arcs':       dict(ag2ag=ag2ag_rows, ag2nonag=ag2nonag_rows, nonag2ag=nonag2ag_rows),       # charged per arc (transition cost in the objective, transition emissions in the GHG row), never per cell
-        'cell_use':   dict(cell_usage=cell_usage_rows),                                             # no cost at all: the objective stops where they start (n_dec)
-    }
+    # the blocks, in the table's order: the three a per-cell coefficient accounts over (ag, nonag, am: the first
+    # n_terms columns the demand, GHG, water, biodiversity and renewable rows read), then the arcs (charged per arc:
+    # transition cost in the objective, transition emissions in the GHG row)
+    blocks = dict(ag=ag_rows, nonag=nonag_rows, am=am_rows, ag2ag=ag2ag_rows, ag2nonag=ag2nonag_rows, nonag2ag=nonag2ag_rows)
 
     # the chunks inside the am and arc blocks — one per (option, land use, lm), one per source — by their widths: the
     # table lays them out as it lays the blocks out, and keeps their (start, stop) beside block_range
@@ -116,11 +110,11 @@ def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSide]:
         'nonag2ag': {src: int(mask.sum()) for src, mask in valid_nonag2ag.items()},
     }
 
-    table = table_space(blocks, chunks, list(data.AGMAN2LU))                        # the block and chunk bounds land in its attrs
+    table = table_space(blocks, chunks, list(data.AGMAN2LU), data.LANDMANS)                        # the block and chunk bounds land in its attrs
 
     block_range = table.attrs['block_range']
-    print(f"Column space: {table.attrs['n_all']:,} columns = {table.attrs['n_dec']:,} decision (n_dec) + "
-          f"{table.attrs['n_all'] - table.attrs['n_dec']:,} cell-usage slacks", flush=True)
+    print(f"Column space: {table.attrs['n_all']:,} columns = {table.attrs['n_terms']:,} accounting (n_terms) + "
+          f"{table.attrs['n_all'] - table.attrs['n_terms']:,} arcs", flush=True)
     for name, (start, stop) in block_range.items():
         print(f"{'└──' if name == list(block_range)[-1] else '├──'} {name:<10s} {stop - start:>12,}", flush=True)
 
@@ -227,15 +221,6 @@ def get_arc_ag2nonag_src(data: Data, trans_source_ag: dict, trans_ub_nonag_rk: n
         (from_m, from_j): (trans_ub_nonag_rk[src_cells, :] * reach_jk[from_j][None, :]) > 0   # (ncells_src, N_NONAG)
         for (from_m, from_j), src_cells in trans_source_ag.items()
     }
-
-def get_feasible_cell_usage_r(trans_ub_ag_mrj: np.ndarray, trans_ub_nonag_rk: np.ndarray, ag_mask_r: np.ndarray) -> np.ndarray:
-    """Bool over cells: which can meet the cell-usage equality Σ(ag + non-ag shares) = ag_mask (any ag var, or enough non-ag ub)."""
-    print('Getting cells that can meet the cell-usage equality...', flush=True)
-    has_any_ag_r = (trans_ub_ag_mrj > 0).any(axis=(0, 2))
-    max_nonag_r  = trans_ub_nonag_rk.sum(axis=1)
-    max_alloc_r  = np.where(has_any_ag_r, 1.0, max_nonag_r)
-    return max_alloc_r >= ag_mask_r - 1e-6
-
 
 # ═══════════════════════════ the column blocks: every builder returns its block's ROWS as a field dict (table_space lays them back to back) ═══════════════════════════
 
@@ -404,29 +389,13 @@ def nonag2ag_space(valid_nonag2ag: dict, trans_source_nonag: dict) -> dict:
     return rows
 
 
-def cell_usage_space(feasible_cell_usage_r: np.ndarray, ag_mask_r: np.ndarray) -> dict:
-    """The cell-usage slack columns as rows: one per cell that gets a cell-usage row, its ub the width of that ranged row."""
-    slack_cells = np.flatnonzero(feasible_cell_usage_r)
-    band = 10 * settings.FEASIBILITY_TOLERANCE                                              # the cell-usage row is ranged: Σ shares ∈ [ag_mask − band, ag_mask + band]
-    ag_mask = ag_mask_r[slack_cells].astype(np.float64)                                     # widened before the band is applied
-    # the column (gp.Var) view: one slack per cell that gets a cell-usage row; no row view, the row finds its slack through the table
-    return dict(
-        cell=slack_cells,                                                                   # the slack of a ranged row: lb 0, ub = hi − lo
-        ub=(ag_mask + band) - (ag_mask - band)                                              # written as hi − lo, not 2 · band: the slack spans exactly the float64 width the row's two bounds span
-    )
-
-
-def table_space(blocks: dict, chunks: dict, options: list) -> xr.Dataset:
-    """The whole space as ONE long table on (col = Var.index): the blocks' rows back to back, group after group in the order ``blocks`` declares them, the fields of each column (-1 where n/a), its lb / ub / base; ``chunks`` = {block: {key: width}} the runs inside the am and arc blocks, kept as ``<block>_range`` = {key: (start, stop)} beside ``block_range``; ``options`` names the am_idx field."""
-
-    # the groups laid out one after another: their declared order IS the table's, so the widths below are its prefixes
-    parts = {block: rows for group in blocks.values() for block, rows in group.items()}
-    group_width = {group: sum(rows['cell'].size for rows in group_blocks.values()) for group, group_blocks in blocks.items()}
+def table_space(blocks: dict, chunks: dict, options: list, landmans: list) -> xr.Dataset:
+    """The whole space as ONE long table on (col = Var.index): the blocks' rows back to back in the order ``blocks`` declares them, the fields of each column (-1 where n/a), its lb / ub / base; ``chunks`` = {block: {key: width}} the runs inside the am and arc blocks, kept as ``<block>_range`` = {key: (start, stop)} beside ``block_range``; ``options`` names the am_idx field and ``landmans`` the m field."""
 
     # each block's run of the table: the rows [start, stop) it owns
-    widths = [part['cell'].size for part in parts.values()]
+    widths = [rows['cell'].size for rows in blocks.values()]
     bounds = np.cumsum([0, *widths])
-    block_range = {block: (int(start), int(stop)) for block, start, stop in zip(parts, bounds[:-1], bounds[1:])}
+    block_range = {block: (int(start), int(stop)) for block, start, stop in zip(blocks, bounds[:-1], bounds[1:])}
 
     n_all   = int(bounds[-1])                         # every column: the rows are built at this width
 
@@ -436,15 +405,14 @@ def table_space(blocks: dict, chunks: dict, options: list) -> xr.Dataset:
         chunk_bounds = block_range[block][0] + np.cumsum([0, *chunk_widths.values()])
         chunk_range[f'{block}_range'] = {key: (int(start), int(stop)) for key, start, stop in zip(chunk_widths, chunk_bounds[:-1], chunk_bounds[1:])}
         assert chunk_bounds[-1] == block_range[block][1], f'the {block} chunks do not fill the block'
-    n_terms = group_width['accounting']               # the accounting group leads, so its width IS the prefix a demand / GHG / water / biodiversity / renewable coefficient array is allocated at
-    n_dec   = n_all - group_width['cell_use']         # the cell-use group trails, so the objective stops where it starts
+    n_terms = blocks['ag']['cell'].size + blocks['nonag']['cell'].size + blocks['am']['cell'].size   # the three accounting blocks lead the table, so their width IS the prefix a demand / GHG / water / biodiversity / renewable coefficient array is allocated at
 
     # a field over the whole table: -1 (or the fill) on the blocks that have no such field, e.g. slot / am_idx / j_idx off the am block
     def field(field_name, dtype, fill):
         """One field over the whole table: each block's array for it, or the fill where the block has no such field."""
         per_block = []
-        for part, width in zip(parts.values(), widths):
-            value = part.get(field_name, fill)                   # the block's own array, or the fill where the field does not apply to it
+        for rows, width in zip(blocks.values(), widths):
+            value = rows.get(field_name, fill)                   # the block's own array, or the fill where the field does not apply to it
             value = np.asarray(value, dtype=dtype)               # one dtype for the whole field, whatever each block happened to store
             per_block.append(np.broadcast_to(value, width))      # a scalar stretches to the block's width (the fill, or a constant like ub = 1.0)
         return np.concatenate(per_block)                         # the blocks back to back: one value per column of the table
@@ -468,10 +436,10 @@ def table_space(blocks: dict, chunks: dict, options: list) -> xr.Dataset:
         attrs=dict(
             block_range=block_range,                                                         # {block: (start, stop)} — the rows each block owns, in the table's block order
             **chunk_range,                                                                   # am_range {(option, j_idx, m): (start, stop)}, ag2ag_range / ag2nonag_range / nonag2ag_range {source: (start, stop)} — the runs inside those blocks
+            landmans=landmans,                                                               # the land-management names, in m order ('dry', 'irr'): what the m field means
             options=options,                                                                 # the ag-management options, in am_idx order: what the am_idx field means
-            n_terms=n_terms,                                                                 # the accounting group: the table's first rows, the width a demand / GHG / water / biodiversity / renewable coefficient array is allocated at
-            n_dec=n_dec,                                                                     # everything before the cell-use group: the objective is built at this width (a slack carries no cost)
-            n_all=n_all,                                                                     # every column: the rows are built at this width
+            n_terms=n_terms,                                                                 # the ag, nonag and am blocks: the table's first rows, the width a demand / GHG / water / biodiversity / renewable coefficient array is allocated at
+            n_all=n_all,                                                                     # every column: the rows and the objective are built at this width
         )
     )
 

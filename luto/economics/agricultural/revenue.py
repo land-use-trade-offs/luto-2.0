@@ -589,17 +589,17 @@ def get_agricultural_management_revenue_matrices(data:Data, r_mrj, yr_idx: int) 
         The keys of the dictionary represent the management practices, and the values are numpy arrays.
 
     """
-    ag_mam_r_mrj = {}
+    ag_man_r_mrj = {}
 
-    ag_mam_r_mrj['Asparagopsis taxiformis'] = get_asparagopsis_effect_r_mrj(data, r_mrj, yr_idx)           
-    ag_mam_r_mrj['Precision Agriculture'] = get_precision_agriculture_effect_r_mrj(data, r_mrj, yr_idx)  
-    ag_mam_r_mrj['Ecological Grazing'] = get_ecological_grazing_effect_r_mrj(data, r_mrj, yr_idx)          
-    ag_mam_r_mrj['Savanna Burning'] = get_savanna_burning_effect_r_mrj(data, yr_idx)                       
-    ag_mam_r_mrj['AgTech EI'] = get_agtech_ei_effect_r_mrj(data, r_mrj, yr_idx)                            
-    ag_mam_r_mrj['Biochar'] = get_biochar_effect_r_mrj(data, r_mrj, yr_idx)                                
-    ag_mam_r_mrj['HIR - Beef'] = get_beef_hir_effect_r_mrj(data, r_mrj)                                    
-    ag_mam_r_mrj['HIR - Sheep'] = get_sheep_hir_effect_r_mrj(data, r_mrj)
-    ag_mam_r_mrj['Utility Solar PV'] = get_utility_solar_pv_effect_r_mrj(data, r_mrj, yr_idx)
-    ag_mam_r_mrj['Onshore Wind'] = get_onshore_wind_effect_r_mrj(data, r_mrj, yr_idx)
+    ag_man_r_mrj['Asparagopsis taxiformis'] = get_asparagopsis_effect_r_mrj(data, r_mrj, yr_idx)           
+    ag_man_r_mrj['Precision Agriculture'] = get_precision_agriculture_effect_r_mrj(data, r_mrj, yr_idx)  
+    ag_man_r_mrj['Ecological Grazing'] = get_ecological_grazing_effect_r_mrj(data, r_mrj, yr_idx)          
+    ag_man_r_mrj['Savanna Burning'] = get_savanna_burning_effect_r_mrj(data, yr_idx)                       
+    ag_man_r_mrj['AgTech EI'] = get_agtech_ei_effect_r_mrj(data, r_mrj, yr_idx)                            
+    ag_man_r_mrj['Biochar'] = get_biochar_effect_r_mrj(data, r_mrj, yr_idx)                                
+    ag_man_r_mrj['HIR - Beef'] = get_beef_hir_effect_r_mrj(data, r_mrj)                                    
+    ag_man_r_mrj['HIR - Sheep'] = get_sheep_hir_effect_r_mrj(data, r_mrj)
+    ag_man_r_mrj['Utility Solar PV'] = get_utility_solar_pv_effect_r_mrj(data, r_mrj, yr_idx)
+    ag_man_r_mrj['Onshore Wind'] = get_onshore_wind_effect_r_mrj(data, r_mrj, yr_idx)
 
-    return ag_mam_r_mrj
+    return ag_man_r_mrj
