@@ -199,7 +199,6 @@ def get_row_inputs(data: Data, base_year: int, target_year: int) -> RowInputs:
     downstream of the economics modules and ``Data``; the column space is never seen here."""
 
     target_index = target_year - data.YR_CAL_BASE
-    base_lumap = data.lumaps[base_year]
 
     # ── 1. transition GHG emissions, SOURCE-KEYED over each source's base-year cells: the physical
     #       parallel of the per-arc transition cost, so the emissions of a move are charged against
@@ -222,13 +221,13 @@ def get_row_inputs(data: Data, base_year: int, target_year: int) -> RowInputs:
     ag_q_mrp = ag_quantity.get_quantity_matrices(data, target_index).astype(np.float32)
 
     print('Getting non-agricultural GHG emissions matrices...', flush=True)
-    non_ag_g_rk = non_ag_ghg.get_ghg_matrix(data, ag_g_mrj, base_lumap).astype(np.float32)
+    non_ag_g_rk = non_ag_ghg.get_ghg_matrix(data, ag_g_mrj).astype(np.float32)
 
     print('Getting non-agricultural water yield matrices...', flush=True)
-    non_ag_w_rk = non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj, base_lumap, target_index, *hist_water_yield).astype(np.float32)
+    non_ag_w_rk = non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj, target_index, *hist_water_yield).astype(np.float32)
 
     print('Getting non-agricultural production quantity matrices...', flush=True)
-    non_ag_q_crk = non_ag_quantity.get_quantity_matrix(data, ag_q_mrp, base_lumap).astype(np.float32)
+    non_ag_q_crk = non_ag_quantity.get_quantity_matrix(data, ag_q_mrp).astype(np.float32)
 
     print("Getting agricultural management options' GHG emission effects...", flush=True)
     ag_man_g_mrj = {am: arr.astype(np.float32) for am, arr in ag_ghg.get_agricultural_management_ghg_matrices(data, target_index).items()}
@@ -426,7 +425,6 @@ def get_economics(data: Data, base_year: int, target_year: int) -> EconomicInput
     """Cost, revenue and the per-arc transition cost of one step, as one ``EconomicInputs``."""
 
     target_index = target_year - data.YR_CAL_BASE
-    base_lumap = data.lumaps[base_year]
 
     print('Getting agricultural cost matrices...', flush=True)
     ag_c_mrj = ag_cost.get_cost_matrices(data, target_index).astype(np.float32)
@@ -435,10 +433,10 @@ def get_economics(data: Data, base_year: int, target_year: int) -> EconomicInput
     ag_r_mrj = ag_revenue.get_rev_matrices(data, target_index).astype(np.float32)
 
     print('Getting non-agricultural cost matrices...', flush=True)
-    non_ag_c_rk = non_ag_cost.get_cost_matrix(data, ag_c_mrj, base_lumap, target_year).astype(np.float32)
+    non_ag_c_rk = non_ag_cost.get_cost_matrix(data, ag_c_mrj, target_year).astype(np.float32)
 
     print('Getting non-agricultural revenue matrices...', flush=True)
-    non_ag_r_rk = non_ag_revenue.get_rev_matrix(data, target_year, ag_r_mrj, base_lumap).astype(np.float32)
+    non_ag_r_rk = non_ag_revenue.get_rev_matrix(data, target_year, ag_r_mrj).astype(np.float32)
 
     # nonag→nonag transition cost. Currently a ZERO matrix — non-ag LUs are not allowed to transition
     # to other non-ag LUs (get_nonag2nonag_transition_matrix returns zeros). Kept as an explicit hook

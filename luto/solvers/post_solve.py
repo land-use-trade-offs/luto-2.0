@@ -76,18 +76,18 @@ def post_solve(x: np.ndarray, cols: xr.Dataset, col_side: ColSide, rows: xr.Data
     am_X_irr_sol_rj = {am: np.zeros((ncells, n_ag_lus), dtype=np.float32) for am in agman2lu}
 
     # agricultural
-    ag = slice(*block_range['ag'])
+    ag = block_range['ag']
     is_dry = m[ag] == 0
     X_dry_sol_rj[cell[ag][is_dry],  j[ag][is_dry]]  = x[ag][is_dry]
     X_irr_sol_rj[cell[ag][~is_dry], j[ag][~is_dry]] = x[ag][~is_dry]
 
     # non-agricultural (a disabled land use's columns are fixed at zero)
-    nonag = slice(*block_range['nonag'])
+    nonag = block_range['nonag']
     non_ag_X_sol_rk[cell[nonag], k[nonag]] = x[nonag]
 
     # ag-management. Savanna eligibility is applied to BOTH lm here, while variable creation applied
     # it to dry only: irr savanna vars outside the eligible cells report 0.
-    am = slice(*block_range['am'])
+    am = block_range['am']
     options = cols.attrs['options']
     am_of_col = np.asarray(options, dtype=object)[am_idx[am]]
     reported = ~((am_of_col == "Savanna Burning") & (m[am] == 1) & ~np.isin(cell[am], inputs.savanna_eligible_r))
@@ -115,7 +115,7 @@ def post_solve(x: np.ndarray, cols: xr.Dataset, col_side: ColSide, rows: xr.Data
                                     ('nonag2ag', col_side.valid_nonag2ag, dvar_D_nonag2ag_mrj)):
         for src, mask in masks.items():
             deltas = np.zeros(mask.shape, dtype=np.float32)
-            deltas[mask] = x_arcs[slice(*cols.attrs[f'{block}_range'][src])]
+            deltas[mask] = x_arcs[cols.attrs[f'{block}_range'][src]]
             deltas_of[src] = deltas
 
     # ── 3. the maps: land use, land management, ag-management options ──

@@ -2081,14 +2081,6 @@ class Data:
         # Calculate year index (i.e., number of years since 2010)
         yr_idx = yr_cal - self.YR_CAL_BASE
         
-        # Get lumap of base year
-        sim_year = sorted(set([self.YR_CAL_BASE]) | set(settings.SIM_YEARS)) 
-        if yr_cal == self.YR_CAL_BASE:
-            lumap = self.lumaps[self.YR_CAL_BASE]
-        else:
-            prev_year = sim_year[sim_year.index(yr_cal)-1]
-            lumap = self.lumaps[prev_year]
-                
         # Get commodity matrices
         ag_q_mrp_xr = xr.DataArray(
             ag_quantity.get_quantity_matrices(self, yr_idx).astype(np.float32),
@@ -2103,7 +2095,7 @@ class Data:
         )
 
         non_ag_crk_xr = xr.DataArray(
-            non_ag_quantity.get_quantity_matrix(self, ag_q_mrp_xr, lumap).astype(np.float32),
+            non_ag_quantity.get_quantity_matrix(self, ag_q_mrp_xr).astype(np.float32),
             dims=['Commodity', 'cell', 'lu'],
             coords={
                 'Commodity': self.COMMODITIES,

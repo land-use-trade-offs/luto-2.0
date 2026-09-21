@@ -21,7 +21,6 @@ import numpy as np
 
 from luto import settings
 from luto.data import Data
-from luto import tools
 from functools import lru_cache
 from luto.settings import (
     BIO_CONTRIBUTION_ENV_PLANTING,
@@ -68,7 +67,7 @@ def get_biodiv_sheep_agroforestry(
     ------
     Numpy array indexed by r
     """
-    sheep_j = tools.get_sheep_code(data)
+    sheep_j = data.DESC2AGLU['Sheep - modified land']
 
     # Only use the dryland version of sheep
     sheep_biodiv = ag_b_mrj[0, :, sheep_j]
@@ -98,7 +97,7 @@ def get_biodiv_beef_agroforestry(
     ------
     Numpy array indexed by r
     """
-    beef_j = tools.get_beef_code(data)
+    beef_j = data.DESC2AGLU['Beef - modified land']
 
     # Only use the dryland version of beef
     beef_biodiv = ag_b_mrj[0, :, beef_j]
@@ -138,7 +137,7 @@ def get_biodiv_sheep_carbon_plantings_belt(
     ------
     Numpy array indexed by r
     """
-    sheep_j = tools.get_sheep_code(data)
+    sheep_j = data.DESC2AGLU['Sheep - modified land']
 
     # Only use the dryland version of sheep
     sheep_biodiv = ag_b_mrj[0, :, sheep_j]
@@ -168,7 +167,7 @@ def get_biodiv_beef_carbon_plantings_belt(
     ------
     Numpy array indexed by r
     """
-    beef_j = tools.get_beef_code(data)
+    beef_j = data.DESC2AGLU['Beef - modified land']
 
     # Only use the dryland version of beef
     beef_biodiv = ag_b_mrj[0, :, beef_j]
@@ -240,8 +239,8 @@ def get_breq_matrix(data: Data, ag_b_mrj: np.ndarray, lumap: np.ndarray, bio_qua
     Returns
     - numpy.ndarray: The non-agricultural b_rk matrix of biodiversity scores per cell and land use.
     """
-    agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, lumap)
-    cp_belt_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, lumap)
+    agroforestry_x_r = np.full(data.NCELLS, settings.AF_PROPORTION, dtype=np.float32)   # the share of a cell agroforestry can take: the same everywhere
+    cp_belt_x_r = np.full(data.NCELLS, settings.CP_BELT_PROPORTION, dtype=np.float32)   # the share of a cell carbon plantings (belt) can take
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
     non_agr_b_matrices = [
@@ -273,27 +272,27 @@ def get_non_ag_lu_biodiv_contribution(data: Data) -> dict[int, float]:
         # Sheep agroforestry
         2: (
             AF_PROPORTION * BIO_CONTRIBUTION_AGROFORESTRY
-            + (1 - AF_PROPORTION) * (data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[tools.get_sheep_code(data)])
+            + (1 - AF_PROPORTION) * (data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[data.DESC2AGLU['Sheep - modified land']])
         ),
         # Beef agroforestry
         3: (
             AF_PROPORTION * BIO_CONTRIBUTION_AGROFORESTRY
-            + (1 - AF_PROPORTION) * (data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[tools.get_beef_code(data)])
+            + (1 - AF_PROPORTION) * (data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[data.DESC2AGLU['Beef - modified land']])
         ),
         # Carbon plantings (block)
         4: BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK,
         # Sheep carbon plantings (belt)
         5: (
             CP_BELT_PROPORTION * BIO_CONTRIBUTION_AGROFORESTRY
-            + (1 - CP_BELT_PROPORTION) * (data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[tools.get_sheep_code(data)])
+            + (1 - CP_BELT_PROPORTION) * (data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[data.DESC2AGLU['Sheep - modified land']])
         ),
         # Beef carbon plantings (belt)
         6: (
             CP_BELT_PROPORTION * BIO_CONTRIBUTION_AGROFORESTRY
-            + (1 - CP_BELT_PROPORTION) * (data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[tools.get_beef_code(data)])
+            + (1 - CP_BELT_PROPORTION) * (data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[data.DESC2AGLU['Beef - modified land']])
         ),
         # BECCS
         7: BIO_CONTRIBUTION_BECCS,
         # Destocked land
-        8: data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[tools.get_unallocated_natural_land_code(data)],
+        8: data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[data.DESC2AGLU['Unallocated - natural land']],
     }

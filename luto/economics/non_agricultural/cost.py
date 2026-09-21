@@ -22,7 +22,6 @@ import numpy as np
 from luto.data import Data
 import luto.settings as settings
 from luto.settings import NON_AG_LAND_USES
-from luto import tools
 
 
 def get_cost_env_plantings(data: Data, yr_cal: int) -> np.ndarray:
@@ -96,7 +95,7 @@ def get_cost_sheep_agroforestry(
     ------
     Numpy array indexed by r
     """
-    sheep_j = tools.get_sheep_code(data)
+    sheep_j = data.DESC2AGLU['Sheep - modified land']
 
     # Only use the dryland version of sheep
     sheep_cost = ag_c_mrj[0, :, sheep_j]
@@ -125,7 +124,7 @@ def get_cost_beef_agroforestry(
     ------
     Numpy array indexed by r
     """
-    beef_j = tools.get_beef_code(data)
+    beef_j = data.DESC2AGLU['Beef - modified land']
 
     # Only use the dryland version of beef
     beef_cost = ag_c_mrj[0, :, beef_j]
@@ -191,7 +190,7 @@ def get_cost_sheep_carbon_plantings_belt(
     ------
     Numpy array indexed by r
     """
-    sheep_j = tools.get_sheep_code(data)
+    sheep_j = data.DESC2AGLU['Sheep - modified land']
 
     # Only use the dryland version of sheep
     sheep_cost = ag_c_mrj[0, :, sheep_j]
@@ -220,7 +219,7 @@ def get_cost_beef_carbon_plantings_belt(
     ------
     Numpy array indexed by r
     """
-    beef_j = tools.get_beef_code(data)
+    beef_j = data.DESC2AGLU['Beef - modified land']
 
     # Only use the dryland version of beef
     beef_cost = ag_c_mrj[0, :, beef_j]
@@ -262,7 +261,7 @@ def get_cost_destocked(data: Data, yr_cal: int) -> np.ndarray:
     return settings.EP_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR * data.MAINT_COST_MULTS[yr_cal] * data.REAL_AREA
 
 
-def get_cost_matrix(data:Data, ag_c_mrj:np.ndarray, lumap:np.ndarray, yr_cal:int) -> np.ndarray:
+def get_cost_matrix(data:Data, ag_c_mrj:np.ndarray, yr_cal:int) -> np.ndarray:
     """
     Returns non-agricultural c_rk matrix of costs per cell and land use.
 
@@ -272,8 +271,8 @@ def get_cost_matrix(data:Data, ag_c_mrj:np.ndarray, lumap:np.ndarray, yr_cal:int
     Returns
     - cost_matrix: A 2D numpy array of costs per cell and land use.
     """
-    agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, lumap)
-    cp_belt_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, lumap)
+    agroforestry_x_r = np.full(data.NCELLS, settings.AF_PROPORTION, dtype=np.float32)   # the share of a cell agroforestry can take: the same everywhere
+    cp_belt_x_r = np.full(data.NCELLS, settings.CP_BELT_PROPORTION, dtype=np.float32)   # the share of a cell carbon plantings (belt) can take
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
     non_agr_c_matrices = [

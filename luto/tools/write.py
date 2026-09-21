@@ -1419,8 +1419,8 @@ def write_economics(data: Data, yr_cal, path):
                        region_NRM=('cell', data.REGION_NRM_NAME))
     )
 
-    non_ag_rev_mat  = tools.non_ag_rk_to_xr(data, non_ag_revenue.get_rev_matrix(data, yr_cal, ag_rev_mrj, data.lumaps[yr_cal]))
-    non_ag_cost_mat = tools.non_ag_rk_to_xr(data, non_ag_cost.get_cost_matrix(data, ag_cost_mrj, data.lumaps[yr_cal], yr_cal))
+    non_ag_rev_mat  = tools.non_ag_rk_to_xr(data, non_ag_revenue.get_rev_matrix(data, yr_cal, ag_rev_mrj))
+    non_ag_cost_mat = tools.non_ag_rk_to_xr(data, non_ag_cost.get_cost_matrix(data, ag_cost_mrj, yr_cal))
     nonag2nonag_mat = tools.non_ag_rk_to_xr(data, non_ag_transitions.get_nonag2nonag_transition_matrix(data)) / gap
 
     # TRUE ag→nonag transition cost paid: Σ_src cost[src]·D[src] per target k, scattered to global
@@ -1959,10 +1959,10 @@ def write_transition_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         ag2nonag_cost_mat = non_ag_transitions.get_transition_matrix_ag2nonag(
             data, yr_cal_sim_pre, yr_cal, separate=True)     # {lu_name: {(fm,fj): {Cost-type: (n,)}}}
         ag_g_mrj      = ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True)
-        ghg_rk_full   = non_ag_ghg.get_ghg_matrix(data, ag_g_mrj, data.lumaps[yr_cal_sim_pre]).astype(np.float32)
+        ghg_rk_full   = non_ag_ghg.get_ghg_matrix(data, ag_g_mrj).astype(np.float32)
         ag_w_mrj      = ag_water.get_wreq_matrices(data, yr_idx)
         water_rk_full = non_ag_water.get_w_net_yield_matrix(
-            data, ag_w_mrj, data.lumaps[yr_cal_sim_pre], yr_idx).astype(np.float32)
+            data, ag_w_mrj, yr_idx).astype(np.float32)
 
     # Region groupings (sorted unique names + integer codes, matching process_chunks).
     reg_info = []
@@ -2647,7 +2647,7 @@ def write_ghg(data: Data, yr_cal: int, path: str):
         ).assign_coords(region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME))
     non_ag_g_rk = tools.non_ag_rk_to_xr(
         data,
-        non_ag_ghg.get_ghg_matrix(data, ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True), data.lumaps[yr_cal])
+        non_ag_ghg.get_ghg_matrix(data, ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True))
     )
 
     xr_ghg_non_ag = non_ag_dvar_rk * non_ag_g_rk
@@ -2844,7 +2844,7 @@ def write_water(data: Data, yr_cal, path):
         )
         non_ag_w_rk = tools.non_ag_rk_to_xr(
             data,
-            non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj.values, data.lumaps[yr_cal], yr_idx)
+            non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj.values, yr_idx)
         )
         ag_man_w_mrj = tools.am_mrj_to_xr(  # Ag-man water yield only related to water requirement, that not affected by climate change
             data,
@@ -2857,7 +2857,7 @@ def write_water(data: Data, yr_cal, path):
         )
         non_ag_w_rk = tools.non_ag_rk_to_xr(
             data,
-            non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj.values, data.lumaps[yr_cal], yr_idx, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)
+            non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj.values, yr_idx, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)
         )
         ag_man_w_mrj = tools.am_mrj_to_xr(  # Ag-man water yield only related to water requirement, that not affected by climate change
             data,

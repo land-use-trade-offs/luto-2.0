@@ -89,8 +89,7 @@ class LutoSolver:
                                      for from_k, m, local_r, j in zip(t['from_k'], t['m'], t['local_r'], t['j'])],
         }
      
-        for block, block_rows in cols.attrs['block_range'].items():
-            span = slice(*block_rows)
+        for block, span in cols.attrs['block_range'].items():
             fields = {field: cols[field].values[span] for field in ('m', 'j', 'k', 'am_idx', 'from_m', 'from_j', 'from_k', 'local_r', 'cell')}
             self.gurobi_model.setAttr('VarName', self.x[span].tolist(), names_of[block](fields))
             print(f"│   {'└──' if block == list(cols.attrs['block_range'])[-1] else '├──'} {block:<10s} {span.stop - span.start:>12,} variables")
@@ -112,9 +111,10 @@ class LutoSolver:
         handles = np.full(T.sizes['row'], None, dtype=object)
         handles[built] = constrs
         T['constr'] = (('row',), handles)
-        for family, (start, stop) in T.attrs['family_range'].items():
-            n_built = int(active[start:stop].sum())
-            print(f"│   │   {family}: {n_built:,} row(s)" + (f", {stop - start - n_built:,} dropped before the build" if n_built < stop - start else ""))
+        for family, span in T.attrs['family_range'].items():
+            n_rows  = span.stop - span.start
+            n_built = int(active[span].sum())
+            print(f"│   │   {family}: {n_built:,} row(s)" + (f", {n_rows - n_built:,} dropped before the build" if n_built < n_rows else ""))
 
     def _setup_objective(self):
         """Objective obj · x: the coefficient of every column as the column table carries it

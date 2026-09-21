@@ -19,7 +19,6 @@
 
 import numpy as np
 
-from luto import tools
 from copy import deepcopy
 from luto import settings
 
@@ -28,7 +27,7 @@ def get_sheep_q_cr(data, ag_q_mrp: np.ndarray) -> np.ndarray:
     """
     Gets the matrix containing the commodities produced by sheep (modified land) 
     """
-    sheep_j = tools.get_sheep_code(data)
+    sheep_j = data.DESC2AGLU['Sheep - modified land']
 
     sheep_p = []
     for p in range(data.NPRS):
@@ -48,7 +47,7 @@ def get_beef_q_cr(data, ag_q_mrp: np.ndarray) -> np.ndarray:
     """
     Gets the matrix containing the commodities produced by beef (modified land) 
     """
-    beef_j = tools.get_beef_code(data)
+    beef_j = data.DESC2AGLU['Beef - modified land']
 
     beef_p = []
     for p in range(data.NPRS):
@@ -306,7 +305,7 @@ def get_quantity_destocked(data) -> np.ndarray:
     return np.zeros((data.NCMS, data.NCELLS)).astype(np.float32)
 
 
-def get_quantity_matrix(data, ag_q_mrp: np.ndarray, lumap: np.ndarray) -> np.ndarray:
+def get_quantity_matrix(data, ag_q_mrp: np.ndarray) -> np.ndarray:
     """
     Get the non-agricultural quantity matrix q_crk.
     Values represent the yield of each commodity c from the cell r when using
@@ -318,8 +317,8 @@ def get_quantity_matrix(data, ag_q_mrp: np.ndarray, lumap: np.ndarray) -> np.nda
     Returns
     - np.ndarray: The non-agricultural quantity matrix q_crk.
     """
-    agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, lumap)
-    cp_belt_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, lumap)
+    agroforestry_x_r = np.full(data.NCELLS, settings.AF_PROPORTION, dtype=np.float32)   # the share of a cell agroforestry can take: the same everywhere
+    cp_belt_x_r = np.full(data.NCELLS, settings.CP_BELT_PROPORTION, dtype=np.float32)   # the share of a cell carbon plantings (belt) can take
     
     # reshape each non-agricultural quantity matrix to be indexed (c, r, 1) and concatenate on the k indexing
     non_agr_quantity_matrices = [

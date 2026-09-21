@@ -68,8 +68,8 @@ def get_row_bounds(rows: xr.Dataset, cols: xr.Dataset) -> xr.Dataset:
     ``preflight`` = {block: counts of the columns no row can explain} and ``conservation`` = the cells with node-balance
     rows, and how many of them sum to a unit row."""
     A = rows.attrs['A']
-    lb = cols['lb'].values
-    ub = cols['ub'].values
+    lb = cols['lb'].values.astype(np.float64)                          # the column table keeps float32 bounds; the engine reads them as doubles, and so does this pass
+    ub = cols['ub'].values.astype(np.float64)
     rhs = rows['rhs'].values
     sense = rows['sense'].values
 
@@ -101,9 +101,8 @@ def get_row_bounds(rows: xr.Dataset, cols: xr.Dataset) -> xr.Dataset:
     # ── 6. the column preflight: columns no row touches, bounds no point can satisfy ──
     in_rows = np.bincount(A.indices, minlength=A.shape[1])
     preflight = {}
-    for block, (start, stop) in cols.attrs['block_range'].items():
-        span = slice(start, stop)
-        preflight[block] = dict(columns=stop - start,
+    for block, span in cols.attrs['block_range'].items():
+        preflight[block] = dict(columns=span.stop - span.start,
                                 in_no_row=int((in_rows[span] == 0).sum()),
                                 nan_bound=int(np.isnan(lb[span]).sum() + np.isnan(ub[span]).sum()),
                                 lb_neg_inf=int(np.isneginf(lb[span]).sum()),
@@ -204,7 +203,7 @@ def conservation_rows(rows: xr.Dataset, margin: np.ndarray) -> tuple[sparse.csr_
     node row leaves a stray ±1, and that cell implies nothing here) and whose node rows are all active — (C, rhs,
     margin), and the counts."""
     A = rows.attrs['A']
-    node_rows = np.flatnonzero(row_table.rows_where(rows, group='flow_in'))                 # the node-balance rows, ag and non-ag: each carries its cell
+    node_rows = np.flatnonzero(row_table.rows_where(rows, family='node_balance_ag') | row_table.rows_where(rows, family='node_balance_nonag'))   # the node-balance rows, ag and non-ag: each carries its cell
     if not node_rows.size:
         return sparse.csr_matrix((0, A.shape[1])), np.empty(0), np.empty(0), dict(cells=0, unit=0)
     cell = rows['cell'].values[node_rows]
@@ -343,12 +342,12 @@ def report_row_bounds(rows: xr.Dataset, bounds: xr.Dataset, target_year: int, ou
     print(f"│   ├── Bound propagation (rel tol {settings.BOUND_PROP_REL_TOL:g}): {status.size:,} rows; the verdict over the box, "
           f"then impossible / tight under the bounds the rows imply")
     print(f"│   │   {'family':<30s} {'rows':>10s} " + ' '.join(f'{name:>14s}' for name in STATUS) + f" {'dropped':>9s} {'imp·implied':>12s} {'tight·implied':>14s}")
-    for family, (start, stop) in rows.attrs['family_range'].items():
-        counts = np.bincount(status[start:stop], minlength=len(STATUS))
-        n_dropped = int(rows['redundant'].values[start:stop].sum())
-        n_imp = int((status_implied[start:stop] == IMPOSSIBLE).sum())
-        n_tight = int((status_implied[start:stop] == TIGHT).sum())
-        print(f"│   │   {family:<30s} {stop - start:>10,} " + ' '.join(f'{count:>14,}' for count in counts) + f" {n_dropped:>9,} {n_imp:>12,} {n_tight:>14,}")
+    for family, span in rows.attrs['family_range'].items():
+        counts = np.bincount(status[span], minlength=len(STATUS))
+        n_dropped = int(rows['redundant'].values[span].sum())
+        n_imp = int((status_implied[span] == IMPOSSIBLE).sum())
+        n_tight = int((status_implied[span] == TIGHT).sum())
+        print(f"│   │   {family:<30s} {span.stop - span.start:>10,} " + ' '.join(f'{count:>14,}' for count in counts) + f" {n_dropped:>9,} {n_imp:>12,} {n_tight:>14,}")
     conservation = bounds.attrs['conservation']
     print(f"│   │   conservation: the node-balance rows of {conservation['unit']:,} of {conservation['cells']:,} cells sum to Σ X = Σ base (the row that bounds a cell's columns together)")
     for block, counts in bounds.attrs['preflight'].items():
@@ -367,8 +366,8 @@ def report_row_bounds(rows: xr.Dataset, bounds: xr.Dataset, target_year: int, ou
     #    unit — a structural row that pins its columns at a bound (a disabled land use's inflow guard, an adoption
     #    limit of 0) is tight by construction: counted above, not listed ──
     policy = np.zeros(status.size, dtype=bool)
-    for family, (start, stop) in rows.attrs['family_range'].items():
-        policy[start:stop] = family in UNIT
+    for family, span in rows.attrs['family_range'].items():
+        policy[span] = family in UNIT
     listed = np.flatnonzero((status == REDUNDANT) | (status == IMPOSSIBLE) | (status_implied == IMPOSSIBLE)
                             | (((status == TIGHT) | (status_implied == TIGHT)) & policy))
     scale = rows['scale'].values[listed]

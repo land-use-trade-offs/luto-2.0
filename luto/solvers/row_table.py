@@ -26,16 +26,19 @@ from scipy import sparse
 # ═══════════════════════════ the row table: how the rows are stored, and how they are asked ═══════════════════════════
 
 ROW_FIELDS_INT = ('cell', 'm', 'j', 'k', 'am_idx', 'from_m', 'from_j', 'from_k', 'local_r', 'commodity')   # -1 where n/a
-ROW_FIELDS_CODED = ('family', 'group', 'region', 'item', 'presence', 'bound', 'state')                     # codes into attrs['vocab'][field]
+ROW_FIELDS_CODED = ('family', 'region', 'item', 'presence', 'bound', 'state')                     # codes into attrs['vocab'][field]
 
 
-def make_part(family: str, group: str, keys: dict, A: sparse.csr_matrix, rhs, sense, names, scale=None) -> xr.Dataset:
-    """One family's rows: ``keys`` = {field: labels per row} over the row schema (``ROW_FIELDS_INT`` as ints,
-    ``ROW_FIELDS_CODED`` as labels); ``sense`` one character or one per row; ``A`` the family's block."""
+def make_part(family: str, A: sparse.csr_matrix, rhs, sense, names, scale=None, **labels) -> xr.Dataset:
+    """One family's rows. What the solver takes: ``A`` the family's block, ``rhs``, ``sense`` (one character or one per
+    row) and ``names``; ``scale`` the row-rescale factor the readers restore raw units with (1 where not rescaled).
+    ``labels`` = what the reports say each row is about — one array per field of the row schema (``ROW_FIELDS_INT`` as
+    ints, ``ROW_FIELDS_CODED`` as labels), e.g. ``region=..., item=...``; a family of one global row gives none."""
     n_rows = A.shape[0]
-    unknown = set(keys) - set(ROW_FIELDS_INT) - set(ROW_FIELDS_CODED)
-    assert not unknown, f'{family}: key field(s) {unknown} are not in the row schema'
-    fields = {field: (('row',), np.asarray(labels, dtype=np.int32 if field in ROW_FIELDS_INT else object)) for field, labels in keys.items()}
+    unknown = set(labels) - set(ROW_FIELDS_INT) - set(ROW_FIELDS_CODED)
+    assert not unknown, f'{family}: label field(s) {unknown} are not in the row schema'
+
+    fields = {field: (('row',), np.asarray(values, dtype=np.int32 if field in ROW_FIELDS_INT else object)) for field, values in labels.items()}
     sense = np.full(n_rows, sense, dtype=object) if isinstance(sense, str) else np.asarray(sense, dtype=object)
     return xr.Dataset(
         dict(**fields,
@@ -43,22 +46,21 @@ def make_part(family: str, group: str, keys: dict, A: sparse.csr_matrix, rhs, se
              sense=(('row',), sense),
              name=(('row',), np.asarray(names, dtype=object)),
              scale=(('row',), np.ones(n_rows, dtype=np.float64) if scale is None else np.asarray(scale, dtype=np.float64))),
-        attrs=dict(family=family, group=group, A=A, keys=list(keys)))
+        attrs=dict(family=family, A=A))
 
 
 def stack_rows(parts: list) -> xr.Dataset:
     """The row table: the parts back to back in the order given (the model's row order), dim ``row`` =
     Constr.index. Every field of the schema over every row, the coded fields as int32 codes into
     ``attrs['vocab']``, the ONE A vstacked into ``attrs['A']`` (rows × n_all), ``attrs['family_range']`` =
-    {family: (start, stop)} (the rows each family owns, as ``block_range`` does for the columns),
-    ``attrs['keys']`` = {family: its key fields}, and ``active`` — a dropped row is flagged off, the table
+    {family: slice(start, stop)} (the rows each family owns, as ``block_range`` does for the columns), and ``active`` — a dropped row is flagged off, the table
     never shrinks — with ``redundant`` beside it, on where a row was dropped before the build because every point of
     the column box satisfies it (``row_bounds.drop_redundant_rows``). The solver adds ``constr`` (the Gurobi handle)
     after ``addMConstr``."""
     widths = [part.sizes['row'] for part in parts]
     bounds = np.cumsum([0, *widths])
     n_rows = int(bounds[-1])
-    family_range = {part.attrs['family']: (int(start), int(stop)) for part, start, stop in zip(parts, bounds[:-1], bounds[1:])}
+    family_range = {part.attrs['family']: slice(int(start), int(stop)) for part, start, stop in zip(parts, bounds[:-1], bounds[1:])}
 
     def field(name, dtype, fill):
         """One field over the whole table: each part's array for it, or the fill where the part has no such field."""
@@ -71,8 +73,8 @@ def stack_rows(parts: list) -> xr.Dataset:
         code_of = {}
         codes = np.full(n_rows, -1, dtype=np.int32)
         for part, start, stop in zip(parts, bounds[:-1], bounds[1:]):
-            if name in ('family', 'group'):                                               # one label per part
-                codes[start:stop] = code_of.setdefault(part.attrs[name], len(code_of))
+            if name == 'family':                                                          # one label per part
+                codes[start:stop] = code_of.setdefault(part.attrs['family'], len(code_of))
             elif name in part:                                                            # one label per row, on the parts that carry the field
                 codes[start:stop] = [code_of.setdefault(label, len(code_of)) for label in part[name].values]
         vocab[name] = list(code_of)
@@ -88,7 +90,6 @@ def stack_rows(parts: list) -> xr.Dataset:
              redundant=(('row',), np.zeros(n_rows, dtype=bool))),
         attrs=dict(A=sparse.vstack([part.attrs['A'] for part in parts], format='csr') if parts else None,
                    family_range=family_range,
-                   keys={part.attrs['family']: part.attrs['keys'] for part in parts},
                    vocab=vocab))
 
 
@@ -96,8 +97,7 @@ def stack_rows(parts: list) -> xr.Dataset:
 
 def family_rows(table: xr.Dataset, family: str) -> slice | None:
     """The rows one family owns (``attrs['family_range']``), None where the family was not built."""
-    span = table.attrs['family_range'].get(family)
-    return slice(*span) if span is not None else None
+    return table.attrs['family_range'].get(family)
 
 
 def decode(table: xr.Dataset, field: str, rows=None) -> np.ndarray:
@@ -119,11 +119,3 @@ def rows_where(table: xr.Dataset, **fields) -> np.ndarray:
             label = vocab.index(label) if label in vocab else -2                         # a label the table has never seen matches no row
         mask &= table[field].values == label
     return mask
-
-
-def keys_of(table: xr.Dataset, family: str, rows=None) -> list:
-    """The family's row keys as tuples (its key fields, decoded), at ``rows`` (its own rows by default), in row order."""
-    rows = family_rows(table, family) if rows is None else rows
-    columns = [decode(table, field, rows) for field in table.attrs['keys'][family]]
-    n = table[table.attrs['keys'][family][0]].values[rows].size if columns else table['name'].values[rows].size
-    return list(zip(*columns)) if columns else [()] * n

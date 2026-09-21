@@ -433,7 +433,7 @@ def get_sheep_agroforestry_to_ag(
     yr_idx     = target_year - data.YR_CAL_BASE
     af_prop    = settings.AF_PROPORTION
 
-    sheep_j             = tools.get_sheep_code(data)
+    sheep_j             = data.DESC2AGLU['Sheep - modified land']
     sheep_tcosts        = get_transition_matrices_ag2ag(data, yr_idx, 0, sheep_j, cell_idx, separate)
     agroforestry_tcosts = get_env_plantings_to_ag(data, target_year, {sheep_af_k: cell_idx}, separate)[sheep_af_k]
 
@@ -454,7 +454,7 @@ def get_beef_agroforestry_to_ag(
     yr_idx    = target_year - data.YR_CAL_BASE
     af_prop   = settings.AF_PROPORTION
 
-    beef_j              = tools.get_beef_code(data)
+    beef_j              = data.DESC2AGLU['Beef - modified land']
     beef_tcosts         = get_transition_matrices_ag2ag(data, yr_idx, 0, beef_j, cell_idx, separate)
     agroforestry_tcosts = get_env_plantings_to_ag(data, target_year, {beef_af_k: cell_idx}, separate)[beef_af_k]
 
@@ -485,7 +485,7 @@ def get_sheep_carbon_plantings_belt_to_ag(
     yr_idx      = target_year - data.YR_CAL_BASE
     cp_prop     = settings.CP_BELT_PROPORTION
 
-    sheep_j        = tools.get_sheep_code(data)
+    sheep_j        = data.DESC2AGLU['Sheep - modified land']
     sheep_tcosts   = get_transition_matrices_ag2ag(data, yr_idx, 0, sheep_j, cell_idx, separate)
     cp_belt_tcosts = get_env_plantings_to_ag(data, target_year, {sheep_cpb_k: cell_idx}, separate)[sheep_cpb_k]
 
@@ -506,7 +506,7 @@ def get_beef_carbon_plantings_belt_to_ag(
     yr_idx     = target_year - data.YR_CAL_BASE
     cp_prop    = settings.CP_BELT_PROPORTION
 
-    beef_j         = tools.get_beef_code(data)
+    beef_j         = data.DESC2AGLU['Beef - modified land']
     beef_tcosts    = get_transition_matrices_ag2ag(data, yr_idx, 0, beef_j, cell_idx, separate)
     cp_belt_tcosts = get_env_plantings_to_ag(data, target_year, {beef_cpb_k: cell_idx}, separate)[beef_cpb_k]
 
@@ -549,7 +549,7 @@ def get_destocked_to_ag_base(
     water_mrj[1] += new_irrig_r[:, np.newaxis]
 
     # --- Carbon release: natural-equivalent land → modified/lvstk-natural (source-parameterised) ---
-    unallocated_j = tools.get_unallocated_natural_land_code(data)
+    unallocated_j = data.DESC2AGLU['Unallocated - natural land']
     ghg = ag_ghg.get_ghg_transition_emissions(data, 0, unallocated_j, cell_idx, separate=False)   # (NLMS, ncells, N_AG_LUS) t/cell
     carbon_mrj = tools.amortise(ghg * data.get_carbon_price_by_yr_idx(yr_idx)).astype(np.float32)
 

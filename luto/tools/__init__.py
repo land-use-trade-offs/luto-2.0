@@ -31,20 +31,16 @@ import traceback
 import functools
 from contextlib import redirect_stdout, redirect_stderr
 
-import pandas as pd
 import numpy as np
 import psutil
 import xarray as xr
 import numpy_financial as npf
 import matplotlib.patches as patches
 
-from typing import Tuple
 from datetime import datetime
 from matplotlib import pyplot as plt
 
 import luto.settings as settings
-import luto.economics.agricultural.water as ag_water
-import luto.economics.non_agricultural.water as non_ag_water
 
 
 def write_timestamp():
@@ -119,167 +115,6 @@ def lumap2ag_l_mrj(lumap, lmmap):
     return x_mrj.astype(bool)
 
 
-def lumap2non_ag_l_mk(lumap, num_non_ag_land_uses: int):
-    """
-    Convert the land-use map to a decision variable X_rk, where 'r' indexes cell and
-    'k' indexes non-agricultural land use.
-
-    Cells used for agricultural purposes have value 0 for all k.
-    """
-    base_code = settings.NON_AGRICULTURAL_LU_BASE_CODE
-    non_ag_lu_codes = list(range(base_code, base_code + num_non_ag_land_uses))
-
-    # Set up a container array of shape r, k.
-    x_rk = np.zeros((lumap.shape[0], num_non_ag_land_uses), dtype=bool)
-
-    for i,k in enumerate(non_ag_lu_codes):
-        kmap = np.where(lumap == k, True, False)
-        x_rk[:, i] = kmap
-
-    return x_rk.astype(bool)
-
-
-def get_ag_and_non_ag_cells(lumap) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Splits the index of cells based on whether that cell is used for agricultural
-    land, given the lumap.
-
-    Returns
-    -------
-    ( np.ndarray, np.ndarray )
-        Two numpy arrays containing the split cell index.
-    """
-    non_ag_base = settings.NON_AGRICULTURAL_LU_BASE_CODE
-    all_cells = np.array(range(lumap.shape[0]))
-
-    # get all agricultural and non agricultural cells
-    non_agricultural_cells = np.nonzero(lumap >= non_ag_base)[0]
-    agricultural_cells = np.nonzero(~np.isin(all_cells, non_agricultural_cells))[0]
-
-    return agricultural_cells, non_agricultural_cells
-
-
-def get_env_plantings_cells(lumap) -> np.ndarray:
-    """
-    Get an array with cells used for environmental plantings
-    """
-    return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 0)[0]
-
-
-def get_riparian_plantings_cells(lumap) -> np.ndarray:
-    """
-    Get an array with cells used for riparian plantings
-    """
-    return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 1)[0]
-
-
-def get_sheep_agroforestry_cells(lumap) -> np.ndarray:
-    """
-    Get an array with cells used for riparian plantings
-    """
-    return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 2)[0]
-
-
-def get_beef_agroforestry_cells(lumap) -> np.ndarray:
-    """
-    Get an array with cells used for riparian plantings
-    """
-    return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 3)[0]
-
-
-def get_agroforestry_cells(lumap) -> np.ndarray:
-    """
-    Get an array with cells that currently use agroforestry (either sheep or beef)
-    """
-    agroforestry_lus = [settings.NON_AGRICULTURAL_LU_BASE_CODE + 2, settings.NON_AGRICULTURAL_LU_BASE_CODE + 3]
-    return np.nonzero(np.isin(lumap, agroforestry_lus))[0]
-
-
-def get_carbon_plantings_block_cells(lumap) -> np.ndarray:
-    """
-    Get an array with all cells being used for carbon plantings (block)
-    """
-    return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 4)[0]
-
-
-def get_sheep_carbon_plantings_belt_cells(lumap) -> np.ndarray:
-    """
-    Get an array with all cells being used for sheep carbon plantings (belt)
-    """
-    return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 5)[0]
-
-
-def get_beef_carbon_plantings_belt_cells(lumap) -> np.ndarray:
-    """
-    Get an array with all cells being used for beef carbon plantings (belt)
-    """
-    return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 6)[0]
-
-
-def get_carbon_plantings_belt_cells(lumap) -> np.ndarray:
-    """
-    Get an array with cells used that currently use carbon plantings belt (either sheep or beef)
-    """
-
-    cp_belt_lus = [settings.NON_AGRICULTURAL_LU_BASE_CODE + 5, settings.NON_AGRICULTURAL_LU_BASE_CODE + 6]
-    return np.nonzero(np.isin(lumap, cp_belt_lus))[0]
-
-
-def get_beccs_cells(lumap) -> np.ndarray:
-    """
-    Get an array with all cells being used for carbon plantings (block)
-    """
-    return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 7)[0]
-
-
-def get_destocked_land_cells(lumap) -> np.ndarray:
-    """
-    Get an array with all destocked land cells
-    """
-    return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 8)[0]
-
-
-def get_unallocated_natural_lu_cells(data, lumap) -> np.ndarray:
-    """
-    Gets all cells being used for unallocated natural land uses.
-    """
-    return np.nonzero(np.isin(lumap, data.DESC2AGLU["Unallocated - natural land"]))[0]
-
-def get_lvstk_natural_lu_cells(data, lumap) -> np.ndarray:
-    """
-    Gets all cells being used for livestock natural land uses.
-    """
-    return np.nonzero(np.isin(lumap, data.LU_LVSTK_NATURAL))[0]
-
-
-def get_non_ag_natural_lu_cells(data, lumap) -> np.ndarray:
-    """
-    Gets all cells being used for non-agricultural natural land uses.
-    """
-    return np.nonzero(np.isin(lumap, data.NON_AG_LU_NATURAL))[0]
-
-
-def get_ag_and_non_ag_natural_lu_cells(data, lumap) -> np.ndarray:
-    """
-    Gets all cells being used for natural land uses, both agricultural and non-agricultural.
-    """
-    return np.nonzero(np.isin(lumap, data.LU_NATURAL + data.NON_AG_LU_NATURAL))[0]
-
-
-def get_ag_cells(lumap) -> np.ndarray:
-    """
-    Get an array containing the index of all agricultural cells
-    """
-    return np.nonzero(lumap < settings.NON_AGRICULTURAL_LU_BASE_CODE)[0]
-
-
-def get_non_ag_cells(lumap) -> np.ndarray:
-    """
-    Get an array containing the index of all non-agricultural cells
-    """
-    return np.nonzero(lumap >= settings.NON_AGRICULTURAL_LU_BASE_CODE)[0]
-
-
 def get_ag_to_ag_water_delta_matrix(data, from_m, from_j, cells, w_mrj, yr_idx) -> np.ndarray:
     """Source-parameterised water-licence delta ($/cell): transitioning FROM (from_m, from_j) TO every
     target (to_m, to_j) on `cells` — (target req − source req) × licence price, plus the dry↔irr
@@ -298,146 +133,9 @@ def get_ag_to_ag_water_delta_matrix(data, from_m, from_j, cells, w_mrj, yr_idx) 
     return w_cost.astype(np.float32)
 
 
-def get_ag_to_non_ag_water_delta_matrix(data, yr_idx, lumap, lmmap)->tuple[np.ndarray, np.ndarray]:
-    """
-    Gets the water delta matrix ($/cell) that applies the cost of installing/removing irrigation to
-    base transition costs. Includes the costs of water license fees.
-    
-    Parameters
-     data (object): Data object containing necessary information.
-     yr_idx (int): Index of the target year.
-     lumap (numpy.ndarray): Land-use map.
-     lmmap (numpy.ndarray): Land management map.
-    
-    Returns
-     w_rm_irrig_cost_r (numpy.ndarray) : Cost of removing irrigation for each cell.
-     
-     
-    """
-    
-    yr_cal = data.YR_CAL_BASE + yr_idx
-    l_mrj = lumap2ag_l_mrj(lumap, lmmap)
-    non_ag_cells = get_non_ag_cells(lumap)
-    
-    w_req_mrj = ag_water.get_wreq_matrices(data, yr_idx).astype(np.float32)     # <unit: ML/CELL>
-    w_req_r = (w_req_mrj * l_mrj).sum(axis=0).sum(axis=1)
-    w_yield_r = non_ag_water.get_w_net_yield_env_planting(data, yr_idx)  # <unit: ML/CELL>
-    w_delta_r = - (w_req_r + w_yield_r)
-    
-    w_license_cost_r = w_delta_r * data.WATER_LICENCE_PRICE * data.WATER_LICENSE_COST_MULTS[yr_cal] * settings.INCLUDE_WATER_LICENSE_COSTS     # <unit: $/CELL>
-    w_rm_irrig_cost_r = np.where(lmmap == 1, settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal], 0) * data.REAL_AREA                   # <unit: $/CELL>
-
-    return w_rm_irrig_cost_r
-
-
 def am_name_snake_case(am_name):
     """Get snake_case version of the AM name"""
     return am_name.lower().replace(' ', '_')
-
-
-def get_exclusions_for_excluding_all_natural_cells(data, lumap) -> np.ndarray:
-    """
-    A number of non-agricultural land uses can only be applied to cells that
-    don't already utilise a natural land use. This function gets the exclusion
-    matrix for all such non-ag land uses, returning an array valued 0 at the 
-    indices of cells that use natural land uses, and 1 everywhere else.
-
-    Parameters
-     data: The data object containing information about the cells.
-     lumap: The land use map.
-
-    Returns
-     exclude: An array of shape (NCELLS,) with values 0 at the indices of cells
-               that use natural land uses, and 1 everywhere else.
-    """
-    exclude = np.ones(data.NCELLS)
-
-    natural_lu_cells = get_ag_and_non_ag_natural_lu_cells(data, lumap)
-    exclude[natural_lu_cells] = 0
-
-    return exclude
-
-
-def get_exclusions_agroforestry_base(data, lumap) -> np.ndarray:
-    """
-    Return a 1-D array indexed by r that represents how much agroforestry can possibly 
-    be done at each cell.
-
-    Parameters
-     data: The data object containing information about the landscape.
-     lumap: The land use map.
-
-    Returns
-     exclude: A 1-D array.
-    """
-    exclude = (np.ones(data.NCELLS) * settings.AF_PROPORTION).astype(np.float32)
-
-    # Ensure cells being used for agroforestry may retain that LU
-    exclude[get_agroforestry_cells(lumap)] = settings.AF_PROPORTION
-
-    return exclude
-
-
-def get_exclusions_carbon_plantings_belt_base(data, lumap) -> np.ndarray:
-    """
-    Return a 1-D array indexed by r that represents how much carbon plantings (belt) can possibly 
-    be done at each cell.
-
-    Parameters
-     data (Data): The data object containing information about the cells.
-     lumap (np.ndarray): The land use map.
-
-    Returns
-     exclude: A 1-D array
-    """
-    exclude = (np.ones(data.NCELLS) * settings.CP_BELT_PROPORTION).astype(np.float32)
-
-    # Ensure cells being used for carbon plantings (belt) may retain that LU
-    exclude[get_carbon_plantings_belt_cells(lumap)] = settings.CP_BELT_PROPORTION
-
-    return exclude
-
-
-def get_sheep_code(data):
-    """
-    Get the land use code (j) for 'Sheep - modified land'
-    """
-    return data.DESC2AGLU['Sheep - modified land']
-
-
-def get_beef_code(data):
-    """
-    Get the land use code (j) for 'Beef - modified land'
-    """
-    return data.DESC2AGLU['Beef - modified land']
-
-
-def get_natural_sheep_code(data):
-    """
-    Get the land use code (j) for 'Sheep - natural land'
-    """
-    return data.DESC2AGLU['Sheep - natural land']
-
-
-def get_natural_beef_code(data):
-    """
-    Get the land use code (j) for 'Beef - modified land'
-    """
-    return data.DESC2AGLU['Beef - natural land']
-
-
-def get_unallocated_natural_land_code(data):
-    """
-    Get the land use code (j) for 'Unallocated - natural land'
-    """
-    return data.DESC2AGLU['Unallocated - natural land']
-
-
-def get_cells_using_ag_landuse(lumap: np.ndarray, j: int) -> np.ndarray:
-    """
-    Gets the cells in the given 'lumap' using the land use indexed by 'j'
-    """
-    return np.where(lumap == j)[0]
 
 
 def ag_mrj_to_xr(data, arr: np.ndarray, threshold: float = 0.01) -> xr.DataArray:
@@ -508,27 +206,6 @@ def am_mrj_to_xr(data, am_mrj_dict: dict, threshold: float = 0.01) -> xr.DataArr
                 'cell': np.arange(data.NCELLS),
                 'lu': data.AGRICULTURAL_LANDUSES}
     )
-
-
-def map_desc_to_dvar_index(category: str,
-                           desc2idx: dict,
-                           dvar_arr: np.ndarray):
-    '''Input:
-        category: str, the category of the dvar, e.g., 'Agriculture/Non-Agriculture',
-        desc2idx: dict, the mapping between lu_desc and dvar index, e.g., {'Apples': 0 ...},
-        dvar_arr: np.ndarray, the dvar array with shape (r,{j|k}), where r is the number of pixels,
-                  and {j|k} is the dimension of ag-landuses or non-ag-landuses.
-
-    Return:
-        pd.DataFrame, with columns of ['Category','lu_desc','dvar_idx','dvar'].'''
-
-    df = pd.DataFrame({'Category': category,
-                       'lu_desc': desc2idx.keys(),
-                       'dvar_idx': desc2idx.values()})
-
-    df['dvar'] = [dvar_arr[:, j] for j in df['dvar_idx']]
-
-    return df.reindex(columns=['Category', 'lu_desc', 'dvar_idx', 'dvar'])
 
 
 def plot_t_mat(t_mat:xr.DataArray):

@@ -100,7 +100,7 @@ def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSide]:
     blocks = dict(ag=ag_rows, nonag=nonag_rows, am=am_rows, ag2ag=ag2ag_rows, ag2nonag=ag2nonag_rows, nonag2ag=nonag2ag_rows)
 
     # the chunks inside the am and arc blocks — one per (option, land use, lm), one per source — by their widths: the
-    # table lays them out as it lays the blocks out, and keeps their (start, stop) beside block_range
+    # table lays them out as it lays the blocks out, and keeps their slice of it beside block_range
     slots    = [(option, j_idx) for option, lus in data.AGMAN2LU.items() for j_idx in range(len(lus))]
     valid_am = {(option, j_idx, m): valid_am_smr[s, m] for s, (option, j_idx) in enumerate(slots) for m in range(data.NLMS)}   # {(option, j_idx, m): bool (cell,)}, in the am block's (slot, lm) order
     chunks = {
@@ -115,8 +115,8 @@ def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSide]:
     block_range = table.attrs['block_range']
     print(f"Column space: {table.attrs['n_all']:,} columns = {table.attrs['n_terms']:,} accounting (n_terms) + "
           f"{table.attrs['n_all'] - table.attrs['n_terms']:,} arcs", flush=True)
-    for name, (start, stop) in block_range.items():
-        print(f"{'└──' if name == list(block_range)[-1] else '├──'} {name:<10s} {stop - start:>12,}", flush=True)
+    for name, span in block_range.items():
+        print(f"{'└──' if name == list(block_range)[-1] else '├──'} {name:<10s} {span.stop - span.start:>12,}", flush=True)
 
     # ── 7. the space: the table, and beside it the handles — the mask every block was enumerated from, the region pair,
     #       the cell incidence and the position → column grids ──
@@ -133,8 +133,8 @@ def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSide]:
 
     # for each mrj / rk position, which ag / non-ag variable it is: the column at a valid entry is its running count
     # within the block (the mask read backwards), -1 where it has none (no arcs, no am)
-    ag           = slice(*block_range['ag'])
-    nonag        = slice(*block_range['nonag'])
+    ag           = block_range['ag']
+    nonag        = block_range['nonag']
     ag_mrj2col   = np.where(valid_ag_mrj,   ag.start    + np.cumsum(valid_ag_mrj).reshape(valid_ag_mrj.shape)     - 1, -1).astype(np.int32)
     nonag_rk2col = np.where(valid_nonag_rk, nonag.start + np.cumsum(valid_nonag_rk).reshape(valid_nonag_rk.shape) - 1, -1).astype(np.int32)
 
@@ -390,21 +390,21 @@ def nonag2ag_space(valid_nonag2ag: dict, trans_source_nonag: dict) -> dict:
 
 
 def table_space(blocks: dict, chunks: dict, options: list, landmans: list) -> xr.Dataset:
-    """The whole space as ONE long table on (col = Var.index): the blocks' rows back to back in the order ``blocks`` declares them, the fields of each column (-1 where n/a), its lb / ub / base; ``chunks`` = {block: {key: width}} the runs inside the am and arc blocks, kept as ``<block>_range`` = {key: (start, stop)} beside ``block_range``; ``options`` names the am_idx field and ``landmans`` the m field."""
+    """The whole space as ONE long table on (col = Var.index): the blocks' rows back to back in the order ``blocks`` declares them, the fields of each column (-1 where n/a), its lb / ub / base; ``chunks`` = {block: {key: width}} the runs inside the am and arc blocks, kept as ``<block>_range`` = {key: slice(start, stop)} beside ``block_range``; ``options`` names the am_idx field and ``landmans`` the m field."""
 
     # each block's run of the table: the rows [start, stop) it owns
     widths = [rows['cell'].size for rows in blocks.values()]
     bounds = np.cumsum([0, *widths])
-    block_range = {block: (int(start), int(stop)) for block, start, stop in zip(blocks, bounds[:-1], bounds[1:])}
+    block_range = {block: slice(int(start), int(stop)) for block, start, stop in zip(blocks, bounds[:-1], bounds[1:])}
 
     n_all   = int(bounds[-1])                         # every column: the rows are built at this width
 
     # each chunk's run of its block: the (option, land use) slots of the am block, the sources of an arc block, laid out in the order given
     chunk_range = {}
     for block, chunk_widths in chunks.items():
-        chunk_bounds = block_range[block][0] + np.cumsum([0, *chunk_widths.values()])
-        chunk_range[f'{block}_range'] = {key: (int(start), int(stop)) for key, start, stop in zip(chunk_widths, chunk_bounds[:-1], chunk_bounds[1:])}
-        assert chunk_bounds[-1] == block_range[block][1], f'the {block} chunks do not fill the block'
+        chunk_bounds = block_range[block].start + np.cumsum([0, *chunk_widths.values()])
+        chunk_range[f'{block}_range'] = {key: slice(int(start), int(stop)) for key, start, stop in zip(chunk_widths, chunk_bounds[:-1], chunk_bounds[1:])}
+        assert chunk_bounds[-1] == block_range[block].stop, f'the {block} chunks do not fill the block'
     n_terms = blocks['ag']['cell'].size + blocks['nonag']['cell'].size + blocks['am']['cell'].size   # the three accounting blocks lead the table, so their width IS the prefix a demand / GHG / water / biodiversity / renewable coefficient array is allocated at
 
     # a field over the whole table: -1 (or the fill) on the blocks that have no such field, e.g. slot / am_idx / j_idx off the am block
@@ -429,13 +429,13 @@ def table_space(blocks: dict, chunks: dict, options: list, landmans: list) -> xr
              from_k =(('col',), field('from_k', np.int32, -1)),
              local_r=(('col',), field('local_r', np.int32, -1)),                             # ... and the arc's cell in that SOURCE's frame (-1 off the arc blocks: only an arc lives in a source frame), where its cost / GHG coefficients are stored and its solved value is scattered back
              cell   =(('col',), field('cell', np.int32, -1)),                                # the cell in the GLOBAL frame — every column has one, and the demand / GHG / water / biodiversity / renewable rows weight by it
-             lb     =(('col',), field('lb', np.float64, 0.0)),                               # the bounds of the column (gurobi stores double)
-             ub     =(('col',), field('ub', np.float64, np.inf)),
+             lb     =(('col',), field('lb', np.float32, 0.0)),                               # the bounds of the column (float32, as every input is; gurobi reads them as doubles)
+             ub     =(('col',), field('ub', np.float32, np.inf)),
              base   =(('col',), field('base', np.float32, 0.0))                              # the node-balance constant of an ag / non-ag column
         ),
         attrs=dict(
-            block_range=block_range,                                                         # {block: (start, stop)} — the rows each block owns, in the table's block order
-            **chunk_range,                                                                   # am_range {(option, j_idx, m): (start, stop)}, ag2ag_range / ag2nonag_range / nonag2ag_range {source: (start, stop)} — the runs inside those blocks
+            block_range=block_range,                                                         # {block: slice(start, stop)} — the rows each block owns, in the table's block order
+            **chunk_range,                                                                   # am_range {(option, j_idx, m): slice(start, stop)}, ag2ag_range / ag2nonag_range / nonag2ag_range {source: slice(start, stop)} — the runs inside those blocks
             landmans=landmans,                                                               # the land-management names, in m order ('dry', 'irr'): what the m field means
             options=options,                                                                 # the ag-management options, in am_idx order: what the am_idx field means
             n_terms=n_terms,                                                                 # the ag, nonag and am blocks: the table's first rows, the width a demand / GHG / water / biodiversity / renewable coefficient array is allocated at

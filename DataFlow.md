@@ -509,12 +509,13 @@ or annualisation, both of which already happened at L4.
 | `get_ghg_destocked_land` | 311-348 | per base-year livestock-natural LU: `CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR × (habitat_contr[from_lu] − 1) × REAL_AREA` | `natural_land_t_co2_ha.h5`, `fire_risk.h5`, `bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv` |
 | `get_ghg_matrix` | 352-398 | assembles all nine into `(r, k)` | — |
 
-**Exclusion (mixing) proportions** — `luto/tools/__init__.py`:
+**Exclusion (mixing) proportions** — written inline at the top of each non-ag matrix assembler (`get_*_matrix`
+in `non_agricultural/{biodiversity,cost,ghg,quantity,revenue,water}.py`):
 
-- `get_exclusions_agroforestry_base` (351-368): `np.ones(NCELLS) × settings.AF_PROPORTION`, where
-  `AF_PROPORTION = AGROFORESTRY_ROW_WIDTH / (ROW_WIDTH + ROW_SPACING)` (`settings.py:631`).
-- `get_exclusions_carbon_plantings_belt_base` (371-388): same shape with `CP_BELT_PROPORTION`
-  (`settings.py:614`).
+- `agroforestry_x_r = np.full(NCELLS, settings.AF_PROPORTION, float32)`, where
+  `AF_PROPORTION = AGROFORESTRY_ROW_WIDTH / (ROW_WIDTH + ROW_SPACING)` (`settings.py`).
+- `cp_belt_x_r = np.full(NCELLS, settings.CP_BELT_PROPORTION, float32)`: same shape with `CP_BELT_PROPORTION`
+  (`settings.py`).
 
 **Destocked land — two corrections to earlier versions of this document:**
 
