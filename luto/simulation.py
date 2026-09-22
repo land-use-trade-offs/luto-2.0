@@ -332,8 +332,9 @@ def store_solution(data: Data, target_year: int, solution, obj_val: float, input
     # transition emissions on the ag → ag flows, plus the off-land constant — what the GHG row summed, in float64 over
     # every share (the row's contract dropped its sub-floor coefficients; the two agree to that and float32)
     def dot(g, x):
+        assert g.shape == x.shape, (g.shape, x.shape)
         g = np.nan_to_num(g) if np.isnan(g).any() else g                                    # a NaN coefficient is no emission (the row dropped it)
-        return float(np.einsum('...,...->', g, x, dtype=np.float64))
+        return float(np.einsum('i,i->', g.ravel(), x.ravel(), dtype=np.float64))            # Σ g·x accumulated in float64, no float64 copy of either
     ghg = dot(inputs.ag_g_mrj, solution.ag_X_mrj) + dot(inputs.non_ag_g_rk, solution.non_ag_X_rk)
     for am, g in inputs.ag_man_g_mrj.items():                                               # [m, r, j_idx] against the option's land uses
         for j_idx, j in enumerate(inputs.agman2lu[am]):
