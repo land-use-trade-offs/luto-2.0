@@ -95,7 +95,9 @@ class LutoSolver:
         for block, span in cols.attrs['block_range'].items():
             fields = {field: cols[field].values[span] for field in ('m', 'j', 'k', 'am_idx', 'from_m', 'from_j', 'from_k', 'local_r', 'cell')}
             self.gurobi_model.setAttr('VarName', self.x[span].tolist(), names_of[block](fields))
-            print(f"│   {'└──' if block == list(cols.attrs['block_range'])[-1] else '├──'} {block:<10s} {span.stop - span.start:>12,} variables")
+        blocks = pd.DataFrame({'block': list(cols.attrs['block_range']), 'variables': [span.stop - span.start for span in cols.attrs['block_range'].values()]})
+        for line in blocks.to_markdown(index=False, tablefmt='psql', intfmt=',').split('\n'):
+            print(f"│   {line}")
 
     def _setup_constraints(self):
         """Every ACTIVE row of the row table as ONE addMConstr (in table order), the rows named, the handles kept on
@@ -115,11 +117,11 @@ class LutoSolver:
         handles[built] = constrs
         T['constr'] = (('row',), handles)
         family = T['family'].values
-        for name in pd.unique(family):                                       # the families, in table order
-            on = family == name
-            n_rows  = int(on.sum())
-            n_built = int((on & active).sum())
-            print(f"│   │   {name}: {n_built:,} row(s)" + (f", {n_rows - n_built:,} dropped before the build" if n_built < n_rows else ""))
+        families = pd.DataFrame([dict(family=name, constraints=int((family == name).sum()) - int(((family == name) & ~active).sum()),
+                                      **{'dropped before the build': int(((family == name) & ~active).sum())})
+                                 for name in pd.unique(family)])                                   # the families, in table order
+        for line in families.to_markdown(index=False, tablefmt='psql', intfmt=',').split('\n'):
+            print(f"│   {line}")
 
     def _setup_objective(self):
         """Objective obj · x: the coefficient of every column as given (``row_builder.get_obj``: million AUD,

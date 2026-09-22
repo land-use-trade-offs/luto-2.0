@@ -18,6 +18,7 @@
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
+import pandas as pd
 import xarray as xr
 
 from dataclasses import dataclass
@@ -115,8 +116,9 @@ def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSupport]:
     block_range = table.attrs['block_range']
     print(f"Column space: {table.attrs['n_all']:,} columns = {table.attrs['n_terms']:,} accounting (n_terms) + "
           f"{table.attrs['n_all'] - table.attrs['n_terms']:,} arcs", flush=True)
-    for name, span in block_range.items():
-        print(f"{'└──' if name == list(block_range)[-1] else '├──'} {name:<10s} {span.stop - span.start:>12,}", flush=True)
+    blocks_table = pd.DataFrame({'block': list(block_range), 'columns': [span.stop - span.start for span in block_range.values()]})
+    for line in blocks_table.to_markdown(index=False, tablefmt='psql', intfmt=',').split('\n'):
+        print(f"│   {line}", flush=True)
 
     # ── 7. the space: the table, and beside it the handles — the mask every block was enumerated from, the region pair,
     #       the cell incidence and the position → column grids ──

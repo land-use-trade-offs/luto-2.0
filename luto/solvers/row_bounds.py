@@ -17,28 +17,6 @@
 # You should have received a copy of the GNU General Public License along with
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
-"""
-Bound propagation over the row space: every row's activity interval over the column box, and its verdict.
-
-Every row is a linear form over columns whose bounds the column table already holds, so two sums per row give the
-interval the form can occupy — lo = A⁺·lb + A⁻·ub, hi = A⁺·ub + A⁻·lb — and the interval against the rhs classifies
-the row before any solver sees it: REDUNDANT (every point of the box satisfies it: dropping it is exact, whatever else
-is in the model), IMPOSSIBLE (no point does: a diagnosis, never dropped), TIGHT (met only at the box's extreme),
-NEAR_REDUNDANT (satisfied everywhere but within the margin: kept), STRADDLE (nothing learned).
-
-The box alone overcounts: a policy row sums every column of a cell at its own ub while the cell's shares can only
-sum to what the cell held, and the arcs have no ub at all. So the rows are also judged under the bounds the rows
-themselves imply — (2a) a row whose entries are all positive, sense < or =, bounds each of its columns; (2b) a row whose
-entries are all exactly 1 bounds its columns TOGETHER, so a row reaches at most its best coefficient times that group's
-room; (2c) the one fact no single row states: a cell's node-balance rows SUM to Σ X = Σ base (every arc leaves one node
-of the cell and lands on another, so it cancels) — the model carries no cell-usage row, because conservation already
-pins the cell's total, so that sum is formed here and joins (2a) and (2b) as one more implying row per cell. Those
-bounds hold at every feasible point, so IMPOSSIBLE under them is still a proof; a row that implies a bound keeps its box
-verdict, and only the BOX verdict licenses a drop. Everything reads A, rhs, sense, scale and the node-balance rows'
-``cell`` key off the row table and lb / ub off the column table — no engine — and the verdicts sit beside the row table
-on the same ``row`` dim. What no bound here sees is rows competing for the same cells: "nothing proven" is not "feasible".
-"""
-
 import os
 
 import numpy as np
@@ -337,15 +315,20 @@ def report_row_bounds(rows: xr.Dataset, bounds: xr.Dataset, target_year: int, ou
     # ── the log ──
     print(f"│   ├── Bound propagation (rel tol {settings.BOUND_PROP_REL_TOL:g}): {status.size:,} rows; the verdict over the box, "
           f"then impossible / tight under the bounds the rows imply")
-    print(f"│   │   {'family':<30s} {'rows':>10s} " + ' '.join(f'{name:>14s}' for name in STATUS) + f" {'dropped':>9s} {'imp·implied':>12s} {'tight·implied':>14s}")
     family = rows['family'].values
+    verdicts = {}
     for name in pd.unique(family):                                                          # the families, in table order
         on = family == name
-        counts = np.bincount(status[on], minlength=len(STATUS))
-        n_dropped = int(rows['redundant'].values[on].sum())
-        n_imp = int((status_implied[on] == IMPOSSIBLE).sum())
-        n_tight = int((status_implied[on] == TIGHT).sum())
-        print(f"│   │   {name:<30s} {int(on.sum()):>10,} " + ' '.join(f'{count:>14,}' for count in counts) + f" {n_dropped:>9,} {n_imp:>12,} {n_tight:>14,}")
+        verdicts[name] = dict(
+            rows=int(on.sum()),
+            **dict(zip(STATUS, np.bincount(status[on], minlength=len(STATUS)).tolist())),
+            dropped=int(rows['redundant'].values[on].sum()),
+            **{'imp·implied': int((status_implied[on] == IMPOSSIBLE).sum()),
+               'tight·implied': int((status_implied[on] == TIGHT).sum())}
+        )
+    table = pd.DataFrame(verdicts).T                                                       # families down, verdicts across
+    for line in table.to_markdown(tablefmt='psql', intfmt=',').split('\n'):
+        print(f"│   │   {line}")
     conservation = bounds.attrs['conservation']
     print(f"│   │   conservation: the node-balance rows of {conservation['unit']:,} of {conservation['cells']:,} cells sum to Σ X = Σ base (the row that bounds a cell's columns together)")
     for block, counts in bounds.attrs['preflight'].items():

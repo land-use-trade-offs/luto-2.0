@@ -18,6 +18,7 @@
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
+import pandas as pd
 import xarray as xr
 
 from scipy import sparse
@@ -625,9 +626,10 @@ def get_water(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
     rhs = []
     names = []
     region_ids = []
+    region_names = []
     for region_id, water_limit_raw in inputs.limits["water"].items():
         region_name = inputs.water_region_names[region_id]
-        print(f"│   │   ├── target (inside LUTO study area) is {water_limit_raw:15,.0f} ML for {region_name}")
+        region_names.append(region_name)
         on = (region_of_col == region_id) & (coeff != 0)                                  # the region's columns with a net yield
         row_idx.append(np.full(int(on.sum()), len(names)))
         col_idx.append(np.flatnonzero(on))
@@ -635,6 +637,11 @@ def get_water(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
         rhs.append(water_limit_raw)
         names.append(f"water_yield_limit_{region_name}".replace(" ", "_"))
         region_ids.append(region_id)
+    for line in pd.DataFrame({
+        'water region': region_names, 
+        'target inside LUTO study area (ML)': rhs}
+        ).to_markdown(index=False, tablefmt='psql', floatfmt=',.0f').split('\n'):
+        print(f"│   │   {line}")
     if not names:
         return None, None
     A = sparse.csr_matrix((np.concatenate(vals), (np.concatenate(row_idx), np.concatenate(col_idx))), shape=(len(names), n_all))
