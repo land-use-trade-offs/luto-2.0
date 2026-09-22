@@ -31,8 +31,7 @@ from typing import Any
 
 import luto.settings as settings
 from luto.settings import AG_MANAGEMENTS
-from luto.solvers.col_builder import ColSide
-from luto.solvers.row_builder import RowSide
+from luto.solvers.col_builder import ColSupport
 from luto.solvers.row_inputs import RowInputs
 
 
@@ -50,9 +49,9 @@ class SolverSolution:
     prod_data: dict[str, Any]                       # what the writers read: 'Production' (raw t per commodity, unscaled) and 'GHG' (raw tCO2e, the off-land constant included)
 
 
-def post_solve(x: np.ndarray, cols: xr.Dataset, col_side: ColSide, A, rows: xr.Dataset, row_side: RowSide, inputs: RowInputs) -> SolverSolution:
+def post_solve(x: np.ndarray, cols: xr.Dataset, col_support: ColSupport, A, rows: xr.Dataset, inputs: RowInputs) -> SolverSolution:
     """The LUTO-format solution of one step from the raw ``x`` (``LutoSolver.solve``): the column table says
-    what every entry of x is, the col side which source each arc belongs to, the row side and the row table
+    what every entry of x is, the column support which source each arc belongs to, the row side and the row table
     give the production data."""
     print("Collecting results...\n", flush=True)
     n_ag_lus    = inputs.n_ag_lus
@@ -109,9 +108,9 @@ def post_solve(x: np.ndarray, cols: xr.Dataset, col_side: ColSide, A, rows: xr.D
     dvar_D_nonag2ag_mrj = {}   # from_k           -> (NLMS, ncells_k, N_AG_LUS)
     x_arcs = x.astype(np.float32)
 
-    for block, masks, deltas_of in (('ag2ag',    col_side.valid_ag2ag,    dvar_D_ag2ag_mrj),
-                                    ('ag2nonag', col_side.valid_ag2nonag, dvar_D_ag2nonag_rk),
-                                    ('nonag2ag', col_side.valid_nonag2ag, dvar_D_nonag2ag_mrj)):
+    for block, masks, deltas_of in (('ag2ag',    col_support.valid_ag2ag,    dvar_D_ag2ag_mrj),
+                                    ('ag2nonag', col_support.valid_ag2nonag, dvar_D_ag2nonag_rk),
+                                    ('nonag2ag', col_support.valid_nonag2ag, dvar_D_nonag2ag_mrj)):
         for src, mask in masks.items():
             deltas = np.zeros(mask.shape, dtype=np.float32)
             deltas[mask] = x_arcs[cols.attrs[f'{block}_range'][src]]
@@ -137,11 +136,11 @@ def post_solve(x: np.ndarray, cols: xr.Dataset, col_side: ColSide, A, rows: xr.D
         adopted = (adoption >= settings.AGRICULTURAL_MANAGEMENT_USE_THRESHOLD) & np.isin(chosen_j, lu_codes)
         ammaps[am][ag_cells[adopted]] = 1
 
-    # ── 4. the production data the writers read: Production from the unscaled production block (raw t per
-    #       commodity); GHG as the GHG row's raw-unit value (row × scale) plus the off-land constant the row
-    #       excludes — read off the row table whether or not the row went into the model (a row dropped before
-    #       the build is still A[row]), 0 when the GHG limit is off ──
-    prod_data = {"Production": (row_side.q_block @ x).tolist()}
+    # ── 4. GHG as the GHG row's raw-unit value (row × scale) plus the off-land constant the row excludes — read off
+    #       the row table whether or not the row went into the model (a row dropped before the build is still A[row]),
+    #       0 when the GHG limit is off. Production is not read here: ``simulation.store_solution`` computes it from the
+    #       stored dvars the way the base year's is (``data.get_actual_production_lyr``) ──
+    prod_data = {}
     ghg = rows.attrs['family_range'].get('ghg')
     if ghg is not None and ghg.stop > ghg.start:
         row = ghg.start                                                   # the single GHG row

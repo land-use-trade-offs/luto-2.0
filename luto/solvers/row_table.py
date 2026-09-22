@@ -28,9 +28,10 @@ from scipy import sparse
 FAMILIES = ('demand', 'ghg', 'GBF2', 'GBF3_NVIS', 'GBF4_SNES', 'GBF4_ECNES', 'GBF8', 'ag_mgt_adoption',
             'regional_adoption_ag', 'regional_adoption_nonag', 'regional_adoption_nonag_sum', 'water', 'renewable',
             'ag_mgt_link', 'renewable_ceiling', 'source_cap_ag', 'source_cap_nonag',
-            'node_balance_ag', 'node_balance_nonag')                                       # ``family`` is a code into this list
-ROW_FIELDS_INT = ('cell', 'm', 'j', 'k', 'am_idx', 'from_m', 'from_j', 'from_k', 'local_r', 'commodity')   # -1 where n/a
-ROW_FIELDS_CODED = ('region', 'item', 'presence', 'bound', 'state')                       # codes into the row's OWN family's map, attrs['vocab_<family>'][field]; -1 where n/a
+            'node_balance_ag', 'node_balance_nonag')
+ROW_FIELDS_INT = ('cell', 'm', 'j', 'k', 'am_idx', 'from_m', 'from_j', 'from_k', 'local_r', 'commodity')
+ROW_FIELDS_CODED = ('region', 'item', 'presence', 'bound', 'state')
+
 
 # what ``xr.concat`` needs to stack the families' tables as they are (``get_rows``): an empty table carrying every field
 # at its dtype, so a field no family carries this step is still there, and the fill of a field a family does not carry
@@ -46,16 +47,10 @@ ROW_SCHEMA = xr.Dataset(dict(
 ROW_FILL = {field: -1 for field in (*ROW_FIELDS_INT, *ROW_FIELDS_CODED)}
 
 
+
 def make_part(family: str, A: sparse.csr_matrix, rhs, sense, names, scale=None, **labels) -> tuple[sparse.csr_matrix, xr.Dataset]:
-    """One family's rows, as the pair (A, table) — row i of one is row i of the other. What the solver takes: ``A`` the
-    family's block, ``rhs``, ``sense`` (one character or one per row) and ``names``; ``scale`` the row-rescale factor
-    the readers restore raw units with (1 where not rescaled). ``labels`` = what the reports say each row is about — one
-    array per field of the row schema, e.g. ``region=..., item=...``: a ``ROW_FIELDS_INT`` field as ints, a
-    ``ROW_FIELDS_CODED`` field as labels, which the table keeps as int32 codes into the family's OWN map
-    (``attrs['vocab_<family>'][field]``, in order of first appearance). A field the family does not give is left out:
-    the stack fills it with -1. ``active`` — a dropped row is flagged off, the table never shrinks — with ``redundant``
-    beside it, on where a row was dropped before the build because every point of the column box satisfies it
-    (``row_bounds.drop_redundant_rows``). The solver adds ``constr`` (the Gurobi handle) after ``addMConstr``."""
+    """One family's rows, as the pair (A, table)"""
+
     n_rows = A.shape[0]
     unknown = set(labels) - set(ROW_FIELDS_INT) - set(ROW_FIELDS_CODED)
     assert not unknown, f'{family}: label field(s) {unknown} are not in the row schema'
@@ -68,7 +63,9 @@ def make_part(family: str, A: sparse.csr_matrix, rhs, sense, names, scale=None, 
             values = [code_of.setdefault(label, len(code_of)) for label in values]
             vocab[field] = list(code_of)
         fields[field] = (('row',), np.asarray(values, dtype=np.int32))
+
     sense = np.full(n_rows, sense, dtype=object) if isinstance(sense, str) else np.asarray(sense, dtype=object)
+
     table = xr.Dataset(
         dict(family=(('row',), np.full(n_rows, FAMILIES.index(family), dtype=np.int32)),
              **fields,
@@ -79,6 +76,7 @@ def make_part(family: str, A: sparse.csr_matrix, rhs, sense, names, scale=None, 
              active=(('row',), np.ones(n_rows, dtype=bool)),
              redundant=(('row',), np.zeros(n_rows, dtype=bool))),
         attrs={f'vocab_{family}': vocab} if vocab else {})
+
     return A, table
 
 

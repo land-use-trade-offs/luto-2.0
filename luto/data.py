@@ -1179,7 +1179,7 @@ class Data:
             self.prod_base_yr_actual_ag_mrc,
             self.prod_base_yr_actual_non_ag_rc,
             self.prod_base_yr_actual_am_amrc
-        ) = self.get_actual_production_lyr(self.YR_CAL_BASE)
+        ) = self.get_actual_production_lyr(self.YR_CAL_BASE, threshold=0.0)   # every share counted: an accounting total, the same computation as simulation.store_solution's for a target year (the 0.01 default is the maps' clean-up)
 
         yr_cal_base_prod_data = (
             self.prod_base_yr_actual_ag_mrc.sum(['cell','lm'])
@@ -2122,7 +2122,7 @@ class Data:
         return (ag_q_mrp_xr.compute(), non_ag_crk_xr.compute(), ag_man_q_amrp_xr.compute())
     
     
-    def get_actual_production_lyr(self, yr_cal:int):
+    def get_actual_production_lyr(self, yr_cal:int, threshold: float = 0.01):
         '''
         Return the production data for a given year as xarray DataArrays.
         The returned DataArrays are spatial layers where each cell is the production of a commodity.
@@ -2130,6 +2130,10 @@ class Data:
         
         Note: the 'actual' means the production is calculated based on true decision variables, 
         meaning the production is calculated based on actual land-use areas.
+
+        `threshold`: a cell whose total ag / non-ag / ag-mgt share is at or below it is zeroed before the product
+        (the converters' map clean-up, 0.01 = 1 % of a cell). Pass 0 for an accounting total that counts every
+        share (`simulation.store_solution`: the solver met demand with every share, so the total must too).
         '''
         # Get dvars and production potential matrices
         if yr_cal == self.YR_CAL_BASE:
@@ -2149,9 +2153,9 @@ class Data:
             ag_q_mrp_xr, non_ag_crk_xr, ag_man_q_amrp_xr = self.get_potential_production_lyr(yr_cal)
 
         # Convert dvar array to xr.DataArray; Chunk the data to reduce memory usage
-        ag_X_mrj_xr = tools.ag_mrj_to_xr(self, ag_X_mrj).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, self.NCELLS)})
-        non_ag_X_rk_xr = tools.non_ag_rk_to_xr(self, non_ag_X_rk).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, self.NCELLS)})
-        ag_man_X_amrj_xr = tools.am_mrj_to_xr(self, ag_man_X_mrj).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, self.NCELLS)})
+        ag_X_mrj_xr = tools.ag_mrj_to_xr(self, ag_X_mrj, threshold).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, self.NCELLS)})
+        non_ag_X_rk_xr = tools.non_ag_rk_to_xr(self, non_ag_X_rk, threshold).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, self.NCELLS)})
+        ag_man_X_amrj_xr = tools.am_mrj_to_xr(self, ag_man_X_mrj, threshold).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, self.NCELLS)})
 
         # Calculate the commodity production (BEFORE dimension expansion to avoid double counting)
         #   Using xr.dot() instead of broadcasting for better memory efficiency and performance

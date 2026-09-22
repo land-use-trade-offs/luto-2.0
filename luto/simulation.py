@@ -239,11 +239,11 @@ def solve_timeseries(
         print( "-------------------------------------------------\n", flush=True)
 
         start_time = time.time()
-        cols, col_side = get_cols(data, base_year)                                          # the unknowns: the column table, and what the row side reads beside it
+        cols, col_support = get_cols(data, base_year)                                          # the unknowns: the column table, and what the row side reads beside it
         inputs = get_row_inputs(data, base_year, target_year)                               # the coefficient streams and targets
-        cols['obj'] = get_obj(get_economics(data, base_year, target_year), cols, col_side)  # the objective coefficient of every column; the economy streams (~300 MB at RES5) die with the call
-        A, rows, row_side = get_rows(inputs, cols, col_side)                                # the constraints: the matrix, the row table on the same rows, and the production block beside them
-        col_side.cell2col = col_side.ag_mrj2col = col_side.nonag_rk2col = None              # read by get_rows only: freed before the solve (GBs at RES1), the masks and the region pair stay for post_solve
+        cols['obj'] = get_obj(get_economics(data, base_year, target_year), cols, col_support)  # the objective coefficient of every column; the economy streams (~300 MB at RES5) die with the call
+        A, rows = get_rows(inputs, cols, col_support)                                          # the constraints: the matrix, and the row table on the same rows
+        col_support.cell2col = col_support.ag_mrj2col = col_support.nonag_rk2col = None              # read by get_rows only: freed before the solve (GBs at RES1), the masks and the region pair stay for post_solve
         bounds = get_row_bounds(A, rows, cols)                                              # every row's interval over the column box, and its verdict
         drop_redundant_rows(rows, bounds, settings.BOUND_PROP_DROP_FAMILIES)                # opt-in per family: rows every point of the box satisfies never reach the solver
         report_row_bounds(rows, bounds, target_year, f"{data.path}/out_{target_year}")      # the log table, bound_report_<year>.csv, bound_preflight_<year>.csv
@@ -265,7 +265,7 @@ def solve_timeseries(
         accepted, x, status = solve_with_retries(luto_solver, target_year)
 
         if accepted:
-            solution = post_solve(x, cols, col_side, A, rows, row_side, inputs)             # the LUTO 1-D format
+            solution = post_solve(x, cols, col_support, A, rows, inputs)                       # the LUTO 1-D format
             store_solution(data, target_year, solution, luto_solver.gurobi_model.ObjVal)
             record_shadow_prices(luto_solver, inputs, target_year, f"{data.path}/out_{target_year}")
             if checkpoint_path is not None:
@@ -330,6 +330,13 @@ def store_solution(data: Data, target_year: int, solution, obj_val: float) -> No
 
     for data_type, prod_data in solution.prod_data.items():
         data.add_production_data(target_year, data_type, prod_data)
+
+    # Production from the stored dvars, the way the base year's is (data.py, at load): t / KL per commodity — every share
+    # counted (threshold 0: the map clean-up that drops a cell's slivers under 1 % would leave the total 0.1–0.8 % under
+    # the demand the solver met)
+    ag_mrc, non_ag_rc, am_amrc = data.get_actual_production_lyr(target_year, threshold=0.0)
+    production = (ag_mrc.sum(['cell', 'lm']) + non_ag_rc.sum(['cell']) + am_amrc.sum(['cell', 'am', 'lm'])).compute().values
+    data.add_production_data(target_year, 'Production', production)
 
 
 # ---------------------------------------------------------------------------- #

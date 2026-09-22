@@ -34,7 +34,7 @@ from luto.solvers.row_inputs import get_mask_gbf2_solar, get_mask_gbf2_wind
 # ═══════════════════════════ get_cols: the column space of one step ═══════════════════════════
 
 @dataclass
-class ColSide:
+class ColSupport:
     """Supporting data that maps the SPARSE column variables onto the DENSE input arrays, so the row side never infers 
     an index: every subset comes as a PAIR of handles — one slices the input (``valid_*``, ``region2cell``), its twin 
     slices the column table (``block_range`` / ``*_range``, ``region2col``) — and a constraint is input[handle] · x[twin].
@@ -56,9 +56,9 @@ class ColSide:
     nonag_rk2col: np.ndarray      # (cell, nonag_lu) int32: for each non-ag position, the column index of its variable, -1 where it has none
 
 
-def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSide]:
+def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSupport]:
     """The column space of one solve step: every unknown as one row of the long table ``cols`` (on ``col`` =
-    Var.index), and beside it the ``ColSide``: the handles the row side slices the inputs and the table with."""
+    Var.index), and beside it the ``ColSupport``: the handles the row side slices the inputs and the table with."""
 
     # ── 1. sources (FROM-view): the base-year holders of land ──
     trans_source_ag         = ag_transition.get_base_dvar_mj_cell_map(data, base_year)          # (from_m, from_j): global cell indices
@@ -138,7 +138,7 @@ def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSide]:
     ag_mrj2col   = np.where(valid_ag_mrj,   ag.start    + np.cumsum(valid_ag_mrj).reshape(valid_ag_mrj.shape)     - 1, -1).astype(np.int32)
     nonag_rk2col = np.where(valid_nonag_rk, nonag.start + np.cumsum(valid_nonag_rk).reshape(valid_nonag_rk.shape) - 1, -1).astype(np.int32)
 
-    return table, ColSide(
+    return table, ColSupport(
         valid_ag_mrj=valid_ag_mrj,
         valid_nonag_rk=valid_nonag_rk,
         valid_am=valid_am,

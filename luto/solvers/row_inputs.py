@@ -257,7 +257,7 @@ def get_row_inputs(data: Data, base_year: int, target_year: int) -> RowInputs:
     print('Getting existing wind capacity fraction (all years, solver ceiling)...', flush=True)
     exist_renewable_wind_r = ag_quantity.get_existing_renewable_dvar_fraction(data, 'Onshore Wind', 99999)
 
-    # ── 4. regions: the names the water rows are written for (the state and NRM codes are the region pair on col_side) ──
+    # ── 4. regions: the names the water rows are written for (the state and NRM codes are the region pair on the column support) ──
     water_region_names = data.WATER_REGION_NAMES if settings.WATER_LIMITS != 'off' else {}
 
     # ── 5. biodiversity: the contribution scales every GBF family shares, then each family's layer and selection ──

@@ -28,6 +28,22 @@ from luto.solvers import row_table
 # Shadow prices (called by simulation.py after an ACCEPTED solve)              #
 # ---------------------------------------------------------------------------- #
 
+PRICED = {                                      # the priced families, in the CSV's order: family -> (its 'constraint' label, the unit of its rhs)
+    'GBF2': ('GBF2', 'ha'),
+    'GBF3_NVIS': ('GBF3_NVIS', 'ha'),
+    'GBF4_SNES': ('GBF4_SNES', 'ha'),
+    'GBF4_ECNES': ('GBF4_ECNES', 'ha'),
+    'GBF8': ('GBF8', 'ha'),
+    'water': ('Water', 'ML'),
+    'ghg': ('GHG', 'tCO2e'),
+    'demand': ('Demand', 't'),
+    'renewable': ('renewable', 'MWh'),          # the label is the renewable type, read off am_idx below
+    'regional_adoption_ag': ('Regional_Adoption', 'ha'),
+    'regional_adoption_nonag': ('Regional_Adoption', 'ha'),
+    'regional_adoption_nonag_sum': ('Regional_Adoption', 'ha'),
+}
+
+
 def _priced_rows(T, family: str) -> np.ndarray:
     """The rows of one family the shadow prices cover, as row indices in table order: the ACTIVE rows, and the rows
     dropped before the build as redundant (priced 0) — empty where the family was not built. A row removed by name
@@ -38,155 +54,33 @@ def _priced_rows(T, family: str) -> np.ndarray:
     return np.arange(span.start, span.stop)[T['active'].values[span] | T['redundant'].values[span]]
 
 
-def _labels(T, field: str, rows: np.ndarray) -> np.ndarray:
-    """One coded key field of the row table at ``rows``, as labels."""
-    return row_table.decode(T, field, rows)
-
-
-def _price(constr, scale, unit: str) -> dict:
-    """The numeric columns of one shadow-price record, from a row's Gurobi handle and its row scale. A row dropped
-    before the build as redundant has no handle: every feasible point leaves it slack, so its dual is 0."""
-    So = 1e6                                    # the objective is in million AUD
-    Ss = float(scale)
-    if constr is None:
-        return {"pi_rescaled": 0.0, "scale": Ss, "shadow_price": 0.0, "shadow_price_AUD": 0.0, "unit": unit, "dropped": True}
-    pi = float(constr.Pi)
-    return {"pi_rescaled": pi, "scale": Ss, "shadow_price": pi * So / Ss,
-            "shadow_price_AUD": pi * So * float(constr.RHS), "unit": unit, "dropped": False}
-
-
-def calc_shadow_price_GBF2(luto_solver, inputs, target_year) -> pd.DataFrame:
-    """GBF2 priority-degraded-area constraint shadow price (AUD per real ha of target)."""
-    T = luto_solver.rows
-    r = _priced_rows(T, 'GBF2')
-    return pd.DataFrame([
-        {"year": target_year, "constraint": "GBF2", "region": "Australia", "item": "", "presence": "", **_price(constr, scale, "ha")}
-        for constr, scale in zip(T['constr'].values[r], T['scale'].values[r])
-    ])
-
-
-def calc_shadow_price_GBF3_NVIS(luto_solver, inputs, target_year) -> pd.DataFrame:
-    """GBF3 NVIS vegetation-group constraint shadow prices (AUD per real ha of target)."""
-    T = luto_solver.rows
-    r = _priced_rows(T, 'GBF3_NVIS')
-    return pd.DataFrame([
-        {"year": target_year, "constraint": "GBF3_NVIS", "region": region, "item": group, "presence": "", **_price(constr, scale, "ha")}
-        for constr, scale, region, group in zip(T['constr'].values[r], T['scale'].values[r], _labels(T, 'region', r), _labels(T, 'item', r))
-    ])
-
-
-def calc_shadow_price_GBF4_SNES(luto_solver, inputs, target_year) -> pd.DataFrame:
-    """GBF4 SNES species constraint shadow prices (AUD per real ha of target)."""
-    T = luto_solver.rows
-    r = _priced_rows(T, 'GBF4_SNES')
-    return pd.DataFrame([
-        {"year": target_year, "constraint": "GBF4_SNES", "region": region, "item": species, "presence": presence, **_price(constr, scale, "ha")}
-        for constr, scale, region, species, presence in zip(T['constr'].values[r], T['scale'].values[r],
-                                                            _labels(T, 'region', r), _labels(T, 'item', r), _labels(T, 'presence', r))
-    ])
-
-
-def calc_shadow_price_GBF4_ECNES(luto_solver, inputs, target_year) -> pd.DataFrame:
-    """GBF4 ECNES ecological-community constraint shadow prices (AUD per real ha of target)."""
-    T = luto_solver.rows
-    r = _priced_rows(T, 'GBF4_ECNES')
-    return pd.DataFrame([
-        {"year": target_year, "constraint": "GBF4_ECNES", "region": region, "item": community, "presence": presence, **_price(constr, scale, "ha")}
-        for constr, scale, region, community, presence in zip(T['constr'].values[r], T['scale'].values[r],
-                                                              _labels(T, 'region', r), _labels(T, 'item', r), _labels(T, 'presence', r))
-    ])
-
-
-def calc_shadow_price_GBF8(luto_solver, inputs, target_year) -> pd.DataFrame:
-    """GBF8 species-conservation constraint shadow prices (AUD per real ha of target)."""
-    T = luto_solver.rows
-    r = _priced_rows(T, 'GBF8')
-    return pd.DataFrame([
-        {"year": target_year, "constraint": "GBF8", "region": region, "item": species, "presence": "", **_price(constr, scale, "ha")}
-        for constr, scale, region, species in zip(T['constr'].values[r], T['scale'].values[r], _labels(T, 'region', r), _labels(T, 'item', r))
-    ])
-
-
-def calc_shadow_price_Water(luto_solver, inputs, target_year) -> pd.DataFrame:
-    """Per-region water-yield constraint shadow prices (AUD per real ML of target); ``item`` is the row name."""
-    T = luto_solver.rows
-    r = _priced_rows(T, 'water')
-    return pd.DataFrame([
-        {"year": target_year, "constraint": "Water", "region": "", "item": name, "presence": "", **_price(constr, scale, "ML")}
-        for constr, scale, name in zip(T['constr'].values[r], T['scale'].values[r], T['name'].values[r])
-    ])
-
-
-def calc_shadow_price_GHG(luto_solver, inputs, target_year) -> pd.DataFrame:
-    """GHG-emissions constraint shadow price (AUD per real tCO2e of target); ``item`` is the row name."""
-    T = luto_solver.rows
-    r = _priced_rows(T, 'ghg')
-    return pd.DataFrame([
-        {"year": target_year, "constraint": "GHG", "region": "", "item": name, "presence": "", **_price(constr, scale, "tCO2e")}
-        for constr, scale, name in zip(T['constr'].values[r], T['scale'].values[r], T['name'].values[r])
-    ])
-
-
-def calc_shadow_price_Demand(luto_solver, inputs, target_year) -> pd.DataFrame:
-    """Per-commodity production/demand constraint shadow prices (AUD per real tonne of demand).
-
-    ``presence`` holds the bound kind (eq/lower/upper) so a commodity's paired bounds stay
-    distinguishable; ``inputs`` is the step's ``RowInputs`` (the commodity names).
-    """
-    T = luto_solver.rows
-    r = _priced_rows(T, 'demand')
-    return pd.DataFrame([
-        {"year": target_year, "constraint": "Demand", "region": "", "item": inputs.commodity_names[commodity], "presence": bound, **_price(constr, scale, "t")}
-        for constr, scale, commodity, bound in zip(T['constr'].values[r], T['scale'].values[r], T['commodity'].values[r], _labels(T, 'bound', r))
-    ])
-
-
-def calc_shadow_price_Renewable(luto_solver, inputs, target_year) -> pd.DataFrame:
-    """State-level renewable-generation-target shadow prices (AUD per real MWh of target); ``constraint``
-    is the renewable type, ``region`` the state. Every (type, state) row carries its own row scale."""
-    T = luto_solver.rows
-    r = _priced_rows(T, 'renewable')
-    options = luto_solver.cols.attrs['options']
-    return pd.DataFrame([
-        {"year": target_year, "constraint": options[am_idx], "region": state, "item": "", "presence": "", **_price(constr, scale, "MWh")}
-        for constr, scale, am_idx, state in zip(T['constr'].values[r], T['scale'].values[r], T['am_idx'].values[r], _labels(T, 'state', r))
-    ])
-
-
-def calc_shadow_price_Regional_Adoption(luto_solver, inputs, target_year) -> pd.DataFrame:
-    """Regional adoption area-cap shadow prices (AUD per real ha of cap), the three families in row order
-    (ag, non-ag, non-ag sum); ``item`` is the row name. These rows are not rescaled, so scale = 1."""
-    T = luto_solver.rows
-    r = np.concatenate([_priced_rows(T, family) for family in ('regional_adoption_ag', 'regional_adoption_nonag', 'regional_adoption_nonag_sum')])
-    return pd.DataFrame([
-        {"year": target_year, "constraint": "Regional_Adoption", "region": "", "item": name, "presence": "", **_price(constr, scale, "ha")}
-        for constr, scale, name in zip(T['constr'].values[r], T['scale'].values[r], T['name'].values[r])
-    ])
-
-
-PRICED_FAMILIES = ('GBF2', 'GBF3_NVIS', 'GBF4_SNES', 'GBF4_ECNES', 'GBF8', 'water', 'ghg', 'demand', 'renewable',
-                   'regional_adoption_ag', 'regional_adoption_nonag', 'regional_adoption_nonag_sum')   # the row-table families the readers above price
+def _label(T, field: str, rows: np.ndarray) -> np.ndarray:
+    """One coded field of the row table at ``rows`` as labels, '' where the row's family has none."""
+    labels = row_table.decode(T, field, rows)
+    return np.where(labels == None, '', labels).astype(object)   # noqa: E711 — an object array against None
 
 
 def record_shadow_prices(luto_solver, inputs, target_year, out_dir) -> None:
-    """Compute every priced constraint's shadow prices and write one CSV for the year.
+    """Every priced row's shadow price into ``shadow_prices_{target_year}.csv``, as ONE query on the row table.
 
-    ``inputs`` is the step's ``RowInputs`` (the commodity names). Probes the simplex basis once
-    (barrier-only solves have unreliable duals → skip the year), then concatenates the per-constraint
-    calculators into ``shadow_prices_{target_year}.csv``; rows dropped before the build as redundant are
-    priced 0 with ``dropped`` True. The file is written fresh per year, so a resume/re-run simply
-    overwrites the year's file.
+    The duals are read ONCE — one batched ``getAttr('Pi')`` over the priced rows in the model — and written onto the
+    table as ``rows['pi']`` (NaN where not read; 0 on a row dropped before the build as redundant: every feasible point
+    leaves it slack). Then every column of the CSV is a field of the table at the priced rows: ``shadow_price`` =
+    pi · 1e6 / scale (the objective is million AUD, the row is scaled), ``shadow_price_AUD`` = pi · 1e6 · rhs, the
+    labels through ``row_table.decode``. ``inputs`` is the step's ``RowInputs`` (the commodity names). Probes the
+    simplex basis once first (barrier-only solves have unreliable duals → skip the year). The file is written fresh
+    per year, so a resume / re-run simply overwrites the year's file.
     """
     T = luto_solver.rows
-    priced = np.concatenate([_priced_rows(T, family) for family in PRICED_FAMILIES])
-    if not priced.size:
+    rows = np.concatenate([_priced_rows(T, family) for family in PRICED])          # the CSV's rows, family by family in PRICED's order
+    if not rows.size:
         print(f"No active constraints to record shadow prices for {target_year}.")
         return
 
-    # Constr.Pi is a clean basic dual only when the accepted solve left a simplex basis; CBasis
-    # raises GurobiError on a barrier-only solve (no basis) → duals unreliable, skip the year.
-    # One handle off the table probes it — never `model.getConstrs()`, a Python list of every row of the model.
-    built = priced[T['active'].values[priced]]
+    # ── the duals: Constr.Pi is a clean basic dual only when the accepted solve left a simplex basis; CBasis raises
+    #    GurobiError on a barrier-only solve (no basis) → duals unreliable, skip the year. One handle off the table
+    #    probes it — never `model.getConstrs()`, a Python list of every row of the model ──
+    built = rows[T['active'].values[rows]]                                          # the priced rows in the model (the rest were dropped before the build)
     try:
         if built.size:
             _ = T['constr'].values[built[0]].CBasis
@@ -194,23 +88,38 @@ def record_shadow_prices(luto_solver, inputs, target_year, out_dir) -> None:
         print(f"Skipping shadow prices for {target_year}: accepted solve has no simplex basis "
               f"(barrier-only) — duals would be unreliable.")
         return
+    pi = np.full(T.sizes['row'], np.nan)
+    pi[rows] = 0.0
+    pi[built] = luto_solver.gurobi_model.getAttr('Pi', T['constr'].values[built].tolist())
+    T['pi'] = (('row',), pi)
 
-    # Each calculator returns rows for its priced constraints, or a column-less empty frame.
-    df = pd.concat(
-        [calc(luto_solver, inputs, target_year) for calc in (
-            calc_shadow_price_GBF2,
-            calc_shadow_price_GBF3_NVIS,
-            calc_shadow_price_GBF4_SNES,
-            calc_shadow_price_GBF4_ECNES,
-            calc_shadow_price_GBF8,
-            calc_shadow_price_Water,
-            calc_shadow_price_GHG,
-            calc_shadow_price_Demand,
-            calc_shadow_price_Renewable,
-            calc_shadow_price_Regional_Adoption,
-        )],
-        ignore_index=True,
-    )
+    # ── the record: every column read off the table at the priced rows ──
+    family  = row_table.decode(T, 'family', rows)
+    name    = T['name'].values[rows]
+    scale   = T['scale'].values[rows]
+    rhs     = T['rhs'].values[rows]
+    dropped = T['redundant'].values[rows]
+    pi      = pi[rows]
+    constraint = np.array([PRICED[f][0] for f in family], dtype=object)
+    unit       = np.array([PRICED[f][1] for f in family], dtype=object)
+    region, item, presence = _label(T, 'region', rows), _label(T, 'item', rows), _label(T, 'presence', rows)
+    # what each family reports where the table's own labels are not the CSV's
+    on = family == 'GBF2'
+    region[on] = 'Australia'
+    on = np.isin(family, ('water', 'ghg', 'regional_adoption_ag', 'regional_adoption_nonag', 'regional_adoption_nonag_sum'))
+    item[on] = name[on]                                                              # the row name says which region / cap ...
+    region[on] = ''                                                                  # ... so the region column stays empty (the table's own region label is the id)
+    on = family == 'demand'
+    item[on] = np.asarray(inputs.commodity_names, dtype=object)[T['commodity'].values[rows][on]]
+    presence[on] = _label(T, 'bound', rows)[on]                                      # eq / lower / upper: a commodity's paired bounds stay distinguishable
+    on = family == 'renewable'
+    constraint[on] = np.asarray(luto_solver.cols.attrs['options'], dtype=object)[T['am_idx'].values[rows][on]]   # the renewable type
+    region[on] = _label(T, 'state', rows)[on]
 
+    shadow_price = pi * 1e6 / scale
+    shadow_price_AUD = pi * 1e6 * rhs
+    shadow_price_AUD[dropped] = 0.0                                                  # not -0.0 where the rhs is negative
+    df = pd.DataFrame(dict(year=target_year, constraint=constraint, region=region, item=item, presence=presence,
+                           pi_rescaled=pi, scale=scale, shadow_price=shadow_price, shadow_price_AUD=shadow_price_AUD,
+                           unit=unit, dropped=dropped))
     df.to_csv(f"{out_dir}/shadow_prices_{target_year}.csv", index=False)
-    print(f"Recorded {len(df)} shadow prices for {target_year} -> {out_dir}/shadow_prices_{target_year}.csv")

@@ -899,7 +899,11 @@ def write_quantity(data: Data, yr_cal: int, path: str) -> np.ndarray:
 
     # ==================== Separate Spatial Outputs ====================
 
-    # Get the commodity quantity dataarrays (sptial layers, (tonnes/KL)/(cell))
+    # Get the commodity quantity dataarrays (spatial layers, (tonnes/KL)/(cell)). The default threshold (0.01) is a map
+    # CLEAN-UP: a cell whose total ag / non-ag / ag-mgt share is at or below 1 % is zeroed before the product, so the
+    # layers and the per-region tables below do not carry slivers. It makes these layers sum to slightly LESS than the
+    # Production total in `data.prod_data` (the comparison CSV above), which counts every share (threshold 0) as the
+    # solver's demand rows did.
     ag_q_mrc, non_ag_p_rc, am_p_amrc = data.get_actual_production_lyr(yr_cal)
 
     ag_q_mrc  = add_all(ag_q_mrc,  ['lm'])

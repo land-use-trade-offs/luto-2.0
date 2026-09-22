@@ -141,7 +141,9 @@ def am_name_snake_case(am_name):
 def ag_mrj_to_xr(data, arr: np.ndarray, threshold: float = 0.01) -> xr.DataArray:
     """Convert agricultural dvar array to xarray DataArray with automatic masking.
 
-    Masks out cells where the sum across all land uses is less than 0.01.
+    Masks out cells where the sum across all land uses is at or below `threshold` (0.01 = 1 % of a cell): a CLEAN-UP
+    for the maps and per-region tables, which would otherwise carry slivers. An accounting total (Production in
+    `data.prod_data`) passes threshold 0 and counts every share, as the solver's demand rows did.
     """
     xr_arr = xr.DataArray(
         arr,
@@ -160,7 +162,9 @@ def ag_mrj_to_xr(data, arr: np.ndarray, threshold: float = 0.01) -> xr.DataArray
 def non_ag_rk_to_xr(data, arr: np.ndarray, threshold: float = 0.01) -> xr.DataArray:
     """Convert non-agricultural dvar array to xarray DataArray with automatic masking.
 
-    Masks out cells where the sum across all land uses is less than 0.01.
+    Masks out cells where the sum across all land uses is at or below `threshold` (0.01 = 1 % of a cell): a CLEAN-UP
+    for the maps and per-region tables, which would otherwise carry slivers. An accounting total (Production in
+    `data.prod_data`) passes threshold 0 and counts every share, as the solver's demand rows did.
     """
     xr_arr = xr.DataArray(
         arr,
@@ -178,7 +182,9 @@ def non_ag_rk_to_xr(data, arr: np.ndarray, threshold: float = 0.01) -> xr.DataAr
 def am_mrj_to_xr(data, am_mrj_dict: dict, threshold: float = 0.01) -> xr.DataArray:
     """Convert agricultural management dvar dict to xarray DataArray with automatic masking.
 
-    Masks out cells where the sum across all agricultural management types is less than 0.01.
+    Masks out cells where the sum across all agricultural management types is at or below `threshold` (0.01 = 1 % of a cell): a CLEAN-UP
+    for the maps and per-region tables, which would otherwise carry slivers. An accounting total (Production in
+    `data.prod_data`) passes threshold 0 and counts every share, as the solver's demand rows did.
     """
     arr = np.zeros((data.N_AG_MANS, data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
 
