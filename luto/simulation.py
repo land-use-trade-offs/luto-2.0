@@ -329,18 +329,14 @@ def store_solution(data: Data, target_year: int, solution, obj_val: float, input
     data.add_obj_vals(target_year, obj_val)
 
     # GHG from the stored dvars and the step's own GHG inputs: Σ ghg · share over the ag, ag-mgt and non-ag land, the
-    # transition emissions on the ag → ag flows, plus the off-land constant — what the GHG row summed, in float64 over
-    # every share (the row's contract dropped its sub-floor coefficients; the two agree to that and float32)
-    def dot(g, x):
-        assert g.shape == x.shape, (g.shape, x.shape)
-        g = np.nan_to_num(g) if np.isnan(g).any() else g                                    # a NaN coefficient is no emission (the row dropped it)
-        return float(np.einsum('i,i->', g.ravel(), x.ravel(), dtype=np.float64))            # Σ g·x accumulated in float64, no float64 copy of either
-    ghg = dot(inputs.ag_g_mrj, solution.ag_X_mrj) + dot(inputs.non_ag_g_rk, solution.non_ag_X_rk)
-    for am, g in inputs.ag_man_g_mrj.items():                                               # [m, r, j_idx] against the option's land uses
-        for j_idx, j in enumerate(inputs.agman2lu[am]):
-            ghg += dot(g[:, :, j_idx], solution.ag_man_X_mrj[am][:, :, j])
+    # transition emissions on the ag → ag flows, plus the off-land constant — what the GHG row summed (the row's contract
+    # dropped its sub-floor coefficients; float32 dot products, 1e-7 relative of the float64 sum at RES50)
+    ghg = float(np.dot(inputs.ag_g_mrj.ravel(), solution.ag_X_mrj.ravel())) + float(np.dot(inputs.non_ag_g_rk.ravel(), solution.non_ag_X_rk.ravel()))
+    for am, lus in inputs.agman2lu.items():                                                 # the enabled options; the GHG effect is [m, r, j_idx] over the option's land uses
+        for j_idx, j in enumerate(lus):
+            ghg += float(np.dot(inputs.ag_man_g_mrj[am][:, :, j_idx].ravel(), solution.ag_man_X_mrj[am][:, :, j].ravel()))
     for src, g in inputs.trans_ghg_ag2ag.items():                                           # [to_m, local_r, to_j], as the flows are keyed
-        ghg += dot(g, solution.dvar_D_ag2ag_mrj[src])
+        ghg += float(np.dot(g.ravel(), solution.dvar_D_ag2ag_mrj[src].ravel()))
     ghg += float(np.asarray(inputs.offland_ghg).ravel()[0])
     data.add_production_data(target_year, 'GHG', ghg)
 
