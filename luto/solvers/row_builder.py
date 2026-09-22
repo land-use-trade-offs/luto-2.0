@@ -27,7 +27,7 @@ import luto.tools as tools
 from luto import settings
 from luto.solvers.col_builder import ColSupport
 from luto.solvers.row_inputs import EconomicInputs, RowInputs
-from luto.solvers.row_table import FAMILIES, ROW_FILL, ROW_SCHEMA, make_part
+from luto.solvers.row_table import ROW_FILL, ROW_SCHEMA, make_part
 
 
 # ═══════════════════════════ get_rows: the row space of one step ═══════════════════════════
@@ -37,23 +37,19 @@ def get_rows(inputs: RowInputs, cols: xr.Dataset, support: ColSupport) -> tuple[
     the few, wide rows a target or a limit writes over the columns, then the many, narrow rows that say where land
     can move — stacked into the ONE matrix and the ONE row table."""
 
-    # ── 1. the constraints: a coefficient per column laid on the support, summed over the cells the target covers ──
+    bio_on = any(target != 'off' for target in (
+            settings.GBF2_TARGET,
+            settings.GBF3_NVIS_TARGET,
+            settings.GBF4_TARGET_SNES,
+            settings.GBF4_TARGET_ECNES,
+            settings.GBF8_TARGET)
+        )
+    
+    bio_S = support.cell2col @ sparse.diags(bio_coeff(inputs, cols, support)) if bio_on else None   # (cell x col) every column's biodiversity contribution in its cell's row, laid out ONCE for the five GBF families
+    
     parts = [
         get_demand(inputs, cols, support),
         get_ghg(inputs, cols, support),
-    ]
-
-    print("│   ├── Adding constraints for biodiversity...")
-    bio_on = any(target != 'off' for target in (
-        settings.GBF2_TARGET,
-        settings.GBF3_NVIS_TARGET,
-        settings.GBF4_TARGET_SNES,
-        settings.GBF4_TARGET_ECNES,
-        settings.GBF8_TARGET)
-    )
-    bio_S = support.cell2col @ sparse.diags(bio_coeff(inputs, cols, support)) if bio_on else None   # (cell x col) every column's biodiversity contribution in its cell's row, laid out ONCE for the five GBF families
-
-    parts += [
         get_GBF2(inputs, bio_S),
         get_GBF3_NVIS(inputs, support, bio_S),
         get_GBF4_SNES(inputs, support, bio_S),
@@ -65,35 +61,22 @@ def get_rows(inputs: RowInputs, cols: xr.Dataset, support: ColSupport) -> tuple[
         get_regional_adoption_nonag_sum(inputs, cols),
         get_water(inputs, cols, support),
         get_renewable(inputs, cols, support),
-    ]
-
-    # ── 2. the structure: what a column can be at all — an ag-mgt column within its ag column, simulated + existing
-    #       capacity within the cell, the arcs within the source they leave, every node at what it held plus what flowed ──
-    parts += [
         get_ag_mgt_link(inputs, cols, support),
         get_renewable_ceiling(inputs, cols, support),
         get_source_cap_ag(cols, support),
         get_source_cap_nonag(cols, support),
         get_node_balance_ag(cols, support),
-        get_node_balance_nonag(cols, support),
+        get_node_balance_nonag(cols, support)
     ]
 
-    # ── 3. the space: every family's block into the ONE matrix and its table into the ONE row table, in the order above
+    # the space: every family's block into the ONE matrix and its table into the ONE row table, in the order above
     #       (the model's row order); a family that is off returned (None, None) and is left out ──
     A = sparse.vstack([A for A, _ in parts if A is not None], format='csr')
     rows = xr.concat(
         [ROW_SCHEMA, *[table for _, table in parts if table is not None]],
         dim='row',
-        fill_value=ROW_FILL,
-        combine_attrs='no_conflicts'
+        fill_value=ROW_FILL
     )
-
-    # Embed the family ranges
-    codes = rows['family'].values
-    starts = np.flatnonzero(np.r_[True, codes[1:] != codes[:-1]])                           # where the family code changes
-    stops = np.r_[starts[1:], codes.size]
-    rows.attrs['family_range'] = {FAMILIES[codes[start]]: slice(int(start), int(stop)) for start, stop in zip(starts, stops)}
-
     return A, rows
 
 
@@ -204,7 +187,7 @@ def bio_coeff(inputs: RowInputs, cols: xr.Dataset, support: ColSupport) -> np.nd
 
 # ═══════════════════════════ get_obj: the objective coefficient of every column ═══════════════════════════
 
-def get_obj(econ: EconomicInputs, cols: xr.Dataset, support: ColSupport) -> xr.DataArray:
+def get_obj(econ: EconomicInputs, cols: xr.Dataset, support: ColSupport) -> np.ndarray:
     """The objective coefficient of every column (on ``col``), as Gurobi takes it: the operating economics on
     the accounting columns and the transition costs, negated, on the arcs — raw AUD, float32 — through the
     coefficient contract (the SOLVER_COEFF_MIN drop), then scaled to million AUD and floored again, because
@@ -219,112 +202,11 @@ def get_obj(econ: EconomicInputs, cols: xr.Dataset, support: ColSupport) -> xr.D
     obj[~(np.abs(obj) >= settings.SOLVER_COEFF_MIN)] = 0.0                     # the drop; NaN fails the test too
     obj = obj * (1.0 / 1e6)                                                    # raw AUD -> million AUD (float32, a reciprocal multiply as gurobipy did)
     obj[np.abs(obj) < settings.SOLVER_COEFF_MIN] = 0.0                         # floor the scaled coefficient
-    return xr.DataArray(obj, dims=('col',))
-
-
-# ═══════════════════════════ the structural rows ═══════════════════════════
-
-def get_ag_mgt_link(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
-    """One row per am column: X_am − X_ag ≤ 0 (an ag-mgt column cannot exceed the ag column it sits on)."""
-    n_all   = cols.attrs['n_all']
-    options = cols.attrs['options']
-    am_idx_all = []
-    ag_idx_all = []
-    names = []
-    key_am = []
-    key_lu = []
-    key_lm = []
-    key_cell = []
-    for (option, j_idx, m), valid_am in support.valid_am.items():
-        j = inputs.agman2lu[option][j_idx]
-        lm = inputs.landmans[m]
-        cells = np.flatnonzero(valid_am)                                                # the cells with an am column of (slot, m): one row each, ascending
-        am_cols = np.r_[cols.attrs['am_range'][(option, j_idx, m)]]                # those am columns ...
-        ag_cols = support.ag_mrj2col[m, cells, j]                                          # ... and the ag column each sits on
-        am_idx_all.append(am_cols)
-        ag_idx_all.append(ag_cols)
-        names += [f"const_ag_man_{option}_usage_{lm}_{j}_{r}".replace(" ", "_") for r in cells]
-        key_am.append(np.full(cells.size, options.index(option), dtype=np.int32))
-        key_lu.append(np.full(cells.size, j, dtype=np.int32))
-        key_lm.append(np.full(cells.size, m, dtype=np.int32))
-        key_cell.append(cells)
-    am_idx_all = np.concatenate(am_idx_all)
-    ag_idx_all = np.concatenate(ag_idx_all)
-    n_rows = am_idx_all.size
-    rows = np.arange(n_rows)
-    A = sparse.csr_matrix(
-        (np.concatenate([np.ones(n_rows), -np.ones(n_rows)]), (np.concatenate([rows, rows]), np.concatenate([am_idx_all, ag_idx_all]))),
-        shape=(n_rows, n_all)
-    )                                         # +1 on X_am, −1 on X_ag
-    A, _, _ = contract(A)
-    return make_part(
-        'ag_mgt_link',
-        A,
-        np.zeros(n_rows),
-        '<',
-        names,
-        am_idx=np.concatenate(key_am), j=np.concatenate(key_lu), m=np.concatenate(key_lm), cell=np.concatenate(key_cell),
-    )
-
-
-def get_ag_mgt_adoption(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
-    """One row per (option, land use): Σ X_am − limit · Σ X_ag ≤ 0."""
-    n_all   = cols.attrs['n_all']
-    options = cols.attrs['options']
-    row_idx = []
-    col_idx = []
-    vals = []
-    names = []
-    key_am = []
-    key_lu = []
-    slots = [(option, j_idx) for option, lus in inputs.agman2lu.items() for j_idx in range(len(lus))]
-    for row, (option, j_idx) in enumerate(slots):
-        j = inputs.agman2lu[option][j_idx]
-        adoption_limit = float(inputs.ag_man_limits[option][j])
-        am_cols = np.concatenate([np.r_[cols.attrs['am_range'][(option, j_idx, m)]] for m in range(inputs.nlms)])   # the slot's am columns, both lm, dry first
-        ag_cols = support.ag_mrj2col[:, :, j][support.valid_ag_mrj[:, :, j]]                                               # the ag columns of j: both lm, dry first, cells ascending
-        row_idx += [np.full(am_cols.size, row), np.full(ag_cols.size, row)]
-        col_idx += [am_cols, ag_cols]
-        vals += [np.ones(am_cols.size), np.full(ag_cols.size, -adoption_limit)]
-        names.append(f"const_ag_man_adoption_limit_{option}_{j}".replace(" ", "_"))
-        key_am.append(options.index(option))
-        key_lu.append(j)
-    n_rows = len(names)
-    A, _, _ = contract(sparse.csr_matrix((np.concatenate(vals), (np.concatenate(row_idx), np.concatenate(col_idx))), shape=(n_rows, n_all)))
-    return make_part('ag_mgt_adoption', A, np.zeros(n_rows), '<', names, am_idx=key_am, j=key_lu)
-
-
-def get_renewable_ceiling(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
-    """One row per (renewable option, cell with existing capacity): Σ X_am ≤ max(ag_mask − existing, 0)."""
-    am_idx = cols['am_idx'].values
-    ag_mask = inputs.ag_mask_proportion_r
-    blocks = []
-    rhs = []
-    names = []
-    key_am = []
-    key_cell = []
-    for option_idx, option in enumerate(cols.attrs['options']):
-        if option not in settings.RENEWABLES_OPTIONS:
-            continue
-        am_name = tools.am_name_snake_case(option)
-        exist_r = inputs.exist_renewable_solar_r if option == "Utility Solar PV" else inputs.exist_renewable_wind_r   # the total across ALL data years: the ceiling never decreases between periods, so lb(t) <= ceiling always holds
-        on_option = (am_idx == option_idx).astype(np.float32)                                   # 1 on the option's columns
-        has_option = support.cell2col @ on_option != 0                                            # the cells holding a column of the option ...
-        row_cells = np.flatnonzero(has_option & (exist_r != 0))                                  # ... and existing capacity (none -> no ceiling row): one row each, ascending
-        if not row_cells.size:
-            continue
-        blocks.append(support.cell2col[row_cells] @ sparse.diags(on_option))                     # the variables in those cells, each column times its on_option: the option's columns
-        rhs.append(np.maximum(ag_mask[row_cells] - exist_r[row_cells], 0.0))                    # cell space left for simulated capacity
-        names += [f"const_{am_name}_solvable_ub_{r}".replace(" ", "_") for r in row_cells]
-        key_am += [option_idx] * row_cells.size
-        key_cell.append(row_cells)
-    if not blocks:
-        return None, None
-    A, rhs, _ = contract(sparse.vstack(blocks, format='csr'), np.concatenate(rhs))
-    return make_part('renewable_ceiling', A, rhs, '<', names, am_idx=key_am, cell=np.concatenate(key_cell))
+    return obj
 
 
 # ═══════════════════════════ the demand rows ═══════════════════════════
+
 
 def get_demand(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
     """
@@ -384,10 +266,11 @@ def get_demand(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
     q_block, _, _ = contract(q_block)
 
     # ── the bound rows ──
-    commodity = []                                                       # the row's commodity: which production row it copies, and its label on the table
+    commodity = []                                                       # the row's commodity: which production row it copies
     senses = []
     rhs = []
     names = []
+    key_commodity = []
     key_bound = []
     for c_idx, c_name in enumerate(inputs.commodity_names):
         lb, ub = settings.DEMAND_BOUNDS[c_name]
@@ -398,12 +281,14 @@ def get_demand(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
             senses.append(sense)
             rhs.append(demand * factor)
             names.append(f"demand_{bound}_[{c_name}]".replace(" ", "_"))     # e.g. demand_hard_bound_eq_[sheep_meat]
+            key_commodity.append(c_name)
             key_bound.append(bound)
     A, rhs, scale = contract(q_block[commodity], rhs, rescale=True)      # the commodity's production row under each of its bounds; row rescale, factors kept
-    return make_part('demand', A, rhs, np.array(senses, dtype=object), names, scale, commodity=commodity, bound=key_bound)
+    return make_part('demand', A, rhs, np.array(senses, dtype=object), names, scale, demand_commodity=key_commodity, demand_bound=key_bound)
 
 
 # ═══════════════════════════ the policy rows ═══════════════════════════
+
 
 def get_ghg(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
     """One global row: Σ ghg · X over the ag, ag-mgt, non-ag columns and the ag → ag arcs ≤ limit − offland."""
@@ -424,9 +309,9 @@ def get_ghg(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
 def get_GBF2(inputs: RowInputs, bio_S: sparse.csr_matrix):
     """One row: Σ_r mask_area[r] · (the bio contribution of cell r's columns) ≥ target."""
     if settings.GBF2_TARGET == "off":
-        print("│   │   ├── TURNING OFF constraints for biodiversity GBF 2...")
+        print("│   ├── TURNING OFF constraints for biodiversity GBF 2...")
         return None, None
-    print(f'│   │   ├── Adding constraints for biodiversity GBF 2: {inputs.limits["GBF2"]:15,.0f}')
+    print(f'│   ├── Adding constraints for biodiversity GBF 2: {inputs.limits["GBF2"]:15,.0f}')
     A, rhs, scale = contract(weight_rows([inputs.GBF2_mask_area_r], inputs.ncells) @ bio_S, [inputs.limits["GBF2"]], rescale=True)
     return make_part('GBF2', A, rhs, '>', ["bio_GBF2_priority_degraded_area_limit"], scale)
 
@@ -434,9 +319,9 @@ def get_GBF2(inputs: RowInputs, bio_S: sparse.csr_matrix):
 def get_GBF3_NVIS(inputs: RowInputs, support: ColSupport, bio_S: sparse.csr_matrix):
     """One row per (region, group) with a target ≥ 0 and a cell: Σ_r area[group, r] · (the bio contribution of cell r's columns) ≥ target; IBRA bioregions in 'IBRA_REG' mode."""
     if settings.GBF3_NVIS_TARGET == "off":
-        print("│   │   ├── TURNING OFF constraints for biodiversity GBF 3 NVIS")
+        print("│   ├── TURNING OFF constraints for biodiversity GBF 3 NVIS")
         return None, None
-    print("│   │   ├── Adding constraints for biodiversity GBF 3 NVIS...")
+    print("│   ├── Adding constraints for biodiversity GBF 3 NVIS...")
     layers = inputs.GBF3_NVIS_pre_1750_area_vr                           # xr [group, cell]
     targets = inputs.limits["GBF3_NVIS"]
     layer = 'ibra' if settings.GBF3_NVIS_REGION_MODE == 'IBRA_REG' else 'nrm'   # the region layer the targets are set on
@@ -459,19 +344,19 @@ def get_GBF3_NVIS(inputs: RowInputs, support: ColSupport, bio_S: sparse.csr_matr
         rhs.append(target)
         names.append(f"bio_GBF3_NVIS_limit_{region}_{group}".replace(" ", "_"))
         kept.append((region, group))
-    print(f"│   │   │   ├── {len(kept)} constraint(s) added, {len(inputs.GBF3_NVIS_region_group) - len(kept)} skipped")
+    print(f"│   │   └── {len(kept)} constraint(s) added, {len(inputs.GBF3_NVIS_region_group) - len(kept)} skipped")
     if not weights:
         return None, None
     A, rhs, scale = contract(weight_rows(weights, inputs.ncells) @ bio_S, rhs, rescale=True)
-    return make_part('GBF3_NVIS', A, rhs, '>', names, scale, region=[region for region, _ in kept], item=[group for _, group in kept])
+    return make_part('GBF3_NVIS', A, rhs, '>', names, scale, region=[region for region, _ in kept], GBF_target=[group for _, group in kept])
 
 
 def get_GBF4_SNES(inputs: RowInputs, support: ColSupport, bio_S: sparse.csr_matrix):
     """One row per (region, species, presence) with a target > 0 and a cell: Σ_r area[species, r] · (the bio contribution of cell r's columns) ≥ target."""
     if settings.GBF4_TARGET_SNES == 'off':
-        print('│   │   ├── TURNING OFF constraints for biodiversity GBF 4 SNES...')
+        print('│   ├── TURNING OFF constraints for biodiversity GBF 4 SNES...')
         return None, None
-    print("│   │   ├── Adding constraints for biodiversity GBF 4 SNES ...")
+    print("│   ├── Adding constraints for biodiversity GBF 4 SNES ...")
     layers = inputs.GBF4_SNES_pre_1750_area_sr                           # xr [layer=(species, presence), cell]
     targets = inputs.limits["GBF4_SNES"]
     region_of_cell = support.region2cell['nrm'].values                     # the NRM code of every cell
@@ -493,20 +378,20 @@ def get_GBF4_SNES(inputs: RowInputs, support: ColSupport, bio_S: sparse.csr_matr
         rhs.append(target)
         names.append(f"bio_GBF4_SNES_limit_{region}_{species}_{presence}".replace(" ", "_"))
         kept.append((region, species, presence))
-    print(f"│   │   │   ├── {len(kept)} constraint(s) added, {len(inputs.GBF4_SNES_region_species) - len(kept)} skipped")
+    print(f"│   │   └── {len(kept)} constraint(s) added, {len(inputs.GBF4_SNES_region_species) - len(kept)} skipped")
     if not weights:
         return None, None
     A, rhs, scale = contract(weight_rows(weights, inputs.ncells) @ bio_S, rhs, rescale=True)
     return make_part('GBF4_SNES', A, rhs, '>', names, scale,
-                     region=[key[0] for key in kept], item=[key[1] for key in kept], presence=[key[2] for key in kept])
+                     region=[key[0] for key in kept], GBF_target=[key[1] for key in kept], GBF4_presence=[key[2] for key in kept])
 
 
 def get_GBF4_ECNES(inputs: RowInputs, support: ColSupport, bio_S: sparse.csr_matrix):
     """One row per (region, community, presence) with a target > 0 and a cell: Σ_r area[community, r] · (the bio contribution of cell r's columns) ≥ target."""
     if settings.GBF4_TARGET_ECNES == 'off':
-        print('│   │   ├── TURNING OFF constraints for biodiversity GBF 4 ECNES...')
+        print('│   ├── TURNING OFF constraints for biodiversity GBF 4 ECNES...')
         return None, None
-    print("│   │   ├── Adding constraints for biodiversity GBF 4 ECNES ...")
+    print("│   ├── Adding constraints for biodiversity GBF 4 ECNES ...")
     layers = inputs.GBF4_ECNES_pre_1750_area_sr                          # xr [layer=(community, presence), cell]
     targets = inputs.limits["GBF4_ECNES"]
     region_of_cell = support.region2cell['nrm'].values                     # the NRM code of every cell
@@ -528,20 +413,20 @@ def get_GBF4_ECNES(inputs: RowInputs, support: ColSupport, bio_S: sparse.csr_mat
         rhs.append(target)
         names.append(f"bio_GBF4_ECNES_limit_{region}_{community}_{presence}".replace(" ", "_"))
         kept.append((region, community, presence))
-    print(f"│   │   │   ├── {len(kept)} constraint(s) added, {len(inputs.GBF4_ECNES_region_species) - len(kept)} skipped")
+    print(f"│   │   └── {len(kept)} constraint(s) added, {len(inputs.GBF4_ECNES_region_species) - len(kept)} skipped")
     if not weights:
         return None, None
     A, rhs, scale = contract(weight_rows(weights, inputs.ncells) @ bio_S, rhs, rescale=True)
     return make_part('GBF4_ECNES', A, rhs, '>', names, scale,
-                     region=[key[0] for key in kept], item=[key[1] for key in kept], presence=[key[2] for key in kept])
+                     region=[key[0] for key in kept], GBF_target=[key[1] for key in kept], GBF4_presence=[key[2] for key in kept])
 
 
 def get_GBF8(inputs: RowInputs, support: ColSupport, bio_S: sparse.csr_matrix):
     """One row per (region, species) with a target > 0 and a cell: Σ_r area[species, r] · (the bio contribution of cell r's columns) ≥ target."""
     if settings.GBF8_TARGET == "off":
-        print('│   │   ├── TURNING OFF constraints for biodiversity GBF 8 ...')
+        print('│   ├── TURNING OFF constraints for biodiversity GBF 8 ...')
         return None, None
-    print("│   │   ├── Adding constraints for biodiversity GBF 8 ...")
+    print("│   ├── Adding constraints for biodiversity GBF 8 ...")
     layers = inputs.GBF8_pre_1750_area_sr                                # xr [species, cell]
     targets = inputs.limits["GBF8"]
     region_of_cell = support.region2cell['nrm'].values                     # the NRM code of every cell
@@ -563,18 +448,47 @@ def get_GBF8(inputs: RowInputs, support: ColSupport, bio_S: sparse.csr_matrix):
         rhs.append(target)
         names.append(f"bio_GBF8_limit_{region}_{species}".replace(" ", "_"))
         kept.append((region, species))
-    print(f"│   │   │   ├── {len(kept)} constraint(s) added, {len(inputs.GBF8_region_species) - len(kept)} skipped")
+    print(f"│   │   └── {len(kept)} constraint(s) added, {len(inputs.GBF8_region_species) - len(kept)} skipped")
     if not weights:
         return None, None
     A, rhs, scale = contract(weight_rows(weights, inputs.ncells) @ bio_S, rhs, rescale=True)
-    return make_part('GBF8', A, rhs, '>', names, scale, region=[region for region, _ in kept], item=[species for _, species in kept])
+    return make_part('GBF8', A, rhs, '>', names, scale, region=[region for region, _ in kept], GBF_target=[species for _, species in kept])
+
+
+def get_ag_mgt_adoption(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
+    """One row per (option, land use): Σ X_am − limit · Σ X_ag ≤ 0."""
+    print("│   ├── Adding ag-management adoption-limit constraints...")
+    n_all   = cols.attrs['n_all']
+    options = cols.attrs['options']
+    row_idx = []
+    col_idx = []
+    vals = []
+    names = []
+    key_am = []
+    key_lu = []
+    slots = [(option, j_idx) for option, lus in inputs.agman2lu.items() for j_idx in range(len(lus))]
+    for row, (option, j_idx) in enumerate(slots):
+        j = inputs.agman2lu[option][j_idx]
+        adoption_limit = float(inputs.ag_man_limits[option][j])
+        am_cols = np.concatenate([np.r_[cols.attrs['am_range'][(option, j_idx, m)]] for m in range(inputs.nlms)])   # the slot's am columns, both lm, dry first
+        ag_cols = support.ag_mrj2col[:, :, j][support.valid_ag_mrj[:, :, j]]                                               # the ag columns of j: both lm, dry first, cells ascending
+        row_idx += [np.full(am_cols.size, row), np.full(ag_cols.size, row)]
+        col_idx += [am_cols, ag_cols]
+        vals += [np.ones(am_cols.size), np.full(ag_cols.size, -adoption_limit)]
+        names.append(f"const_ag_man_adoption_limit_{option}_{j}".replace(" ", "_"))
+        key_am.append(options.index(option))
+        key_lu.append(j)
+    n_rows = len(names)
+    A, _, _ = contract(sparse.csr_matrix((np.concatenate(vals), (np.concatenate(row_idx), np.concatenate(col_idx))), shape=(n_rows, n_all)))
+    return make_part('ag_mgt_adoption', A, np.zeros(n_rows), '<', names, am_idx=key_am, j=key_lu)
 
 
 def get_regional_adoption_ag(inputs: RowInputs, cols: xr.Dataset):
     """One row per (region, ag land use) cap: Σ hectares · X_ag over the cap's cells ≤ cap (hectares, NOT rescaled)."""
     if settings.REGIONAL_ADOPTION_CONSTRAINTS == "off":
-        print("│   │   └── TURNING OFF constraints for regional adoption ...")
+        print("│   ├── TURNING OFF constraints for regional adoption (ag land uses) ...")
         return None, None
+    print("│   ├── Adding constraints for regional adoption (ag land uses)...")
     n_all = cols.attrs['n_all']
     in_ag = np.zeros(n_all, dtype=bool)
     in_ag[cols.attrs['block_range']['ag']] = True
@@ -590,9 +504,9 @@ def get_regional_adoption_ag(inputs: RowInputs, cols: xr.Dataset):
     for reg_id, lu_code, lu_name, reg_cells, area_limit_ha in inputs.limits["ag_regional_adoption"]:
         name = f"reg_adopt_limit_ag_{lu_name}_{reg_id}".replace(" ", "_")
         if len(reg_cells) == 0:
-            print(f"│   │   │   ├── SKIPPING {name} (no cells at this resolution)")
+            print(f"│   │   ├── SKIPPING {name} (no cells at this resolution)")
             continue
-        print(f"│   │   │   ├── Adding constraint {name} <= {area_limit_ha:,.0f} HA...")
+        print(f"│   │   ├── Adding constraint {name} <= {area_limit_ha:,.0f} HA...")
         in_region = np.zeros(inputs.ncells, dtype=bool)                                    # the cap's cells ...
         in_region[reg_cells] = True
         on = in_ag & (j == lu_code) & in_region[cell]                                    # ... and the land use's ag columns in them
@@ -612,7 +526,9 @@ def get_regional_adoption_ag(inputs: RowInputs, cols: xr.Dataset):
 def get_regional_adoption_nonag(inputs: RowInputs, cols: xr.Dataset):
     """One row per (region, non-ag land use) cap: Σ hectares · X_nonag over the cap's cells ≤ cap · relax."""
     if settings.REGIONAL_ADOPTION_CONSTRAINTS == "off":
+        print("│   ├── TURNING OFF constraints for regional adoption (non-ag land uses) ...")
         return None, None
+    print("│   ├── Adding constraints for regional adoption (non-ag land uses)...")
     # the caps recede 1e-6/yr RELATIVE, so the RHS always stays ahead of the ratcheting lower bound non-reversible
     # plantings create: last year's solved areas become this year's exact lower bounds, and float32 noise then puts the
     # locked-in floor a hair over a saturated cap, which presolve rejects with NO tolerance (ag caps need none: ag is reversible)
@@ -632,9 +548,9 @@ def get_regional_adoption_nonag(inputs: RowInputs, cols: xr.Dataset):
     for reg_id, lu_code, lu_name, reg_cells, area_limit_ha in inputs.limits.get("non_ag_regional_adoption") or []:
         name = f"reg_adopt_limit_non_ag_{lu_name}_{reg_id}".replace(" ", "_")
         if len(reg_cells) == 0:
-            print(f"│   │   │   ├── SKIPPING {name} (no cells at this resolution)")
+            print(f"│   │   ├── SKIPPING {name} (no cells at this resolution)")
             continue
-        print(f"│   │   │   ├── Adding constraint {name} <= {area_limit_ha:,.0f} HA...")
+        print(f"│   │   ├── Adding constraint {name} <= {area_limit_ha:,.0f} HA...")
         in_region = np.zeros(inputs.ncells, dtype=bool)                                    # the cap's cells ...
         in_region[reg_cells] = True
         on = in_nonag & (k == lu_code) & in_region[cell]                                 # ... and the land use's non-ag columns in them
@@ -654,7 +570,9 @@ def get_regional_adoption_nonag(inputs: RowInputs, cols: xr.Dataset):
 def get_regional_adoption_nonag_sum(inputs: RowInputs, cols: xr.Dataset):
     """One row per region cap ('NON_AG_CAP' mode): Σ hectares · X_nonag over EVERY non-ag land use in the cap's cells ≤ cap · relax."""
     if settings.REGIONAL_ADOPTION_CONSTRAINTS == "off":
+        print("│   ├── TURNING OFF constraints for regional adoption (non-ag total) ...")
         return None, None
+    print("│   ├── Adding constraints for regional adoption (non-ag total)...")
     # the caps recede 1e-6/yr RELATIVE, so the RHS always stays ahead of the ratcheting lower bound non-reversible
     # plantings create: last year's solved areas become this year's exact lower bounds, and float32 noise then puts the
     # locked-in floor a hair over a saturated cap, which presolve rejects with NO tolerance (ag caps need none: ag is reversible)
@@ -673,9 +591,9 @@ def get_regional_adoption_nonag_sum(inputs: RowInputs, cols: xr.Dataset):
     for reg_id, reg_cells, area_limit_ha in inputs.limits.get("non_ag_regional_adoption_sum") or []:
         name = f"reg_adopt_limit_non_ag_sum_{reg_id}".replace(" ", "_")
         if len(reg_cells) == 0:
-            print(f"│   │   │   ├── SKIPPING {name} (no cells at this resolution)")
+            print(f"│   │   ├── SKIPPING {name} (no cells at this resolution)")
             continue
-        print(f"│   │   │   ├── Adding constraint {name} <= {area_limit_ha:,.0f} HA...")
+        print(f"│   │   ├── Adding constraint {name} <= {area_limit_ha:,.0f} HA...")
         in_region = np.zeros(inputs.ncells, dtype=bool)                                    # the cap's cells ...
         in_region[reg_cells] = True
         on = in_nonag & in_region[cell]                                                  # ... and every non-ag column in them
@@ -794,7 +712,85 @@ def get_renewable(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
         return None, None
     A = sparse.csr_matrix((np.concatenate(vals), (np.concatenate(row_idx), np.concatenate(col_idx))), shape=(len(names), n_all))
     A, rhs, scale = contract(A, rhs, rescale=True)
-    return make_part('renewable', A, rhs, '>', names, scale, am_idx=key_am, state=key_state)
+    return make_part('renewable', A, rhs, '>', names, scale, am_idx=key_am, region=key_state)
+
+
+# ═══════════════════════════ the structural rows ═══════════════════════════
+
+
+def get_ag_mgt_link(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
+    """One row per am column: X_am − X_ag ≤ 0 (an ag-mgt column cannot exceed the ag column it sits on)."""
+    print("│   ├── Adding ag-management link (X_am ≤ X_ag) constraints...")
+    n_all   = cols.attrs['n_all']
+    options = cols.attrs['options']
+    am_idx_all = []
+    ag_idx_all = []
+    names = []
+    key_am = []
+    key_lu = []
+    key_lm = []
+    key_cell = []
+    for (option, j_idx, m), valid_am in support.valid_am.items():
+        j = inputs.agman2lu[option][j_idx]
+        lm = inputs.landmans[m]
+        cells = np.flatnonzero(valid_am)                                                # the cells with an am column of (slot, m): one row each, ascending
+        am_cols = np.r_[cols.attrs['am_range'][(option, j_idx, m)]]                # those am columns ...
+        ag_cols = support.ag_mrj2col[m, cells, j]                                          # ... and the ag column each sits on
+        am_idx_all.append(am_cols)
+        ag_idx_all.append(ag_cols)
+        names += [f"const_ag_man_{option}_usage_{lm}_{j}_{r}".replace(" ", "_") for r in cells]
+        key_am.append(np.full(cells.size, options.index(option), dtype=np.int32))
+        key_lu.append(np.full(cells.size, j, dtype=np.int32))
+        key_lm.append(np.full(cells.size, m, dtype=np.int32))
+        key_cell.append(cells)
+    am_idx_all = np.concatenate(am_idx_all)
+    ag_idx_all = np.concatenate(ag_idx_all)
+    n_rows = am_idx_all.size
+    rows = np.arange(n_rows)
+    A = sparse.csr_matrix(
+        (np.concatenate([np.ones(n_rows), -np.ones(n_rows)]), (np.concatenate([rows, rows]), np.concatenate([am_idx_all, ag_idx_all]))),
+        shape=(n_rows, n_all)
+    )                                         # +1 on X_am, −1 on X_ag
+    A, _, _ = contract(A)
+    return make_part(
+        'ag_mgt_link',
+        A,
+        np.zeros(n_rows),
+        '<',
+        names,
+        am_idx=np.concatenate(key_am), j=np.concatenate(key_lu), m=np.concatenate(key_lm), cell=np.concatenate(key_cell),
+    )
+
+
+def get_renewable_ceiling(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
+    """One row per (renewable option, cell with existing capacity): Σ X_am ≤ max(ag_mask − existing, 0)."""
+    print("│   ├── Adding renewable ceiling (Σ X_am ≤ ag mask − existing) constraints...")
+    am_idx = cols['am_idx'].values
+    ag_mask = inputs.ag_mask_proportion_r
+    blocks = []
+    rhs = []
+    names = []
+    key_am = []
+    key_cell = []
+    for option_idx, option in enumerate(cols.attrs['options']):
+        if option not in settings.RENEWABLES_OPTIONS:
+            continue
+        am_name = tools.am_name_snake_case(option)
+        exist_r = inputs.exist_renewable_solar_r if option == "Utility Solar PV" else inputs.exist_renewable_wind_r   # the total across ALL data years: the ceiling never decreases between periods, so lb(t) <= ceiling always holds
+        on_option = (am_idx == option_idx).astype(np.float32)                                   # 1 on the option's columns
+        has_option = support.cell2col @ on_option != 0                                            # the cells holding a column of the option ...
+        row_cells = np.flatnonzero(has_option & (exist_r != 0))                                  # ... and existing capacity (none -> no ceiling row): one row each, ascending
+        if not row_cells.size:
+            continue
+        blocks.append(support.cell2col[row_cells] @ sparse.diags(on_option))                     # the variables in those cells, each column times its on_option: the option's columns
+        rhs.append(np.maximum(ag_mask[row_cells] - exist_r[row_cells], 0.0))                    # cell space left for simulated capacity
+        names += [f"const_{am_name}_solvable_ub_{r}".replace(" ", "_") for r in row_cells]
+        key_am += [option_idx] * row_cells.size
+        key_cell.append(row_cells)
+    if not blocks:
+        return None, None
+    A, rhs, _ = contract(sparse.vstack(blocks, format='csr'), np.concatenate(rhs))
+    return make_part('renewable_ceiling', A, rhs, '<', names, am_idx=key_am, cell=np.concatenate(key_cell))
 
 
 # ═══════════════════════════ the flow rows ═══════════════════════════
@@ -805,10 +801,11 @@ def get_renewable(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
 #   a cell's total is not a row either: every arc leaves one node of the cell and lands on another, so the cell's
 #   node-balance rows sum to Σ X = Σ base (row_bounds forms that sum to bound a cell's columns together).
 
+
 def get_source_cap_ag(cols: xr.Dataset, support: ColSupport):
     """One row per ag source (lm, lu, cell): Σ of the arcs leaving it (ag2ag ∪ ag2nonag) ≤ its base share."""
     # bounds the arc columns (some flow costs are negative) and rules out pass-through
-    print("│   ├── Adding source-cap (Σ out ≤ base) constraints...")
+    print("│   ├── Adding source-cap (Σ out ≤ base) constraints at the ag sources...")
     n_all       = cols.attrs['n_all']
     block_range = cols.attrs['block_range']
     arcs        = np.r_[block_range['ag2ag'], block_range['ag2nonag']]   # the arcs leaving an ag node
@@ -835,6 +832,7 @@ def get_source_cap_ag(cols: xr.Dataset, support: ColSupport):
 
 def get_source_cap_nonag(cols: xr.Dataset, support: ColSupport):
     """One row per non-ag source (nonag_lu, cell): Σ of the arcs leaving it (nonag2ag) ≤ its base share."""
+    print("│   ├── Adding source-cap (Σ out ≤ base) constraints at the non-ag sources...")
     n_all   = cols.attrs['n_all']
     arcs    = np.r_[cols.attrs['block_range']['nonag2ag']]                                      # the arcs leaving a non-ag node
     if not arcs.size:

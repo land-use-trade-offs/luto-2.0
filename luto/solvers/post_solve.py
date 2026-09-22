@@ -27,7 +27,6 @@ import numpy as np
 import xarray as xr
 
 from dataclasses import dataclass
-from typing import Any
 
 import luto.settings as settings
 from luto.settings import AG_MANAGEMENTS
@@ -46,13 +45,12 @@ class SolverSolution:
     dvar_D_ag2ag_mrj: dict                          # Solved ag->ag deltas, SOURCE-KEYED: {(from_m, from_j): ndarray(NLMS, ncells_src, N_AG_LUS) [to_m, local_r, to_j]} over the source's cells (get_base_dvar_mj_cell_map)
     dvar_D_ag2nonag_rk: dict                        # Solved ag->nonag deltas, SOURCE-KEYED: {(from_m, from_j): ndarray(ncells_src, N_NON_AG_LUS) [local_r, k]}
     dvar_D_nonag2ag_mrj: dict                       # Solved nonag->ag deltas, SOURCE-KEYED: {from_k: ndarray(NLMS, ncells_k, N_AG_LUS) [to_m, local_r, to_j]} (e.g. reversible Destocked back to ag; cells via get_base_nonag_dvar_k_cell_map)
-    prod_data: dict[str, Any]                       # what the writers read: 'Production' (raw t per commodity, unscaled) and 'GHG' (raw tCO2e, the off-land constant included)
 
 
-def post_solve(x: np.ndarray, cols: xr.Dataset, col_support: ColSupport, A, rows: xr.Dataset, inputs: RowInputs) -> SolverSolution:
-    """The LUTO-format solution of one step from the raw ``x`` (``LutoSolver.solve``): the column table says
-    what every entry of x is, the column support which source each arc belongs to, the row side and the row table
-    give the production data."""
+def post_solve(x: np.ndarray, cols: xr.Dataset, col_support: ColSupport, inputs: RowInputs) -> SolverSolution:
+    """The LUTO-format solution of one step from the raw ``x`` (``LutoSolver.solve``): the column table says what every
+    entry of x is, the column support which source each arc belongs to. Nothing is read off the model here: Production
+    and GHG are computed by ``simulation.store_solution`` from the stored dvars."""
     print("Collecting results...\n", flush=True)
     n_ag_lus    = inputs.n_ag_lus
     n_nonag_lus = inputs.n_nonag_lus
@@ -136,18 +134,6 @@ def post_solve(x: np.ndarray, cols: xr.Dataset, col_support: ColSupport, A, rows
         adopted = (adoption >= settings.AGRICULTURAL_MANAGEMENT_USE_THRESHOLD) & np.isin(chosen_j, lu_codes)
         ammaps[am][ag_cells[adopted]] = 1
 
-    # ── 4. GHG as the GHG row's raw-unit value (row × scale) plus the off-land constant the row excludes — read off
-    #       the row table whether or not the row went into the model (a row dropped before the build is still A[row]),
-    #       0 when the GHG limit is off. Production is not read here: ``simulation.store_solution`` computes it from the
-    #       stored dvars the way the base year's is (``data.get_actual_production_lyr``) ──
-    prod_data = {}
-    ghg = rows.attrs['family_range'].get('ghg')
-    if ghg is not None and ghg.stop > ghg.start:
-        row = ghg.start                                                   # the single GHG row
-        prod_data["GHG"] = float((A[row] @ x)[0] * rows['scale'].values[row]) + float(np.asarray(inputs.offland_ghg).ravel()[0])
-    else:
-        prod_data["GHG"] = 0
-
     return SolverSolution(
         lumap=lumap,
         lmmap=lmmap,
@@ -158,5 +144,4 @@ def post_solve(x: np.ndarray, cols: xr.Dataset, col_support: ColSupport, A, rows
         dvar_D_ag2ag_mrj=dvar_D_ag2ag_mrj,
         dvar_D_ag2nonag_rk=dvar_D_ag2nonag_rk,
         dvar_D_nonag2ag_mrj=dvar_D_nonag2ag_mrj,
-        prod_data=prod_data,
     )

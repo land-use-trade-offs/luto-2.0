@@ -48,27 +48,23 @@ def _priced_rows(T, family: str) -> np.ndarray:
     """The rows of one family the shadow prices cover, as row indices in table order: the ACTIVE rows, and the rows
     dropped before the build as redundant (priced 0) — empty where the family was not built. A row removed by name
     (``LutoSolver.remove_constraints_by_name``) is neither, and gets no price."""
-    span = T.attrs['family_range'].get(family)
-    if span is None:
-        return np.empty(0, dtype=np.int64)
-    return np.arange(span.start, span.stop)[T['active'].values[span] | T['redundant'].values[span]]
+    return np.flatnonzero((T['family'].values == family) & (T['active'].values | T['redundant'].values))
 
 
 def _label(T, field: str, rows: np.ndarray) -> np.ndarray:
-    """One coded field of the row table at ``rows`` as labels, '' where the row's family has none."""
-    labels = row_table.decode(T, field, rows)
+    """One label field of the row table at ``rows``, '' where the row's family has none."""
+    labels = T[field].values[rows]
     return np.where(labels == None, '', labels).astype(object)   # noqa: E711 — an object array against None
 
 
-def record_shadow_prices(luto_solver, inputs, target_year, out_dir) -> None:
+def record_shadow_prices(luto_solver, target_year, out_dir) -> None:
     """Every priced row's shadow price into ``shadow_prices_{target_year}.csv``, as ONE query on the row table.
 
     The duals are read ONCE — one batched ``getAttr('Pi')`` over the priced rows in the model — and written onto the
     table as ``rows['pi']`` (NaN where not read; 0 on a row dropped before the build as redundant: every feasible point
     leaves it slack). Then every column of the CSV is a field of the table at the priced rows: ``shadow_price`` =
     pi · 1e6 / scale (the objective is million AUD, the row is scaled), ``shadow_price_AUD`` = pi · 1e6 · rhs, the
-    labels through ``row_table.decode``. ``inputs`` is the step's ``RowInputs`` (the commodity names). Probes the
-    simplex basis once first (barrier-only solves have unreliable duals → skip the year). The file is written fresh
+    labels read off its columns. Probes the simplex basis once first (barrier-only solves have unreliable duals → skip the year). The file is written fresh
     per year, so a resume / re-run simply overwrites the year's file.
     """
     T = luto_solver.rows
@@ -94,7 +90,7 @@ def record_shadow_prices(luto_solver, inputs, target_year, out_dir) -> None:
     T['pi'] = (('row',), pi)
 
     # ── the record: every column read off the table at the priced rows ──
-    family  = row_table.decode(T, 'family', rows)
+    family  = T['family'].values[rows]
     name    = T['name'].values[rows]
     scale   = T['scale'].values[rows]
     rhs     = T['rhs'].values[rows]
@@ -102,7 +98,7 @@ def record_shadow_prices(luto_solver, inputs, target_year, out_dir) -> None:
     pi      = pi[rows]
     constraint = np.array([PRICED[f][0] for f in family], dtype=object)
     unit       = np.array([PRICED[f][1] for f in family], dtype=object)
-    region, item, presence = _label(T, 'region', rows), _label(T, 'item', rows), _label(T, 'presence', rows)
+    region, item, presence = _label(T, 'region', rows), _label(T, 'GBF_target', rows), _label(T, 'GBF4_presence', rows)
     # what each family reports where the table's own labels are not the CSV's
     on = family == 'GBF2'
     region[on] = 'Australia'
@@ -110,11 +106,10 @@ def record_shadow_prices(luto_solver, inputs, target_year, out_dir) -> None:
     item[on] = name[on]                                                              # the row name says which region / cap ...
     region[on] = ''                                                                  # ... so the region column stays empty (the table's own region label is the id)
     on = family == 'demand'
-    item[on] = np.asarray(inputs.commodity_names, dtype=object)[T['commodity'].values[rows][on]]
-    presence[on] = _label(T, 'bound', rows)[on]                                      # eq / lower / upper: a commodity's paired bounds stay distinguishable
+    item[on] = _label(T, 'demand_commodity', rows)[on]
+    presence[on] = _label(T, 'demand_bound', rows)[on]                               # eq / lower / upper: a commodity's paired bounds stay distinguishable
     on = family == 'renewable'
-    constraint[on] = np.asarray(luto_solver.cols.attrs['options'], dtype=object)[T['am_idx'].values[rows][on]]   # the renewable type
-    region[on] = _label(T, 'state', rows)[on]
+    constraint[on] = np.asarray(luto_solver.cols.attrs['options'], dtype=object)[T['am_idx'].values[rows][on]]   # the renewable type (its region is the state)
 
     shadow_price = pi * 1e6 / scale
     shadow_price_AUD = pi * 1e6 * rhs

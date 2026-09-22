@@ -30,6 +30,7 @@ import re
 import time
 import threading
 import joblib
+import numpy as np
 
 from contextlib import contextmanager
 from pathlib import Path
@@ -38,7 +39,7 @@ from gurobipy import GRB
 from luto import settings
 from luto.data import Data
 from luto.solvers.col_builder import get_cols
-from luto.solvers.row_inputs import get_economics, get_row_inputs
+from luto.solvers.row_inputs import RowInputs, get_economics, get_row_inputs
 from luto.solvers.row_builder import get_rows, get_obj
 from luto.solvers.row_bounds import STATUS, drop_redundant_rows, get_row_bounds, report_row_bounds
 from luto.solvers.solver import LutoSolver
@@ -239,15 +240,19 @@ def solve_timeseries(
         print( "-------------------------------------------------\n", flush=True)
 
         start_time = time.time()
-        cols, col_support = get_cols(data, base_year)                                          # the unknowns: the column table, and what the row side reads beside it
+
+        # ── the columns: the unknowns ──
+        cols, col_support = get_cols(data, base_year)                                       # the column table, and what the row side reads beside it
+
+        # ── the rows: the constraints ──
         inputs = get_row_inputs(data, base_year, target_year)                               # the coefficient streams and targets
-        cols['obj'] = get_obj(get_economics(data, base_year, target_year), cols, col_support)  # the objective coefficient of every column; the economy streams (~300 MB at RES5) die with the call
-        A, rows = get_rows(inputs, cols, col_support)                                          # the constraints: the matrix, and the row table on the same rows
-        col_support.cell2col = col_support.ag_mrj2col = col_support.nonag_rk2col = None              # read by get_rows only: freed before the solve (GBs at RES1), the masks and the region pair stay for post_solve
+        A, rows = get_rows(inputs, cols, col_support)                                       # the matrix, and the row table on the same rows
+        col_support.cell2col = col_support.ag_mrj2col = col_support.nonag_rk2col = None     # read by get_rows only: freed before the solve (GBs at RES1), the masks and the region pair stay for post_solve
+
+        # ── the pre-solve diagnosis: bound propagation over the rows ──
         bounds = get_row_bounds(A, rows, cols)                                              # every row's interval over the column box, and its verdict
         drop_redundant_rows(rows, bounds, settings.BOUND_PROP_DROP_FAMILIES)                # opt-in per family: rows every point of the box satisfies never reach the solver
         report_row_bounds(rows, bounds, target_year, f"{data.path}/out_{target_year}")      # the log table, bound_report_<year>.csv, bound_preflight_<year>.csv
-
         n_impossible = int(((bounds['status'].values == STATUS.index('impossible')) | (bounds['status_implied'].values == STATUS.index('impossible'))).sum())
         if n_impossible and settings.BOUND_PROP_ON_IMPOSSIBLE == 'stop':
             print('!' * 100, flush=True)
@@ -257,7 +262,10 @@ def solve_timeseries(
             break
         data.last_year = target_year
 
-        luto_solver = LutoSolver(cols, rows, A)                                             # A x T
+        # ── the objective: the coefficient of every column ──
+        obj = get_obj(get_economics(data, base_year, target_year), cols, col_support)       # million AUD; the economy streams (~300 MB at RES5, ~7 GB at RES1) die with the call
+
+        luto_solver = LutoSolver(cols, rows, A, obj)                                        # A x T, obj · x
         luto_solver.formulate()
 
         # Save the model to disk BEFORE solving (see save_model_to_disk for why).
@@ -265,9 +273,9 @@ def solve_timeseries(
         accepted, x, status = solve_with_retries(luto_solver, target_year)
 
         if accepted:
-            solution = post_solve(x, cols, col_support, A, rows, inputs)                       # the LUTO 1-D format
-            store_solution(data, target_year, solution, luto_solver.gurobi_model.ObjVal)
-            record_shadow_prices(luto_solver, inputs, target_year, f"{data.path}/out_{target_year}")
+            solution = post_solve(x, cols, col_support, inputs)                                # the LUTO 1-D format
+            store_solution(data, target_year, solution, luto_solver.gurobi_model.ObjVal, inputs)
+            record_shadow_prices(luto_solver, target_year, f"{data.path}/out_{target_year}")
             if checkpoint_path is not None:
                 save_checkpoint(data, checkpoint_path, target_year)
 
@@ -282,41 +290,33 @@ def solve_timeseries(
 
 
 def solve_with_retries(luto_solver: LutoSolver, target_year: int):
-    """Run the RETRY_PARAMS ladder against the current model. Returns (accepted, x, status).
+    """Run the RETRY_PARAMS ladder against the current model. Returns (accepted, x, status) — x the raw solution
+    vector over the column table (None when the solve left no solution).
 
     settings.RETRY_PARAMS is a list of (NumericFocus, Method, Crossover, Presolve,
     BarHomogeneous) tuples tried in order; only GRB.OPTIMAL is accepted.
     """
-    accepted, x, status = False, None, None
-    for params in settings.RETRY_PARAMS:
-        accepted, x, status = solve_attempt(luto_solver, target_year, *params)
-        if accepted:
-            break
-    return accepted, x, status
+    x, status = None, None
+    for nf, method, crossover, presolve, barhomogenous in settings.RETRY_PARAMS:
+        print(f"Trying NumericFocus={nf}, Method={method}, Crossover={crossover}, Presolve={presolve}, BarHomogeneous={barhomogenous} for year {target_year}...", flush=True)
+        luto_solver.gurobi_model.Params.NumericFocus    = nf
+        luto_solver.gurobi_model.Params.Method          = method
+        luto_solver.gurobi_model.Params.Crossover       = crossover
+        luto_solver.gurobi_model.Params.Presolve        = presolve
+        luto_solver.gurobi_model.Params.BarHomogeneous  = barhomogenous
 
-
-def solve_attempt(luto_solver, target_year, nf, method, crossover, presolve, barhomogenous):
-    """One RETRY_PARAMS attempt against the current model. Returns (accepted, x, status) — x the raw
-    solution vector over the column table (None when the solve left no solution)."""
-    print(f"Trying NumericFocus={nf}, Method={method}, Crossover={crossover}, Presolve={presolve}, BarHomogeneous={barhomogenous} for year {target_year}...", flush=True)
-    luto_solver.gurobi_model.Params.NumericFocus    = nf
-    luto_solver.gurobi_model.Params.Method          = method
-    luto_solver.gurobi_model.Params.Crossover       = crossover
-    luto_solver.gurobi_model.Params.Presolve        = presolve
-    luto_solver.gurobi_model.Params.BarHomogeneous  = barhomogenous
-
-    x = luto_solver.solve()
-    status = luto_solver.gurobi_model.Status
-    if x is not None and status == GRB.OPTIMAL:
-        print(f"Optimal solution found with NumericFocus={nf}, Method={method}", flush=True)
-        return True, x, status
-
-    print(f"Non-optimal status {status} with NumericFocus={nf}, Method={method}; retrying with next attempt if available.", flush=True)
+        x = luto_solver.solve()
+        status = luto_solver.gurobi_model.Status
+        if x is not None and status == GRB.OPTIMAL:
+            print(f"Optimal solution found with NumericFocus={nf}, Method={method}", flush=True)
+            return True, x, status
+        print(f"Non-optimal status {status} with NumericFocus={nf}, Method={method}; retrying with next attempt if available.", flush=True)
     return False, x, status
 
 
-def store_solution(data: Data, target_year: int, solution, obj_val: float) -> None:
-    """Copy the accepted solution (the LUTO format, ``post_solve``) and the objective value into the Data singleton."""
+def store_solution(data: Data, target_year: int, solution, obj_val: float, inputs: RowInputs) -> None:
+    """Copy the accepted solution (the LUTO format, ``post_solve``) and the objective value into the Data singleton, and
+    put Production and GHG beside them — both computed from the stored dvars, every share counted."""
     data.add_lumap(target_year, solution.lumap)
     data.add_lmmap(target_year, solution.lmmap)
     data.add_ammaps(target_year, solution.ammaps)
@@ -328,8 +328,20 @@ def store_solution(data: Data, target_year: int, solution, obj_val: float) -> No
     data.add_ag_man_dvars(target_year, solution.ag_man_X_mrj)
     data.add_obj_vals(target_year, obj_val)
 
-    for data_type, prod_data in solution.prod_data.items():
-        data.add_production_data(target_year, data_type, prod_data)
+    # GHG from the stored dvars and the step's own GHG inputs: Σ ghg · share over the ag, ag-mgt and non-ag land, the
+    # transition emissions on the ag → ag flows, plus the off-land constant — what the GHG row summed, in float64 over
+    # every share (the row's contract dropped its sub-floor coefficients; the two agree to that and float32)
+    def dot(g, x):
+        g = np.nan_to_num(g) if np.isnan(g).any() else g                                    # a NaN coefficient is no emission (the row dropped it)
+        return float(np.einsum('...,...->', g, x, dtype=np.float64))
+    ghg = dot(inputs.ag_g_mrj, solution.ag_X_mrj) + dot(inputs.non_ag_g_rk, solution.non_ag_X_rk)
+    for am, g in inputs.ag_man_g_mrj.items():                                               # [m, r, j_idx] against the option's land uses
+        for j_idx, j in enumerate(inputs.agman2lu[am]):
+            ghg += dot(g[:, :, j_idx], solution.ag_man_X_mrj[am][:, :, j])
+    for src, g in inputs.trans_ghg_ag2ag.items():                                           # [to_m, local_r, to_j], as the flows are keyed
+        ghg += dot(g, solution.dvar_D_ag2ag_mrj[src])
+    ghg += float(np.asarray(inputs.offland_ghg).ravel()[0])
+    data.add_production_data(target_year, 'GHG', ghg)
 
     # Production from the stored dvars, the way the base year's is (data.py, at load): t / KL per commodity — every share
     # counted (threshold 0: the map clean-up that drops a cell's slivers under 1 % would leave the total 0.1–0.8 % under

@@ -306,9 +306,7 @@ def drop_redundant_rows(rows: xr.Dataset, bounds: xr.Dataset, families) -> np.nd
     redundant = bounds['status'].values == STATUS.index('redundant')
     hit = np.zeros(rows.sizes['row'], dtype=bool)
     for family in families:
-        span = rows.attrs['family_range'].get(family)
-        if span is not None:
-            hit[span] = redundant[span]
+        hit |= redundant & (rows['family'].values == family)
     rows['active'] = (('row',), rows['active'].values & ~hit)
     rows['redundant'] = (('row',), rows['redundant'].values | hit)
     return np.flatnonzero(hit)
@@ -340,12 +338,14 @@ def report_row_bounds(rows: xr.Dataset, bounds: xr.Dataset, target_year: int, ou
     print(f"│   ├── Bound propagation (rel tol {settings.BOUND_PROP_REL_TOL:g}): {status.size:,} rows; the verdict over the box, "
           f"then impossible / tight under the bounds the rows imply")
     print(f"│   │   {'family':<30s} {'rows':>10s} " + ' '.join(f'{name:>14s}' for name in STATUS) + f" {'dropped':>9s} {'imp·implied':>12s} {'tight·implied':>14s}")
-    for family, span in rows.attrs['family_range'].items():
-        counts = np.bincount(status[span], minlength=len(STATUS))
-        n_dropped = int(rows['redundant'].values[span].sum())
-        n_imp = int((status_implied[span] == IMPOSSIBLE).sum())
-        n_tight = int((status_implied[span] == TIGHT).sum())
-        print(f"│   │   {family:<30s} {span.stop - span.start:>10,} " + ' '.join(f'{count:>14,}' for count in counts) + f" {n_dropped:>9,} {n_imp:>12,} {n_tight:>14,}")
+    family = rows['family'].values
+    for name in pd.unique(family):                                                          # the families, in table order
+        on = family == name
+        counts = np.bincount(status[on], minlength=len(STATUS))
+        n_dropped = int(rows['redundant'].values[on].sum())
+        n_imp = int((status_implied[on] == IMPOSSIBLE).sum())
+        n_tight = int((status_implied[on] == TIGHT).sum())
+        print(f"│   │   {name:<30s} {int(on.sum()):>10,} " + ' '.join(f'{count:>14,}' for count in counts) + f" {n_dropped:>9,} {n_imp:>12,} {n_tight:>14,}")
     conservation = bounds.attrs['conservation']
     print(f"│   │   conservation: the node-balance rows of {conservation['unit']:,} of {conservation['cells']:,} cells sum to Σ X = Σ base (the row that bounds a cell's columns together)")
     for block, counts in bounds.attrs['preflight'].items():
@@ -354,22 +354,19 @@ def report_row_bounds(rows: xr.Dataset, bounds: xr.Dataset, target_year: int, ou
             print(f"│   │   columns of {block}: " + ', '.join(f'{count:,} {what}' for what, count in hits.items()))
     impossible = np.flatnonzero((status == IMPOSSIBLE) | (status_implied == IMPOSSIBLE))
     for r in impossible:
-        family = row_table.decode(rows, 'family', [r])[0]
         scale = rows['scale'].values[r]
-        print(f"│   │   IMPOSSIBLE {rows['name'].values[r]}: short by {-best[r] * scale:,.6g} {UNIT.get(family, 'share')} "
+        print(f"│   │   IMPOSSIBLE {rows['name'].values[r]}: short by {-best[r] * scale:,.6g} {UNIT.get(family[r], 'share')} "
               f"(rhs {rhs[r] * scale:,.6g}; reachable [{lo_implied[r] * scale:,.6g}, {hi_implied[r] * scale:,.6g}] under the implied bounds, "
               f"[{lo[r] * scale:,.6g}, {hi[r] * scale:,.6g}] over the box)")
 
     # ── bound_report_<year>.csv: every redundant and impossible row, and the tight rows of the families with a physical
     #    unit — a structural row that pins its columns at a bound (a disabled land use's inflow guard, an adoption
     #    limit of 0) is tight by construction: counted above, not listed ──
-    policy = np.zeros(status.size, dtype=bool)
-    for family, span in rows.attrs['family_range'].items():
-        policy[span] = family in UNIT
+    policy = np.isin(family, list(UNIT))                                                   # the families with a physical unit
     listed = np.flatnonzero((status == REDUNDANT) | (status == IMPOSSIBLE) | (status_implied == IMPOSSIBLE)
                             | (((status == TIGHT) | (status_implied == TIGHT)) & policy))
     scale = rows['scale'].values[listed]
-    family = row_table.decode(rows, 'family', listed)
+    family = family[listed]
     report = pd.DataFrame(dict(
         year=target_year,
         family=family,
@@ -388,8 +385,8 @@ def report_row_bounds(rows: xr.Dataset, bounds: xr.Dataset, target_year: int, ou
         unit=[UNIT.get(f, 'share') for f in family],
         empty=bounds['empty'].values[listed],
         dropped=rows['redundant'].values[listed]))
-    for field in ('region', 'item', 'presence', 'bound', 'state', 'commodity', 'am_idx'):
-        report[field] = row_table.decode(rows, field, listed)
+    for field in ('region', 'GBF_target', 'GBF4_presence', 'demand_commodity', 'demand_bound', 'am_idx'):
+        report[field] = rows[field].values[listed]
     os.makedirs(out_dir, exist_ok=True)
     report.to_csv(f"{out_dir}/bound_report_{target_year}.csv", index=False)
 

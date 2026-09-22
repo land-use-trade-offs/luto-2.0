@@ -23,6 +23,7 @@ The Gurobi model of one step: A x T — the row table over the column table, and
 """
 
 import numpy as np
+import pandas as pd
 import gurobipy as gp
 import xarray as xr
 import luto.settings as settings
@@ -44,12 +45,13 @@ gurenv.start()
 
 
 class LutoSolver:
-    """The Gurobi model of one step, returns the raw x."""
+    """The Gurobi model of one step — the column table, the row table, A and obj — returns the raw x."""
 
-    def __init__(self, cols: xr.Dataset, rows: xr.Dataset, A):
+    def __init__(self, cols: xr.Dataset, rows: xr.Dataset, A, obj: np.ndarray):
         self.cols = cols
         self.rows = rows
         self.A = A                      # (row x n_all) scipy CSR: row i of A is row i of the row table
+        self.obj = obj                  # (n_all,) the objective coefficient of every column (million AUD, row_builder.get_obj)
         self.gurobi_model = gp.Model(f"LUTO {settings.VERSION}", env=gurenv)
         self.x = None                           # ONE MVar over the column table: every column, in Var.index order
         self._vars = None                       # model.getVars() in Var.index order (materialised once, for addMConstr)
@@ -112,16 +114,18 @@ class LutoSolver:
         handles = np.full(T.sizes['row'], None, dtype=object)
         handles[built] = constrs
         T['constr'] = (('row',), handles)
-        for family, span in T.attrs['family_range'].items():
-            n_rows  = span.stop - span.start
-            n_built = int(active[span].sum())
-            print(f"│   │   {family}: {n_built:,} row(s)" + (f", {n_rows - n_built:,} dropped before the build" if n_built < n_rows else ""))
+        family = T['family'].values
+        for name in pd.unique(family):                                       # the families, in table order
+            on = family == name
+            n_rows  = int(on.sum())
+            n_built = int((on & active).sum())
+            print(f"│   │   {name}: {n_built:,} row(s)" + (f", {n_rows - n_built:,} dropped before the build" if n_built < n_rows else ""))
 
     def _setup_objective(self):
-        """Objective obj · x: the coefficient of every column as the column table carries it
-        (``row_builder.get_obj``: million AUD, dropped and floored — the coefficient contract is done there)."""
+        """Objective obj · x: the coefficient of every column as given (``row_builder.get_obj``: million AUD,
+        dropped and floored — the coefficient contract is done there)."""
         print(f"├── Setting up the objective function to {settings.OBJECTIVE}...")
-        obj = self.cols['obj'].values
+        obj = self.obj
         sense = {"mincost": GRB.MINIMIZE, "maxprofit": GRB.MAXIMIZE}.get(settings.OBJECTIVE)
         if sense is None:
             raise ValueError(f"Unknown objective: {settings.OBJECTIVE}")

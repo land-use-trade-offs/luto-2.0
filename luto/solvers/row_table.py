@@ -25,18 +25,19 @@ from scipy import sparse
 
 # ═══════════════════════════ the row table: how the rows are stored, and how they are asked ═══════════════════════════
 
-FAMILIES = ('demand', 'ghg', 'GBF2', 'GBF3_NVIS', 'GBF4_SNES', 'GBF4_ECNES', 'GBF8', 'ag_mgt_adoption',
-            'regional_adoption_ag', 'regional_adoption_nonag', 'regional_adoption_nonag_sum', 'water', 'renewable',
-            'ag_mgt_link', 'renewable_ceiling', 'source_cap_ag', 'source_cap_nonag',
-            'node_balance_ag', 'node_balance_nonag')
-ROW_FIELDS_INT = ('cell', 'm', 'j', 'k', 'am_idx', 'from_m', 'from_j', 'from_k', 'local_r', 'commodity')
-ROW_FIELDS_CODED = ('region', 'item', 'presence', 'bound', 'state')
-
-
-# what ``xr.concat`` needs to stack the families' tables as they are (``get_rows``): an empty table carrying every field
-# at its dtype, so a field no family carries this step is still there, and the fill of a field a family does not carry
+# The ONE declaration of the row table: every field at its dtype, as an empty table. ``get_rows`` stacks the families'
+# tables onto it (``xr.concat``), so a field no family carries this step is still there; a family passes only the
+# labels it has (``make_part``), and the rest is filled — -1 on an int field, None on a label. The ints: ``cell`` (every
+# row of a per-cell family), ``m, j, k`` (the (lm, lu) / non-ag lu the row is about), ``am_idx`` (the ag-mgt option),
+# ``from_m, from_j, from_k, local_r`` (a source cap's source). The labels, as they are (one shared str per row):
+# ``family`` (the family's name: nothing on the table is a code, and it carries no index — a family's rows are the mask
+# ``rows['family'].values == name``), ``region`` (the region a GBF / regional-cap / water / renewable row is about),
+# ``GBF_target`` (the vegetation group / species / community a GBF3 / GBF4 / GBF8 row targets), ``GBF4_presence``,
+# ``demand_commodity`` and ``demand_bound`` (eq / lower / upper).
 ROW_SCHEMA = xr.Dataset(dict(
-    **{field: (('row',), np.empty(0, dtype=np.int32)) for field in ('family', *ROW_FIELDS_INT, *ROW_FIELDS_CODED)},
+    family=(('row',), np.empty(0, dtype=object)),
+    **{field: (('row',), np.empty(0, dtype=np.int32)) for field in ('cell', 'm', 'j', 'k', 'am_idx', 'from_m', 'from_j', 'from_k', 'local_r')},
+    **{field: (('row',), np.empty(0, dtype=object)) for field in ('region', 'GBF_target', 'GBF4_presence', 'demand_commodity', 'demand_bound')},
     rhs=(('row',), np.empty(0, dtype=np.float64)),
     sense=(('row',), np.empty(0, dtype=object)),
     name=(('row',), np.empty(0, dtype=object)),
@@ -44,72 +45,39 @@ ROW_SCHEMA = xr.Dataset(dict(
     active=(('row',), np.empty(0, dtype=bool)),
     redundant=(('row',), np.empty(0, dtype=bool))))
 
-ROW_FILL = {field: -1 for field in (*ROW_FIELDS_INT, *ROW_FIELDS_CODED)}
-
+ROW_FILL = {field: None if var.dtype == object else -1 for field, var in ROW_SCHEMA.data_vars.items()}   # what a family does not carry (only the labels and ints are ever missing)
 
 
 def make_part(family: str, A: sparse.csr_matrix, rhs, sense, names, scale=None, **labels) -> tuple[sparse.csr_matrix, xr.Dataset]:
     """One family's rows, as the pair (A, table)"""
 
     n_rows = A.shape[0]
-    unknown = set(labels) - set(ROW_FIELDS_INT) - set(ROW_FIELDS_CODED)
+    unknown = set(labels) - set(ROW_SCHEMA.data_vars)
     assert not unknown, f'{family}: label field(s) {unknown} are not in the row schema'
 
-    fields = {}
-    vocab = {}
-    for field, values in labels.items():
-        if field in ROW_FIELDS_CODED:                                                     # labels -> codes, the map kept beside them
-            code_of = {}
-            values = [code_of.setdefault(label, len(code_of)) for label in values]
-            vocab[field] = list(code_of)
-        fields[field] = (('row',), np.asarray(values, dtype=np.int32))
+    fields = {field: (('row',), np.asarray(values, dtype=ROW_SCHEMA[field].dtype)) for field, values in labels.items()}
 
     sense = np.full(n_rows, sense, dtype=object) if isinstance(sense, str) else np.asarray(sense, dtype=object)
 
     table = xr.Dataset(
-        dict(family=(('row',), np.full(n_rows, FAMILIES.index(family), dtype=np.int32)),
+        dict(family=(('row',), np.full(n_rows, family, dtype=object)),
              **fields,
              rhs=(('row',), np.asarray(rhs, dtype=np.float64)),
              sense=(('row',), sense),
              name=(('row',), np.asarray(names, dtype=object)),
              scale=(('row',), np.ones(n_rows, dtype=np.float64) if scale is None else np.asarray(scale, dtype=np.float64)),
              active=(('row',), np.ones(n_rows, dtype=bool)),
-             redundant=(('row',), np.zeros(n_rows, dtype=bool))),
-        attrs={f'vocab_{family}': vocab} if vocab else {})
+             redundant=(('row',), np.zeros(n_rows, dtype=bool))))
 
     return A, table
 
 
 # ── the queries: how the rest of the model asks the table what it holds ──────────────────────────
 
-def decode(table: xr.Dataset, field: str, rows=None) -> np.ndarray:
-    """A field's values at ``rows`` (a slice / mask / index array; every row by default) as labels: ``family`` through
-    ``FAMILIES``, a coded field through the map of each row's own family (None where -1), an int field as it is."""
-    rows = slice(None) if rows is None else rows
-    values = table[field].values[rows]
-    if field == 'family':
-        return np.array(FAMILIES, dtype=object)[values]
-    if field not in ROW_FIELDS_CODED:
-        return values
-    family = table['family'].values[rows]
-    labels = np.full(values.shape, None, dtype=object)
-    for code in np.unique(family):                                                        # the codes are local to a family: one lookup per family present
-        vocab = table.attrs.get(f'vocab_{FAMILIES[code]}', {}).get(field)
-        if vocab is not None:
-            on = (family == code) & (values >= 0)
-            labels[on] = np.array(vocab, dtype=object)[values[on]]
-    return labels
-
-
 def rows_where(table: xr.Dataset, **fields) -> np.ndarray:
-    """A boolean mask over the table: the rows whose fields carry the given labels (``family='GBF8', region='AUSTRALIA'``);
-    a coded field's label is looked up in the map of the ``family`` given with it."""
+    """A boolean mask over the table: the rows whose fields carry the given values (``family='GBF8', region='AUSTRALIA'``).
+    Nothing on the table is a code and it carries no index: a family's rows are ``table['family'].values == name``."""
     mask = np.ones(table.sizes['row'], dtype=bool)
-    for field, label in fields.items():
-        if field == 'family':
-            label = FAMILIES.index(label)
-        elif field in ROW_FIELDS_CODED:
-            vocab = table.attrs.get(f"vocab_{fields['family']}", {}).get(field, [])       # a coded field needs its family: the codes are local to it
-            label = vocab.index(label) if label in vocab else -2                          # a label the family has never seen matches no row
-        mask &= table[field].values == label
+    for field, value in fields.items():
+        mask &= table[field].values == value
     return mask
