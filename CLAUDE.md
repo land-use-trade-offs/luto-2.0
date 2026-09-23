@@ -212,7 +212,7 @@ Every constraint is hard: there are no soft / penalised options (the `*_CONSTRAI
   - `GBF4_TARGET_ECNES`: Ecological Community NES targets (same semantics with `GBF4_ECNES_TARGETS_DICT` / `GBF4_ECNES_SEL_REGION_TARGETS`)
   - `GBF3_NVIS_TARGET` also accepts 'SPECIFIED' with `GBF3_NVIS_SEL_REGION_TARGETS` as `{region: {year: pct}}`
   - `GBF4_SNES_MIN_AREA_HA` / `GBF4_ECNES_MIN_AREA_HA` / `GBF3_NVIS_MIN_AREA_HA` (100): every (region, item) whose `IN_LUTO_HA` is below the threshold is dropped in `data.py` (LHS ≈ 0 → structurally infeasible). These replaced the hand-written `GBF4_SNES_EXCLUDE_REGION_SPECIES` / `GBF4_ECNES_EXCLUDE_REGION_COMMUNITIES` / `GBF3_NVIS_EXCLUDE_REGION_GROUPS` lists (removed 2026-08-26)
-  - `GBF8_TARGET`: Species conservation targets ('off', 'medium', 'high', or 'USER_DEFINED'; levels apply uniform presets from `GBF8_TARGETS_DICT` to ALL ~10.6k species; 'USER_DEFINED' = former 'on', reads hand-filled USER_DEFINED_TARGET_PERCENT_* CSV columns)
+  - `GBF8_TARGET`: Species conservation targets ('off', 'medium', 'high', or 'CSV_DEFINED'; levels apply uniform presets from `GBF8_TARGETS_DICT` to ALL ~10.6k species; 'CSV_DEFINED' (the former 'on') reads the hand-filled USER_DEFINED_TARGET_PERCENT_* CSV columns)
 
 ### Renewable Energy Settings
 

@@ -286,7 +286,7 @@ settings.GBF3_NVIS_TARGET = 'off'                       # 'off', 'medium', 'high
 settings.GBF3_NVIS_REGION_MODE = 'NRM'                  # 'AUSTRALIA', 'NRM', or 'IBRA_REG'
 settings.GBF4_TARGET_SNES = 'off'                       # 'off', 'medium', 'high', 'SPECIFIED', or 'CSV_DEFINED'
 settings.GBF4_TARGET_ECNES = 'off'                      # 'off', 'medium', 'high', 'SPECIFIED', or 'CSV_DEFINED'
-settings.GBF8_TARGET = 'off'                            # 'off', 'medium', 'high', or 'USER_DEFINED'
+settings.GBF8_TARGET = 'off'                            # 'off', 'medium', 'high', or 'CSV_DEFINED'
 
 settings.DYNAMIC_PRICE = True                           # Demand elasticity-based dynamic pricing
 
@@ -375,12 +375,12 @@ LUTO2 behavior can be customized through the `luto.settings` module. Key paramet
   - Must match available ages in NetCDF input data
   - Default: 60 years (based on S-curve carbon accumulation pattern)
 - `GBF2_TARGET`: Global Biodiversity Framework Target 2 ('off', 'low', 'medium', 'high')
-- `GBF3_NVIS_TARGET`: Conservation targets for vegetation groups ('off', 'medium', 'high', 'USER_DEFINED')
+- `GBF3_NVIS_TARGET`: Conservation targets for vegetation groups ('off', 'medium', 'high', 'SPECIFIED', or 'CSV_DEFINED')
 - `GBF3_NVIS_REGION_MODE`: Spatial framing of the GBF3 targets — 'AUSTRALIA', 'NRM', or 'IBRA_REG'. IBRA bioregion targets are served by this mode; there is no separate IBRA setting
-- `GBF4_TARGET_SNES`: Species of National Environmental Significance ('off', 'USER_DEFINED', or 'dict')
-- `GBF4_TARGET_ECNES`: Ecological Communities of National Environmental Significance ('off', 'USER_DEFINED', or 'dict')
+- `GBF4_TARGET_SNES`: Species of National Environmental Significance ('off', 'medium', 'high', 'SPECIFIED', or 'CSV_DEFINED')
+- `GBF4_TARGET_ECNES`: Ecological Communities of National Environmental Significance ('off', 'medium', 'high', 'SPECIFIED', or 'CSV_DEFINED')
 - `GBF4_SNES_TARGETS_OVERRIDE` / `GBF4_SNES_CAP_MARGIN`: Per-species target overrides, and the safety margin subtracted from each species' attainable level to keep a feasibility buffer
-- `GBF8_TARGET`: Species and group targets ('on' or 'off')
+- `GBF8_TARGET`: Species climate-suitability targets ('off', 'medium', 'high', or 'CSV_DEFINED')
 
 ### Renewable Energy Constraints
 - `RENEWABLES_OPTIONS`: Dict of renewable energy types and whether each is enabled (e.g., `{'Utility Solar PV': True, 'Onshore Wind': True}`). Set values to `False` to disable individual types.

@@ -98,7 +98,7 @@ Every constraint is hard: there are no soft / penalised options.
   - `GBF4_TARGET_ECNES`: Ecological Community NES targets ('off', 'medium', 'high', 'SPECIFIED', or 'CSV_DEFINED')
   - `GBF4_SNES_TARGETS_OVERRIDE`: dict letting a few species carry a different target from the rest (empty = no override)
   - `GBF4_SNES_CAP_MARGIN`: safety margin (percentage points, default 2.0) subtracted from each species' `ATTAINABLE_LEVEL` when clamping an interpolated SNES target, to keep a feasibility buffer (effective cap = `ATTAINABLE_LEVEL - GBF4_SNES_CAP_MARGIN`)
-  - `GBF8_TARGET`: Species conservation targets ('on' or 'off')
+  - `GBF8_TARGET`: Species conservation targets ('off', 'medium', 'high', or 'CSV_DEFINED')
 
 ### Renewable Energy Settings
 - `RENEWABLES_OPTIONS`: Dict controlling which renewable energy types are enabled, e.g. `{'Utility Solar PV': True, 'Onshore Wind': True}`. Set values to `False` to disable individual types. Also drives the corresponding `AG_MANAGEMENTS` entries.
