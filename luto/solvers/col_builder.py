@@ -419,6 +419,6 @@ def cell_regions(data: Data) -> xr.Dataset:
     return xr.Dataset(
         dict(state        =(('cell',), np.array([state_of_code.get(code) for code in np.asarray(data.REGION_STATE_CODE).tolist()], dtype=object)),
              nrm          =(('cell',), np.asarray(data.REGION_NRM_NAME, dtype=object)),
-             water_region =(('cell',), np.asarray(data.WATER_REGION_ID).astype(np.int32)),
+             water_region =(('cell',), np.array([data.WATER_REGION_NAMES.get(region_id) for region_id in np.asarray(data.WATER_REGION_ID).tolist()], dtype=object)),
              **ibra),
     )

@@ -660,7 +660,8 @@ def get_water(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
     print("│   ├── Adding constraints for water usage limits...")
     n_col = cols.sizes['col']
     coeff = gather(cols, inputs, inputs.ag_w_mrj, inputs.ag_man_w_mrj, inputs.non_ag_w_rk)
-    region_of_col = support.region2cell['water_region'].values[cols['cell'].values]   # the water region of every column: its cell's
+    region_of_cell = support.region2cell['water_region'].values             # the water region of every cell
+    cell = cols['cell'].values
     row_idx = []
     col_idx = []
     vals = []
@@ -671,7 +672,7 @@ def get_water(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
     for region_id, water_limit_raw in inputs.limits["water"].items():
         region_name = inputs.water_region_names[region_id]
         region_names.append(region_name)
-        on = (region_of_col == region_id) & (coeff != 0)                                  # the region's columns with a net yield
+        on = (region_of_cell == region_name)[cell] & (coeff != 0)                        # the region's columns (those in its cells) with a net yield
         row_idx.append(np.full(int(on.sum()), len(names)))
         col_idx.append(np.flatnonzero(on))
         vals.append(coeff[on])
@@ -707,8 +708,8 @@ def get_renewable(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
     cell         = cols['cell'].values
     j            = cols['j'].values
     am_idx       = cols['am_idx'].values
-    state_of_col = support.region2cell['state'].values[cell]             # the state of every column: its cell's
-    states       = sorted(set(support.region2cell['state'].values) - {None, 'Australian Capital Territory'})   # the states the rows are written for, by name; ACT folded into NSW below
+    state_of_cell = support.region2cell['state'].values                  # the state of every cell
+    states       = sorted(set(state_of_cell) - {None, 'Australian Capital Territory'})   # the states the rows are written for, by name; ACT folded into NSW below
     in_ag        = cols['block'].values == 'ag'
 
     # ── per type: its columns' yield, and the columns the exclusion masks keep out ──
@@ -733,9 +734,9 @@ def get_renewable(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
     key_am = []
     key_state = []
     for state_name in states:
-        in_state = state_of_col == state_name
+        in_state = (state_of_cell == state_name)[cell]                   # the state's columns: those in its cells
         if state_name == 'New South Wales':                              # ACT counts toward the NSW+ACT target
-            in_state |= state_of_col == 'Australian Capital Territory'
+            in_state |= (state_of_cell == 'Australian Capital Territory')[cell]
         print(f"│   │   ├── Adding renewable energy constraints for {state_name} ...")
         for am in re_types:
             target_raw = inputs.limits[f"renewable_{am}"][state_name]

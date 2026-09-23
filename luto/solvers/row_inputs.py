@@ -81,7 +81,7 @@ class RowInputs:
     exist_renewable_solar_r: np.ndarray                                 # existing solar capacity converted to annual MWh per cell
     exist_renewable_wind_r: np.ndarray                                  # existing wind capacity converted to annual MWh per cell
 
-    water_region_names: dict[int, str]                                  # {region id: name} — the water regions with a target (the id labels the cells on col_support.region2cell)
+    water_region_names: dict[int, str]                                  # {region id: name} — the water regions with a target (the name labels the cells on col_support.region2cell)
 
     biodiv_contr_ag_j: np.ndarray                                       # biodiversity contribution scale per agricultural land use (j)
     biodiv_contr_non_ag_k: dict[int, float]                             # biodiversity contribution scale per non-agricultural land use (k)
