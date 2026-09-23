@@ -11,22 +11,27 @@ area) and numerical breakdown (ill-conditioned coefficient rows).
 
 - A run fails with `GRB.NUMERIC` or `GRB.INFEASIBLE` at a specific year and GBF4
   SNES or ECNES constraints are active
-- You want to identify which species to add to `GBF4_SNES_EXCLUDE_REGION_SPECIES`
-  or `GBF4_ECNES_EXCLUDE_REGION_COMMUNITIES`
-- Applies to any `USER_DEFINED` or NRM-mode SNES/ECNES run
+- You want to identify which species are physically unachievable (note: since 2026-08-26 there are no
+  hand-written exclusion lists — `GBF4_SNES_MIN_AREA_HA` / `GBF4_ECNES_MIN_AREA_HA` drop pairs with
+  `IN_LUTO_HA` below 100 ha automatically; an unachievable species above that threshold is handled by
+  lowering its level via `GBF4_*_TARGETS_OVERRIDE` or the drop-unreachable flow, not by an exclusion list)
+- Applies to any `CSV_DEFINED` or NRM-mode SNES/ECNES run
 
 ## Key concept
 
 For each `(region, species/community, presence)` triplet:
 - Build the full model with GBF4 disabled (all other constraints: GHG, water, GBF2/3,
   land budget, renewables, etc. remain active)
-- Add **one** constraint: `sum(val_vector × dvar) >= lb_rescale`
+- Add **one** constraint: `sum(val_vector × dvar) >= lb_raw` (built as
+  `weight_rows([val_vector]) @ bio_S` — `bio_S` the biodiversity contribution laid on the
+  support, `row_builder.bio_contribution` — then `contract`ed, exactly as `get_GBF4_SNES` /
+  `get_GBF4_ECNES` build it)
 - Solve with barrier (15-min cap per worker)
 - Record: `status`, `tightness`, `coeff_ratio`, `n_cells`, solve time
 
-**Tightness** = `avail / lb_rescale` where `avail = val_vector[ind].sum()` (rescaled
-available area) and `lb_rescale = lb_raw / scale_factor`. Both are in rescaled solver
-space.
+**Tightness** = `avail / lb_raw` where `avail = val_vector[ind].sum()` (available area,
+ha). Both are raw: the layers and targets reach the solver unscaled, and the solver
+rescales each row at build time (`row_builder.contract` with `rescale=True`).
 - `tightness < 1` → structurally infeasible (available area < target even if every
   eligible cell is fully converted)
 - `tightness ≥ 1` but solver returns NUMERIC/TIME_LIMIT → numerically ill-conditioned
@@ -200,22 +205,15 @@ production archive only saved every other year), generate one from
 in `simulation.py`'s `solve_timeseries()`:
 
 ```python
-from luto.simulation import save_data_to_disk
+from luto.simulation import save_data_to_disk, store_solution
+from luto.solvers.post_solve import post_solve
 
-solution = solver.solve()   # NOT model.optimize() — solve() returns SolverSolution
+x = solver.solve()   # NOT model.optimize() — solve() returns the raw x over the column table
 
-if solution is not None and model.Status == GRB.OPTIMAL:
-    data.add_lumap(target_year, solution.lumap)
-    data.add_lmmap(target_year, solution.lmmap)
-    data.add_ammaps(target_year, solution.ammaps)
-    data.add_ag_dvars(target_year, solution.ag_X_mrj)
-    data.add_non_ag_dvars(target_year, solution.non_ag_X_rk)
-    data.add_ag_man_dvars(target_year, solution.ag_man_X_mrj)
-    data.add_obj_vals(target_year, solution.obj_val)
-    for data_type, prod_data in solution.prod_data.items():
-        data.add_production_data(target_year, data_type, prod_data)
-    data.last_year = target_year
-    save_data_to_disk(data, os.path.join(DATA_DIR, f"data_{target_year}.lz4"))
+if x is not None and model.Status == GRB.OPTIMAL:
+    solution = post_solve(x, cols, col_support, inputs)                      # the LUTO format
+    store_solution(data, target_year, solution, model.ObjVal, inputs)       # the dvars, maps, obj value, Production and GHG
+    save_data_to_disk(data, os.path.join(DATA_DIR, f"data_{target_year}.lz4"))   # not save_checkpoint: that deletes older checkpoints
 ```
 
 ### RETRY_PARAMS unpacking (5-tuples)
@@ -233,8 +231,9 @@ for attempt, (numeric_focus, method, crossover, presolve, bar_homogeneous) in en
     model.Params.Presolve       = presolve
     model.Params.BarHomogeneous = bar_homogeneous
 
-    solution = solver.solve()
+    x = solver.solve()
     if model.Status == GRB.OPTIMAL:
+        solution = post_solve(x, cols, col_support, inputs)
         break
     elif model.Status in (GRB.INFEASIBLE, GRB.INF_OR_UNBD):
         break  # don't burn remaining retries on a proven infeasibility
@@ -317,13 +316,15 @@ for attr in dir(run_settings):
     if not attr.startswith("_"):
         setattr(settings, attr, getattr(run_settings, attr))
 
-from luto.solvers.input_data import get_input_data
+from luto.solvers.col_builder import get_cols
+from luto.solvers.row_inputs import get_row_inputs
 
 print(f"Loading {CHECKPOINT} ...", flush=True)
 data = joblib.load(os.path.join(DATA_DIR, CHECKPOINT))
 
 print(f"Building input_data for {BASE_YEAR}→{TARGET_YEAR} ...", flush=True)
-input_data = get_input_data(data, BASE_YEAR, TARGET_YEAR)
+cols, col_support = get_cols(data, BASE_YEAR)
+input_data = get_row_inputs(data, BASE_YEAR, TARGET_YEAR)
 
 all_targets = []
 for region, species, presence in input_data.GBF4_SNES_region_species:
@@ -415,14 +416,18 @@ for attr in dir(run_settings):
     if not attr.startswith("_"):
         setattr(settings, attr, getattr(run_settings, attr))
 
-from luto.solvers.input_data import get_input_data
+from scipy import sparse
+from luto.solvers.col_builder import get_cols
+from luto.solvers.row_inputs import get_economics, get_row_inputs
+from luto.solvers.row_builder import bio_contribution, contract, get_obj, get_rows, weight_rows
 from luto.solvers.solver import LutoSolver
 
 print(f"[idx={idx}] Loading {CHECKPOINT} ...", flush=True)
 data = joblib.load(os.path.join(DATA_DIR, CHECKPOINT))
 
 print(f"[idx={idx}] Building input_data for {BASE_YEAR}→{TARGET_YEAR} ...", flush=True)
-input_data = get_input_data(data, BASE_YEAR, TARGET_YEAR)
+cols, col_support = get_cols(data, BASE_YEAR)
+input_data = get_row_inputs(data, BASE_YEAR, TARGET_YEAR)
 
 # Build flat targets list (GBF4 must be enabled in settings so triplets are populated)
 all_targets = []
@@ -442,12 +447,15 @@ if idx >= len(all_targets):
 typ, region, name, presence, lb_raw = all_targets[idx]
 print(f"[idx={idx}] Target: {typ}  {name} ({presence})  [{region}]  target={lb_raw:,.0f}", flush=True)
 
-# Build base model with GBF4 disabled
+# Build base model with GBF4 disabled (get_rows reads the setting at the call, so the GBF4 families
+# return no rows while input_data keeps the GBF4 layers and targets)
 settings.GBF4_TARGET_SNES  = "off"
 settings.GBF4_TARGET_ECNES = "off"
 
 print(f"[idx={idx}] Formulating base model ...", flush=True)
-solver = LutoSolver(input_data)
+A, rows = get_rows(input_data, cols, col_support)
+obj = get_obj(get_economics(data, BASE_YEAR, TARGET_YEAR), cols, input_data)
+solver = LutoSolver(cols, rows, A, obj, input_data)
 solver.formulate()
 model  = solver.gurobi_model
 
@@ -458,29 +466,23 @@ model.Params.BarConvTol   = 1e-4
 model.Params.TimeLimit    = 900     # 15-min cap per test
 model.Params.OutputFlag   = 1
 
-# Compute constraint row metrics
-reg_matrix = input_data.region_NRM_names_r
+# Compute constraint row metrics (raw units — the layers and targets reach the solver unscaled;
+# the solver rescales each ROW at build time and keeps the factor in bio_GBF4_*_scales)
+reg_matrix = col_support.region2cell['nrm'].values   # the NRM region of every cell, as get_GBF4_* reads it
 if typ == "SNES":
     val_matrix    = input_data.GBF4_SNES_pre_1750_area_sr
-    scale_factors = input_data.scale_factors["GBF4_SNES"]
-    val_vector    = val_matrix.sel(dict(layer=(name, presence)), drop=True).values
-    sf            = scale_factors.sel(dict(layer=(region, name, presence))).item()
 else:
     val_matrix    = input_data.GBF4_ECNES_pre_1750_area_sr
-    scale_factors = input_data.scale_factors["GBF4_ECNES"]
-    val_vector    = val_matrix.sel(dict(layer=(name, presence)), drop=True).values
-    sf            = scale_factors.sel(dict(layer=(region, name, presence))).item()
+val_vector = val_matrix.sel(dict(layer=(name, presence)), drop=True).values
 
-lb_rescale = lb_raw / sf
-
-if region == "Australia":
+if region == "AUSTRALIA":
     ind = np.where(val_vector > 0)[0]
 else:
     ind = np.intersect1d(np.where(val_vector > 0)[0], np.where(reg_matrix == region)[0])
 
 n_cells     = ind.size
 avail_ha    = float(val_vector[ind].sum()) if n_cells > 0 else 0.0
-tightness   = avail_ha / lb_rescale if lb_rescale > 0 else float("inf")  # <1 infeasible, ≥1 feasible
+tightness   = avail_ha / lb_raw if lb_raw > 0 else float("inf")  # <1 infeasible, ≥1 feasible
 bare_min    = float(val_vector[ind].min()) if n_cells > 0 else 0.0
 bare_max    = float(val_vector[ind].max()) if n_cells > 0 else 0.0
 coeff_ratio = bare_max / bare_min if bare_min > 0 else float("inf")  # ill-conditioning indicator
@@ -501,7 +503,7 @@ result = dict(
     idx=idx, type=typ, region=region, name=name, presence=presence,
     n_cells=n_cells, target_ha=lb_raw, avail_ha=avail_ha,
     tightness=tightness, bare_coeff_min=bare_min, bare_coeff_max=bare_max,
-    coeff_ratio=coeff_ratio, lb_rescale=lb_rescale, scale_factor=sf,
+    coeff_ratio=coeff_ratio,
     status=None, status_str=None, solve_s=None,
 )
 
@@ -513,10 +515,14 @@ else:
     if tightness < 1.0:
         print(f"[idx={idx}] WARNING: tightness < 1 ({tightness:.4f}) — target exceeds available area!", flush=True)
 
-    model.addConstr(
-        solver._build_biodiv_contr_expr(val_vector, ind) >= lb_rescale,
-        name=f"test_{typ}_{region}_{name}_{presence}".replace(" ", "_"),
-    )
+    # One row, built the way row_builder.get_GBF4_SNES / _ECNES builds it: the region-masked layer as a
+    # weight row over cells, times the biodiversity contribution laid on the support (bio_S), then
+    # row-rescaled with the target.
+    bio_S  = col_support.cell2col @ sparse.diags(bio_contribution(input_data, cols))
+    masked = val_vector if region == "AUSTRALIA" else np.where(reg_matrix == region, val_vector, 0)
+    row, rhs, _scale = contract(weight_rows([masked], input_data.ncells) @ bio_S, [lb_raw], rescale=True)
+    constr = model.addMConstr(row, solver.x, '>', rhs).tolist()
+    model.setAttr('ConstrName', constr, [f"test_{typ}_{region}_{name}_{presence}".replace(" ", "_")])
     model.update()
 
     print(f"[idx={idx}] Solving ...", flush=True)
@@ -560,7 +566,7 @@ fieldnames = [
     "idx", "type", "region", "name", "presence",
     "n_cells", "target_ha", "avail_ha", "tightness",
     "bare_coeff_min", "bare_coeff_max", "coeff_ratio",
-    "lb_rescale", "scale_factor", "status", "status_str", "solve_s",
+    "status", "status_str", "solve_s",
 ]
 with open(OUT_CSV, "w", newline="") as f:
     writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
@@ -591,14 +597,14 @@ if non_opt:
 
 ### Tightness formula
 
-`tightness = avail / lb_rescale` — **both in rescaled solver space**.
-`val_vector` comes from `input_data.GBF4_SNES_pre_1750_area_sr` which is already
-rescaled by `rescale_solver_input_data()`. Do **not** use `lb_raw / avail` — that
-mixes raw and rescaled units and gives inverted results.
+`tightness = avail / lb_raw` — both raw hectares. `val_vector` comes from
+`input_data.GBF4_SNES_pre_1750_area_sr`, which is unscaled (there is no input
+rescaling; the solver rescales each row at build time and keeps the factor in
+`solver.bio_GBF4_SNES_scales`). Do **not** use `lb_raw / avail` — that inverts the ratio.
 
 ### Exclusions not applied from checkpoints
 
-`GBF4_SNES_EXCLUDE_REGION_SPECIES` is filtered in `data.py` during `Data()` init.
+(Historical: `GBF4_SNES_EXCLUDE_REGION_SPECIES` was filtered in `data.py` during `Data()` init; replaced by the `*_MIN_AREA_HA` rule on 2026-08-26.)
 A saved `data_YYYY.lz4` checkpoint bypasses this. Apply post-load filtering when
 using checkpoints in diagnostic or retry scripts (see Step 5).
 
@@ -719,13 +725,15 @@ for attr in dir(run_settings):
     if not attr.startswith("_"):
         setattr(settings, attr, getattr(run_settings, attr))
 
-from luto.solvers.input_data import get_input_data
+from luto.solvers.col_builder import get_cols
+from luto.solvers.row_inputs import get_row_inputs
 
 print(f"Loading data_{BASE_YEAR}.lz4 ...", flush=True)
 data = joblib.load(os.path.join(DATA_DIR, f"data_{BASE_YEAR}.lz4"))
 
 print(f"Building input_data for {BASE_YEAR}->{TARGET_YEAR} ...", flush=True)
-input_data = get_input_data(data, BASE_YEAR, TARGET_YEAR)
+cols, col_support = get_cols(data, BASE_YEAR)
+input_data = get_row_inputs(data, BASE_YEAR, TARGET_YEAR)
 
 all_targets = []
 for region, species, presence in input_data.GBF4_SNES_region_species:

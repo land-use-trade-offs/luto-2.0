@@ -22,7 +22,6 @@ import pandas as pd
 import luto.settings as settings
 
 from luto.data import Data
-from luto import tools
 
 
 
@@ -111,7 +110,7 @@ def get_ghg_sheep_agroforestry(
     ------
     Numpy array indexed by r
     """
-    sheep_j = tools.get_sheep_code(data)
+    sheep_j = data.DESC2AGLU['Sheep - modified land']
 
     # Only use the dryland version of sheep
     sheep_cost = ag_g_mrj[0, :, sheep_j]
@@ -148,7 +147,7 @@ def get_ghg_beef_agroforestry(
     ------
     Numpy array indexed by r
     """
-    beef_j = tools.get_beef_code(data)
+    beef_j = data.DESC2AGLU['Beef - modified land']
 
     # Only use the dryland version of beef
     beef_cost = ag_g_mrj[0, :, beef_j]
@@ -228,7 +227,7 @@ def get_ghg_sheep_carbon_plantings_belt(
     ------
     Numpy array indexed by r
     """
-    sheep_j = tools.get_sheep_code(data)
+    sheep_j = data.DESC2AGLU['Sheep - modified land']
 
     # Only use the dryland version of sheep
     sheep_cost = ag_g_mrj[0, :, sheep_j]
@@ -265,7 +264,7 @@ def get_ghg_beef_carbon_plantings_belt(
     ------
     Numpy array indexed by r
     """
-    beef_j = tools.get_beef_code(data)
+    beef_j = data.DESC2AGLU['Beef - modified land']
 
     # Only use the dryland version of beef
     beef_cost = ag_g_mrj[0, :, beef_j]
@@ -310,7 +309,6 @@ def get_ghg_beccs(data, aggregate) -> np.ndarray|pd.DataFrame:
 
 def get_ghg_destocked_land(
     data: Data,
-    lumap: np.ndarray,
     aggregate: bool = True,
 ) -> np.ndarray:
     """
@@ -349,7 +347,7 @@ def get_ghg_destocked_land(
 
 
 
-def get_ghg_matrix(data: Data, ag_g_mrj, lumap, aggregate=True) -> np.ndarray:
+def get_ghg_matrix(data: Data, ag_g_mrj, aggregate=True) -> np.ndarray:
     """
     Get the g_rk matrix containing non-agricultural greenhouse gas emissions.
 
@@ -368,8 +366,8 @@ def get_ghg_matrix(data: Data, ag_g_mrj, lumap, aggregate=True) -> np.ndarray:
     - The function internally calls several other functions to calculate different components of the g_rk matrix.
     """
 
-    agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, lumap)
-    cp_belt_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, lumap)
+    agroforestry_x_r = np.full(data.NCELLS, settings.AF_PROPORTION, dtype=np.float32)   # the share of a cell agroforestry can take: the same everywhere
+    cp_belt_x_r = np.full(data.NCELLS, settings.CP_BELT_PROPORTION, dtype=np.float32)   # the share of a cell carbon plantings (belt) can take
 
     non_agr_ghg_matrices = {}
 
@@ -382,7 +380,7 @@ def get_ghg_matrix(data: Data, ag_g_mrj, lumap, aggregate=True) -> np.ndarray:
     non_agr_ghg_matrices['Sheep Carbon Plantings (Belt)'] = get_ghg_sheep_carbon_plantings_belt(data, ag_g_mrj, cp_belt_x_r, aggregate) 
     non_agr_ghg_matrices['Beef Carbon Plantings (Belt)'] = get_ghg_beef_carbon_plantings_belt(data, ag_g_mrj, cp_belt_x_r, aggregate)       
     non_agr_ghg_matrices['BECCS'] = get_ghg_beccs(data, aggregate)                                                                          
-    non_agr_ghg_matrices['Destocked - natural land'] = get_ghg_destocked_land(data, lumap, aggregate)                                       
+    non_agr_ghg_matrices['Destocked - natural land'] = get_ghg_destocked_land(data, aggregate)                                       
       
     if aggregate==True:
         # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing

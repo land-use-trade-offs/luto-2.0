@@ -107,20 +107,6 @@ Mean FIRE_RISK cell values (%)
 AMORTISE_UPFRONT_COSTS = False
 
 
-# θ — the EXACT ↔ CRISP dial of the transition flow model (fold-into-dominant, per cell).
-# Essentially: COLLAPSE each cell's small dvar fractions (≤ θ) into its dominant fraction, so the
-# solver sets up delta variables only for the collapsed base — every (source, cell) pair removed
-# saves one full row of delta vars (~28 targets × 2 lms), while the collapsed land stays in the
-# model (mobile, conserved) under the dominant's identity.
-# Example, θ = 0.10, one dry cell:
-#
-#     true base:    Beef 0.55 | Winter cereals 0.35 | Hay 0.06 | Citrus 0.04
-#     folded base:  Beef 0.65 | Winter cereals 0.35                            (Hay+Citrus -> Beef)
-# θ→0: pure exact per-source model (at RESFACTOR=5 nothing folds below 0.04, the min block fraction).
-# θ→1: one source per cell carrying the whole cell = the old crisp dominant-LU model.
-# θ only applies to AG land-uses; non-ag sources are always exact (noise-floor cutoff, no folding).
-EXACT_REACHABILITY_MIN_FRACTION = 0.01
-
 # Discount rate for amortisation
 DISCOUNT_RATE = 0.07     # 0.05 = 5% pa.
 
@@ -151,19 +137,8 @@ RESFACTOR = 5        # set to 1 to run at full spatial resolution, > 1 to run at
 SIM_YEARS = list(range(2020, 2051, 5))
 
 # Define the objective function
-OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
+OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs); over-production is capped by the hard demand bounds (DEMAND_BOUNDS)
 # OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
-
-
-
-DEMAND_CONSTRAINT_TYPE = 'hard'
-'''
-Options are 'soft', or 'hard'. This determines the type of demand constraint to apply in the model.
-- 'soft': commodity can be produced under/over the target, but the under/over part will pay a penalty that
-  equals the deviation amount multiplied by the corresponding prices. 
-- 'hard': commodity must be produced at the target amount, with a relaxation factor (DEMAND_BOUNDS) 
-  that allows for a certain percentage above the target to be produced (e.g., 1.05 allows for 5% overproduction).
-'''                      
 
 DEMAND_BOUNDS = {
     # Commodities need relaxation
@@ -217,29 +192,6 @@ E.g., the water yield for some cells is 10t but the Biodiversity-score is 1e-7, 
 the model sensitive to variations in input data. 
 '''
 
-REDUCE_FORCED_ZERO_ROWS = False
-'''
-Apply the forced-zero row reduction to the PRODUCTION model, not just the diagnosis probes.
-
-An equality row `sum(a_i x_i) = 0` whose coefficients are all positive and whose variables all have
-lb >= 0 has exactly one solution: every variable in it is zero. Deleting the row and fixing those
-variables is therefore EXACT -- no feasible solution is removed, the optimum is unchanged.
-
-LUTO emits an enormous number of them from the transition-flow node balances, one per (source, cell)
-with no land to move. Measured on R2_SNES_T1525_cap15's 2045 model: 1,393,366 of 1,760,948 flow_in
-rows (79 %), pinning 4,369,481 variables -- 30 % of ALL rows in the model, and the most degenerate
-30 %. Gurobi's presolve would normally clear them, but the barrier runs with Presolve=0 by design
-(presolve + homogeneous barrier once produced false infeasibility), so they go straight into the
-factorisation of A.D.A'.
-
-Default False pending full-trajectory validation: the mathematics is not in doubt, but a solve is
-allowed to differ in which OPTIMAL vertex it reports, so the claim to check is that the objective
-and the reported dvars are unchanged. The diagnosis probes apply the reduction unconditionally
-(solvers/tools._feasibility_copy) -- there it is not an optimisation but a precondition, because
-without it a probe including the flow system returns NUMERIC and the caller cannot tell that from
-feasible.
-'''
-
 SOLVER_COEFF_MIN = 1e-4
 '''
 Minimum absolute coefficient threshold applied by ``_qsum()`` in solver.py before
@@ -258,6 +210,32 @@ Applied to ALL constraint / objective builders:
 1e-4 was chosen empirically: 1e-3 caused ~3% economic loss by filtering meaningful
 small production coefficients; 1e-4 retains those while keeping the matrix range
 ratio at 1e8 (well within Gurobi's safe zone).
+'''
+
+BOUND_PROP_REL_TOL = 1e-6
+'''
+Relative margin of the pre-solve bound propagation (solvers/row_bounds.py). Every row's activity interval [lo, hi]
+over the column box is compared with its rhs within a per-row margin
+    max(10 * FEASIBILITY_TOLERANCE, BOUND_PROP_REL_TOL * max(|rhs|, sum |a| * |bound|))
+— relative to the magnitude of the row's terms, because the rounding of the sum grows with them, and never under the
+solver's own tolerance, so a row called IMPOSSIBLE is beyond anything the engine could accept. A row inside the margin
+is TIGHT or NEAR_REDUNDANT and always kept.
+'''
+
+BOUND_PROP_DROP_FAMILIES = []
+'''
+The row families whose REDUNDANT rows are dropped before the model is built, e.g.
+['GBF3_NVIS', 'GBF4_SNES', 'GBF4_ECNES', 'GBF8']. A redundant row is satisfied by every point of the column box, so
+dropping it is exact: the solution does not change, and the dropped rows appear in shadow_prices_<year>.csv priced 0
+with dropped = True. Every row is classified and reported (bound_report_<year>.csv) whatever this list holds;
+impossible and tight rows are never dropped. Worth listing only families with many rows.
+'''
+
+BOUND_PROP_ON_IMPOSSIBLE = 'stop'
+'''
+What a year does when some row is IMPOSSIBLE over the column box (bound_report_<year>.csv names each with its shortfall):
+ - 'stop'  : stop before building the model — no solve can succeed — the way an infeasible year stops the run
+ - 'solve' : report it and solve anyway
 '''
 
 
@@ -323,108 +301,6 @@ Range from 1e-2 (fast, loose) to 1e-8 (slow, tight; Gurobi default).
    prevents the barrier from closing the gap to 1e-5; crossover polishes the result.
 '''
 
-DROP_UNREACHABLE_CONSTRAINTS = []
-'''
-Which constraint groups may be SACRIFICED to keep a year solvable — ORDERED, least-valued first.
-
-DEFAULT [] (since v2.4): the diagnose-and-drop machinery (solvers/tools.py) is OFF — nothing is
-probed or removed, and an infeasible year fails as-is. To enable it, set an ordered list such as
-['bio_snes', 'bio_ecnes', 'bio_nvis'] together with INFEASIBILITY_DIAGNOSIS_GROUPS below.
-
-This list is the drop policy for BOTH halves of the infeasibility flow in simulation.py:
-
-  1. Pre-solve, each group in INFEASIBILITY_DIAGNOSIS_GROUPS is feasibility-tested alone; a row
-     that cannot hold even by itself (e.g. one ECNES community whose target exceeds anything its
-     cells could reach) is dropped before the real solve.
-  2. After a failed solve, the IIS names a set of rows that cannot all hold together; the earliest
-     group in this list that appears in the IIS gives up one row, and the solve is retried.
-
-Order matters: when a conflict could be resolved from several of these groups, the FIRST group
-listed loses its row. Groups not listed are never dropped — the adoption caps, GHG, water and
-demand are deliberately absent, so a conflict entirely among those ends the year and is REPORTED
-instead of silently relaxing a scenario-defining constraint.
-
-Group names come from CONSTRAINT_GROUPS in solvers/tools.py. Every drop is recorded in
-out_<year>/dropped_constraints_<year>.csv, never silent.
-
-Set to [] to drop nothing (e.g. when reproducing a historical run): the pre-solve test is then
-skipped, and a failed year is still diagnosed — the IIS is printed — but nothing is removed, so
-the year fails as-is.
-'''
-
-KNIFE_EDGE_DROP_BELOW = 1e-4
-'''
-Drop threshold for the pre-solve knife-edge census (see solvers/tools.knife_edge_rows).
-
-The census names rows that are SATISFIABLE but only by a hair — tightening every diagnosis-group
-RHS by 1%/1e-4/1e-6 of its magnitude and reading the IIS at each level. Rows whose relative
-headroom is below THIS value, and whose group is in DROP_UNREACHABLE_CONSTRAINTS, are dropped
-before the solve and recorded as action='DROPPED_KNIFE_EDGE' with their headroom tier
-(`headroom_lt`) in out_<year>/dropped_constraints_<year>.csv. Thin rows above the threshold (and
-ALL rows of non-droppable groups, e.g. the non-ag cap) are recorded as 'KNIFE_EDGE' but kept.
-
-Why drop them at all: a row inside this margin is numerically indistinguishable from infeasible to
-the production solve (FeasibilityTol 1e-6) — measured on R2_SNES_T1525_cap10, whose 2045 stalled
-DETERMINISTICALLY (twice, to the digit) on rows every probe certified feasible. Dropping trades a
-met-by-a-hair target for guaranteed termination, and the record says exactly how thin the margin
-was. 1e-4 is the saturation threshold from the Phase-1 analysis: the GB cap sat at 5e-6 relative
-slack when its runs returned status 4; healthy rows sit above 8.5e-2.
-
-Set to 0 to disable knife-edge dropping (the census still records). Inert while
-DROP_UNREACHABLE_CONSTRAINTS / INFEASIBILITY_DIAGNOSIS_GROUPS are empty — the census itself
-only runs as part of the pre-solve spectrum.
-'''
-
-INFEASIBILITY_DIAGNOSIS_GROUPS = []
-'''
-Which constraint groups the infeasibility diagnosis works on.
-
-DEFAULT [] (since v2.4): diagnosis is OFF — the pre-solve feasibility spectrum, knife-edge census
-and post-failure restricted IIS are all skipped (simulation.py bypasses them when this is empty).
-The recommended set when diagnosing infeasible runs is
-['bio_nvis', 'bio_snes', 'bio_ecnes', 'nonag_cap', 'flow_in', 'flow_out']. Two roles in simulation.py:
-
-  * pre-solve: each of these groups is feasibility-tested ALONE (plus the structural rows);
-  * post-failure: the diagnosis probe keeps ONLY these groups (plus structural), and the IIS is
-    computed on that restricted copy.
-
-Restriction is what makes the IIS affordable, not just faster: one measured feasibility solve went
-from 417 s (full model) to 13 s (restricted), and the full model's computeIIS did not finish in
-2.7 h. It is not free — discarding constraints is a relaxation, so:
-
-    restricted model INFEASIBLE  ->  the full model is infeasible too, and the conflict lies
-                                     entirely within the groups kept. Sound.
-    restricted model FEASIBLE    ->  says NOTHING about the full model. A conflict involving a
-                                     discarded group is invisible, and the year will still fail.
-
-So only exclude a group when you are confident it does not bind. The recommended set keeps the
-biodiversity families, the non-ag adoption cap AND the transition-flow system (`flow_in` /
-`flow_out`), and discards demand, GHG, water and renewables. (Water was tested: a restriction that
-still contained it returned the identical IIS, so it does not participate.)
-
-The flow system is in the recommended set because excluding it manufactures false FEASIBLE verdicts
-(2026-08-10): a species target can be satisfiable in an unconstrained-land sense yet unreachable
-given how land is permitted to MOVE — T_MAT reachability and source availability live in the flow
-rows. Five capped runs stalled for days on exactly this: their flow-blind probes reported feasible,
-the ladder ran into `Numerical trouble`, and Gurobi's internal simplex fallback never returned.
-With flow in scope the same probe answers INFEASIBLE in ~75 s and the IIS names the rows
-(Macquaria australasica, E. alligatrix, ...); dropping them let every stalled year solve by
-ordinary barrier in ~8-14 min. Diagnosis cost: ~25-75 s per IIS round.
-
-`bio_gbf2` is deliberately NOT in the default: when GBF2 is on ('high', hard), its severely-scaled
-national row (dual ~500x the largest SNES dual) makes every deletion-filter LP inside computeIIS
-glacial — 111 min for 5 rounds, measured on R4_GBF2_T3050_cap25. Excluding it only blinds the
-probe, never the solve (GBF2 stays a hard constraint in the real model); the accepted risk is that
-a genuinely GBF2-involving conflict surfaces as a real-solve failure instead of a pre-solve drop.
-
-Group names come from CONSTRAINT_GROUPS in solvers/tools.py. `cell_usage` and `ag_mgt_link` are
-always kept regardless: without them land is not scarce and almost anything looks feasible.
-
-Set to [] (or None) to turn the diagnosis machinery OFF entirely — both the pre-solve test and the
-post-failure IIS are skipped, and a failed year just fails. NOTE there is currently no value that
-diagnoses against the FULL model; the closest is listing every group from CONSTRAINT_GROUPS.
-'''
-
 SCALE_FLAG = 0
 ''' 
 Scales the rows and columns of the model to improve the numerical properties of 
@@ -458,21 +334,24 @@ Crossover:
 
 Presolve:
     -1 = automatic, 0 = off, 1 = conservative, 2 = aggressive.
-    Keep OFF (0) for barrier (Method=2) — observed to introduce numerical
-    errors that cause the homogeneous barrier to declare false infeasibility.
+    The default barrier attempt leaves it automatic (-1). Presolve was observed
+    to introduce numerical errors that can make the homogeneous barrier declare
+    false infeasibility; 0 (off) avoids that, at the cost of the barrier
+    factorising the raw, degenerate flow equalities (docs/FINDINGS.md).
     Safe to enable for simplex (Method=0 or 1).
 
 BarHomogeneous:
     -1 = automatic, 0 = off, 1 = on.
-    Keep OFF (0): the homogeneous algorithm's tau parameter drifts toward zero
-    in highly degenerate problems, triggering false INFEASIBLE (status 3) even
-    with NumericFocus=3. With 0, the barrier reports NUMERIC (12) or SUBOPTIMAL
+    The default barrier attempt leaves it automatic (-1). 0 (off) avoids a known
+    failure: the homogeneous algorithm's tau parameter drifts toward zero in
+    highly degenerate problems, triggering false INFEASIBLE (status 3) even with
+    NumericFocus=3, whereas with 0 the barrier reports NUMERIC (12) or SUBOPTIMAL
     (13) instead — both handled by the retry loop. Set to 1 only when debugging
     to avoid ambiguous INF_OR_UNBD status.
 
 Default sequence:
-  (0, 2, -1, -1, -1) barrier, auto crossover, presolve off, homogeneous off  — fast first pass
-  (0, 1,  0, -1, 0)  dual simplex, presolve auto, homogeneous off            — fallback; simplex
+  (0, 2, -1, -1, -1) barrier, auto crossover, auto presolve, auto homogeneous  — fast first pass
+  (0, 1,  0, -1, 0)  dual simplex, auto presolve, homogeneous off              — fallback; simplex
                      walks the boundary so it cannot misdiagnose feasibility
                      from an interior-point argument; presolve safe with simplex
 '''
@@ -882,6 +761,11 @@ CARBON_PRICES_FIELD = 'CONSTANT'
 
 # Automatically update the carbon price field if it is set to 'AS_GHG'
 if CARBON_PRICES_FIELD == 'AS_GHG':
+    if GHG_TARGETS_DICT[GHG_EMISSIONS_LIMITS] is None:
+        raise ValueError(
+            "CARBON_PRICES_FIELD='AS_GHG' requires GHG_EMISSIONS_LIMITS to name a GHG target "
+            f"(got '{GHG_EMISSIONS_LIMITS}'); set an explicit carbon price scenario instead."
+        )
     CARBON_PRICES_FIELD = GHG_TARGETS_DICT[GHG_EMISSIONS_LIMITS][:9].replace('(','')  # '1.5C (67%) excl. avoided emis' -> '1.5C 67%'
 
 if CARBON_PRICES_FIELD == 'CONSTANT':
@@ -925,16 +809,6 @@ CROP_GHG_SCOPE_1 = ['CO2E_KG_HA_SOIL']
 LVSTK_GHG_SCOPE_1 = ['CO2E_KG_HEAD_DUNG_URINE', 'CO2E_KG_HEAD_ENTERIC', 'CO2E_KG_HEAD_IND_LEACH_RUNOFF', 'CO2E_KG_HEAD_MANURE_MGT']
 
 
-GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (linear programming approach)
-# GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)
-# NOTE: 'soft' mode is planned to be decommissioned so the objective only considers economy.
-
-SOLVE_WEIGHT_BETA = 0.5
-'''
-The weight of the deviations from target in the objective function.
- - if approaching 0, the model will ignore the deviations from target.
- - if approaching 1, the model will try harder to meet the target.
-'''
 
 
 # Water use yield and parameters *******************************
@@ -956,11 +830,6 @@ WATER_CLIMATE_CHANGE_IMPACT = 'on'      # 'on' or 'off'. 'off' will turn off cli
        solver infeasibility. The inside-LUTO target = relaxed_target - wny_outside_LUTO.
        Otherwise, the standard target applies: wny_hist_target - wny_outside_LUTO.
 '''
-
-WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
-# WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)
-# NOTE: 'soft' mode is planned to be decommissioned so the objective only considers economy.
-
 
 # Regionalisation to enforce water use limits by
 WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
@@ -1037,8 +906,6 @@ GBF2_TARGETS_DICT = {
 }
 
 
-GBF2_CONSTRAINT_TYPE = 'hard' # Adds biodiversity limits as a constraint in the solver (linear programming approach)
-# GBF2_CONSTRAINT_TYPE = 'soft'  # Adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
 '''
 The constraint type for the biodiversity target.
 - 'hard' adds biodiversity limits as a constraint in the solver (linear programming approach)
@@ -1073,7 +940,7 @@ One of 'Suitability', 'ECNES_likely_may', 'ECNES_likely', 'SNES_likely_may', 'SN
 
 Essentially, the biodiversity quality layer determines how important (0-100) a cell is to the overall biodiversity value. 
     - By choosing 'Suitability' layer, you assume that the overal biodiversity is determined by considering all species (plants, 
-      mamals, amphibians, birds, reptiles, etc). 
+      mammals, amphibians, birds, reptiles, etc). 
     - If choosing one of the 'SNES_likely|may' layers, you assume that the overal biodiversity is determined by species 
       related to the Environment Protection and Biodiversity Conservation Act 1999 (EPBC Act). 
     - If choosing one of the 'ECNES_likely|may' layers, you assume that the overal biodiversity is determined by ecological
@@ -1121,7 +988,11 @@ I.e., the lower bound of the connectivity score for weighting the raw biodiversi
 
 
 # Habitat condition data source
-HCAS_CONTRIBUTION_PERCENTILE = 'USER_DEFINED'                  # One of ['10', '25', '50', '75', '90'], 'USER_DEFINED', or 'AG_UNIFORM'
+HCAS_CONTRIBUTION_PERCENTILE = 'CSV_DEFINED'                  # One of ['10', '25', '50', '75', '90'], 'CSV_DEFINED', or 'AG_UNIFORM'
+HCAS_AG_UNIFORM_CONTRIBUTION = 0.0                             # Only under 'AG_UNIFORM': the one habitat contribution (0-1) given to EVERY
+                                                               # modified / cropped agricultural land use (data.LU_MODIFIED_LAND). Natural land
+                                                               # (Beef/Dairy/Sheep - natural land, Unallocated - natural land) keeps the CSV's
+                                                               # AG_UNIFORM column values (0.7 / 1.0). 0.0 = only non-ag and native land count.
 '''
 Different land-use types have different biodiversity degradation impacts. We calculated the percentiles values of HCAS (indicating the
 suitability for wild animals ranging between 0-1) for each land-use type.Avaliable percentiles is one of ['10', '25', '50', '75', '90'].
@@ -1138,13 +1009,13 @@ BIO_CONTRIBUTION_LDS = 0.75
 '''
 
 # Non-agricultural biodiversity parameters 
-BIO_CONTRIBUTION_ENV_PLANTING = 0.7
+BIO_CONTRIBUTION_ENV_PLANTING = 0.8         # 0.8->0.6 20260831; we think environmental planting should be higher than 0.7.
 BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK = 0.12
 BIO_CONTRIBUTION_CARBON_PLANTING_BELT = 0.12
 BIO_CONTRIBUTION_RIPARIAN_PLANTING = 1.0
-BIO_CONTRIBUTION_AGROFORESTRY = 0.7
+BIO_CONTRIBUTION_AGROFORESTRY = 0.6         # 0.7->0.6 20260831; we think agroforestry should not be as high as EP.
 BIO_CONTRIBUTION_BECCS = 0
-BIO_CONTRIBUTION_DESTOCKING = 0.75  # If 'GAP', uses BIO_HABITAT_CONTRIBUTION_LOOK_UP difference; if set to a number (e.g. 0.75), overrides with a fixed scalar
+BIO_CONTRIBUTION_DESTOCKING = 1.0           # If 'GAP' <Should never be used!!, since its produces neg bio-contr scores>, uses BIO_HABITAT_CONTRIBUTION_LOOK_UP difference; if set to a number (e.g. 0.75), overrides with a fixed scalar
 '''
 The benefit of each non-agricultural land use to biodiversity is set as a proportion to the raw biodiversity priority value.
 For example, if the raw biodiversity priority value is 0.6 and the benefit is 0.8, then the biodiversity value
@@ -1156,7 +1027,7 @@ will be 0.6 * 0.8 = 0.48.
 
 # ---------------------- GBF3 parameters ----------------------
 
-GBF3_NVIS_TARGET = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
+GBF3_NVIS_TARGET = 'off'           # 'off', 'medium', 'high', 'SPECIFIED', or 'CSV_DEFINED'
 '''
 Target 3 of the Kunming-Montreal Global Biodiversity Framework (NVIS):
 protect and manage vegetation groups using the National Vegetation Information System.
@@ -1164,7 +1035,9 @@ protect and manage vegetation groups using the National Vegetation Information S
 - if 'off' is selected, turn off the GBF-3 NVIS target for biodiversity.
 - if 'medium' is selected, the conservation target is set to 30% by 2030 and 30% by 2050 for each vegetation group.
 - if 'high' is selected, the conservation target is set to 30% by 2030 and 50% by 2050 for each vegetation group.
-- if 'USER_DEFINED' is selected, targets are kept from the input CSV; only groups with all year targets > 0 are constrained.
+- if 'CSV_DEFINED' is selected, targets are kept from the input CSV; only groups with all year targets > 0 are constrained.
+- if 'SPECIFIED' is selected, GBF3_NVIS_SEL_REGION_TARGETS is a dict {region: {year: pct}} and every group in a region
+  gets that region's level (region-specific uniform targets; in AUSTRALIA mode key it 'AUSTRALIA').
 Level presets apply to ALL vegetation groups at the configured region mode (no CSV-target filter).
 (No 'low' level — a 0% target only makes sense for GBF2's degraded-areas logic.)
 '''
@@ -1174,23 +1047,24 @@ GBF3_TARGETS_DICT = {
     'off':     None,
     'medium':  {2030: 30, 2050: 30},
     'high':    {2030: 30, 2050: 50},
-    'USER_DEFINED': None
+    'SPECIFIED':    None,                    # levels come from GBF3_NVIS_SEL_REGION_TARGETS (a dict in this mode)
+    'CSV_DEFINED': None
 }
 
 
 # Per-(region, vegetation group) GBF3 NVIS target overrides — the NVIS counterpart of
 # GBF4_SNES_TARGETS_OVERRIDE / GBF4_ECNES_TARGETS_OVERRIDE. Applied AFTER the uniform
 # GBF3_TARGETS_DICT and independent of GBF3_NVIS_TARGET mode, so it works with 'medium', 'high' and
-# 'USER_DEFINED' alike. Maps (region, group) -> {year: pct}. Empty = no override (a byte-identical
+# 'CSV_DEFINED' alike. Maps (region, group) -> {year: pct}. Empty = no override (a byte-identical
 # no-op, so every run that does not set it is unaffected).
 #
 # Lets the vegetation floor carry a target level that GBF3_TARGETS_DICT has no preset for — there is
 # no 15/25 option, so halving NVIS alongside SNES/ECNES is only expressible this way short of the
-# USER_DEFINED Excel route.
+# CSV_DEFINED Excel route.
 #
 # NOTE ON KEYS: in AUSTRALIA region mode the rows are relabelled 'AUSTRALIA' BEFORE this is applied,
 # so keys must use ('AUSTRALIA', group) there, not the NRM region name. In NRM mode use the NRM
-# region name, exactly as GBF3_NVIS_EXCLUDE_REGION_GROUPS does.
+# region name, exactly as GBF3_NVIS_SEL_REGION_TARGETS does.
 GBF3_NVIS_TARGETS_OVERRIDE = {}
 
 
@@ -1198,7 +1072,7 @@ GBF3_NVIS_TARGET_CLASS  = 'NVIS_MVG'             # 'NVIS_MVG', 'NVIS_MVS'
 '''
 The National Vegetation Information System (NVIS) provides the 100m resolution information on
 the distribution of vegetation (~30 primary group layers, or ~90 subgroup layers) across Australia.
-Also used as the class selector for IBRA bioregion layers when GBF3_NVIS_REGION_MODE = 'IBRA'.
+Also used as the class selector for IBRA bioregion layers when GBF3_NVIS_REGION_MODE = 'IBRA_REG'.
 '''
 
 
@@ -1210,82 +1084,23 @@ Controls the spatial resolution of GBF3 NVIS constraints.
  - 'IBRA_REG'  → IBRA bioregion targets (bio_GBF3_NVIS_MVG/MVS.nc + IBRA Excel file)
 '''
 
-GBF3_NVIS_SELECTED_REGIONS = ['North East', 'Goulburn Broken']
+GBF3_NVIS_SEL_REGION_TARGETS = {
+    'North East':      {2030: 30, 2050: 50, 2100: 50},
+    'Goulburn Broken': {2030: 30, 2050: 50, 2100: 50},
+}
 '''
-List of NRM region names to enforce GBF3 NVIS constraints for.
-Must match region names in REGION_NRM_NAME. Only used when GBF3_NVIS_REGION_MODE = 'NRM'.
+The NRM regions to enforce GBF3 NVIS constraints for (keys must match REGION_NRM_NAME; used when
+GBF3_NVIS_REGION_MODE = 'NRM') and, under GBF3_NVIS_TARGET = 'SPECIFIED', each region's uniform target
+{year: pct} (all three years required). In the preset / CSV_DEFINED modes only the keys are used, so a
+plain list of region names is also accepted there. In AUSTRALIA region mode key it 'AUSTRALIA'.
 '''
 
-# -- GBF3 NVIS explicit (region, group) exclusions, keyed by GBF3_NVIS_TARGET_CLASS.
-# data.py automatically drops any group where IN_LUTO_HA <= 100 ha (structurally
-# infeasible: constraint LHS ≈ 0). The entries below document those groups for both
-# NVIS_MVG and NVIS_MVS target classes, confirmed from
-# BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS_NRM.xlsx on 2026-05-02.
-# To add IIS-diagnosed exclusions beyond the auto filter, append tuples here.
-GBF3_NVIS_EXCLUDE_REGION_GROUPS = {
-    'NVIS_MVG': [
-        # IN_LUTO_HA = 78.4 ha
-        ('Goulburn Broken', 'Acacia Open Woodlands'),
-        # IN_LUTO_HA = 24.8 ha
-        ('North East',      'Callitris Forests and Woodlands'),
-        # IN_LUTO_HA = 0.0 ha
-        ('Goulburn Broken', 'Chenopod Shrublands, Samphire Shrublands and Forblands'),
-        # IN_LUTO_HA = 0.2 ha
-        ('North East',      'Eucalypt Tall Open Forests'),
-        # IN_LUTO_HA = 0.0 ha
-        ('Goulburn Broken', 'Heathlands'),
-        # IN_LUTO_HA = 44.5 ha
-        ('North East',      'Heathlands'),
-        # IN_LUTO_HA = 4.9 ha
-        ('Goulburn Broken', 'Naturally bare - sand, rock, claypan, mudflat'),
-        # IN_LUTO_HA = 0.0 ha
-        ('North East',      'Naturally bare - sand, rock, claypan, mudflat'),
-        # IN_LUTO_HA = 78.8 ha
-        ('Goulburn Broken', 'Other Forests and Woodlands'),
-        # IN_LUTO_HA = 45.5 ha
-        ('North East',      'Other Forests and Woodlands'),
-        # IN_LUTO_HA = 0.0 ha
-        ('Goulburn Broken', 'Other Open Woodlands'),
-        # IN_LUTO_HA = 15.1 ha
-        ('Goulburn Broken', 'Rainforests and Vine Thickets'),
-        # IN_LUTO_HA = 0.0 ha
-        ('North East',      'Tussock Grasslands'),
-        # IN_LUTO_HA = 0.0 ha
-        ('Goulburn Broken', 'Unclassified native vegetation'),
-    ],
-    'NVIS_MVS': [
-        # IN_LUTO_HA = 0.0 ha
-        ('Goulburn Broken', 'Boulders/rock with algae, lichen or scattered plants, or alpine fjaeldmarks'),
-        # IN_LUTO_HA = 0.0 ha
-        ('North East',      'Boulders/rock with algae, lichen or scattered plants, or alpine fjaeldmarks'),
-        # IN_LUTO_HA = 24.8 ha
-        ('North East',      'Callitris forests and woodlands'),
-        # IN_LUTO_HA = 0.0 ha
-        ('Goulburn Broken', 'Callitris open woodlands'),
-        # IN_LUTO_HA = 15.1 ha
-        ('Goulburn Broken', 'Cool temperate rainforest'),
-        # IN_LUTO_HA = 0.0 ha
-        ('Goulburn Broken', 'Heathlands'),
-        # IN_LUTO_HA = 44.5 ha
-        ('North East',      'Heathlands'),
-        # IN_LUTO_HA = 78.8 ha
-        ('Goulburn Broken', 'Leptospermum forests and woodlands'),
-        # IN_LUTO_HA = 45.5 ha
-        ('North East',      'Leptospermum forests and woodlands'),
-        # IN_LUTO_HA = 4.9 ha
-        ('Goulburn Broken', 'Naturally bare, sand, rock, claypan, mudflat'),
-        # IN_LUTO_HA = 0.0 ha
-        ('North East',      'Naturally bare, sand, rock, claypan, mudflat'),
-        # IN_LUTO_HA = 0.0 ha
-        ('North East',      'Other grasslands'),
-        # IN_LUTO_HA = 0.9 ha
-        ('Goulburn Broken', 'Other tussock grasslands'),
-        # IN_LUTO_HA = 38.5 ha
-        ('North East',      'Other tussock grasslands'),
-        # IN_LUTO_HA = 2.0 ha
-        ('Goulburn Broken', 'Unclassified native vegetation'),
-    ],
-}
+GBF3_NVIS_MIN_AREA_HA = 100
+'''
+Drop every (region, group) whose IN_LUTO_HA (restorable habitat inside the LUTO study area) is below this
+many hectares: a constraint with LHS ≈ 0 is structurally infeasible. Applies in every mode and region mode.
+'''
+
 
 
 # ------------------------------- GBF4 Parameters -------------------------------
@@ -1296,12 +1111,16 @@ and manage human-wildlife interactions
 '''
 
 
-GBF4_TARGET_SNES  = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
-GBF4_TARGET_ECNES = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
+GBF4_TARGET_SNES  = 'off'           # 'off', 'medium', 'high', 'SPECIFIED', or 'CSV_DEFINED'
+GBF4_TARGET_ECNES = 'off'           # 'off', 'medium', 'high', 'SPECIFIED', or 'CSV_DEFINED'
 '''
 'off'               — GBF4 SNES/ECNES constraints disabled.
-'USER_DEFINED'      — targets read from the input CSV as-is; only species/communities with a
+'CSV_DEFINED'      — targets read from the input CSV as-is; only species/communities with a
                       defined TARGET_LEVEL_2030 > 0 in the CSV are selected.
+'SPECIFIED'              — same species/communities as 'CSV_DEFINED', with REGION-SPECIFIC uniform levels:
+                      GBF4_{SNES,ECNES}_SEL_REGION_TARGETS is then a dict {region: {year: pct}} whose keys
+                      are the selected regions (in AUSTRALIA mode: {'AUSTRALIA': {...}}). Makes automated
+                      task runs easy, e.g. a sensitivity sweep over target levels per CMA.
 'medium'/'high'     — ALL species/communities at the configured presence/region are selected
                       (no CSV-target filter), and every TARGET_LEVEL_{year} column is set to the
                       uniform level preset in GBF4_{SNES,ECNES}_TARGETS_DICT
@@ -1312,8 +1131,8 @@ GBF4_TARGET_ECNES = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
 GBF4_SNES_PRESENCE_CLASS  = 'LIKELY'  # 'LIKELY', 'LIKELY_AND_MAYBE'
 GBF4_ECNES_PRESENCE_CLASS = 'LIKELY'  # 'LIKELY', 'LIKELY_AND_MAYBE'
 
-# Uniform target presets (percent) keyed by GBF4_TARGET_{SNES,ECNES} level.
-# Only consulted when the target setting is 'medium'/'high'.
+# Uniform target presets (percent) keyed by GBF4_TARGET_{SNES,ECNES} mode.
+# Only consulted when the target setting is 'medium'/'high' ('SPECIFIED' levels live in *_SEL_REGION_TARGETS).
 GBF4_SNES_TARGETS_DICT  = {
     'medium': {2030: 30, 2050: 30, 2100: 30},
     'high':   {2030: 30, 2050: 50, 2100: 50},
@@ -1343,51 +1162,47 @@ GBF4_ECNES_TARGETS_OVERRIDE = {}
 GBF4_SNES_CAP_MARGIN = 2.0
 
 GBF4_SNES_REGION_MODE       = 'AUSTRALIA'                    # 'AUSTRALIA' or 'NRM'
-GBF4_SNES_SELECTED_REGIONS  = ['North East', 'Goulburn Broken']
+GBF4_SNES_SEL_REGION_TARGETS  = {
+    'North East':      {2030: 30, 2050: 50, 2100: 50},
+    'Goulburn Broken': {2030: 30, 2050: 50, 2100: 50},
+}
 '''
 Controls the spatial resolution of GBF4 SNES constraints.
  - 'AUSTRALIA' → nationwide targets (existing behaviour, default)
  - 'NRM'       → per-NRM-region targets from NRM target files
-GBF4_SNES_SELECTED_REGIONS: list of NRM region names. Only used when mode = 'NRM'.
+GBF4_SNES_SEL_REGION_TARGETS: {region: {year: pct}} — the keys select the NRM regions (mode = 'NRM') and,
+under GBF4_TARGET_SNES = 'SPECIFIED', the values are each region's uniform level (all three years required).
+The preset / CSV_DEFINED modes use only the keys, so a plain list of names is also accepted there.
+AUSTRALIA mode: {'AUSTRALIA': {...}}.
 '''
+GBF4_SNES_MIN_AREA_HA = 100     # drop (region, species) pairs with IN_LUTO_HA below this (LHS ≈ 0 → infeasible)
 
 GBF4_ECNES_REGION_MODE      = 'AUSTRALIA'                   # 'AUSTRALIA' or 'NRM'
-GBF4_ECNES_SELECTED_REGIONS = ['North East', 'Goulburn Broken']
+GBF4_ECNES_SEL_REGION_TARGETS = {
+    'North East':      {2030: 30, 2050: 50, 2100: 50},
+    'Goulburn Broken': {2030: 30, 2050: 50, 2100: 50},
+}
 '''
 Controls the spatial resolution of GBF4 ECNES constraints.
  - 'AUSTRALIA' → nationwide targets (existing behaviour, default)
  - 'NRM'       → per-NRM-region targets from NRM target files
-GBF4_ECNES_SELECTED_REGIONS: list of NRM region names. Only used when mode = 'NRM'.
+GBF4_ECNES_SEL_REGION_TARGETS: {region: {year: pct}} — the keys select the NRM regions (mode = 'NRM') and,
+under GBF4_TARGET_ECNES = 'SPECIFIED', the values are each region's uniform level (all three years required).
+The preset / CSV_DEFINED modes use only the keys, so a plain list of names is also accepted there.
+AUSTRALIA mode: {'AUSTRALIA': {...}}.
 '''
+GBF4_ECNES_MIN_AREA_HA = 100    # drop (region, community) pairs with IN_LUTO_HA below this (LHS ≈ 0 → infeasible)
 
-# -- Trouble-maker exclusions used by the rule_out_trouble_maker_speceis workflow.
-# GBF4_ECNES_EXCLUDE_REGION_COMMUNITIES: list of (region, COMMUNITY) tuples to drop.
-# GBF4_SNES_EXCLUDE_REGION_SPECIES:      list of (region, SCIENTIFIC_NAME) tuples to drop.
-#   NRM mode       — matches on the (region, name) pair exactly.
-#   AUSTRALIA mode — only the name part is used (region is ignored).
-# Match exactly the values in BIODIVERSITY_GBF4_TARGET_*[_NRM].csv.
-GBF4_ECNES_EXCLUDE_REGION_COMMUNITIES = []
-GBF4_SNES_EXCLUDE_REGION_SPECIES = [
-    # Only the 6 zero-area (IN_LUTO_HA == 0) SNES pairs — no restorable habitat inside the LUTO
-    # study area, so structurally infeasible. All other NE+GB species are carried (matches Run_0027
-    # and the fresh-baseline decision from the NECMA exploration, Explore_NECMA_runs).
-    ('North East',      'Argyrotegium nitidulum'),
-    ('Goulburn Broken', 'Burramys parvus'),
-    ('North East',      'Burramys parvus'),
-    ('North East',      'Euphrasia crassiuscula subsp. glandulifera'),
-    ('North East',      'Euphrasia eichleri'),
-    ('North East',      'Kelleria bogongensis'),
-]
 
 
 # -------------------------------- Climate change impacts on biodiversity -------------------------------
-GBF8_TARGET = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
+GBF8_TARGET = 'off'           # 'off', 'medium', 'high', or 'CSV_DEFINED'
 '''
 Target 8 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to
 reduce the impacts of climate change on biodiversity and ecosystems.
 
 'off'               — GBF8 constraints disabled.
-'USER_DEFINED'      — targets read from the hand-filled USER_DEFINED_TARGET_PERCENT_{year}
+'CSV_DEFINED'       — targets read from the hand-filled USER_DEFINED_TARGET_PERCENT_{year}
                       columns of BIODIVERSITY_GBF8_TARGET.csv; only species with all three
                       year targets defined and > 0 are selected.
 'medium'/'high'     — ALL species in the CSV are selected and given the uniform level preset

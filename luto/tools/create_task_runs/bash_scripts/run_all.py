@@ -74,7 +74,7 @@ def get_checkpoint_lz4(run_dir: Path) -> list[Path]:
     return sorted(
         f
         for d in output_dir.iterdir() if d.is_dir()
-        for f in d.iterdir() if re.match(r"data_\d{4}\.lz4", f.name)
+        for f in d.iterdir() if re.fullmatch(r"data_\d{4}\.lz4", f.name)
     )
 
 

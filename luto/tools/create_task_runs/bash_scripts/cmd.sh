@@ -18,6 +18,7 @@ SCRIPT_PBS=$(mktemp)
 cat << EOF > $SCRIPT_PBS
 #!/bin/bash
 #PBS -N ${JOB_NAME}
+#PBS -P ${PROJECT}
 #PBS -q ${QUEUE}
 #PBS -l storage=scratch/${PROJECT}+gdata/${PROJECT}
 #PBS -l ncpus=${NCPUS}

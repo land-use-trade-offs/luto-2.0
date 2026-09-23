@@ -601,20 +601,20 @@ def get_agricultural_management_quantity_matrices(data, q_mrp, yr_idx) -> Dict[s
         A dictionary containing the quantity matrices for different agricultural management practices.
         The keys of the dictionary represent the names of the practices, and the values are the corresponding quantity matrices.
     """
-    ag_mam_q_mrp = {}
+    ag_man_q_mrp = {}
 
-    ag_mam_q_mrp['Asparagopsis taxiformis'] = get_asparagopsis_effect_q_mrp(data, q_mrp, yr_idx)            
-    ag_mam_q_mrp['Precision Agriculture'] = get_precision_agriculture_effect_q_mrp(data, q_mrp, yr_idx)     
-    ag_mam_q_mrp['Ecological Grazing'] = get_ecological_grazing_effect_q_mrp(data, q_mrp, yr_idx)           
-    ag_mam_q_mrp['Savanna Burning'] = get_savanna_burning_effect_q_mrp(data)                                
-    ag_mam_q_mrp['AgTech EI'] = get_agtech_ei_effect_q_mrp(data, q_mrp, yr_idx)                             
-    ag_mam_q_mrp['Biochar'] = get_biochar_effect_q_mrp(data, q_mrp, yr_idx)                                 
-    ag_mam_q_mrp['HIR - Beef'] = get_beef_hir_effect_q_mrp(data, q_mrp)                                     
-    ag_mam_q_mrp['HIR - Sheep'] = get_sheep_hir_effect_q_mrp(data, q_mrp)     
-    ag_mam_q_mrp['Utility Solar PV'] = get_utility_solar_pv_effect_q_mrp(data, q_mrp, yr_idx)
-    ag_mam_q_mrp['Onshore Wind'] = get_onshore_wind_effect_q_mrp(data, q_mrp, yr_idx)                     
+    ag_man_q_mrp['Asparagopsis taxiformis'] = get_asparagopsis_effect_q_mrp(data, q_mrp, yr_idx)            
+    ag_man_q_mrp['Precision Agriculture'] = get_precision_agriculture_effect_q_mrp(data, q_mrp, yr_idx)     
+    ag_man_q_mrp['Ecological Grazing'] = get_ecological_grazing_effect_q_mrp(data, q_mrp, yr_idx)           
+    ag_man_q_mrp['Savanna Burning'] = get_savanna_burning_effect_q_mrp(data)                                
+    ag_man_q_mrp['AgTech EI'] = get_agtech_ei_effect_q_mrp(data, q_mrp, yr_idx)                             
+    ag_man_q_mrp['Biochar'] = get_biochar_effect_q_mrp(data, q_mrp, yr_idx)                                 
+    ag_man_q_mrp['HIR - Beef'] = get_beef_hir_effect_q_mrp(data, q_mrp)                                     
+    ag_man_q_mrp['HIR - Sheep'] = get_sheep_hir_effect_q_mrp(data, q_mrp)     
+    ag_man_q_mrp['Utility Solar PV'] = get_utility_solar_pv_effect_q_mrp(data, q_mrp, yr_idx)
+    ag_man_q_mrp['Onshore Wind'] = get_onshore_wind_effect_q_mrp(data, q_mrp, yr_idx)                     
 
-    return {am:ag_mam_q_mrp[am] for am in settings.AG_MANAGEMENTS if settings.AG_MANAGEMENTS[am]}
+    return {am:ag_man_q_mrp[am] for am in settings.AG_MANAGEMENTS if settings.AG_MANAGEMENTS[am]}
 
 
 

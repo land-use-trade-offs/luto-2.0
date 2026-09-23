@@ -58,7 +58,7 @@ import luto.settings as settings
 # sim.run() loads the checkpoint internally when data=None.
 _checkpoint_dir = next(
     (str(d) for d in sorted(pathlib.Path(settings.OUTPUT_DIR).iterdir(), key=lambda d: d.name)
-     if d.is_dir() and any(re.match(r'data_\d{4}\.lz4', f.name) for f in d.iterdir())),
+     if d.is_dir() and any(re.fullmatch(r'data_\d{4}\.lz4', f.name) for f in d.iterdir())),
     None
 )
 data = None if _checkpoint_dir else sim.load_data()
@@ -75,6 +75,17 @@ except Exception as e:
     # data.path can't be relied upon - the run dir is simply the parent of OUTPUT_DIR.
     simulation_root = pathlib.Path(settings.OUTPUT_DIR).absolute().parent
 
+
+# Safety gate: simulation_root must be an actual task-run directory (every run dir
+# carries a python_script.py copy). On the exception path with a relative OUTPUT_DIR,
+# simulation_root can resolve to the repo checkout — archiving and deleting THAT would
+# destroy the source tree, so bail out and let the error surface instead.
+if not (simulation_root / 'python_script.py').exists():
+    print(f"Refusing to archive/clean {simulation_root}: not a task-run directory "
+          "(no python_script.py marker).")
+    if sim_error is not None:
+        raise sim_error
+    raise SystemExit(1)
 
 # Set up report directory and archive path
 run_idx = simulation_root.name

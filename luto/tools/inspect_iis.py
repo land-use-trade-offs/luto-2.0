@@ -142,14 +142,14 @@ def _decode_constraint(name: str, luts: dict) -> str:
     if m:
         return f"Cell usage @ cell {m.group(1)}"
 
-    m = re.match(r"const_ag_mam_(dry|irr)_usage_(.+?)_(\d+)_(\d+)$", name)
+    m = re.match(r"const_ag_man_(.+?)_usage_(dry|irr)_(\d+)_(\d+)$", name)
     if m:
-        lm = "dryland" if m.group(1) == "dry" else "irrigated"
-        am_display = AM.get(m.group(2).lower(), m.group(2))
+        lm = "dryland" if m.group(2) == "dry" else "irrigated"
+        am_display = AM.get(m.group(1).lower(), m.group(1))
         j = int(m.group(3))
         return f"AM usage: {lm} {am_display} on {AG.get(j, f'LU({j})')} @ cell {m.group(4)}"
 
-    m = re.match(r"const_ag_mam_adoption_limit_(.+?)_(\d+)$", name)
+    m = re.match(r"const_ag_man_adoption_limit_(.+?)_(\d+)$", name)
     if m:
         am_display = AM.get(m.group(1).lower(), m.group(1))
         j = int(m.group(2))
@@ -194,7 +194,7 @@ def _is_cell_level(name: str) -> bool:
     """Return True if the constraint is cell-level (not a global target)."""
     return bool(
         re.match(r"const_cell_usage_\d+", name)
-        or re.match(r"const_ag_mam_(dry|irr)_usage_", name)
+        or re.match(r"const_ag_man_.+?_usage_(dry|irr)_", name)
         or re.match(r"const_.+?_solvable_ub_\d+$", name)
     )
 
@@ -273,7 +273,7 @@ def _analyze_iis_inner(filepath: str, data):
         cell_types = Counter()
         cell_ids = []
         for name, _ in cell_constraints:
-            m = re.match(r"(const_cell_usage|const_ag_mam_\w+_usage)", name)
+            m = re.match(r"(const_cell_usage|const_ag_man_.+?_usage)", name)
             ctype = m.group(1) if m else name
             cell_types[ctype] += 1
             # Extract cell id (last number in the constraint name)

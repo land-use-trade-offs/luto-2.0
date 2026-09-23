@@ -30,7 +30,7 @@ import re
 import time
 import threading
 import joblib
-import pandas as pd
+import numpy as np
 
 from contextlib import contextmanager
 from pathlib import Path
@@ -38,9 +38,13 @@ from gurobipy import GRB
 
 from luto import settings
 from luto.data import Data
-from luto.solvers.input_data import get_input_data
+from luto.solvers.col_builder import get_cols
+from luto.solvers.row_inputs import RowInputs, get_economics, get_row_inputs
+from luto.solvers.row_builder import get_rows, get_obj
+from luto.solvers.row_bounds import STATUS, drop_redundant_rows, get_row_bounds, report_row_bounds
 from luto.solvers.solver import LutoSolver
-from luto.solvers.tools import feasibility_spectrum, resolve_infeasibility, group_of
+from luto.solvers.post_solve import post_solve
+from luto.solvers.tools import record_shadow_prices
 from luto.tools.write import write_outputs
 from luto.tools import (
     LogToFile,
@@ -48,7 +52,6 @@ from luto.tools import (
     set_path,
     write_timestamp,
     read_timestamp,
-    record_shadow_prices,
 )
 
 
@@ -237,23 +240,42 @@ def solve_timeseries(
         print( "-------------------------------------------------\n", flush=True)
 
         start_time = time.time()
-        input_data = get_input_data(data, base_year, target_year)
-        data.last_year = target_year
 
-        luto_solver = LutoSolver(input_data)
+        # ── the columns: the unknowns ──
+        cols, col_support = get_cols(data, base_year)                                       # the column table, and what the row side reads beside it
+
+        # ── the rows: the constraints ──
+        inputs = get_row_inputs(data, base_year, target_year)                               # the coefficient streams and targets
+        A, rows = get_rows(inputs, cols, col_support)                                       # the matrix, and the row table on the same rows
+        col_support.cell2col = col_support.ag_mrj2col = col_support.nonag_rk2col = None     # read by get_rows only: freed before the solve (GBs at RES1), the masks and the regions stay for post_solve
+
+        # ── the pre-solve diagnosis: bound propagation over the rows ──
+        bounds = get_row_bounds(A, rows, cols)                                              # every row's interval over the column box, and its verdict
+        drop_redundant_rows(rows, bounds, settings.BOUND_PROP_DROP_FAMILIES)                # opt-in per family: rows every point of the box satisfies never reach the solver
+        report_row_bounds(rows, bounds, target_year, f"{data.path}/out_{target_year}")      # the log table, bound_report_<year>.csv, bound_preflight_<year>.csv
+        n_impossible = int(((bounds['status'].values == STATUS.index('impossible')) | (bounds['status_implied'].values == STATUS.index('impossible'))).sum())
+        if n_impossible and settings.BOUND_PROP_ON_IMPOSSIBLE == 'stop':
+            print('!' * 100, flush=True)
+            print(f"Year {target_year}: {n_impossible:,} row(s) cannot hold at any point the column box and the rows' own bounds allow, so no solve can succeed "
+                  f"(see {data.path}/out_{target_year}/bound_report_{target_year}.csv). Stopping before the model is built.", flush=True)
+            print('!' * 100, flush=True)
+            break
+
+        # ── the objective: the coefficient of every column ──
+        obj = get_obj(get_economics(data, base_year, target_year), cols, inputs)            # million AUD; the economy streams (~300 MB at RES5, ~7 GB at RES1) die with the call
+
+        luto_solver = LutoSolver(cols, rows, A, obj, inputs)                                # A x T, obj · x; the inputs name m and am_idx in the variable names
         luto_solver.formulate()
 
         # Save the model to disk BEFORE solving (see save_model_to_disk for why).
         save_model_to_disk(luto_solver.gurobi_model, data.path, base_year, target_year)
-        # Drop constraints that cannot hold even alone, BEFORE solving. Dropped rows
-        # are recorded in out_<year>/dropped_constraints_<year>.csv.
-        drop_unreachable_before_solve(luto_solver, data, target_year)
-
-        accepted, solution, status = solve_with_retries(luto_solver, data, target_year)
+        accepted, x, status = solve_with_retries(luto_solver, target_year)
 
         if accepted:
-            store_solution(data, target_year, solution)
-            record_shadow_prices(luto_solver, input_data, target_year, f"{data.path}/out_{target_year}")
+            solution = post_solve(x, cols, col_support, inputs)                                # the LUTO 1-D format
+            store_solution(data, target_year, solution, luto_solver.gurobi_model.ObjVal, inputs)
+            data.last_year = target_year                                                        # only a solved and stored year: the writers report through it
+            record_shadow_prices(luto_solver, target_year, f"{data.path}/out_{target_year}")
             if checkpoint_path is not None:
                 save_checkpoint(data, checkpoint_path, target_year)
 
@@ -267,52 +289,34 @@ def solve_timeseries(
             break
 
 
-def solve_with_retries(luto_solver: LutoSolver, data: Data, target_year: int):
-    """Run the RETRY_PARAMS ladder against the current model. Returns (accepted, solution, status).
+def solve_with_retries(luto_solver: LutoSolver, target_year: int):
+    """Run the RETRY_PARAMS ladder against the current model. Returns (accepted, x, status) — x the raw solution
+    vector over the column table (None when the solve left no solution).
 
     settings.RETRY_PARAMS is a list of (NumericFocus, Method, Crossover, Presolve,
     BarHomogeneous) tuples tried in order; only GRB.OPTIMAL is accepted.
-
-    A failed attempt is treated as a CONFLICT first and a numerical problem second: diagnose
-    and drop, then re-solve with the same configuration. Only when nothing more can be
-    dropped does the next RETRY_PARAMS entry get tried.
-
-    That ordering matters in wall-clock. Falling straight through to the next configuration
-    sends a genuinely infeasible model into the dual-simplex rung, which has been measured
-    diverging for 35 min+ without terminating — so the diagnosis that would have explained
-    the failure in minutes never gets reached. Diagnosing first costs one restricted IIS.
     """
-    accepted, solution, status = False, None, None
-    for params in settings.RETRY_PARAMS:
-        accepted, solution, status = solve_attempt(luto_solver, target_year, *params)
-        while not accepted and diagnose_and_drop_conflict(luto_solver, data, target_year):
-            accepted, solution, status = solve_attempt(luto_solver, target_year, *params)
-        if accepted:
-            break
-    return accepted, solution, status
+    x, status = None, None
+    for nf, method, crossover, presolve, barhomogenous in settings.RETRY_PARAMS:
+        print(f"Trying NumericFocus={nf}, Method={method}, Crossover={crossover}, Presolve={presolve}, BarHomogeneous={barhomogenous} for year {target_year}...", flush=True)
+        luto_solver.gurobi_model.Params.NumericFocus    = nf
+        luto_solver.gurobi_model.Params.Method          = method
+        luto_solver.gurobi_model.Params.Crossover       = crossover
+        luto_solver.gurobi_model.Params.Presolve        = presolve
+        luto_solver.gurobi_model.Params.BarHomogeneous  = barhomogenous
+
+        x = luto_solver.solve()
+        status = luto_solver.gurobi_model.Status
+        if x is not None and status == GRB.OPTIMAL:
+            print(f"Optimal solution found with NumericFocus={nf}, Method={method}", flush=True)
+            return True, x, status
+        print(f"Non-optimal status {status} with NumericFocus={nf}, Method={method}; retrying with next attempt if available.", flush=True)
+    return False, x, status
 
 
-def solve_attempt(luto_solver, target_year, nf, method, crossover, presolve, barhomogenous):
-    """One RETRY_PARAMS attempt against the current model. Returns (accepted, solution, status)."""
-    print(f"Trying NumericFocus={nf}, Method={method}, Crossover={crossover}, Presolve={presolve}, BarHomogeneous={barhomogenous} for year {target_year}...", flush=True)
-    luto_solver.gurobi_model.Params.NumericFocus    = nf
-    luto_solver.gurobi_model.Params.Method          = method
-    luto_solver.gurobi_model.Params.Crossover       = crossover
-    luto_solver.gurobi_model.Params.Presolve        = presolve
-    luto_solver.gurobi_model.Params.BarHomogeneous  = barhomogenous
-
-    solution = luto_solver.solve()
-    status = luto_solver.gurobi_model.Status
-    if solution is not None and status == GRB.OPTIMAL:
-        print(f"Optimal solution found with NumericFocus={nf}, Method={method}", flush=True)
-        return True, solution, status
-
-    print(f"Non-optimal status {status} with NumericFocus={nf}, Method={method}; retrying with next attempt if available.", flush=True)
-    return False, solution, status
-
-
-def store_solution(data: Data, target_year: int, solution) -> None:
-    """Copy the accepted solver solution into the Data singleton."""
+def store_solution(data: Data, target_year: int, solution, obj_val: float, inputs: RowInputs) -> None:
+    """Copy the accepted solution (the LUTO format, ``post_solve``) and the objective value into the Data singleton, and
+    put Production and GHG beside them — both computed from the stored dvars, every share counted."""
     data.add_lumap(target_year, solution.lumap)
     data.add_lmmap(target_year, solution.lmmap)
     data.add_ammaps(target_year, solution.ammaps)
@@ -322,152 +326,26 @@ def store_solution(data: Data, target_year: int, solution) -> None:
     data.add_delta_dvars_ag2nonag(target_year, solution.dvar_D_ag2nonag_rk)
     data.add_delta_dvars_nonag2ag(target_year, solution.dvar_D_nonag2ag_mrj)
     data.add_ag_man_dvars(target_year, solution.ag_man_X_mrj)
-    data.add_obj_vals(target_year, solution.obj_val)
+    data.add_obj_vals(target_year, obj_val)
 
-    for data_type, prod_data in solution.prod_data.items():
-        data.add_production_data(target_year, data_type, prod_data)
+    # GHG from the stored dvars and the step's own GHG inputs: Σ ghg · share over the ag, ag-mgt and non-ag land, the
+    # transition emissions on the ag → ag flows, plus the off-land constant — what the GHG row summed (the row's contract
+    # dropped its sub-floor coefficients; float32 dot products, 1e-7 relative of the float64 sum at RES50)
+    ghg = float(np.dot(inputs.ag_g_mrj.ravel(), solution.ag_X_mrj.ravel())) + float(np.dot(inputs.non_ag_g_rk.ravel(), solution.non_ag_X_rk.ravel()))
+    for am, lus in inputs.agman2lu.items():                                                 # the enabled options; the GHG effect is [m, r, j_idx] over the option's land uses
+        for j_idx, j in enumerate(lus):
+            ghg += float(np.dot(inputs.ag_man_g_mrj[am][:, :, j_idx].ravel(), solution.ag_man_X_mrj[am][:, :, j].ravel()))
+    for src, g in inputs.trans_ghg_ag2ag.items():                                           # [to_m, local_r, to_j], as the flows are keyed
+        ghg += float(np.dot(g.ravel(), solution.dvar_D_ag2ag_mrj[src].ravel()))
+    ghg += float(np.asarray(inputs.offland_ghg).ravel()[0])
+    data.add_production_data(target_year, 'GHG', ghg)
 
-
-# ---------------------------------------------------------------------------- #
-# Infeasibility handling                                                       #
-# ---------------------------------------------------------------------------- #
-
-def drop_unreachable_before_solve(luto_solver: LutoSolver, data: Data, target_year: int) -> list:
-    """One pre-solve feasibility SPECTRUM: provable infeasibility and knife-edge thinness are the
-    same question at different tightenings, asked on one shared probe copy (tools.py).
-
-        eps = 0      an IIS is a PROOF — the least-valued droppable row is surrendered per round
-                     until feasible. Catches rows impossible alone (NE Buloke) AND joint conflicts
-                     (SNES × cap) before any production rung runs. Termination guarantee, not an
-                     optimisation: a jointly-infeasible model can send a rung into `Numerical
-                     trouble` → Gurobi's internal simplex fallback → divergence that never
-                     terminates, so the post-failure IIS is unreachable (R2_SNES_T1525_cap10,
-                     2026-08-09, deterministic to the digit).
-        eps > 0      rows with relative headroom below 1e-6/1e-4/1e-2. Below
-                     KNIFE_EDGE_DROP_BELOW (droppable groups only) they are removed — inside that
-                     margin the production solve cannot distinguish them from infeasible, and both
-                     observed stall classes trace to exactly such rows. The 1e-2 band is recorded
-                     as early warning (lock-in ratchets: under-1% today is thinner next year).
-
-    Non-droppable groups (the cap, GBF2, ...) are NEVER removed however thin — when the cap
-    itself is the thin row, the IIS names its droppable partner, and dropping the partner
-    relieves the edge. Analysis note: filter dropped_constraints CSVs on `action` — 'DROPPED'
-    (proven) and 'DROPPED_KNIFE_EDGE' (inside numerical noise, margin in `headroom_lt`) left the
-    model; 'KNIFE_EDGE' rows stayed in.
-    """
-    if not (settings.DROP_UNREACHABLE_CONSTRAINTS and settings.INFEASIBILITY_DIAGNOSIS_GROUPS):
-        return []
-
-    print("├── Pre-solve feasibility spectrum (provable infeasibility → knife-edge census)...", flush=True)
-    spec = feasibility_spectrum(
-        luto_solver.gurobi_model,
-        keep_groups=settings.INFEASIBILITY_DIAGNOSIS_GROUPS,
-        droppable=settings.DROP_UNREACHABLE_CONSTRAINTS)
-
-    # Proven drops. Removal goes through the solver so the bookkeeping dicts stay in sync — a
-    # stale Constr would crash `record_shadow_prices` after the accepted solve. Records are
-    # written BEFORE the solve on purpose: they matter most when the year still goes on to fail.
-    if spec['dropped']:
-        luto_solver.remove_constraints_by_name(spec['dropped'])
-        record_dropped([{'group': group_of(n), 'constraint': n, 'action': 'DROPPED'}
-                        for n in spec['dropped']],
-                       luto_solver, data, target_year, 'pre_solve')
-
-    if spec['status'] == 'INFEASIBLE_UNRESOLVABLE':
-        print("├── conflict among non-droppable rows — nothing more can be given up; the ladder "
-              "will run and the year will fail loudly if it cannot solve", flush=True)
-        record_dropped([{'group': None, 'constraint': None, 'action': 'UNRESOLVABLE'}],
-                       luto_solver, data, target_year, 'pre_solve')
-        return spec['dropped']
-
-    threshold = getattr(settings, 'KNIFE_EDGE_DROP_BELOW', 1e-4)
-    droppable = set(settings.DROP_UNREACHABLE_CONSTRAINTS)
-    to_drop = {n: eps for n, eps in spec['edge'].items()
-               if eps <= threshold and group_of(n) in droppable}
-    to_keep = {n: eps for n, eps in spec['edge'].items() if n not in to_drop}
-
-    if to_drop:
-        print(f"├── dropping {len(to_drop)} knife-edge row(s) with relative headroom "
-              f"<= {threshold:g} (numerically indistinguishable from infeasible):", flush=True)
-        for n, eps in sorted(to_drop.items(), key=lambda kv: kv[1]):
-            print(f"│       [{group_of(n)}] headroom<{eps:g}  {n}", flush=True)
-        luto_solver.remove_constraints_by_name(list(to_drop))
-        record_dropped([{'group': group_of(n), 'constraint': n,
-                         'action': 'DROPPED_KNIFE_EDGE', 'headroom_lt': eps}
-                        for n, eps in to_drop.items()],
-                       luto_solver, data, target_year, 'pre_solve')
-    if to_keep:
-        print(f"├── {len(to_keep)} thin row(s) recorded as knife-edge, kept in the model:", flush=True)
-        for n, eps in sorted(to_keep.items(), key=lambda kv: kv[1]):
-            print(f"│       [{group_of(n)}] headroom<{eps:g}  {n}", flush=True)
-        record_dropped([{'group': group_of(n), 'constraint': n, 'action': 'KNIFE_EDGE',
-                         'headroom_lt': eps}
-                        for n, eps in to_keep.items()],
-                       luto_solver, data, target_year, 'pre_solve')
-
-    return spec['dropped'] + list(to_drop)
-
-
-def diagnose_and_drop_conflict(luto_solver: LutoSolver, data: Data, target_year: int) -> bool:
-    """After the ladder fails: ask the IIS what conflicts, drop it, and say whether to retry.
-
-    Returns True when something was dropped — the caller should put the ladder back on the reduced
-    model — and False when there is nothing left to give up, which ends the year.
-    """
-    if not settings.INFEASIBILITY_DIAGNOSIS_GROUPS:
-        return False
-
-    print("├── Not optimal — diagnosing the conflict...", flush=True)
-    resolution = resolve_infeasibility(
-        luto_solver.gurobi_model,
-        droppable=settings.DROP_UNREACHABLE_CONSTRAINTS,
-        keep_groups=settings.INFEASIBILITY_DIAGNOSIS_GROUPS)
-
-    if not resolution['dropped']:
-        print(f"├── {resolution['status']} — nothing droppable in the conflict; "
-              f"giving up on {target_year}", flush=True)
-        return False
-
-    print(f"├── dropping {len(resolution['dropped'])} row(s) and re-solving {target_year}:", flush=True)
-    for n in resolution['dropped']:
-        print(f"│       [{group_of(n)}] {n}", flush=True)
-
-    # Removes from the model AND the solver's bookkeeping dicts — a stale Constr left in those
-    # would crash `record_shadow_prices` after the accepted solve.
-    luto_solver.remove_constraints_by_name(resolution['dropped'])
-    record_dropped([{'group': group_of(n), 'constraint': n, 'action': 'DROPPED'}
-                     for n in resolution['dropped']],
-                    luto_solver, data, target_year, 'post_solve')
-    return True
-
-
-def record_dropped(records, luto_solver, data, target_year, stage) -> None:
-    """Append dropped-constraint records to out_<year>/dropped_constraints_<year>.csv.
-
-    Re-attaches family / region / item / presence from the solver's own index, because the
-    constraint name cannot be parsed back into them (spaces became underscores, and the arity
-    differs by family). Appends rather than overwrites: a year can drop rows in BOTH the pre-solve
-    per-group test and the post-failure IIS, and the first record must survive the second.
-    """
-    if records is None or (hasattr(records, 'empty') and records.empty) or len(records) == 0:
-        return
-    df = pd.DataFrame(records)
-    index = luto_solver.bio_constraint_index()
-    parts = pd.DataFrame(
-        [index.get(n, {'family': None, 'region': None, 'item': None, 'presence': None})
-         for n in df['constraint']],
-        index=df.index)
-    df = pd.concat([df, parts], axis=1).assign(year=target_year, stage=stage)
-    # Canonical column set: appends from different stages carry different keys (feasible_solve has
-    # round/iis_size, the knife-edge census has headroom_lt) and a CSV append with a different
-    # column set from the existing header silently misaligns the file. Absent keys become blanks.
-    df = df.reindex(columns=['year', 'stage', 'group', 'constraint', 'action', 'round',
-                             'iis_size', 'headroom_lt', 'family', 'region', 'item', 'presence'])
-
-    out_dir = f"{data.path}/out_{target_year}"
-    os.makedirs(out_dir, exist_ok=True)
-    path = f"{out_dir}/dropped_constraints_{target_year}.csv"
-    df.to_csv(path, mode='a' if os.path.exists(path) else 'w', header=not os.path.exists(path), index=False)
+    # Production from the stored dvars, the way the base year's is (data.py, at load): t / KL per commodity — every share
+    # counted (threshold 0: the map clean-up that drops a cell's slivers under 1 % would leave the total 0.1–0.8 % under
+    # the demand the solver met)
+    ag_mrc, non_ag_rc, am_amrc = data.get_actual_production_lyr(target_year, threshold=0.0)
+    production = (ag_mrc.sum(['cell', 'lm']) + non_ag_rc.sum(['cell']) + am_amrc.sum(['cell', 'am', 'lm'])).compute().values
+    data.add_production_data(target_year, 'Production', production)
 
 
 # ---------------------------------------------------------------------------- #

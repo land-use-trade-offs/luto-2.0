@@ -74,11 +74,16 @@ luto/                                    # Main package directory
 │   │   ├── revenue.py                   # Non-ag revenue streams
 │   │   ├── transitions.py               # Non-ag transition costs
 │   │   └── water.py                     # Non-ag water impacts
-│   ├── off_land_commodity/              # Off-land commodity economics
-│   └── land_use_culling.py              # Land use optimization culling
-├── solvers/                             # Optimization solvers and algorithms
-│   ├── input_data.py                    # GUROBI solver input preparation and rescaling
-│   └── solver.py                        # GUROBI solver interface (LutoSolver)
+│   └── off_land_commodity/              # Off-land commodity economics
+├── solvers/                             # The optimization model: a row table over a column table
+│   ├── col_builder.py                   # The column table: every decision variable, its bounds and fields
+│   ├── row_inputs.py                    # The coefficient streams and targets the rows read
+│   ├── row_builder.py                   # The row table: every constraint family, and the objective
+│   ├── row_table.py                     # How the rows are stored and queried
+│   ├── row_bounds.py                    # Pre-solve bound check: every row's verdict, the bound report
+│   ├── solver.py                        # GUROBI solver interface (LutoSolver)
+│   ├── post_solve.py                    # The solution back into the LUTO format
+│   └── tools.py                         # Shadow prices
 └── tools/                               # Utility tools and scripts
     ├── __init__.py                      # Shared helpers, shadow-price recording
     ├── create_task_runs/                # Task execution and batch processing
@@ -168,7 +173,31 @@ result = my_expensive_function(my_data)
 **Non-optimal Solves (INFEASIBLE / NUMERIC):**
 - A year is only accepted when Gurobi returns `GRB.OPTIMAL`; the attempts in `settings.RETRY_PARAMS` are tried in order first
 - Barrier can report false infeasibility on numerically hard scenarios. The dual-simplex fallback in `RETRY_PARAMS` usually resolves it; if not, re-run that year from its checkpoint with different parameters (`docs/CLAUDE_SKILL/retry_task_runs.md`)
-- Genuinely infeasible biodiversity targets are usually a handful of GBF4 SNES/ECNES species whose targets cannot be met on the available land. The run diagnoses these itself: rows that cannot hold are dropped (governed by `DROP_UNREACHABLE_CONSTRAINTS` / `INFEASIBILITY_DIAGNOSIS_GROUPS`) and recorded in `out_<year>/dropped_constraints_<year>.csv`. For a manual post-mortem, load the `debug_model_*.mps` saved before every solve and use `luto/solvers/tools.py` (`diagnose`, `resolve_infeasibility`), or follow `docs/CLAUDE_SKILL/debug_species_infeasibility.md`
+- A genuinely infeasible year is usually a handful of targets that cannot be met on the available land. Start with the bound report every year writes before its model is built — see [Diagnosing Infeasible Years](#diagnosing-infeasible-years)
+
+### Diagnosing Infeasible Years
+
+Every constraint row is a linear expression over decision variables whose bounds are already known. Before each year's model is built, `luto/solvers/row_bounds.py` works out the range each row's left-hand side can take and compares it with the row's target — first over the variable bounds alone, then under the bounds the rows themselves imply (the land-use shares of a cell cannot together exceed its agricultural area; a transition cannot move more land than its source holds). Every row, in every constraint family, gets a verdict:
+
+| Verdict | Meaning | What happens |
+|---|---|---|
+| `impossible` | No feasible point can meet the row | Reported with its shortfall in physical units. With `BOUND_PROP_ON_IMPOSSIBLE = 'stop'` (default) the run stops at that year before the model is built, since no solve could succeed |
+| `redundant` | Every point within the variable bounds meets the row | Reported. Dropped before the build if its family is listed in `BOUND_PROP_DROP_FAMILIES` — exact: the solution does not change, and the row appears in the shadow prices at 0 with `dropped = True` |
+| `tight` | The row can be met only at the extreme of its bounds (a knife-edge) | Reported for the target families (GBF2/3/4/8, water, GHG, demand, renewable, regional adoption) |
+| `near_redundant`, `straddle` | Met everywhere up to the tolerance; nothing proven | Counted in the run log |
+
+**Outputs** in `out_<year>/`, written before the solve — so they exist even when the year fails:
+- `bound_report_<year>.csv` — one line per impossible, redundant or tight row: `family`, `name` (the constraint name in the saved model), the row's labels (`region` — the NRM / IBRA region, water region id, state or regional cap the row is about; `GBF_target` = the vegetation group / species / community a GBF3 / GBF4 / GBF8 row targets; `GBF4_presence`; `demand_commodity`; `demand_bound` = eq / lower / upper; `am_idx` = the renewable option of a renewable row), `rhs_raw` (the target), `lo_raw` / `hi_raw` (the range over the variable bounds), `lo_implied_raw` / `hi_implied_raw` (the range under the implied bounds), `best_raw` (how far the target is met at the most favourable reachable point — negative is the shortfall), `worst_raw`, `unit` (ha, ML, tCO2e, t, MWh), `status` / `status_implied`, `dropped`
+- `bound_preflight_<year>.csv` — for each variable block: variables that no constraint touches, and NaN or inverted bounds
+- The run log — a table of rows per family and verdict, and one line per impossible row with its shortfall
+
+The check needs no solver — it is arithmetic on the constraint matrix and the variable bounds — so the report can be reproduced and shared without a Gurobi licence.
+
+**What it cannot see.** It proves facts about one row at a time. Targets that are each achievable on their own but compete for the same cells (several species sharing habitat, a water limit against a planting target) are not detected, so "nothing proven" does not mean feasible. When the solver still reports INFEASIBLE:
+- Load `debug_model_<base_year>_<target_year>.mps`, saved in the run directory before every solve, compute an IIS, and decode the `.ilp` with `luto/tools/inspect_iis.py`
+- Follow `docs/CLAUDE_SKILL/debug_species_infeasibility.md` (per-species maximisation) or `docs/CLAUDE_SKILL/debug_iis_from_zip.md` (IIS from a run archive)
+
+The settings (`BOUND_PROP_REL_TOL`, `BOUND_PROP_DROP_FAMILIES`, `BOUND_PROP_ON_IMPOSSIBLE`) are under [Solver Configuration](#solver-configuration).
 
 
 ### Getting Help
@@ -185,6 +214,7 @@ result = my_expensive_function(my_data)
 - 16 GB RAM at `RESFACTOR >= 10`; 32 GB or more for `RESFACTOR = 5`. Full resolution (`RESFACTOR = 1`) is an HPC workload — budget several hundred GB and expect the write/report phase to dominate peak memory.
 - 50 GB available disk space for input data and outputs
 - GUROBI optimization solver license (academic licenses available); `gurobipy` is pinned to 13.0.0
+- CPLEX is **planned** as an alternative solving engine. The `cplex` / `docplex` Python bindings ship in `requirements.yml`; using them additionally requires a licensed IBM ILOG CPLEX Optimization Studio 22.2 installation. GUROBI remains the only engine the model solves with today
 
 **Supported Operating Systems:**
 - Windows 10/11
@@ -207,12 +237,18 @@ conda env create -f requirements.yml
 conda activate luto
 ```
 
-### 3. Configure GUROBI Solver
-LUTO2 requires GUROBI for optimization. Follow these steps:
+### 3. Configure the Solver
+LUTO2 currently solves with GUROBI. Follow these steps:
 ```bash
 # 1) Set up your GUROBI license (academic license available at gurobi.com)
 # 2) Place your gurobi.lic file in the appropriate directory
 ```
+
+**CPLEX (planned).** We plan to support CPLEX as a second solving engine, so that a run can be
+solved with either engine. The `cplex` and `docplex` packages are already part of
+`requirements.yml`; a licensed IBM ILOG CPLEX Optimization Studio 22.2 installation is needed to
+provide the native solver runtime. Nothing in the model reads CPLEX yet — no settings switch
+exists, and every run goes through GUROBI.
 
 ### 4. Obtain Input Data
 The LUTO2 input database is approximately 40 GB and contains sensitive data. 
@@ -244,14 +280,13 @@ settings.SIM_YEARS = list(range(2020, 2051, 5))
 
 settings.WATER_LIMITS = 'on'                            # 'on' or 'off'.
 settings.GHG_EMISSIONS_LIMITS = 'low'                   # 'off', 'low', 'medium', or 'high'
-settings.DEMAND_CONSTRAINT_TYPE = 'hard'                # 'hard' (per-commodity DEMAND_BOUNDS) or 'soft'
 
 settings.GBF2_TARGET = 'high'                           # 'off', 'low', 'medium', or 'high'
-settings.GBF3_NVIS_TARGET = 'off'                       # 'off', 'medium', 'high', or 'USER_DEFINED'
+settings.GBF3_NVIS_TARGET = 'off'                       # 'off', 'medium', 'high', 'SPECIFIED', or 'CSV_DEFINED'
 settings.GBF3_NVIS_REGION_MODE = 'NRM'                  # 'AUSTRALIA', 'NRM', or 'IBRA_REG'
-settings.GBF4_TARGET_SNES = 'off'                       # 'off', 'USER_DEFINED', or 'dict'
-settings.GBF4_TARGET_ECNES = 'off'                      # 'off', 'USER_DEFINED', or 'dict'
-settings.GBF8_TARGET = 'off'                            # 'on' or 'off'
+settings.GBF4_TARGET_SNES = 'off'                       # 'off', 'medium', 'high', 'SPECIFIED', or 'CSV_DEFINED'
+settings.GBF4_TARGET_ECNES = 'off'                      # 'off', 'medium', 'high', 'SPECIFIED', or 'CSV_DEFINED'
+settings.GBF8_TARGET = 'off'                            # 'off', 'medium', 'high', or 'USER_DEFINED'
 
 settings.DYNAMIC_PRICE = True                           # Demand elasticity-based dynamic pricing
 
@@ -310,7 +345,8 @@ Results are saved in a run directory named `output/<timestamp>_RF<resfactor>_<fi
 2. **Raw Data Outputs:**
    - **NetCDF Files:** Spatial datasets (`.nc`) for each year and variable
    - **CSV Files:** Tabular data summaries for regional analysis
-   - **Shadow Prices:** `out_<year>/shadow_prices_<year>.csv` — the dual value of every binding constraint (GHG, water, demand, GBF2/3/4/8, renewable, regional adoption), reported both per real unit and normalised to AUD
+   - **Shadow Prices:** `out_<year>/shadow_prices_<year>.csv` — the dual value of every binding constraint (GHG, water, demand, GBF2/3/4/8, renewable, regional adoption), reported both per real unit and normalised to AUD; rows dropped before the build as redundant are listed with price 0 and `dropped = True`
+   - **Bound Reports:** `out_<year>/bound_report_<year>.csv` and `bound_preflight_<year>.csv` — the verdict of the pre-solve bound check for every impossible, redundant and tight row, with targets and shortfalls in physical units, written before the model is built (see [Diagnosing Infeasible Years](#diagnosing-infeasible-years))
 
 3. **Execution Logs:** 
    - `LUTO_RUN__stdout.log`: Standard output logs
@@ -328,12 +364,11 @@ LUTO2 behavior can be customized through the `luto.settings` module. Key paramet
 - `OBJECTIVE`: Optimization objective ('maxprofit' or 'mincost')
 
 ### Demand Constraints
-- `DEMAND_CONSTRAINT_TYPE`: `'hard'` (default) forces production into per-commodity bounds; `'soft'` allows deviation at a price-weighted penalty
-- `DEMAND_BOUNDS`: Per-commodity `[lower, upper]` multipliers applied to the demand target under the hard constraint. Most commodities are pinned at `[1.0, 1.0]`; sheep wool is relaxed because meat and wool are co-produced in biologically fixed ratios
+- Every constraint is hard: production is forced into per-commodity bounds (there is no soft, penalised option)
+- `DEMAND_BOUNDS`: Per-commodity `[lower, upper]` multipliers applied to the demand target. Most commodities are pinned at `[1.0, 1.0]`; sheep wool is relaxed because meat and wool are co-produced in biologically fixed ratios
 
 ### Environmental Constraints
 - `GHG_EMISSIONS_LIMITS`: Greenhouse gas emission targets ('off', 'low', 'medium', 'high')
-- `GHG_CONSTRAINT_TYPE` / `WATER_CONSTRAINT_TYPE` / `GBF2_CONSTRAINT_TYPE`: 'hard' or 'soft'
 - `WATER_LIMITS`: Whether to enforce water yield constraints ('on' or 'off')
 - `CARBON_EFFECTS_WINDOW`: Years for carbon accumulation averaging (50, 60, 70, 80, or 90 years)
   - Determines the time period over which carbon sequestration is averaged
@@ -376,18 +411,17 @@ LUTO2 behavior can be customized through the `luto.settings` module. Key paramet
 - `TECH_ADOPT_MULT`: Scenario multiplier on technical adoption ceilings (Asparagopsis, Precision Ag, AgTech EI, Biochar)
 
 ### Transition Flow Model
-Transitions are modelled as explicit per-source delta flows: each cell's land is tracked back to the land uses it came from, and only the land that actually moves is charged.
-
-- `EXACT_REACHABILITY_MIN_FRACTION` (θ): The exact ↔ crisp dial. Each cell's dvar fractions at or below θ are folded into that cell's dominant fraction before delta variables are built, trading resolution for model size. θ→0 is the pure exact per-source model; θ→1 reproduces the old crisp dominant-land-use model. Applies to agricultural sources only — non-agricultural sources are always exact
+Transitions are modelled as explicit per-source delta flows: each cell's land is tracked back to the land uses it came from, and only the land that actually moves is charged. The model is exact: every nonzero land-use fraction of a cell in the base year (above the `ROUND_DECIMALS` noise floor) is its own source with its own flow variables, for agricultural and non-agricultural land uses alike. There is no dial that merges small fractions into a cell's dominant land use.
 
 ### Solver Configuration
 - `THREADS`: Number of parallel threads for optimization (default: 32)
-- `RETRY_PARAMS`: Ordered list of solve attempts, each a `(NumericFocus, Method, Crossover, Presolve, BarHomogeneous)` tuple. The algorithm is chosen here — there is no standalone `SOLVE_METHOD` setting. The default first attempt is barrier with presolve off; the fallback is dual simplex
+- `RETRY_PARAMS`: Ordered list of solve attempts, each a `(NumericFocus, Method, Crossover, Presolve, BarHomogeneous)` tuple. The algorithm is chosen here — there is no standalone `SOLVE_METHOD` setting. The default first attempt is barrier with presolve, crossover and the homogeneous algorithm left automatic (`-1`); the fallback is dual simplex
 - `FEASIBILITY_TOLERANCE` / `OPTIMALITY_TOLERANCE` / `BARRIER_CONVERGENCE_TOLERANCE`: Solver tolerances. `ROUND_DECIMALS` and the near-zero bound snapping threshold are derived from `FEASIBILITY_TOLERANCE`
 - `RESCALE_FACTOR`: Target magnitude (1e3) that solver input arrays are rescaled to for numerical stability
 - `SOLVER_COEFF_MIN`: Universal floor (1e-4) below which a term's coefficient is dropped before entering Gurobi, keeping the constraint matrix range within Gurobi's safe zone
-- `DROP_UNREACHABLE_CONSTRAINTS`: Ordered list of constraint groups that may be sacrificed (least-valued first) when a year cannot solve; drops are recorded in `out_<year>/dropped_constraints_<year>.csv`
-- `INFEASIBILITY_DIAGNOSIS_GROUPS`: Constraint groups the infeasibility diagnosis restricts its probe to (pre-solve per-group test and post-failure IIS); `[]` turns the machinery off
+- `BOUND_PROP_REL_TOL`: Relative margin (default 1e-6) of the pre-solve bound check (see [Diagnosing Infeasible Years](#diagnosing-infeasible-years)). A row is called impossible or redundant only beyond max(10 × `FEASIBILITY_TOLERANCE`, `BOUND_PROP_REL_TOL` × the magnitude of the row's terms); a borderline row is kept
+- `BOUND_PROP_DROP_FAMILIES`: Constraint families whose provably redundant rows are dropped before the model is built (default `[]`; e.g. `['GBF3_NVIS', 'GBF4_SNES', 'GBF4_ECNES', 'GBF8']`). Exact — the solution does not change — and every row is still reported
+- `BOUND_PROP_ON_IMPOSSIBLE`: `'stop'` (default) ends the run at a year with a provably impossible row, before its model is built; `'solve'` reports the row and solves anyway
 - `VERBOSE`: Control solver output verbosity
 
 ### Output Control

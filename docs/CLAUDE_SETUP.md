@@ -80,10 +80,9 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 - `AMORTISATION_PERIOD`: Period for cost amortization in years (default: 30)
 
 ### Environmental Constraints
+Every constraint is hard: there are no soft / penalised options.
 - `GHG_EMISSIONS_LIMITS`: Greenhouse gas targets ('off', 'low', 'medium', 'high')
-- `GHG_CONSTRAINT_TYPE`: Hard or soft constraint ('hard' or 'soft')
 - `WATER_LIMITS`: Water yield constraints ('on' or 'off')
-- `WATER_CONSTRAINT_TYPE`: Hard or soft constraint ('hard' or 'soft')
 - `WATER_CLIMATE_CHANGE_IMPACT`: Apply climate change to water yields ('on' or 'off')
 - `WATER_STRESS`: Historical yield requirement fraction (default: 0.6 = 60%)
 - `CARBON_EFFECTS_WINDOW`: Years for carbon accumulation averaging (50, 60, 70, 80, or 90 years)
@@ -92,12 +91,11 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
   - Default: 50 years (follows S-curve logic with rapid early accumulation)
 - `BIODIVERSITY_TARGET_GBF_*`: Global Biodiversity Framework targets
   - `GBF2_TARGET`: Priority degraded areas restoration ('off', 'low', 'medium', 'high')
-  - `GBF2_CONSTRAINT_TYPE`: Hard or soft constraint ('hard' or 'soft')
-  - `GBF3_NVIS_TARGET`: NVIS vegetation group targets ('off', 'medium', 'high', 'USER_DEFINED')
+  - `GBF3_NVIS_TARGET`: NVIS vegetation group targets ('off', 'medium', 'high', 'CSV_DEFINED')
   - `GBF3_NVIS_TARGET_CLASS`: Layer class ('NVIS_MVG' or 'NVIS_MVS'); also selects the class for IBRA layers when `GBF3_NVIS_REGION_MODE = 'IBRA_REG'`
   - `GBF3_NVIS_REGION_MODE`: 'AUSTRALIA', 'NRM', or 'IBRA_REG' (IBRA bioregion targets are handled through the NVIS stream — there is no separate `BIODIVERSITY_TARGET_GBF_3_IBRA` setting or IBRA constraint method)
-  - `GBF4_TARGET_SNES`: Species NES targets ('off', 'USER_DEFINED', or 'dict')
-  - `GBF4_TARGET_ECNES`: Ecological Community NES targets ('off', 'USER_DEFINED', or 'dict')
+  - `GBF4_TARGET_SNES`: Species NES targets ('off', 'medium', 'high', 'SPECIFIED', or 'CSV_DEFINED')
+  - `GBF4_TARGET_ECNES`: Ecological Community NES targets ('off', 'medium', 'high', 'SPECIFIED', or 'CSV_DEFINED')
   - `GBF4_SNES_TARGETS_OVERRIDE`: dict letting a few species carry a different target from the rest (empty = no override)
   - `GBF4_SNES_CAP_MARGIN`: safety margin (percentage points, default 2.0) subtracted from each species' `ATTAINABLE_LEVEL` when clamping an interpolated SNES target, to keep a feasibility buffer (effective cap = `ATTAINABLE_LEVEL - GBF4_SNES_CAP_MARGIN`)
   - `GBF8_TARGET`: Species conservation targets ('on' or 'off')
@@ -116,9 +114,12 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 - `FEASIBILITY_TOLERANCE`: Solver feasibility tolerance (default: 1e-6)
 - `OPTIMALITY_TOLERANCE`: Optimality tolerance (default: 1e-2)
 - `BARRIER_CONVERGENCE_TOLERANCE`: Barrier method convergence (default: 1e-5)
-- `RESCALE_FACTOR`: Rescaling magnitude for numerical stability (default: 1e3)
-- `SOLVER_COEFF_MIN`: Universal minimum coefficient threshold (default: 1e-4). The `_qsum(coeffs, gurobi_vars)` helper in `solver.py` is called by **all** constraint and objective builders; any term whose absolute value falls below this threshold is dropped before entering Gurobi. Applies to Economy, Biodiversity-quality, GHG, Water, Renewable, GBF2/3/4/8, Demand/Quantity, and Regional Adoption limits. Chosen empirically: 1e-3 caused ~3% economic loss; 1e-4 retains meaningful small coefficients while keeping the matrix range ratio at 1e8 (well within Gurobi's safe zone). `RESCALE_ZERO_THRESHOLD` was removed — post-rescale zeroing is superseded by this universal filter.
-  - `_qsum` floors coefficients as each term is *built*, but some coefficients are created **downstream** — e.g. the accounting term `coeff × X_acct`, where a folded-sliver `X_acct` is a `LinExpr` with `~1/RESFACTOR²` weights, distributes a kept `coeff` into sub-floor products. A single post-build sweep, `_floor_assembled_matrix(model)`, runs after `_setup_objective()` and drops `|coeff| < SOLVER_COEFF_MIN` from both the assembled constraint matrix (`getA()`) **and** the objective vector (`v.Obj`), which `getA()` can't reach. See `docs/FINDINGS.md` (20260721).
+- `RESCALE_FACTOR`: Target magnitude of the per-row rescale (default: 1e3) — `row_builder.contract` lands max|row| and |RHS| symmetrically around it
+- `SOLVER_COEFF_MIN`: Universal minimum coefficient threshold (default: 1e-4). Applied by `row_builder.contract` to every family's stacked block and to the objective block (`_setup_objective` scales it to million AUD and floors again) as a two-step contract: an entry dropped when `|a| < SOLVER_COEFF_MIN`, the scaled coefficient floored again after the row rescale. Applies to Economy, Biodiversity-quality, GHG, Water, Renewable, GBF2/3/4/8, Demand/Quantity, and Regional Adoption limits; the structural ±1 rows (flow, ag-mgt link) are exempt. Chosen empirically: 1e-3 caused ~3% economic loss; 1e-4 retains meaningful small coefficients while keeping the matrix range ratio at 1e8 (well within Gurobi's safe zone). `RESCALE_ZERO_THRESHOLD` was removed — post-rescale zeroing is superseded by this universal filter.
+  - The former "stage 4" (floor the MERGED coefficient) existed because the θ-fold accounting view was substituted into every row with fold weights w ~ 1/RESFACTOR²; the fold itself was removed on 2026-09-08 (exact transition model only), so no policy coefficient is ever multiplied by a fold weight. See `docs/FINDINGS.md` (20260721 for the original diagnosis, 20260908 for the removal).
+- `BOUND_PROP_REL_TOL`: Relative margin of the pre-solve bound propagation, `solvers/row_bounds.py` (default: 1e-6). Every row's activity interval over the column box is compared with its rhs within max(10 × `FEASIBILITY_TOLERANCE`, `BOUND_PROP_REL_TOL` × max(|rhs|, Σ|a|·|bound|)) — relative to the magnitude of the row's terms, because the rounding of the sum grows with them, and never under the solver's own tolerance, so a row called IMPOSSIBLE is beyond anything the engine could accept. A row inside the margin is TIGHT or NEAR_REDUNDANT and always kept
+- `BOUND_PROP_DROP_FAMILIES`: Row families whose REDUNDANT rows are dropped before the model is built (default: `[]`; e.g. `['GBF3_NVIS', 'GBF4_SNES', 'GBF4_ECNES', 'GBF8']`). Exact — every point of the column box satisfies a redundant row — and the dropped rows are priced 0 in `shadow_prices_<year>.csv` (`dropped = True`). Every row is classified and written to `bound_report_<year>.csv` whatever the list holds; impossible and tight rows are never dropped
+- `BOUND_PROP_ON_IMPOSSIBLE`: `'stop'` (default: a year with an impossible row stops before the model is built — no solve could succeed) or `'solve'` (report it and solve anyway)
 
 ### Output Writing Configuration
 - `WRITE_REPORT_MAX_MEM_MB`: Max memory (MB) for report generation (default: `64 * 1024` = 65536). Parallel-write `n_jobs` is budgeted from this: `get_n_jobs(peak_mb)` subtracts the parent `Data` object's live RSS, then divides the remaining budget by each worker's `peak_mb + ~500 MB` overhead (true per-worker cost, not a plain floor-division).
@@ -131,11 +132,6 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 - `REGIONAL_ADOPTION_NON_AG_CAP`: uniform sum-of-non-ag cap % per region (only under `NON_AG_CAP`)
 - `REGIONAL_ADOPTION_NON_AG_CAP_REGIONS`: scope of the cap — `[]` caps all regions (default); a list of region names caps only those, leaving the rest uncapped
 - `REGIONAL_ADOPTION_NON_AG_CAP_OVERRIDE`: dict of per-region cap % that override the uniform `REGIONAL_ADOPTION_NON_AG_CAP` for named regions (applied within the `_REGIONS` scope)
-
-### Land-Use Culling
-- `CULL_MODE`: Land-use culling mode ('absolute', 'percentage', 'none')
-- `MAX_LAND_USES_PER_CELL`: Max land uses per cell if absolute culling (default: 12)
-- `LAND_USAGE_CULL_PERCENTAGE`: Culling percentage if percentage mode (default: 0.15)
 
 ## Memory and Performance
 

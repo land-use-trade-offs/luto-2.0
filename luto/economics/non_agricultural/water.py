@@ -21,7 +21,7 @@ import numpy as np
 import luto.data as Data
 
 from typing import Optional
-from luto import tools
+from luto import settings
 
 
 def get_w_net_yield_env_planting(
@@ -126,7 +126,7 @@ def get_w_net_yield_sheep_agroforestry(
     ------
     Numpy array indexed by r
     """
-    sheep_j = tools.get_sheep_code(data)
+    sheep_j = data.DESC2AGLU['Sheep - modified land']
 
     # Only use the dryland version of sheep
     sheep_w_net_yield = ag_w_mrj[0, :, sheep_j]
@@ -157,7 +157,7 @@ def get_w_net_yield_beef_agroforestry(
     ------
     Numpy array indexed by r
     """
-    beef_j = tools.get_beef_code(data)
+    beef_j = data.DESC2AGLU['Beef - modified land']
 
     # Only use the dryland version of beef
     beef_w_net_yield = ag_w_mrj[0, :, beef_j]
@@ -200,7 +200,7 @@ def get_w_net_yield_sheep_carbon_plantings_belt(
     ------
     Numpy array indexed by r
     """
-    sheep_j = tools.get_sheep_code(data)
+    sheep_j = data.DESC2AGLU['Sheep - modified land']
 
     # Only use the dryland version of sheep
     sheep_w_net_yield = ag_w_mrj[0, :, sheep_j]
@@ -230,7 +230,7 @@ def get_w_net_yield_beef_carbon_plantings_belt(
     ------
     Numpy array indexed by r
     """
-    beef_j = tools.get_beef_code(data)
+    beef_j = data.DESC2AGLU['Beef - modified land']
 
     # Only use the dryland version of beef
     beef_w_net_yield = ag_w_mrj[0, :, beef_j]
@@ -256,14 +256,13 @@ def get_w_net_yield_beccs(data, yr_idx: int, water_dr_yield: Optional[np.ndarray
 
 
 def get_w_net_yield_destocked(data, ag_w_mrj):
-    unallocated_j = tools.get_unallocated_natural_land_code(data)
+    unallocated_j = data.DESC2AGLU['Unallocated - natural land']
     return ag_w_mrj[0, :, unallocated_j]
 
 
 def get_w_net_yield_matrix(
     data: Data,
     ag_w_mrj: np.ndarray,
-    lumap: np.ndarray,
     yr_idx: int,
     water_dr_yield: Optional[np.ndarray] = None,
     water_sr_yield: Optional[np.ndarray] = None
@@ -282,8 +281,8 @@ def get_w_net_yield_matrix(
         The water yields matrix for all non-agricultural land uses.
         Indexed by (r, k) where r is the cell index and k is the non-agricultural land usage index.
     """
-    agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, lumap)
-    cp_belt_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, lumap)
+    agroforestry_x_r = np.full(data.NCELLS, settings.AF_PROPORTION, dtype=np.float32)   # the share of a cell agroforestry can take: the same everywhere
+    cp_belt_x_r = np.full(data.NCELLS, settings.CP_BELT_PROPORTION, dtype=np.float32)   # the share of a cell carbon plantings (belt) can take
 
     non_agr_yield_matrices = [
         get_w_net_yield_env_planting(data, yr_idx, water_dr_yield, water_sr_yield)                     ,

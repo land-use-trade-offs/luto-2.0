@@ -611,7 +611,7 @@ def write_dvar_and_mosaic_map(data: Data, yr_cal, path):
         exist_re_irr  = xr.zeros_like(exist_re_dry).assign_coords(lm=['irr'])
         exist_re_full = (
             xr.concat([exist_re_dry, exist_re_irr], dim='lm')
-            .reindex(am=am_map.am.values, fill_value=0.0)
+            .reindex(am=am_map['am'].values, fill_value=0.0)
         )
         am_map = xr.concat([am_map, exist_re_full], dim='lu')
 
@@ -899,7 +899,11 @@ def write_quantity(data: Data, yr_cal: int, path: str) -> np.ndarray:
 
     # ==================== Separate Spatial Outputs ====================
 
-    # Get the commodity quantity dataarrays (sptial layers, (tonnes/KL)/(cell))
+    # Get the commodity quantity dataarrays (spatial layers, (tonnes/KL)/(cell)). The default threshold (0.01) is a map
+    # CLEAN-UP: a cell whose total ag / non-ag / ag-mgt share is at or below 1 % is zeroed before the product, so the
+    # layers and the per-region tables below do not carry slivers. It makes these layers sum to slightly LESS than the
+    # Production total in `data.prod_data` (the comparison CSV above), which counts every share (threshold 0) as the
+    # solver's demand rows did.
     ag_q_mrc, non_ag_p_rc, am_p_amrc = data.get_actual_production_lyr(yr_cal)
 
     ag_q_mrc  = add_all(ag_q_mrc,  ['lm'])
@@ -1053,7 +1057,7 @@ def write_economics(data: Data, yr_cal, path):
     Transition costs are the TRUE per-source flow costs `Σ_src cost[src]·D[src]` — the exact
     quantities the solver charged — computed from the solved delta dicts
     (`data.delta_dvars_ag2ag[yr_cal]` / `data.delta_dvars_ag2nonag[yr_cal]`, source-keyed with leaves
-    over each source's dvar>θ cells at the previous simulated year). They are absolute $ paid,
+    over each source's cells at the previous simulated year). They are absolute $ paid,
     so they are NOT multiplied by any dvar downstream."""
     yr_idx = yr_cal - data.YR_CAL_BASE
     gap = get_year_gap(data, yr_cal)  # annualise: divide period value matrices by this
@@ -1079,7 +1083,7 @@ def write_economics(data: Data, yr_cal, path):
     ag_rev_df.columns.names = ag_cost_df.columns.names = ['lu', 'lm', 'source']
 
     # TRUE ag→ag transition cost paid: Σ_src cost[src]·D[src] per cost component, scattered to
-    # global cells. Both dicts share the (from_m, from_j) keys and each source's dvar>θ cell axis
+    # global cells. Both dicts share the (from_m, from_j) keys and each source's cell axis
     # (get_base_dvar_mj_cell_map at the previous simulated year), so the product is exact.
     if yr_cal_sim_pre is not None:
         ag2ag_paid   = {}   # {cost_type: dense (NLMS, NCELLS, N_AG_LUS) of $ paid on [to_m, r, to_j]}
@@ -1283,15 +1287,15 @@ def write_economics(data: Data, yr_cal, path):
             wind_dvar_delta  = wind_dvar_now  - am_dvar_xr_pre.sel(am='Onshore Wind')
 
         solar_potential = xr.concat([
-            (solar_dvar_now * solar_opex_xr).reindex(lu=xr_cost_am.lu.values, fill_value=0.0).expand_dims(am=['Utility Solar PV']).expand_dims(Cost_type=['Operating Cost']),
-            (solar_dvar_delta * solar_capex_xr / gap).reindex(lu=xr_cost_am.lu.values, fill_value=0.0).expand_dims(am=['Utility Solar PV']).expand_dims(Cost_type=['Capital expenditure']),
+            (solar_dvar_now * solar_opex_xr).reindex(lu=xr_cost_am['lu'].values, fill_value=0.0).expand_dims(am=['Utility Solar PV']).expand_dims(Cost_type=['Operating Cost']),
+            (solar_dvar_delta * solar_capex_xr / gap).reindex(lu=xr_cost_am['lu'].values, fill_value=0.0).expand_dims(am=['Utility Solar PV']).expand_dims(Cost_type=['Capital expenditure']),
         ], dim='Cost_type')
         wind_potential = xr.concat([
-            (wind_dvar_now * wind_opex_xr).reindex(lu=xr_cost_am.lu.values, fill_value=0.0).expand_dims(am=['Onshore Wind']).expand_dims(Cost_type=['Operating Cost']),
-            (wind_dvar_delta * wind_capex_xr / gap).reindex(lu=xr_cost_am.lu.values, fill_value=0.0).expand_dims(am=['Onshore Wind']).expand_dims(Cost_type=['Capital expenditure']),
+            (wind_dvar_now * wind_opex_xr).reindex(lu=xr_cost_am['lu'].values, fill_value=0.0).expand_dims(am=['Onshore Wind']).expand_dims(Cost_type=['Operating Cost']),
+            (wind_dvar_delta * wind_capex_xr / gap).reindex(lu=xr_cost_am['lu'].values, fill_value=0.0).expand_dims(am=['Onshore Wind']).expand_dims(Cost_type=['Capital expenditure']),
         ], dim='Cost_type')
 
-        re_reindexed = xr.concat([solar_potential, wind_potential], dim='am').reindex(am=xr_cost_am.am.values, lu=xr_cost_am.lu.values, fill_value=0.0)
+        re_reindexed = xr.concat([solar_potential, wind_potential], dim='am').reindex(am=xr_cost_am['am'].values, lu=xr_cost_am['lu'].values, fill_value=0.0)
         xr_cost_am = xr.concat([
             (xr_cost_am.sel(Cost_type='Operating Cost') + re_reindexed.sel(Cost_type='Operating Cost')).expand_dims(Cost_type=['Operating Cost']),
             re_reindexed.sel(Cost_type='Capital expenditure').expand_dims(Cost_type=['Capital expenditure']),
@@ -1300,8 +1304,8 @@ def write_economics(data: Data, yr_cal, path):
         solar_rev_opt = ag_revenue.get_utility_solar_pv_effect_r_mrj(data, ag_rev_mrj, yr_idx)
         wind_rev_opt  = ag_revenue.get_onshore_wind_effect_r_mrj(data, ag_rev_mrj, yr_idx)
         re_rev = xr.concat([
-            (solar_dvar_now * xr.DataArray(solar_rev_opt, dims=['lm', 'cell', 'lu'], coords={'lu': solar_lu})).reindex(lu=xr_revenue_am.lu.values, fill_value=0.0).expand_dims(am=['Utility Solar PV']),
-            (wind_dvar_now  * xr.DataArray(wind_rev_opt,  dims=['lm', 'cell', 'lu'], coords={'lu': wind_lu})).reindex(lu=xr_revenue_am.lu.values, fill_value=0.0).expand_dims(am=['Onshore Wind']),
+            (solar_dvar_now * xr.DataArray(solar_rev_opt, dims=['lm', 'cell', 'lu'], coords={'lu': solar_lu})).reindex(lu=xr_revenue_am['lu'].values, fill_value=0.0).expand_dims(am=['Utility Solar PV']),
+            (wind_dvar_now  * xr.DataArray(wind_rev_opt,  dims=['lm', 'cell', 'lu'], coords={'lu': wind_lu})).reindex(lu=xr_revenue_am['lu'].values, fill_value=0.0).expand_dims(am=['Onshore Wind']),
         ], dim='am')
         xr_revenue_am = xr_revenue_am + re_rev.reindex_like(xr_revenue_am, fill_value=0.0)
 
@@ -1341,7 +1345,7 @@ def write_economics(data: Data, yr_cal, path):
         def _expand_exist(da, cost_type_label):
             return (
                 xr.concat([da, xr.zeros_like(da).assign_coords(lm=['irr'])], dim='lm')
-                .reindex(am=xr_cost_am.am.values, fill_value=0.0)
+                .reindex(am=xr_cost_am['am'].values, fill_value=0.0)
                 .expand_dims(Cost_type=[cost_type_label])
             )
 
@@ -1362,7 +1366,7 @@ def write_economics(data: Data, yr_cal, path):
                     'region_state': ('cell', data.REGION_STATE_NAME),
                     'region_NRM': ('cell', data.REGION_NRM_NAME)},
         ).expand_dims(lm=['dry'], lu=['Existing Capacity'])
-        exist_rev_full = xr.concat([exist_rev_da, xr.zeros_like(exist_rev_da).assign_coords(lm=['irr'])], dim='lm').reindex(am=xr_revenue_am.am.values, fill_value=0.0)
+        exist_rev_full = xr.concat([exist_rev_da, xr.zeros_like(exist_rev_da).assign_coords(lm=['irr'])], dim='lm').reindex(am=xr_revenue_am['am'].values, fill_value=0.0)
         xr_revenue_am  = xr.concat([xr_revenue_am, exist_rev_full], dim='lu')
 
     del am_dvar_mrj, am_revenue_mat, am_cost_mat
@@ -1419,8 +1423,8 @@ def write_economics(data: Data, yr_cal, path):
                        region_NRM=('cell', data.REGION_NRM_NAME))
     )
 
-    non_ag_rev_mat  = tools.non_ag_rk_to_xr(data, non_ag_revenue.get_rev_matrix(data, yr_cal, ag_rev_mrj, data.lumaps[yr_cal]))
-    non_ag_cost_mat = tools.non_ag_rk_to_xr(data, non_ag_cost.get_cost_matrix(data, ag_cost_mrj, data.lumaps[yr_cal], yr_cal))
+    non_ag_rev_mat  = tools.non_ag_rk_to_xr(data, non_ag_revenue.get_rev_matrix(data, yr_cal, ag_rev_mrj))
+    non_ag_cost_mat = tools.non_ag_rk_to_xr(data, non_ag_cost.get_cost_matrix(data, ag_cost_mrj, yr_cal))
     nonag2nonag_mat = tools.non_ag_rk_to_xr(data, non_ag_transitions.get_nonag2nonag_transition_matrix(data)) / gap
 
     # TRUE ag→nonag transition cost paid: Σ_src cost[src]·D[src] per target k, scattered to global
@@ -1701,7 +1705,7 @@ def write_transition_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 
     Every quantity is the TRUE flow `Σ_src leaf[src]·D[src]` over the solved delta dict
     `data.delta_dvars_ag2ag[yr_cal]` ({(from_m, from_j): [to_m, local_r, to_j]} over each source's
-    dvar>θ cells at the previous simulated year) — the exact per-source from→to attribution the
+    cells at the previous simulated year) — the exact per-source from→to attribution the
     solver priced, replacing the old `dvar_base × dvar_target × per-unit-matrix` compositional
     approximation:
       - Area  : D × REAL_AREA                          ha moved from → to
@@ -1927,7 +1931,7 @@ def write_transition_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     """Ag→non-ag transition reporting from the solved per-source flow deltas.
 
     Every quantity is the TRUE flow `Σ_src leaf[src]·D[src]` over the solved delta dict
-    `data.delta_dvars_ag2nonag[yr_cal]` ({(from_m, from_j): [local_r, k]} over each source's dvar>θ
+    `data.delta_dvars_ag2nonag[yr_cal]` ({(from_m, from_j): [local_r, k]} over each source's
     cells at the previous simulated year) — exact per-source from→to attribution, replacing the old
     `base-composition × target-dvar × per-unit` approximation (which also double-weighted GHG/water:
     per-unit × delta AND × target dvar):
@@ -1959,10 +1963,10 @@ def write_transition_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         ag2nonag_cost_mat = non_ag_transitions.get_transition_matrix_ag2nonag(
             data, yr_cal_sim_pre, yr_cal, separate=True)     # {lu_name: {(fm,fj): {Cost-type: (n,)}}}
         ag_g_mrj      = ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True)
-        ghg_rk_full   = non_ag_ghg.get_ghg_matrix(data, ag_g_mrj, data.lumaps[yr_cal_sim_pre]).astype(np.float32)
+        ghg_rk_full   = non_ag_ghg.get_ghg_matrix(data, ag_g_mrj).astype(np.float32)
         ag_w_mrj      = ag_water.get_wreq_matrices(data, yr_idx)
         water_rk_full = non_ag_water.get_w_net_yield_matrix(
-            data, ag_w_mrj, data.lumaps[yr_cal_sim_pre], yr_idx).astype(np.float32)
+            data, ag_w_mrj, yr_idx).astype(np.float32)
 
     # Region groupings (sorted unique names + integer codes, matching process_chunks).
     reg_info = []
@@ -2220,7 +2224,7 @@ def write_transition_nonag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     # ==================== Transitions - Cost ====================
     # TRUE per-source flow cost: Σ_k cost[k]·D[k] — the exact quantity the solver charged for
     # nonag→ag conversions (e.g. reversible Destocked land back to ag). Both dicts are keyed by the
-    # non-ag source k with leaves [to_m, local_r, to_j] over that source's dvar>θ cells at the
+    # non-ag source k with leaves [to_m, local_r, to_j] over that source's cells at the
     # previous simulated year; local_r decodes to global cells via get_base_nonag_dvar_k_cell_map.
     non_ag_transitions_flat = {}
     if dvar_D_nonag2ag:
@@ -2647,7 +2651,7 @@ def write_ghg(data: Data, yr_cal: int, path: str):
         ).assign_coords(region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME))
     non_ag_g_rk = tools.non_ag_rk_to_xr(
         data,
-        non_ag_ghg.get_ghg_matrix(data, ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True), data.lumaps[yr_cal])
+        non_ag_ghg.get_ghg_matrix(data, ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True))
     )
 
     xr_ghg_non_ag = non_ag_dvar_rk * non_ag_g_rk
@@ -2844,7 +2848,7 @@ def write_water(data: Data, yr_cal, path):
         )
         non_ag_w_rk = tools.non_ag_rk_to_xr(
             data,
-            non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj.values, data.lumaps[yr_cal], yr_idx)
+            non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj.values, yr_idx)
         )
         ag_man_w_mrj = tools.am_mrj_to_xr(  # Ag-man water yield only related to water requirement, that not affected by climate change
             data,
@@ -2857,7 +2861,7 @@ def write_water(data: Data, yr_cal, path):
         )
         non_ag_w_rk = tools.non_ag_rk_to_xr(
             data,
-            non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj.values, data.lumaps[yr_cal], yr_idx, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)
+            non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj.values, yr_idx, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)
         )
         ag_man_w_mrj = tools.am_mrj_to_xr(  # Ag-man water yield only related to water requirement, that not affected by climate change
             data,
@@ -3093,7 +3097,7 @@ def write_biodiversity_quality_scores(data: Data, yr_cal, path):
     # Decision variables are the same for every backend layer — load once
     ag_dvar_mrj = chunk_unify_size(tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
         ).assign_coords(region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME))
-    ag_mam_dvar_mrj = chunk_unify_size(tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
+    ag_man_dvar_mrj = chunk_unify_size(tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
         ).assign_coords(region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME))
     non_ag_dvar_rk = chunk_unify_size(tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
         ).assign_coords(region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME))
@@ -3138,7 +3142,7 @@ def write_biodiversity_quality_scores(data: Data, yr_cal, path):
         # Weighted biodiversity scores
         xr_priority_ag = ag_dvar_mrj * bio_ag_priority_mrj
         xr_priority_non_ag = non_ag_dvar_rk * bio_non_ag_priority_rk
-        xr_priority_am = ag_mam_dvar_mrj * bio_am_priority_amrj
+        xr_priority_am = ag_man_dvar_mrj * bio_am_priority_amrj
         xr_priority_all = xr.concat(
             [
                 xr_priority_ag.sum(dim=['lm', 'lu']).expand_dims({'Type': ['ag']}),
@@ -3622,7 +3626,7 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
         if not all_groups:
             cause = ("`GBF3_NVIS_TARGET` is 'off', so no groups are constrained — use 'all' to write "
                      "every group" if settings.GBF3_NVIS_TARGET == 'off' else
-                     "check GBF3_NVIS_REGION_MODE / GBF3_NVIS_SELECTED_REGIONS / GBF3_NVIS_EXCLUDE_REGION_GROUPS")
+                     "check GBF3_NVIS_REGION_MODE / GBF3_NVIS_SEL_REGION_TARGETS / GBF3_NVIS_MIN_AREA_HA")
             return (f"Skipping Biodiversity GBF3 NVIS scores for year {yr_cal}: `WRITE_GBF3_NVIS` is "
                     f"'selected' but no vegetation groups are selected — {cause}")
 
@@ -4035,7 +4039,7 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
         if not all_species:
             return (f"Skipping Biodiversity GBF4 SNES scores for year {yr_cal}: `WRITE_GBF4_SNES` is "
                     f"'selected' but no species are selected — check GBF4_SNES_REGION_MODE / "
-                    f"GBF4_SNES_SELECTED_REGIONS / GBF4_SNES_EXCLUDE_REGION_SPECIES")
+                    f"GBF4_SNES_SEL_REGION_TARGETS / GBF4_SNES_MIN_AREA_HA")
 
     # 2. Unify chunk ag/agmgt/nonag decision variables.
     am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]
@@ -4502,7 +4506,7 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
         if not all_species:
             return (f"Skipping Biodiversity GBF4 ECNES scores for year {yr_cal}: `WRITE_GBF4_ECNES` is "
                     f"'selected' but no communities are selected — check GBF4_ECNES_REGION_MODE / "
-                    f"GBF4_ECNES_SELECTED_REGIONS / GBF4_ECNES_EXCLUDE_REGION_COMMUNITIES")
+                    f"GBF4_ECNES_SEL_REGION_TARGETS / GBF4_ECNES_MIN_AREA_HA")
 
     # 2. Unify chunk ag/agmgt/nonag decision variables.
     am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]

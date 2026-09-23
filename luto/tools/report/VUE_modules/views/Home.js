@@ -239,7 +239,7 @@ window.HomeView = {
       if (runScenario.value['WRITE_GBF3_NVIS'] !== 'off') {
         await loadScript(chartOverview_bio_GBF3_NVIS['path'], chartOverview_bio_GBF3_NVIS['name'], VIEW_NAME);
       }
-      if (runScenario.value['GBF4_TARGET_SNES'] !== 'off') {
+      if (runScenario.value['WRITE_GBF4_SNES'] !== 'off') {
         await loadScript(chartOverview_bio_GBF4_SNES['path'], chartOverview_bio_GBF4_SNES['name'], VIEW_NAME);
       }
       if (runScenario.value['WRITE_GBF4_ECNES'] !== 'off') {
@@ -335,7 +335,7 @@ window.HomeView = {
       if (runScenario.value['WRITE_GBF3_NVIS'] !== 'off') {
         ChartData.value['Biodiversity']['GBF3 (NVIS)'] = window[chartOverview_bio_GBF3_NVIS['name']];
       }
-      if (runScenario.value['GBF4_TARGET_SNES'] !== 'off') {
+      if (runScenario.value['WRITE_GBF4_SNES'] !== 'off') {
         ChartData.value['Biodiversity']['GBF4 (SNES)'] = window[chartOverview_bio_GBF4_SNES['name']];
       }
       if (runScenario.value['WRITE_GBF4_ECNES'] !== 'off') {

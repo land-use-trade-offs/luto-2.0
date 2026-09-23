@@ -88,14 +88,12 @@ grid_search = {
     # --------------- GHG settings ---------------
     'GHG_EMISSIONS_LIMITS': ['low'],                                        # 'low'=core 1.8C 67% (LUF Report 2026); 'high'=higher ambition 1.5C 50% (lower priority sensitivity)
     'CARBON_PRICES_FIELD': ['CONSTANT'],
-    'GHG_CONSTRAINT_TYPE': ['hard'],                                        # 'hard' or 'soft'
     'USE_GHG_SCOPE_1': [True],                                              # True or False
 
     
     # --------------- Water constraints ---------------
     'WATER_REGION_DEF':['Drainage Division'],                               # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
     'WATER_LIMITS': ['on'],                                                 # 'on' or 'off'
-    'WATER_CONSTRAINT_TYPE': ['hard'],                                      # 'hard' or 'soft'
     'WATER_STRESS': [0.6],                                                  # Water yield must be >= 60% of historical; aligns with 2023 Planetary Boundaries update
     'WATER_CLIMATE_CHANGE_IMPACT': ['on'],                                  # 'on' or 'off'; climate change impacts on water yields
     'LIVESTOCK_DRINKING_WATER': [1],                                        # 1=ON; include livestock drinking water in water balance
@@ -103,7 +101,7 @@ grid_search = {
     
     # --------------- Biodiversity overall ---------------
     'BIO_QUALITY_LAYER': ['Suitability'],
-    'HCAS_CONTRIBUTION_PERCENTILE': ['USER_DEFINED'],                            # 50th percentile of HCAS per LUF Report 2026 (need to be 'USER_DEFINED', which is 50th percentile but with nudges for sheep/beef/dairy nat land)
+    'HCAS_CONTRIBUTION_PERCENTILE': ['CSV_DEFINED'],                            # the hand-set contribution column (the 50th percentile of HCAS per LUF Report 2026, nudged for sheep/beef/dairy nat land); also '10'-'90' or 'AG_UNIFORM'
     'CONNECTIVITY_SOURCE': ['NCI'],
     'CONNECTIVITY_LB': [0.7],                                               # Connectivity score importance: 0.7 per LUF Report 2026
 
@@ -120,25 +118,23 @@ grid_search = {
     # --------------- Biodiversity settings - GBF 2 ---------------
     'GBF2_TARGET': ['high'],                                  # 'off', 'low', 'medium', 'high'
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [15],                    # Core: 20% central; test [15,30] alongside (Third iteration)
-    'GBF2_CONSTRAINT_TYPE': ['hard'],                                       # 'hard' or 'soft'
 
     # --------------- Biodiversity settings - GBF 3 ---------------
-    'GBF3_NVIS_TARGET': ['high'],                             # 'off', 'medium', 'high', 'USER_DEFINED'
+    'GBF3_NVIS_TARGET': ['high'],                             # 'off', 'medium', 'high', 'CSV_DEFINED'
     'GBF3_NVIS_TARGET_CLASS': ['NVIS_MVS'],                                  # 'NVIS_MVG' or 'NVIS_MVS' NVIS class
     'GBF3_NVIS_REGION_MODE': ['AUSTRALIA'],                                 # 'AUSTRALIA', 'NRM', or 'IBRA_REG'
-    'GBF3_NVIS_SELECTED_REGIONS': [['North East', 'Goulburn Broken']],      # Only used when mode = 'NRM'
-    'BIODIVERSITY_TARGET_GBF_3_IBRA': ['off'],                              # 'off', 'medium', 'high', 'USER_DEFINED'
+    'GBF3_NVIS_SEL_REGION_TARGETS': [['North East', 'Goulburn Broken']],      # Only used when mode = 'NRM'
 
     # --------------- Biodiversity settings - GBF 4 ---------------
-    'GBF4_TARGET_SNES': ['USER_DEFINED'],                     # 'off', 'medium', 'high', or 'USER_DEFINED'
-    'GBF4_SNES_REGION_MODE': ['Australia'],                                 # 'Australia' or 'NRM'
-    'GBF4_SNES_SELECTED_REGIONS': [['North East', 'Goulburn Broken']],      # Only used when mode = 'NRM'
-    'GBF4_TARGET_ECNES': ['USER_DEFINED'],                    # 'off', 'medium', 'high', or 'USER_DEFINED'
-    'GBF4_ECNES_REGION_MODE': ['Australia'],                                # 'Australia' or 'NRM'
-    'GBF4_ECNES_SELECTED_REGIONS': [['North East', 'Goulburn Broken']],     # Only used when mode = 'NRM'
+    'GBF4_TARGET_SNES': ['CSV_DEFINED'],                     # 'off', 'medium', 'high', 'SPECIFIED', or 'CSV_DEFINED'
+    'GBF4_SNES_REGION_MODE': ['AUSTRALIA'],                                 # 'AUSTRALIA' or 'NRM'
+    'GBF4_SNES_SEL_REGION_TARGETS': [['North East', 'Goulburn Broken']],      # Only used when mode = 'NRM'
+    'GBF4_TARGET_ECNES': ['CSV_DEFINED'],                    # 'off', 'medium', 'high', 'SPECIFIED', or 'CSV_DEFINED'
+    'GBF4_ECNES_REGION_MODE': ['AUSTRALIA'],                                # 'AUSTRALIA' or 'NRM'
+    'GBF4_ECNES_SEL_REGION_TARGETS': [['North East', 'Goulburn Broken']],     # Only used when mode = 'NRM'
 
     # --------------- Biodiversity settings - GBF 8 ---------------
-    'GBF8_TARGET': ['off'],                                   # 'off', 'medium', 'high', or 'USER_DEFINED'
+    'GBF8_TARGET': ['off'],                                   # 'off', 'medium', 'high', 'SPECIFIED', or 'CSV_DEFINED'
 
     # --------------- Renewable energy ---------------
     # Core: RE OFF. REN1-REN4 are separate renewable energy scenario runs (not part of this grid search).
@@ -158,7 +154,6 @@ grid_search = {
 
 
     # --------------- Objective function weights ---------------
-    'SOLVE_WEIGHT_BETA':  [0.5],
     
     # --------------- Ag management ---------------
     'AG_MANAGEMENTS': [{

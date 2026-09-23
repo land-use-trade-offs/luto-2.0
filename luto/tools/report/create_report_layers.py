@@ -263,7 +263,13 @@ def get_map2json(
             raise ValueError('legend_int_level must be None, a dict, or a str')
         if isInt:
             return True, None, legend_key_int
-        magnitude = float_magnitude[sel['Commodity']] if isinstance(float_magnitude, dict) else float_magnitude
+        if isinstance(float_magnitude, dict):
+            # Keyed by any dim VALUE of the combo (Commodity for production, backend for the
+            # bio-quality maps, ...): the first sel value that is a key wins.
+            key = next((v for v in sel.values() if v in float_magnitude), None)
+            magnitude = float_magnitude[key]
+        else:
+            magnitude = float_magnitude
         return False, magnitude, None
 
     prefix = save_path.removesuffix('.js')
@@ -693,21 +699,39 @@ def save_report_layer(raw_data_dir: str):
     gbf8_min_max       = (min(gbf8_vals),           max(gbf8_vals))          if gbf8_vals          else bio_min_max
     
     
+    # Per-backend scale for the quality maps: RHI carries native 0-100 units while every other
+    # quality backend runs 0-1, so ONE shared (min, max) washes every non-RHI backend into the
+    # bottom of the colour ramp. Quantiles come from the 'all' files so each backend keeps a
+    # single scale across the Ag / NonAg / Am / All views.
+    bio_backend_min_max = {}
+    for _p in files_bio.query('base_name == "xr_biodiversity_overall_priority_all"')['path']:
+        _arr = cfxr.decode_compress_to_multi_index(xr.open_dataset(_p, chunks={}), 'layer')['data']
+        for _backend in _arr['layer'].to_index().unique(level='backend'):
+            _vals = np.asarray(_arr.sel(backend=_backend).values).ravel()
+            _vals = _vals[(_vals != 0) & np.isfinite(_vals)]
+            if _vals.size:
+                _lo, _hi = float(np.nanquantile(_vals, 0.005)), float(np.nanquantile(_vals, 0.995))
+                _prev = bio_backend_min_max.get(str(_backend))
+                bio_backend_min_max[str(_backend)] = ((min(_lo, _prev[0]), max(_hi, _prev[1]))
+                                                      if _prev else (_lo, _hi))
+        _arr.close()
+    bio_backend_min_max = bio_backend_min_max or bio_min_max
+
     # Quality layers
     bio_overall_ag = files_bio.query('base_name == "xr_biodiversity_overall_priority_ag"')
-    get_map2json(bio_overall_ag, None, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_overall_Ag.js')
+    get_map2json(bio_overall_ag, None, bio_backend_min_max, f'{SAVE_DIR}/map_layers/map_bio_overall_Ag.js')
     print('│   ├── Biodiversity Overall Ag layer saved.')
 
     bio_overall_nonag = files_bio.query('base_name == "xr_biodiversity_overall_priority_non_ag"')
-    get_map2json(bio_overall_nonag, None, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_overall_NonAg.js')
+    get_map2json(bio_overall_nonag, None, bio_backend_min_max, f'{SAVE_DIR}/map_layers/map_bio_overall_NonAg.js')
     print('│   ├── Biodiversity Overall Non-Ag layer saved.')
 
     bio_overall_am = files_bio.query('base_name == "xr_biodiversity_overall_priority_ag_management"')
-    get_map2json(bio_overall_am, None, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_overall_Am.js')
+    get_map2json(bio_overall_am, None, bio_backend_min_max, f'{SAVE_DIR}/map_layers/map_bio_overall_Am.js')
     print('│   ├── Biodiversity Overall Am layer saved.')
 
     bio_overall_all = files_bio.query('base_name == "xr_biodiversity_overall_priority_all"')
-    get_map2json(bio_overall_all, None, bio_min_max, f'{SAVE_DIR}/map_layers/map_bio_overall_All.js')
+    get_map2json(bio_overall_all, None, bio_backend_min_max, f'{SAVE_DIR}/map_layers/map_bio_overall_All.js')
     print('│   ├── Biodiversity Overall All layer saved.')
 
 

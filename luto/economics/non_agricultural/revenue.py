@@ -21,7 +21,6 @@ import numpy as np
 from luto.settings import NON_AG_LAND_USES
 import luto.settings as settings
 from luto.data import Data
-from luto import tools
 
 
 def get_rev_env_plantings(data: Data, yr_cal: int) -> np.ndarray:
@@ -88,7 +87,7 @@ def get_rev_sheep_agroforestry(
     ------
     Numpy array indexed by r
     """
-    sheep_j = tools.get_sheep_code(data)
+    sheep_j = data.DESC2AGLU['Sheep - modified land']
 
     # Only use the dryland version of sheep
     sheep_rev = ag_r_mrj[0, :, sheep_j]
@@ -117,7 +116,7 @@ def get_rev_beef_agroforestry(
     ------
     Numpy array indexed by r
     """
-    beef_j = tools.get_beef_code(data)
+    beef_j = data.DESC2AGLU['Beef - modified land']
 
     # Only use the dryland version of beef
     beef_rev = ag_r_mrj[0, :, beef_j]
@@ -179,7 +178,7 @@ def get_rev_sheep_carbon_plantings_belt(
     ------
     Numpy array indexed by r
     """
-    sheep_j = tools.get_sheep_code(data)
+    sheep_j = data.DESC2AGLU['Sheep - modified land']
 
     # Only use the dryland version of sheep
     sheep_rev = ag_r_mrj[0, :, sheep_j]
@@ -208,7 +207,7 @@ def get_rev_beef_carbon_plantings_belt(
     ------
     Numpy array indexed by r
     """
-    beef_j = tools.get_beef_code(data)
+    beef_j = data.DESC2AGLU['Beef - modified land']
 
     # Only use the dryland version of beef
     beef_rev = ag_r_mrj[0, :, beef_j]
@@ -248,11 +247,11 @@ def get_rev_destocked(data: Data, ag_r_mrj: np.ndarray) -> np.ndarray:
     -------
     np.ndarray
     """
-    unallocated_j = tools.get_unallocated_natural_land_code(data)
+    unallocated_j = data.DESC2AGLU['Unallocated - natural land']
     return ag_r_mrj[0, :, unallocated_j]
 
 
-def get_rev_matrix(data: Data, yr_cal: int, ag_r_mrj, lumap) -> np.ndarray:
+def get_rev_matrix(data: Data, yr_cal: int, ag_r_mrj) -> np.ndarray:
     """
     Gets the matrix containing the revenue produced by each non-agricultural land use for each cell.
 
@@ -262,8 +261,8 @@ def get_rev_matrix(data: Data, yr_cal: int, ag_r_mrj, lumap) -> np.ndarray:
     Returns
         np.ndarray.
     """
-    agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, lumap)
-    cp_belt_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, lumap)
+    agroforestry_x_r = np.full(data.NCELLS, settings.AF_PROPORTION, dtype=np.float32)   # the share of a cell agroforestry can take: the same everywhere
+    cp_belt_x_r = np.full(data.NCELLS, settings.CP_BELT_PROPORTION, dtype=np.float32)   # the share of a cell carbon plantings (belt) can take
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
     non_agr_rev_matrices = [

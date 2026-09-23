@@ -227,18 +227,17 @@ The transition system is **source-keyed**: costs and feasibility are sliced per 
 
 | Field | Builder (line) | L5 entry | Key `data.` attributes | L3 files |
 |-------|----------------|----------|------------------------|----------|
-| `ag_x_mrj` | `get_ag_x_mrj` 394 | `ag_transition.get_to_ag_exclude_matrices` | `EXCLUDE` (← `x_mrj.npy`), `T_MAT`, `NO_GO_{LANDUSE,REGION}_AG` | `x_mrj.npy`, `ag_tmatrix.npy`, `no_go_areas/` |
+| `feasible_ag_mrj` | `col_builder.get_cols` | — (`dvar_ub_ag > 0`: an ag entry exists where its upper bound is above zero) | `EXCLUDE` (← `x_mrj.npy`), `T_MAT`, `NO_GO_{LANDUSE,REGION}_AG` | `x_mrj.npy`, `ag_tmatrix.npy`, `no_go_areas/` |
 | `flow_cost_ag2ag` | `get_ag_t_mrj` 372 | `ag_transition.get_transition_matrices_ag2ag` | `T_MAT`, `TRANS_COST_MULTS`, `AG_TMATRIX`, `WATER_LICENCE_PRICE`, `IRRIG_COST_MULTS`, `REGIONAL_ADOPTION_ZONES` | `ag_tmatrix.npy`, `transition_cost_clearing_forest.npz`, `cost_multipliers.xlsx`, `water_licence_price.h5`, `regional_adoption_zones.h5` |
 | `flow_cost_ag2nonag` | inline 1080-1086 | `non_ag_transition.get_transition_matrix_ag2nonag` | `EP_EST_COST_HA`, `RP_EST_COST_HA`, `AF_EST_COST_HA`, `CP_EST_COST_HA`, `AG2EP_TRANSITION_COSTS_HA`, `AG_TO_DESTOCKED_NATURAL_COSTS_HA`, `RP_FENCING_LENGTH`, `EST/FENCE/IRRIG_COST_MULTS` | `ep_est_cost_ha.h5`, `cp_est_cost_ha.h5`, `ag_to_ep_tmatrix.npy`, `ag_to_destock_tmatrix.npy`, `stream_length_m_cell.h5`, `cost_multipliers.xlsx` |
 | `flow_cost_nonag2ag` | inline 1090-1096 | `non_ag_transition.get_transition_matrix_nonag2ag` | `EP2AG_TRANSITION_COSTS_HA`, `T_MAT` | `ep_to_ag_tmatrix.npy` |
 | `dvar_ub_ag` / `dvar_lb_ag` | 484 / 517 | `ag_transition.get_ag2ag_{ub,lb}` + `non_ag_transition.get_nonag2ag_ub` | `T_MAT`, `EXCLUDE`, base dvars | `ag_tmatrix.npy`, `x_mrj.npy` |
 | `dvar_ub_nonag` / `dvar_lb_nonag` | 504 / 524 | `non_ag_transition.get_non_ag_{ub,lb}_matrices` | `RP_PROPORTION`, `LU_LVSTK_NATURAL`, `NO_GO_*_NON_AG`, reversibility flags | `stream_length_m_cell.h5`, `no_go_areas/` |
-| `feasible_*` (4 fields) | 399, 410, 426, 450, 466 | — (pure logic over `ag_x_mrj`, `dvar_ub_nonag`, `T_MAT` reach) | `T_MAT` | `ag_tmatrix.npy` |
+| `arc_*_src` (3 dicts) | `col_builder.get_arc_{ag2ag,nonag2ag,ag2nonag}_src` | `ag_transition.get_ag2ag_ub_src`, `non_ag_transition.get_nonag2ag_ub_src` | `T_MAT`, `EXCLUDE`, `NO_GO_*_AG`, base dvars | `ag_tmatrix.npy`, `x_mrj.npy`, `no_go_areas/` |
 | `ag_source_cells` / `nonag_source_cells` | 416 / 421 | `ag_transition.get_base_dvar_mj_cell_map`, `non_ag_transition.get_base_nonag_dvar_k_cell_map` | base-year dvars | — (runtime state) |
 | `ag_man_limits` | `get_ag_man_limits` 620 | `ag_transition.get_agricultural_management_adoption_limits` | AM bundles | AM bundle `.xlsx` |
 | `ag_man_lb_mrj` | `get_ag_man_lb_mrj` 533 | `ag_transition.get_lower_bound_agricultural_management_matrices` | base-year AM dvars | — (runtime state) |
-| `dvar_base_ag_mrj` / `dvar_base_non_ag_rk` | inline 1346-1347 | `ag_transition.get_folded_base_ag_dvar`, `data.non_ag_dvars` | `lumaps`, `lmmaps` | `lumap.h5`, `lmmap.h5` (base year only; later years are runtime state) |
-| `ag_fold_map`, `acct_cells_mrj` | 1310, 1316-1324 | `ag_transition.get_ag_dvar_fold_map` | θ-fold bookkeeping | — (runtime) |
+| `dvar_base_ag_mrj` / `dvar_base_non_ag_rk` | `get_cols` §2 | `data.ag_dvars`, `data.non_ag_dvars` | `lumaps`, `lmmaps` | `lumap.h5`, `lmmap.h5` (base year only; later years are runtime state) |
 
 ### 4.8 Renewable energy
 
@@ -510,12 +509,13 @@ or annualisation, both of which already happened at L4.
 | `get_ghg_destocked_land` | 311-348 | per base-year livestock-natural LU: `CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR × (habitat_contr[from_lu] − 1) × REAL_AREA` | `natural_land_t_co2_ha.h5`, `fire_risk.h5`, `bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv` |
 | `get_ghg_matrix` | 352-398 | assembles all nine into `(r, k)` | — |
 
-**Exclusion (mixing) proportions** — `luto/tools/__init__.py`:
+**Exclusion (mixing) proportions** — written inline at the top of each non-ag matrix assembler (`get_*_matrix`
+in `non_agricultural/{biodiversity,cost,ghg,quantity,revenue,water}.py`):
 
-- `get_exclusions_agroforestry_base` (351-368): `np.ones(NCELLS) × settings.AF_PROPORTION`, where
-  `AF_PROPORTION = AGROFORESTRY_ROW_WIDTH / (ROW_WIDTH + ROW_SPACING)` (`settings.py:631`).
-- `get_exclusions_carbon_plantings_belt_base` (371-388): same shape with `CP_BELT_PROPORTION`
-  (`settings.py:614`).
+- `agroforestry_x_r = np.full(NCELLS, settings.AF_PROPORTION, float32)`, where
+  `AF_PROPORTION = AGROFORESTRY_ROW_WIDTH / (ROW_WIDTH + ROW_SPACING)` (`settings.py`).
+- `cp_belt_x_r = np.full(NCELLS, settings.CP_BELT_PROPORTION, float32)`: same shape with `CP_BELT_PROPORTION`
+  (`settings.py`).
 
 **Destocked land — two corrections to earlier versions of this document:**
 

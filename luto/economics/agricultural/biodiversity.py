@@ -28,7 +28,6 @@ import pandas as pd
 import xarray as xr
 
 from luto import settings
-from luto import tools
 from luto.data import Data
 from functools import lru_cache
 
@@ -214,7 +213,7 @@ def get_beef_hir_effect_b_mrj(data: Data, ag_b_mrj: np.ndarray) -> np.ndarray:
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
     b_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
-    unallocated_j = tools.get_unallocated_natural_land_code(data)
+    unallocated_j = data.DESC2AGLU['Unallocated - natural land']
     # HIR's biodiversity contribution is based on that of unallocated land 
     unallocated_b_mr = ag_b_mrj[:, :, unallocated_j]
 
@@ -245,7 +244,7 @@ def get_sheep_hir_effect_b_mrj(data: Data, ag_b_mrj: np.ndarray) -> np.ndarray:
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
     b_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
-    unallocated_j = tools.get_unallocated_natural_land_code(data)
+    unallocated_j = data.DESC2AGLU['Unallocated - natural land']
     # HIR's biodiversity contribution is based on that of unallocated land 
     unallocated_b_mr = ag_b_mrj[:, :, unallocated_j]
 
@@ -371,6 +370,9 @@ score by 20% (compared to 'pre-1750' land), thus the biodiversity contribution o
 
 # Functions to calculate biodiversity scores for pre-1750 times.
 def get_GBF2_MASK_area(data:Data) -> np.ndarray:
+    """The GBF2 priority-degraded-area mask weighted by real area, per cell; empty when GBF2 is off."""
+    if settings.GBF2_TARGET == 'off':
+        return np.empty(0)
     return data.BIO_GBF2_MASK * data.REAL_AREA
 
 def get_GBF3_NVIS_matrices_vr(data:Data) -> xr.DataArray:
@@ -380,8 +382,10 @@ def get_GBF3_NVIS_matrices_vr(data:Data) -> xr.DataArray:
     Returns
     -------
     xr.DataArray
-        dims (group, cell) — only the unique selected vegetation groups
+        dims (group, cell) — only the unique selected vegetation groups. Empty when GBF3 NVIS is off.
     """
+    if settings.GBF3_NVIS_TARGET == 'off':
+        return np.empty(0)
     return data.GBF3_NVIS_LAYERS_LDS * data.REAL_AREA
 
 
@@ -405,8 +409,10 @@ def get_GBF4_SNES_matrix_sr(data: Data) -> xr.DataArray:
     -------
     xr.DataArray
         dims ['layer', 'cell'] — layer coord is a MultiIndex of (species, presence).
-        Full-Australia layers; no per-region masking.
+        Full-Australia layers; no per-region masking. Empty when GBF4 SNES is off.
     """
+    if settings.GBF4_TARGET_SNES == 'off':
+        return np.empty(0)
     return data.GBF4_SNES_LAYERS_LDS * data.REAL_AREA
 
 
@@ -418,8 +424,10 @@ def get_GBF4_ECNES_matrix_sr(data: Data) -> xr.DataArray:
     -------
     xr.DataArray
         dims ['layer', 'cell'] — layer coord is a MultiIndex of (species, presence).
-        Full-Australia layers; no per-region masking.
+        Full-Australia layers; no per-region masking. Empty when GBF4 ECNES is off.
     """
+    if settings.GBF4_TARGET_ECNES == 'off':
+        return np.empty(0)
     return data.GBF4_ECNES_LAYERS_LDS * data.REAL_AREA
 
 
@@ -430,14 +438,15 @@ def get_GBF8_matrix_sr(data: Data, target_year: int) -> xr.DataArray:
     Returns
     -------
     xr.DataArray
-        dims ['species', 'cell'] — species coord holds species name strings.
+        dims ['species', 'cell'] — species coord holds species name strings. Empty when GBF8 is off.
     """
+    if settings.GBF8_TARGET == 'off':
+        return np.empty(0)
+    # LDS penalty on SAVBURN_ELIGIBLE cells is already applied inside
+    # get_GBF8_bio_layers_by_yr (same single-application convention as the
+    # GBF3/GBF4 *_LAYERS_LDS attributes) — only the area weighting happens here.
     bio_layers = data.get_GBF8_bio_layers_by_yr(target_year)  # numpy (n_species, n_cells)
-    base = np.where(
-        data.SAVBURN_ELIGIBLE,
-        bio_layers * data.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
-        bio_layers * data.REAL_AREA,
-    ).astype(np.float32)
+    base = (bio_layers * data.REAL_AREA).astype(np.float32)
     return xr.DataArray(
         base,
         dims=['species', 'cell'],
@@ -514,7 +523,7 @@ def get_ag_management_biodiversity_contribution(
             j_idx: (
                 np.ones(data.NCELLS).astype(np.float32) 
                 * (
-                    (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[tools.get_natural_beef_code(data)])  # The proportional gap of biodiversity between beef-natural to full-natural
+                    (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[data.DESC2AGLU['Beef - natural land']])  # The proportional gap of biodiversity between beef-natural to full-natural
                     - (1 - settings.HIR_CEILING_PERCENTAGE)                                         # The gap that HIR's biodiversity contribution to full-natural biodiversity 
                 )   
             )
@@ -525,7 +534,7 @@ def get_ag_management_biodiversity_contribution(
             j_idx: (
                 np.ones(data.NCELLS).astype(np.float32)
                 * (
-                    (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[tools.get_natural_beef_code(data)])  # The proportional gap of biodiversity between beef-natural to full-natural
+                    (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[data.DESC2AGLU['Beef - natural land']])  # The proportional gap of biodiversity between beef-natural to full-natural
                     - (1 - settings.HIR_CEILING_PERCENTAGE)                                         # The gap that HIR's biodiversity contribution to full-natural biodiversity 
                 )  
             )

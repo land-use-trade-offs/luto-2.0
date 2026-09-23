@@ -11,14 +11,17 @@ This document describes the core architecture, modules, and data flow of LUTO2.
   - `solver.py`: GUROBI solver wrapper (LutoSolver class)
     - Biodiversity constraint methods: `_add_GBF2_constraints()`, `_add_GBF3_NVIS_constraints()`, `_add_GBF4_SNES_constraints()`, `_add_GBF4_ECNES_constraints()`, `_add_GBF8_constraints()`. IBRA bioregion targets have **no separate constraint method** — they run through `_add_GBF3_NVIS_constraints()` when `GBF3_NVIS_REGION_MODE = 'IBRA_REG'`.
     - Renewable energy constraint method: `_add_renewable_energy_constraints()` — enforces state-level solar and wind generation targets
-    - Hard/soft constraint flexibility: `GHG_CONSTRAINT_TYPE`, `WATER_CONSTRAINT_TYPE`, `GBF2_CONSTRAINT_TYPE`
-    - Two-stream transition/accounting model (see "Theta-Fold Transition Model" below): `_setup_ag_accounting_vars()` re-expresses the folded decision vars for correct accounting.
-  - `input_data.py`: Prepares optimization model input data
+    - Every constraint is hard: there are no soft / penalised rows and no `*_CONSTRAINT_TYPE` settings
+    - Exact transition flow model (see "Transition Flow Model" below): one source per nonzero base-year (lm, lu, cell) entry, per-source delta variables, node-balance and source-cap rows.
+  - `col_builder.py`: the COLUMN side — `get_cols(data, base_year) -> (cols, col_support)` builds the column space from the base-year state: `cols`, the long table (every unknown as one row, its fields, `lb` / `ub` / `base`; the row side adds `obj`), and beside it a `ColSupport` — the SUPPORT the row side reads by position (`region2cell`, the region of every cell as data variables — `state` / `nrm` / `ibra` / `water_region` names — so a regional family takes its cells as `region2cell[layer].values == region` and its columns by reading the layer at their `cell` — the wide grids, source maps and renewable masks of earlier versions are gone: every feasible entry has a column, the arcs are keyed by source through their masks, and the cell sets live on `RowInputs`)
+  - `row_inputs.py`: the row side's INPUT DATA, purely downstream of the economics modules — it never sees the column space. `get_row_inputs(data, base_year, target_year)` returns every coefficient stream, target and layer as ONE `RowInputs` (no wrapper layer; the setting that turns a family off is read at the call); `get_economics(...)` returns the objective's own streams as an `EconomicInputs`, loaded separately because it is ~300 MB at RES5 and wanted only while the objective is built
+  - `row_builder.py`: the row side's ROW GENERATION, the mirror of `col_builder.py` — `get_rows(inputs, cols, col_support) -> (A, rows)` at the top, one function that lists every family's `(A, table)` pair (`None, None` where off; the wide target / limit rows, then the structural rows) whose body IS the model's row order, everything it calls below it in that order. Every sum family builds rows of the one matrix (rows × cols) the same way: `gather` → the row's columns by the region of their cell (`(col_support.region2cell[layer].values == region)[cell]`) or by weighing (`weight_rows(W) @ (cell2col @ diags(c))`, `col_support.cell2col`, the table's `cell` field as a matrix) → `contract` (drop, then the policy rescale + floor, one loop over the stacked rows); the join families look their nodes up on the column-id grids (−1 = no column / no row), and section 3 lays the biodiversity contribution on the support once (`bio_S`); each family is a `get_*` written out in full as one plain section (19 of them — node balance is two, the ag nodes then the non-ag nodes; no cell-usage family, the cell's node-balance rows already sum to Σ X = Σ base; no lambda-taking wrappers, no shared row constructor) returning a part (`row_table.make_part`), and `get_rows` stacks the blocks (`sparse.vstack`) and the tables (`xr.concat` with the empty `ROW_SCHEMA` template and `fill_value=ROW_FILL`: −1 / None where a family does not carry a field), the `None`s dropped, into the pair `(A, rows)`: `A` the ONE scipy CSR (rows × cols), `rows` the `xr.Dataset` on `row` (rhs, sense, name, scale, labels, `active`; no attrs — a family's rows are the mask `rows['family'].values == name`), row i of one being row i of the other; `get_obj(econ, cols, inputs)` is the objective coefficient of every column (million AUD, dropped and floored), a plain vector over the columns.
+  - `row_table.py`: the row table's storage (`make_part`, `ROW_SCHEMA` — the one declaration — and `ROW_FILL` derived from it) and its query (`rows_where`: a mask over the table; a family's rows are `rows['family'].values == name`) — split out of `row_builder.py` on 2026-09-10 so that file holds only `get_rows`, `get_obj` and the families. `LutoSolver(cols, rows, A, obj, inputs)` is A x T and obj · x — the two tables, the matrix and the objective vector, and the inputs it reads the names that spell `m` / `am_idx` in a variable's name off; `solve()` returns the raw x; `post_solve.post_solve(x, cols, col_support, inputs)` turns it into the LUTO format (`SolverSolution`: the maps and the dvars; `simulation.store_solution` computes Production and GHG from them)
     - Biodiversity data attributes use `*_pre_1750_area_*` naming (e.g., `GBF3_NVIS_pre_1750_area_vr`, `GBF4_SNES_pre_1750_area_sr`). IBRA reuses the NVIS attribute — there is no `GBF3_IBRA_pre_1750_area_vr`.
     - Renewable energy data: `renewable_solar_r`, `renewable_wind_r` yield arrays; `region_state_r` mapping
-    - `rescale_solver_input_data()`: Rescales arrays in-place to magnitude 0–1e3 for numerical stability. Each category (Economy, Demand, Biodiversity-quality, GHG, Water, GBF2/3/4/8, Renewable) is rescaled separately. **No post-rescale zeroing** — tiny cross-products are handled by `_qsum` in `solver.py`.
-    - `SOLVER_COEFF_MIN` (1e-4): Universal minimum coefficient threshold. `_qsum(coeffs, gurobi_vars)` in `solver.py` is called by **all** constraint and objective builders; any term whose absolute coefficient falls below this value is dropped before entering Gurobi. A post-build sweep, `_floor_assembled_matrix()`, runs after `_setup_objective()` and re-applies the floor to the assembled constraint matrix **and** objective vector, catching sub-floor coefficients created downstream by the folded-sliver accounting re-expression. Chosen empirically: 1e-3 caused ~3% economic loss; 1e-4 keeps the matrix ratio at 1e8.
-    - Separate rescaling for: Economy, Demand, Biodiversity, GHG, Renewable_Solar, Renewable_Wind, Water, GBF2, GBF3_NVIS, GBF4_SNES, GBF4_ECNES, GBF8 (12 scale factors; IBRA shares the GBF3_NVIS factor)
+    - **No input rescaling** (2026-09-03): the coefficient streams reach the solver raw (float32). Every constraint block is row-rescaled by `row_builder.contract` — per row, scale = geometric mean of max|row| and |RHS| over `RESCALE_FACTOR`, row and RHS divided by it, stage-4 floor on the scaled row — and the factor is kept on the row table (`scale`); `solvers/tools.record_shadow_prices` reads it per row straight off the table (So = 1e6: the objective is raw AUD / 1e6). Row scaling is an exact LP transformation; the gate compares models in RESTORED space (rows × their factor).
+    - `SOLVER_COEFF_MIN` (1e-4): Universal minimum coefficient threshold, applied by `row_builder.contract` to every family's stacked block (and by `row_builder.get_obj` to the objective coefficients, which it then scales `× (1/1e6)` and floors again): (1) an entry is dropped when `|a| < SOLVER_COEFF_MIN` (NaN too); (2) after the row rescale the scaled coefficient is floored again. Every policy coefficient multiplies an ag / ag-mgt / non-ag column directly. Chosen empirically: 1e-3 caused ~3% economic loss; 1e-4 retains meaningful small coefficients while keeping the matrix ratio at 1e8.
+    - No per-family scale factors: every factor is per constraint row, carried on the row table (`scale`); `solvers/tools.record_shadow_prices` reads the duals once into `rows['pi']` and the CSV's columns off the table — no per-family readers.
 
 ## Economic Modules
 
@@ -105,16 +108,17 @@ This document describes the core architecture, modules, and data flow of LUTO2.
    - Elasticity multipliers computed as: `1 + (demand_delta / demand_elasticity)`
    - Renewable energy: electricity yield, revenue, cost, biodiversity effects across all economics modules
 
-4. **Solver Input**: `solvers/input_data.py` prepares optimization model data
+4. **Solver Input**: `col_builder.get_cols` → `(cols, col_support)`; `row_inputs.get_row_inputs` → `inputs`; `row_builder.get_rows(inputs, cols, col_support)` → `(A, rows)`; `row_builder.get_obj(get_economics(...), cols, inputs)` → `obj`; the solver takes them as they are, `LutoSolver(cols, rows, A, obj, inputs)`
    - Biodiversity matrices: GBF2 mask areas, GBF3 NVIS layers (NVIS or IBRA, per `GBF3_NVIS_REGION_MODE`), GBF4 SNES/ECNES matrices, GBF8 species data
-   - Renewable energy: Solar/wind yield arrays (`renewable_solar_r`, `renewable_wind_r`), state region mapping, rescaled targets
-   - Data rescaling: Arrays rescaled in-place to 0-1e3 magnitude for numerical stability (12 separate scale factors; IBRA shares GBF3_NVIS)
+   - Renewable energy: Solar/wind yield arrays (`renewable_solar_r`, `renewable_wind_r`), state region mapping, raw targets
+   - No input rescaling: constraint blocks are row-rescaled on the row side (`row_builder.contract`, factor kept per row on the row table); the objective is raw AUD / 1e6 (`row_builder.get_obj`)
+   - The column space (`col_builder.py`): every unknown as one row of the long table `cols` (on `col` = Var.index, the blocks `ag | nonag | am | ag2ag | ag2nonag | nonag2ag` back to back, every column labelled with its `block` (an object string: a block is the mask `cols['block'].values == name`); fields `m, j, k, slot, am_idx, j_idx, from_m, from_j, from_k, local_r, cell` with −1 where a field does not apply, `lb` / `ub` / `base` per column; no attrs — the width is `cols.sizes['col']`, and what `m` / `am_idx` mean is `RowInputs.landmans` / the keys of `RowInputs.agman2lu` — the sizes `nlms` / `n_ag_lus` / `n_nonag_lus` / `ncells`, `agman2lu` and `savanna_eligible_r` are data facts and live on `RowInputs`), beside a `ColSupport` (`col_support`), supporting data that maps the sparse columns onto the dense inputs : the input masks `valid_ag_mrj`, `valid_nonag_rk`, `valid_ag2ag` / `valid_ag2nonag` / `valid_nonag2ag` (one per source: the shape of its solved deltas); then `region2cell` (`cell_regions`: the region of every cell — state / nrm / ibra / water_region names — on `cell`, no attrs) and, beside them, the cell × col incidence `cell2col` and the position → column grids `ag_mrj2col` / `nonag_rk2col` (in the inputs' layout, −1 = no column; no am grid), built in `get_cols` from the table's `cell` field and by writing every ag / non-ag column at its own position, and nothing else. Every feasible non-ag entry has a column (a disabled land use's fixed at zero), so nothing is carried for entries without one. Built once in `get_cols` (getters first, then the block builders — each returns its block's ROWS beside the mask it enumerated them from (the ag block in the inputs' (lm, cell, lu) order, the non-ag block in (cell, nonag_lu) order, every feasible entry, a disabled land use's fixed at zero) — then `table_space(blocks)`, which lays the rows back to back in the flat `blocks` dict's order and labels each with its block). Every sum family gathers (`row_builder.gather`: every column reads its block's input at its own fields) and then takes its rows' columns by the region of their cell (`(region2cell[layer].values == region)[cell]`: water, renewables; regional adoption reads the cap's own cell set at the column's cell) or by weighing (`W @ (cell2col @ diags(c))`: the GBF families), the join families look their nodes up on the id grids, source cap groups the arcs by their source's position in (lm, lu, cell) order and caps each at its `base` on the table, and the objective (`get_obj`) is the same six-block gather, its arcs negated. Every policy row scores the ag columns directly: there is no accounting layer.
+   - `LutoSolver(cols, rows, A, obj, inputs)` is A x T and obj · x (the inputs' `landmans` / `agman2lu` spell `m` / `am_idx` in the variable names). `formulate()` = `_setup_vars` (ONE `addMVar` over the column table, the names from the fields) → `_setup_constraints` (ONE `addMConstr` over the row table's ACTIVE rows — a row `row_bounds.drop_redundant_rows` flagged off before the build never reaches the solver, its handle None — the names, the handles kept on `rows['constr']`) → `_setup_objective` (`obj @ x`); then `remove_constraints_by_name` / `restore_constraints_by_name` (flag on the table + remove / re-add) and `solve()` → the raw x. The row order is the row table's (`row_builder.get_rows`): ag-mgt link → adoption → renewable ceiling → demand → GHG → GBF2/3/4/8 → regional adoption → water → renewables → source cap → node balance (the ag nodes, then the non-ag nodes). No constraint-handle attributes on the solver: the row table holds every handle and scale, and `solvers/tools.record_shadow_prices` prices its active rows of the families in `tools.PRICED`, plus the rows dropped before the build as redundant (priced 0, `dropped = True`), as one table query
 
 5. **Optimization**: `solvers/solver.py` runs GUROBI optimization with biodiversity, renewable energy, and environmental constraints
-   - Hard/soft constraint flexibility for GHG, water, GBF2
-   - Soft constraints add deviation penalties (`_setup_deviation_penalties()`): demand, GHG, water, biodiversity
-   - Objective: `obj_economy × (1 - SOLVE_WEIGHT_BETA) ± obj_penalties × SOLVE_WEIGHT_BETA`. `SOLVE_WEIGHT_BETA` is the **only** economy-vs-penalty knob — the former per-target `SOLVER_WEIGHT_DEMAND/GHG/WATER` weights were removed.
-   - After `_setup_objective()`, `_floor_assembled_matrix()` drops sub-`SOLVER_COEFF_MIN` coefficients from the assembled matrix and objective vector.
+   - Every constraint is hard (demand, GHG, water, GBF2/3/4/8, renewables): no deviation variables, no penalties
+   - Objective: the economy alone, `obj · x` in million AUD (`row_builder.get_obj`); `SOLVE_WEIGHT_BETA` is gone
+   - The sub-`SOLVER_COEFF_MIN` floor on scaled coefficients is the last step of `row_builder.contract` on every family's stacked block and of the objective vector; no post-build sweep exists. The flow rows (source cap, node balance) and the ag-mgt link rows are structural ±1 rows: they pass through `contract` without the rescale, and the drop is a no-op on them or rescaled.
 
 6. **Output Generation**: `tools/write.py` writes results to `/output/`
    - **Two-stage writing process**: Decision variables and mosaic maps written first (stage 1), then all other outputs (stage 2)
@@ -122,7 +126,8 @@ This document describes the core architecture, modules, and data flow of LUTO2.
    - Mosaic maps are concatenated directly to dvar arrays before saving (optimizes file I/O)
    - Biodiversity outputs: GBF2/3/4/8 scores, species impacts, vegetation group restoration
    - Transition reporting is rebuilt on the solved per-source **delta flows** (`data.delta_dvars_ag2ag[yr_cal]`), giving exact from→to attribution rather than a `base × target × cost` approximation
-   - **Per-constraint shadow prices**: after each accepted (OPTIMAL) solve, `record_shadow_prices()` (in `luto/tools/__init__.py`, called from `simulation.py`) reads each constraint's dual (`Constr.Pi`) and writes a shadow-price DataFrame per constraint family (GBF2, GBF3_NVIS, GBF4_SNES, GBF4_ECNES, GBF8, Water, GHG, Demand, Renewable, Regional Adoption) into each `out_<year>/` dir. Columns include `shadow_price` (per real unit, e.g. AUD/ha) and `shadow_price_AUD` (normalised, comparable across families)
+   - **Per-constraint shadow prices**: after each accepted (OPTIMAL) solve, `record_shadow_prices()` (in `luto/solvers/tools.py`, called from `simulation.py`) reads the priced rows' duals in one batched `getAttr('Pi')` onto the row table (`rows['pi']`) and writes one shadow-price CSV over the priced families (GBF2, GBF3_NVIS, GBF4_SNES, GBF4_ECNES, GBF8, Water, GHG, Demand, Renewable, Regional Adoption — `tools.PRICED`, in that order) into each `out_<year>/` dir. Columns include `shadow_price` (per real unit, e.g. AUD/ha), `shadow_price_AUD` (normalised, comparable across families) and `dropped` — a row the bound pass dropped before the build as redundant (`BOUND_PROP_DROP_FAMILIES`) is recorded with price 0, since every feasible point leaves it slack
+   - **Bound propagation** (`luto/solvers/row_bounds.py`, before the model is built): every row's activity interval over the column box and its verdict — redundant / impossible / tight / near_redundant / straddle — and again under the bounds the rows themselves imply (all-positive caps bound each column; all-ones rows such as source cap bound their columns together — and with them the sum of each cell's node-balance rows, Σ X = Σ base, which `conservation_rows` forms because the model carries no cell-usage row (conservation already pins the cell total) — which removes the per-cell overcount and makes the arc rows finite), in `out_<year>/bound_report_<year>.csv` (raw units, keys) and `bound_preflight_<year>.csv`. Impossible under either is a proof and stops the year (`BOUND_PROP_ON_IMPOSSIBLE`); only the box verdict licenses a drop. Arithmetic on the row and column tables only, so the report needs no solver
    - Parallel output writing with joblib (concurrency auto-determined by `WRITE_REPORT_MAX_MEM_MB`; `get_n_jobs()` budgets by true per-worker cost)
 
 ## Biodiversity Module Naming Conventions
@@ -147,7 +152,7 @@ The biodiversity module follows consistent naming conventions for GBF (Global Bi
 ### Key GBF Modules
 1. **GBF2**: Priority degraded areas restoration
    - Function: `get_GBF2_MASK_area(data)` returns mask × real area
-   - Constraint type: hard or soft (configurable via `GBF2_CONSTRAINT_TYPE`)
+   - Constraint type: hard
 2. **GBF3 NVIS / IBRA**: NVIS major vegetation group targets, or IBRA bioregion targets
    - Function: `get_GBF3_NVIS_matrices_vr(data)` returns the layers for both
    - Settings: `GBF3_NVIS_TARGET_CLASS` ('NVIS_MVG' or 'NVIS_MVS'); `GBF3_NVIS_REGION_MODE` ('AUSTRALIA', 'NRM', or 'IBRA_REG') selects NVIS vs IBRA. There is no separate IBRA function, attribute, setting, or constraint method.
@@ -192,8 +197,8 @@ Renewable energy types (Utility Solar PV, Onshore Wind) are implemented as non-r
 
 `_add_renewable_energy_constraints()` in `solver.py` enforces state-level generation targets:
 - Separate constraints for solar and wind per state (ACT excluded)
-- Uses `renewable_solar_r` / `renewable_wind_r` yield arrays from `input_data.py`
-- Separate rescaling: `Renewable_Solar` and `Renewable_Wind` scale factors
+- Uses `renewable_solar_r` / `renewable_wind_r` yield arrays from `row_inputs.get_rows`
+- Per-row rescaling: each (type, state) row carries its own factor (`renewable_scales`)
 
 ### Data Loading (`data.py`)
 
@@ -202,16 +207,11 @@ Renewable energy types (Utility Solar PV, Onshore Wind) are implemented as non-r
 - `RENEWABLE_LAYERS`: NetCDF spatial layers (install cost, operation cost, capacity %, distribution loss %)
 - `RENEWABLE_BUNDLE_SOLAR` / `RENEWABLE_BUNDLE_WIND`: Parameters per land use
 
-## Theta-Fold Transition Model & Accounting Stream
+## Transition Flow Model (exact)
 
-Transition costs use a **fold-into-dominant (θ)** model with a **two-stream** formulation in `solver.py`:
+Transitions are explicit per-source delta flows. The base-year ag dvar `data.ag_dvars[base_year]` is used as it is: every nonzero (lm, lu) fraction of a cell above the `ROUND_DECIMALS` noise floor (1e-6) is a **source** (`get_base_dvar_mj_cell_map`: `{(from_m, from_j): cells}`), and so is every nonzero non-ag fraction (`get_base_nonag_dvar_k_cell_map`). For each source the column space holds one delta variable per feasible (cell, target) arc (`ag2ag / ag2nonag / nonag2ag`), the source-cap rows bound Σ out ≤ base, and the node-balance rows define every land-use column as base + Σ in − Σ out. Policy rows (profit, water, GHG, GBF, production) score the ag / ag-mgt / non-ag columns directly.
 
-- **Decision / flow stream (`dvar_flow`)** carries the *folded* composition: within each cell, every sub-θ land-use sliver is merged into that cell's **dominant** land use, so a single scalar variable represents "how much of this cell stays in its original composition". This keeps the transition matrix small and well-conditioned.
-- **Accounting stream (`dvar_account`)**, built by `_setup_ag_accounting_vars()`, **un-folds** that scalar back into each true land use as a constant-ratio `LinExpr`, so profit / water / GHG / GBF / production are scored against the real per-land-use fractions rather than the folded dominant.
-
-**Mental model** — a cell is a fixed-composition bundle scaled by one scalar. If a cell is 0.7 Beef + 0.3 Apple, folding merges Apple into the dominant Beef so one variable `X_Beef` (mass 1.0) represents the whole cell; each land use is then a constant ratio of it (`Apple = 0.3/1.0 · X_Beef`). Reducing `X_Beef` shrinks both fractions proportionally — the 7:3 composition ratio is preserved, only the scale changes.
-
-**Coefficient-floor consequence**: because accounting terms are `coeff × X_acct` where `X_acct` is a `LinExpr` with `~1/RESFACTOR²` weights, a floored-and-kept `coeff` can distribute into a *sub-floor* product on the dominant var. `_floor_assembled_matrix()` sweeps the assembled matrix and objective vector post-build to drop these (see `docs/FINDINGS.md`, 20260721).
+There is no fold. The former θ dial (`EXACT_REACHABILITY_MIN_FRACTION`), which merged sub-θ fractions into the cell's dominant land use and undid the merge with an accounting layer (`X_acct_*` columns, `acct_link_*` rows), was removed on 2026-09-08: a census of the RES5 2020→2050 trajectory showed the fold catching 12–69 of ~350k nonzero entries per year (≤ 0.02 %), so the exact model was already the model being solved (see `docs/FINDINGS.md`, 20260908). Model size scales with the number of nonzero base-year entries, not with the number of cells.
 
 Transition **reporting** (`write.py`) is rebuilt on the solved per-source delta flows (`data.delta_dvars_ag2ag[yr_cal]` etc.), giving exact from→to attribution.
 
@@ -223,13 +223,18 @@ load_data() → Data() initialization
 run(data) → solve_timeseries(data, years=sorted(SIM_YEARS))   # default 2020, 2025, …, 2050
     ↓
     For each year pair (base→target):
-        ├── get_input_data(data, base_yr, target_yr) → SolverInputData
-        ├── LutoSolver(input_data).formulate()
-        │   ├── _setup_vars()             # incl. _setup_ag_accounting_vars() (accounting stream)
-        │   ├── _setup_constraints()
-        │   ├── _setup_objective()
-        │   └── _floor_assembled_matrix() # post-build sub-SOLVER_COEFF_MIN sweep
-        ├── solve() → SolverSolution
+        ├── col_builder.get_cols(data, base_yr) → (cols, col_support);  row_inputs.get_row_inputs(data, base_yr, target_yr) → inputs
+        ├── row_builder.get_rows(inputs, cols, col_support) → (A, rows)
+        ├── row_bounds.get_row_bounds(A, rows, cols) → bounds          # every row's interval over the column box, and its verdict
+        │   ├── drop_redundant_rows(rows, bounds, BOUND_PROP_DROP_FAMILIES)   # opt-in: redundant rows flagged off, never built
+        │   ├── report_row_bounds(...) → out_<year>/bound_report_<year>.csv, bound_preflight_<year>.csv
+        │   └── an impossible row + BOUND_PROP_ON_IMPOSSIBLE == 'stop' → the year stops here, before the model
+        ├── obj = row_builder.get_obj(row_inputs.get_economics(...), cols, inputs)   # the objective, built last: a stopped year never loads the economy streams
+        ├── LutoSolver(cols, rows, A, obj, inputs).formulate()      # A x T, obj · x: ONE addMVar over the column table; ONE addMConstr over the row table's active rows
+        │   ├── _setup_vars()             # the column table -> gp.MVar, names from the fields
+        │   ├── _setup_constraints()      # the active rows -> addMConstr; handles on rows['constr'] (None on a row dropped before the build)
+        │   └── _setup_objective()       # obj @ x
+        ├── solve() → x;  post_solve.post_solve(x, cols, col_support, inputs) → SolverSolution;  store_solution(...) → Production, GHG from the stored dvars
         ├── record_shadow_prices(...) → out_<year>/ (per-constraint duals)
         └── Store results: lumaps, lmmaps, ag_dvars, non_ag_dvars, ag_man_dvars, delta_dvars_ag2ag
     ↓
