@@ -158,4 +158,4 @@ cat /g/data/jk53/jinzhu/LUTO/Custom_runs/<ITER>/Run_G0001/redo_write.stderr
 | `RESFACTOR mismatch` | luto-2.0 `settings.py` used instead of run's | Ensure `os.chdir(run_dir)` so run's own `luto/settings.py` is imported |
 | PBS logs in wrong dir | `#PBS -d` not supported | Use `#PBS -o/-e` with absolute paths + `cd` in script body |
 | Output written to new timestamped dir | Used `sim.load_data_from_disk` which calls `write_timestamp()` and overwrites `data.path` | Use `joblib.load` directly so `data.path` stays as the existing output dir |
-| `ValueError: place: mask and data must be the same size` (RF=1) | Old `helpers/__init__.py` has broken intermediate `arr_fulllen` step | Copy fixed `luto/tools/Manual_jupyter_books/helpers/__init__.py` into run's dir (Step 2) |
+| `ValueError: place: mask and data must be the same size` (RF=1) | Old `arr_to_xr` has broken intermediate `arr_fulllen` step | Copy fixed `luto/tools/__init__.py` (holds `arr_to_xr` now) into run's dir (Step 2) |

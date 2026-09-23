@@ -33,6 +33,8 @@ from contextlib import redirect_stdout, redirect_stderr
 
 import numpy as np
 import psutil
+import rasterio
+import rioxarray as rxr
 import xarray as xr
 import numpy_financial as npf
 import matplotlib.patches as patches
@@ -211,6 +213,66 @@ def am_mrj_to_xr(data, am_mrj_dict: dict, threshold: float = 0.01) -> xr.DataArr
                 'lm': data.LANDMANS,
                 'cell': np.arange(data.NCELLS),
                 'lu': data.AGRICULTURAL_LANDUSES}
+    )
+
+
+def arr_to_2d(data, arr: np.ndarray) -> tuple[np.ndarray, dict]:
+    """Place a 1D cell array on its 2D grid (NODATA -> NaN); returns the grid and its geo metadata.
+
+    `arr` is a full-res 1D array (len = data.LUMASK.size), a full-res array over the LUTO cells
+    (len = data.LUMASK.sum()), or a resfactored array (len = data.NCELLS).
+    """
+    if arr.size == data.LUMASK.size:
+        geo_meta = data.GEO_META_FULLRES
+        arr_2d = np.full(data.NLUM_MASK.shape, data.NODATA).astype(np.float32)
+        np.place(arr_2d, data.NLUM_MASK, arr)
+    elif arr.size == data.LUMASK.sum():
+        geo_meta = data.GEO_META_FULLRES
+        arr_2d = np.full(data.NLUM_MASK.shape, data.NODATA).astype(np.float32)
+        mask_2d = np.zeros(data.NLUM_MASK.shape, dtype=bool)
+        mask_2d[data.NLUM_MASK.astype(bool)] = data.LUMASK
+        np.place(arr_2d, mask_2d, arr)
+    else:
+        geo_meta = data.GEO_META
+        arr_2d = data.LUMAP_2D_RESFACTORED.copy().astype(np.float32)
+        arr_2d[*data.COORD_ROW_COL_RESFACTORED] = arr
+
+    return np.where(arr_2d == data.NODATA, np.nan, arr_2d), geo_meta
+
+
+def arr_to_xr(data, arr: np.ndarray) -> xr.DataArray:
+    """Convert a 1D cell array (any length `arr_to_2d` accepts) to a georeferenced 2D xarray DataArray on (y, x)."""
+    arr_2d, geo_meta = arr_to_2d(data, arr)
+
+    with rasterio.io.MemoryFile() as memfile:
+        with memfile.open(**geo_meta) as dataset:
+            dataset.write(arr_2d, 1)
+            da_raster = rxr.open_rasterio(memfile).squeeze(drop=True)
+            # rxr.open_rasterio loses the values of the array; write them back
+            da_raster.values = arr_2d
+            da_raster.attrs = {}
+
+    return da_raster
+
+
+def mrj_to_xr(data, in_mrj: np.ndarray) -> xr.DataArray:
+    """Convert an (m, r, j) array to a georeferenced xarray DataArray on (lm, lu, y, x).
+
+    `j` is named by data.AGRICULTURAL_LANDUSES when its length matches, else by data.PRODUCTS. The grid is
+    georeferenced once (`arr_to_xr` on the first map) and every (m, j) map is placed on it with `arr_to_2d`.
+    """
+    j_vals = data.AGRICULTURAL_LANDUSES if in_mrj.shape[2] == len(data.AGRICULTURAL_LANDUSES) else data.PRODUCTS
+    grid = arr_to_xr(data, in_mrj[0, :, 0])
+
+    maps = np.stack([
+        np.stack([arr_to_2d(data, in_mrj[m, :, j])[0] for j in range(in_mrj.shape[2])])
+        for m in range(in_mrj.shape[0])
+    ])
+
+    return xr.DataArray(
+        maps,
+        dims=['lm', 'lu', *grid.dims],
+        coords={'lm': data.LANDMANS[:in_mrj.shape[0]], 'lu': j_vals, **grid.coords},
     )
 
 

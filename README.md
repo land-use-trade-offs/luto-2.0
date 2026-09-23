@@ -95,9 +95,6 @@ luto/                                    # Main package directory
     │   ├── create_grid_search_plots.py  # Grid search result plotting
     │   ├── helpers.py                   # Task run utilities
     │   └── parameters.py                # Task run parameters
-    ├── Manual_jupyter_books/            # Documentation notebooks
-    │   ├── helpers/                     # Notebook helper functions
-    │   └── asset/                       # Notebook assets and data descriptions
     ├── report/                          # Reporting and visualization system
     │   ├── VUE_modules/                 # Vue.js 3 interactive reporting dashboard
     │   │   ├── assets/                  # Shapefiles and styling assets (NRM, state, AEMO REZ)

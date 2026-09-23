@@ -32,7 +32,6 @@ import luto.settings as settings
 import luto.economics.agricultural.quantity as ag_quantity
 import luto.economics.non_agricultural.quantity as non_ag_quantity
 import luto.economics.agricultural.water as ag_water
-from luto.tools.Manual_jupyter_books.helpers import arr_to_xr
 
 from collections import defaultdict
 from typing import Any, Literal, Optional
@@ -154,7 +153,7 @@ class Data:
 
         # Mask out non-agricultural, non-environmental plantings land (i.e., -1) from lumap 
         self.LUMASK = self.LUMAP_NO_RESFACTOR != self.MASK_LU_CODE                                                      # 1D (ij flattend);  `True` for land uses; `False` for desert, urban, water, etc
-        self.LUMASK_2D_FULLRES = np.nan_to_num(arr_to_xr(self, self.LUMASK))
+        self.LUMASK_2D_FULLRES = np.nan_to_num(tools.arr_to_xr(self, self.LUMASK))
         
 
         # Return combined land-use and resfactor mask
@@ -196,7 +195,7 @@ class Data:
             raise KeyError("Resfactor setting invalid")
         
         # Get the 2D MASK
-        self.MASK_2D = np.nan_to_num(arr_to_xr(self, self.MASK))
+        self.MASK_2D = np.nan_to_num(tools.arr_to_xr(self, self.MASK))
         
         
         # Get the lon/lat coordinates.
