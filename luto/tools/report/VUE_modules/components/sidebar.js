@@ -69,8 +69,8 @@ window.Sidebar = {
       <div class="flex items-center h-[80px]">
         <!-- Logo -->
         <div v-if="!isCollapsed" class="flex-1 flex items-center transition-opacity duration-300">
-          <img class="rounded-full w-10 h-10" src="resources/LUTO.png" alt="LUTO 2.0" />
-          <span class="ml-2 text-sm font-semibold">LUTO 2.0</span>
+          <img class="rounded-full w-10 h-10" src="resources/LUTO.png" alt="LUTO 2" />
+          <span class="ml-2 text-sm font-semibold">LUTO 2</span>
         </div>
         <!-- Toggle button -->
         <div class="w-6 h-6 items-center ml-2 cursor-pointer" @click="toggleCollapse">
