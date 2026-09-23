@@ -214,7 +214,7 @@ The settings (`BOUND_PROP_REL_TOL`, `BOUND_PROP_DROP_FAMILIES`, `BOUND_PROP_ON_I
 - 16 GB RAM at `RESFACTOR >= 10`; 32 GB or more for `RESFACTOR = 5`. Full resolution (`RESFACTOR = 1`) is an HPC workload — budget several hundred GB and expect the write/report phase to dominate peak memory.
 - 50 GB available disk space for input data and outputs
 - GUROBI optimization solver license (academic licenses available); `gurobipy` is pinned to 13.0.0
-- CPLEX is **planned** as an alternative solving engine. The `cplex` / `docplex` Python bindings ship in `requirements.yml`; using them additionally requires a licensed IBM ILOG CPLEX Optimization Studio 22.2 installation. GUROBI remains the only engine the model solves with today
+- We are working on support for other solving engines, such as IBM CPLEX and NVIDIA cuOpt (see [Other solving engines](#other-solving-engines-in-progress)). GUROBI is the only engine the model solves with today
 
 **Supported Operating Systems:**
 - Windows 10/11
@@ -244,11 +244,21 @@ LUTO2 currently solves with GUROBI. Follow these steps:
 # 2) Place your gurobi.lic file in the appropriate directory
 ```
 
-**CPLEX (planned).** We plan to support CPLEX as a second solving engine, so that a run can be
-solved with either engine. The `cplex` and `docplex` packages are already part of
-`requirements.yml`; a licensed IBM ILOG CPLEX Optimization Studio 22.2 installation is needed to
-provide the native solver runtime. Nothing in the model reads CPLEX yet — no settings switch
-exists, and every run goes through GUROBI.
+#### Other solving engines (in progress)
+
+We are working on letting a run solve with engines other than GUROBI:
+
+- **IBM CPLEX**, a commercial LP solver on the CPU and the engine the original LUTO used. The `cplex` and `docplex`
+  packages are already in `requirements.yml`; the native runtime needs a licensed IBM ILOG CPLEX Optimization
+  Studio 22.2 installation.
+- **NVIDIA cuOpt**, an open-source, GPU-accelerated solver. Its first-order LP method (PDLP) can make very large
+  models, such as full-resolution LUTO years, much faster on a GPU, with a looser default precision than barrier.
+
+The model build is what makes this practical. Each year's LP is handed to the solver as plain arrays: the column
+table (bounds), one scipy CSR matrix `A`, the row table (rhs, sense) and the objective vector. So a new engine only
+needs a small adapter in `luto/solvers/solver.py`; the model code (`col_builder`, `row_builder`, `row_bounds`,
+`post_solve`) doesn't change. A saved `debug_model_*.mps` file already loads in other engines, which is how we compare
+them. Nothing in the model selects an engine yet: there is no engine setting, and every run goes through GUROBI.
 
 ### 4. Obtain Input Data
 The LUTO2 input database is approximately 40 GB and contains sensitive data. 
