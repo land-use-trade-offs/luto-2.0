@@ -37,18 +37,17 @@ from luto.solvers.row_inputs import get_mask_gbf2_solar, get_mask_gbf2_wind
 @dataclass
 class ColSupport:
     """Supporting data that maps the SPARSE column variables onto the DENSE input arrays: the masks an input is
-    filtered with (``valid_*``, ``region2cell``) beside the column table, whose own fields (``block``, ``m``, ``j``,
-    ``cell`` ...) say where every column reads its input. Beside them, the lookups the rows need at once:
-    ``region2col`` (the region of every column), ``cell2col`` (every cell's variables, for the layer families) and
-    ``ag_mrj2col`` / ``nonag_rk2col`` (position → column, for the rows that join variables by node)."""
+    filtered with (``valid_*``) and the region of every cell (``region2cell``, read at a column's ``cell`` for the
+    column's region) beside the column table, whose own fields (``block``, ``m``, ``j``, ``cell`` ...) say where every
+    column reads its input. Beside them, the lookups the rows need at once: ``cell2col`` (every cell's variables, for
+    the layer families) and ``ag_mrj2col`` / ``nonag_rk2col`` (position → column, for the rows that join variables by node)."""
 
     valid_ag_mrj: np.ndarray      # (lm, cell, lu) bool: the ag entries that have a column
     valid_nonag_rk: np.ndarray    # (cell, nonag_lu) bool: the non-ag entries that have a column
     valid_ag2ag: dict             # {source: bool (to_m, local_r, to_j)}: the ag→ag arcs a source has a column for — the shape of its solved deltas
     valid_ag2nonag: dict          # {source: bool (local_r, to_k)}: the ag→non-ag arcs a source has a column for
     valid_nonag2ag: dict          # {source: bool (to_m, local_r, to_j)}: the non-ag→ag arcs a source has a column for
-    region2cell: xr.Dataset       # filter the INPUT by region
-    region2col: xr.Dataset        # filter the gp.Vars table by region
+    region2cell: xr.Dataset       # the region of every cell, one variable per layer: a region's cells are region2cell[layer].values == region
     # the three below are read by get_rows only; simulation frees them before the solve
     cell2col: sparse.csr_matrix   # (cell x col), 1 where a variable (ag/nonag/am/ag2ag/ag2nonag/nonag2ag) sits in the cell: for each cell, the variables in it
     ag_mrj2col: np.ndarray        # (lm, cell, lu) int32: for each ag position, the column index of its variable, -1 where it has none (no arcs, no am)
@@ -106,8 +105,7 @@ def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSupport]:
 
     # ── 7. the space: the table, and beside it the handles — the mask every block was enumerated from, the region pair,
     #       the cell incidence and the position → column grids ──
-    region2cell = cell_regions(data)                                                # the region layers on cell: what filters an input
-    region2col  = region2cell.isel(cell=table['cell'].values).rename(cell='col')    # the same layers read at every column's cell: what filters the table
+    region2cell = cell_regions(data)                                                # the region layers on cell; a column's region is the layer read at its cell
 
     # for each cell, which variables sit in it: the table's ``cell`` field as a (cell x col) matrix, 1 where they do
     block    = table['block'].values
@@ -134,7 +132,6 @@ def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSupport]:
         valid_ag2nonag=valid_ag2nonag,
         valid_nonag2ag=valid_nonag2ag,
         region2cell=region2cell,
-        region2col=region2col,
         cell2col=cell2col,
         ag_mrj2col=ag_mrj2col,
         nonag_rk2col=nonag_rk2col,
@@ -413,23 +410,15 @@ def table_space(blocks: dict) -> xr.Dataset:
 
 
 def cell_regions(data: Data) -> xr.Dataset:
-    """Every cell labelled with the region it sits in — one variable per region layer on ``cell``: the ``state`` and
-    ``nrm`` codes and the ``water_region`` id — with the code → name maps in attrs. Read at the columns' cells it is
-    ``region2col``; a region's cells are ``region2cell[layer] == code`` and its columns ``region2col[layer] == code``.
-    (The regional-adoption caps carry their own cell set, because their region is whichever layer the settings pick,
-    so they are not a layer here.) The ``ibra`` bioregion layer (-1 = no bioregion) is there only when the GBF3 targets
-    are set per IBRA bioregion, the one mode that loads it."""
-    ibra, ibra_name = {}, {}
+    """Every cell labelled with the region it sits in."""
+    state_of_code = {code: name for name, code in data.REGION_STATE_NAME2CODE.items()}   # 'Other Territories' has no name: None
+    ibra = {}
     if settings.GBF3_NVIS_TARGET != 'off' and settings.GBF3_NVIS_REGION_MODE == 'IBRA_REG':
-        ibra      = dict(ibra=(('cell',), np.asarray(data.REGION_IBRA_CODE).astype(np.int32)))
-        ibra_name = dict(ibra_name=dict(enumerate(data.REGION_IBRA_NAMES)))
+        ibra_names = np.array([*data.REGION_IBRA_NAMES, None], dtype=object)               # code -1 (no bioregion) reads the last: None
+        ibra = dict(ibra=(('cell',), ibra_names[np.asarray(data.REGION_IBRA_CODE)]))
     return xr.Dataset(
-        dict(state        =(('cell',), np.asarray(data.REGION_STATE_CODE).astype(np.int16)),
-             nrm          =(('cell',), np.asarray(data.REGION_NRM_CODE).astype(np.int32)),
+        dict(state        =(('cell',), np.array([state_of_code.get(code) for code in np.asarray(data.REGION_STATE_CODE).tolist()], dtype=object)),
+             nrm          =(('cell',), np.asarray(data.REGION_NRM_NAME, dtype=object)),
              water_region =(('cell',), np.asarray(data.WATER_REGION_ID).astype(np.int32)),
              **ibra),
-        attrs=dict(state_name={code: name for name, code in data.REGION_STATE_NAME2CODE.items()},
-                   nrm_name=dict(zip(np.asarray(data.REGION_NRM_CODE).tolist(), np.asarray(data.REGION_NRM_NAME).tolist())),
-                   water_region_name=dict(data.WATER_REGION_NAMES),
-                   **ibra_name),
     )

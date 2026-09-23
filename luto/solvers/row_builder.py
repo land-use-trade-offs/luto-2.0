@@ -357,8 +357,8 @@ def get_GBF3_NVIS(inputs: RowInputs, support: ColSupport, bio_S: sparse.csr_matr
     layers = inputs.GBF3_NVIS_pre_1750_area_vr                           # xr [group, cell]
     targets = inputs.limits["GBF3_NVIS"]
     layer = 'ibra' if settings.GBF3_NVIS_REGION_MODE == 'IBRA_REG' else 'nrm'   # the region layer the targets are set on
-    region_of_cell = support.region2cell[layer].values                     # the NRM / IBRA code of every cell
-    region_code = {name: code for code, name in support.region2cell.attrs[f'{layer}_name'].items()}
+    region_of_cell = support.region2cell[layer].values                     # the NRM / IBRA region of every cell
+    regions = set(region_of_cell)                                          # the regions the layer knows
     weights = []
     rhs = []
     names = []
@@ -369,7 +369,9 @@ def get_GBF3_NVIS(inputs: RowInputs, support: ColSupport, bio_S: sparse.csr_matr
             continue
         weight_row = layers.sel(group=group, drop=True).data
         if region != "AUSTRALIA":                                        # regional scope: mask the cells outside the region
-            weight_row = np.where(region_of_cell == region_code[region], weight_row, 0)   # an unknown region raises
+            if region not in regions:
+                raise KeyError(f'target region {region!r} is not a region of the layer')
+            weight_row = np.where(region_of_cell == region, weight_row, 0)
         if not (weight_row > 0).any():
             continue
         weights.append(weight_row)
@@ -391,8 +393,8 @@ def get_GBF4_SNES(inputs: RowInputs, support: ColSupport, bio_S: sparse.csr_matr
     print("│   ├── Adding constraints for biodiversity GBF 4 SNES ...")
     layers = inputs.GBF4_SNES_pre_1750_area_sr                           # xr [layer=(species, presence), cell]
     targets = inputs.limits["GBF4_SNES"]
-    region_of_cell = support.region2cell['nrm'].values                     # the NRM code of every cell
-    region_code = {name: code for code, name in support.region2cell.attrs['nrm_name'].items()}
+    region_of_cell = support.region2cell['nrm'].values                     # the NRM region of every cell
+    regions = set(region_of_cell)                                          # the regions the layer knows
     weights = []
     rhs = []
     names = []
@@ -403,7 +405,9 @@ def get_GBF4_SNES(inputs: RowInputs, support: ColSupport, bio_S: sparse.csr_matr
             continue
         weight_row = layers.sel(layer=(species, presence), drop=True).values
         if region != "AUSTRALIA":                                        # NRM scope: mask the cells outside the region
-            weight_row = np.where(region_of_cell == region_code[region], weight_row, 0)   # an unknown region raises
+            if region not in regions:
+                raise KeyError(f'target region {region!r} is not a region of the layer')
+            weight_row = np.where(region_of_cell == region, weight_row, 0)
         if not (weight_row > 0).any():
             continue
         weights.append(weight_row)
@@ -426,8 +430,8 @@ def get_GBF4_ECNES(inputs: RowInputs, support: ColSupport, bio_S: sparse.csr_mat
     print("│   ├── Adding constraints for biodiversity GBF 4 ECNES ...")
     layers = inputs.GBF4_ECNES_pre_1750_area_sr                          # xr [layer=(community, presence), cell]
     targets = inputs.limits["GBF4_ECNES"]
-    region_of_cell = support.region2cell['nrm'].values                     # the NRM code of every cell
-    region_code = {name: code for code, name in support.region2cell.attrs['nrm_name'].items()}
+    region_of_cell = support.region2cell['nrm'].values                     # the NRM region of every cell
+    regions = set(region_of_cell)                                          # the regions the layer knows
     weights = []
     rhs = []
     names = []
@@ -438,7 +442,9 @@ def get_GBF4_ECNES(inputs: RowInputs, support: ColSupport, bio_S: sparse.csr_mat
             continue
         weight_row = layers.sel(layer=(community, presence), drop=True).values
         if region != "AUSTRALIA":                                        # NRM scope: mask the cells outside the region
-            weight_row = np.where(region_of_cell == region_code[region], weight_row, 0)   # an unknown region raises
+            if region not in regions:
+                raise KeyError(f'target region {region!r} is not a region of the layer')
+            weight_row = np.where(region_of_cell == region, weight_row, 0)
         if not (weight_row > 0).any():
             continue
         weights.append(weight_row)
@@ -461,8 +467,8 @@ def get_GBF8(inputs: RowInputs, support: ColSupport, bio_S: sparse.csr_matrix):
     print("│   ├── Adding constraints for biodiversity GBF 8 ...")
     layers = inputs.GBF8_pre_1750_area_sr                                # xr [species, cell]
     targets = inputs.limits["GBF8"]
-    region_of_cell = support.region2cell['nrm'].values                     # the NRM code of every cell
-    region_code = {name: code for code, name in support.region2cell.attrs['nrm_name'].items()}
+    region_of_cell = support.region2cell['nrm'].values                     # the NRM region of every cell
+    regions = set(region_of_cell)                                          # the regions the layer knows
     weights = []
     rhs = []
     names = []
@@ -473,7 +479,9 @@ def get_GBF8(inputs: RowInputs, support: ColSupport, bio_S: sparse.csr_matrix):
             continue
         weight_row = layers.sel(species=species, drop=True).data
         if region != "AUSTRALIA":                                        # NRM scope: mask the cells outside the region
-            weight_row = np.where(region_of_cell == region_code[region], weight_row, 0)   # an unknown region raises
+            if region not in regions:
+                raise KeyError(f'target region {region!r} is not a region of the layer')
+            weight_row = np.where(region_of_cell == region, weight_row, 0)
         if not (weight_row > 0).any():
             continue
         weights.append(weight_row)
@@ -652,7 +660,7 @@ def get_water(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
     print("│   ├── Adding constraints for water usage limits...")
     n_col = cols.sizes['col']
     coeff = gather(cols, inputs, inputs.ag_w_mrj, inputs.ag_man_w_mrj, inputs.non_ag_w_rk)
-    region_of_col = support.region2col['water_region'].values
+    region_of_col = support.region2cell['water_region'].values[cols['cell'].values]   # the water region of every column: its cell's
     row_idx = []
     col_idx = []
     vals = []
@@ -695,13 +703,12 @@ def get_renewable(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
             'Onshore Wind':     dict(energy_r=inputs.renewable_wind_r,  gbf2_mask_idx=inputs.mask_gbf2_wind,  mnes_mask_idx=inputs.mask_mnes_wind),
         }.items() if option in options
     }
-    state_code = {name: code for code, name in support.region2col.attrs['state_name'].items()}   # the states the rows are written for ...
-    act_code = state_code.pop('Australian Capital Territory')                                # ... ACT folded into NSW below
     n_col        = cols.sizes['col']
     cell         = cols['cell'].values
     j            = cols['j'].values
     am_idx       = cols['am_idx'].values
-    state_of_col = support.region2col['state'].values
+    state_of_col = support.region2cell['state'].values[cell]             # the state of every column: its cell's
+    states       = sorted(set(support.region2cell['state'].values) - {None, 'Australian Capital Territory'})   # the states the rows are written for, by name; ACT folded into NSW below
     in_ag        = cols['block'].values == 'ag'
 
     # ── per type: its columns' yield, and the columns the exclusion masks keep out ──
@@ -725,10 +732,10 @@ def get_renewable(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
     names = []
     key_am = []
     key_state = []
-    for state_name, code in state_code.items():
-        in_state = state_of_col == code
+    for state_name in states:
+        in_state = state_of_col == state_name
         if state_name == 'New South Wales':                              # ACT counts toward the NSW+ACT target
-            in_state |= state_of_col == act_code
+            in_state |= state_of_col == 'Australian Capital Territory'
         print(f"│   │   ├── Adding renewable energy constraints for {state_name} ...")
         for am in re_types:
             target_raw = inputs.limits[f"renewable_{am}"][state_name]

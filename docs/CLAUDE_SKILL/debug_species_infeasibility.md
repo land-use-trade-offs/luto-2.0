@@ -468,8 +468,7 @@ model.Params.OutputFlag   = 1
 
 # Compute constraint row metrics (raw units — the layers and targets reach the solver unscaled;
 # the solver rescales each ROW at build time and keeps the factor in bio_GBF4_*_scales)
-nrm_code   = {name: code for code, name in col_support.region2cell.attrs['nrm_name'].items()}
-reg_matrix = col_support.region2cell['nrm'].values   # the NRM code of every cell, as get_GBF4_* reads it
+reg_matrix = col_support.region2cell['nrm'].values   # the NRM region of every cell, as get_GBF4_* reads it
 if typ == "SNES":
     val_matrix    = input_data.GBF4_SNES_pre_1750_area_sr
 else:
@@ -479,7 +478,7 @@ val_vector = val_matrix.sel(dict(layer=(name, presence)), drop=True).values
 if region == "AUSTRALIA":
     ind = np.where(val_vector > 0)[0]
 else:
-    ind = np.intersect1d(np.where(val_vector > 0)[0], np.where(reg_matrix == nrm_code[region])[0])
+    ind = np.intersect1d(np.where(val_vector > 0)[0], np.where(reg_matrix == region)[0])
 
 n_cells     = ind.size
 avail_ha    = float(val_vector[ind].sum()) if n_cells > 0 else 0.0
@@ -520,7 +519,7 @@ else:
     # weight row over cells, times the biodiversity contribution laid on the support (bio_S), then
     # row-rescaled with the target.
     bio_S  = col_support.cell2col @ sparse.diags(bio_contribution(input_data, cols))
-    masked = val_vector if region == "AUSTRALIA" else np.where(reg_matrix == nrm_code[region], val_vector, 0)
+    masked = val_vector if region == "AUSTRALIA" else np.where(reg_matrix == region, val_vector, 0)
     row, rhs, _scale = contract(weight_rows([masked], input_data.ncells) @ bio_S, [lb_raw], rescale=True)
     constr = model.addMConstr(row, solver.x, '>', rhs).tolist()
     model.setAttr('ConstrName', constr, [f"test_{typ}_{region}_{name}_{presence}".replace(" ", "_")])

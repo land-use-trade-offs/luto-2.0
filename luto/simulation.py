@@ -247,7 +247,7 @@ def solve_timeseries(
         # ── the rows: the constraints ──
         inputs = get_row_inputs(data, base_year, target_year)                               # the coefficient streams and targets
         A, rows = get_rows(inputs, cols, col_support)                                       # the matrix, and the row table on the same rows
-        col_support.cell2col = col_support.ag_mrj2col = col_support.nonag_rk2col = None     # read by get_rows only: freed before the solve (GBs at RES1), the masks and the region pair stay for post_solve
+        col_support.cell2col = col_support.ag_mrj2col = col_support.nonag_rk2col = None     # read by get_rows only: freed before the solve (GBs at RES1), the masks and the regions stay for post_solve
 
         # ── the pre-solve diagnosis: bound propagation over the rows ──
         bounds = get_row_bounds(A, rows, cols)                                              # every row's interval over the column box, and its verdict
