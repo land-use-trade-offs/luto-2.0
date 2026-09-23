@@ -36,11 +36,7 @@ from luto.solvers.row_inputs import get_mask_gbf2_solar, get_mask_gbf2_wind
 
 @dataclass
 class ColSupport:
-    """Supporting data that maps the SPARSE column variables onto the DENSE input arrays: the masks an input is
-    filtered with (``valid_*``) and the region of every cell (``region2cell``, read at a column's ``cell`` for the
-    column's region) beside the column table, whose own fields (``block``, ``m``, ``j``, ``cell`` ...) say where every
-    column reads its input. Beside them, the lookups the rows need at once: ``cell2col`` (every cell's variables, for
-    the layer families) and ``ag_mrj2col`` / ``nonag_rk2col`` (position → column, for the rows that join variables by node)."""
+    """Input data comes at dense format (e.g., mrj). These are masks to extract input to match the column space."""
 
     valid_ag_mrj: np.ndarray      # (lm, cell, lu) bool: the ag entries that have a column
     valid_nonag_rk: np.ndarray    # (cell, nonag_lu) bool: the non-ag entries that have a column
@@ -48,6 +44,7 @@ class ColSupport:
     valid_ag2nonag: dict          # {source: bool (local_r, to_k)}: the ag→non-ag arcs a source has a column for
     valid_nonag2ag: dict          # {source: bool (to_m, local_r, to_j)}: the non-ag→ag arcs a source has a column for
     region2cell: xr.Dataset       # the region of every cell, one variable per layer: a region's cells are region2cell[layer].values == region
+    
     # the three below are read by get_rows only; simulation frees them before the solve
     cell2col: sparse.csr_matrix   # (cell x col), 1 where a variable (ag/nonag/am/ag2ag/ag2nonag/nonag2ag) sits in the cell: for each cell, the variables in it
     ag_mrj2col: np.ndarray        # (lm, cell, lu) int32: for each ag position, the column index of its variable, -1 where it has none (no arcs, no am)
@@ -55,8 +52,7 @@ class ColSupport:
 
 
 def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSupport]:
-    """The column space of one solve step: every unknown as one row of the long table ``cols`` (on ``col`` =
-    Var.index), and beside it the ``ColSupport``: the handles the row side slices the inputs and the table with."""
+    """The column space of one solve step."""
 
     # ── 1. sources (FROM-view): the base-year holders of land ──
     trans_source_ag         = ag_transition.get_base_dvar_mj_cell_map(data, base_year)          # (from_m, from_j): global cell indices
@@ -75,18 +71,18 @@ def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSupport]:
     feasible_ag_mrj         = trans_ub_ag_mrj > 0                                               # which ag (m, j) a cell may hold: reachable from a source here, or already held (the ub is raised to the base)
 
     # ── 4. the arcs: each source's own upper bound, above zero, on its own cells ──
-    valid_ag2ag           = get_arc_ag2ag_src(data, base_year, trans_source_ag)               # {source: bool (to_m, local_r, to_j)}
-    valid_nonag2ag        = get_arc_nonag2ag_src(data, base_year, trans_source_nonag)         # {source: bool (to_m, local_r, to_j)}
-    valid_ag2nonag        = get_arc_ag2nonag_src(data, trans_source_ag, trans_ub_nonag_rk)    # {source: bool (local_r, to_k)}
+    valid_ag2ag             = get_arc_ag2ag_src(data, base_year, trans_source_ag)               # {source: bool (to_m, local_r, to_j)}
+    valid_nonag2ag          = get_arc_nonag2ag_src(data, base_year, trans_source_nonag)         # {source: bool (to_m, local_r, to_j)}
+    valid_ag2nonag          = get_arc_ag2nonag_src(data, trans_source_ag, trans_ub_nonag_rk)    # {source: bool (local_r, to_k)}
 
     # ── 5. masks: the cells the renewable options get no column in (the row side reads the same cell sets off its inputs) ──
     mask_gbf2_solar         = get_mask_gbf2_solar(data)
     mask_gbf2_wind          = get_mask_gbf2_wind(data)
 
     # ── 6. the blocks and the table: every block's rows laid back to back in Var.index order, each block enumerated from its mask ──
-    valid_ag_mrj,   ag_rows    = ag_space(feasible_ag_mrj, trans_ub_ag_mrj, dvar_base_ag_mrj)
-    valid_nonag_rk, nonag_rows = nonag_space(data, trans_lb_nonag_rk, trans_ub_nonag_rk, dvar_base_nonag_rk)
-    am_rows                    = am_space(data, feasible_ag_mrj, mask_gbf2_solar, mask_gbf2_wind, trans_lb_ag_man_mrj)
+    valid_ag_mrj,   ag_rows      = ag_space(feasible_ag_mrj, trans_ub_ag_mrj, dvar_base_ag_mrj)
+    valid_nonag_rk, nonag_rows   = nonag_space(data, trans_lb_nonag_rk, trans_ub_nonag_rk, dvar_base_nonag_rk)
+    am_rows                      = am_space(data, feasible_ag_mrj, mask_gbf2_solar, mask_gbf2_wind, trans_lb_ag_man_mrj)
 
     ag2ag_rows                   = ag2ag_space(valid_ag2ag, trans_source_ag)              # each source carries its own cells: local_r -> the global cell
     ag2nonag_rows                = ag2nonag_space(valid_ag2nonag, trans_source_ag)

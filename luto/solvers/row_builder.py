@@ -141,8 +141,12 @@ def gather(cols: xr.Dataset, inputs: RowInputs, ag_c_mrj, am_c_mrj: dict, nonag_
 
 
 def weight_rows(weights, ncells: int) -> sparse.csr_matrix:
-    """A family's weighting rows over cells as ONE sparse ``W`` (n_rows × ncells), float32, the nonzero support
-    only — built row by row, never as a dense stack (GBF8 would be 10k rows × ncells)."""
+    """Apply weights to a row space.
+    1. Used as a mask to turn on/off cells (GBF2 priority areas: the mask × each cell's area)
+    2. Used as the area each cell holds of a target (GBF3 NVIS vegetation groups, GBF4 SNES species / ECNES
+       communities, GBF8 species), zeroed outside the target's region
+    Multiplied by the biodiversity contribution laid on the support (``W @ bio_S``), the rows go over the columns.
+    """
     indptr = [0]
     indices = []
     data = []
@@ -152,8 +156,10 @@ def weight_rows(weights, ncells: int) -> sparse.csr_matrix:
         indices.append(cells)
         data.append(weight_row[cells])
         indptr.append(indptr[-1] + cells.size)
-    return sparse.csr_matrix((np.concatenate(data), np.concatenate(indices), np.asarray(indptr, dtype=np.int64)),
-                             shape=(len(weights), ncells))
+    return sparse.csr_matrix(
+        (np.concatenate(data), np.concatenate(indices), np.asarray(indptr, dtype=np.int64)),
+        shape=(len(weights), ncells)
+    )
 
 
 def contract(block: sparse.csr_matrix, rhs=None, rescale: bool = False) -> tuple[sparse.csr_matrix, np.ndarray, np.ndarray]:
@@ -161,9 +167,10 @@ def contract(block: sparse.csr_matrix, rhs=None, rescale: bool = False) -> tuple
     1. Drop tiny coefficients (abs < SOLVER_COEFF_MIN) and eliminate zeros.
     2. Sort the indices of every row (Gurobi requires it).
     3. If ``rescale`` is True, geometrically rescale every row and the RHS.
+    The block is modified in place (every caller hands over a freshly built block), and returned.
     """
-    
-    block = block.tocsr(copy=True)          # copy to avoid modifying the original block in place
+
+    block = block.tocsr()                   # a CSR block is returned as it is: no copy
     # Drop tiny coefficients and eliminate zeros
     block.data[~(np.abs(block.data) >= settings.SOLVER_COEFF_MIN)] = 0.0   # the drop; NaN fails the test
     block.eliminate_zeros()
@@ -176,7 +183,9 @@ def contract(block: sparse.csr_matrix, rhs=None, rescale: bool = False) -> tuple
         return block, rhs, np.ones(block.shape[0], dtype=np.float64)
 
     # the two magnitudes of every row: its largest coefficient and its rhs
-    row_max = abs(block).max(axis=1).toarray().ravel().astype(np.float64)  # 0 for an empty row
+    has_entry = np.diff(block.indptr) > 0
+    row_max = np.zeros(block.shape[0], dtype=np.float64)                    # 0 for an empty row
+    row_max[has_entry] = np.maximum.reduceat(np.abs(block.data), block.indptr[:-1][has_entry])   # off the stored entries: no second matrix
     rhs_abs = np.abs(rhs)
 
     # the row's factor: the geometric mean of the two, so both land around RESCALE_FACTOR
@@ -187,7 +196,8 @@ def contract(block: sparse.csr_matrix, rhs=None, rescale: bool = False) -> tuple
 
     # divide every entry by its row's factor
     row_of_entry = np.repeat(np.arange(block.shape[0]), np.diff(block.indptr))   # the row each stored entry sits in
-    block.data = (block.data / scale[row_of_entry]).astype(np.float32)
+    block.data /= scale[row_of_entry]                                      # in place, in the data's own precision ...
+    block.data = block.data.astype(np.float32, copy=False)                 # ... then float32 (no copy when it already is)
     block.data[np.abs(block.data) < settings.SOLVER_COEFF_MIN] = 0.0       # floor the scaled row
     block.eliminate_zeros()
     block.sort_indices()
