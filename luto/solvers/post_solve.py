@@ -56,9 +56,10 @@ def post_solve(x: np.ndarray, cols: xr.Dataset, col_support: ColSupport, inputs:
     n_nonag_lus = inputs.n_nonag_lus
     ncells      = inputs.ncells
     agman2lu    = inputs.agman2lu
-    block_range = cols.attrs['block_range']
+    options     = list(agman2lu)                                         # the am_idx field's names
 
     # ── 1. the decision variables: x scattered back through the table's fields (float64 -> float32) ──
+    block   = cols['block'].values
     m       = cols['m'].values
     j       = cols['j'].values
     k       = cols['k'].values
@@ -72,19 +73,18 @@ def post_solve(x: np.ndarray, cols: xr.Dataset, col_support: ColSupport, inputs:
     am_X_irr_sol_rj = {am: np.zeros((ncells, n_ag_lus), dtype=np.float32) for am in agman2lu}
 
     # agricultural
-    ag = block_range['ag']
+    ag = block == 'ag'
     is_dry = m[ag] == 0
     X_dry_sol_rj[cell[ag][is_dry],  j[ag][is_dry]]  = x[ag][is_dry]
     X_irr_sol_rj[cell[ag][~is_dry], j[ag][~is_dry]] = x[ag][~is_dry]
 
     # non-agricultural (a disabled land use's columns are fixed at zero)
-    nonag = block_range['nonag']
+    nonag = block == 'nonag'
     non_ag_X_sol_rk[cell[nonag], k[nonag]] = x[nonag]
 
     # ag-management. Savanna eligibility is applied to BOTH lm here, while variable creation applied
     # it to dry only: irr savanna vars outside the eligible cells report 0.
-    am = block_range['am']
-    options = cols.attrs['options']
+    am = block == 'am'
     am_of_col = np.asarray(options, dtype=object)[am_idx[am]]
     reported = ~((am_of_col == "Savanna Burning") & (m[am] == 1) & ~np.isin(cell[am], inputs.savanna_eligible_r))
     for option in options:
@@ -99,20 +99,36 @@ def post_solve(x: np.ndarray, cols: xr.Dataset, col_support: ColSupport, inputs:
     # ── 2. the transition deltas: the gross flows the objective charged, SOURCE-KEYED so reporting can
     #       attribute the true from → to flows. Leaf axes mirror the flow_cost dicts ([to_m, local_r, to_j]
     #       for ag targets, [local_r, k] for non-ag targets); local_r indexes the source's cell list.
-    #       Each source's arcs are one run of the block (<block>_range on the table) enumerated from one mask (the column
-    #       side): its run of x scattered back through its mask is its dense delta array.
-    dvar_D_ag2ag_mrj    = {}   # (from_m, from_j) -> (NLMS, ncells_src, N_AG_LUS)
-    dvar_D_ag2nonag_rk  = {}   # (from_m, from_j) -> (ncells_src, N_NON_AG_LUS)
-    dvar_D_nonag2ag_mrj = {}   # from_k           -> (NLMS, ncells_k, N_AG_LUS)
-    x_arcs = x.astype(np.float32)
+    #       Every arc is written at its own fields in its source's array, shaped like the source's arc mask (the column side).
+    from_m  = cols['from_m'].values
+    from_j  = cols['from_j'].values
+    from_k  = cols['from_k'].values
+    local_r = cols['local_r'].values
+    x_arcs  = x.astype(np.float32)
 
-    for block, masks, deltas_of in (('ag2ag',    col_support.valid_ag2ag,    dvar_D_ag2ag_mrj),
-                                    ('ag2nonag', col_support.valid_ag2nonag, dvar_D_ag2nonag_rk),
-                                    ('nonag2ag', col_support.valid_nonag2ag, dvar_D_nonag2ag_mrj)):
-        for src, mask in masks.items():
-            deltas = np.zeros(mask.shape, dtype=np.float32)
-            deltas[mask] = x_arcs[cols.attrs[f'{block}_range'][src]]
-            deltas_of[src] = deltas
+    dvar_D_ag2ag_mrj = {}      # (from_m, from_j) -> (NLMS, ncells_src, N_AG_LUS)
+    arcs = np.flatnonzero(block == 'ag2ag')
+    for (src_m, src_j), mask in col_support.valid_ag2ag.items():
+        on = arcs[(from_m[arcs] == src_m) & (from_j[arcs] == src_j)]
+        deltas = np.zeros(mask.shape, dtype=np.float32)
+        deltas[m[on], local_r[on], j[on]] = x_arcs[on]
+        dvar_D_ag2ag_mrj[(src_m, src_j)] = deltas
+
+    dvar_D_ag2nonag_rk = {}    # (from_m, from_j) -> (ncells_src, N_NON_AG_LUS)
+    arcs = np.flatnonzero(block == 'ag2nonag')
+    for (src_m, src_j), mask in col_support.valid_ag2nonag.items():
+        on = arcs[(from_m[arcs] == src_m) & (from_j[arcs] == src_j)]
+        deltas = np.zeros(mask.shape, dtype=np.float32)
+        deltas[local_r[on], k[on]] = x_arcs[on]
+        dvar_D_ag2nonag_rk[(src_m, src_j)] = deltas
+
+    dvar_D_nonag2ag_mrj = {}   # from_k -> (NLMS, ncells_k, N_AG_LUS)
+    arcs = np.flatnonzero(block == 'nonag2ag')
+    for src_k, mask in col_support.valid_nonag2ag.items():
+        on = arcs[from_k[arcs] == src_k]
+        deltas = np.zeros(mask.shape, dtype=np.float32)
+        deltas[m[on], local_r[on], j[on]] = x_arcs[on]
+        dvar_D_nonag2ag_mrj[src_k] = deltas
 
     # ── 3. the maps: land use, land management, ag-management options ──
     non_ag_dominates_r = non_ag_X_sol_rk.max(axis=1) > ag_X_mrj.max(axis=(0, 2))   # used for lumap/lmmap only

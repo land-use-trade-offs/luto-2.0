@@ -263,9 +263,9 @@ def solve_timeseries(
         data.last_year = target_year
 
         # ── the objective: the coefficient of every column ──
-        obj = get_obj(get_economics(data, base_year, target_year), cols, col_support)       # million AUD; the economy streams (~300 MB at RES5, ~7 GB at RES1) die with the call
+        obj = get_obj(get_economics(data, base_year, target_year), cols, inputs)            # million AUD; the economy streams (~300 MB at RES5, ~7 GB at RES1) die with the call
 
-        luto_solver = LutoSolver(cols, rows, A, obj)                                        # A x T, obj · x
+        luto_solver = LutoSolver(cols, rows, A, obj, inputs)                                # A x T, obj · x; the inputs name m and am_idx in the variable names
         luto_solver.formulate()
 
         # Save the model to disk BEFORE solving (see save_model_to_disk for why).

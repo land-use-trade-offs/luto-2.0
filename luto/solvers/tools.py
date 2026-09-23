@@ -109,7 +109,7 @@ def record_shadow_prices(luto_solver, target_year, out_dir) -> None:
     item[on] = _label(T, 'demand_commodity', rows)[on]
     presence[on] = _label(T, 'demand_bound', rows)[on]                               # eq / lower / upper: a commodity's paired bounds stay distinguishable
     on = family == 'renewable'
-    constraint[on] = np.asarray(luto_solver.cols.attrs['options'], dtype=object)[T['am_idx'].values[rows][on]]   # the renewable type (its region is the state)
+    constraint[on] = np.asarray(luto_solver.options, dtype=object)[T['am_idx'].values[rows][on]]   # the renewable type (its region is the state)
 
     shadow_price = pi * 1e6 / scale
     shadow_price_AUD = pi * 1e6 * rhs

@@ -22,9 +22,10 @@ area) and numerical breakdown (ill-conditioned coefficient rows).
 For each `(region, species/community, presence)` triplet:
 - Build the full model with GBF4 disabled (all other constraints: GHG, water, GBF2/3,
   land budget, renewables, etc. remain active)
-- Add **one** constraint: `sum(val_vector × dvar) >= lb_raw` (composed with
-  `row_builder.compose` over the coefficient support and the solver's shared bio
-  coefficients, exactly as the family method would build it)
+- Add **one** constraint: `sum(val_vector × dvar) >= lb_raw` (built as
+  `weight_rows([val_vector]) @ bio_S` — `bio_S` the biodiversity contribution laid on the
+  support, `row_builder.bio_contribution` — then `contract`ed, exactly as `get_GBF4_SNES` /
+  `get_GBF4_ECNES` build it)
 - Solve with barrier (15-min cap per worker)
 - Record: `status`, `tightness`, `coeff_ratio`, `n_cells`, solve time
 
@@ -204,23 +205,15 @@ production archive only saved every other year), generate one from
 in `simulation.py`'s `solve_timeseries()`:
 
 ```python
-from luto.simulation import save_data_to_disk
+from luto.simulation import save_data_to_disk, store_solution
+from luto.solvers.post_solve import post_solve
 
 x = solver.solve()   # NOT model.optimize() — solve() returns the raw x over the column table
-solution = post_solve(x, cols, col_side, rows, row_side, inputs) if x is not None else None   # the LUTO format (luto.solvers.post_solve)
 
-if solution is not None and model.Status == GRB.OPTIMAL:
-    data.add_lumap(target_year, solution.lumap)
-    data.add_lmmap(target_year, solution.lmmap)
-    data.add_ammaps(target_year, solution.ammaps)
-    data.add_ag_dvars(target_year, solution.ag_X_mrj)
-    data.add_non_ag_dvars(target_year, solution.non_ag_X_rk)
-    data.add_ag_man_dvars(target_year, solution.ag_man_X_mrj)
-    data.add_obj_vals(target_year, model.ObjVal)
-    for data_type, prod_data in solution.prod_data.items():
-        data.add_production_data(target_year, data_type, prod_data)
-    data.last_year = target_year
-    save_data_to_disk(data, os.path.join(DATA_DIR, f"data_{target_year}.lz4"))
+if x is not None and model.Status == GRB.OPTIMAL:
+    solution = post_solve(x, cols, col_support, inputs)                      # the LUTO format
+    store_solution(data, target_year, solution, model.ObjVal, inputs)       # the dvars, maps, obj value, Production and GHG
+    save_data_to_disk(data, os.path.join(DATA_DIR, f"data_{target_year}.lz4"))   # not save_checkpoint: that deletes older checkpoints
 ```
 
 ### RETRY_PARAMS unpacking (5-tuples)
@@ -239,8 +232,8 @@ for attempt, (numeric_focus, method, crossover, presolve, bar_homogeneous) in en
     model.Params.BarHomogeneous = bar_homogeneous
 
     x = solver.solve()
-    solution = post_solve(x, cols, col_side, rows, row_side, inputs)
     if model.Status == GRB.OPTIMAL:
+        solution = post_solve(x, cols, col_support, inputs)
         break
     elif model.Status in (GRB.INFEASIBLE, GRB.INF_OR_UNBD):
         break  # don't burn remaining retries on a proven infeasibility
@@ -324,14 +317,14 @@ for attr in dir(run_settings):
         setattr(settings, attr, getattr(run_settings, attr))
 
 from luto.solvers.col_builder import get_cols
-from luto.solvers.row_inputs import get_rows
+from luto.solvers.row_inputs import get_row_inputs
 
 print(f"Loading {CHECKPOINT} ...", flush=True)
 data = joblib.load(os.path.join(DATA_DIR, CHECKPOINT))
 
 print(f"Building input_data for {BASE_YEAR}→{TARGET_YEAR} ...", flush=True)
-cols = get_cols(data, BASE_YEAR)
-input_data = get_rows(data, BASE_YEAR, TARGET_YEAR, cols)
+cols, col_support = get_cols(data, BASE_YEAR)
+input_data = get_row_inputs(data, BASE_YEAR, TARGET_YEAR)
 
 all_targets = []
 for region, species, presence in input_data.GBF4_SNES_region_species:
@@ -423,16 +416,18 @@ for attr in dir(run_settings):
     if not attr.startswith("_"):
         setattr(settings, attr, getattr(run_settings, attr))
 
+from scipy import sparse
 from luto.solvers.col_builder import get_cols
-from luto.solvers.row_inputs import get_rows
+from luto.solvers.row_inputs import get_economics, get_row_inputs
+from luto.solvers.row_builder import bio_contribution, contract, get_obj, get_rows, weight_rows
 from luto.solvers.solver import LutoSolver
 
 print(f"[idx={idx}] Loading {CHECKPOINT} ...", flush=True)
 data = joblib.load(os.path.join(DATA_DIR, CHECKPOINT))
 
 print(f"[idx={idx}] Building input_data for {BASE_YEAR}→{TARGET_YEAR} ...", flush=True)
-cols = get_cols(data, BASE_YEAR)
-input_data = get_rows(data, BASE_YEAR, TARGET_YEAR, cols)
+cols, col_support = get_cols(data, BASE_YEAR)
+input_data = get_row_inputs(data, BASE_YEAR, TARGET_YEAR)
 
 # Build flat targets list (GBF4 must be enabled in settings so triplets are populated)
 all_targets = []
@@ -452,12 +447,15 @@ if idx >= len(all_targets):
 typ, region, name, presence, lb_raw = all_targets[idx]
 print(f"[idx={idx}] Target: {typ}  {name} ({presence})  [{region}]  target={lb_raw:,.0f}", flush=True)
 
-# Build base model with GBF4 disabled
+# Build base model with GBF4 disabled (get_rows reads the setting at the call, so the GBF4 families
+# return no rows while input_data keeps the GBF4 layers and targets)
 settings.GBF4_TARGET_SNES  = "off"
 settings.GBF4_TARGET_ECNES = "off"
 
 print(f"[idx={idx}] Formulating base model ...", flush=True)
-solver = LutoSolver(cols, rows)        # cols with cols['obj'] set (row_builder.get_obj); rows from row_builder.get_rows(inputs, cols, col_side)
+A, rows = get_rows(input_data, cols, col_support)
+obj = get_obj(get_economics(data, BASE_YEAR, TARGET_YEAR), cols, input_data)
+solver = LutoSolver(cols, rows, A, obj, input_data)
 solver.formulate()
 model  = solver.gurobi_model
 
@@ -470,17 +468,18 @@ model.Params.OutputFlag   = 1
 
 # Compute constraint row metrics (raw units — the layers and targets reach the solver unscaled;
 # the solver rescales each ROW at build time and keeps the factor in bio_GBF4_*_scales)
-reg_matrix = data.REGION_NRM_NAME              # the NRM name of every cell (RowInputs no longer carries it)
+nrm_code   = {name: code for code, name in col_support.region2cell.attrs['nrm_name'].items()}
+reg_matrix = col_support.region2cell['nrm'].values   # the NRM code of every cell, as get_GBF4_* reads it
 if typ == "SNES":
     val_matrix    = input_data.GBF4_SNES_pre_1750_area_sr
 else:
     val_matrix    = input_data.GBF4_ECNES_pre_1750_area_sr
 val_vector = val_matrix.sel(dict(layer=(name, presence)), drop=True).values
 
-if region == "Australia":
+if region == "AUSTRALIA":
     ind = np.where(val_vector > 0)[0]
 else:
-    ind = np.intersect1d(np.where(val_vector > 0)[0], np.where(reg_matrix == region)[0])
+    ind = np.intersect1d(np.where(val_vector > 0)[0], np.where(reg_matrix == nrm_code[region])[0])
 
 n_cells     = ind.size
 avail_ha    = float(val_vector[ind].sum()) if n_cells > 0 else 0.0
@@ -517,14 +516,13 @@ else:
     if tightness < 1.0:
         print(f"[idx={idx}] WARNING: tightness < 1 ({tightness:.4f}) — target exceeds available area!", flush=True)
 
-    # One row, built the way _add_GBF4_*_constraints builds it: region-masked layer as the
-    # weighting row over the coefficient support with the shared bio coefficients, then
+    # One row, built the way row_builder.get_GBF4_SNES / _ECNES builds it: the region-masked layer as a
+    # weight row over cells, times the biodiversity contribution laid on the support (bio_S), then
     # row-rescaled with the target.
-    from luto.solvers.row_builder import bio_coeff, compose, contract
-    masked = val_vector if region == "Australia" else np.where(reg_matrix == region, val_vector, 0)
-    row = compose(cols, bio_coeff(rows, cols), [masked])
-    row, rhs, _scale = contract(row, [lb_raw], rescale=True)
-    constr = model.addMConstr(row, solver._vars, '>', rhs).tolist()
+    bio_S  = col_support.cell2col @ sparse.diags(bio_contribution(input_data, cols))
+    masked = val_vector if region == "AUSTRALIA" else np.where(reg_matrix == nrm_code[region], val_vector, 0)
+    row, rhs, _scale = contract(weight_rows([masked], input_data.ncells) @ bio_S, [lb_raw], rescale=True)
+    constr = model.addMConstr(row, solver.x, '>', rhs).tolist()
     model.setAttr('ConstrName', constr, [f"test_{typ}_{region}_{name}_{presence}".replace(" ", "_")])
     model.update()
 
@@ -729,14 +727,14 @@ for attr in dir(run_settings):
         setattr(settings, attr, getattr(run_settings, attr))
 
 from luto.solvers.col_builder import get_cols
-from luto.solvers.row_inputs import get_rows
+from luto.solvers.row_inputs import get_row_inputs
 
 print(f"Loading data_{BASE_YEAR}.lz4 ...", flush=True)
 data = joblib.load(os.path.join(DATA_DIR, f"data_{BASE_YEAR}.lz4"))
 
 print(f"Building input_data for {BASE_YEAR}->{TARGET_YEAR} ...", flush=True)
-cols = get_cols(data, BASE_YEAR)
-input_data = get_rows(data, BASE_YEAR, TARGET_YEAR, cols)
+cols, col_support = get_cols(data, BASE_YEAR)
+input_data = get_row_inputs(data, BASE_YEAR, TARGET_YEAR)
 
 all_targets = []
 for region, species, presence in input_data.GBF4_SNES_region_species:

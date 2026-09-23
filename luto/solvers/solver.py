@@ -31,6 +31,7 @@ import luto.settings as settings
 from gurobipy import GRB
 
 from luto import tools
+from luto.solvers.row_inputs import RowInputs
 
 
 # Set Gurobi environment.
@@ -47,11 +48,13 @@ gurenv.start()
 class LutoSolver:
     """The Gurobi model of one step — the column table, the row table, A and obj — returns the raw x."""
 
-    def __init__(self, cols: xr.Dataset, rows: xr.Dataset, A, obj: np.ndarray):
+    def __init__(self, cols: xr.Dataset, rows: xr.Dataset, A, obj: np.ndarray, inputs: RowInputs):
         self.cols = cols
         self.rows = rows
-        self.A = A                      # (row x n_all) scipy CSR: row i of A is row i of the row table
-        self.obj = obj                  # (n_all,) the objective coefficient of every column (million AUD, row_builder.get_obj)
+        self.A = A                      # (row x col) scipy CSR: row i of A is row i of the row table
+        self.obj = obj                  # (col,) the objective coefficient of every column (million AUD, row_builder.get_obj)
+        self.landmans = inputs.landmans         # the land-management names in m order: how a variable's name spells m
+        self.options = list(inputs.agman2lu)    # the ag-management options in am_idx order: how a variable's name spells am_idx
         self.gurobi_model = gp.Model(f"LUTO {settings.VERSION}", env=gurenv)
         self.x = None                           # ONE MVar over the column table: every column, in Var.index order
         self._vars = None                       # model.getVars() in Var.index order (materialised once, for addMConstr)
@@ -68,10 +71,10 @@ class LutoSolver:
         table order (ag | nonag | am | ag2ag | ag2nonag | nonag2ag) — the names from the fields."""
         print("├── Setting up decision variables...")
         cols = self.cols
-        lm_name = np.array(cols.attrs['landmans'])                                  # the land managements in m order
-        snake_of_option = np.array([tools.am_name_snake_case(option) for option in cols.attrs['options']], dtype=object)   # the options in am_idx order
+        lm_name = np.array(self.landmans)                                           # the land managements in m order
+        snake_of_option = np.array([tools.am_name_snake_case(option) for option in self.options], dtype=object)   # the options in am_idx order
         self.x = self.gurobi_model.addMVar(
-            cols.attrs['n_all'], 
+            cols.sizes['col'], 
             lb=cols['lb'].values, 
             ub=cols['ub'].values, 
             name="X"
@@ -92,10 +95,12 @@ class LutoSolver:
                                      for from_k, m, local_r, j in zip(t['from_k'], t['m'], t['local_r'], t['j'])],
         }
      
-        for block, span in cols.attrs['block_range'].items():
-            fields = {field: cols[field].values[span] for field in ('m', 'j', 'k', 'am_idx', 'from_m', 'from_j', 'from_k', 'local_r', 'cell')}
-            self.gurobi_model.setAttr('VarName', self.x[span].tolist(), names_of[block](fields))
-        blocks = pd.DataFrame({'block': list(cols.attrs['block_range']), 'variables': [span.stop - span.start for span in cols.attrs['block_range'].values()]})
+        block_of_col = cols['block'].values
+        for block in pd.unique(block_of_col):                                       # the blocks, in table order
+            on = np.flatnonzero(block_of_col == block)
+            fields = {field: cols[field].values[on] for field in ('m', 'j', 'k', 'am_idx', 'from_m', 'from_j', 'from_k', 'local_r', 'cell')}
+            self.gurobi_model.setAttr('VarName', self.x[on].tolist(), names_of[block](fields))
+        blocks = pd.DataFrame({'block': pd.unique(block_of_col), 'variables': [int((block_of_col == block).sum()) for block in pd.unique(block_of_col)]})
         for line in blocks.to_markdown(index=False, tablefmt='psql', intfmt=',').split('\n'):
             print(f"│   {line}")
 
@@ -106,7 +111,7 @@ class LutoSolver:
         model = self.gurobi_model
         model.update()                       # the ONE update before the first row: every variable exists
         self._vars = model.getVars()
-        assert len(self._vars) == self.cols.attrs['n_all'], 'the model must hold exactly the columns of the space'
+        assert len(self._vars) == self.cols.sizes['col'], 'the model must hold exactly the columns of the space'
         T = self.rows
         active = T['active'].values
         built = np.flatnonzero(active)

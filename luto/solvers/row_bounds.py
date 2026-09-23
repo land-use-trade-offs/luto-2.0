@@ -78,8 +78,10 @@ def get_row_bounds(A: sparse.csr_matrix, rows: xr.Dataset, cols: xr.Dataset) -> 
     # ── 6. the column preflight: columns no row touches, bounds no point can satisfy ──
     in_rows = np.bincount(A.indices, minlength=A.shape[1])
     preflight = {}
-    for block, span in cols.attrs['block_range'].items():
-        preflight[block] = dict(columns=span.stop - span.start,
+    block_of_col = cols['block'].values
+    for block in pd.unique(block_of_col):                               # the blocks, in table order
+        span = block_of_col == block
+        preflight[block] = dict(columns=int(span.sum()),
                                 in_no_row=int((in_rows[span] == 0).sum()),
                                 nan_bound=int(np.isnan(lb[span]).sum() + np.isnan(ub[span]).sum()),
                                 lb_neg_inf=int(np.isneginf(lb[span]).sum()),

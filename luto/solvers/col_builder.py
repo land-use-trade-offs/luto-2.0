@@ -36,19 +36,17 @@ from luto.solvers.row_inputs import get_mask_gbf2_solar, get_mask_gbf2_wind
 
 @dataclass
 class ColSupport:
-    """Supporting data that maps the SPARSE column variables onto the DENSE input arrays, so the row side never infers 
-    an index: every subset comes as a PAIR of handles — one slices the input (``valid_*``, ``region2cell``), its twin 
-    slices the column table (``block_range`` / ``*_range``, ``region2col``) — and a constraint is input[handle] · x[twin].
-    Beside them, the same pairs vectorised for the rows that need them at once: ``cell2col`` (every cell's variables,
-    for the layer families) and ``ag_mrj2col`` / ``nonag_rk2col`` (the masks read backwards, position → column, for the
-    rows that join variables by node)."""
+    """Supporting data that maps the SPARSE column variables onto the DENSE input arrays: the masks an input is
+    filtered with (``valid_*``, ``region2cell``) beside the column table, whose own fields (``block``, ``m``, ``j``,
+    ``cell`` ...) say where every column reads its input. Beside them, the lookups the rows need at once:
+    ``region2col`` (the region of every column), ``cell2col`` (every cell's variables, for the layer families) and
+    ``ag_mrj2col`` / ``nonag_rk2col`` (position → column, for the rows that join variables by node)."""
 
-    valid_ag_mrj: np.ndarray      # filter the INPUT to the ag entries that have a column, as a 1-D vector in column order     
-    valid_nonag_rk: np.ndarray    # filter the INPUT to the non-ag entries that have a column, as a 1-D vector in column order 
-    valid_am: dict                # filter an option's INPUT at one land use and one lm to the cells that have a column, per (option, j_idx, m)
-    valid_ag2ag: dict             # filter a source's ag→ag INPUT to the arcs that have a column, per source                   
-    valid_ag2nonag: dict          # filter a source's ag→non-ag INPUT to the arcs that have a column, per source               
-    valid_nonag2ag: dict          # filter a source's non-ag→ag INPUT to the arcs that have a column, per source               
+    valid_ag_mrj: np.ndarray      # (lm, cell, lu) bool: the ag entries that have a column
+    valid_nonag_rk: np.ndarray    # (cell, nonag_lu) bool: the non-ag entries that have a column
+    valid_ag2ag: dict             # {source: bool (to_m, local_r, to_j)}: the ag→ag arcs a source has a column for — the shape of its solved deltas
+    valid_ag2nonag: dict          # {source: bool (local_r, to_k)}: the ag→non-ag arcs a source has a column for
+    valid_nonag2ag: dict          # {source: bool (to_m, local_r, to_j)}: the non-ag→ag arcs a source has a column for
     region2cell: xr.Dataset       # filter the INPUT by region
     region2col: xr.Dataset        # filter the gp.Vars table by region
     # the three below are read by get_rows only; simulation frees them before the solve
@@ -89,34 +87,20 @@ def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSupport]:
     # ── 6. the blocks and the table: every block's rows laid back to back in Var.index order, each block enumerated from its mask ──
     valid_ag_mrj,   ag_rows    = ag_space(feasible_ag_mrj, trans_ub_ag_mrj, dvar_base_ag_mrj)
     valid_nonag_rk, nonag_rows = nonag_space(data, trans_lb_nonag_rk, trans_ub_nonag_rk, dvar_base_nonag_rk)
-    valid_am_smr,   am_rows    = am_space(data, feasible_ag_mrj, mask_gbf2_solar, mask_gbf2_wind, trans_lb_ag_man_mrj)
+    am_rows                    = am_space(data, feasible_ag_mrj, mask_gbf2_solar, mask_gbf2_wind, trans_lb_ag_man_mrj)
 
     ag2ag_rows                   = ag2ag_space(valid_ag2ag, trans_source_ag)              # each source carries its own cells: local_r -> the global cell
     ag2nonag_rows                = ag2nonag_space(valid_ag2nonag, trans_source_ag)
     nonag2ag_rows                = nonag2ag_space(valid_nonag2ag, trans_source_nonag)
     
-    # the blocks, in the table's order: the three a per-cell coefficient accounts over (ag, nonag, am: the first
-    # n_terms columns the demand, GHG, water, biodiversity and renewable rows read), then the arcs (charged per arc:
-    # transition cost in the objective, transition emissions in the GHG row)
+    # the blocks, in the table's order: the three a per-cell coefficient accounts over (ag, nonag, am), then the arcs
+    # (charged per arc: transition cost in the objective, transition emissions in the GHG row)
     blocks = dict(ag=ag_rows, nonag=nonag_rows, am=am_rows, ag2ag=ag2ag_rows, ag2nonag=ag2nonag_rows, nonag2ag=nonag2ag_rows)
 
-    # the chunks inside the am and arc blocks — one per (option, land use, lm), one per source — by their widths: the
-    # table lays them out as it lays the blocks out, and keeps their slice of it beside block_range
-    slots    = [(option, j_idx) for option, lus in data.AGMAN2LU.items() for j_idx in range(len(lus))]
-    valid_am = {(option, j_idx, m): valid_am_smr[s, m] for s, (option, j_idx) in enumerate(slots) for m in range(data.NLMS)}   # {(option, j_idx, m): bool (cell,)}, in the am block's (slot, lm) order
-    chunks = {
-        'am':       {key: int(mask.sum()) for key, mask in valid_am.items()},
-        'ag2ag':    {src: int(mask.sum()) for src, mask in valid_ag2ag.items()},
-        'ag2nonag': {src: int(mask.sum()) for src, mask in valid_ag2nonag.items()},
-        'nonag2ag': {src: int(mask.sum()) for src, mask in valid_nonag2ag.items()},
-    }
+    table = table_space(blocks)                                                     # every column labelled with its block
 
-    table = table_space(blocks, chunks, list(data.AGMAN2LU), data.LANDMANS)                        # the block and chunk bounds land in its attrs
-
-    block_range = table.attrs['block_range']
-    print(f"Column space: {table.attrs['n_all']:,} columns = {table.attrs['n_terms']:,} accounting (n_terms) + "
-          f"{table.attrs['n_all'] - table.attrs['n_terms']:,} arcs", flush=True)
-    blocks_table = pd.DataFrame({'block': list(block_range), 'columns': [span.stop - span.start for span in block_range.values()]})
+    print(f"Column space: {table.sizes['col']:,} columns", flush=True)
+    blocks_table = pd.DataFrame({'block': list(blocks), 'columns': [rows['cell'].size for rows in blocks.values()]})
     for line in blocks_table.to_markdown(index=False, tablefmt='psql', intfmt=',').split('\n'):
         print(f"│   {line}", flush=True)
 
@@ -126,24 +110,26 @@ def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSupport]:
     region2col  = region2cell.isel(cell=table['cell'].values).rename(cell='col')    # the same layers read at every column's cell: what filters the table
 
     # for each cell, which variables sit in it: the table's ``cell`` field as a (cell x col) matrix, 1 where they do
+    block    = table['block'].values
     cell     = table['cell'].values                                                 # the cell each gp Variable (column) sits in, one per column
-    n_all    = table.attrs['n_all']                                                 # num of gp Variables (columns)
+    n_col    = table.sizes['col']                                                   # num of gp Variables (columns)
     cell2col = sparse.csr_matrix(
-        (np.ones(n_all, dtype=np.float32), (cell, np.arange(n_all, dtype=np.int32))),
-        shape=(data.NCELLS, n_all)
+        (np.ones(n_col, dtype=np.float32), (cell, np.arange(n_col, dtype=np.int32))),
+        shape=(data.NCELLS, n_col)
     )
 
-    # for each mrj / rk position, which ag / non-ag variable it is: the column at a valid entry is its running count
-    # within the block (the mask read backwards), -1 where it has none (no arcs, no am)
-    ag           = block_range['ag']
-    nonag        = block_range['nonag']
-    ag_mrj2col   = np.where(valid_ag_mrj,   ag.start    + np.cumsum(valid_ag_mrj).reshape(valid_ag_mrj.shape)     - 1, -1).astype(np.int32)
-    nonag_rk2col = np.where(valid_nonag_rk, nonag.start + np.cumsum(valid_nonag_rk).reshape(valid_nonag_rk.shape) - 1, -1).astype(np.int32)
+    # for each mrj / rk position, which ag / non-ag variable it is: every ag / non-ag column written at its own
+    # (m, cell, j) / (cell, k), -1 where the position has none (no arcs, no am)
+    ag           = np.flatnonzero(block == 'ag')
+    ag_mrj2col   = np.full(valid_ag_mrj.shape, -1, dtype=np.int32)
+    ag_mrj2col[table['m'].values[ag], cell[ag], table['j'].values[ag]] = ag
+    nonag        = np.flatnonzero(block == 'nonag')
+    nonag_rk2col = np.full(valid_nonag_rk.shape, -1, dtype=np.int32)
+    nonag_rk2col[cell[nonag], table['k'].values[nonag]] = nonag
 
     return table, ColSupport(
         valid_ag_mrj=valid_ag_mrj,
         valid_nonag_rk=valid_nonag_rk,
-        valid_am=valid_am,
         valid_ag2ag=valid_ag2ag,
         valid_ag2nonag=valid_ag2nonag,
         valid_nonag2ag=valid_nonag2ag,
@@ -261,8 +247,8 @@ def nonag_space(data: Data, trans_lb_nonag_rk: np.ndarray, trans_ub_nonag_rk: np
     return valid, rows
 
 
-def am_space(data: Data, feasible_ag_mrj: np.ndarray, mask_gbf2_solar: np.ndarray, mask_gbf2_wind: np.ndarray, trans_lb_ag_man_mrj: dict) -> tuple[np.ndarray, dict]:
-    """The ag-management columns: the mask (slot, lm, cell) the block is enumerated from — per slot the (lm, cell) layout of an option's input at that slot's land use — and the block's rows — its slot, option, land use, the ag (lm, lu) it sits on, cell and lb; ub = 1 — in (slot = (am, lu), lm, cell) order."""
+def am_space(data: Data, feasible_ag_mrj: np.ndarray, mask_gbf2_solar: np.ndarray, mask_gbf2_wind: np.ndarray, trans_lb_ag_man_mrj: dict) -> dict:
+    """The ag-management columns as rows — its slot, option, land use, the ag (lm, lu) it sits on, cell and lb; ub = 1 — in (slot = (am, lu), lm, cell) order."""
     slots = [(am, lu_code) for am, lu_codes in data.AGMAN2LU.items() for lu_code in lu_codes]   # the (option, land use) slots, in slot order
 
     valid = np.zeros((len(slots), data.NLMS, data.NCELLS), dtype=bool)
@@ -290,7 +276,7 @@ def am_space(data: Data, feasible_ag_mrj: np.ndarray, mask_gbf2_solar: np.ndarra
 
     # the column (gp.Var) view: where the ag-mgt slot exists; nothing reads an am column by grid position
     slot, m, r = np.nonzero(valid)                                                   # the block's columns: mask order = column order
-    return valid, dict(
+    return dict(
         slot=slot,
         am_idx=am_idx_of_slot[slot],
         j_idx=j_idx_of_slot[slot],
@@ -391,23 +377,10 @@ def nonag2ag_space(valid_nonag2ag: dict, trans_source_nonag: dict) -> dict:
     return rows
 
 
-def table_space(blocks: dict, chunks: dict, options: list, landmans: list) -> xr.Dataset:
-    """The whole space as ONE long table on (col = Var.index): the blocks' rows back to back in the order ``blocks`` declares them, the fields of each column (-1 where n/a), its lb / ub / base; ``chunks`` = {block: {key: width}} the runs inside the am and arc blocks, kept as ``<block>_range`` = {key: slice(start, stop)} beside ``block_range``; ``options`` names the am_idx field and ``landmans`` the m field."""
+def table_space(blocks: dict) -> xr.Dataset:
+    """The whole space as ONE long table on (col = Var.index): the blocks' rows back to back in the order ``blocks`` declares them, each column labelled with its ``block`` and carrying its fields (-1 where n/a), its lb / ub / base."""
 
-    # each block's run of the table: the rows [start, stop) it owns
     widths = [rows['cell'].size for rows in blocks.values()]
-    bounds = np.cumsum([0, *widths])
-    block_range = {block: slice(int(start), int(stop)) for block, start, stop in zip(blocks, bounds[:-1], bounds[1:])}
-
-    n_all   = int(bounds[-1])                         # every column: the rows are built at this width
-
-    # each chunk's run of its block: the (option, land use) slots of the am block, the sources of an arc block, laid out in the order given
-    chunk_range = {}
-    for block, chunk_widths in chunks.items():
-        chunk_bounds = block_range[block].start + np.cumsum([0, *chunk_widths.values()])
-        chunk_range[f'{block}_range'] = {key: slice(int(start), int(stop)) for key, start, stop in zip(chunk_widths, chunk_bounds[:-1], chunk_bounds[1:])}
-        assert chunk_bounds[-1] == block_range[block].stop, f'the {block} chunks do not fill the block'
-    n_terms = blocks['ag']['cell'].size + blocks['nonag']['cell'].size + blocks['am']['cell'].size   # the three accounting blocks lead the table, so their width IS the prefix a demand / GHG / water / biodiversity / renewable coefficient array is allocated at
 
     # a field over the whole table: -1 (or the fill) on the blocks that have no such field, e.g. slot / am_idx / j_idx off the am block
     def field(field_name, dtype, fill):
@@ -420,11 +393,12 @@ def table_space(blocks: dict, chunks: dict, options: list, landmans: list) -> xr
         return np.concatenate(per_block)                         # the blocks back to back: one value per column of the table
 
     return xr.Dataset(
-        dict(m      =(('col',), field('m', np.int32, -1)),                                   # the ag (lm, lu) the column lands on: own (ag), host (am), TO fields (ag2ag, nonag2ag)
+        dict(block  =(('col',), np.repeat(np.array(list(blocks), dtype=object), widths)),    # the block the column belongs to — ag, nonag, am, ag2ag, ag2nonag, nonag2ag — one shared str per column
+             m      =(('col',), field('m', np.int32, -1)),                                   # the ag (lm, lu) the column lands on: own (ag), host (am), TO fields (ag2ag, nonag2ag)
              j      =(('col',), field('j', np.int32, -1)),
              k      =(('col',), field('k', np.int32, -1)),                                   # the non-ag land use it lands on: own (nonag), TO field (ag2nonag)
              slot   =(('col',), field('slot', np.int32, -1)),                                # the (am, lu) slot of an ag-mgt column ...
-             am_idx =(('col',), field('am_idx', np.int32, -1)),                              # ... its option (attrs['options'][am_idx] is the name) ...
+             am_idx =(('col',), field('am_idx', np.int32, -1)),                              # ... its option, as a position in the inputs' agman2lu ...
              j_idx  =(('col',), field('j_idx', np.int32, -1)),                               # ... and its land use's position within the option (the last axis of the per-option effect arrays)
              from_m =(('col',), field('from_m', np.int32, -1)),                              # where an arc comes from
              from_j =(('col',), field('from_j', np.int32, -1)),
@@ -434,14 +408,6 @@ def table_space(blocks: dict, chunks: dict, options: list, landmans: list) -> xr
              lb     =(('col',), field('lb', np.float32, 0.0)),                               # the bounds of the column (float32, as every input is; gurobi reads them as doubles)
              ub     =(('col',), field('ub', np.float32, np.inf)),
              base   =(('col',), field('base', np.float32, 0.0))                              # the node-balance constant of an ag / non-ag column
-        ),
-        attrs=dict(
-            block_range=block_range,                                                         # {block: slice(start, stop)} — the rows each block owns, in the table's block order
-            **chunk_range,                                                                   # am_range {(option, j_idx, m): slice(start, stop)}, ag2ag_range / ag2nonag_range / nonag2ag_range {source: slice(start, stop)} — the runs inside those blocks
-            landmans=landmans,                                                               # the land-management names, in m order ('dry', 'irr'): what the m field means
-            options=options,                                                                 # the ag-management options, in am_idx order: what the am_idx field means
-            n_terms=n_terms,                                                                 # the ag, nonag and am blocks: the table's first rows, the width a demand / GHG / water / biodiversity / renewable coefficient array is allocated at
-            n_all=n_all,                                                                     # every column: the rows and the objective are built at this width
         )
     )
 
