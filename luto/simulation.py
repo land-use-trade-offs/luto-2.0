@@ -260,7 +260,6 @@ def solve_timeseries(
                   f"(see {data.path}/out_{target_year}/bound_report_{target_year}.csv). Stopping before the model is built.", flush=True)
             print('!' * 100, flush=True)
             break
-        data.last_year = target_year
 
         # ── the objective: the coefficient of every column ──
         obj = get_obj(get_economics(data, base_year, target_year), cols, inputs)            # million AUD; the economy streams (~300 MB at RES5, ~7 GB at RES1) die with the call
@@ -275,6 +274,7 @@ def solve_timeseries(
         if accepted:
             solution = post_solve(x, cols, col_support, inputs)                                # the LUTO 1-D format
             store_solution(data, target_year, solution, luto_solver.gurobi_model.ObjVal, inputs)
+            data.last_year = target_year                                                        # only a solved and stored year: the writers report through it
             record_shadow_prices(luto_solver, target_year, f"{data.path}/out_{target_year}")
             if checkpoint_path is not None:
                 save_checkpoint(data, checkpoint_path, target_year)

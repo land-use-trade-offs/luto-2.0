@@ -101,7 +101,7 @@ grid_search = {
     
     # --------------- Biodiversity overall ---------------
     'BIO_QUALITY_LAYER': ['Suitability'],
-    'HCAS_CONTRIBUTION_PERCENTILE': ['CSV_DEFINED'],                            # 50th percentile of HCAS per LUF Report 2026 (need to be 'USER_DEFINED', which is 50th percentile but with nudges for sheep/beef/dairy nat land)
+    'HCAS_CONTRIBUTION_PERCENTILE': ['CSV_DEFINED'],                            # the hand-set contribution column (the 50th percentile of HCAS per LUF Report 2026, nudged for sheep/beef/dairy nat land); also '10'-'90' or 'AG_UNIFORM'
     'CONNECTIVITY_SOURCE': ['NCI'],
     'CONNECTIVITY_LB': [0.7],                                               # Connectivity score importance: 0.7 per LUF Report 2026
 

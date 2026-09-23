@@ -40,9 +40,9 @@ The LUTO2 documentation is split into themed files for better memory efficiency.
 - GBF2 priority degraded areas logic (mask construction, Zonation performance curve)
 - `BIO_GBF2_BASE_YR`, `BIO_GBF2_MASK`, savanna-burning LDS correction
 - `get_GBF2_target_for_yr_cal()` — baseline / base-year / restoration-fraction interpolation
-- `_add_GBF2_constraints()` in solver.py — how the hard/soft constraint is built
+- `get_GBF2()` in row_builder.py — how the (hard) constraint is built
 - `write_biodiversity_GBF2_scores()` in write.py — denominator, ag/non-ag/am numerators, `Relative_Contribution_Percentage` formula and why it sums to ~30%
-- Settings: `GBF2_TARGET`, `GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT`, `BIO_CONTRIBUTION_LDS`, `GBF2_CONSTRAINT_TYPE`
+- Settings: `GBF2_TARGET`, `GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT`, `BIO_CONTRIBUTION_LDS`
 
 ### 📁 [docs/CLAUDE_OUTPUT.md](docs/CLAUDE_OUTPUT.md)
 
@@ -196,17 +196,16 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 
 ### Environmental Constraints
 
+Every constraint is hard: there are no soft / penalised options (the `*_CONSTRAINT_TYPE` settings and `SOLVE_WEIGHT_BETA` are gone).
+
 - `GHG_EMISSIONS_LIMITS`: Greenhouse gas targets ('off', 'low', 'medium', 'high')
-- `GHG_CONSTRAINT_TYPE`: Hard or soft GHG constraint ('hard' or 'soft')
 - `WATER_LIMITS`: Water yield constraints ('on' or 'off')
-- `WATER_CONSTRAINT_TYPE`: Hard or soft water constraint ('hard' or 'soft')
 - `CARBON_EFFECTS_WINDOW`: Years for carbon accumulation averaging (50, 60, 70, 80, or 90 years)
   - Must match available NetCDF data ages in input files
   - Determines annual sequestration rate by averaging total CO2 over this period
   - Default: 50 years (follows S-curve logic with rapid early accumulation)
 - `BIODIVERSITY_TARGET_GBF_*`: Global Biodiversity Framework targets
   - `GBF2_TARGET`: Priority degraded areas restoration ('off', 'low', 'medium', 'high')
-  - `GBF2_CONSTRAINT_TYPE`: Hard or soft GBF2 constraint ('hard' or 'soft')
   - `GBF3_NVIS_TARGET`: NVIS vegetation group targets ('off', 'medium', 'high', 'CSV_DEFINED')
   - `GBF3_NVIS_REGION_MODE`: 'AUSTRALIA', 'NRM', or 'IBRA_REG' (IBRA bioregion targets are handled through the NVIS stream — there is no separate `BIODIVERSITY_TARGET_GBF_3_IBRA` setting or IBRA constraint method)
   - `GBF4_TARGET_SNES`: Species NES targets ('off', 'medium', 'high', 'SPECIFIED', or 'CSV_DEFINED'; levels apply uniform presets from `GBF4_SNES_TARGETS_DICT` to ALL species, GBF2-style; 'CSV_DEFINED' keeps CSV targets and filters to species with TARGET_LEVEL_2030 > 0; **'SPECIFIED'** = the same species as CSV_DEFINED with **region-specific** uniform levels — `GBF4_SNES_SEL_REGION_TARGETS` is then a dict `{region: {year: pct}}` whose keys select the regions (`{'AUSTRALIA': {...}}` at national scope); a plain list in the other modes)

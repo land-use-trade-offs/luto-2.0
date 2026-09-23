@@ -11,7 +11,7 @@ This document describes the core architecture, modules, and data flow of LUTO2.
   - `solver.py`: GUROBI solver wrapper (LutoSolver class)
     - Biodiversity constraint methods: `_add_GBF2_constraints()`, `_add_GBF3_NVIS_constraints()`, `_add_GBF4_SNES_constraints()`, `_add_GBF4_ECNES_constraints()`, `_add_GBF8_constraints()`. IBRA bioregion targets have **no separate constraint method** — they run through `_add_GBF3_NVIS_constraints()` when `GBF3_NVIS_REGION_MODE = 'IBRA_REG'`.
     - Renewable energy constraint method: `_add_renewable_energy_constraints()` — enforces state-level solar and wind generation targets
-    - Hard/soft constraint flexibility: `GHG_CONSTRAINT_TYPE`, `WATER_CONSTRAINT_TYPE`, `GBF2_CONSTRAINT_TYPE`
+    - Every constraint is hard: there are no soft / penalised rows and no `*_CONSTRAINT_TYPE` settings
     - Exact transition flow model (see "Transition Flow Model" below): one source per nonzero base-year (lm, lu, cell) entry, per-source delta variables, node-balance and source-cap rows.
   - `col_builder.py`: the COLUMN side — `get_cols(data, base_year) -> (cols, col_support)` builds the column space from the base-year state: `cols`, the long table (every unknown as one row, its fields, `lb` / `ub` / `base`; the row side adds `obj`), and beside it a `ColSupport` — the SUPPORT the row side reads by position (`region2cell`, the region of every cell as data variables — `state` / `nrm` / `ibra` / `water_region` names — so a regional family takes its cells as `region2cell[layer].values == region` and its columns by reading the layer at their `cell` — the wide grids, source maps and renewable masks of earlier versions are gone: every feasible entry has a column, the arcs are keyed by source through their masks, and the cell sets live on `RowInputs`)
   - `row_inputs.py`: the row side's INPUT DATA, purely downstream of the economics modules — it never sees the column space. `get_row_inputs(data, base_year, target_year)` returns every coefficient stream, target and layer as ONE `RowInputs` (no wrapper layer; the setting that turns a family off is read at the call); `get_economics(...)` returns the objective's own streams as an `EconomicInputs`, loaded separately because it is ~300 MB at RES5 and wanted only while the objective is built
@@ -116,9 +116,8 @@ This document describes the core architecture, modules, and data flow of LUTO2.
    - `LutoSolver(cols, rows, A, obj, inputs)` is A x T and obj · x (the inputs' `landmans` / `agman2lu` spell `m` / `am_idx` in the variable names). `formulate()` = `_setup_vars` (ONE `addMVar` over the column table, the names from the fields) → `_setup_constraints` (ONE `addMConstr` over the row table's ACTIVE rows — a row `row_bounds.drop_redundant_rows` flagged off before the build never reaches the solver, its handle None — the names, the handles kept on `rows['constr']`) → `_setup_objective` (`obj @ x`); then `remove_constraints_by_name` / `restore_constraints_by_name` (flag on the table + remove / re-add) and `solve()` → the raw x. The row order is the row table's (`row_builder.get_rows`): ag-mgt link → adoption → renewable ceiling → demand → GHG → GBF2/3/4/8 → regional adoption → water → renewables → source cap → node balance (the ag nodes, then the non-ag nodes). No constraint-handle attributes on the solver: the row table holds every handle and scale, and `solvers/tools.record_shadow_prices` prices its active rows of the families in `tools.PRICED`, plus the rows dropped before the build as redundant (priced 0, `dropped = True`), as one table query
 
 5. **Optimization**: `solvers/solver.py` runs GUROBI optimization with biodiversity, renewable energy, and environmental constraints
-   - Hard/soft constraint flexibility for GHG, water, GBF2
-   - Soft constraints add deviation penalties (`_setup_deviation_penalties()`): demand, GHG, water, biodiversity
-   - Objective: `obj_economy × (1 - SOLVE_WEIGHT_BETA) ± obj_penalties × SOLVE_WEIGHT_BETA`. `SOLVE_WEIGHT_BETA` is the **only** economy-vs-penalty knob — the former per-target `SOLVER_WEIGHT_DEMAND/GHG/WATER` weights were removed.
+   - Every constraint is hard (demand, GHG, water, GBF2/3/4/8, renewables): no deviation variables, no penalties
+   - Objective: the economy alone, `obj · x` in million AUD (`row_builder.get_obj`); `SOLVE_WEIGHT_BETA` is gone
    - The sub-`SOLVER_COEFF_MIN` floor on scaled coefficients is the last step of `row_builder.contract` on every family's stacked block and of the objective vector; no post-build sweep exists. The flow rows (source cap, node balance) and the ag-mgt link rows are structural ±1 rows: they pass through `contract` without the rescale, and the drop is a no-op on them or rescaled.
 
 6. **Output Generation**: `tools/write.py` writes results to `/output/`
@@ -153,7 +152,7 @@ The biodiversity module follows consistent naming conventions for GBF (Global Bi
 ### Key GBF Modules
 1. **GBF2**: Priority degraded areas restoration
    - Function: `get_GBF2_MASK_area(data)` returns mask × real area
-   - Constraint type: hard or soft (configurable via `GBF2_CONSTRAINT_TYPE`)
+   - Constraint type: hard
 2. **GBF3 NVIS / IBRA**: NVIS major vegetation group targets, or IBRA bioregion targets
    - Function: `get_GBF3_NVIS_matrices_vr(data)` returns the layers for both
    - Settings: `GBF3_NVIS_TARGET_CLASS` ('NVIS_MVG' or 'NVIS_MVS'); `GBF3_NVIS_REGION_MODE` ('AUSTRALIA', 'NRM', or 'IBRA_REG') selects NVIS vs IBRA. There is no separate IBRA function, attribute, setting, or constraint method.
@@ -226,7 +225,7 @@ run(data) → solve_timeseries(data, years=sorted(SIM_YEARS))   # default 2020, 
     For each year pair (base→target):
         ├── col_builder.get_cols(data, base_yr) → (cols, col_support);  row_inputs.get_row_inputs(data, base_yr, target_yr) → inputs
         ├── row_builder.get_rows(inputs, cols, col_support) → (A, rows)
-        ├── row_bounds.get_row_bounds(rows, cols) → bounds          # every row's interval over the column box, and its verdict
+        ├── row_bounds.get_row_bounds(A, rows, cols) → bounds          # every row's interval over the column box, and its verdict
         │   ├── drop_redundant_rows(rows, bounds, BOUND_PROP_DROP_FAMILIES)   # opt-in: redundant rows flagged off, never built
         │   ├── report_row_bounds(...) → out_<year>/bound_report_<year>.csv, bound_preflight_<year>.csv
         │   └── an impossible row + BOUND_PROP_ON_IMPOSSIBLE == 'stop' → the year stops here, before the model

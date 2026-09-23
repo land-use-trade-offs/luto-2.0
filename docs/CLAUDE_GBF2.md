@@ -125,7 +125,7 @@ The constraint is:
 score ≥ target(yr_cal)          [hard constraint]
 ```
 
-or, when `GBF2_CONSTRAINT_TYPE = 'soft'`, expressed as a soft goal-programming slack.
+It is always hard: there is no soft option.
 
 Cells are pre-filtered to `GBF2_mask_idx = where(BIO_GBF2_MASK_LDS)` — only cells within the priority mask (with the LDS adjustment applied) enter the constraint. This keeps the LP matrix sparse.
 
@@ -204,7 +204,6 @@ To avoid double-counting the `add_all`-generated aggregate rows:
 | Setting | Default | Effect |
 |---------|---------|--------|
 | `GBF2_TARGET` | `'high'` | Scenario: `'off'`, `'low'`, `'medium'`, `'high'` |
-| `GBF2_CONSTRAINT_TYPE` | `'hard'` | Hard or soft solver constraint |
 | `GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT` | `15` | Top-N% of Zonation performance curve used as the priority mask |
 | `GBF2_TARGETS_DICT` | see above | Restoration fractions at key years per scenario |
 | `BIO_QUALITY_LAYER` | `'MNES_likely'` | Zonation quality layer used for both priority masking and bio-contribution scores |

@@ -273,7 +273,7 @@ def _analyze_iis_inner(filepath: str, data):
         cell_types = Counter()
         cell_ids = []
         for name, _ in cell_constraints:
-            m = re.match(r"(const_cell_usage|const_ag_man_\w+_usage)", name)
+            m = re.match(r"(const_cell_usage|const_ag_man_.+?_usage)", name)
             ctype = m.group(1) if m else name
             cell_types[ctype] += 1
             # Extract cell id (last number in the constraint name)

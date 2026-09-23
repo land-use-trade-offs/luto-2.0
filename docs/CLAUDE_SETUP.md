@@ -80,10 +80,9 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 - `AMORTISATION_PERIOD`: Period for cost amortization in years (default: 30)
 
 ### Environmental Constraints
+Every constraint is hard: there are no soft / penalised options.
 - `GHG_EMISSIONS_LIMITS`: Greenhouse gas targets ('off', 'low', 'medium', 'high')
-- `GHG_CONSTRAINT_TYPE`: Hard or soft constraint ('hard' or 'soft')
 - `WATER_LIMITS`: Water yield constraints ('on' or 'off')
-- `WATER_CONSTRAINT_TYPE`: Hard or soft constraint ('hard' or 'soft')
 - `WATER_CLIMATE_CHANGE_IMPACT`: Apply climate change to water yields ('on' or 'off')
 - `WATER_STRESS`: Historical yield requirement fraction (default: 0.6 = 60%)
 - `CARBON_EFFECTS_WINDOW`: Years for carbon accumulation averaging (50, 60, 70, 80, or 90 years)
@@ -92,7 +91,6 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
   - Default: 50 years (follows S-curve logic with rapid early accumulation)
 - `BIODIVERSITY_TARGET_GBF_*`: Global Biodiversity Framework targets
   - `GBF2_TARGET`: Priority degraded areas restoration ('off', 'low', 'medium', 'high')
-  - `GBF2_CONSTRAINT_TYPE`: Hard or soft constraint ('hard' or 'soft')
   - `GBF3_NVIS_TARGET`: NVIS vegetation group targets ('off', 'medium', 'high', 'CSV_DEFINED')
   - `GBF3_NVIS_TARGET_CLASS`: Layer class ('NVIS_MVG' or 'NVIS_MVS'); also selects the class for IBRA layers when `GBF3_NVIS_REGION_MODE = 'IBRA_REG'`
   - `GBF3_NVIS_REGION_MODE`: 'AUSTRALIA', 'NRM', or 'IBRA_REG' (IBRA bioregion targets are handled through the NVIS stream — there is no separate `BIODIVERSITY_TARGET_GBF_3_IBRA` setting or IBRA constraint method)

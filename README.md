@@ -187,7 +187,7 @@ Every constraint row is a linear expression over decision variables whose bounds
 | `near_redundant`, `straddle` | Met everywhere up to the tolerance; nothing proven | Counted in the run log |
 
 **Outputs** in `out_<year>/`, written before the solve — so they exist even when the year fails:
-- `bound_report_<year>.csv` — one line per impossible, redundant or tight row: `family`, `name` (the constraint name in the saved model), the keys (`region`, `item` = species / community / vegetation group, `presence`, `bound`, `state`, `commodity`), `rhs_raw` (the target), `lo_raw` / `hi_raw` (the range over the variable bounds), `lo_implied_raw` / `hi_implied_raw` (the range under the implied bounds), `best_raw` (how far the target is met at the most favourable reachable point — negative is the shortfall), `worst_raw`, `unit` (ha, ML, tCO2e, t, MWh), `status` / `status_implied`, `dropped`
+- `bound_report_<year>.csv` — one line per impossible, redundant or tight row: `family`, `name` (the constraint name in the saved model), the row's labels (`region` — the NRM / IBRA region, water region id, state or regional cap the row is about; `GBF_target` = the vegetation group / species / community a GBF3 / GBF4 / GBF8 row targets; `GBF4_presence`; `demand_commodity`; `demand_bound` = eq / lower / upper; `am_idx` = the renewable option of a renewable row), `rhs_raw` (the target), `lo_raw` / `hi_raw` (the range over the variable bounds), `lo_implied_raw` / `hi_implied_raw` (the range under the implied bounds), `best_raw` (how far the target is met at the most favourable reachable point — negative is the shortfall), `worst_raw`, `unit` (ha, ML, tCO2e, t, MWh), `status` / `status_implied`, `dropped`
 - `bound_preflight_<year>.csv` — for each variable block: variables that no constraint touches, and NaN or inverted bounds
 - The run log — a table of rows per family and verdict, and one line per impossible row with its shortfall
 
@@ -280,14 +280,13 @@ settings.SIM_YEARS = list(range(2020, 2051, 5))
 
 settings.WATER_LIMITS = 'on'                            # 'on' or 'off'.
 settings.GHG_EMISSIONS_LIMITS = 'low'                   # 'off', 'low', 'medium', or 'high'
-settings.DEMAND_CONSTRAINT_TYPE = 'hard'                # 'hard' (per-commodity DEMAND_BOUNDS) or 'soft'
 
 settings.GBF2_TARGET = 'high'                           # 'off', 'low', 'medium', or 'high'
-settings.GBF3_NVIS_TARGET = 'off'                       # 'off', 'medium', 'high', or 'USER_DEFINED'
+settings.GBF3_NVIS_TARGET = 'off'                       # 'off', 'medium', 'high', 'SPECIFIED', or 'CSV_DEFINED'
 settings.GBF3_NVIS_REGION_MODE = 'NRM'                  # 'AUSTRALIA', 'NRM', or 'IBRA_REG'
-settings.GBF4_TARGET_SNES = 'off'                       # 'off', 'USER_DEFINED', or 'dict'
-settings.GBF4_TARGET_ECNES = 'off'                      # 'off', 'USER_DEFINED', or 'dict'
-settings.GBF8_TARGET = 'off'                            # 'on' or 'off'
+settings.GBF4_TARGET_SNES = 'off'                       # 'off', 'medium', 'high', 'SPECIFIED', or 'CSV_DEFINED'
+settings.GBF4_TARGET_ECNES = 'off'                      # 'off', 'medium', 'high', 'SPECIFIED', or 'CSV_DEFINED'
+settings.GBF8_TARGET = 'off'                            # 'off', 'medium', 'high', or 'USER_DEFINED'
 
 settings.DYNAMIC_PRICE = True                           # Demand elasticity-based dynamic pricing
 
@@ -365,12 +364,11 @@ LUTO2 behavior can be customized through the `luto.settings` module. Key paramet
 - `OBJECTIVE`: Optimization objective ('maxprofit' or 'mincost')
 
 ### Demand Constraints
-- `DEMAND_CONSTRAINT_TYPE`: `'hard'` (default) forces production into per-commodity bounds; `'soft'` allows deviation at a price-weighted penalty
-- `DEMAND_BOUNDS`: Per-commodity `[lower, upper]` multipliers applied to the demand target under the hard constraint. Most commodities are pinned at `[1.0, 1.0]`; sheep wool is relaxed because meat and wool are co-produced in biologically fixed ratios
+- Every constraint is hard: production is forced into per-commodity bounds (there is no soft, penalised option)
+- `DEMAND_BOUNDS`: Per-commodity `[lower, upper]` multipliers applied to the demand target. Most commodities are pinned at `[1.0, 1.0]`; sheep wool is relaxed because meat and wool are co-produced in biologically fixed ratios
 
 ### Environmental Constraints
 - `GHG_EMISSIONS_LIMITS`: Greenhouse gas emission targets ('off', 'low', 'medium', 'high')
-- `GHG_CONSTRAINT_TYPE` / `WATER_CONSTRAINT_TYPE` / `GBF2_CONSTRAINT_TYPE`: 'hard' or 'soft'
 - `WATER_LIMITS`: Whether to enforce water yield constraints ('on' or 'off')
 - `CARBON_EFFECTS_WINDOW`: Years for carbon accumulation averaging (50, 60, 70, 80, or 90 years)
   - Determines the time period over which carbon sequestration is averaged
