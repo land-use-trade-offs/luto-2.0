@@ -93,6 +93,7 @@ class LutoSolver:
                                      for from_m, from_j, k, local_r in zip(t['from_m'], t['from_j'], t['k'], t['local_r'])],
             'nonag2ag':   lambda t: [f"F_n2a_{from_k}[{m},{local_r},{j}]"
                                      for from_k, m, local_r, j in zip(t['from_k'], t['m'], t['local_r'], t['j'])],
+            'slack':      lambda t: [f"S_{i}" for i in range(len(t['cell']))],       # an elastic row's shortfall (row_builder.add_elastic)
         }
      
         block_of_col = cols['block'].values

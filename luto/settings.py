@@ -238,6 +238,20 @@ What a year does when some row is IMPOSSIBLE over the column box (bound_report_<
  - 'solve' : report it and solve anyway
 '''
 
+ELASTIC_FAMILIES = []
+'''
+Row families solved ELASTIC, e.g. ['GBF3_NVIS', 'GBF4_SNES', 'GBF4_ECNES', 'GBF8'] — a diagnostic mode: instead of
+an infeasible year, a solution that names the targets it cannot meet. Every row of a listed family gets its own
+shortfall column s in [0, 1], the fraction of the row's target it may miss (a·x + rhs·s >= rhs), at ELASTIC_PENALTY
+(AUD) per unit of s in the objective; the rows with s > 0 are the targets that cannot be met together with everything else
+(out_<year>/shortfall_<year>.csv). An impossible row of a listed family no longer stops the year. Empty = every row
+hard, the model as without this setting.
+'''
+
+ELASTIC_PENALTY = 1e10
+'''AUD per unit of shortfall (1e10 = 10 bn AUD for a target missed in full): large enough that a target is missed only
+where it cannot be met, not merely where meeting it is expensive; larger widens the objective's range (conditioning).'''
+
 
 
 

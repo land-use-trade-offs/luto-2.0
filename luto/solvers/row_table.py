@@ -43,7 +43,8 @@ ROW_SCHEMA = xr.Dataset(dict(
     name=(('row',), np.empty(0, dtype=object)),
     scale=(('row',), np.empty(0, dtype=np.float64)),
     active=(('row',), np.empty(0, dtype=bool)),
-    redundant=(('row',), np.empty(0, dtype=bool))))
+    redundant=(('row',), np.empty(0, dtype=bool)),
+    slack_col=(('row',), np.empty(0, dtype=np.int32))))                  # the row's shortfall column (settings.ELASTIC_FAMILIES), -1 = hard
 
 ROW_FILL = {field: None if var.dtype == object else -1 for field, var in ROW_SCHEMA.data_vars.items()}   # what a family does not carry (only the labels and ints are ever missing)
 

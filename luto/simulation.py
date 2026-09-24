@@ -31,6 +31,7 @@ import time
 import threading
 import joblib
 import numpy as np
+import pandas as pd
 
 from contextlib import contextmanager
 from pathlib import Path
@@ -40,7 +41,7 @@ from luto import settings
 from luto.data import Data
 from luto.solvers.col_builder import get_cols
 from luto.solvers.row_inputs import RowInputs, get_economics, get_row_inputs
-from luto.solvers.row_builder import get_rows, get_obj
+from luto.solvers.row_builder import add_elastic, get_rows, get_obj
 from luto.solvers.row_bounds import STATUS, drop_redundant_rows, get_row_bounds, report_row_bounds
 from luto.solvers.solver import LutoSolver
 from luto.solvers.post_solve import post_solve
@@ -253,7 +254,8 @@ def solve_timeseries(
         bounds = get_row_bounds(A, rows, cols)                                              # every row's interval over the column box, and its verdict
         drop_redundant_rows(rows, bounds, settings.BOUND_PROP_DROP_FAMILIES)                # opt-in per family: rows every point of the box satisfies never reach the solver
         report_row_bounds(rows, bounds, target_year, f"{data.path}/out_{target_year}")      # the log table, bound_report_<year>.csv, bound_preflight_<year>.csv
-        n_impossible = int(((bounds['status'].values == STATUS.index('impossible')) | (bounds['status_implied'].values == STATUS.index('impossible'))).sum())
+        impossible = (bounds['status'].values == STATUS.index('impossible')) | (bounds['status_implied'].values == STATUS.index('impossible'))
+        n_impossible = int((impossible & ~np.isin(rows['family'].values, settings.ELASTIC_FAMILIES)).sum())   # an elastic row absorbs its own impossibility
         if n_impossible and settings.BOUND_PROP_ON_IMPOSSIBLE == 'stop':
             print('!' * 100, flush=True)
             print(f"Year {target_year}: {n_impossible:,} row(s) cannot hold at any point the column box and the rows' own bounds allow, so no solve can succeed "
@@ -263,6 +265,7 @@ def solve_timeseries(
 
         # ── the objective: the coefficient of every column ──
         obj = get_obj(get_economics(data, base_year, target_year), cols, inputs)            # million AUD; the economy streams (~300 MB at RES5, ~7 GB at RES1) die with the call
+        A, rows, cols, obj = add_elastic(A, rows, cols, obj)                                # settings.ELASTIC_FAMILIES: a shortfall column per row of those families
 
         luto_solver = LutoSolver(cols, rows, A, obj, inputs)                                # A x T, obj · x; the inputs name m and am_idx in the variable names
         luto_solver.formulate()
@@ -276,6 +279,7 @@ def solve_timeseries(
             store_solution(data, target_year, solution, luto_solver.gurobi_model.ObjVal, inputs)
             data.last_year = target_year                                                        # only a solved and stored year: the writers report through it
             record_shadow_prices(luto_solver, target_year, f"{data.path}/out_{target_year}")
+            report_shortfall(x, rows, target_year, f"{data.path}/out_{target_year}")
             if checkpoint_path is not None:
                 save_checkpoint(data, checkpoint_path, target_year)
 
@@ -287,6 +291,24 @@ def solve_timeseries(
             print('!' * 100, flush=True)
             print('\n', flush=True)
             break
+
+
+def report_shortfall(x: np.ndarray, rows, target_year: int, out_dir: str) -> None:
+    """The elastic rows (settings.ELASTIC_FAMILIES) and how much of each target the solution misses: shortfall_<year>.csv
+    (s = the fraction missed; raw = in the row's own units, restored by its scale), and the count in the log."""
+    on = np.flatnonzero(rows['slack_col'].values >= 0)
+    if on.size == 0:
+        return
+    s = x[rows['slack_col'].values[on]]
+    target = rows['rhs'].values[on] * rows['scale'].values[on]
+    df = pd.DataFrame({'family': rows['family'].values[on], 'region': rows['region'].values[on],
+                       'GBF_target': rows['GBF_target'].values[on], 'name': rows['name'].values[on],
+                       'shortfall_frac': s, 'target_raw': target, 'shortfall_raw': s * target})
+    df.sort_values('shortfall_frac', ascending=False).to_csv(f"{out_dir}/shortfall_{target_year}.csv", index=False)
+    short = df[df['shortfall_frac'] > 1e-6]
+    print(f"Year {target_year}: {len(short):,} of {on.size:,} elastic rows fall short (sum of fractions missed {s.sum():.3f})"
+          + ''.join(f"\n    {r.family} {r.region} {r.GBF_target}: {r.shortfall_frac:.1%} of the target missed"
+                    for r in short.sort_values('shortfall_frac', ascending=False).head(10).itertuples()), flush=True)
 
 
 def solve_with_retries(luto_solver: LutoSolver, target_year: int):

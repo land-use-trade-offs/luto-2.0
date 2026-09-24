@@ -240,6 +240,32 @@ def get_obj(econ: EconomicInputs, cols: xr.Dataset, inputs: RowInputs) -> np.nda
     return obj
 
 
+def add_elastic(A: sparse.csr_matrix, rows: xr.Dataset, cols: xr.Dataset, obj: np.ndarray):
+    """Every active row of a settings.ELASTIC_FAMILIES family gets its own shortfall column s in [0, 1] (block
+    ``slack``): a·x + rhs·s >= rhs on the scaled row (so the coefficient is the row's scaled rhs; sign-flipped on a <
+    row), at settings.ELASTIC_PENALTY AUD per unit in the objective (million AUD there, as every objective coefficient).
+    ``rows['slack_col']`` names the column."""
+    on = np.flatnonzero(np.isin(rows['family'].values, settings.ELASTIC_FAMILIES) & rows['active'].values)
+    if on.size == 0:
+        return A, rows, cols, obj
+    sense = rows['sense'].values[on]
+    assert not (sense == '=').any(), 'an elastic family has an equality row'
+    n_col, n = cols.sizes['col'], on.size
+    coef = np.where(sense == '<', -1.0, 1.0) * rows['rhs'].values[on]
+    A = sparse.hstack([A, sparse.csr_matrix((coef, (on, np.arange(n))), shape=(A.shape[0], n))], format='csr')
+    slack = xr.Dataset({v: (('col',), np.full(n, 'slack' if v == 'block' else 1.0 if v == 'ub' else 0.0 if cols[v].dtype.kind == 'f' else -1,
+                                              dtype=cols[v].dtype)) for v in cols.data_vars})
+    cols = xr.concat([cols, slack], 'col')
+    penalty = settings.ELASTIC_PENALTY / 1e6 * (-1 if settings.OBJECTIVE == 'maxprofit' else 1)   # AUD -> million AUD, a cost
+    obj = np.concatenate([obj, np.full(n, penalty, dtype=obj.dtype)])
+    slack_col = rows['slack_col'].values.copy()
+    slack_col[on] = n_col + np.arange(n)
+    rows = rows.assign(slack_col=(('row',), slack_col))
+    print(f"│   elastic: {n:,} rows of {sorted(set(rows['family'].values[on]))} get a shortfall column "
+          f"at {settings.ELASTIC_PENALTY:,.0f} AUD per target missed", flush=True)
+    return A, rows, cols, obj
+
+
 # ═══════════════════════════ the demand rows ═══════════════════════════
 
 
