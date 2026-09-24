@@ -1,3 +1,4 @@
-# Enforce LF line endings for Python sources so Windows checkouts (core.autocrlf)
-# no longer produce whole-file CRLF/LF diffs. LF is the repo's de-facto standard.
-*.py text eol=lf
+# Enforce LF line endings for every text file so Windows checkouts (core.autocrlf)
+# no longer produce whole-file CRLF/LF diffs. LF is the repo's de-facto standard;
+# binaries (docx, pdf, shapefiles, png) are auto-detected and left untouched.
+* text=auto eol=lf
