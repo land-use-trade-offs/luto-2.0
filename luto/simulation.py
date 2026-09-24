@@ -300,15 +300,18 @@ def solve_timeseries(
 
 def report_shortfall(x: np.ndarray, rows, target_year: int, out_dir: str) -> None:
     """The elastic rows (settings.ELASTIC_FAMILIES) and how much of each target the solution misses: shortfall_<year>.csv
-    (s = the fraction missed; raw = in the row's own units, restored by its scale), and the count in the log."""
+    (s = the target's size moved — a fraction of it on a GBF row, possibly > 1 on another; raw = in the row's own units,
+    restored by its scale: a floor lowered or a ceiling raised by that much), and the count in the log."""
     on = np.flatnonzero(rows['slack_col'].values >= 0)
     if on.size == 0:
         return
     s = x[rows['slack_col'].values[on]]
-    target = rows['rhs'].values[on] * rows['scale'].values[on]
-    df = pd.DataFrame({'family': rows['family'].values[on], 'region': rows['region'].values[on],
+    rhs, scale = rows['rhs'].values[on], rows['scale'].values[on]
+    gbf = np.array([f.startswith('GBF') for f in rows['family'].values[on]], dtype=bool)
+    df = pd.DataFrame({'family': rows['family'].values[on], 'sense': rows['sense'].values[on], 'region': rows['region'].values[on],
                        'GBF_target': rows['GBF_target'].values[on], 'name': rows['name'].values[on],
-                       'shortfall_frac': s, 'target_raw': target, 'shortfall_raw': s * target})
+                       'shortfall_frac': s, 'target_raw': rhs * scale,
+                       'shortfall_raw': s * np.where(gbf, rhs, np.abs(rhs)) * scale})   # the bound moved, as add_elastic's slack coefficient
     df.sort_values('shortfall_frac', ascending=False).to_csv(f"{out_dir}/shortfall_{target_year}.csv", index=False)
     short = df[df['shortfall_frac'] > 1e-6]
     print(f"Year {target_year}: {len(short):,} of {on.size:,} elastic rows fall short (sum of fractions missed {s.sum():.3f})"

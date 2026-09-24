@@ -251,15 +251,22 @@ def add_elastic(A: sparse.csr_matrix, rows: xr.Dataset, cols: xr.Dataset, obj: n
     sense = rows['sense'].values[on]
     assert not (sense == '=').any(), 'an elastic family has an equality row'
     n_col, n = cols.sizes['col'], on.size
-    # s is a fraction of the target, so its coefficient is the target itself: +rhs on a >= row (s relaxes it
-    # downward), -rhs on a <= row (s relaxes it upward). A GBF target is rhs = target area - the score already held
-    # outside LUTO, and rhs <= 0 means the land outside LUTO already meets the target; its slack, with a
-    # coefficient <= 0, could only tighten the row and cost the penalty, so the solver leaves s = 0 — harmless,
-    # never reported as a shortfall.
-    coef = np.where(sense == '<', -1.0, 1.0) * rows['rhs'].values[on]
+    # One unit of s moves the row's bound by the target's size, signed by the row's direction (a·x + m·s >= rhs lowers
+    # a floor, a·x - m·s <= rhs raises a ceiling):
+    #   GBF row:   m = rhs, s in [0, 1] — the fraction of the target area missed; rhs <= 0 means the land outside LUTO
+    #              already meets it, and a slack that could only tighten the row stays 0
+    #   other row: m = |rhs|, s in [0, inf) — a GHG limit (rhs = limit - off-land emissions) is negative under net
+    #              sequestration, where rhs itself would make s TIGHTEN the row, and a ceiling can be overshot by more
+    #              than its own size
+    rhs = rows['rhs'].values[on]
+    gbf = np.array([f.startswith('GBF') for f in rows['family'].values[on]], dtype=bool)
+    if ((rhs == 0) & ~gbf).any():
+        print(f"│   elastic: {((rhs == 0) & ~gbf).sum():,} non-GBF row(s) with a target of 0 cannot be relaxed", flush=True)
+    coef = np.where(sense == '<', -1.0, 1.0) * np.where(gbf, rhs, np.abs(rhs))
     A = sparse.hstack([A, sparse.csr_matrix((coef, (on, np.arange(n))), shape=(A.shape[0], n))], format='csr')
-    slack = xr.Dataset({v: (('col',), np.full(n, 'slack' if v == 'block' else 1.0 if v == 'ub' else 0.0 if cols[v].dtype.kind == 'f' else -1,
+    slack = xr.Dataset({v: (('col',), np.full(n, 'slack' if v == 'block' else 0.0 if cols[v].dtype.kind == 'f' else -1,
                                               dtype=cols[v].dtype)) for v in cols.data_vars})
+    slack['ub'] = (('col',), np.where(gbf, 1.0, np.inf).astype(cols['ub'].dtype))     # GBF: at most the whole target
     cols = xr.concat([cols, slack], 'col')
     penalty = settings.ELASTIC_PENALTY / 1e6 * (-1 if settings.OBJECTIVE == 'maxprofit' else 1)   # AUD -> million AUD, a cost
     obj = np.concatenate([obj, np.full(n, penalty, dtype=obj.dtype)])
