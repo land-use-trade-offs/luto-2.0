@@ -38,27 +38,6 @@ from typing import Any, Literal, Optional
 from affine import Affine
 from scipy.interpolate import interp1d
 from math import ceil
-
-
-def _alias_old_sparse_modules():
-    """Let checkpoints pickled with sparse < 0.16 load under newer sparse, which moved `sparse._<mod>` to
-    `sparse.numba_backend._<mod>`: register every moved module under its old name. Unpickling a checkpoint imports
-    this module (for `Data`) before it meets a sparse object, so the aliases are in place in time. A no-op on old
-    sparse (no `numba_backend`)."""
-    import importlib, pkgutil, sys
-    try:
-        nb = importlib.import_module('sparse.numba_backend')
-    except ImportError:
-        return
-    for m in pkgutil.walk_packages(nb.__path__, 'sparse.numba_backend.'):
-        old_name = 'sparse.' + m.name[len('sparse.numba_backend.'):]
-        if old_name not in sys.modules:
-            try:
-                sys.modules[old_name] = importlib.import_module(m.name)
-            except Exception:
-                pass
-
-_alias_old_sparse_modules()
 from dataclasses import dataclass
 
 
