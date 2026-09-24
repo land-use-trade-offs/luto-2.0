@@ -114,7 +114,20 @@ def record_shadow_prices(luto_solver, target_year, out_dir) -> None:
     shadow_price = pi * 1e6 / scale
     shadow_price_AUD = pi * 1e6 * rhs
     shadow_price_AUD[dropped] = 0.0                                                  # not -0.0 where the rhs is negative
+
+    # an elastic row (settings.ELASTIC_FAMILIES) that fell short is priced by the penalty alone (P / target, the real
+    # marginal cost being infinite): no price for it (NaN), flagged short with the fraction missed; a met elastic row
+    # (s = 0) is priced as a hard row — the penalty is inactive there
+    slack_col = T['slack_col'].values[rows]
+    shortfall = np.full(rows.size, np.nan)
+    elastic = slack_col >= 0
+    if elastic.any():
+        shortfall[elastic] = luto_solver.x[slack_col[elastic]].X
+    short = shortfall > 1e-6                                                         # NaN (a hard row) is never short
+    shadow_price[short] = np.nan
+    shadow_price_AUD[short] = np.nan
+
     df = pd.DataFrame(dict(year=target_year, constraint=constraint, region=region, item=item, presence=presence,
                            pi_rescaled=pi, scale=scale, shadow_price=shadow_price, shadow_price_AUD=shadow_price_AUD,
-                           unit=unit, dropped=dropped))
+                           unit=unit, dropped=dropped, shortfall_frac=shortfall, short=short))
     df.to_csv(f"{out_dir}/shadow_prices_{target_year}.csv", index=False)

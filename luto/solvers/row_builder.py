@@ -251,6 +251,11 @@ def add_elastic(A: sparse.csr_matrix, rows: xr.Dataset, cols: xr.Dataset, obj: n
     sense = rows['sense'].values[on]
     assert not (sense == '=').any(), 'an elastic family has an equality row'
     n_col, n = cols.sizes['col'], on.size
+    # s is a fraction of the target, so its coefficient is the target itself: +rhs on a >= row (s relaxes it
+    # downward), -rhs on a <= row (s relaxes it upward). A GBF target is rhs = target area - the score already held
+    # outside LUTO, and rhs <= 0 means the land outside LUTO already meets the target; its slack, with a
+    # coefficient <= 0, could only tighten the row and cost the penalty, so the solver leaves s = 0 — harmless,
+    # never reported as a shortfall.
     coef = np.where(sense == '<', -1.0, 1.0) * rows['rhs'].values[on]
     A = sparse.hstack([A, sparse.csr_matrix((coef, (on, np.arange(n))), shape=(A.shape[0], n))], format='csr')
     slack = xr.Dataset({v: (('col',), np.full(n, 'slack' if v == 'block' else 1.0 if v == 'ub' else 0.0 if cols[v].dtype.kind == 'f' else -1,

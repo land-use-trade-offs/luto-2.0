@@ -276,7 +276,12 @@ def solve_timeseries(
 
         if accepted:
             solution = post_solve(x, cols, col_support, inputs)                                # the LUTO 1-D format
-            store_solution(data, target_year, solution, luto_solver.gurobi_model.ObjVal, inputs)
+            slack = cols['block'].values == 'slack'                                           # the elastic rows' shortfall columns (settings.ELASTIC_FAMILIES)
+            penalty = float(obj[slack] @ x[slack]) if slack.any() else 0.0                  # million AUD: the penalty in the objective, bookkeeping not money
+            if penalty:
+                print(f"Year {target_year}: objective {luto_solver.gurobi_model.ObjVal:,.2f} includes the elastic penalty {penalty:,.2f} (million AUD); "
+                      f"stored without it: {luto_solver.gurobi_model.ObjVal - penalty:,.2f}", flush=True)
+            store_solution(data, target_year, solution, luto_solver.gurobi_model.ObjVal - penalty, inputs)
             data.last_year = target_year                                                        # only a solved and stored year: the writers report through it
             record_shadow_prices(luto_solver, target_year, f"{data.path}/out_{target_year}")
             report_shortfall(x, rows, target_year, f"{data.path}/out_{target_year}")
