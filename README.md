@@ -1,7 +1,7 @@
 # LUTO2: The Land-Use Trade-Offs Model Version 2.0
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.14](https://img.shields.io/badge/python-3.14-blue.svg)](https://www.python.org/downloads/)
 [![Version](https://img.shields.io/github/v/release/land-use-trade-offs/luto-2.0?label=Version&color=green)](https://github.com/land-use-trade-offs/luto-2.0/releases/latest)
 
 ## Introduction
@@ -207,10 +207,10 @@ The settings (`BOUND_PROP_REL_TOL`, `BOUND_PROP_DROP_FAMILIES`, `BOUND_PROP_ON_I
 ## System Requirements
 
 **Minimum Requirements:**
-- Python 3.12 (pinned in `requirements.yml`)
+- Python 3.14 (pinned in `requirements.yml`)
 - 16 GB RAM at `RESFACTOR >= 10`; 32 GB or more for `RESFACTOR = 5`. Full resolution (`RESFACTOR = 1`) is an HPC workload — budget several hundred GB and expect the write/report phase to dominate peak memory.
 - 50 GB available disk space for input data and outputs
-- GUROBI optimization solver license (academic licenses available); `gurobipy` is pinned to 13.0.0
+- GUROBI optimization solver license (academic licenses available); `gurobipy` is pinned to 13.0.3
 - We are working on support for other solving engines, such as IBM CPLEX and NVIDIA cuOpt (see [Other solving engines](#other-solving-engines-in-progress)). GUROBI is the only engine the model solves with today
 
 **Supported Operating Systems:**

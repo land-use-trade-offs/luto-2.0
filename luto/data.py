@@ -518,7 +518,7 @@ class Data:
         )        
         
         self.REGION_NRM_CODE = REGION_NRM_r['NRM_CODE']
-        self.REGION_NRM_NAME = REGION_NRM_r['NRM_NAME'].values
+        self.REGION_NRM_NAME = REGION_NRM_r['NRM_NAME'].to_numpy()
         
         REGION_STATE_r = pd.read_hdf(
             os.path.join(settings.INPUT_DIR, "REGION_STATE_r.h5"), where=self.MASK
