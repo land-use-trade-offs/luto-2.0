@@ -46,6 +46,10 @@ Developer-facing reference material lives alongside the code:
 | `docs/CLAUDE_VUE_REPORTING.md` | Vue.js reporting interface and data hierarchies |
 | `docs/CLAUDE_SKILL/` | Step-by-step guides for recurring tasks (task runs, retries, infeasibility debugging) |
 | `docs/FINDINGS.md` | Running log of investigations: solver numerics, transition-cost audits, performance profiling |
+| `docs/CLAUDE_DATA.md` | Input data catalogue: grid, base map, MASK/RESFACTOR, economic tables |
+| `docs/CLAUDE_TIME_AXIS.md` | Base year and year indexing; positional sites that assume 2010 |
+| `docs/CLAUDE_DATAPREP.md` | dataprep pipeline, N: sources, SA2 join, regeneration dependency map |
+| `docs/CLAUDE_BASEYEAR_RUN.md` | Base-year-only runs, write functions, reading output csvs, environment traps |
 
 ## Project Structure
 

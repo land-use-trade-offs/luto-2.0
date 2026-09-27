@@ -69,6 +69,18 @@ The LUTO2 documentation is split into themed files for better memory efficiency.
 - Special cases (Economics dual map-types, GHG Ag Source level, Biodiversity multi-metric, Water Am chart series-by-AgMgt)
 - File structure (views, data, services, routes)
 
+### 📁 [docs/CLAUDE_DATA.md](docs/CLAUDE_DATA.md)
+Input data catalogue: the 6,956,407-cell NLUM grid, base map files (`lumap.h5`, `lmmap.h5`, `NLUM_2010-11_mask.tif`, derived `AG_L_MRJ`), `x_mrj.npy` eligibility, MASK/RESFACTOR mechanics, agec/agGHG economic tables and their column families, non-spatial tables.
+
+### 📁 [docs/CLAUDE_TIME_AXIS.md](docs/CLAUDE_TIME_AXIS.md)
+`YR_CAL_BASE` and year indexing: which inputs carry real year labels, the four positional sites that assume 2010 (demand `D_CY`, SSP water yield, BAU productivity csv, climate-impact base), dynamic-pricing dependence on the base year.
+
+### 📁 [docs/CLAUDE_DATAPREP.md](docs/CLAUDE_DATAPREP.md)
+How `input/` is produced from N: raw snapshots, the `SA2_ID` join, and the dependency map of which outputs must regenerate for a new `cell_LU_mapping.h5`.
+
+### 📁 [docs/CLAUDE_BASEYEAR_RUN.md](docs/CLAUDE_BASEYEAR_RUN.md)
+Base-year-only runs (why `write_outputs` fails with `last_year None`), extracting base-year aggregates by calling write functions directly, reading the regional csvs (national row = `AUSTRALIA` inside `region_state`), reference 2010 aggregates at RESFACTOR 10/5, Windows environment traps.
+
 ### 📁 [docs/CLAUDE_SKILL/](docs/CLAUDE_SKILL/)
 
 **Step-by-step skill guides for common tasks:**
