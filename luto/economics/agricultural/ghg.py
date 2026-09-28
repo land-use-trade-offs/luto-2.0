@@ -779,6 +779,27 @@ def get_sheep_hir_effect_g_mrj(data: Data, yr_idx, separate=False):
     parts = {'Regrowth carbon': regrowth, 'Destocking livestock emissions': destocking}
     return parts if separate else sum_parts(parts)
 
+def get_hir_baseline_t(data: Data, yr_idx) -> dict:
+    """The existing-HIR-project baseline on each GHG row (t CO2e, negative = reduction), for settings.HIR_BASELINE:
+    {'HIR_BASELINE_AG_t': destocking, 'HIR_BASELINE_LULUCF_t': regrowth}. LUTO's own HIR effect per cell (full
+    adoption) x the share of the cell under existing projects (held flat after the baseline FY) x the cell's base-year
+    share in the option's land use. LUTO's HIR counts on each row only above it, as its plantings do."""
+    out = {'HIR_BASELINE_AG_t': 0.0, 'HIR_BASELINE_LULUCF_t': 0.0}
+    if getattr(data, "HIR_BASELINE_HA", None) is None:          # off, or a Data pickled before the setting existed
+        return out
+    hb = data.HIR_BASELINE_HA
+    fy = min(data.YR_CAL_BASE + yr_idx, hb['baseline_fy'])
+    if fy < hb['first_fy']:
+        return out
+    frac = np.minimum(hb['ha'][fy] / data.REAL_AREA, 1.0)
+    base = data.ag_dvars[data.YR_CAL_BASE]
+    for am, fn in (('HIR - Beef', get_beef_hir_effect_g_mrj), ('HIR - Sheep', get_sheep_hir_effect_g_mrj)):
+        j = data.DESC2AGLU[settings.AG_MANAGEMENTS_TO_LAND_USES[am][0]]
+        for name, arr in fn(data, yr_idx, separate=True).items():
+            out[f'HIR_BASELINE_{AG_MAN_GHG_SUBTERMS[am][name]}_t'] += float((arr[:, :, 0] * base[:, :, j] * frac).sum())
+    return out
+
+
 def get_utility_solar_pv_effect_g_mrj(data: Data) -> np.ndarray:
     """
     Applies the effects of using solar PV to the GHG data
