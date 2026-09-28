@@ -2596,7 +2596,14 @@ def write_ghg(data: Data, yr_cal: int, path: str):
 
     # ==================== Total / Limit Summary ====================
 
-    ghg_limits = 0 if settings.GHG_EMISSIONS_LIMITS == 'off' else data.GHG_TARGETS[yr_cal]
+    # The limit on LUTO's modelled net emissions (GHG_EMISSIONS_TCO2e): the two rows' series with the exogenous
+    # constants on their left-hand sides taken out, AG - exogenous ag + LULUCF_MOD + plantings baseline. Each row is
+    # compared with its own series in GHG_emissions_split_<yr>.csv.
+    if settings.GHG_EMISSIONS_LIMITS == 'off':
+        ghg_limits = 0
+    else:
+        t = data.GHG_TARGETS.loc[yr_cal]
+        ghg_limits = t['AG_t'] - t['AG_EXO_t'] + t['LULUCF_MOD_t'] + t['PLANTINGS_BASELINE_t']
     if yr_cal >= data.YR_CAL_BASE + 1:
         ghg_emissions = data.prod_data[yr_cal]['GHG']
     else:
@@ -2608,6 +2615,11 @@ def write_ghg(data: Data, yr_cal: int, path: str):
         'Emissions (t CO2e)': [ghg_limits, ghg_emissions],
         'Year': yr_cal,
     }).to_csv(os.path.join(path, f'GHG_emissions_{yr_cal}.csv'), index=False)
+
+    # ==================== The two constraint rows (agriculture, net LULUCF) ====================
+
+    if 'GHG_split' in data.prod_data.get(yr_cal, {}):
+        data.prod_data[yr_cal]['GHG_split'].to_csv(os.path.join(path, f'GHG_emissions_split_{yr_cal}.csv'), index=False)
 
     # ==================== Off-land Commodity ====================
 
