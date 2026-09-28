@@ -247,6 +247,16 @@ Available: 'GBF2', 'GBF3_NVIS', 'GBF4_SNES', 'GBF4_ECNES', 'GBF8', 'ghg', 'water
            'renewable_ceiling', 'source_cap_ag', 'source_cap_nonag'
 '''
 
+ELASTIC_DROP_SHORT = False
+'''
+True: the elastic solve is PASS 1 of two (the two-pass step). The rows it leaves short are removed (their targets
+cannot be met together with the rest of the year — still scored by the writers), every other elastic row is made hard
+(its shortfall column fixed at 0), and the year is solved again; that solution is the one stored. Never infeasible:
+pass 1's solution meets every row kept. out_<year>/shortfall_<year>.csv keeps pass 1's shortfall, with `dropped`.
+False: the elastic solve is stored as it is (the rows short at the penalty's price). GBF8 under GBF8_ROW_GENERATION
+runs its own two passes and is not touched by this.
+'''
+
 ELASTIC_PENALTY = 1e10
 '''AUD per unit of shortfall (1e10 = 10 bn AUD for a target missed in full): large enough that a target is missed only
 where it cannot be met, not merely where meeting it is expensive; larger widens the objective's range (conditioning).'''

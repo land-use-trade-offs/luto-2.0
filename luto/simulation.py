@@ -284,6 +284,8 @@ def solve_timeseries(
             accepted, x, status = solve_with_retries(luto_solver, target_year)
         else:
             accepted, x, status = rowgen.solve(luto_solver, target_year, solve_with_retries)   # the GBF8 rows round by round, then the hard pass
+        if accepted and settings.ELASTIC_DROP_SHORT and (cols['block'].values == 'slack').any():
+            accepted, x, status = solve_elastic_hard_pass(luto_solver, x, target_year, out_dir)  # the elastic rows left short dropped, the rest hard
 
         if not accepted:
             print(f'Processing for {target_year} completed in {round(time.time() - start_time)} seconds\n\n' , flush=True)
@@ -304,7 +306,8 @@ def solve_timeseries(
         data.last_year = target_year                                                            # only a solved and stored year: the writers report through it
 
         record_shadow_prices(luto_solver, target_year, out_dir)
-        report_shortfall(x, luto_solver.rows, target_year, out_dir)
+        if not settings.ELASTIC_DROP_SHORT:                                                   # under the hard pass, pass 1's shortfall was written before the re-solve
+            report_shortfall(x, luto_solver.rows, target_year, out_dir)
         if rowgen is not None:
             rowgen.report(luto_solver, out_dir)
             carry = rowgen.carry_next(luto_solver)
@@ -315,7 +318,30 @@ def solve_timeseries(
         print(f'Processing for {target_year} completed in {round(time.time() - start_time)} seconds\n\n' , flush=True)
 
 
-def report_shortfall(x: np.ndarray, rows, target_year: int, out_dir: str) -> None:
+def solve_elastic_hard_pass(luto_solver: LutoSolver, x: np.ndarray, target_year: int, out_dir: str):
+    """settings.ELASTIC_DROP_SHORT — pass 2 of the elastic families: the rows pass 1 (``x``) left short are removed, every
+    other elastic row made hard (its shortfall column's ub = 0), and the year solved again. Pass 1's shortfall is
+    written first (shortfall_<year>.csv, with ``dropped``). Returns (accepted, x, status) as ``solve_with_retries``."""
+    rows = luto_solver.rows
+    on = np.flatnonzero((rows['slack_col'].values >= 0) & rows['active'].values)
+    s = x[rows['slack_col'].values[on]]
+    short = on[s > 1e-6]
+    report_shortfall(x, rows, target_year, out_dir, dropped=short)
+    if short.size == 0:                                                                   # pass 1 missed nothing: its solution is the hard one
+        print(f"Year {target_year}: no elastic row falls short — pass 1's solution is kept", flush=True)
+        return True, x, luto_solver.gurobi_model.Status
+
+    # ── the rows left short removed; every shortfall column fixed at 0, so each remaining elastic row is hard ──
+    model = luto_solver.gurobi_model
+    slack_vars = luto_solver.x[rows['slack_col'].values[on]].tolist()
+    model.setAttr('UB', slack_vars, [0.0] * len(slack_vars))
+    luto_solver.remove_constraints_by_name(rows['name'].values[short].tolist())
+    print(f"Year {target_year}: {short.size:,} elastic row(s) cannot be met together with the year — removed; "
+          f"the other {on.size - short.size:,} made hard, solving again", flush=True)
+    return solve_with_retries(luto_solver, target_year)
+
+
+def report_shortfall(x: np.ndarray, rows, target_year: int, out_dir: str, dropped=None) -> None:
     """The elastic rows (settings.ELASTIC_FAMILIES) and how much of each target the solution misses: shortfall_<year>.csv
     (s = the target's size moved — a fraction of it on a GBF row, possibly > 1 on another; raw = in the row's own units,
     restored by its scale: a floor lowered or a ceiling raised by that much), and the count in the log."""
@@ -328,7 +354,8 @@ def report_shortfall(x: np.ndarray, rows, target_year: int, out_dir: str) -> Non
     df = pd.DataFrame({'family': rows['family'].values[on], 'sense': rows['sense'].values[on], 'region': rows['region'].values[on],
                        'GBF_target': rows['GBF_target'].values[on], 'name': rows['name'].values[on],
                        'shortfall_frac': s, 'target_raw': rhs * scale,
-                       'shortfall_raw': s * np.where(gbf, rhs, np.abs(rhs)) * scale})   # the bound moved, as add_elastic's slack coefficient
+                       'shortfall_raw': s * np.where(gbf, rhs, np.abs(rhs)) * scale,   # the bound moved, as add_elastic's slack coefficient
+                       'dropped': np.isin(on, [] if dropped is None else dropped)})    # settings.ELASTIC_DROP_SHORT: removed before the hard pass
     df.sort_values('shortfall_frac', ascending=False).to_csv(f"{out_dir}/shortfall_{target_year}.csv", index=False)
     short = df[df['shortfall_frac'] > 1e-6]
     print(f"Year {target_year}: {len(short):,} of {on.size:,} elastic rows fall short (sum of fractions missed {s.sum():.3f})"
