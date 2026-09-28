@@ -123,8 +123,10 @@ def get_yield_pot(data, lvstype, vegtype, lm, yr_idx):
     lu = f'{lvstype.capitalize()} - {vegtype}'
     feed_req, pasture_kg_dm_ha, safe_pur = data.lvstk_pasture(lu, lm)
 
-    # Base potential.
-    yield_pot = feed_req * pasture_kg_dm_ha / denominator
+    # Base potential: the type's stocking calibration k with a per-type file (LVSTK_K, centre-sampled at RESFACTOR > 1),
+    # else FEED_REQ through lvstk_pasture (block-aggregated at RESFACTOR > 1).
+    k = data.LVSTK_K[lvstype] if settings.LVSTK_K_FILE else feed_req
+    yield_pot = k * pasture_kg_dm_ha / denominator
 
     # Multiply potential by appropriate SAFE_PUR (safe pasture utilisation rate; NATL or MODL by vegtype).
     yield_pot *= safe_pur
