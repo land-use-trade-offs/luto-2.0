@@ -121,6 +121,12 @@ TRANSITION_COST_MULT = 1
 # 1 = baseline; <1 tighter ceilings; >1 relaxed ceilings (capped at 1.0 to stay a valid proportion).
 TECH_ADOPT_MULT = 1
 
+# Observed ag-management adoption caps (DCCEEW baseline calibration run). None = off (no caps).
+# Otherwise a path under INPUT_DIR to the caps file written by luto/tools/ag_mgt_caps.py (e.g. 'ag_mgt_caps/caps.csv').
+# Each (option, land use) with rows is limited to min(current limit, observed cap); the cap is held flat after the
+# file's last year, and an (option, land use) with no rows keeps its current limit.
+AG_MANAGEMENT_OBSERVED_CAPS = None
+
 # Set whether to use demand elasticity when calculating commodity prices
 DYNAMIC_PRICE = True
 

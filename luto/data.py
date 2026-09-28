@@ -709,7 +709,22 @@ class Data:
             "cropping":     pd.read_excel(biochar_file, sheet_name='Biochar (cropping)', index_col='Year').rename(columns=bundle_rename),
             "horticulture": pd.read_excel(biochar_file, sheet_name='Biochar (horticulture)', index_col='Year').rename(columns=bundle_rename),
         }
-        
+
+        # Observed ag-management adoption caps: {(option, land use): Series of cap fractions by year}, or None when off
+        self.AG_MAN_OBSERVED_CAPS = None
+        if settings.AG_MANAGEMENT_OBSERVED_CAPS is not None:
+            caps = pd.read_csv(os.path.join(settings.INPUT_DIR, settings.AG_MANAGEMENT_OBSERVED_CAPS))
+            unknown = {(am, lu) for am, lu in zip(caps['option'], caps['land_use'])
+                       if lu not in settings.AG_MANAGEMENTS_TO_LAND_USES.get(am, [])}
+            if unknown:
+                raise ValueError(f"{settings.AG_MANAGEMENT_OBSERVED_CAPS}: unknown (option, land use) pairs {sorted(unknown)}.")
+            if not caps['cap_fraction'].between(0, 1).all():
+                raise ValueError(f"{settings.AG_MANAGEMENT_OBSERVED_CAPS}: cap_fraction must lie in [0, 1].")
+            self.AG_MAN_OBSERVED_CAPS = {
+                key: grp.set_index('year_end')['cap_fraction'].sort_index()
+                for key, grp in caps.groupby(['option', 'land_use'])
+            }
+
         # Load soil carbon data, convert C to CO2e (x 44/12), and average over years
         self.SOIL_CARBON_AVG_T_CO2_HA_PER_YR = (
             pd.read_hdf(os.path.join(settings.INPUT_DIR, "soil_carbon_t_ha.h5"), where=self.MASK).to_numpy(dtype=np.float32) 
