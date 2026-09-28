@@ -23,7 +23,7 @@ import h5py
 import numpy as np
 import xarray as xr
 import pandas as pd
-import shutil, os, time, h5py
+import shutil, os, time, h5py, subprocess, sys
 
 from luto import settings
 
@@ -111,7 +111,12 @@ def create_new_dataset(refresh=False):
     shutil.copyfile(nlum_inpath + 'NLUM_2010-11_mask.tif', outpath + 'NLUM_2010-11_mask.tif')
     shutil.copyfile(nlum_inpath + 'ag_landuses.csv', outpath + 'ag_landuses.csv')
 
-    shutil.copyfile(luto_1D_inpath + 'GHG_targets_20260223_2010-2060.xlsx', outpath + 'GHG_targets.xlsx')
+    # The GHG constraint series are built from public sources (NIR 2024, DCCEEW 2025) by
+    # luto/tools/ghg_targets.py, replacing the retired GHG_targets.xlsx.
+    subprocess.run([sys.executable, os.path.dirname(__file__) + '/tools/ghg_targets.py',
+                    '--out', outpath + 'ghg_targets',
+                    '--scope-matrix', outpath + 'ghg_targets/scope_matrix.csv',
+                    '--cache', raw_data + 'ghg_targets_cache'], check=True)
     shutil.copyfile(luto_1D_inpath + 'carbon_prices_20240612.xlsx', outpath + 'carbon_prices.xlsx')
     shutil.copyfile(luto_1D_inpath + 'ag_price_multipliers_20240612.xlsx', outpath + 'ag_price_multipliers.xlsx')
     shutil.copyfile(luto_1D_inpath + 'cost_multipliers_20240612.xlsx', outpath + 'cost_multipliers.xlsx')
