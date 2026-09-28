@@ -77,6 +77,7 @@ NICK_DECISIONS = [
     'Extension: "Hold flat at 2040"',
     'Splice: "Ag offset, LULUCF hybrid"',
     'Plantings: "Leave all of DCCEEW\'s plantings in the exogenous series, and count LUTO\'s term (3) only above a baseline planting rate. That treats LUTO plantings as additional to what\'s already assumed in the baseline, which is the natural scenario framing: DCCEEW\'s baseline is "current policies", and LUTO\'s plantings are what the optimisation adds on top. The baseline rate can come from NIR history, for example the FY2021-24 average rate of new plantings, carried forward as a disclosed assumption."',
+    'Unmodelled agriculture: series_agriculture_exogenous on the agriculture row\'s left-hand side; projection "Proportional share"',
 ]
 
 
@@ -439,6 +440,14 @@ def main():
         return n24 * (1 - w) + d[CONVERGE_TO] * w
     ag_comm_p = {c: {y: off(comm_nir[c][ANCHOR], DC[c], y) for y in YR_PROJ} for c in comm_nir}
     AGP = {y: math.fsum(ag_comm_p[c][y] for c in comm_nir) for y in YR_PROJ}
+
+    # agriculture LUTO does not model: exogenous on the AG row. History: the sector 3 leaves not modelled by LUTO.
+    # Projection: each DCCEEW commodity keeps its FY2024 unmodelled share of its spliced projection.
+    unmod = lambda r: r['assignment'] == 'AG' and r['modelled_by_luto'] != 'yes'
+    AGX_h = {y: ssum(unmod, y) for y in years}
+    agx_share = {c: (ssum(lambda r, c=c: unmod(r) and r['dcceew_row'] == c, ANCHOR) / comm_nir[c][ANCHOR]
+                     if comm_nir[c][ANCHOR] else 0.0) for c in comm_nir}
+    AGXp = {y: math.fsum(agx_share[c] * ag_comm_p[c][y] for c in comm_nir) for y in YR_PROJ}
     FOp = {y: off(buck_nir[FO][ANCHOR], DB[FO], y) for y in YR_PROJ}
     AOp = {y: conv(buck_nir[AO][ANCHOR], DB[AO], y) for y in YR_PROJ}
     FCp = {y: conv(buck_nir[FC][ANCHOR], DB[FC], y) for y in YR_PROJ}
@@ -457,12 +466,14 @@ def main():
     method = {
         'AG': ('sum of all NIR 2024 sector 3 leaves',
                'NIR 2024 FY2024 level + DCCEEW 2025 year-on-year change from FY2024, by commodity (offset splice)'),
+        'AG_EXO': ('sum of NIR 2024 sector 3 leaves not modelled by LUTO (scope_matrix modelled_by_luto != yes); part of AG',
+                   'AG projection by commodity x the FY2024 unmodelled share of that commodity (proportional share); part of AG'),
         'LULUCF_MOD': ('sum of NIR 2024 leaves assigned LULUCF_MOD (whole forest-to-crop/grass conversion leaves; PROVISIONAL)',
                        f'forest-conversion bucket (converge to DCCEEW level by FY2030) x MOD share of that bucket FY2021-2024 = {share:.6f} (PROVISIONAL)'),
         'LULUCF_EXO': ('sum of NIR 2024 leaves assigned LULUCF_EXO (all plantings stay here)',
                        'Forests bucket (offset) + Agricultural and other land (converge by FY2030) + (1 - MOD share) x forest-conversion bucket (converge); PROVISIONAL share'),
     }
-    series_vals = {'AG': (H['AG'], AGP), 'LULUCF_MOD': (H['LULUCF_MOD'], MODp), 'LULUCF_EXO': (H['LULUCF_EXO'], EXOp)}
+    series_vals = {'AG': (H['AG'], AGP), 'AG_EXO': (AGX_h, AGXp), 'LULUCF_MOD': (H['LULUCF_MOD'], MODp), 'LULUCF_EXO': (H['LULUCF_EXO'], EXOp)}
     hdr = ['year_end', 'fy_label', 'luto_year', 'value_t_co2e', 'value_kt_co2e_ar5', 'source', 'status', 'method', 'role']
     full = {}
     for k, (hv, pv) in series_vals.items():
@@ -470,7 +481,7 @@ def main():
         for y in YR_HIST:
             full[k][y] = hv[y]
             rows.append([y, fy(y), y, fmt(hv[y] * 1000, 3), fmt(hv[y]), 'NIR2024', 'HISTORY', method[k][0], role(y)])
-        prov_tag = '' if k == 'AG' else ' PROVISIONAL (MOD share open)'
+        prov_tag = '' if k in ('AG', 'AG_EXO') else ' PROVISIONAL (MOD share open)'
         for y in YR_PROJ:
             full[k][y] = pv[y]
             rows.append([y, fy(y), y, fmt(pv[y] * 1000, 3), fmt(pv[y]), 'DCCEEW2025', 'PROJECTION' + prov_tag, method[k][1], role(y)])
@@ -478,7 +489,8 @@ def main():
             full[k][y] = pv[2040]
             rows.append([y, fy(y), y, fmt(pv[2040] * 1000, 3), fmt(pv[2040]), 'DCCEEW2025', 'HELD (FY2040 value, not projection)',
                          'held flat at FY2040 (Nick: "Hold flat at 2040")', 'BINDING'])
-        fn = {'AG': 'series_agriculture.csv', 'LULUCF_MOD': 'series_lulucf_modelled.csv', 'LULUCF_EXO': 'series_lulucf_exogenous.csv'}[k]
+        fn = {'AG': 'series_agriculture.csv', 'AG_EXO': 'series_agriculture_exogenous.csv', 'LULUCF_MOD': 'series_lulucf_modelled.csv',
+              'LULUCF_EXO': 'series_lulucf_exogenous.csv'}[k]
         write_csv(os.path.join(a.out, fn), hdr, rows)
 
     # ---- components long ----
@@ -499,6 +511,11 @@ def main():
     comp.sort(key=lambda r: (r[0], r[1], r[2]))
     write_csv(os.path.join(a.out, 'series_components_long.csv'),
               ['year_end', 'series', 'component_id', 'component', 'value_kt_co2e_ar5', 'source', 'status'], comp)
+
+    # AG_EXO is a part of AG, not a fourth series: it never enters the sum check below
+    for y in full['AG']:
+        if not 0.0 <= full['AG_EXO'][y] <= full['AG'][y]:
+            raise SystemExit(f'AG_EXO outside [0, AG] in {y}: {full["AG_EXO"][y]} vs {full["AG"][y]}')
 
     # ---- sum check ----
     sc = []
@@ -564,9 +581,10 @@ def main():
     write_csv(os.path.join(a.out, 'plantings_baseline.csv'),
               ['quantity', 'definition', 'value', 'by_year', 'basis', 'carried_forward', 'status'], prow)
 
-    # ---- agriculture not modelled (information for the open fourth-series decision) ----
+    # ---- agriculture not modelled (history of series_agriculture_exogenous.csv, by modelled / not modelled) ----
     ag_nm = [[y, fmt(ssum(lambda r: r['assignment'] == 'AG' and r['modelled_by_luto'] != 'yes', y)),
-              fmt(ssum(lambda r: r['assignment'] == 'AG' and r['modelled_by_luto'] == 'yes', y)), fmt(NIR3[y]), 'NIR2024', 'INFO (open decision)']
+              fmt(ssum(lambda r: r['assignment'] == 'AG' and r['modelled_by_luto'] == 'yes', y)), fmt(NIR3[y]), 'NIR2024',
+              'INFO (history of series_agriculture_exogenous.csv)']
              for y in YR_HIST]
     write_csv(os.path.join(a.out, 'ag_not_modelled.csv'),
               ['year_end', 'ag_not_modelled_kt', 'ag_modelled_kt', 'ag_total_kt', 'source', 'status'], ag_nm)
@@ -590,7 +608,8 @@ def main():
     P += [['decision', f'Nick decision {n + 1} (verbatim)', '', '', d, '', ''] for n, d in enumerate(NICK_DECISIONS)]
     P += [['provisional', 'LULUCF_MOD definition', '', '', 'whole forest-to-crop/grass conversion leaves (open)', '', ''],
           ['provisional', 'LULUCF projection MOD share', '', '', f'{share:.6f} of the forest-conversion bucket, FY2021-2024 (open)', '', ''],
-          ['provisional', 'unmodelled agriculture', '', '', 'no fourth series built; see ag_not_modelled.csv (open)', '', ''],
+          ['decided', 'unmodelled agriculture', '', '', 'series_agriculture_exogenous.csv, a part of AG on the AG row left-hand side; '
+           'projection keeps each commodity\'s FY2024 unmodelled share', '', ''],
           ['provisional', 'tolerances', '', '', 'tolerances.csv, PROPOSAL (open)', '', ''],
           ['provisional', 'plantings baseline', '', '', 'plantings_baseline.csv, INFERRED / PROPOSAL', '', ''],
           ['year_basis', 'LUTO year Y = FY ending Y; base year 2021 (NLUM 2020-21)', '', '', '', '', '']]
