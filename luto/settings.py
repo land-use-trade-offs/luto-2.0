@@ -776,6 +776,19 @@ EGGS_AVG_WEIGHT = 60  # Average weight of an egg in grams
 
 
 # ---------------------------------------------------------------------------- #
+# Livestock stocking calibration
+# ---------------------------------------------------------------------------- #
+
+LVSTK_K_FILE = None
+'''
+The per-type stocking calibration k, in place of FEED_REQ in the stocking rate (quantity.get_yield_pot).
+- None: every livestock type takes FEED_REQ (feed_req.h5), as before.
+- A file name (relative to INPUT_DIR, or an absolute path): an h5 table (key 'lvstk_k', one row per full-resolution
+  cell, the same index as feed_req.h5) with float columns 'BEEF', 'SHEEP' and 'DAIRY': each cell's SA2 k per type.
+'''
+
+
+# ---------------------------------------------------------------------------- #
 # Environmental parameters
 # ---------------------------------------------------------------------------- #
 
