@@ -28,7 +28,7 @@ import pandas as pd
 import luto.settings as settings
 
 from luto.data import Data
-from luto.economics.agricultural.quantity import get_yield_pot, get_quantity, lvs_veg_types, get_quantity_renewable, get_exist_renewable_capacity
+from luto.economics.agricultural.quantity import get_yield_pot, get_quantity, lvs_veg_types, get_quantity_renewable, get_exist_renewable_capacity, get_stubble_yield_pot
 from luto.economics.agricultural.ghg import get_savanna_burning_effect_g_mrj
 from functools import lru_cache
 
@@ -61,8 +61,25 @@ def get_rev_crop( data:Data         # Data object.
                 * data.get_elasticity_multiplier(yr_cal)[lu.lower()]    # Dynamic price elasticity multiplier
                 ).values
     
+    rev = pd.DataFrame(rev_t, columns=pd.MultiIndex.from_tuples([(lu, lm, 'Crop')]))
+
+    # Sheep grazing the cereal stubble: the sheep revenue per head (as get_rev_lvstk) at the stubble stocking rate
+    if lu in data.LU_STUBBLE:
+        stubble_head_cell = get_stubble_yield_pot(data) * data.REAL_AREA
+        for name, (f, q, p, cm) in {
+            'Stubble sheep meat': ('F1', 'Q1', 'P1', 'sheep meat'),
+            'Stubble sheep wool': ('F2', 'Q2', 'P2', 'sheep wool'),
+            'Stubble sheep live exports': ('F3', 'Q3', 'P3', 'sheep lexp'),
+        }.items():
+            rev[(lu, lm, name)] = (
+                stubble_head_cell
+                * data.AGEC_LVSTK[f, 'SHEEP'] * data.AGEC_LVSTK[q, 'SHEEP'] * data.AGEC_LVSTK[p, 'SHEEP']
+                * data.LVSTK_PRICE_MULTIPLIERS.loc[yr_cal, f"SHEEP {p}"]
+                * data.get_elasticity_multiplier(yr_cal)[cm]
+            ).fillna(0).to_numpy()                                           # no sheep data: no stubble sheep
+
     # Return revenue as MultiIndexed DataFrame.
-    return pd.DataFrame(rev_t, columns=pd.MultiIndex.from_tuples([(lu, lm, 'Crop')]))
+    return rev
 
 
 def get_rev_lvstk( data:Data   # Data object.
