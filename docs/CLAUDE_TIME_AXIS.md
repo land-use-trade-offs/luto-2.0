@@ -35,6 +35,8 @@ These four were verified against the files on disk. Each is a silent misalignmen
 
 Consequence of site 4 under a 2020 base with the file unchanged: base-year production would be observed 2020 yields times the 2020 climate multiplier, i.e. climate impact counted twice.
 
+**Status: sites 1-4 and off-land GHG now read by year label** (branch `rebase-2021`). `D_CY_xr` keeps `DEMAND_C.columns` and is read with `.sel(year=)` (`row_inputs.get_limits`, `write.write_quantity`); `OFF_LAND_GHG_EMISSION_C` is a Series by `YEAR`, read with `.loc[target_year]`; the water yield files are read through `Data.get_water_yield_file_row(yr_cal)` over `WATER_YIELD_FILE_YEARS` (2010-2100, from the file name); the BAU productivity csv is labelled from 2010; the climate files anchor on `Data.CLIMATE_CHANGE_IMPACT_ANCHOR_YEAR` (2010), not `YR_CAL_BASE`. At the 2010 base every read returns the same values as before. Moving the base still leaves the renormalisation question for sites 3 and 4 (multipliers relative to 2010, not to the new base) open.
+
 ## 4. Dynamic pricing depends on the base year twice
 
 `data.py:2140-2158` builds the price elasticity multiplier from (a) `BASE_YR_production_t` (production implied by the base-year dvars, :1195) and (b) `D_CY_xr.sel(year=YR_CAL_BASE)`. Changing the base map changes (a); changing the base year changes (b). With `settings.DYNAMIC_PRICE = True` (default) price trajectories therefore move after a base swap even when `demand_projections.h5` is untouched. Compare against a `DYNAMIC_PRICE = False` run before attributing a solve difference to anything else.
