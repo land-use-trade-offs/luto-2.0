@@ -754,6 +754,18 @@ The per-type stocking calibration k, in place of FEED_REQ in the stocking rate (
   cell, the same index as feed_req.h5) with float columns 'BEEF', 'SHEEP' and 'DAIRY': each cell's SA2 k per type.
 '''
 
+STUBBLE_DSE_FILE = None
+'''
+Sheep grazing cereal stubble, a co-product of the cereal land uses (STUBBLE_LAND_USES).
+- None: no stubble sheep; the product list is as before.
+- A file name (relative to INPUT_DIR, or an absolute path): an h5 table (key 'stubble_dse_ha', one row per
+  full-resolution cell) holding the stubble carrying rate in DSE per ha, annualised. Cereal cells then carry
+  k_sheep x rate / (DSE per head x grassfed factor) sheep per ha, whose meat, wool and live exports count toward the
+  sheep demand rows and whose emissions sit on the agriculture row. Per-head economics and emission factors are the
+  cell's sheep values (provisional).
+'''
+STUBBLE_LAND_USES = ['Winter cereals', 'Summer cereals']
+
 
 # ---------------------------------------------------------------------------- #
 # Environmental parameters

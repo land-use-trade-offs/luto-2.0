@@ -321,8 +321,17 @@ class Data:
             'SHEEP - NATURAL LAND WOOL'
         ]
         
+        # Sheep grazing cereal stubble (settings.STUBBLE_DSE_FILE): its own products on the cereal land uses, so that
+        # cereal columns carry sheep meat, wool and live exports into the sheep commodities' demand rows
+        self.LU_STUBBLE = settings.STUBBLE_LAND_USES if settings.STUBBLE_DSE_FILE else []
+        self.PR_STUBBLE = [
+            'SHEEP - STUBBLE LEXP',
+            'SHEEP - STUBBLE MEAT',
+            'SHEEP - STUBBLE WOOL',
+        ] if settings.STUBBLE_DSE_FILE else []
+
         # Sort each product category alphabetically, then concatenate
-        self.PRODUCTS = self.PR_CROPS + self.PR_LVSTK
+        self.PRODUCTS = self.PR_CROPS + self.PR_LVSTK + self.PR_STUBBLE
         self.PRODUCTS.sort()
 
         # Get number of products
@@ -335,6 +344,8 @@ class Data:
             for PR in self.PR_LVSTK:
                 if lu.upper() in PR:
                     self.LU2PR_DICT[lu] = self.LU2PR_DICT[lu] + [PR]
+        for lu in self.LU_STUBBLE:
+            self.LU2PR_DICT[lu] = self.LU2PR_DICT[lu] + self.PR_STUBBLE
 
         # A reverse dictionary for convenience.
         self.PR2LU_DICT = {pr: key for key, val in self.LU2PR_DICT.items() for pr in val}
@@ -356,7 +367,7 @@ class Data:
         self.COMMODITIES = { ( s.replace(' - NATURAL LAND', '')
                                 .replace(' - MODIFIED LAND', '')
                                 .lower() )
-                                for s in self.PRODUCTS }
+                                for s in self.PR_CROPS + self.PR_LVSTK }     # the stubble products are sheep commodities
         self.COMMODITIES = list(self.COMMODITIES)
         self.COMMODITIES.sort()
         self.CM_CROPS = [s for s in self.COMMODITIES if s in [k.lower() for k in self.LU_CROPS]]
@@ -376,7 +387,7 @@ class Data:
             else:
                 head = key.split()[0]
                 tail = key.split()[1]
-            for PR in self.PR_LVSTK:
+            for PR in self.PR_LVSTK + self.PR_STUBBLE:
                 if tail==0 and head.upper() in PR:
                     self.CM2PR_DICT[key] = self.CM2PR_DICT[key] + [PR]
                 elif (head.upper()) in PR and (tail.upper() in PR):
@@ -657,6 +668,15 @@ class Data:
             self.LVSTK_K = {lvstype: np.nan_to_num(lvstk_k[lvstype].to_numpy()) for lvstype in ('BEEF', 'SHEEP', 'DAIRY')}
         else:
             self.LVSTK_K = {lvstype: self.FEED_REQ for lvstype in ('BEEF', 'SHEEP', 'DAIRY')}
+
+        # The stubble carrying rate <unit: DSE per ha, annualised>, read on every cell and applied on the cereal land uses
+        # only (quantity.get_stubble_yield_pot); 0 where no file is given
+        if settings.STUBBLE_DSE_FILE:
+            self.STUBBLE_DSE_HA = np.nan_to_num(
+                pd.read_hdf(os.path.join(settings.INPUT_DIR, settings.STUBBLE_DSE_FILE), where=self.MASK).to_numpy()
+            )
+        else:
+            self.STUBBLE_DSE_HA = np.zeros(self.NCELLS, dtype=np.float32)
 
         self.PASTURE_KG_DM_HA = pd.read_hdf(
             os.path.join(settings.INPUT_DIR, "pasture_kg_dm_ha.h5"), where=self.MASK
