@@ -78,6 +78,7 @@ NICK_DECISIONS = [
     'Splice: "Ag offset, LULUCF hybrid"',
     'Plantings: "Leave all of DCCEEW\'s plantings in the exogenous series, and count LUTO\'s term (3) only above a baseline planting rate. That treats LUTO plantings as additional to what\'s already assumed in the baseline, which is the natural scenario framing: DCCEEW\'s baseline is "current policies", and LUTO\'s plantings are what the optimisation adds on top. The baseline rate can come from NIR history, for example the FY2021-24 average rate of new plantings, carried forward as a disclosed assumption."',
     'Unmodelled agriculture: series_agriculture_exogenous on the agriculture row\'s left-hand side; projection "Proportional share"',
+    'Decision B: "Direct clearing moves from `LULUCF_MOD` to `LULUCF_EXO` in the targets tool. Term (4) stays on the LULUCF row, so any clearing LUTO chooses is additional to baseline clearing, on the same logic as plantings." MOD: "Yes, MOD = 0"',
 ]
 
 
@@ -283,10 +284,10 @@ def lulucf_rule(p):
                 'Baseline level is not in LUTO; term 2 adds an avoided-emissions delta from EDS adoption. Level is exogenous.',
                 'OBSERVED (tree) / INFERRED')
     if has('4.B.2.1 Forest Land converted to Cropland', '4.C.2.1 Forest Land converted to Grassland'):
-        return ('LULUCF_MOD', 'partial', '4', 'flow_ghg_ag2ag . D (natural -> modified land, clearing)',
-                'Forest clearing to cropland/grassland. LUTO term 4 models new clearing only (stock/60 per step, INFERRED under-count). '
-                'The leaf also carries post-clearing legacy emissions; whole leaf assigned MOD (PROVISIONAL, open decision).',
-                'OBSERVED (code) / INFERRED (coverage)')
+        return ('LULUCF_EXO', 'partial', '4', 'flow_ghg_ag2ag . D (natural -> modified land, clearing), increments only',
+                'Forest clearing to cropland/grassland, with its post-clearing legacy emissions. Baseline clearing is exogenous '
+                '(Nick decision B); LUTO term 4 stays on the LULUCF row, so any clearing LUTO chooses is additional to it, as plantings are.',
+                'STATED (decision) / OBSERVED (code)')
     if has(*PLANTING_LEAVES):
         what = 'EP / riparian / agroforestry / carbon plantings' if 'Environmental' in p else 'none (commercial plantations are not a LUTO land use)'
         return ('LULUCF_EXO', 'partial' if 'Environmental' in p else 'no', '3' if 'Environmental' in p else '', what,
@@ -468,10 +469,10 @@ def main():
                'NIR 2024 FY2024 level + DCCEEW 2025 year-on-year change from FY2024, by commodity (offset splice)'),
         'AG_EXO': ('sum of NIR 2024 sector 3 leaves not modelled by LUTO (scope_matrix modelled_by_luto != yes); part of AG',
                    'AG projection by commodity x the FY2024 unmodelled share of that commodity (proportional share); part of AG'),
-        'LULUCF_MOD': ('sum of NIR 2024 leaves assigned LULUCF_MOD (whole forest-to-crop/grass conversion leaves; PROVISIONAL)',
-                       f'forest-conversion bucket (converge to DCCEEW level by FY2030) x MOD share of that bucket FY2021-2024 = {share:.6f} (PROVISIONAL)'),
-        'LULUCF_EXO': ('sum of NIR 2024 leaves assigned LULUCF_EXO (all plantings stay here)',
-                       'Forests bucket (offset) + Agricultural and other land (converge by FY2030) + (1 - MOD share) x forest-conversion bucket (converge); PROVISIONAL share'),
+        'LULUCF_MOD': ('sum of NIR 2024 leaves assigned LULUCF_MOD (none: direct clearing is exogenous, Nick decision B)',
+                       f'forest-conversion bucket (converge to DCCEEW level by FY2030) x MOD share of that bucket FY2021-2024 = {share:.6f}'),
+        'LULUCF_EXO': ('sum of NIR 2024 leaves assigned LULUCF_EXO (all plantings and all direct clearing)',
+                       'Forests bucket (offset) + Agricultural and other land (converge by FY2030) + (1 - MOD share) x forest-conversion bucket (converge)'),
     }
     series_vals = {'AG': (H['AG'], AGP), 'AG_EXO': (AGX_h, AGXp), 'LULUCF_MOD': (H['LULUCF_MOD'], MODp), 'LULUCF_EXO': (H['LULUCF_EXO'], EXOp)}
     hdr = ['year_end', 'fy_label', 'luto_year', 'value_t_co2e', 'value_kt_co2e_ar5', 'source', 'status', 'method', 'role']
@@ -481,10 +482,9 @@ def main():
         for y in YR_HIST:
             full[k][y] = hv[y]
             rows.append([y, fy(y), y, fmt(hv[y] * 1000, 3), fmt(hv[y]), 'NIR2024', 'HISTORY', method[k][0], role(y)])
-        prov_tag = '' if k in ('AG', 'AG_EXO') else ' PROVISIONAL (MOD share open)'
         for y in YR_PROJ:
             full[k][y] = pv[y]
-            rows.append([y, fy(y), y, fmt(pv[y] * 1000, 3), fmt(pv[y]), 'DCCEEW2025', 'PROJECTION' + prov_tag, method[k][1], role(y)])
+            rows.append([y, fy(y), y, fmt(pv[y] * 1000, 3), fmt(pv[y]), 'DCCEEW2025', 'PROJECTION', method[k][1], role(y)])
         for y in YR_HELD:
             full[k][y] = pv[2040]
             rows.append([y, fy(y), y, fmt(pv[2040] * 1000, 3), fmt(pv[2040]), 'DCCEEW2025', 'HELD (FY2040 value, not projection)',
@@ -506,8 +506,8 @@ def main():
             comp.append([y, 'AG', f'DCCEEW:Figure25:{c}', f'DCCEEW commodity {c} (offset)', fmt(ag_comm_p[c][yy]), 'DCCEEW2025', st])
         comp.append([y, 'LULUCF_EXO', 'DCCEEW:Figure30:Forests', 'DCCEEW bucket Forests (offset); includes all plantings', fmt(FOp[yy]), 'DCCEEW2025', st])
         comp.append([y, 'LULUCF_EXO', 'DCCEEW:Figure30:AgriculturalOther', 'DCCEEW bucket Agricultural and other land (converge by FY2030)', fmt(AOp[yy]), 'DCCEEW2025', st])
-        comp.append([y, 'LULUCF_EXO', 'DCCEEW:Figure30:ForestConversion:EXO', 'forest-conversion bucket x (1 - MOD share) (PROVISIONAL)', fmt((1 - share) * FCp[yy]), 'DCCEEW2025', st])
-        comp.append([y, 'LULUCF_MOD', 'DCCEEW:Figure30:ForestConversion:MOD', 'forest-conversion bucket x MOD share (PROVISIONAL)', fmt(share * FCp[yy]), 'DCCEEW2025', st])
+        comp.append([y, 'LULUCF_EXO', 'DCCEEW:Figure30:ForestConversion:EXO', 'forest-conversion bucket x (1 - MOD share)', fmt((1 - share) * FCp[yy]), 'DCCEEW2025', st])
+        comp.append([y, 'LULUCF_MOD', 'DCCEEW:Figure30:ForestConversion:MOD', 'forest-conversion bucket x MOD share', fmt(share * FCp[yy]), 'DCCEEW2025', st])
     comp.sort(key=lambda r: (r[0], r[1], r[2]))
     write_csv(os.path.join(a.out, 'series_components_long.csv'),
               ['year_end', 'series', 'component_id', 'component', 'value_kt_co2e_ar5', 'source', 'status'], comp)
@@ -548,7 +548,7 @@ def main():
     tol.append(['LULUCF_MOD_BUDGET', 'cumulative window FY2021-FY2024', '2021-2024', fmt(bud, 3), fmt(100 * UNC_FOREST_CONVERSION, 3),
                 fmt(UNC_FOREST_CONVERSION * bud, 3), 'NIR 2024 Vol 2 Annex II Table A2.4 (printed p.21) B.2/C.2 +/-27.9%, fully correlated across years (lean)', 'PROPOSAL'])
     tol.append(['LULUCF_MOD_BUDGET', 'cumulative window FY2021-FY2024 (alternative: independent years)', '2021-2024', fmt(bud, 3),
-                fmt(100 * unc / bud, 3), fmt(unc, 3), 'as above, quadrature over the four years', 'PROPOSAL'])
+                fmt(100 * unc / bud, 3) if bud else '', fmt(unc, 3), 'as above, quadrature over the four years', 'PROPOSAL'])
     write_csv(os.path.join(a.out, 'tolerances.csv'),
               ['series', 'applies_to', 'year_end', 'reference_kt', 'tolerance_pct', 'tolerance_kt', 'basis', 'status'], tol)
     write_csv(os.path.join(a.out, 'budget.csv'),
@@ -556,7 +556,7 @@ def main():
                'tolerance_kt', 'by_year_kt', 'rule', 'status'],
               [['LULUCF_MOD', w0, w1, '2021-2024', '2022-2024 (2021 is the base year)', fmt(bud, 3), fmt(UNC_FOREST_CONVERSION * bud, 3),
                 '; '.join(f'{y}: {fmt(H["LULUCF_MOD"][y], 3)}' for y in range(w0, w1 + 1)),
-                'sum over window of LUTO modelled LULUCF within budget_kt +/- tolerance_kt', 'PROPOSAL (MOD definition PROVISIONAL)']])
+                'sum over window of LUTO modelled LULUCF within budget_kt +/- tolerance_kt', 'PROPOSAL']])
 
     # ---- plantings baseline (INFERRED / PROPOSAL) ----
     pl = {p: next(i for i in leaves if nodes[i]['name'] == p) for p in PLANTING_LEAVES}
@@ -606,8 +606,8 @@ def main():
         ['script', 'luto/tools/ghg_targets.py', '', sha(me), 'sha256 of script', '', ''],
     ]
     P += [['decision', f'Nick decision {n + 1} (verbatim)', '', '', d, '', ''] for n, d in enumerate(NICK_DECISIONS)]
-    P += [['provisional', 'LULUCF_MOD definition', '', '', 'whole forest-to-crop/grass conversion leaves (open)', '', ''],
-          ['provisional', 'LULUCF projection MOD share', '', '', f'{share:.6f} of the forest-conversion bucket, FY2021-2024 (open)', '', ''],
+    P += [['decided', 'LULUCF_MOD definition', '', '', 'no NIR leaf: direct clearing is exogenous (Nick decision B); LUTO term 4 is additional', '', ''],
+          ['decided', 'LULUCF projection MOD share', '', '', f'{share:.6f} of the forest-conversion bucket, FY2021-2024', '', ''],
           ['decided', 'unmodelled agriculture', '', '', 'series_agriculture_exogenous.csv, a part of AG on the AG row left-hand side; '
            'projection keeps each commodity\'s FY2024 unmodelled share', '', ''],
           ['provisional', 'tolerances', '', '', 'tolerances.csv, PROPOSAL (open)', '', ''],

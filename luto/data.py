@@ -3247,7 +3247,8 @@ class Data:
         Read from the files `luto/tools/ghg_targets.py` writes (NIR 2024 history, DCCEEW 2025 projections; the
         file contract is stage2_contract.md):
           - AG_t: the agriculture series (NIR sector 3).
-          - LULUCF_MOD_t, LULUCF_EXO_t: modelled and exogenous LULUCF; net LULUCF is their sum.
+          - LULUCF_MOD_t, LULUCF_EXO_t: modelled and exogenous LULUCF; net LULUCF is their sum. MOD is 0: direct
+            clearing is exogenous, and LUTO's clearing (term 4) and plantings count as additional to EXO.
           - AG_EXO_t: exogenous agriculture on the AG row (the sector 3 categories LUTO does not model), from
             series_agriculture_exogenous.csv; 0 if that file is absent (target folders built before it existed).
           - PLANTINGS_BASELINE_t: the baseline new-plantings removals in the year (negative), from the LEAN row of
