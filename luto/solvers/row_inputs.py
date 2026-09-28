@@ -144,6 +144,7 @@ def get_limits(data: Data, yr_cal: int) -> dict[str, Any]:
 
     if settings.GHG_EMISSIONS_LIMITS != 'off':
         limits['ghg'] = data.GHG_TARGETS.loc[yr_cal].to_dict()                 # the year's series (t CO2e) and role: see Data.load_ghg_targets
+        limits['ghg'].update(ag_ghg.get_hir_baseline_t(data, yr_cal - data.YR_CAL_BASE))   # HIR_BASELINE_{AG,LULUCF}_t, 0 when off
 
     if any(settings.RENEWABLES_OPTIONS.values()):
         renewable_targets = data.RENEWABLE_TARGETS.query('Year == @yr_cal').set_index('state')

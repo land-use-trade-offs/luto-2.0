@@ -1396,6 +1396,11 @@ class Data:
                 raise ValueError(f"GHG target series have no row for SIM_YEARS {missing} (input/ghg_targets covers "
                                  f"{self.GHG_TARGETS.index.min()}-{self.GHG_TARGETS.index.max()}).")
 
+        # Existing HIR projects (hectares per cell by registration FY), for the HIR baseline on the two GHG rows
+        self.HIR_BASELINE_HA = None
+        if settings.GHG_EMISSIONS_LIMITS != 'off' and settings.HIR_BASELINE is not None:
+            self.HIR_BASELINE_HA = self.load_hir_baseline_area(os.path.join(settings.INPUT_DIR, settings.HIR_BASELINE))
+
 
 
         ###############################################################
@@ -2894,6 +2899,34 @@ class Data:
                 f"Year should be between {self.YR_CAL_BASE} and 2100."
             )
         return self.CARBON_PRICES[yr_cal]
+
+    def load_hir_baseline_area(self, hir_dir: str) -> dict:
+        """Hectares of existing ACCU HIR projects on each cell, cumulative by registration FY up to the baseline FY
+        (held flat after it), from the files `luto/tools/ag_mgt_caps.py` writes:
+          - hir_project_cells.csv: the share of each full-resolution cell (NLUM land-cell index) inside each mapped
+            project's Carbon Estimation Area. Overlapping projects are clipped at the whole cell.
+          - hir_scaling.csv: the scale factor for the unmapped projects (all / mapped issuance to the baseline FY).
+        Full-resolution cells are summed into the RESFACTOR block of the cell that represents them; a block with no
+        cell in the model drops its area (reported in 'dropped_ha')."""
+        cells = pd.read_csv(os.path.join(hir_dir, 'hir_project_cells.csv'))
+        scaling = pd.read_csv(os.path.join(hir_dir, 'hir_scaling.csv')).iloc[0]
+        rf = settings.RESFACTOR
+        rows, cols = np.nonzero(self.NLUM_MASK)                                   # the file's cell index order
+        block = np.full((rows.max() // rf + 1, cols.max() // rf + 1), -1, dtype=np.int64)
+        block[rows[self.MASK] // rf, cols[self.MASK] // rf] = np.arange(self.NCELLS)
+
+        baseline_fy = int(scaling['baseline_fy'])
+        ha, dropped = {}, {}
+        for fy in range(int(cells['fy_registered'].min()), baseline_fy + 1):
+            sel = cells['fy_registered'] <= fy
+            frac = cells.loc[sel].groupby('cell')['fraction'].sum().clip(upper=1)
+            px = frac.index.to_numpy()
+            px_ha = frac.to_numpy() * self.REAL_AREA_NO_RESFACTOR[px] * float(scaling['scale_factor'])
+            cell = block[rows[px] // rf, cols[px] // rf]
+            ha[fy] = np.bincount(cell[cell >= 0], weights=px_ha[cell >= 0], minlength=self.NCELLS)
+            dropped[fy] = float(px_ha[cell < 0].sum())
+        return {'ha': ha, 'dropped_ha': dropped, 'baseline_fy': baseline_fy, 'first_fy': min(ha),
+                'scale_factor': float(scaling['scale_factor'])}
 
     def load_ghg_targets(self, target_dir: str) -> pd.DataFrame:
         """The two GHG constraints' series, one row per LUTO year (luto_year = financial year ending that year), in t CO2e.

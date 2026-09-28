@@ -383,13 +383,14 @@ def get_ghg_coeffs(inputs: RowInputs, cols: xr.Dataset) -> dict[str, np.ndarray]
 
 def get_ghg_rhs(inputs: RowInputs) -> dict[str, float]:
     """The two GHG rows' right-hand sides (raw tCO2e), with the constants each row's left-hand side carries moved over:
-      AG:      Σ coeff · X + off-land + exogenous ag             ≤ AG series
-      LULUCF:  Σ coeff · X − plantings baseline + LULUCF_EXO     ≤ LULUCF_MOD + LULUCF_EXO (net LULUCF)
-    LUTO's plantings count on the LULUCF row only above the baseline new-plantings removals (negative)."""
+      AG:      Σ coeff · X + off-land + exogenous ag − HIR baseline (destocking)                 ≤ AG series
+      LULUCF:  Σ coeff · X − plantings baseline − HIR baseline (regrowth) + LULUCF_EXO          ≤ LULUCF_MOD + LULUCF_EXO (net LULUCF)
+    LUTO's plantings count on the LULUCF row only above the baseline new-plantings removals (negative), and its HIR
+    on each row only above the existing HIR projects' regrowth and destocking (negative; 0 when HIR_BASELINE is off)."""
     t = inputs.limits['ghg']
     return {
-        'AG': t['AG_t'] - inputs.offland_ghg - t['AG_EXO_t'],
-        'LULUCF': (t['LULUCF_MOD_t'] + t['LULUCF_EXO_t']) - t['LULUCF_EXO_t'] + t['PLANTINGS_BASELINE_t'],
+        'AG': t['AG_t'] - inputs.offland_ghg - t['AG_EXO_t'] + t['HIR_BASELINE_AG_t'],
+        'LULUCF': (t['LULUCF_MOD_t'] + t['LULUCF_EXO_t']) - t['LULUCF_EXO_t'] + t['PLANTINGS_BASELINE_t'] + t['HIR_BASELINE_LULUCF_t'],
     }
 
 

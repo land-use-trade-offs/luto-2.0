@@ -2597,13 +2597,15 @@ def write_ghg(data: Data, yr_cal: int, path: str):
     # ==================== Total / Limit Summary ====================
 
     # The limit on LUTO's modelled net emissions (GHG_EMISSIONS_TCO2e): the two rows' series with the exogenous
-    # constants on their left-hand sides taken out, AG - exogenous ag + LULUCF_MOD + plantings baseline. Each row is
-    # compared with its own series in GHG_emissions_split_<yr>.csv.
+    # constants on their left-hand sides taken out, AG - exogenous ag + LULUCF_MOD + plantings baseline + HIR baseline.
+    # Each row is compared with its own series in GHG_emissions_split_<yr>.csv.
     if settings.GHG_EMISSIONS_LIMITS == 'off':
         ghg_limits = 0
     else:
         t = data.GHG_TARGETS.loc[yr_cal]
-        ghg_limits = t['AG_t'] - t['AG_EXO_t'] + t['LULUCF_MOD_t'] + t['PLANTINGS_BASELINE_t']
+        hir = ag_ghg.get_hir_baseline_t(data, yr_idx)
+        ghg_limits = (t['AG_t'] - t['AG_EXO_t'] + t['LULUCF_MOD_t'] + t['PLANTINGS_BASELINE_t']
+                      + hir['HIR_BASELINE_AG_t'] + hir['HIR_BASELINE_LULUCF_t'])
     if yr_cal >= data.YR_CAL_BASE + 1:
         ghg_emissions = data.prod_data[yr_cal]['GHG']
     else:
