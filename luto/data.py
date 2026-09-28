@@ -3248,8 +3248,8 @@ class Data:
         file contract is stage2_contract.md):
           - AG_t: the agriculture series (NIR sector 3).
           - LULUCF_MOD_t, LULUCF_EXO_t: modelled and exogenous LULUCF; net LULUCF is their sum.
-          - AG_EXO_t: exogenous agriculture on the AG row, from series_agriculture_exogenous.csv when that file
-            exists; 0 without it (no such series is built yet).
+          - AG_EXO_t: exogenous agriculture on the AG row (the sector 3 categories LUTO does not model), from
+            series_agriculture_exogenous.csv; 0 if that file is absent (target folders built before it existed).
           - PLANTINGS_BASELINE_t: the baseline new-plantings removals in the year (negative), from the LEAN row of
             plantings_baseline.csv: rate x (year - anchor year), 0 up to the anchor year. LUTO's plantings count on
             the LULUCF row only above it.
