@@ -1296,6 +1296,14 @@ def create_new_dataset(refresh=False):
     cell_xy.to_hdf(outpath + 'cell_BECCS_df.h5', key='cell_BECCS_df', mode='w', format='table', index=False, complevel=9)
 
 
+    # Observed ag-management adoption caps and the existing-HIR-project cells (CER register, CEA files, ABS 4627.0),
+    # built by luto/tools/ag_mgt_caps.py on the NLUM grid, lumap.h5 and real_area.h5 written above.
+    subprocess.run([sys.executable, os.path.dirname(__file__) + '/tools/ag_mgt_caps.py',
+                    '--out', outpath + 'ag_mgt_caps',
+                    '--input', outpath,
+                    '--cache', raw_data + 'ag_mgt_caps_cache'], check=True)
+
+
     # Complete processing and report back
     laps_time = round(time.time() - start_time)
     print('Completed input data refresh at', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), ', taking', laps_time, 'seconds')
