@@ -1232,6 +1232,21 @@ GBF8_TARGETS_DICT = {
     'high':   {2030: 30, 2050: 50, 2100: 50},
 }
 
+GBF8_ROW_GENERATION = False
+'''
+True: the GBF8 rows are not built up front (all ~10.6 k species are ~5 × 10⁹ entries at RES5) but generated per step
+(luto/solvers/gbf8_rowgen.py): a screen proves most species safe or unattainable before the solve; pass 1 adds, round
+by round, the open species short at the current solution, each with a shortfall variable at ELASTIC_PENALTY, until no
+species without a row is short; pass 2 drops the rows of the species pass 1 left short (they cannot be met together
+with the step; still scored) and re-solves with every other GBF8 row hard. Every species' target is then met, proven
+unattainable, or dropped. Per year: out_<year>/GBF8_rowgen_<year>.csv and GBF8_rowgen_rounds_<year>.csv.
+Only with GBF8_TARGET on; 'GBF8' in ELASTIC_FAMILIES has no effect then (the generated rows carry their own shortfall).
+'''
+GBF8_ROWGEN_BATCH_MIN = 20          # rows added per round: GBF8_ROWGEN_BATCH_SHARE of the species short,
+GBF8_ROWGEN_BATCH_SHARE = 0.05      # at least GBF8_ROWGEN_BATCH_MIN and at most GBF8_ROWGEN_BATCH_MAX (the hardest first);
+GBF8_ROWGEN_BATCH_MAX = 100         # a round costs one full solve, and the hardest few lift most of the rest
+GBF8_ROWGEN_MAX_ROUNDS = 30         # per pass: a pass that reaches it stops NOT converged (said in the log)
+
 
 
 

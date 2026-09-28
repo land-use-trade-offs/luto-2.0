@@ -523,6 +523,9 @@ def get_GBF8(inputs: RowInputs, support: ColSupport, bio_S: sparse.csr_matrix):
     if settings.GBF8_TARGET == "off":
         print('│   ├── TURNING OFF constraints for biodiversity GBF 8 ...')
         return None, None
+    if settings.GBF8_ROW_GENERATION:                                       # the rows are generated during the solve (gbf8_rowgen)
+        print('│   ├── GBF 8 by row generation: no rows built up front ...')
+        return None, None
     print("│   ├── Adding constraints for biodiversity GBF 8 ...")
     layers = inputs.GBF8_pre_1750_area_sr                                # xr [species, cell]
     targets = inputs.limits["GBF8"]
