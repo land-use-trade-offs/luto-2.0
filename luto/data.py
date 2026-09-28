@@ -649,6 +649,15 @@ class Data:
         self.FEED_REQ = np.nan_to_num(
             pd.read_hdf(os.path.join(settings.INPUT_DIR, "feed_req.h5"), where=self.MASK).to_numpy()
         )
+
+        # The stocking calibration k per livestock type, in place of FEED_REQ: one value per (cell, type), each cell
+        # carrying its SA2's k for that type. Without a file every type takes FEED_REQ (the model as before).
+        if settings.LVSTK_K_FILE:
+            lvstk_k = pd.read_hdf(os.path.join(settings.INPUT_DIR, settings.LVSTK_K_FILE), where=self.MASK)
+            self.LVSTK_K = {lvstype: np.nan_to_num(lvstk_k[lvstype].to_numpy()) for lvstype in ('BEEF', 'SHEEP', 'DAIRY')}
+        else:
+            self.LVSTK_K = {lvstype: self.FEED_REQ for lvstype in ('BEEF', 'SHEEP', 'DAIRY')}
+
         self.PASTURE_KG_DM_HA = pd.read_hdf(
             os.path.join(settings.INPUT_DIR, "pasture_kg_dm_ha.h5"), where=self.MASK
         ).to_numpy()

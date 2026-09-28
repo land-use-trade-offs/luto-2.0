@@ -118,8 +118,8 @@ def get_yield_pot(data, lvstype, vegtype, lm, yr_idx):
     grassfed_factor = {'BEEF': 0.85, 'SHEEP': 0.85, 'DAIRY': 0.65}
     denominator = (365 * dse_per_head[lvstype] * grassfed_factor[lvstype])
 
-    # Base potential.
-    yield_pot = data.FEED_REQ * data.PASTURE_KG_DM_HA / denominator
+    # Base potential: the type's stocking calibration k (FEED_REQ when no per-type file is given)
+    yield_pot = data.LVSTK_K[lvstype] * data.PASTURE_KG_DM_HA / denominator
 
     # Multiply potential by appropriate SAFE_PUR (safe pasture utilisation rate).
     if vegtype == 'natural land':
