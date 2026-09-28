@@ -751,6 +751,12 @@ HIR_PRODUCTIVITY_CONTRIBUTION = 0.5
 # HIR celling factor, assuming HIR achienves x% of bio/GHG benefits of the Destocked - natural land land use
 HIR_CEILING_PERCENTAGE = 0.8
 
+# Existing-HIR-project baseline on the two GHG rows. None = off. Otherwise a folder under INPUT_DIR written by
+# luto/tools/ag_mgt_caps.py (e.g. 'ag_mgt_caps'). LUTO's HIR then counts only above the regrowth (LULUCF row) and
+# destocking (AG row) of the existing ACCU HIR projects on their mapped cells, as its plantings count above the
+# plantings baseline: the NIR series already carry those projects.
+HIR_BASELINE = None
+
 # Maintainace cost for HIR
 BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
 SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100

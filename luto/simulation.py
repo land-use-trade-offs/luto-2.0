@@ -477,7 +477,9 @@ def get_ghg_split(data: Data, target_year: int, solution, inputs: RowInputs) -> 
               ('AG', 5, 'Off-land commodities', 'On-farm energy CO2 (direct, embedded)', inputs.offland_ghg_energy),
               ('AG', 'exogenous', 'Exogenous agriculture', 'series_agriculture_exogenous.csv (none built: 0)' if t['AG_EXO_t'] == 0 else 'series_agriculture_exogenous.csv', t['AG_EXO_t']),
               ('LULUCF', 'exogenous', 'Exogenous LULUCF', 'LULUCF_EXO (series_lulucf_exogenous.csv)', t['LULUCF_EXO_t']),
-              ('LULUCF', 'baseline', 'Plantings baseline', 'Baseline new-plantings removals, subtracted (plantings_baseline.csv)', -t['PLANTINGS_BASELINE_t'])]
+              ('LULUCF', 'baseline', 'Plantings baseline', 'Baseline new-plantings removals, subtracted (plantings_baseline.csv)', -t['PLANTINGS_BASELINE_t']),
+              ('AG', 'baseline', 'HIR baseline', 'Existing HIR projects destocking, subtracted (ag_mgt_caps)', -t['HIR_BASELINE_AG_t']),
+              ('LULUCF', 'baseline', 'HIR baseline', 'Existing HIR projects regrowth, subtracted (ag_mgt_caps)', -t['HIR_BASELINE_LULUCF_t'])]
 
     df = pd.DataFrame(lines, columns=['row', 'term', 'component', 'sub_term', 'value_t'])
     df['term'] = df['term'].astype(str)
