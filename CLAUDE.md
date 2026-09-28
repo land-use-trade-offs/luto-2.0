@@ -210,7 +210,7 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 
 Every constraint is hard: there are no soft / penalised options (the `*_CONSTRAINT_TYPE` settings and `SOLVE_WEIGHT_BETA` are gone).
 
-- `GHG_EMISSIONS_LIMITS`: Greenhouse gas targets ('off', 'low', 'medium', 'high')
+- `GHG_EMISSIONS_LIMITS`: 'off', 'low' or 'high'. Not 'off': two GHG rows (agriculture, net LULUCF) against the series in `input/ghg_targets/` in the years they bind; 'low'/'high' pick only the AusTIMES demand pathway and the 'AS_GHG' carbon price
 - `WATER_LIMITS`: Water yield constraints ('on' or 'off')
 - `CARBON_EFFECTS_WINDOW`: Years for carbon accumulation averaging (50, 60, 70, 80, or 90 years)
   - Must match available NetCDF data ages in input files

@@ -24,6 +24,22 @@ import luto.settings as settings
 from luto.data import Data
 
 
+# The row (agriculture 'AG' or net LULUCF 'LULUCF') each non-agricultural GHG sub-term sits on. The belt land uses
+# carry the livestock emissions of the pasture between the belts, which are agriculture. BECCS is energy-sector CCS
+# (off both inventories); it stays on the LULUCF row, where the single net row counted it, and is off by default.
+NON_AG_GHG_SUBTERMS = {
+    'Environmental Plantings':          {'Plantings sequestration': 'LULUCF'},
+    'Riparian Plantings':               {'Plantings sequestration': 'LULUCF'},
+    'Sheep Agroforestry':               {'Tree share sequestration': 'LULUCF', 'Livestock share emissions': 'AG'},
+    'Beef Agroforestry':                {'Tree share sequestration': 'LULUCF', 'Livestock share emissions': 'AG'},
+    'Carbon Plantings (Block)':         {'Plantings sequestration': 'LULUCF'},
+    'Sheep Carbon Plantings (Belt)':    {'Tree share sequestration': 'LULUCF', 'Livestock share emissions': 'AG'},
+    'Beef Carbon Plantings (Belt)':     {'Tree share sequestration': 'LULUCF', 'Livestock share emissions': 'AG'},
+    'BECCS':                            {'BECCS removals': 'LULUCF'},
+    'Destocked - natural land':         {'Regrowth carbon': 'LULUCF'},
+}
+
+
 
 def get_ghg_env_plantings(data: Data, aggregate) -> np.ndarray|pd.DataFrame:
     """
@@ -97,6 +113,7 @@ def get_ghg_sheep_agroforestry(
     ag_g_mrj: np.ndarray, 
     agroforestry_x_r: np.ndarray,
     aggregate: bool,
+    separate: bool = False,
 ) -> np.ndarray|pd.DataFrame:
     """
     Parameters
@@ -121,6 +138,8 @@ def get_ghg_sheep_agroforestry(
     sheep_contr = sheep_cost * (1 - agroforestry_x_r)
     ghg_total = agroforestry_contr + sheep_contr
 
+    if separate:
+        return {'Tree share sequestration': agroforestry_contr, 'Livestock share emissions': sheep_contr}
     if aggregate==True:
         return ghg_total
     elif aggregate==False:
@@ -134,6 +153,7 @@ def get_ghg_beef_agroforestry(
     ag_g_mrj: np.ndarray, 
     agroforestry_x_r: np.ndarray,
     aggregate: bool,
+    separate: bool = False,
 ) -> np.ndarray|pd.DataFrame:
     """
     Parameters
@@ -158,6 +178,8 @@ def get_ghg_beef_agroforestry(
     beef_contr = beef_cost * (1 - agroforestry_x_r)
     ghg_total = agroforestry_contr + beef_contr
 
+    if separate:
+        return {'Tree share sequestration': agroforestry_contr, 'Livestock share emissions': beef_contr}
     if aggregate==True:
         return ghg_total
     elif aggregate==False:
@@ -214,6 +236,7 @@ def get_ghg_sheep_carbon_plantings_belt(
     ag_g_mrj: np.ndarray, 
     cp_belt_x_r: np.ndarray,
     aggregate: bool,
+    separate: bool = False,
 ) -> np.ndarray|pd.DataFrame:
     """
     Parameters
@@ -238,6 +261,8 @@ def get_ghg_sheep_carbon_plantings_belt(
     sheep_contr = sheep_cost * (1 - cp_belt_x_r)
     ghg_total = cp_contr + sheep_contr
 
+    if separate:
+        return {'Tree share sequestration': cp_contr, 'Livestock share emissions': sheep_contr}
     if aggregate==True:
         return ghg_total
     elif aggregate==False:
@@ -251,6 +276,7 @@ def get_ghg_beef_carbon_plantings_belt(
     ag_g_mrj: np.ndarray, 
     cp_belt_x_r: np.ndarray,
     aggregate: bool,
+    separate: bool = False,
 ) -> np.ndarray|pd.DataFrame:
     """
     Parameters
@@ -275,6 +301,8 @@ def get_ghg_beef_carbon_plantings_belt(
     beef_contr = beef_cost * (1 - cp_belt_x_r)
     ghg_total = cp_contr + beef_contr
 
+    if separate:
+        return {'Tree share sequestration': cp_contr, 'Livestock share emissions': beef_contr}
     if aggregate==True:
         return ghg_total
     elif aggregate==False:
@@ -347,13 +375,15 @@ def get_ghg_destocked_land(
 
 
 
-def get_ghg_matrix(data: Data, ag_g_mrj, aggregate=True) -> np.ndarray:
+def get_ghg_matrix(data: Data, ag_g_mrj, aggregate=True, separate=False) -> np.ndarray:
     """
     Get the g_rk matrix containing non-agricultural greenhouse gas emissions.
 
     Parameters
     - data: The input data for calculating greenhouse gas emissions.
     - aggregate: A boolean flag indicating whether to aggregate the matrices or not. Default is True.
+    - separate: True -> {land use: {sub-term: r-array}} (NON_AG_GHG_SUBTERMS); the sub-terms of a land use
+      sum to its column of the aggregated g_rk matrix.
 
     Returns
     - If aggregate is True, returns a numpy ndarray representing the aggregated g_rk matrix.
@@ -368,6 +398,25 @@ def get_ghg_matrix(data: Data, ag_g_mrj, aggregate=True) -> np.ndarray:
 
     agroforestry_x_r = np.full(data.NCELLS, settings.AF_PROPORTION, dtype=np.float32)   # the share of a cell agroforestry can take: the same everywhere
     cp_belt_x_r = np.full(data.NCELLS, settings.CP_BELT_PROPORTION, dtype=np.float32)   # the share of a cell carbon plantings (belt) can take
+
+    if separate:
+        belts = {
+            'Sheep Agroforestry': get_ghg_sheep_agroforestry(data, ag_g_mrj, agroforestry_x_r, True, separate=True),
+            'Beef Agroforestry': get_ghg_beef_agroforestry(data, ag_g_mrj, agroforestry_x_r, True, separate=True),
+            'Sheep Carbon Plantings (Belt)': get_ghg_sheep_carbon_plantings_belt(data, ag_g_mrj, cp_belt_x_r, True, separate=True),
+            'Beef Carbon Plantings (Belt)': get_ghg_beef_carbon_plantings_belt(data, ag_g_mrj, cp_belt_x_r, True, separate=True),
+        }
+        return {
+            'Environmental Plantings': {'Plantings sequestration': get_ghg_env_plantings(data, True)},
+            'Riparian Plantings': {'Plantings sequestration': get_ghg_rip_plantings(data, True)},
+            'Sheep Agroforestry': belts['Sheep Agroforestry'],
+            'Beef Agroforestry': belts['Beef Agroforestry'],
+            'Carbon Plantings (Block)': {'Plantings sequestration': get_ghg_carbon_plantings_block(data, True)},
+            'Sheep Carbon Plantings (Belt)': belts['Sheep Carbon Plantings (Belt)'],
+            'Beef Carbon Plantings (Belt)': belts['Beef Carbon Plantings (Belt)'],
+            'BECCS': {'BECCS removals': get_ghg_beccs(data, True)},
+            'Destocked - natural land': {'Regrowth carbon': get_ghg_destocked_land(data, True)},
+        }
 
     non_agr_ghg_matrices = {}
 

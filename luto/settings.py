@@ -746,7 +746,8 @@ EGGS_AVG_WEIGHT = 60  # Average weight of an egg in grams
 # Environmental parameters
 # ---------------------------------------------------------------------------- #
 
-# Take data from 'GHG_targets.xlsx', 
+# The AusTIMES pathway each level names: it picks the demand multipliers (AusTIMES_demand_multiplier.xlsx) and the
+# 'AS_GHG' carbon price. It no longer picks the GHG targets (GHG_targets.xlsx is retired).
 GHG_TARGETS_DICT = {
     'off':     None,
     'low':    '1.8C 67%',
@@ -754,9 +755,14 @@ GHG_TARGETS_DICT = {
 }
 
 # Greenhouse gas emissions limits and parameters *******************************
-GHG_EMISSIONS_LIMITS = 'low'         # 'off', 'low', 'medium', or 'high'
+GHG_EMISSIONS_LIMITS = 'low'         # 'off', 'low', or 'high'
 '''
-`GHG_EMISSIONS_LIMITS` options include: 
+Any level but 'off' adds two GHG rows in the years the target series bind: agriculture-sector emissions and net
+LULUCF, each against its own series in input/ghg_targets/ (NIR 2024 history, DCCEEW 2025 baseline projections,
+built by luto/tools/ghg_targets.py). In the other years the series are benchmarks, reported in
+GHG_emissions_split_<yr>.csv but not imposed. 'off' adds no GHG row.
+
+Historical `GHG_EMISSIONS_LIMITS` options (targets from the retired GHG_targets.xlsx):
 - (deprecated) Assuming agriculture is responsible to sequester 100% of the carbon emissions
     - '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)' 
 - (deprecated) Assuming agriculture is responsible to sequester carbon emissions not including electricity emissions and  off-land emissions 

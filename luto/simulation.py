@@ -46,6 +46,8 @@ from luto.solvers.row_bounds import STATUS, drop_redundant_rows, get_row_bounds,
 from luto.solvers.solver import LutoSolver
 from luto.solvers.post_solve import post_solve
 from luto.solvers.tools import record_shadow_prices
+import luto.economics.agricultural.ghg as ag_ghg
+import luto.economics.non_agricultural.ghg as non_ag_ghg
 from luto.tools.write import write_outputs
 from luto.tools import (
     LogToFile,
@@ -361,14 +363,19 @@ def store_solution(data: Data, target_year: int, solution, obj_val: float, input
     # GHG from the stored dvars and the step's own GHG inputs: Σ ghg · share over the ag, ag-mgt and non-ag land, the
     # transition emissions on the ag → ag flows, plus the off-land constant — what the GHG row summed (the row's contract
     # dropped its sub-floor coefficients; float32 dot products, 1e-7 relative of the float64 sum at RES50)
-    ghg = float(np.dot(inputs.ag_g_mrj.ravel(), solution.ag_X_mrj.ravel())) + float(np.dot(inputs.non_ag_g_rk.ravel(), solution.non_ag_X_rk.ravel()))
+    ghg = float(np.dot(inputs.ag_g_mrj.ravel(), solution.ag_X_mrj.ravel()))
+    for non_ag_g_rk in (inputs.non_ag_g_rk_ag, inputs.non_ag_g_rk_lulucf):                # both rows' streams: the net total
+        ghg += float(np.dot(non_ag_g_rk.ravel(), solution.non_ag_X_rk.ravel()))
     for am, lus in inputs.agman2lu.items():                                                 # the enabled options; the GHG effect is [m, r, j_idx] over the option's land uses
         for j_idx, j in enumerate(lus):
-            ghg += float(np.dot(inputs.ag_man_g_mrj[am][:, :, j_idx].ravel(), solution.ag_man_X_mrj[am][:, :, j].ravel()))
+            for ag_man_g_mrj in (inputs.ag_man_g_mrj_ag, inputs.ag_man_g_mrj_lulucf):
+                ghg += float(np.dot(ag_man_g_mrj[am][:, :, j_idx].ravel(), solution.ag_man_X_mrj[am][:, :, j].ravel()))
     for src, g in inputs.trans_ghg_ag2ag.items():                                           # [to_m, local_r, to_j], as the flows are keyed
         ghg += float(np.dot(g.ravel(), solution.dvar_D_ag2ag_mrj[src].ravel()))
     ghg += inputs.offland_ghg
     data.add_production_data(target_year, 'GHG', ghg)
+    if settings.GHG_EMISSIONS_LIMITS != 'off':
+        data.add_production_data(target_year, 'GHG_split', get_ghg_split(data, target_year, solution, inputs))
 
     # Production from the stored dvars, the way the base year's is (data.py, at load): t / KL per commodity — every share
     # counted (threshold 0: the map clean-up that drops a cell's slivers under 1 % would leave the total 0.1–0.8 % under
@@ -376,6 +383,72 @@ def store_solution(data: Data, target_year: int, solution, obj_val: float, input
     ag_mrc, non_ag_rc, am_amrc = data.get_actual_production_lyr(target_year, threshold=0.0)
     production = (ag_mrc.sum(['cell', 'lm']) + non_ag_rc.sum(['cell']) + am_amrc.sum(['cell', 'am', 'lm'])).compute().values
     data.add_production_data(target_year, 'Production', production)
+
+
+def get_ghg_split(data: Data, target_year: int, solution, inputs: RowInputs) -> pd.DataFrame:
+    """The two GHG rows of the step, agriculture ('AG') and net LULUCF ('LULUCF'), from the stored dvars: one line per
+    named sub-term (tCO2e), the exogenous constants on each row's left-hand side, the row's total and its series.
+
+    ``value_t`` of the 'total' lines is the row's left-hand side; ``rhs_t`` is what it is compared with. In a year
+    whose role is not 'BINDING' the row was not imposed, and ``deviation_t`` is the benchmark deviation (for AG also
+    tested against the NIR tolerance in ``within_tolerance``)."""
+    target_index = target_year - data.YR_CAL_BASE
+    t = inputs.limits['ghg']
+    lines = []                                                              # (row, term, component, sub_term, value_t)
+
+    # term 1: the ag land uses (all on AG)
+    energy = float(np.dot(ag_ghg.get_irrpast_energy_ghg_matrices(data).ravel(), solution.ag_X_mrj.ravel()))
+    total_1 = float(np.dot(inputs.ag_g_mrj.ravel(), solution.ag_X_mrj.ravel()))
+    lines += [('AG', 1, 'Agricultural land uses', 'Crop and livestock emissions', total_1 - energy),
+              ('AG', 1, 'Agricultural land uses', 'Irrigated pasture energy and lifecycle fields', energy)]
+
+    # term 2: the ag-management options, sub-term by sub-term
+    am_parts = ag_ghg.get_agricultural_management_ghg_matrices(data, target_index, separate=True)
+    for am, lus in inputs.agman2lu.items():
+        for name, arr in am_parts[am].items():
+            value = sum(float(np.dot(arr[:, :, j_idx].ravel(), solution.ag_man_X_mrj[am][:, :, j].ravel())) for j_idx, j in enumerate(lus))
+            lines.append((ag_ghg.AG_MAN_GHG_SUBTERMS[am][name], 2, am, name, value))
+
+    # term 3: the non-ag land uses, sub-term by sub-term
+    nonag_parts = non_ag_ghg.get_ghg_matrix(data, inputs.ag_g_mrj, separate=True)
+    for k, lu in enumerate(data.NON_AGRICULTURAL_LANDUSES):
+        for name, arr in nonag_parts[lu].items():
+            lines.append((non_ag_ghg.NON_AG_GHG_SUBTERMS[lu][name], 3, lu, name, float(np.dot(arr, solution.non_ag_X_rk[:, k]))))
+
+    # term 4: the ag -> ag transitions (all on LULUCF)
+    trans = sum(float(np.dot(g.ravel(), solution.dvar_D_ag2ag_mrj[src].ravel())) for src, g in inputs.trans_ghg_ag2ag.items())
+    lines.append((ag_ghg.TRANSITION_GHG_SIDE, 4, 'Land-use transitions', 'Natural land carbon released', trans))
+
+    # term 5 and the exogenous constants
+    lines += [('AG', 5, 'Off-land commodities', 'Livestock emissions (enteric, manure)', inputs.offland_ghg - inputs.offland_ghg_energy),
+              ('AG', 5, 'Off-land commodities', 'On-farm energy CO2 (direct, embedded)', inputs.offland_ghg_energy),
+              ('AG', 'exogenous', 'Exogenous agriculture', 'series_agriculture_exogenous.csv (none built: 0)' if t['AG_EXO_t'] == 0 else 'series_agriculture_exogenous.csv', t['AG_EXO_t']),
+              ('LULUCF', 'exogenous', 'Exogenous LULUCF', 'LULUCF_EXO (series_lulucf_exogenous.csv)', t['LULUCF_EXO_t']),
+              ('LULUCF', 'baseline', 'Plantings baseline', 'Baseline new-plantings removals, subtracted (plantings_baseline.csv)', -t['PLANTINGS_BASELINE_t'])]
+
+    df = pd.DataFrame(lines, columns=['row', 'term', 'component', 'sub_term', 'value_t'])
+    df['term'] = df['term'].astype(str)
+
+    # the rows' totals against their series
+    imposed = t['role'] == 'BINDING'
+    target = {'AG': t['AG_t'], 'LULUCF': t['LULUCF_MOD_t'] + t['LULUCF_EXO_t']}
+    totals = []
+    for row in ('AG', 'LULUCF'):
+        lhs = float(df.loc[df['row'] == row, 'value_t'].sum())
+        tol = t['AG_TOLERANCE_t'] if row == 'AG' else np.nan
+        totals.append(dict(row=row, term='total', component='Row total (left-hand side)', sub_term='', value_t=lhs,
+                           rhs_t=target[row], role=t['role'], imposed=imposed, deviation_t=lhs - target[row],
+                           slack_t=target[row] - lhs if imposed else np.nan, tolerance_t=tol,
+                           within_tolerance=(abs(lhs - target[row]) <= tol) if (not imposed and not np.isnan(tol)) else None))
+    df = pd.concat([df, pd.DataFrame(totals)], ignore_index=True)
+    df.insert(0, 'Year', target_year)
+
+    for r in totals:
+        what = (f"slack {r['slack_t']:,.0f}" if imposed
+                else f"benchmark deviation {r['deviation_t']:,.0f}" + ('' if np.isnan(r['tolerance_t']) else
+                     f" (tolerance ±{r['tolerance_t']:,.0f}: {'within' if r['within_tolerance'] else 'OUTSIDE'})"))
+        print(f"Year {target_year}: GHG {r['row']} row {r['value_t']:,.0f} tCO2e vs series {r['rhs_t']:,.0f} ({r['role']}); {what}", flush=True)
+    return df
 
 
 # ---------------------------------------------------------------------------- #
