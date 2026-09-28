@@ -98,7 +98,7 @@ class RowInputs:
     GBF8_region_species: list                                           # GBF8 constraint pairs - list[(region, species)]
 
     commodity_names: list[str]                                          # commodity names (data.COMMODITIES order)
-    offland_ghg: np.ndarray                                             # target-year GHG emissions from off-land commodities (tCO2e); 0.0 when GHG limits are off
+    offland_ghg: float                                                  # target-year GHG emissions from off-land commodities (tCO2e); 0.0 when GHG limits are off
     lu2pr_pj: np.ndarray                                                # conversion matrix: product (p) × land use (j)
     pr2cm_cp: np.ndarray                                                # conversion matrix: commodity (c) × product (p)
     limits: dict                                                        # raw constraint targets for the target year (see get_limits)
@@ -123,7 +123,7 @@ def get_limits(data: Data, yr_cal: int) -> dict[str, Any]:
 
     # Clamped again here, not only in Data.__init__: a resumed run loads a pickled Data and never
     # re-runs __init__, so a checkpoint written before the clamp existed would still carry negatives.
-    limits['demand'] = np.maximum(data.D_CY[yr_cal - data.YR_CAL_BASE], 0.0)
+    limits['demand'] = np.maximum(data.D_CY_xr.sel(year=yr_cal).values, 0.0)
 
     if settings.WATER_LIMITS == 'on':
         limits['water'] = data.WATER_YIELD_TARGETS
@@ -295,7 +295,7 @@ def get_row_inputs(data: Data, base_year: int, target_year: int) -> RowInputs:
     # ── 6. the year's targets, and the off-land emissions the GHG cap must leave room for ──
     limits = get_limits(data, target_year)
     offland_ghg = (
-        data.OFF_LAND_GHG_EMISSION_C[target_index]                         # raw tCO2e (row-rescaled in the solver)
+        float(data.OFF_LAND_GHG_EMISSION_C.loc[target_year])               # raw tCO2e (row-rescaled in the solver)
         if settings.GHG_EMISSIONS_LIMITS != 'off'
         else 0.0
     )

@@ -397,7 +397,7 @@ def get_ghg(inputs: RowInputs, cols: xr.Dataset):
     # land-use, ag-management and non-ag emissions on the accounting columns, transition emissions on the ag → ag arcs
     coeff = gather(cols, inputs, inputs.ag_g_mrj, inputs.ag_man_g_mrj, inputs.non_ag_g_rk, ag2ag_c=inputs.trans_ghg_ag2ag)
     row = sparse.csr_matrix(coeff[None, :])                              # the nonzero support; the contract drops the rest
-    rhs = np.asarray(ghg_limit_raw - inputs.offland_ghg, dtype=np.float64).ravel()   # offland_ghg: 1-element array
+    rhs = np.asarray(ghg_limit_raw - inputs.offland_ghg, dtype=np.float64).ravel()
     A, rhs, scale = contract(row, rhs, rescale=True)                     # drop + row rescale, factor kept
     return make_part('ghg', A, rhs, '<', ["ghg_emissions_limit_ub"], scale)
 

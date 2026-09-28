@@ -420,7 +420,7 @@ def store_solution(data: Data, target_year: int, solution, obj_val: float, input
             ghg += float(np.dot(inputs.ag_man_g_mrj[am][:, :, j_idx].ravel(), solution.ag_man_X_mrj[am][:, :, j].ravel()))
     for src, g in inputs.trans_ghg_ag2ag.items():                                           # [to_m, local_r, to_j], as the flows are keyed
         ghg += float(np.dot(g.ravel(), solution.dvar_D_ag2ag_mrj[src].ravel()))
-    ghg += float(np.asarray(inputs.offland_ghg).ravel()[0])
+    ghg += inputs.offland_ghg
     data.add_production_data(target_year, 'GHG', ghg)
 
     # Production from the stored dvars, the way the base year's is (data.py, at load): t / KL per commodity — every share

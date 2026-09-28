@@ -877,7 +877,6 @@ def write_quantity(data: Data, yr_cal: int, path: str) -> np.ndarray:
     # ==================== Total / Comparison Summary ====================
 
     simulated_year_list = sorted(list(data.lumaps.keys()))
-    yr_idx = yr_cal - data.YR_CAL_BASE
     yr_idx_sim = simulated_year_list.index(yr_cal)
     yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1]
 
@@ -885,7 +884,7 @@ def write_quantity(data: Data, yr_cal: int, path: str) -> np.ndarray:
         assert data.YR_CAL_BASE <= yr_cal_sim_pre < yr_cal, f"yr_cal_sim_pre ({yr_cal_sim_pre}) must be >= {data.YR_CAL_BASE} and < {yr_cal}"
         prod_base = np.array(data.prod_data[yr_cal_sim_pre]['Production'])
         prod_targ = np.array(data.prod_data[yr_cal]['Production'])
-        demands = data.D_CY[yr_idx]
+        demands = data.D_CY_xr.sel(year=yr_cal).values
         pd.DataFrame({
             'Commodity': [i[0].capitalize() + i[1:] for i in data.COMMODITIES],
             'Prod_base_year (tonnes, KL)': prod_base,

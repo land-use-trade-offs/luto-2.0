@@ -486,6 +486,10 @@ class Data:
             os.path.join(settings.INPUT_DIR, "climate_change_impacts_" + settings.RCP + "_CO2_FERT_" + settings.CO2_FERT.upper() + ".h5"), where=self.MASK
         )
         
+        # The impact files are multipliers relative to 2010: their years are {2020, 2050, 2080} and 2010 is 1 by
+        # construction. The anchor is a property of the files, not of the model's base year.
+        self.CLIMATE_CHANGE_IMPACT_ANCHOR_YEAR = 2010
+
         # Convert to xarray DataArray for easier indexing.
         self.CLIMATE_CHANGE_IMPACT_xr = self.get_climate_change_impact_xr()
 
@@ -802,7 +806,9 @@ class Data:
         if settings.PRODUCTIVITY_TREND == 'BAU':
             fpath = os.path.join(settings.INPUT_DIR, "yieldincreases_bau2022.csv")
             productivity_trend = pd.read_csv(fpath, header=[0, 1]).astype(np.float32)
-            productivity_trend.index = productivity_trend.index + self.YR_CAL_BASE  # Adjust year to absolute year
+            # The csv has no year column: row 0 is 2010 (multiplier 1.0, cumulative growth since then). The
+            # first year is a property of the file, not of the model's base year.
+            productivity_trend.index = productivity_trend.index + 2010  # Adjust year to absolute year
             productivity_trend.index.name = 'Year'
             
             # Convert to xarray for easier accessing.
@@ -1107,6 +1113,12 @@ class Data:
         # Read water yield data
         self.WATER_YIELD_DR_FILE = pd.read_hdf(wyield_fname_dr, where=self.MASK).T.values
         self.WATER_YIELD_SR_FILE = pd.read_hdf(wyield_fname_sr, where=self.MASK).T.values
+
+        # The files carry no year labels (columns 0..90): their rows are the years the file name gives, 2010-2100.
+        self.WATER_YIELD_FILE_YEARS = list(range(2010, 2101))
+        for f in (self.WATER_YIELD_DR_FILE, self.WATER_YIELD_SR_FILE):
+            if f.shape[0] != len(self.WATER_YIELD_FILE_YEARS):
+                raise ValueError(f"Water yield file has {f.shape[0]} years, expected {len(self.WATER_YIELD_FILE_YEARS)} (2010-2100).")
         
         
         # Water yield from outside LUTO study area.
@@ -1277,16 +1289,17 @@ class Data:
                       f"{len(bad)} year(s) from {bad.index.min()}, min {bad.min():,.0f}", flush=True)
             self.DEMAND_C = self.DEMAND_C.clip(lower=0)
 
-        # Convert to numpy array of shape (91, 26)
+        # Convert to numpy array of shape (years, commodities); read it by year through D_CY_xr, which keeps
+        # the file's own year labels (DEMAND_C.columns)
         self.D_CY = self.DEMAND_C.to_numpy(dtype = np.float32).T
         self.D_CY_xr = xr.DataArray(
-            self.D_CY, 
-            dims=['year','Commodity'], 
+            self.D_CY,
+            dims=['year','Commodity'],
             coords={
-                'year':self.YR_CAL_BASE + np.arange(self.D_CY.shape[0]), 
+                'year':self.DEMAND_C.columns.astype(int).to_numpy(),
                 'Commodity':self.COMMODITIES
             }
-        ) 
+        )
 
         # Price elasticity data
         demand_supply_elasticity = pd.read_csv(f'{settings.INPUT_DIR}/demand_elasticity.csv')
@@ -1324,8 +1337,8 @@ class Data:
                                                              'Emission Source',
                                                              'Total GHG Emissions (tCO2e)']]
 
-        # Get the GHG constraints for luto, shape is (91, 1)
-        self.OFF_LAND_GHG_EMISSION_C = self.OFF_LAND_GHG_EMISSION.groupby(['YEAR']).sum(numeric_only=True).values
+        # Get the GHG constraints for luto: total tCO2e per year, indexed by year
+        self.OFF_LAND_GHG_EMISSION_C = self.OFF_LAND_GHG_EMISSION.groupby('YEAR')['Total GHG Emissions (tCO2e)'].sum()
 
         # Read the carbon price per tonne over the years (indexed by the relevant year)
         if settings.CARBON_PRICES_FIELD == 'CONSTANT':
@@ -1955,7 +1968,7 @@ class Data:
     def get_climate_change_impact_xr(self) -> xr.DataArray:
         """
         CLIMATE_CHANGE_IMPACT as a (year, cell, lm, lu) DataArray.
-        The YRS_CAL_BASE (2010) is not included in the climate change impact data,
+        The anchor year (CLIMATE_CHANGE_IMPACT_ANCHOR_YEAR, 2010) is not included in the climate change impact data,
         so it is added here with a multiplier of 1.
         """
         cci_xr = (
@@ -1968,7 +1981,7 @@ class Data:
         cci_xr_base_year = (
             cci_xr
             .isel(year=0, drop=True)
-            .assign_coords(year=self.YR_CAL_BASE)
+            .assign_coords(year=self.CLIMATE_CHANGE_IMPACT_ANCHOR_YEAR)
             .expand_dims('year')
             .notnull()
             .astype(np.float32)
@@ -3226,6 +3239,12 @@ class Data:
             )
         return self.CARBON_PRICES[yr_cal]
 
+    def get_water_yield_file_row(self, yr_cal: int) -> int:
+        """The row of the SSP water yield files (WATER_YIELD_DR_FILE / _SR_FILE) that holds calendar year `yr_cal`."""
+        if yr_cal not in self.WATER_YIELD_FILE_YEARS:
+            raise ValueError(f"Water yield data not given for year {yr_cal}; the files cover 2010-2100.")
+        return self.WATER_YIELD_FILE_YEARS.index(yr_cal)
+
     def get_water_nl_yield_for_yr_idx(
         self,
         yr_idx: int,
@@ -3241,11 +3260,11 @@ class Data:
         """
         water_dr_yield = (
             water_dr_yield if water_dr_yield is not None
-            else self.WATER_YIELD_DR_FILE[yr_idx]
+            else self.WATER_YIELD_DR_FILE[self.get_water_yield_file_row(self.YR_CAL_BASE + yr_idx)]
         )
         water_sr_yield = (
             water_sr_yield if water_sr_yield is not None
-            else self.WATER_YIELD_SR_FILE[yr_idx]
+            else self.WATER_YIELD_SR_FILE[self.get_water_yield_file_row(self.YR_CAL_BASE + yr_idx)]
         )
         dr_prop = self.DEEP_ROOTED_PROPORTION
 
