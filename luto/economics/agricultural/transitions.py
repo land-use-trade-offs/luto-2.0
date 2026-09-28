@@ -361,7 +361,16 @@ def get_agricultural_management_adoption_limits(data: Data, yr_idx) -> Dict[str,
     ag_management_data['HIR - Sheep'] = get_sheep_hir_adoption_limit(data)
     ag_management_data['Utility Solar PV'] = get_utility_solar_pv_adoption_limit(data)
     ag_management_data['Onshore Wind'] = get_onshore_wind_adoption_limit(data)
-   
+
+    if getattr(data, "AG_MAN_OBSERVED_CAPS", None) is not None:
+        yr_cal = data.YR_CAL_BASE + yr_idx
+        for (am, lu), cap in data.AG_MAN_OBSERVED_CAPS.items():
+            observed = cap[cap.index <= yr_cal]                   # held flat after the last observed year
+            if observed.empty:
+                raise ValueError(f"Observed cap for {am} / {lu} starts in {cap.index[0]}, after {yr_cal}.")
+            j = data.DESC2AGLU[lu]
+            ag_management_data[am][j] = min(ag_management_data[am][j], float(observed.iloc[-1]))
+
     return ag_management_data
 
 
