@@ -55,6 +55,7 @@ BASE_YEAR = 2021           # Nick: FY-end labels, base 2021 (LUTO year Y = FY en
 ANCHOR = 2024              # last NIR year, splice anchor
 CONVERGE_TO = 2030         # LULUCF hybrid convergence year
 BUDGET_WINDOW = (2021, 2024)
+BASELINE_WINDOW = (2016, 2021)   # plantings baseline rate: year-on-year changes FY2016..FY2021 (Nick decision C)
 FC = 'Forest conversion to agriculture and other land'
 AO = 'Agricultural and other land'
 FO = 'Forests'
@@ -79,6 +80,7 @@ NICK_DECISIONS = [
     'Plantings: "Leave all of DCCEEW\'s plantings in the exogenous series, and count LUTO\'s term (3) only above a baseline planting rate. That treats LUTO plantings as additional to what\'s already assumed in the baseline, which is the natural scenario framing: DCCEEW\'s baseline is "current policies", and LUTO\'s plantings are what the optimisation adds on top. The baseline rate can come from NIR history, for example the FY2021-24 average rate of new plantings, carried forward as a disclosed assumption."',
     'Unmodelled agriculture: series_agriculture_exogenous on the agriculture row\'s left-hand side; projection "Proportional share"',
     'Decision B: "Direct clearing moves from `LULUCF_MOD` to `LULUCF_EXO` in the targets tool. Term (4) stays on the LULUCF row, so any clearing LUTO chooses is additional to baseline clearing, on the same logic as plantings." MOD: "Yes, MOD = 0"',
+    'Decision C: "The plantings baseline rate is the NIR FY2016-21 average rate of change in plantings removals, replacing the FY2021-22 rate." Rate: "(R2021-R2015)/6"',
 ]
 
 
@@ -561,19 +563,20 @@ def main():
     # ---- plantings baseline (INFERRED / PROPOSAL) ----
     pl = {p: next(i for i in leaves if nodes[i]['name'] == p) for p in PLANTING_LEAVES}
     prow = []
+    b0, b1 = BASELINE_WINDOW
     for label, keys in (('environmental plantings (4.A.2.2.i.c)', [PLANTING_LEAVES[2]]),
                         ('all plantings (4.A.2.2.i.a + i.b + i.c)', list(PLANTING_LEAVES))):
-        R = {y: math.fsum(V.get((pl[k], y), 0.0) for k in keys) for y in range(2020, ANCHOR + 1)}
-        dlt = {y: R[y] - R[y - 1] for y in range(w0, w1 + 1)}
+        R = {y: math.fsum(V.get((pl[k], y), 0.0) for k in keys) for y in range(b0 - 1, b1 + 1)}
+        dlt = {y: R[y] - R[y - 1] for y in range(b0, b1 + 1)}
         avg_d = math.fsum(dlt.values()) / len(dlt)
-        avg_l = math.fsum(R[y] for y in range(w0, w1 + 1)) / len(dlt)
+        avg_l = math.fsum(R[y] for y in range(b0, b1 + 1)) / len(dlt)
         lean = 'LEAN' if keys == [PLANTING_LEAVES[2]] else 'alternative'
         prow.append([label, 'annual change in net removals (kt CO2-e / yr per yr)', fmt(avg_d, 3),
-                     '; '.join(f'{y}: {fmt(dlt[y], 3)}' for y in range(w0, w1 + 1)),
-                     'mean of year-on-year change FY2021-FY2024 = (R2024 - R2020)/4; negative = removals growing',
+                     '; '.join(f'{y}: {fmt(dlt[y], 3)}' for y in range(b0, b1 + 1)),
+                     f'mean of year-on-year change FY{b0}-FY{b1} = (R{b1} - R{b0 - 1})/{len(dlt)} (Nick decision C); negative = removals growing',
                      'constant from base year 2021', f'INFERRED / PROPOSAL ({lean})'])
         prow.append([label, 'mean annual net removals level (kt CO2-e / yr)', fmt(avg_l, 3),
-                     '; '.join(f'{y}: {fmt(R[y], 3)}' for y in range(w0, w1 + 1)), 'mean FY2021-FY2024 (context only)',
+                     '; '.join(f'{y}: {fmt(R[y], 3)}' for y in range(b0, b1 + 1)), f'mean FY{b0}-FY{b1} (context only)',
                      'n/a', 'INFERRED (context)'])
     prow.append(['planted area (ha / yr)', 'annual new planted area', '', '',
                  'NOT AVAILABLE: the NIR 2024 LULUCF activity table (Tables 1a-17) has no plantation or environmental-planting area series',
@@ -611,7 +614,7 @@ def main():
           ['decided', 'unmodelled agriculture', '', '', 'series_agriculture_exogenous.csv, a part of AG on the AG row left-hand side; '
            'projection keeps each commodity\'s FY2024 unmodelled share', '', ''],
           ['provisional', 'tolerances', '', '', 'tolerances.csv, PROPOSAL (open)', '', ''],
-          ['provisional', 'plantings baseline', '', '', 'plantings_baseline.csv, INFERRED / PROPOSAL', '', ''],
+          ['decided', 'plantings baseline', '', '', 'plantings_baseline.csv, LEAN environmental plantings rate over FY2016-21 (decision C)', '', ''],
           ['year_basis', 'LUTO year Y = FY ending Y; base year 2021 (NLUM 2020-21)', '', '', '', '', '']]
     P += [['output', f, '', sha(open(os.path.join(a.out, f), 'rb').read()), 'sha256', '', ''] for f in outs]
     P += [['output', os.path.basename(scope_path), '', sha(open(scope_path, 'rb').read()), 'sha256', '', '']]
