@@ -196,7 +196,7 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 
 ### Environmental Constraints
 
-Every constraint is hard: there are no soft / penalised options (the `*_CONSTRAINT_TYPE` settings and `SOLVE_WEIGHT_BETA` are gone).
+Every constraint is hard by default: there are no soft / penalised options (the `*_CONSTRAINT_TYPE` settings and `SOLVE_WEIGHT_BETA` are gone); the one exception is opt-in — `ELASTIC_FAMILIES` (default `[]`) gives each row of the listed families a shortfall column at `ELASTIC_PENALTY` AUD per unit (`row_builder.add_elastic`), the rows that fall short listed in `out_<year>/shortfall_<year>.csv`.
 
 - `GHG_EMISSIONS_LIMITS`: Greenhouse gas targets ('off', 'low', 'medium', 'high')
 - `WATER_LIMITS`: Water yield constraints ('on' or 'off')

@@ -262,8 +262,8 @@ def add_elastic(A: sparse.csr_matrix, rows: xr.Dataset, cols: xr.Dataset, obj: n
     gbf = np.array([f.startswith('GBF') for f in rows['family'].values[on]], dtype=bool)
     if ((rhs == 0) & ~gbf).any():
         print(f"│   elastic: {((rhs == 0) & ~gbf).sum():,} non-GBF row(s) with a target of 0 cannot be relaxed", flush=True)
-    coef = np.where(sense == '<', -1.0, 1.0) * np.where(gbf, rhs, np.abs(rhs))
-    A = sparse.hstack([A, sparse.csr_matrix((coef, (on, np.arange(n))), shape=(A.shape[0], n))], format='csr')
+    coef = (np.where(sense == '<', -1.0, 1.0) * np.where(gbf, rhs, np.abs(rhs))).astype(A.dtype)   # A's dtype (float32): hstack would upcast the whole matrix to float64
+    A = sparse.hstack([A, sparse.csr_matrix((coef, (on, np.arange(n))), shape=(A.shape[0], n))], format='csr', dtype=A.dtype)
     slack = xr.Dataset({v: (('col',), np.full(n, 'slack' if v == 'block' else 0.0 if cols[v].dtype.kind == 'f' else -1,
                                               dtype=cols[v].dtype)) for v in cols.data_vars})
     slack['ub'] = (('col',), np.where(gbf, 1.0, np.inf).astype(cols['ub'].dtype))     # GBF: at most the whole target
@@ -277,6 +277,17 @@ def add_elastic(A: sparse.csr_matrix, rows: xr.Dataset, cols: xr.Dataset, obj: n
           f"at {settings.ELASTIC_PENALTY:,.0f} AUD per target missed", flush=True)
     return A, rows, cols, obj
 
+
+
+def elastic_absorbs(rows: xr.Dataset, bounds: xr.Dataset) -> np.ndarray:
+    """Per row: True where add_elastic's shortfall column can make the row hold, so an IMPOSSIBLE verdict on it need not
+    stop the year. A non-GBF row's slack is unbounded (m = |rhs|), so it absorbs anything unless rhs == 0; a GBF row's
+    slack stops at s = 1, where the floor has fallen to 0 — it absorbs only if rhs > 0 and the row can still reach 0
+    (hi_implied >= 0, on the scaled row as the bounds are)."""
+    on = np.isin(rows['family'].values, settings.ELASTIC_FAMILIES) & rows['active'].values
+    rhs = rows['rhs'].values
+    gbf = np.char.startswith(rows['family'].values.astype(str), 'GBF')
+    return on & np.where(gbf, (rhs > 0) & (bounds['hi_implied'].values >= 0), rhs != 0)
 
 # ═══════════════════════════ the demand rows ═══════════════════════════
 
