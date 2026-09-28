@@ -32,7 +32,7 @@ import xarray as xr
 from luto.data import Data
 import luto.settings as settings
 from luto import tools
-from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types, get_quantity, get_exist_renewable_capacity
+from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types, get_quantity, get_exist_renewable_capacity, get_stubble_yield_pot
 from luto.settings import AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
 from functools import lru_cache
 
@@ -193,6 +193,21 @@ def get_cost_lvstk(data:Data, lu, lm, yr_idx):
     )
 
 
+def get_cost_stubble(data:Data, lu, lm, yr_idx):
+    """Return the cost <unit: $/cell> of the sheep grazing the stubble of cereal land use `lu`: the sheep costs per head
+    (quantity costs, drinking water delivery) at the stubble stocking rate. The area and fixed costs stay the crop's.
+    Provisional: the per-head values are the cell's sheep values (AGEC_LVSTK), pending the livestock economics rebuild."""
+    yr_cal = data.YR_CAL_BASE + yr_idx
+    head_ha = get_stubble_yield_pot(data)
+    costs_q = data.AGEC_LVSTK['QC', 'SHEEP'] * head_ha * data.QC_COST_MULTS.loc[yr_cal, 'Sheep']
+    costs_w = (data.AGEC_LVSTK['WR_DRN', 'SHEEP'] * settings.LIVESTOCK_DRINKING_WATER * head_ha
+               * data.WATER_DELIVERY_PRICE * data.WP_COST_MULTS[yr_cal])
+    return pd.DataFrame(
+        np.nan_to_num(np.stack([costs_q * data.REAL_AREA, costs_w * data.REAL_AREA]).T),   # no sheep data: no stubble sheep
+        columns=pd.MultiIndex.from_product([[lu], [lm], ['Stubble sheep quantity cost', 'Stubble sheep water cost']])
+    )
+
+
 def get_cost(data:Data, lu, lm, yr_idx):
     """
     Return production cost <unit: $/cell>.
@@ -201,7 +216,10 @@ def get_cost(data:Data, lu, lm, yr_idx):
     
 
     if lu in data.LU_CROPS:
-        return get_cost_crop(data, lu, lm, yr_idx)
+        costs = get_cost_crop(data, lu, lm, yr_idx)
+        if lu in data.LU_STUBBLE:
+            costs = pd.concat([costs, get_cost_stubble(data, lu, lm, yr_idx)], axis=1)
+        return costs
 
     elif lu in data.LU_LVSTK:
         return get_cost_lvstk(data, lu, lm, yr_idx)
