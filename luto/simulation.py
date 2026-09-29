@@ -485,10 +485,11 @@ def get_ghg_split(data: Data, target_year: int, solution, inputs: RowInputs) -> 
     df['term'] = df['term'].astype(str)
 
     # the rows' totals against their series
-    imposed = t['role'] == 'BINDING'
+    binding_year = t['role'] == 'BINDING'
     target = {'AG': t['AG_t'], 'LULUCF': t['LULUCF_MOD_t'] + t['LULUCF_EXO_t']}
     totals = []
     for row in ('AG', 'LULUCF'):
+        imposed = binding_year and row not in settings.GHG_BENCHMARK_ROWS     # a benchmark row is reported, not imposed
         lhs = float(df.loc[df['row'] == row, 'value_t'].sum())
         tol = t['AG_TOLERANCE_t'] if row == 'AG' else np.nan
         totals.append(dict(row=row, term='total', component='Row total (left-hand side)', sub_term='', value_t=lhs,
@@ -499,7 +500,7 @@ def get_ghg_split(data: Data, target_year: int, solution, inputs: RowInputs) -> 
     df.insert(0, 'Year', target_year)
 
     for r in totals:
-        what = (f"slack {r['slack_t']:,.0f}" if imposed
+        what = (f"slack {r['slack_t']:,.0f}" if r['imposed']
                 else f"benchmark deviation {r['deviation_t']:,.0f}" + ('' if np.isnan(r['tolerance_t']) else
                      f" (tolerance ±{r['tolerance_t']:,.0f}: {'within' if r['within_tolerance'] else 'OUTSIDE'})"))
         print(f"Year {target_year}: GHG {r['row']} row {r['value_t']:,.0f} tCO2e vs series {r['rhs_t']:,.0f} ({r['role']}); {what}", flush=True)
