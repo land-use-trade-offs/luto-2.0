@@ -232,12 +232,17 @@ class GBF8RowGen:
         self.s[rowed] = [self.s_var[i].X for i in rowed]
         short = rowed[self.s[rowed] > S_TOL]
 
-        # ── 4c. pass 2: the species pass 1 left short dropped, every other row hard ──
-        if short.size:
+        # ── 4c. pass 2: the species pass 1 left short dropped, every other row hard (under a feasibility-first pass 1,
+        #        settings.ELASTIC_PASS1_COST_SCALE, the full cost restored and pass 2 run even with nothing short) ──
+        feasibility_first = settings.ELASTIC_PASS1_COST_SCALE != 1
+        if feasibility_first:
+            solver.set_cost_scale(1.0)
+        if short.size or feasibility_first:
             print(f"│   GBF8 row generation, {target_year}: {short.size:,} species cannot be met together with the step "
                   f"(pass 1 Σ s {self.s[rowed].sum():.3f}) — their rows dropped, every other GBF8 row made hard", flush=True)
             self.dropped[short] = True
-            solver.remove_constraints_by_name(solver.rows['name'].values[self.row_of[short]].tolist())
+            if short.size:
+                solver.remove_constraints_by_name(solver.rows['name'].values[self.row_of[short]].tolist())
             solver.gurobi_model.remove(list(self.s_var.values()))
             solver.gurobi_model.update()
             self.s_var = {}

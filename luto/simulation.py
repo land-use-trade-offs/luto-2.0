@@ -278,6 +278,10 @@ def solve_timeseries(
         luto_solver = LutoSolver(cols, rows, A, obj, inputs)                                # A x T, obj · x; the inputs name m and am_idx in the variable names
         luto_solver.formulate()
         save_model_to_disk(luto_solver.gurobi_model, data.path, base_year, target_year)     # BEFORE solving (see save_model_to_disk for why)
+        two_pass = rowgen is not None or (settings.ELASTIC_DROP_SHORT and (cols['block'].values == 'slack').any())
+        if two_pass and settings.ELASTIC_PASS1_COST_SCALE != 1:                             # feasibility-first pass 1: pass 2 restores the cost
+            luto_solver.set_cost_scale(settings.ELASTIC_PASS1_COST_SCALE)
+            print(f"Year {target_year}: pass 1 feasibility-first — the cost × {settings.ELASTIC_PASS1_COST_SCALE:g}", flush=True)
 
         # ─────────────── 6. the solve ───────────────
         if rowgen is None:
@@ -327,15 +331,19 @@ def solve_elastic_hard_pass(luto_solver: LutoSolver, x: np.ndarray, target_year:
     s = x[rows['slack_col'].values[on]]
     short = on[s > 1e-6]
     report_shortfall(x, rows, target_year, out_dir, dropped=short)
-    if short.size == 0:                                                                   # pass 1 missed nothing: its solution is the hard one
+    feasibility_first = settings.ELASTIC_PASS1_COST_SCALE != 1
+    if short.size == 0 and not feasibility_first:                                         # pass 1 missed nothing: its solution is the hard one
         print(f"Year {target_year}: no elastic row falls short — pass 1's solution is kept", flush=True)
         return True, x, luto_solver.gurobi_model.Status
+    if feasibility_first:                                                                 # pass 1 minimised the shortfall; pass 2 is at full cost
+        luto_solver.set_cost_scale(1.0)
 
     # ── the rows left short removed; every shortfall column fixed at 0, so each remaining elastic row is hard ──
     model = luto_solver.gurobi_model
     slack_vars = luto_solver.x[rows['slack_col'].values[on]].tolist()
     model.setAttr('UB', slack_vars, [0.0] * len(slack_vars))
-    luto_solver.remove_constraints_by_name(rows['name'].values[short].tolist())
+    if short.size:
+        luto_solver.remove_constraints_by_name(rows['name'].values[short].tolist())
     print(f"Year {target_year}: {short.size:,} elastic row(s) cannot be met together with the year — removed; "
           f"the other {on.size - short.size:,} made hard, solving again", flush=True)
     return solve_with_retries(luto_solver, target_year)

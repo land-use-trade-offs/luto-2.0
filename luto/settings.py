@@ -257,6 +257,17 @@ False: the elastic solve is stored as it is (the rows short at the penalty's pri
 runs its own two passes and is not touched by this.
 '''
 
+ELASTIC_PASS1_COST_SCALE = 1.0
+'''
+The economic part of the objective in PASS 1 of the two-pass step (ELASTIC_DROP_SHORT, and GBF8 row generation's own
+pass 1), as a factor on it; the shortfall penalty (ELASTIC_PENALTY) is untouched. 1.0: pass 1 trades cost against
+shortfall, so a row left short is one whose target costs more than the penalty to meet — an ECONOMIC verdict, not a
+proof of infeasibility. A small factor (e.g. 1e-4): FEASIBILITY-FIRST — the penalty outweighs the cost by ~1/factor,
+so pass 1 minimises the shortfall with the cost only breaking ties, and the rows it leaves short are the ones that
+cannot be met together with the rest of the year. Pass 2 then restores the full cost (and runs even when nothing is
+short, so the stored solution and objective are the full-cost ones): every row kept is met at least cost.
+'''
+
 ELASTIC_PENALTY = 1e10
 '''AUD per unit of shortfall (1e10 = 10 bn AUD for a target missed in full): large enough that a target is missed only
 where it cannot be met, not merely where meeting it is expensive; larger widens the objective's range (conditioning).'''
