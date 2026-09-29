@@ -809,6 +809,13 @@ Historical `GHG_EMISSIONS_LIMITS` options (targets from the retired GHG_targets.
 - Assuming agriculture is responsible to sequester carbon emissions only in the scope 1 emissions (i.e., direct emissions From-land-use and livestock types):
     - '1.5C 50%', '1.8C 67%'
 '''
+
+GHG_BENCHMARK_ROWS = []
+'''
+The GHG rows held as benchmarks in the years the target series bind: the row is computed and reported in
+GHG_emissions_split_<yr>.csv with its deviation from its series, but not imposed. [] = both rows binding (default);
+any of 'AG' (agriculture) and 'LULUCF' (net LULUCF), e.g. ['AG'] in calibration runs until activity is calibrated.
+'''
   	  	  
 
 # Carbon price scenario: either 'AS_GHG', 'Default', '100', or 'CONSTANT', or NONE.

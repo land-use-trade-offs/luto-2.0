@@ -396,7 +396,8 @@ def get_ghg_rhs(inputs: RowInputs) -> dict[str, float]:
 
 def get_ghg(inputs: RowInputs, cols: xr.Dataset):
     """Two global rows, agriculture and net LULUCF, in the years the target series bind (role 'BINDING');
-    in the other years the series are benchmarks and no row is added (``simulation.store_solution`` reports both)."""
+    in the other years the series are benchmarks and no row is added (``simulation.store_solution`` reports both).
+    A row in settings.GHG_BENCHMARK_ROWS is a benchmark in every year: not added, reported with its deviation."""
     if settings.GHG_EMISSIONS_LIMITS == "off":
         print("│   ├── TURNING OFF GHG emissions constraints ...")
         return None, None
@@ -405,14 +406,24 @@ def get_ghg(inputs: RowInputs, cols: xr.Dataset):
         print(f"│   ├── GHG series are benchmarks in {inputs.target_year} (role {targets['role']}): no GHG rows, deviation reported after the solve")
         return None, None
 
+    unknown = set(settings.GHG_BENCHMARK_ROWS) - {'AG', 'LULUCF'}
+    if unknown:
+        raise ValueError(f"GHG_BENCHMARK_ROWS: unknown rows {sorted(unknown)}; expected 'AG' and/or 'LULUCF'.")
+    imposed = [row for row in ('AG', 'LULUCF') if row not in settings.GHG_BENCHMARK_ROWS]
+    if not imposed:
+        print(f"│   ├── GHG rows are benchmarks in {inputs.target_year} (GHG_BENCHMARK_ROWS): no GHG rows, deviation reported after the solve")
+        return None, None
+
     coeff = get_ghg_coeffs(inputs, cols)
     rhs_raw = get_ghg_rhs(inputs)
     print(f"│   ├── Adding <hard> constraints for GHG emissions: agriculture {targets['AG_t']:,.0f} tCO2e, "
-          f"net LULUCF {targets['LULUCF_MOD_t'] + targets['LULUCF_EXO_t']:,.0f} tCO2e")
-    rows = sparse.csr_matrix(np.stack([coeff['AG'], coeff['LULUCF']]))    # the nonzero support; the contract drops the rest
-    rhs = np.array([rhs_raw['AG'], rhs_raw['LULUCF']], dtype=np.float64)
+          f"net LULUCF {targets['LULUCF_MOD_t'] + targets['LULUCF_EXO_t']:,.0f} tCO2e"
+          + ('' if len(imposed) == 2 else f"; benchmark only (not imposed): {', '.join(settings.GHG_BENCHMARK_ROWS)}"))
+    name = {'AG': "ghg_ag_emissions_limit_ub", 'LULUCF': "ghg_lulucf_emissions_limit_ub"}
+    rows = sparse.csr_matrix(np.stack([coeff[row] for row in imposed]))  # the nonzero support; the contract drops the rest
+    rhs = np.array([rhs_raw[row] for row in imposed], dtype=np.float64)
     A, rhs, scale = contract(rows, rhs, rescale=True)                    # drop + row rescale, factors kept
-    return make_part('ghg', A, rhs, '<', ["ghg_ag_emissions_limit_ub", "ghg_lulucf_emissions_limit_ub"], scale)
+    return make_part('ghg', A, rhs, '<', [name[row] for row in imposed], scale)
 
 
 def get_GBF2(inputs: RowInputs, bio_S: sparse.csr_matrix):
