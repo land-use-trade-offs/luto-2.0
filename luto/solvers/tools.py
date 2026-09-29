@@ -74,13 +74,14 @@ def record_shadow_prices(luto_solver, target_year, out_dir) -> None:
         return
 
     # ── the duals: Constr.Pi is a clean basic dual only when the accepted solve left a simplex basis; CBasis raises
-    #    GurobiError on a barrier-only solve (no basis) → duals unreliable, skip the year. One handle off the table
-    #    probes it — never `model.getConstrs()`, a Python list of every row of the model ──
+    #    on a barrier-only solve (no basis) — GurobiError, or AttributeError from gurobipy 13's Constr.__getattr__ —
+    #    → duals unreliable, skip the year. One handle off the table probes it — never `model.getConstrs()`, a
+    #    Python list of every row of the model ──
     built = rows[T['active'].values[rows]]                                          # the priced rows in the model (the rest were dropped before the build)
     try:
         if built.size:
             _ = T['constr'].values[built[0]].CBasis
-    except gp.GurobiError:
+    except (gp.GurobiError, AttributeError):
         print(f"Skipping shadow prices for {target_year}: accepted solve has no simplex basis "
               f"(barrier-only) — duals would be unreliable.")
         return

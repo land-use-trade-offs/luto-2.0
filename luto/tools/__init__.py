@@ -255,27 +255,6 @@ def arr_to_xr(data, arr: np.ndarray) -> xr.DataArray:
     return da_raster
 
 
-def mrj_to_xr(data, in_mrj: np.ndarray) -> xr.DataArray:
-    """Convert an (m, r, j) array to a georeferenced xarray DataArray on (lm, lu, y, x).
-
-    `j` is named by data.AGRICULTURAL_LANDUSES when its length matches, else by data.PRODUCTS. The grid is
-    georeferenced once (`arr_to_xr` on the first map) and every (m, j) map is placed on it with `arr_to_2d`.
-    """
-    j_vals = data.AGRICULTURAL_LANDUSES if in_mrj.shape[2] == len(data.AGRICULTURAL_LANDUSES) else data.PRODUCTS
-    grid = arr_to_xr(data, in_mrj[0, :, 0])
-
-    maps = np.stack([
-        np.stack([arr_to_2d(data, in_mrj[m, :, j])[0] for j in range(in_mrj.shape[2])])
-        for m in range(in_mrj.shape[0])
-    ])
-
-    return xr.DataArray(
-        maps,
-        dims=['lm', 'lu', *grid.dims],
-        coords={'lm': data.LANDMANS[:in_mrj.shape[0]], 'lu': j_vals, **grid.coords},
-    )
-
-
 def plot_t_mat(t_mat:xr.DataArray):
     
     '''

@@ -140,6 +140,15 @@ class LutoSolver:
         self.gurobi_model.setObjective(obj @ self.x, sense)
         print(f"│   └── objective: {int((obj != 0).sum()):,} nonzero coefficients over {obj.size:,} variables")
 
+    def set_cost_scale(self, scale: float) -> None:
+        """The objective's economic part × ``scale`` on the live model, the elastic shortfall columns (block ``slack``)
+        and any variable outside the column table (GBF8 row generation's shortfalls) untouched —
+        settings.ELASTIC_PASS1_COST_SCALE; ``scale`` = 1 restores ``self.obj``."""
+        coef = self.obj.astype(np.float64)
+        coef[self.cols['block'].values != 'slack'] *= scale
+        self.x.Obj = coef
+        self.gurobi_model.update()
+
     def remove_constraints_by_name(self, names) -> None:
         """Drop rows: flagged inactive on the row table (it never shrinks, so a dropped row stays
         describable), then removed from the Gurobi model."""
