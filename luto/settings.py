@@ -346,7 +346,7 @@ that 1 tripled solve time, 3 led to numerical problems.
 
 RETRY_PARAMS = [
     (0, 2, -1, -1, -1),   # NF, Method, Crossover, Presolve, BarHomogeneous
-    (0, 1,  0, -1, 0 ),
+    # (0, 1,  0, -1, 0 ), # Fallback to dual simplex, which is VERY SLOW !!
 ]
 '''
 List of solve attempts to try in order, per year. Each entry MUST be a

@@ -771,7 +771,8 @@ def get_renewable(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
     j            = cols['j'].values
     am_idx       = cols['am_idx'].values
     state_of_cell = support.region2cell['state'].values                  # the state of every cell
-    states       = sorted(set(state_of_cell) - {None, 'Australian Capital Territory'})   # the states the rows are written for, by name; ACT folded into NSW below
+    states       = sorted({s for s in set(state_of_cell) if isinstance(s, str)} - {'Australian Capital Territory'})   # the states the rows are written for, by name; ACT folded into NSW below
+                                                                         # (a cell without a state is None in cell_regions, but xarray 2026.7 stores None as NaN: keep names only)
     in_ag        = cols['block'].values == 'ag'
 
     # ── per type: its columns' yield, and the columns the exclusion masks keep out ──

@@ -5,6 +5,80 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20260930 — solving engines at RES5: cuOpt's GPU barrier is 2.7–3.6× faster without GBF8; Gurobi CPU stays the engine
+
+### TL;DR
+
+One RES5 step, 2010 → 2050, solved by four engine modes on the same model (local EPYC 9654P, 32 threads; NVIDIA L40S 46 GB
+under WSL2; Gurobi 13.0.3 GPU build, CPLEX 22.2, cuOpt 26.08), with LUTO's tolerances (feasibility 1e-6, optimality 1e-2,
+barrier convergence 1e-5). Study: `jinzhu_inspect_code/GP_GPU_solve/` (`doc/findings.md` has every run).
+
+- **cuOpt GPU barrier (no crossover)** solves the models without GBF8 in 215–221 s against Gurobi's 592–768 s, feasible to
+  ~1e-6, 0.01–0.03 % below the vertex optimum; through LUTO's own `post_solve` its lumap matched Gurobi's in 99.4 % of cells —
+  but with ~133 k ag shares < 1 % (Gurobi: 51), the price of no crossover. It is the only engine whose UNCROSSED point is usable.
+- **Any GBF8 rows break cuOpt** (20 species already: ADAT fails at iteration 0, augmented misconverges, dualized OOM).
+- **Gurobi CPU barrier + crossover** is the most robust; CPLEX wins only the target-free model (8 %), then trails 1.5–1.9×.
+- **Gurobi GPU PDHG never converged** (three models, 1,800 s each). It ran with `ScaleFlag 0`, as LUTO does: the rows are
+  already geometric-mean rescaled by `row_builder.contract`, so scaling is not the likely cause (columns are not scaled; untested).
+- **Hybrids** (cuOpt barrier → Gurobi crossover) are blocked by cuOpt's duals: WRONG (mis-signed / lost) with its presolve on,
+  and the barrier stalls on its dual residual with presolve off.
+
+### Results — presolve + barrier + crossover → total (s)
+
+Gurobi's log prints the barrier time from the solve's start (presolve included); it is split out here.
+
+| model | nnz | Gurobi CPU | CPLEX CPU | cuOpt GPU (barrier only) | Gurobi GPU PDHG |
+|---|---|---|---|---|---|
+| demand, GHG, GBF2, water (defaults) | 32.3 M | 32 + 529 + **204** → **768** | 144 + 460 + **102** → **704** | 64 + 151 → **215** (PaPILO presolve: 201); crossover ~26 h projected | diverges |
+| + GBF3 + GBF4 | 33.2 M | 32 + 531 + **25** → **592** | 165 + 528 + **193** → **886** | 64 + 157 → **221** | no convergence |
+| + GBF8 20 species | 54.5 M | 46 + 396 + **44** → **491** | 149 + 583 + **203** → **932** | fails | no convergence |
+| + GBF8 20 + renewables | 69.3 M | — | — | fails | — |
+| + GBF8 100 + renewables | 182.4 M | barrier "numerical trouble" at 877 s → simplex, stopped | — | fills the 45 GB card | — |
+
+Barrier alone: Gurobi's end point still violates rows by 0.14 (defaults) / 0.011 (GBF3/4); CPLEX's barrier-only point by
+0.13–0.33. Neither is usable without crossover; cuOpt's is (max row violation ~6e-7).
+
+### GPU memory (L40S)
+
+Every model cuOpt SOLVES takes ~14 GB (ADAT). With GBF8: 20 species + renewables 33 GB (ADAT, failed), 100 species fill the card.
+The augmented system on the GBF3/4 model wanted a ~70 GB factor (memory follows fill, not model size). Gurobi PDHG: 2.5 GB at
+100 % utilisation — it never factorises (A + Aᵀ + ~20 vectors ≈ 2.3 GB). RES1 (~25× the cells) is unlikely to fit an L40S.
+
+### Why more GBF targets made Gurobi FASTER
+
+- **Crossover (GBF3/4: 204 → 25 s), well supported.** Without biodiversity targets the LP is massively degenerate (near-equal
+  options, splittable cells): the optimum is a huge face, the barrier stops at its centre, and crossover walks 2.05 M primal
+  pushes to a vertex. The 24 GBF3/4 rows bind hard (objective −147,307 → −241,564): their duals enter every column's reduced
+  cost and break the ties — primal pushes 2.05 M → 248 k, dual infeasibility after the push 9.2e7 → 4.2e2. The barrier is unchanged.
+- **Barrier (GBF8 20: 167 → 105 iterations), hypothesis.** GBF8 barely binds (−241,564 → −241,566), so not tie-breaking; the
+  primal residual falls 26× faster by iteration 40. Candidates: better-determined duals from dense rows spanning ~0.5 M cells, or
+  scaling / starting-point luck. Test: the same 20 rows with targets 0.
+- The limit: each GBF8 species adds ~1.4 M nnz (+13 % per iteration at 20), and 100 species broke the barrier.
+
+### cuOpt's row duals (26.08)
+
+On two calibration LPs: presolve −1 / 2 (PSLP) mis-signs barrier and PDLP row duals; 1 (PaPILO) loses the duals of rows it
+turns into bounds; only 0 (off) matches Gurobi's `Pi` — and off makes the barrier stall on LUTO's model. Worth reporting to NVIDIA;
+until fixed, `record_shadow_prices` could not use cuOpt.
+
+### Side findings
+
+- Handing the model to cuOpt from LUTO's arrays (the active rows of `A` as CSR, `rhs`/`sense` as row bounds, `lb`/`ub`, `obj`)
+  takes 0.5 s, against Gurobi's `formulate` 28 s; the model is identical to the MPS (4,047,976 × 7,369,963, 32,334,788 nnz).
+- Gurobi's cold dual simplex on this model is far slower than its barrier (1.1 M iterations, 1,461 s, still infeasible).
+- A start set on a Gurobi model with pending (lazy) changes is silently dropped: `m.update()` first. A primal-only start is
+  discarded by dual simplex; primal simplex uses it; Method −1 with primal + dual does a true crossover push.
+- Renewables on crashed `row_builder.get_renewable`: xarray 2026.7 stores `None` as NaN in an object Dataset, so the "no state"
+  cells' NaN survived the `{None}` removal and `sorted()` failed (float vs str). Fixed by keeping names that are `str` (uncommitted).
+
+### Recommendation
+
+A cuOpt engine is worth building for RES5 runs without GBF8 that need no shadow prices — after checking that the sub-1 % slivers
+do not snowball over a trajectory (each nonzero share becomes a source next step). Keep Gurobi CPU for GBF8, shadow prices and
+production. Re-test the hybrid when cuOpt fixes its dual postsolve (estimated ~300 s to an exact vertex).
+
+---
+
 ## 20260908 — the θ fold is gone: the exact per-source transition model is the only model
 
 ### TL;DR
