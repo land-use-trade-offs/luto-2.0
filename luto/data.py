@@ -840,14 +840,22 @@ class Data:
         self.STREAM_LENGTH = pd.read_hdf(
             os.path.join(settings.INPUT_DIR, "stream_length_m_cell.h5"), where=self.MASK
         ).to_numpy()
+        stream_area_ha = self.REAL_AREA_NO_RESFACTOR[self.MASK]
+
+        # RESFACTOR > 1: a coarse cell's stream length is its block's total, and its density is over the block's summed area.
+        if settings.RESFACTOR > 1:
+            self.STREAM_LENGTH = self.get_resfactored_sum(
+                pd.read_hdf(os.path.join(settings.INPUT_DIR, "stream_length_m_cell.h5")).to_numpy()
+            )
+            stream_area_ha = self.get_resfactored_sum(self.REAL_AREA_NO_RESFACTOR)
 
         # Calculate the proportion of the area of each cell within stream buffer (convert REAL_AREA from ha to m2 and divide m2 by m2)
         self.RP_PROPORTION =  (
-            (2 * settings.RIPARIAN_PLANTING_BUFFER_WIDTH * self.STREAM_LENGTH) / (self.REAL_AREA_NO_RESFACTOR[self.MASK] * 10000)
+            (2 * settings.RIPARIAN_PLANTING_BUFFER_WIDTH * self.STREAM_LENGTH) / (stream_area_ha * 10000)
         ).astype(np.float32)
         # Calculate the length of fencing required for each cell in per hectare terms for riparian plantings
         self.RP_FENCING_LENGTH = (
-            (2 * settings.RIPARIAN_PLANTING_TORTUOSITY_FACTOR * self.STREAM_LENGTH) / self.REAL_AREA_NO_RESFACTOR[self.MASK]
+            (2 * settings.RIPARIAN_PLANTING_TORTUOSITY_FACTOR * self.STREAM_LENGTH) / stream_area_ha
         ).astype(np.float32)
 
 
