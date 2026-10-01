@@ -453,6 +453,9 @@ def get_economics(data: Data, base_year: int, target_year: int) -> EconomicInput
     print("Getting agricultural management options' transition cost effects...", flush=True)
     ag_man_t_mrj = ag_transition.get_agricultural_management_transition_matrices(data, target_index)
 
+    # NaN guard on the effects (get_economic_mrj turns NaN into zero); their inputs are checked in Data.check_eligible_nan
+    data.check_ag_man_nan({'cost': ag_man_c_mrj, 'revenue': ag_man_r_mrj, 'adoption cost': ag_man_t_mrj}, target_year)
+
     # operating economics only — revenue − production cost; the land-use transition cost is charged per arc
     ag_obj_mrj, non_ag_obj_rk, ag_man_objs = get_economic_mrj(
         ag_c_mrj, ag_r_mrj, non_ag_c_rk, non_ag_r_rk, non_ag_t_rk, ag_man_c_mrj, ag_man_r_mrj, ag_man_t_mrj)

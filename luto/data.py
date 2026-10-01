@@ -2347,6 +2347,30 @@ class Data:
                     climate_nan = np.where(self.CLIMATE_CHANGE_IMPACT[lm, lu].isna().any(axis=1).to_numpy(), np.nan, 0.0)
                     check('CLIMATE_CHANGE_IMPACT (allocated)', lm, lu, climate_nan, self.AG_L_MRJ[m, :, j] > 0)
 
+        self.raise_nan_report(found, 'guarded arrays, eligible (allocated for the climate multiplier)')
+
+
+    def check_ag_man_nan(self, effects: dict[str, dict[str, np.ndarray]], yr_cal: int) -> None:
+        """
+        NaN guard on the ag-management effect matrices, which `check_eligible_nan` does not see (they also read
+        the option bundles and the adoption costs). `effects` is {'cost': {am: (lm, cell, lu of am)}, ...}. Raise if
+        an effect is NaN on an eligible entry of its land use, before `get_economic_mrj` turns the NaN into zero.
+        """
+        found = []
+        for what, by_am in effects.items():
+            for am, lus in self.AGMAN2LU.items():
+                if am not in by_am:
+                    continue
+                for k, j in enumerate(lus):
+                    for m, lm in enumerate(self.LANDMANS):
+                        bad = self.EXCLUDE[m, :, j] & np.isnan(np.asarray(by_am[am][m, :, k], dtype=np.float64))
+                        if bad.any():
+                            found.append((f'{am} {what} effect ({yr_cal})', lm, self.AGLU2DESC[j], bad))
+        self.raise_nan_report(found, 'ag-management effect matrices, eligible')
+
+
+    def raise_nan_report(self, found: list, what: str) -> None:
+        """Raise the NaN guard's report for `found` [(array, lm, lu, bad cells)]: counts by array, lm and lu, and by region."""
         if not found:
             return
 
@@ -2359,7 +2383,7 @@ class Data:
         )
         raise ValueError(
             f"NaN guard (RES{settings.RESFACTOR}): {by_lu['entries'].sum():,} NaN entries in "
-            f"{by_lu['array'].nunique()} guarded arrays, eligible (allocated for the climate multiplier) "
+            f"{by_lu['array'].nunique()} {what} "
             f"under {len(by_lu)} (array, lm, lu) combinations.\n"
             f"By array, land management and land use:\n{by_lu.to_string(index=False)}\n"
             f"By array and region ({len(by_region):,} rows, first 50):\n{by_region.head(50).to_string(index=False)}"
