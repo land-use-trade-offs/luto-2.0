@@ -893,14 +893,14 @@ class Data:
         
   
         # Boolean x_mrj matrix with allowed land uses j for each cell r under lm.
-        # When RESFACTOR > 1, average all fullres cells in each block; > 0 means eligible.
+        # When RESFACTOR > 1, average the block's land-use cells (LUMASK, the cells RESFACTOR 1 models); > 0 means eligible.
         x_mrj_full = np.load(os.path.join(settings.INPUT_DIR, "x_mrj.npy"))
         if settings.RESFACTOR == 1:
             self.EXCLUDE = x_mrj_full[:, self.MASK, :]
         else:
             self.EXCLUDE = np.stack([
                 np.stack([
-                    self.get_resfactored_average_fraction(x_mrj_full[m, :, j], use_valid_cell_count=False)
+                    self.get_resfactored_average_fraction(x_mrj_full[m, :, j] & self.LUMASK, use_valid_cell_count=False)
                     for j in range(self.N_AG_LUS)
                 ], axis=-1)
                 for m in range(self.NLMS)
