@@ -487,29 +487,8 @@ class Data:
         )
         
         # Convert to xarray DataArray for easier indexing.
-        #   The YRS_CAL_BASE (2010) is not included in the climate change impact data, 
-        #   so we add it here with a multiplier of 1.
-        self.CLIMATE_CHANGE_IMPACT_xr = (
-                xr.DataArray(self.CLIMATE_CHANGE_IMPACT)
-                .unstack('dim_1')
-                .rename({'dim_1_level_0':'lm', 'dim_1_level_1':'lu', 'dim_1_level_2':'year', 'CELL_ID':'cell'})
-                .assign_coords(cell=range(self.NCELLS))     # Cell index from now will be from 0 to NCELLS-1
-            )
-        
-        CLIMATE_CHANGE_IMPACT_xr_base_year = (
-            self.CLIMATE_CHANGE_IMPACT_xr
-            .isel(year=0, drop=True)
-            .assign_coords(year=self.YR_CAL_BASE)
-            .expand_dims('year')
-            .notnull()
-            .astype(np.float32)
-        )
-        
-        self.CLIMATE_CHANGE_IMPACT_xr = xr.concat( 
-            [CLIMATE_CHANGE_IMPACT_xr_base_year,self.CLIMATE_CHANGE_IMPACT_xr],
-            dim='year'
-        )
-        
+        self.CLIMATE_CHANGE_IMPACT_xr = self.get_climate_change_impact_xr()
+
         ###############################################################
         # Regional coverage layers, mainly for regional reporting.
         ###############################################################
@@ -906,6 +885,10 @@ class Data:
                 for m in range(self.NLMS)
             ]) > 0
 
+            # The agricultural economics, GHG, pasture and climate arrays above were read at each block's
+            # centre cell. Re-derive them from the block's eligible fine cells (see coarsen_guarded_arrays).
+            self.LVSTK_COARSE = self.coarsen_guarded_arrays(x_mrj_full)
+
 
 
         ###############################################################
@@ -1065,9 +1048,9 @@ class Data:
                 # First find out which animal is involved.
                 animal, _ = ag_quantity.lvs_veg_types(lu)
                 # Water requirements per head are for drinking and irrigation.
-                wreq_lvstk_dry[lu] = self.AGEC_LVSTK["WR_DRN", animal] * settings.LIVESTOCK_DRINKING_WATER
+                wreq_lvstk_dry[lu] = self.agec_lvstk(lu, 'dry')["WR_DRN", animal] * settings.LIVESTOCK_DRINKING_WATER
                 wreq_lvstk_irr[lu] = (
-                    self.AGEC_LVSTK["WR_IRR", animal] + self.AGEC_LVSTK["WR_DRN", animal] * settings.LIVESTOCK_DRINKING_WATER
+                    self.agec_lvstk(lu, 'irr')["WR_IRR", animal] + self.agec_lvstk(lu, 'irr')["WR_DRN", animal] * settings.LIVESTOCK_DRINKING_WATER
                 )
             else:
                 wreq_lvstk_dry[lu] = 0.0
@@ -1960,6 +1943,34 @@ class Data:
                 
 
 
+    def get_climate_change_impact_xr(self) -> xr.DataArray:
+        """
+        CLIMATE_CHANGE_IMPACT as a (year, cell, lm, lu) DataArray.
+        The YRS_CAL_BASE (2010) is not included in the climate change impact data,
+        so it is added here with a multiplier of 1.
+        """
+        cci_xr = (
+                xr.DataArray(self.CLIMATE_CHANGE_IMPACT)
+                .unstack('dim_1')
+                .rename({'dim_1_level_0':'lm', 'dim_1_level_1':'lu', 'dim_1_level_2':'year', 'CELL_ID':'cell'})
+                .assign_coords(cell=range(self.NCELLS))     # Cell index from now will be from 0 to NCELLS-1
+            )
+
+        cci_xr_base_year = (
+            cci_xr
+            .isel(year=0, drop=True)
+            .assign_coords(year=self.YR_CAL_BASE)
+            .expand_dims('year')
+            .notnull()
+            .astype(np.float32)
+        )
+
+        return xr.concat(
+            [cci_xr_base_year, cci_xr],
+            dim='year'
+        )
+
+
     def get_exact_resfactored_lumap_mrj(self):
         """
         Rather than picking the center cell when resfactoring the lumap, this function
@@ -2064,6 +2075,247 @@ class Data:
         lumap_resfactored[lumap_resfactored == -1] = self.DESC2AGLU['Unallocated - natural land']
 
         return lumap_resfactored
+
+
+    def coarsen_guarded_arrays(self, x_mrj_full: np.ndarray) -> dict:
+        """
+        RESFACTOR > 1: the agricultural economics, GHG, pasture and climate arrays are read at each block's
+        centre cell, while EXCLUDE and AG_L_MRJ are block aggregates. An eligible coarse entry whose centre
+        cell has no data is NaN, and the NaN becomes a zero-cost, zero-output land use.
+
+        Each eligible coarse (lm, cell, lu) entry is replaced by the weighted mean over the block's fine cells
+        that are eligible for (lm, lu), are land-use cells (LUMASK, the cells RESFACTOR 1 models) and carry
+        data, with the weight its class requires. The weights nest, so each coarse product equals the block total
+        of the fine products, e.g. sum(a) * mean_a(Yield) * mean_(a*Yield)(QC) = sum(a * Yield * QC). Entries
+        that are not eligible keep their centre-cell value. An eligible entry is NaN only if no eligible fine
+        cell in its block has data. EXCLUDE counts the same cells.
+
+        Weight classes (a = fine cell area):
+            area            a                           Yield, AC, FLC, FOC, FDC, WR, crop and irrigated-pasture GHG, PASTURE_KG_DM_HA
+            production      a * Yield                   crop QC, P1, crop climate multiplier
+            water           a * WR                      crop WP
+                            head * WR                   WATER_DELIVERY_PRICE
+            pasture         a * PASTURE_KG_DM_HA        SAFE_PUR
+            capacity        pasture * SAFE_PUR          FEED_REQ
+            head            capacity * FEED_REQ         livestock QC, WR, F, GHG, livestock climate multiplier
+            head x F        head * F_k                  Q_k
+            head x F x Q    head * F_k * Q_k            P_k
+        A block whose weights sum to zero over cells with data (e.g. zero Yield) takes the area-weighted mean;
+        its coarse product is zero either way.
+
+        The crop arrays and the climate multiplier are indexed by (lm, lu) and are updated in place. The livestock
+        inputs are shared by the four (lm, lu) entries of an animal, each with its own eligible cells and head, so
+        their coarse values are returned per (lm, lu), read through `agec_lvstk`, `agghg_lvstk`, `agghg_irrpast`,
+        `lvstk_pasture` and `water_delivery_price`. The shared attributes keep their centre-cell values.
+        """
+        crop_class = {
+            'Yield': 'area', 'AC': 'area', 'FLC': 'area', 'FOC': 'area', 'FDC': 'area', 'WR': 'area',
+            'QC': 'production', 'P1': 'production', 'WP': 'water'}
+        lvstk_class = {
+            'AC': 'area', 'FLC': 'area', 'FOC': 'area', 'FDC': 'area',
+            'QC': 'head', 'WR_DRN': 'head', 'WR_IRR': 'head', 'F1': 'head', 'F2': 'head', 'F3': 'head',
+            'Q1': 'head_F', 'Q2': 'head_F', 'Q3': 'head_F', 'P1': 'head_FQ', 'P2': 'head_FQ', 'P3': 'head_FQ'}
+
+        def path(fname):
+            return os.path.join(settings.INPUT_DIR, fname)
+        cci_file = "climate_change_impacts_" + settings.RCP + "_CO2_FERT_" + settings.CO2_FERT.upper() + ".h5"
+
+        # Coarse cell of each fine land cell (-1 if its block has none). Coarse cells are in row-major block order.
+        rf = settings.RESFACTOR
+        rows, cols = np.nonzero(self.NLUM_MASK)
+        n_block_cols = -(-self.NLUM_MASK.shape[1] // rf)
+        fine_key = (rows // rf) * n_block_cols + cols // rf
+        coarse_key = self.COORD_ROW_COL_RESFACTORED[0] * n_block_cols + self.COORD_ROW_COL_RESFACTORED[1]
+        pos = np.minimum(np.searchsorted(coarse_key, fine_key), self.NCELLS - 1)
+        f2c = np.where(coarse_key[pos] == fine_key, pos, -1)
+        area = self.REAL_AREA_NO_RESFACTOR.astype(np.float64)
+
+        # The fine inputs are read in bands of whole block rows (about `band_cells` fine cells each), so peak memory
+        # stays near one band (agec_crops alone is ~19 GB at full resolution). Fine cells are row-major, so a band is
+        # one row range of every input file and one range of coarse cells, and each block lies in a single band.
+        band_cells = 250_000
+        n_block_rows = -(-self.NLUM_MASK.shape[0] // rf)
+        fine_at = np.searchsorted(rows, np.arange(n_block_rows + 1) * rf)
+        coarse_at = np.searchsorted(self.COORD_ROW_COL_RESFACTORED[0], np.arange(n_block_rows + 1))
+        bands, b0 = [], 0
+        for b in range(1, n_block_rows + 1):
+            if fine_at[b] - fine_at[b0] >= band_cells or b == n_block_rows:
+                bands.append((int(fine_at[b0]), int(fine_at[b]), int(coarse_at[b0]), int(coarse_at[b])))
+                b0 = b
+
+        def weight_class(table, field):
+            if field not in table:
+                raise ValueError(f"coarsen_guarded_arrays: no weight class for '{field}'")
+            return table[field]
+
+        def as_float(centre):
+            return np.array(centre, dtype=np.result_type(centre, np.float32), copy=True)     # PASTURE_KG_DM_HA and one AGGHG_IRRPAST column are integer
+
+        # Outputs start as the centre-cell values; each band replaces its eligible entries.
+        crop_pairs = sorted({c[1:] for c in self.AGEC_CROPS.columns})
+        agec_c = self.AGEC_CROPS.to_numpy(copy=True)
+        agghg_c = self.AGGHG_CROPS.to_numpy(copy=True)
+        cci_c = self.CLIMATE_CHANGE_IMPACT.to_numpy(copy=True)
+        water_price_centre = np.nan_to_num(pd.read_hdf(path("water_delivery_price.h5"), where=self.MASK).to_numpy(dtype=np.float64))   # WATER_DELIVERY_PRICE values (read later), float64
+        irrpast_cols = [c for c in self.AGGHG_IRRPAST.columns if 'CO2E' in c]
+        lvstk = {}
+        for lm in self.LANDMANS:
+            for lu in self.LU_LVSTK:
+                animal, vegtype = ag_quantity.lvs_veg_types(lu)
+                lvstk[lm, lu] = {
+                    'AGEC_LVSTK': self.AGEC_LVSTK.loc[:, (slice(None), animal)].to_numpy(copy=True),
+                    'AGGHG_LVSTK': self.AGGHG_LVSTK.loc[:, (animal, slice(None))].to_numpy(copy=True),
+                    'AGGHG_IRRPAST': {c: as_float(self.AGGHG_IRRPAST[c].to_numpy()) for c in irrpast_cols} if lm == 'irr' else None,
+                    'FEED_REQ': as_float(self.FEED_REQ),
+                    'PASTURE_KG_DM_HA': as_float(self.PASTURE_KG_DM_HA),
+                    'SAFE_PUR': as_float(self.SAFE_PUR_NATL if vegtype == 'natural land' else self.SAFE_PUR_MODL),
+                    'WATER_DELIVERY_PRICE': as_float(water_price_centre),
+                }
+
+        for s, e, c0, c1 in bands:
+            if c1 == c0:
+                continue
+            ok = f2c[s:e] >= 0
+            c_loc = f2c[s:e] - c0
+            a = area[s:e]
+            land_use = self.LUMASK[s:e]
+
+            def block_mean(v, w, elig):
+                # Weighted mean of fine v over each block's cells in elig with finite v and w; NaN if there are none.
+                k = elig & ok & np.isfinite(v) & np.isfinite(w)
+                c = c_loc[k]
+                num = np.bincount(c, weights=w[k] * v[k], minlength=c1 - c0)
+                den = np.bincount(c, weights=w[k], minlength=c1 - c0)
+                num_a = np.bincount(c, weights=a[k] * v[k], minlength=c1 - c0)
+                den_a = np.bincount(c, weights=a[k], minlength=c1 - c0)
+                out = np.full(c1 - c0, np.nan)
+                np.divide(num_a, den_a, out=out, where=den_a > 0)
+                np.divide(num, den, out=out, where=den > 0)
+                return out
+
+            read = lambda fname: pd.read_hdf(path(fname), start=s, stop=e)
+            fine = lambda df, col: df[col].to_numpy(dtype=np.float64)
+
+            # Crops: AGEC_CROPS and AGGHG_CROPS by (field, lm, lu).
+            agec_crops = read("agec_crops.h5")
+            agghg_crops = read("agGHG_crops.h5")
+            cci = read(cci_file)
+            for lm, lu in crop_pairs:
+                m, j = self.LANDMANS.index(lm), self.DESC2AGLU[lu]
+                elig, eligible = x_mrj_full[m, s:e, j] & land_use, self.EXCLUDE[m, c0:c1, j]
+                if not eligible.any():
+                    continue
+                weights = {'area': a, 'production': a * fine(agec_crops, ('Yield', lm, lu))}
+                if ('WR', lm, lu) in agec_crops.columns:
+                    weights['water'] = a * fine(agec_crops, ('WR', lm, lu))
+                for i, col in enumerate(self.AGEC_CROPS.columns):
+                    if col[1:] == (lm, lu):
+                        w = weights[weight_class(crop_class, col[0])]
+                        agec_c[c0:c1][eligible, i] = block_mean(fine(agec_crops, col), w, elig)[eligible]
+                for i, col in enumerate(self.AGGHG_CROPS.columns):
+                    if col[1:] == (lm, lu):
+                        agghg_c[c0:c1][eligible, i] = block_mean(fine(agghg_crops, col), a, elig)[eligible]
+                for i, col in enumerate(self.CLIMATE_CHANGE_IMPACT.columns):
+                    if col[:2] == (lm, lu):
+                        cci_c[c0:c1][eligible, i] = block_mean(fine(cci, col), weights['production'], elig)[eligible]
+            del agec_crops, agghg_crops
+
+            # Livestock: per (lm, lu), since an animal's inputs serve both land managements and both vegetation types.
+            agec_lvstk = read("agec_lvstk.h5")
+            agghg_lvstk = read("agGHG_lvstk.h5")
+            agghg_irrpast = read("agGHG_irrpast.h5")
+            feed_req = read("feed_req.h5").to_numpy(dtype=np.float64)
+            pasture = read("pasture_kg_dm_ha.h5").to_numpy(dtype=np.float64)
+            safe_pur = {'natural land': read("safe_pur_natl.h5").to_numpy(dtype=np.float64),
+                        'modified land': read("safe_pur_modl.h5").to_numpy(dtype=np.float64)}
+            water_price = read("water_delivery_price.h5").to_numpy(dtype=np.float64)
+            for m, lm in enumerate(self.LANDMANS):
+                for lu in self.LU_LVSTK:
+                    j = self.DESC2AGLU[lu]
+                    animal, vegtype = ag_quantity.lvs_veg_types(lu)
+                    elig, eligible = x_mrj_full[m, s:e, j] & land_use, self.EXCLUDE[m, c0:c1, j]
+                    if not eligible.any():
+                        continue
+                    out = lvstk[lm, lu]
+                    w = {'area': a, 'pasture': a * pasture}
+                    w['capacity'] = w['pasture'] * safe_pur[vegtype]
+                    w['head'] = w['capacity'] * feed_req
+                    wr = fine(agec_lvstk, ('WR_DRN', animal)) * settings.LIVESTOCK_DRINKING_WATER
+                    if lm == 'irr':
+                        wr = wr + fine(agec_lvstk, ('WR_IRR', animal))
+                    w['water'] = w['head'] * wr
+
+                    for i, (field, _) in enumerate(self.AGEC_LVSTK.loc[:, (slice(None), animal)].columns):
+                        cls = weight_class(lvstk_class, field)
+                        if cls == 'head_F':
+                            wt = w['head'] * fine(agec_lvstk, (f'F{field[1]}', animal))
+                        elif cls == 'head_FQ':
+                            wt = w['head'] * fine(agec_lvstk, (f'F{field[1]}', animal)) * fine(agec_lvstk, (f'Q{field[1]}', animal))
+                        else:
+                            wt = w[cls]
+                        out['AGEC_LVSTK'][c0:c1][eligible, i] = block_mean(fine(agec_lvstk, (field, animal)), wt, elig)[eligible]
+
+                    for i, col in enumerate(self.AGGHG_LVSTK.loc[:, (animal, slice(None))].columns):
+                        out['AGGHG_LVSTK'][c0:c1][eligible, i] = block_mean(fine(agghg_lvstk, col), w['head'], elig)[eligible]
+
+                    if lm == 'irr':
+                        for col in irrpast_cols:
+                            out['AGGHG_IRRPAST'][col][c0:c1][eligible] = block_mean(fine(agghg_irrpast, col), a, elig)[eligible]
+
+                    for i, col in enumerate(self.CLIMATE_CHANGE_IMPACT.columns):
+                        if col[:2] == (lm, lu):
+                            cci_c[c0:c1][eligible, i] = block_mean(fine(cci, col), w['head'], elig)[eligible]
+
+                    out['FEED_REQ'][c0:c1][eligible] = block_mean(feed_req, w['capacity'], elig)[eligible]
+                    out['PASTURE_KG_DM_HA'][c0:c1][eligible] = block_mean(pasture, a, elig)[eligible]
+                    out['SAFE_PUR'][c0:c1][eligible] = block_mean(safe_pur[vegtype], w['pasture'], elig)[eligible]
+                    out['WATER_DELIVERY_PRICE'][c0:c1][eligible] = block_mean(water_price, w['water'], elig)[eligible]
+
+        self.AGEC_CROPS = pd.DataFrame(agec_c, index=self.AGEC_CROPS.index, columns=self.AGEC_CROPS.columns)
+        self.AGGHG_CROPS = pd.DataFrame(agghg_c, index=self.AGGHG_CROPS.index, columns=self.AGGHG_CROPS.columns)
+        for (lm, lu), out in lvstk.items():
+            animal, _ = ag_quantity.lvs_veg_types(lu)
+            agec, agghg = self.AGEC_LVSTK.loc[:, (slice(None), animal)], self.AGGHG_LVSTK.loc[:, (animal, slice(None))]
+            out['AGEC_LVSTK'] = pd.DataFrame(out['AGEC_LVSTK'], index=agec.index, columns=agec.columns)
+            out['AGGHG_LVSTK'] = pd.DataFrame(out['AGGHG_LVSTK'], index=agghg.index, columns=agghg.columns)
+            if out['AGGHG_IRRPAST'] is not None:
+                irrpast = self.AGGHG_IRRPAST.copy()
+                for col, v in out['AGGHG_IRRPAST'].items():
+                    irrpast[col] = v
+                out['AGGHG_IRRPAST'] = irrpast
+
+        self.CLIMATE_CHANGE_IMPACT = pd.DataFrame(cci_c, index=self.CLIMATE_CHANGE_IMPACT.index, columns=self.CLIMATE_CHANGE_IMPACT.columns)
+        self.CLIMATE_CHANGE_IMPACT_xr = self.get_climate_change_impact_xr()
+        return lvstk
+
+
+    # The livestock inputs as read for one (lu, lm): the shared attributes at RESFACTOR 1, the per-(lm, lu)
+    # block means at RESFACTOR > 1 (see coarsen_guarded_arrays).
+    def agec_lvstk(self, lu: str, lm: str) -> pd.DataFrame:
+        coarse = getattr(self, 'LVSTK_COARSE', None)
+        return self.AGEC_LVSTK if coarse is None else coarse[lm, lu]['AGEC_LVSTK']
+
+    def agghg_lvstk(self, lu: str, lm: str) -> pd.DataFrame:
+        coarse = getattr(self, 'LVSTK_COARSE', None)
+        return self.AGGHG_LVSTK if coarse is None else coarse[lm, lu]['AGGHG_LVSTK']
+
+    def agghg_irrpast(self, lu: str, lm: str) -> pd.DataFrame:
+        coarse = getattr(self, 'LVSTK_COARSE', None)
+        return self.AGGHG_IRRPAST if coarse is None else coarse[lm, lu]['AGGHG_IRRPAST']
+
+    def water_delivery_price(self, lu: str, lm: str) -> np.ndarray:
+        coarse = getattr(self, 'LVSTK_COARSE', None)
+        return self.WATER_DELIVERY_PRICE if coarse is None else coarse[lm, lu]['WATER_DELIVERY_PRICE']
+
+    def lvstk_pasture(self, lu: str, lm: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """(FEED_REQ, PASTURE_KG_DM_HA, SAFE_PUR) for (lu, lm); SAFE_PUR is NATL or MODL by vegetation type."""
+        _, vegtype = ag_quantity.lvs_veg_types(lu)
+        coarse = getattr(self, 'LVSTK_COARSE', None)
+        if coarse is not None:
+            c = coarse[lm, lu]
+            return c['FEED_REQ'], c['PASTURE_KG_DM_HA'], c['SAFE_PUR']
+        safe_pur = self.SAFE_PUR_NATL if vegtype == 'natural land' else self.SAFE_PUR_MODL
+        return self.FEED_REQ, self.PASTURE_KG_DM_HA, safe_pur
 
 
 
