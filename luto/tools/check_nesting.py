@@ -15,6 +15,11 @@ switched off for the builds because the 2010 price multiplier is not exactly 1 a
 2050 production is reported as a diagnostic only: the weights are year-invariant, so livestock production (head x C x F
 x Q, with F and Q weighted by head) nests only where the climate multiplier does not co-vary with F x Q in a block.
 
+A product made by several land uses is checked over the cells eligible for any of them. With LVSTK_K_FILE and
+STUBBLE_DSE_FILE set in settings.py the check covers per-type k and the stubble products (one set per stubble land use);
+the stubble rows (the stubble products, and the cost, revenue, GHG and water of the stubble land uses, which add the
+stubble sheep to the crop) are also reported on their own, with national and worst-block residuals.
+
 Usage (from the repo root, inputs and other settings from luto/settings.py):
     python -m luto.tools.check_nesting 10 20 [--out DIR] [--tol 1e-4]
 
@@ -62,6 +67,7 @@ def build_matrices(resfactor: int) -> dict:
         'mask': np.asarray(data.MASK),
         'landmans': list(data.LANDMANS),
         'landuses': list(data.AGRICULTURAL_LANDUSES),
+        'stubble_landuses': list(getattr(data, 'LU_STUBBLE', [])),
         'products': list(data.PRODUCTS),
     }
     if resfactor == 1:
@@ -102,8 +108,8 @@ def compare(fine: dict, coarse: dict, rf: int) -> pd.DataFrame:
                 M1, Mn = fine[qty][m, :, k], coarse[qty][m, :, k]
                 if not (M1 != 0).any() and not (Mn != 0).any():
                     continue
-                j = int(np.nonzero(fine['lu2pr'][k])[0][0]) if is_prod else k     # LU2PR is (product, lu)
-                e1, en = fine['exclude'][m, :, j], coarse['exclude'][m, :, j]
+                js = np.nonzero(fine['lu2pr'][k])[0] if is_prod else [k]           # LU2PR is (product, lu)
+                e1, en = fine['exclude'][m][:, js].any(axis=1), coarse['exclude'][m][:, js].any(axis=1)
                 if not en.any():
                     continue
                 T = per_block(M1, e1)
@@ -111,8 +117,13 @@ def compare(fine: dict, coarse: dict, rf: int) -> pd.DataFrame:
                 d = np.abs(P[en] - T[en])
                 s = np.maximum(np.abs(T[en]), np.abs(P[en]))
                 rel = np.divide(d, s, out=np.zeros_like(d), where=s > 0)
-                rows.append(dict(quantity=qty, lm=lm, key=name, blocks=int(en.sum()), fine_total=float(T[en].sum()),
-                                 coarse_total=float(np.nansum(P[en])), max_rel_error=float(np.nanmax(rel)),
+                fine_total, coarse_total = float(T[en].sum()), float(np.nansum(P[en]))
+                stubble = ('STUBBLE' in name) if is_prod else (name in fine['stubble_landuses'])
+                rows.append(dict(quantity=qty, lm=lm, key=name, stubble=stubble, blocks=int(en.sum()), fine_total=fine_total,
+                                 coarse_total=coarse_total, max_rel_error=float(np.nanmax(rel)),
+                                 max_abs_error=float(np.nanmax(d)), abs_at_max_rel=float(d[np.nanargmax(rel)]),
+                                 national_abs=abs(coarse_total - fine_total),
+                                 national_rel=abs(coarse_total - fine_total) / abs(fine_total) if fine_total else 0.0,
                                  blocks_above_tol=0, nan_blocks=int(np.isnan(P[en]).sum()), _rel=rel))
     return pd.DataFrame(rows)
 
@@ -142,6 +153,12 @@ def main() -> int:
         bad = summary.drop(index=[q for q in summary.index if 'diagnostic' in q])
         rf_failed = bool((bad['blocks_above_tol'] > 0).any() or (bad['nan_blocks'] > 0).any())
         print(f'RESFACTOR {rf}: {"FAIL" if rf_failed else "PASS"} (2010)', flush=True)
+        if df['stubble'].any():
+            st = df[df['stubble']]
+            print(f'RESFACTOR {rf}, stubble rows (stubble products; cost, revenue, GHG, water of the stubble land uses):')
+            print(st[['quantity', 'lm', 'key', 'blocks', 'fine_total', 'coarse_total', 'national_abs', 'national_rel',
+                      'max_abs_error', 'max_rel_error', 'abs_at_max_rel', 'blocks_above_tol']]
+                  .to_string(index=False, float_format=lambda v: f'{v:.6e}'), flush=True)
         failed |= rf_failed
         del coarse
         gc.collect()
