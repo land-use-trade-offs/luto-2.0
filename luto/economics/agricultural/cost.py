@@ -198,10 +198,11 @@ def get_cost_stubble(data:Data, lu, lm, yr_idx):
     (quantity costs, drinking water delivery) at the stubble stocking rate. The area and fixed costs stay the crop's.
     Provisional: the per-head values are the cell's sheep values (AGEC_LVSTK), pending the livestock economics rebuild."""
     yr_cal = data.YR_CAL_BASE + yr_idx
-    head_ha = get_stubble_yield_pot(data)
-    costs_q = data.AGEC_LVSTK['QC', 'SHEEP'] * head_ha * data.QC_COST_MULTS.loc[yr_cal, 'Sheep']
-    costs_w = (data.AGEC_LVSTK['WR_DRN', 'SHEEP'] * settings.LIVESTOCK_DRINKING_WATER * head_ha
-               * data.WATER_DELIVERY_PRICE * data.WP_COST_MULTS[yr_cal])
+    head_ha = get_stubble_yield_pot(data, lu, lm)
+    s = data.stubble(lu, lm)
+    costs_q = s['AGEC_LVSTK']['QC', 'SHEEP'] * head_ha * data.QC_COST_MULTS.loc[yr_cal, 'Sheep']
+    costs_w = (s['AGEC_LVSTK']['WR_DRN', 'SHEEP'] * settings.LIVESTOCK_DRINKING_WATER * head_ha
+               * s['WATER_DELIVERY_PRICE'] * data.WP_COST_MULTS[yr_cal])
     return pd.DataFrame(
         np.nan_to_num(np.stack([costs_q * data.REAL_AREA, costs_w * data.REAL_AREA]).T),   # no sheep data: no stubble sheep
         columns=pd.MultiIndex.from_product([[lu], [lm], ['Stubble sheep quantity cost', 'Stubble sheep water cost']])

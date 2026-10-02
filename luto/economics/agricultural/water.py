@@ -62,7 +62,9 @@ def get_wreq_matrices(data, yr_idx) -> np.ndarray:
             w_req_mrj[0, :, j] = w_req_mrj[0, :, j] * get_yield_pot(data, lvs, veg, 'dry', yr_idx)  # Water reqs depend on current stocking rate for drinking water
             w_req_mrj[1, :, j] = w_req_mrj[1, :, j] * get_yield_pot(data, lvs, veg, 'irr', 0)       # Water reqs depend on initial stocking rate for irrigation
         if lu in data.LU_STUBBLE:                                         # drinking water of the sheep grazing its stubble
-            w_req_mrj[:, :, j] += np.nan_to_num(data.AGEC_LVSTK['WR_DRN', 'SHEEP'].to_numpy() * settings.LIVESTOCK_DRINKING_WATER * get_stubble_yield_pot(data))   # no sheep data: no stubble sheep
+            for m, lm in enumerate(data.LANDMANS):
+                wr_drn = data.stubble(lu, lm)['AGEC_LVSTK']['WR_DRN', 'SHEEP'].to_numpy()
+                w_req_mrj[m, :, j] += np.nan_to_num(wr_drn * settings.LIVESTOCK_DRINKING_WATER * get_stubble_yield_pot(data, lu, lm))   # no sheep data: no stubble sheep
 
     w_req_mrj *= data.REAL_AREA[:, np.newaxis]                      # <unit: ML/ha> * <unit: ha/cell> -> <unit: ML/cell>
 

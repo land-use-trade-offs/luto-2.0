@@ -65,7 +65,8 @@ def get_rev_crop( data:Data         # Data object.
 
     # Sheep grazing the cereal stubble: the sheep revenue per head (as get_rev_lvstk) at the stubble stocking rate
     if lu in data.LU_STUBBLE:
-        stubble_head_cell = get_stubble_yield_pot(data) * data.REAL_AREA
+        stubble_head_cell = get_stubble_yield_pot(data, lu, lm) * data.REAL_AREA
+        agec = data.stubble(lu, lm)['AGEC_LVSTK']
         for name, (f, q, p, cm) in {
             'Stubble sheep meat': ('F1', 'Q1', 'P1', 'sheep meat'),
             'Stubble sheep wool': ('F2', 'Q2', 'P2', 'sheep wool'),
@@ -73,7 +74,7 @@ def get_rev_crop( data:Data         # Data object.
         }.items():
             rev[(lu, lm, name)] = (
                 stubble_head_cell
-                * data.AGEC_LVSTK[f, 'SHEEP'] * data.AGEC_LVSTK[q, 'SHEEP'] * data.AGEC_LVSTK[p, 'SHEEP']
+                * agec[f, 'SHEEP'] * agec[q, 'SHEEP'] * agec[p, 'SHEEP']
                 * data.LVSTK_PRICE_MULTIPLIERS.loc[yr_cal, f"SHEEP {p}"]
                 * data.get_elasticity_multiplier(yr_cal)[cm]
             ).fillna(0).to_numpy()                                           # no sheep data: no stubble sheep
