@@ -163,12 +163,13 @@ def get_ghg_stubble(data:Data, lu, lm) -> pd.DataFrame:
     sheep per-head factors (AGGHG_LVSTK; the scope-1 fields when settings.USE_GHG_SCOPE_1) at the stubble stocking
     rate. Sources are named 'STUBBLE_SHEEP_<field>'. Provisional: the cell's sheep factors, pending the emission
     factor rebuild."""
+    agghg = data.stubble(lu, lm)['AGGHG_LVSTK']
     if settings.USE_GHG_SCOPE_1:
-        ghg_raw = data.AGGHG_LVSTK.loc[:, (data.AGGHG_LVSTK.columns.get_level_values(0) == 'SHEEP') &
-                                          (data.AGGHG_LVSTK.columns.get_level_values(1).isin(settings.LVSTK_GHG_SCOPE_1))]
+        ghg_raw = agghg.loc[:, (agghg.columns.get_level_values(0) == 'SHEEP') &
+                               (agghg.columns.get_level_values(1).isin(settings.LVSTK_GHG_SCOPE_1))]
     else:
-        ghg_raw = data.AGGHG_LVSTK.loc[:, ('SHEEP', slice(None))]
-    head_cell = get_stubble_yield_pot(data) * data.REAL_AREA
+        ghg_raw = agghg.loc[:, ('SHEEP', slice(None))]
+    head_cell = get_stubble_yield_pot(data, lu, lm) * data.REAL_AREA
     ghg_rs = pd.DataFrame(
         np.nan_to_num(ghg_raw.to_numpy() / 1000 * head_cell[:, np.newaxis]),   # no sheep data: no stubble sheep
         columns=pd.MultiIndex.from_tuples([(f'STUBBLE_SHEEP_{src}', lm, lu) for _, src in ghg_raw.columns]),
