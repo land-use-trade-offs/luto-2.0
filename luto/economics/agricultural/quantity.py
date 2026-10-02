@@ -155,8 +155,9 @@ def get_stubble_yield_pot(data):
 
 
 def get_quantity_stubble(data, pr):
-    """Return the stubble-sheep yield of `pr` ('SHEEP - STUBBLE MEAT', 'WOOL' or 'LEXP') <unit: t/cell>, per cell of a
-    cereal land use: the sheep per-head quantities (F x Q, AGEC_LVSTK) times the stubble stocking rate."""
+    """Return the stubble-sheep yield of `pr` ('SHEEP - STUBBLE <LU> MEAT', 'WOOL' or 'LEXP', one set per stubble land
+    use) <unit: t/cell>, per cell of its cereal land use: the sheep per-head quantities (F x Q, AGEC_LVSTK) times the
+    stubble stocking rate."""
     fq = {'MEAT': ('F1', 'Q1'), 'WOOL': ('F2', 'Q2'), 'LEXP': ('F3', 'Q3')}[pr.split()[-1]]
     quantity = data.AGEC_LVSTK[fq[0], 'SHEEP'] * data.AGEC_LVSTK[fq[1], 'SHEEP']
     return np.nan_to_num((quantity * get_stubble_yield_pot(data) * data.REAL_AREA).to_numpy(copy=True))   # writable (get_quantity scales it in place); no sheep data: 0
@@ -289,7 +290,7 @@ def get_quantity(data, pr, lm, yr_idx):
         raise KeyError(f"Land use '{pr}' not found in data.")
 
     # Apply productivity increase multiplier by product (stubble sheep take the modified-land sheep product's).
-    pr_trend = pr.replace(' - STUBBLE ', ' - MODIFIED LAND ') if pr in data.PR_STUBBLE else pr
+    pr_trend = 'SHEEP - MODIFIED LAND ' + pr.split()[-1] if pr in data.PR_STUBBLE else pr
     q *= data.PRODUCTIVITY_MUL_xr.sel(lm=lm, product=pr_trend, year=data.YR_CAL_BASE + yr_idx).item()
 
     return q

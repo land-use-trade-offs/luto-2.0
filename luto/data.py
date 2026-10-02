@@ -321,14 +321,14 @@ class Data:
             'SHEEP - NATURAL LAND WOOL'
         ]
         
-        # Sheep grazing cereal stubble (settings.STUBBLE_DSE_FILE): its own products on the cereal land uses, so that
-        # cereal columns carry sheep meat, wool and live exports into the sheep commodities' demand rows
+        # Sheep grazing cereal stubble (settings.STUBBLE_DSE_FILE): its own products on each cereal land use, so that
+        # cereal columns carry sheep meat, wool and live exports into the sheep commodities' demand rows. One set per
+        # stubble land use ('SHEEP - STUBBLE WINTER MEAT', ...), so each product has one land use and its quantity can
+        # follow that land use's cells; the names never contain both words of a crop commodity.
         self.LU_STUBBLE = settings.STUBBLE_LAND_USES if settings.STUBBLE_DSE_FILE else []
-        self.PR_STUBBLE = [
-            'SHEEP - STUBBLE LEXP',
-            'SHEEP - STUBBLE MEAT',
-            'SHEEP - STUBBLE WOOL',
-        ] if settings.STUBBLE_DSE_FILE else []
+        self.LU2PR_STUBBLE = {lu: [f'SHEEP - STUBBLE {lu.split()[0].upper()} {x}' for x in ('LEXP', 'MEAT', 'WOOL')]
+                              for lu in self.LU_STUBBLE}
+        self.PR_STUBBLE = [pr for prs in self.LU2PR_STUBBLE.values() for pr in prs]
 
         # Sort each product category alphabetically, then concatenate
         self.PRODUCTS = self.PR_CROPS + self.PR_LVSTK + self.PR_STUBBLE
@@ -345,7 +345,7 @@ class Data:
                 if lu.upper() in PR:
                     self.LU2PR_DICT[lu] = self.LU2PR_DICT[lu] + [PR]
         for lu in self.LU_STUBBLE:
-            self.LU2PR_DICT[lu] = self.LU2PR_DICT[lu] + self.PR_STUBBLE
+            self.LU2PR_DICT[lu] = self.LU2PR_DICT[lu] + self.LU2PR_STUBBLE[lu]
 
         # A reverse dictionary for convenience.
         self.PR2LU_DICT = {pr: key for key, val in self.LU2PR_DICT.items() for pr in val}
