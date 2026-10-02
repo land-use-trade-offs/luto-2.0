@@ -28,7 +28,7 @@ import luto.tools as tools
 from luto import settings
 from luto.solvers.col_builder import ColSupport
 from luto.solvers.row_inputs import EconomicInputs, RowInputs
-from luto.solvers.row_table import ROW_FILL, ROW_SCHEMA, make_part
+from luto.solvers.row_table import ROW_FILL, ROW_SCHEMA, make_part, slack_unit
 
 
 # ═══════════════════════════ get_rows: the row space of one step ═══════════════════════════
@@ -241,9 +241,11 @@ def get_obj(econ: EconomicInputs, cols: xr.Dataset, inputs: RowInputs) -> np.nda
 
 
 def add_elastic(A: sparse.csr_matrix, rows: xr.Dataset, cols: xr.Dataset, obj: np.ndarray):
-    """Every active row of a settings.ELASTIC_FAMILIES family gets its own shortfall column s in [0, 1] (block
-    ``slack``): a·x + rhs·s >= rhs on the scaled row (so the coefficient is the row's scaled rhs; sign-flipped on a <
-    row), at settings.ELASTIC_PENALTY AUD per unit in the objective (million AUD there, as every objective coefficient).
+    """Every active row of a settings.ELASTIC_FAMILIES family gets its own shortfall column (block ``slack``):
+    a·x + rhs·s >= rhs on the scaled row, s the fraction of the target missed (sign-flipped on a < row), at
+    settings.ELASTIC_PENALTY AUD per target missed in full (million AUD in the objective, as every objective coefficient).
+    The column carries s in the row's own units, s' = unit · s (``row_table.slack_unit``: |rhs|) — coefficient ±1, ub and
+    penalty rescaled to match — so the scaled rhs never enters the matrix; a reader divides by the unit.
     ``rows['slack_col']`` names the column."""
     on = np.flatnonzero(np.isin(rows['family'].values, settings.ELASTIC_FAMILIES) & rows['active'].values)
     if on.size == 0:
@@ -262,14 +264,17 @@ def add_elastic(A: sparse.csr_matrix, rows: xr.Dataset, cols: xr.Dataset, obj: n
     gbf = np.array([f.startswith('GBF') for f in rows['family'].values[on]], dtype=bool)
     if ((rhs == 0) & ~gbf).any():
         print(f"│   elastic: {((rhs == 0) & ~gbf).sum():,} non-GBF row(s) with a target of 0 cannot be relaxed", flush=True)
-    coef = (np.where(sense == '<', -1.0, 1.0) * np.where(gbf, rhs, np.abs(rhs))).astype(A.dtype)   # A's dtype (float32): hstack would upcast the whole matrix to float64
+    # The column carries s' = unit · s (unit = |m|, row_table.slack_unit): m·s = sign(m)·s', so the coefficient is ±1 (0
+    # where m = 0: the row cannot be relaxed), the ub × unit and the penalty / unit — the same LP, m kept out of the matrix
+    unit = slack_unit(rhs)
+    coef = (np.where(sense == '<', -1.0, 1.0) * np.where(gbf, np.sign(rhs), (rhs != 0).astype(np.float64))).astype(A.dtype)   # A's dtype (float32): hstack would upcast the whole matrix to float64
     A = sparse.hstack([A, sparse.csr_matrix((coef, (on, np.arange(n))), shape=(A.shape[0], n))], format='csr', dtype=A.dtype)
     slack = xr.Dataset({v: (('col',), np.full(n, 'slack' if v == 'block' else 0.0 if cols[v].dtype.kind == 'f' else -1,
                                               dtype=cols[v].dtype)) for v in cols.data_vars})
-    slack['ub'] = (('col',), np.where(gbf, 1.0, np.inf).astype(cols['ub'].dtype))     # GBF: at most the whole target
+    slack['ub'] = (('col',), np.where(gbf, unit, np.inf).astype(cols['ub'].dtype))    # GBF: at most the whole target (s = 1)
     cols = xr.concat([cols, slack], 'col')
-    penalty = settings.ELASTIC_PENALTY / 1e6 * (-1 if settings.OBJECTIVE == 'maxprofit' else 1)   # AUD -> million AUD, a cost
-    obj = np.concatenate([obj, np.full(n, penalty, dtype=obj.dtype)])
+    penalty = settings.ELASTIC_PENALTY / 1e6 * (-1 if settings.OBJECTIVE == 'maxprofit' else 1)   # AUD -> million AUD, a cost per target missed
+    obj = np.concatenate([obj, (penalty / unit).astype(obj.dtype)])
     slack_col = rows['slack_col'].values.copy()
     slack_col[on] = n_col + np.arange(n)
     rows = rows.assign(slack_col=(('row',), slack_col))

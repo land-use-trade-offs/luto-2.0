@@ -123,7 +123,7 @@ def record_shadow_prices(luto_solver, target_year, out_dir) -> None:
     shortfall = np.full(rows.size, np.nan)
     elastic = slack_col >= 0
     if elastic.any():
-        shortfall[elastic] = luto_solver.x[slack_col[elastic]].X
+        shortfall[elastic] = luto_solver.x[slack_col[elastic]].X / row_table.slack_unit(T['rhs'].values[rows][elastic])   # the fraction missed
     short = shortfall > 1e-6                                                         # NaN (a hard row) is never short
     shadow_price[short] = np.nan
     shadow_price_AUD[short] = np.nan

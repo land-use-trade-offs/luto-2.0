@@ -34,7 +34,8 @@ matter, found round by round. Per step:
          OPEN          otherwise          a candidate row
   1. PASS 1 — find the rows. Round 0 adds the species with a row at the previous step's end (``carry``) and the open
      species short at the previous step's land use (scored at this year's layers), hardest first; each row with a
-     shortfall variable s in [0, 1] at settings.ELASTIC_PENALTY per target missed (a·x + rhs·s ≥ rhs), so no round is
+     shortfall variable s in [0, 1] at settings.ELASTIC_PENALTY per target missed (a·x + rhs·s ≥ rhs; carried in the
+     row's units, s' = |rhs|·s at coefficient 1, row_table.slack_unit — the scaled rhs kept out of the matrix), so no round is
      infeasible. Solve; score EVERY species at x (W @ H(x), one product, no rows built); the open species WITHOUT a row
      that are short join the next round, hardest first. Stop when none is short: x is then optimal for the model with
      every open species' row. The species left with s > 0 cannot be met together with the rest of the step.
@@ -62,7 +63,7 @@ from luto import settings
 from luto.solvers.col_builder import ColSupport
 from luto.solvers.row_builder import bio_contribution, contract
 from luto.solvers.row_inputs import RowInputs
-from luto.solvers.row_table import ROW_FILL, make_part
+from luto.solvers.row_table import ROW_FILL, make_part, slack_unit
 
 # ═══════════════════════════ tolerances ═══════════════════════════
 
@@ -117,6 +118,7 @@ class GBF8RowGen:
         self.s = np.full(self.species.size, np.nan)                          # pass 1's shortfall, where the species had a row
         self.row_of = np.full(self.species.size, -1, dtype=np.int64)         # its row in the solver's table
         self.s_var = {}                                                      # species index -> its shortfall variable (pass 1)
+        self.s_unit = np.ones(self.species.size)                             # its unit (row_table.slack_unit): s = s_var.X / s_unit
         self.final = None
         self.rounds = []
         # ── 1e. the log ──
@@ -156,11 +158,13 @@ class GBF8RowGen:
         # ── 3b. onto the live model: with a shortfall variable each (pass 1), or hard (pass 2) ──
         if npass == 1:
             sign = -1.0 if model.ModelSense == -1 else 1.0                                     # a shortfall always COSTS objective
-            s_vars = model.addVars(idx.size, lb=0.0, ub=1.0, obj=sign * settings.ELASTIC_PENALTY / 1e6, name="GBF8_short")   # million AUD
+            unit = slack_unit(rhs)                                                             # s' = unit · s: ub × unit, penalty / unit
+            s_vars = model.addVars(idx.size, lb=0.0, ub=unit.tolist(), obj=(sign * settings.ELASTIC_PENALTY / 1e6 / unit).tolist(), name="GBF8_short")   # million AUD per target missed
             model.update()
             s_list = [s_vars[i] for i in range(idx.size)]
-            constrs = model.addMConstr(sparse.hstack([block, sparse.diags(rhs)], format='csr'), solver._vars + s_list, '>', rhs).tolist()   # a·x + rhs·s ≥ rhs, scaled
+            constrs = model.addMConstr(sparse.hstack([block, sparse.diags(np.sign(rhs))], format='csr'), solver._vars + s_list, '>', rhs).tolist()   # a·x + s' ≥ rhs, scaled
             self.s_var.update(zip(idx.tolist(), s_list))
+            self.s_unit[idx] = unit
         else:
             constrs = model.addMConstr(block, solver._vars, '>', rhs).tolist()
         model.setAttr('ConstrName', constrs, names)
@@ -195,7 +199,7 @@ class GBF8RowGen:
         score = self.W @ self.habitat(x)
         candidates = self.open & (self.row_of < 0) & ~self.dropped
         short_out = np.flatnonzero(candidates & self.is_short(score))
-        s = np.array([self.s_var[i].X for i in np.flatnonzero(self.row_of >= 0) if i in self.s_var]) if npass == 1 else np.zeros(0)
+        s = np.array([self.s_var[i].X / self.s_unit[i] for i in np.flatnonzero(self.row_of >= 0) if i in self.s_var]) if npass == 1 else np.zeros(0)
         # ── 3f. the round's record ──
         model = solver.gurobi_model
         rec.update(short_in_model=int((s > S_TOL).sum()), sum_s=float(s.sum()), short_outside=int(short_out.size),
@@ -229,7 +233,7 @@ class GBF8RowGen:
                   f"{short_out.size:,} open species short and without a row — NOT converged", flush=True)
         # ── 4b. what pass 1 leaves: the species short with a row ──
         rowed = np.flatnonzero(self.row_of >= 0)
-        self.s[rowed] = [self.s_var[i].X for i in rowed]
+        self.s[rowed] = [self.s_var[i].X / self.s_unit[i] for i in rowed]
         short = rowed[self.s[rowed] > S_TOL]
 
         # ── 4c. pass 2: the species pass 1 left short dropped, every other row hard (under a feasibility-first pass 1,

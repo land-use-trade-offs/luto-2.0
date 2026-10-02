@@ -44,6 +44,7 @@ from luto.solvers.gbf8_rowgen import GBF8RowGen
 from luto.solvers.row_inputs import RowInputs, get_economics, get_row_inputs
 from luto.solvers.row_builder import add_elastic, elastic_absorbs, get_rows, get_obj
 from luto.solvers.row_bounds import STATUS, drop_redundant_rows, get_row_bounds, report_row_bounds
+from luto.solvers.row_table import slack_unit
 from luto.solvers.solver import LutoSolver
 from luto.solvers.post_solve import post_solve
 from luto.solvers.tools import record_shadow_prices
@@ -328,7 +329,7 @@ def solve_elastic_hard_pass(luto_solver: LutoSolver, x: np.ndarray, target_year:
     written first (shortfall_<year>.csv, with ``dropped``). Returns (accepted, x, status) as ``solve_with_retries``."""
     rows = luto_solver.rows
     on = np.flatnonzero((rows['slack_col'].values >= 0) & rows['active'].values)
-    s = x[rows['slack_col'].values[on]]
+    s = x[rows['slack_col'].values[on]] / slack_unit(rows['rhs'].values[on])               # the fraction of the target missed
     short = on[s > 1e-6]
     report_shortfall(x, rows, target_year, out_dir, dropped=short)
     feasibility_first = settings.ELASTIC_PASS1_COST_SCALE != 1
@@ -356,13 +357,13 @@ def report_shortfall(x: np.ndarray, rows, target_year: int, out_dir: str, droppe
     on = np.flatnonzero(rows['slack_col'].values >= 0)
     if on.size == 0:
         return
-    s = x[rows['slack_col'].values[on]]
     rhs, scale = rows['rhs'].values[on], rows['scale'].values[on]
+    s = x[rows['slack_col'].values[on]] / slack_unit(rhs)                                   # the column carries unit · s
     gbf = np.array([f.startswith('GBF') for f in rows['family'].values[on]], dtype=bool)
     df = pd.DataFrame({'family': rows['family'].values[on], 'sense': rows['sense'].values[on], 'region': rows['region'].values[on],
                        'GBF_target': rows['GBF_target'].values[on], 'name': rows['name'].values[on],
                        'shortfall_frac': s, 'target_raw': rhs * scale,
-                       'shortfall_raw': s * np.where(gbf, rhs, np.abs(rhs)) * scale,   # the bound moved, as add_elastic's slack coefficient
+                       'shortfall_raw': s * np.where(gbf, rhs, np.abs(rhs)) * scale,   # the bound moved (add_elastic's m · s), in raw units
                        'dropped': np.isin(on, [] if dropped is None else dropped)})    # settings.ELASTIC_DROP_SHORT: removed before the hard pass
     df.sort_values('shortfall_frac', ascending=False).to_csv(f"{out_dir}/shortfall_{target_year}.csv", index=False)
     short = df[df['shortfall_frac'] > 1e-6]
