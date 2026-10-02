@@ -327,11 +327,11 @@ def get_irrpast_energy_ghg_matrices(data: Data) -> np.ndarray:
     field except the soil field, on the irrigated livestock land uses. `get_ghg_lvstk` adds them with no scope-1 filter."""
     g_mrj = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
     energy_cols = [c for c in data.AGGHG_IRRPAST.columns if 'CO2E' in c and c not in settings.CROP_GHG_SCOPE_1]
-    energy_r = (data.AGGHG_IRRPAST[energy_cols].sum(axis=1).to_numpy() / 1000 * data.REAL_AREA).astype(np.float32)
     m = data.LANDMANS.index('irr')
     for j, lu in enumerate(data.AGRICULTURAL_LANDUSES):
         if lu in data.LU_LVSTK:
-            g_mrj[m, :, j] = energy_r
+            irrpast = data.agghg_irrpast(lu, 'irr')       # block-aggregated per (lm, lu) at RESFACTOR > 1, as get_ghg_lvstk reads it
+            g_mrj[m, :, j] = (irrpast[energy_cols].sum(axis=1).to_numpy() / 1000 * data.REAL_AREA).astype(np.float32)
     return g_mrj
 
 
