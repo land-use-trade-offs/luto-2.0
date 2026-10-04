@@ -32,7 +32,6 @@ import luto.settings as settings
 import luto.economics.agricultural.quantity as ag_quantity
 import luto.economics.non_agricultural.quantity as non_ag_quantity
 import luto.economics.agricultural.water as ag_water
-from luto.tools.Manual_jupyter_books.helpers import arr_to_xr
 
 from collections import defaultdict
 from typing import Any, Literal, Optional
@@ -154,7 +153,7 @@ class Data:
 
         # Mask out non-agricultural, non-environmental plantings land (i.e., -1) from lumap 
         self.LUMASK = self.LUMAP_NO_RESFACTOR != self.MASK_LU_CODE                                                      # 1D (ij flattend);  `True` for land uses; `False` for desert, urban, water, etc
-        self.LUMASK_2D_FULLRES = np.nan_to_num(arr_to_xr(self, self.LUMASK))
+        self.LUMASK_2D_FULLRES = np.nan_to_num(tools.arr_to_xr(self, self.LUMASK))
         
 
         # Return combined land-use and resfactor mask
@@ -196,7 +195,7 @@ class Data:
             raise KeyError("Resfactor setting invalid")
         
         # Get the 2D MASK
-        self.MASK_2D = np.nan_to_num(arr_to_xr(self, self.MASK))
+        self.MASK_2D = np.nan_to_num(tools.arr_to_xr(self, self.MASK))
         
         
         # Get the lon/lat coordinates.
@@ -519,7 +518,7 @@ class Data:
         )        
         
         self.REGION_NRM_CODE = REGION_NRM_r['NRM_CODE']
-        self.REGION_NRM_NAME = REGION_NRM_r['NRM_NAME'].values
+        self.REGION_NRM_NAME = REGION_NRM_r['NRM_NAME'].to_numpy()
         
         REGION_STATE_r = pd.read_hdf(
             os.path.join(settings.INPUT_DIR, "REGION_STATE_r.h5"), where=self.MASK
@@ -894,14 +893,14 @@ class Data:
         
   
         # Boolean x_mrj matrix with allowed land uses j for each cell r under lm.
-        # When RESFACTOR > 1, average all fullres cells in each block; > 0 means eligible.
+        # When RESFACTOR > 1, average the block's land-use cells (LUMASK, the cells RESFACTOR 1 models); > 0 means eligible.
         x_mrj_full = np.load(os.path.join(settings.INPUT_DIR, "x_mrj.npy"))
         if settings.RESFACTOR == 1:
             self.EXCLUDE = x_mrj_full[:, self.MASK, :]
         else:
             self.EXCLUDE = np.stack([
                 np.stack([
-                    self.get_resfactored_average_fraction(x_mrj_full[m, :, j], use_valid_cell_count=False)
+                    self.get_resfactored_average_fraction(x_mrj_full[m, :, j] & self.LUMASK, use_valid_cell_count=False)
                     for j in range(self.N_AG_LUS)
                 ], axis=-1)
                 for m in range(self.NLMS)

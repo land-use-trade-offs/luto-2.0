@@ -41,7 +41,6 @@ from luto import settings
 from luto import tools
 from luto.data import Data
 
-from luto.tools.Manual_jupyter_books.helpers import arr_to_xr
 from luto.tools.report.data_tools.parameters import GHG_NAMES
 from luto.tools.report.create_report_layers import save_report_layer
 from luto.tools.report.create_report_data import save_report_data
@@ -231,7 +230,7 @@ def save2nc(in_xr: xr.DataArray, save_path: str):
             [in_xr[n].values for n in mi_names], names=mi_names
         )
         midx_coords = xr.Coordinates.from_pandas_multiindex(layer_midx, 'layer')
-        in_xr = in_xr.drop_vars(mi_names, errors='ignore').assign_coords(midx_coords)
+        in_xr = in_xr.drop_vars(mi_names + ['layer'], errors='ignore').assign_coords(midx_coords)
         ds         = cfxr.encode_multi_index_as_compress(in_xr.to_dataset(name='data'), 'layer')
         chunksizes = [n_cells if d == 'cell' else 1 for d in ds['data'].dims]
         enc        = {'data': {'dtype': 'float32', 'zlib': True, 'complevel': 1, 'chunksizes': chunksizes}}
@@ -678,7 +677,7 @@ def write_dvar_and_mosaic_map(data: Data, yr_cal, path):
     
     
     xr.Dataset({
-        'layer':arr_to_xr(data, lumap_xr_ALL.astype(np.float32))
+        'layer':tools.arr_to_xr(data, lumap_xr_ALL.astype(np.float32))
     }).to_netcdf(os.path.join(path, f'xr_map_template_{yr_cal}.nc'))
 
     return f"Mosaic maps written for year {yr_cal}"
@@ -1143,7 +1142,7 @@ def write_economics(data: Data, yr_cal, path):
         parts.append((ag_dvar_mrj * src_xr).expand_dims({'source': [src]}).compute())
         del src_xr
         gc.collect()
-    xr_ag_rev = xr.concat(parts, dim='source')
+    xr_ag_rev = xr.concat(parts, dim='source', join='outer')
     del parts
 
     parts = []
@@ -1155,7 +1154,7 @@ def write_economics(data: Data, yr_cal, path):
         parts.append((ag_dvar_mrj * src_xr).expand_dims({'source': [src]}).compute())
         del src_xr
         gc.collect()
-    xr_ag_cost = xr.concat(parts, dim='source')
+    xr_ag_cost = xr.concat(parts, dim='source', join='outer')
     del parts
 
     # ag2ag: loop over cost components — values are already $ paid (Σ cost·D), no dvar multiplication.
@@ -2187,8 +2186,8 @@ def write_transition_nonag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
                 'cell': range(data.NCELLS),
                 'To-land-use': data.AGRICULTURAL_LANDUSES},
     ).expand_dims({'From-water-supply': ['dry']}   # non-ag source is dryland
-    ).assign_coords(region=('cell', data.REGION_NRM_NAME)
-    ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
+    ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
+    ).assign_coords(region=('cell', data.REGION_NRM_NAME))
 
     area_xr = area_xr / gap   # annualise: one-off area over the period → annual rate
     area_xr = add_all(area_xr, dims_area)
@@ -2259,8 +2258,8 @@ def write_transition_nonag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
             'To-land-use': data.AGRICULTURAL_LANDUSES
         }
     ).unstack('lu_source'
-    ).assign_coords(region=('cell', data.REGION_NRM_NAME)
-    ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)})
+    ).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, data.NCELLS)}
+    ).assign_coords(region=('cell', data.REGION_NRM_NAME))
 
     cost_xr = cost_xr / gap   # annualise: one-off cost over the period → annual rate
     cost_xr = add_all(cost_xr, ['From-land-use', 'To-land-use', 'Cost-type'])
@@ -3498,7 +3497,7 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
     # save_report_data moves it into DATA_REPORT/data/geo/ after the Vue copy.
     geojson_js_path = f'{data.path}/biodiversity_GBF2_mask.js'
     if not os.path.exists(geojson_js_path):
-        mask_2d_da = arr_to_xr(data, data.BIO_GBF2_MASK)
+        mask_2d_da = tools.arr_to_xr(data, data.BIO_GBF2_MASK)
         mask_2d_np = np.where(np.isnan(mask_2d_da.values), 0, mask_2d_da.values).astype(np.uint8)
 
         # Vectorize using rasterio.features.shapes with the model's CRS and transform

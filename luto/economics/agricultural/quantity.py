@@ -239,7 +239,7 @@ def get_quantity_crop(data, pr, lm, yr_idx):
     else: # Calculate the quantities
         
         # Get the raw quantities in tonnes/ha from data.
-        quantity = data.AGEC_CROPS['Yield', lm, pr].copy().to_numpy()
+        quantity = data.AGEC_CROPS['Yield', lm, pr].to_numpy(copy=True)
         
         # Apply climate change yield impact multiplier. Takes land use (lu) as input rather than product (pr) but lu == pr for crops
         quantity *= get_ccimpact(data, pr, lm, yr_idx)
