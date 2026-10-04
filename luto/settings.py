@@ -121,6 +121,12 @@ TRANSITION_COST_MULT = 1
 # 1 = baseline; <1 tighter ceilings; >1 relaxed ceilings (capped at 1.0 to stay a valid proportion).
 TECH_ADOPT_MULT = 1
 
+# Observed ag-management adoption caps (DCCEEW baseline calibration run). None = off (no caps).
+# Otherwise a path under INPUT_DIR to the caps file written by luto/tools/ag_mgt_caps.py (e.g. 'ag_mgt_caps/caps.csv').
+# Each (option, land use) with rows is limited to min(current limit, observed cap); the cap is held flat after the
+# file's last year, and an (option, land use) with no rows keeps its current limit.
+AG_MANAGEMENT_OBSERVED_CAPS = None
+
 # Set whether to use demand elasticity when calculating commodity prices
 DYNAMIC_PRICE = True
 
@@ -745,6 +751,12 @@ HIR_PRODUCTIVITY_CONTRIBUTION = 0.5
 # HIR celling factor, assuming HIR achienves x% of bio/GHG benefits of the Destocked - natural land land use
 HIR_CEILING_PERCENTAGE = 0.8
 
+# Existing-HIR-project baseline on the two GHG rows. None = off. Otherwise a folder under INPUT_DIR written by
+# luto/tools/ag_mgt_caps.py (e.g. 'ag_mgt_caps'). LUTO's HIR then counts only above the regrowth (LULUCF row) and
+# destocking (AG row) of the existing ACCU HIR projects on their mapped cells, as its plantings count above the
+# plantings baseline: the NIR series already carry those projects.
+HIR_BASELINE = None
+
 # Maintainace cost for HIR
 BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
 SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
@@ -767,7 +779,8 @@ EGGS_AVG_WEIGHT = 60  # Average weight of an egg in grams
 # Environmental parameters
 # ---------------------------------------------------------------------------- #
 
-# Take data from 'GHG_targets.xlsx', 
+# The AusTIMES pathway each level names: it picks the demand multipliers (AusTIMES_demand_multiplier.xlsx) and the
+# 'AS_GHG' carbon price. It no longer picks the GHG targets (GHG_targets.xlsx is retired).
 GHG_TARGETS_DICT = {
     'off':     None,
     'low':    '1.8C 67%',
@@ -775,9 +788,14 @@ GHG_TARGETS_DICT = {
 }
 
 # Greenhouse gas emissions limits and parameters *******************************
-GHG_EMISSIONS_LIMITS = 'low'         # 'off', 'low', 'medium', or 'high'
+GHG_EMISSIONS_LIMITS = 'low'         # 'off', 'low', or 'high'
 '''
-`GHG_EMISSIONS_LIMITS` options include: 
+Any level but 'off' adds two GHG rows in the years the target series bind: agriculture-sector emissions and net
+LULUCF, each against its own series in input/ghg_targets/ (NIR 2024 history, DCCEEW 2025 baseline projections,
+built by luto/tools/ghg_targets.py). In the other years the series are benchmarks, reported in
+GHG_emissions_split_<yr>.csv but not imposed. 'off' adds no GHG row.
+
+Historical `GHG_EMISSIONS_LIMITS` options (targets from the retired GHG_targets.xlsx):
 - (deprecated) Assuming agriculture is responsible to sequester 100% of the carbon emissions
     - '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)' 
 - (deprecated) Assuming agriculture is responsible to sequester carbon emissions not including electricity emissions and  off-land emissions 
@@ -786,6 +804,13 @@ GHG_EMISSIONS_LIMITS = 'low'         # 'off', 'low', 'medium', or 'high'
     - '1.5C (67%) excl. avoided emis SCOPE1', '1.5C (50%) excl. avoided emis SCOPE1', or '1.8C (67%) excl. avoided emis SCOPE1'
 - Assuming agriculture is responsible to sequester carbon emissions only in the scope 1 emissions (i.e., direct emissions From-land-use and livestock types):
     - '1.5C 50%', '1.8C 67%'
+'''
+
+GHG_BENCHMARK_ROWS = []
+'''
+The GHG rows held as benchmarks in the years the target series bind: the row is computed and reported in
+GHG_emissions_split_<yr>.csv with its deviation from its series, but not imposed. [] = both rows binding (default);
+any of 'AG' (agriculture) and 'LULUCF' (net LULUCF), e.g. ['AG'] in calibration runs until activity is calibrated.
 '''
   	  	  
 

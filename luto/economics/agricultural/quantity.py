@@ -85,11 +85,12 @@ def get_ccimpact(data, lu, lm, yr_idx):
     yr_cal = data.YR_CAL_BASE + yr_idx
 
     # Interpolate climate change damage for lu, lm, and year for each cell using a linear function.
+    anchor = data.CLIMATE_CHANGE_IMPACT_ANCHOR_YEAR          # The year the file's multipliers are relative to (2010)
     xs = {t[2] for t in data.CLIMATE_CHANGE_IMPACT.columns}  # Returns set {2020, 2050, 2080}
-    xs.add(2010)                                             # Adds the year 2010 and returns set {2010, 2020, 2050, 2080}
+    xs.add(anchor)                                           # Adds the anchor year and returns set {2010, 2020, 2050, 2080}
     xs = sorted(xs)                                          # Returns list and ensures sorted lowest to highest [2010, 2020, 2050, 2080]
     yys = data.CLIMATE_CHANGE_IMPACT[lm, lu].fillna(1)       # Grabs the column and replaces NaNs with ones to avoid issues with calculating water use limits
-    yys.insert(0, '2010', 1)                                 # Insert a new column for 2010 with value of 1 to ensure no climate change impact at 2010
+    yys.insert(0, str(anchor), 1)                            # Insert a new column for the anchor year with value of 1 to ensure no climate change impact there
     yys = yys.astype(np.float32)
 
     # Create linear function f and interpolate climate change impact

@@ -63,15 +63,19 @@ class RowInputs:
     mask_mnes_solar: np.ndarray                                         # cells solar is kept out of by the EPBC MNES mask: the column exists, the renewable row leaves them out
     mask_mnes_wind: np.ndarray                                          # the same for wind
 
-    ag_g_mrj: np.ndarray                                                # agricultural GHG emissions [m, r, j]
+    # The GHG streams by the row they sit on: agriculture ('ag') or net LULUCF ('lulucf'). Every sub-term is on one
+    # row (ag_ghg.AG_MAN_GHG_SUBTERMS, non_ag_ghg.NON_AG_GHG_SUBTERMS); the two rows' streams sum to the single net row's.
+    ag_g_mrj: np.ndarray                                                # agricultural GHG emissions [m, r, j]: all on the ag row
     ag_w_mrj: np.ndarray                                                # agricultural water net yield [m, r, j]
     ag_q_mrp: np.ndarray                                                # agricultural production quantity [m, r, p] (p = product, not land use)
 
-    non_ag_g_rk: np.ndarray                                             # non-agricultural GHG emissions [r, k]
+    non_ag_g_rk_ag: np.ndarray                                          # non-agricultural GHG emissions [r, k] on the ag row (the belts' livestock share)
+    non_ag_g_rk_lulucf: np.ndarray                                      # non-agricultural GHG emissions [r, k] on the LULUCF row
     non_ag_w_rk: np.ndarray                                             # non-agricultural water net yield [r, k]
     non_ag_q_crk: np.ndarray                                            # non-agricultural production quantity [c, r, k]
 
-    ag_man_g_mrj: dict                                                  # {am: GHG emission effect [m, r, j_idx]}
+    ag_man_g_mrj_ag: dict                                               # {am: GHG emission effect [m, r, j_idx]} on the ag row (a zero view where the option has none)
+    ag_man_g_mrj_lulucf: dict                                           # {am: GHG emission effect [m, r, j_idx]} on the LULUCF row (a zero view where the option has none)
     ag_man_w_mrj: dict                                                  # {am: water net-yield effect [m, r, j_idx]}
     ag_man_q_mrp: dict                                                  # {am: production quantity effect [m, r, p]}
     ag_man_limits: dict                                                 # {am: {j: adoption limit}}
@@ -98,18 +102,28 @@ class RowInputs:
     GBF8_region_species: list                                           # GBF8 constraint pairs - list[(region, species)]
 
     commodity_names: list[str]                                          # commodity names (data.COMMODITIES order)
-    offland_ghg: np.ndarray                                             # target-year GHG emissions from off-land commodities (tCO2e); 0.0 when GHG limits are off
+    offland_ghg: float                                                  # target-year GHG emissions from off-land commodities (tCO2e), on the ag row; 0.0 when GHG limits are off
+    offland_ghg_energy: float                                           # ... the part of it that is on-farm energy CO2 (direct and embedded; off-inventory, kept on the ag row)
     lu2pr_pj: np.ndarray                                                # conversion matrix: product (p) × land use (j)
     pr2cm_cp: np.ndarray                                                # conversion matrix: commodity (c) × product (p)
     limits: dict                                                        # raw constraint targets for the target year (see get_limits)
     real_area: np.ndarray                                               # area of each cell (ha), per cell (r)
     ag_mask_proportion_r: np.ndarray                                    # base-year (2010) agricultural proportion of each cell (r)
 
-    trans_ghg_ag2ag: dict                                               # {(from_m, from_j): ndarray[to_m, local_r, to_j]} transition emissions, raw tCO2e, float32
+    trans_ghg_ag2ag: dict                                               # {(from_m, from_j): ndarray[to_m, local_r, to_j]} transition emissions, raw tCO2e, float32; on the LULUCF row
 
     @property
     def ncms(self):
         return len(self.commodity_names)
+
+
+def get_ghg_side(parts: dict, subterms: dict, side: str) -> np.ndarray:
+    """The float32 sum of the sub-terms of `parts` on `side` ('AG' or 'LULUCF'); a zero view when none are."""
+    on_side = [name for name in parts if subterms[name] == side]
+    if not on_side:
+        shape = next(iter(parts.values())).shape
+        return np.broadcast_to(np.float32(0.0), shape)
+    return ag_ghg.sum_parts({name: parts[name] for name in on_side}).astype(np.float32, copy=False)
 
 
 # ═══════════════════════════ the year's targets ═══════════════════════════
@@ -123,13 +137,14 @@ def get_limits(data: Data, yr_cal: int) -> dict[str, Any]:
 
     # Clamped again here, not only in Data.__init__: a resumed run loads a pickled Data and never
     # re-runs __init__, so a checkpoint written before the clamp existed would still carry negatives.
-    limits['demand'] = np.maximum(data.D_CY[yr_cal - data.YR_CAL_BASE], 0.0)
+    limits['demand'] = np.maximum(data.D_CY_xr.sel(year=yr_cal).values, 0.0)
 
     if settings.WATER_LIMITS == 'on':
         limits['water'] = data.WATER_YIELD_TARGETS
 
     if settings.GHG_EMISSIONS_LIMITS != 'off':
-        limits['ghg'] = data.GHG_TARGETS[yr_cal]
+        limits['ghg'] = data.GHG_TARGETS.loc[yr_cal].to_dict()                 # the year's series (t CO2e) and role: see Data.load_ghg_targets
+        limits['ghg'].update(ag_ghg.get_hir_baseline_t(data, yr_cal - data.YR_CAL_BASE))   # HIR_BASELINE_{AG,LULUCF}_t, 0 when off
 
     if any(settings.RENEWABLES_OPTIONS.values()):
         renewable_targets = data.RENEWABLE_TARGETS.query('Year == @yr_cal').set_index('state')
@@ -221,7 +236,12 @@ def get_row_inputs(data: Data, base_year: int, target_year: int) -> RowInputs:
     ag_q_mrp = ag_quantity.get_quantity_matrices(data, target_index).astype(np.float32)
 
     print('Getting non-agricultural GHG emissions matrices...', flush=True)
-    non_ag_g_rk = non_ag_ghg.get_ghg_matrix(data, ag_g_mrj).astype(np.float32)
+    non_ag_g_parts = non_ag_ghg.get_ghg_matrix(data, ag_g_mrj, separate=True)
+    non_ag_g_rk_ag, non_ag_g_rk_lulucf = (
+        np.stack([ag_ghg.side_of_parts(non_ag_g_parts[lu], non_ag_ghg.NON_AG_GHG_SUBTERMS[lu], side)
+                  for lu in data.NON_AGRICULTURAL_LANDUSES], axis=1).astype(np.float32)
+        for side in ('AG', 'LULUCF')
+    )
 
     print('Getting non-agricultural water yield matrices...', flush=True)
     non_ag_w_rk = non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj, target_index, *hist_water_yield).astype(np.float32)
@@ -230,7 +250,11 @@ def get_row_inputs(data: Data, base_year: int, target_year: int) -> RowInputs:
     non_ag_q_crk = non_ag_quantity.get_quantity_matrix(data, ag_q_mrp).astype(np.float32)
 
     print("Getting agricultural management options' GHG emission effects...", flush=True)
-    ag_man_g_mrj = {am: arr.astype(np.float32) for am, arr in ag_ghg.get_agricultural_management_ghg_matrices(data, target_index).items()}
+    ag_man_g_mrj_ag, ag_man_g_mrj_lulucf = (
+        {am: get_ghg_side(parts, ag_ghg.AG_MAN_GHG_SUBTERMS[am], side)
+         for am, parts in ag_ghg.get_agricultural_management_ghg_matrices(data, target_index, separate=True).items()}
+        for side in ('AG', 'LULUCF')
+    )
 
     print("Getting agricultural management options' water yield effects...", flush=True)
     ag_man_w_mrj = {am: arr.astype(np.float32) for am, arr in ag_water.get_agricultural_management_water_matrices(data, target_index).items()}
@@ -295,7 +319,12 @@ def get_row_inputs(data: Data, base_year: int, target_year: int) -> RowInputs:
     # ── 6. the year's targets, and the off-land emissions the GHG cap must leave room for ──
     limits = get_limits(data, target_year)
     offland_ghg = (
-        data.OFF_LAND_GHG_EMISSION_C[target_index]                         # raw tCO2e (row-rescaled in the solver)
+        float(data.OFF_LAND_GHG_EMISSION_C.loc[target_year])               # raw tCO2e (row-rescaled in the solver)
+        if settings.GHG_EMISSIONS_LIMITS != 'off'
+        else 0.0
+    )
+    offland_ghg_energy = (
+        float(data.OFF_LAND_GHG_EMISSION.query('YEAR == @target_year and `Emission Type`.str.contains("energy")')['Total GHG Emissions (tCO2e)'].sum())
         if settings.GHG_EMISSIONS_LIMITS != 'off'
         else 0.0
     )
@@ -318,10 +347,12 @@ def get_row_inputs(data: Data, base_year: int, target_year: int) -> RowInputs:
         ag_g_mrj=ag_g_mrj,
         ag_w_mrj=ag_w_mrj,
         ag_q_mrp=ag_q_mrp,
-        non_ag_g_rk=non_ag_g_rk,
+        non_ag_g_rk_ag=non_ag_g_rk_ag,
+        non_ag_g_rk_lulucf=non_ag_g_rk_lulucf,
         non_ag_w_rk=non_ag_w_rk,
         non_ag_q_crk=non_ag_q_crk,
-        ag_man_g_mrj=ag_man_g_mrj,
+        ag_man_g_mrj_ag=ag_man_g_mrj_ag,
+        ag_man_g_mrj_lulucf=ag_man_g_mrj_lulucf,
         ag_man_w_mrj=ag_man_w_mrj,
         ag_man_q_mrp=ag_man_q_mrp,
         ag_man_limits=ag_man_limits,
@@ -349,6 +380,7 @@ def get_row_inputs(data: Data, base_year: int, target_year: int) -> RowInputs:
 
         commodity_names=data.COMMODITIES,
         offland_ghg=offland_ghg,
+        offland_ghg_energy=offland_ghg_energy,
         lu2pr_pj=data.LU2PR,
         pr2cm_cp=data.PR2CM,
         limits=limits,

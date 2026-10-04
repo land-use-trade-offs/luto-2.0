@@ -877,7 +877,6 @@ def write_quantity(data: Data, yr_cal: int, path: str) -> np.ndarray:
     # ==================== Total / Comparison Summary ====================
 
     simulated_year_list = sorted(list(data.lumaps.keys()))
-    yr_idx = yr_cal - data.YR_CAL_BASE
     yr_idx_sim = simulated_year_list.index(yr_cal)
     yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1]
 
@@ -885,7 +884,7 @@ def write_quantity(data: Data, yr_cal: int, path: str) -> np.ndarray:
         assert data.YR_CAL_BASE <= yr_cal_sim_pre < yr_cal, f"yr_cal_sim_pre ({yr_cal_sim_pre}) must be >= {data.YR_CAL_BASE} and < {yr_cal}"
         prod_base = np.array(data.prod_data[yr_cal_sim_pre]['Production'])
         prod_targ = np.array(data.prod_data[yr_cal]['Production'])
-        demands = data.D_CY[yr_idx]
+        demands = data.D_CY_xr.sel(year=yr_cal).values
         pd.DataFrame({
             'Commodity': [i[0].capitalize() + i[1:] for i in data.COMMODITIES],
             'Prod_base_year (tonnes, KL)': prod_base,
@@ -2597,7 +2596,16 @@ def write_ghg(data: Data, yr_cal: int, path: str):
 
     # ==================== Total / Limit Summary ====================
 
-    ghg_limits = 0 if settings.GHG_EMISSIONS_LIMITS == 'off' else data.GHG_TARGETS[yr_cal]
+    # The limit on LUTO's modelled net emissions (GHG_EMISSIONS_TCO2e): the two rows' series with the exogenous
+    # constants on their left-hand sides taken out, AG - exogenous ag + LULUCF_MOD + plantings baseline + HIR baseline.
+    # Each row is compared with its own series in GHG_emissions_split_<yr>.csv.
+    if settings.GHG_EMISSIONS_LIMITS == 'off':
+        ghg_limits = 0
+    else:
+        t = data.GHG_TARGETS.loc[yr_cal]
+        hir = ag_ghg.get_hir_baseline_t(data, yr_idx)
+        ghg_limits = (t['AG_t'] - t['AG_EXO_t'] + t['LULUCF_MOD_t'] + t['PLANTINGS_BASELINE_t']
+                      + hir['HIR_BASELINE_AG_t'] + hir['HIR_BASELINE_LULUCF_t'])
     if yr_cal >= data.YR_CAL_BASE + 1:
         ghg_emissions = data.prod_data[yr_cal]['GHG']
     else:
@@ -2609,6 +2617,11 @@ def write_ghg(data: Data, yr_cal: int, path: str):
         'Emissions (t CO2e)': [ghg_limits, ghg_emissions],
         'Year': yr_cal,
     }).to_csv(os.path.join(path, f'GHG_emissions_{yr_cal}.csv'), index=False)
+
+    # ==================== The two constraint rows (agriculture, net LULUCF) ====================
+
+    if 'GHG_split' in data.prod_data.get(yr_cal, {}):
+        data.prod_data[yr_cal]['GHG_split'].to_csv(os.path.join(path, f'GHG_emissions_split_{yr_cal}.csv'), index=False)
 
     # ==================== Off-land Commodity ====================
 

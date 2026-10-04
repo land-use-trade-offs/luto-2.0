@@ -40,6 +40,7 @@ dependencies:
   - pip:
       - gurobipy==13.0.3
       - numpy_financial==1.1.0
+      - xlrd==2.0.2                # .xls reader for luto/tools/ag_mgt_caps.py (ABS 4627.0)
       # CPLEX: alternative solving engine in progress, not used by the model yet (needs IBM ILOG CPLEX Optimization Studio 22.2)
       - cplex==22.2.0.1
       - docplex==2.32.264

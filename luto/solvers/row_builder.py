@@ -386,20 +386,60 @@ def get_demand(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
 # ═══════════════════════════ the policy rows ═══════════════════════════
 
 
+def get_ghg_coeffs(inputs: RowInputs, cols: xr.Dataset) -> dict[str, np.ndarray]:
+    """The two GHG rows' coefficients over the columns: {'AG': agriculture, 'LULUCF': net LULUCF}. They sum to the
+    single net row's: the ag land uses, the ag-mgt and non-ag sub-terms on each row, the ag → ag transitions on LULUCF."""
+    ag2ag_zero = {src: np.broadcast_to(np.float32(0.0), g.shape) for src, g in inputs.trans_ghg_ag2ag.items()}
+    return {
+        'AG': gather(cols, inputs, inputs.ag_g_mrj, inputs.ag_man_g_mrj_ag, inputs.non_ag_g_rk_ag, ag2ag_c=ag2ag_zero),
+        'LULUCF': gather(cols, inputs, np.broadcast_to(np.float32(0.0), inputs.ag_g_mrj.shape), inputs.ag_man_g_mrj_lulucf,
+                         inputs.non_ag_g_rk_lulucf, ag2ag_c=inputs.trans_ghg_ag2ag),
+    }
+
+
+def get_ghg_rhs(inputs: RowInputs) -> dict[str, float]:
+    """The two GHG rows' right-hand sides (raw tCO2e), with the constants each row's left-hand side carries moved over:
+      AG:      Σ coeff · X + off-land + exogenous ag − HIR baseline (destocking)                 ≤ AG series
+      LULUCF:  Σ coeff · X − plantings baseline − HIR baseline (regrowth) + LULUCF_EXO          ≤ LULUCF_MOD + LULUCF_EXO (net LULUCF)
+    LUTO's plantings count on the LULUCF row only above the baseline new-plantings removals (negative), and its HIR
+    on each row only above the existing HIR projects' regrowth and destocking (negative; 0 when HIR_BASELINE is off)."""
+    t = inputs.limits['ghg']
+    return {
+        'AG': t['AG_t'] - inputs.offland_ghg - t['AG_EXO_t'] + t['HIR_BASELINE_AG_t'],
+        'LULUCF': (t['LULUCF_MOD_t'] + t['LULUCF_EXO_t']) - t['LULUCF_EXO_t'] + t['PLANTINGS_BASELINE_t'] + t['HIR_BASELINE_LULUCF_t'],
+    }
+
+
 def get_ghg(inputs: RowInputs, cols: xr.Dataset):
-    """One global row: Σ ghg · X over the ag, ag-mgt, non-ag columns and the ag → ag arcs ≤ limit − offland."""
+    """Two global rows, agriculture and net LULUCF, in the years the target series bind (role 'BINDING');
+    in the other years the series are benchmarks and no row is added (``simulation.store_solution`` reports both).
+    A row in settings.GHG_BENCHMARK_ROWS is a benchmark in every year: not added, reported with its deviation."""
     if settings.GHG_EMISSIONS_LIMITS == "off":
         print("│   ├── TURNING OFF GHG emissions constraints ...")
         return None, None
-    ghg_limit_raw = inputs.limits["ghg"]
-    print(f"│   ├── Adding <hard> constraints for GHG emissions: {ghg_limit_raw:,.0f} tCO2e")
+    targets = inputs.limits["ghg"]
+    if targets['role'] != 'BINDING':
+        print(f"│   ├── GHG series are benchmarks in {inputs.target_year} (role {targets['role']}): no GHG rows, deviation reported after the solve")
+        return None, None
 
-    # land-use, ag-management and non-ag emissions on the accounting columns, transition emissions on the ag → ag arcs
-    coeff = gather(cols, inputs, inputs.ag_g_mrj, inputs.ag_man_g_mrj, inputs.non_ag_g_rk, ag2ag_c=inputs.trans_ghg_ag2ag)
-    row = sparse.csr_matrix(coeff[None, :])                              # the nonzero support; the contract drops the rest
-    rhs = np.asarray(ghg_limit_raw - inputs.offland_ghg, dtype=np.float64).ravel()   # offland_ghg: 1-element array
-    A, rhs, scale = contract(row, rhs, rescale=True)                     # drop + row rescale, factor kept
-    return make_part('ghg', A, rhs, '<', ["ghg_emissions_limit_ub"], scale)
+    unknown = set(settings.GHG_BENCHMARK_ROWS) - {'AG', 'LULUCF'}
+    if unknown:
+        raise ValueError(f"GHG_BENCHMARK_ROWS: unknown rows {sorted(unknown)}; expected 'AG' and/or 'LULUCF'.")
+    imposed = [row for row in ('AG', 'LULUCF') if row not in settings.GHG_BENCHMARK_ROWS]
+    if not imposed:
+        print(f"│   ├── GHG rows are benchmarks in {inputs.target_year} (GHG_BENCHMARK_ROWS): no GHG rows, deviation reported after the solve")
+        return None, None
+
+    coeff = get_ghg_coeffs(inputs, cols)
+    rhs_raw = get_ghg_rhs(inputs)
+    print(f"│   ├── Adding <hard> constraints for GHG emissions: agriculture {targets['AG_t']:,.0f} tCO2e, "
+          f"net LULUCF {targets['LULUCF_MOD_t'] + targets['LULUCF_EXO_t']:,.0f} tCO2e"
+          + ('' if len(imposed) == 2 else f"; benchmark only (not imposed): {', '.join(settings.GHG_BENCHMARK_ROWS)}"))
+    name = {'AG': "ghg_ag_emissions_limit_ub", 'LULUCF': "ghg_lulucf_emissions_limit_ub"}
+    rows = sparse.csr_matrix(np.stack([coeff[row] for row in imposed]))  # the nonzero support; the contract drops the rest
+    rhs = np.array([rhs_raw[row] for row in imposed], dtype=np.float64)
+    A, rhs, scale = contract(rows, rhs, rescale=True)                    # drop + row rescale, factors kept
+    return make_part('ghg', A, rhs, '<', [name[row] for row in imposed], scale)
 
 
 def get_GBF2(inputs: RowInputs, bio_S: sparse.csr_matrix):

@@ -33,6 +33,74 @@ from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types
 from functools import lru_cache
 
 
+# The GHG constraint has two rows: agriculture-sector emissions ('AG') and net LULUCF ('LULUCF'). Every emission
+# term is a sum of named sub-terms, and every sub-term sits on exactly one row. The energy and lifecycle sub-terms
+# are off-inventory (scope-1 leaks); they stay on the AG row, where the single net row counted them, until the
+# scope-1 fix moves them out.
+AG_GHG_SUBTERMS = {
+    'Crop and livestock emissions': 'AG',
+    'Irrigated pasture energy and lifecycle fields': 'AG',
+}
+AG_MAN_GHG_SUBTERMS = {
+    'Asparagopsis taxiformis': {
+        'Enteric CH4': 'AG',
+    },
+    'Precision Agriculture': {
+        'Soil N2O': 'AG',
+        'Energy and lifecycle (CHEM_APPL, CROP_MGT, PEST_PROD)': 'AG',
+    },
+    'Ecological Grazing': {
+        'Leaching and runoff N2O': 'AG',
+        'Soil carbon': 'LULUCF',
+    },
+    'Savanna Burning': {
+        'Avoided CH4 and N2O, sequestered CO2': 'LULUCF',       # NIR 2024 reports savanna fire under 4(IV) (3.E is IE)
+    },
+    'AgTech EI': {
+        'Soil N2O': 'AG',
+        'Energy and lifecycle (CHEM_APPL, CROP_MGT, PEST_PROD, IRRIG)': 'AG',
+    },
+    'Biochar': {
+        'Soil N2O': 'AG',
+        'Energy (CROP_MGT)': 'AG',
+        'Soil carbon': 'LULUCF',
+    },
+    'HIR - Beef': {
+        'Regrowth carbon': 'LULUCF',
+        'Destocking livestock emissions': 'AG',
+    },
+    'HIR - Sheep': {
+        'Regrowth carbon': 'LULUCF',
+        'Destocking livestock emissions': 'AG',
+    },
+    'Utility Solar PV': {
+        'No direct emissions': 'AG',
+    },
+    'Onshore Wind': {
+        'No direct emissions': 'AG',
+    },
+}
+TRANSITION_GHG_SIDE = 'LULUCF'
+
+
+def sum_parts(parts: dict) -> np.ndarray:
+    """The sum of a {sub-term: array} dict, in its own dtype."""
+    arrays = list(parts.values())
+    total = arrays[0].copy()
+    for arr in arrays[1:]:
+        total += arr
+    return total
+
+
+def side_of_parts(parts: dict, subterms: dict, side: str) -> np.ndarray:
+    """The sum of the sub-terms of a {sub-term: array} dict that sit on `side` (zeros if none do)."""
+    total = np.zeros_like(next(iter(parts.values())))
+    for name, arr in parts.items():
+        if subterms[name] == side:
+            total += arr
+    return total
+
+
 def get_ghg_crop(data:Data, lu, lm, aggregate):
     """Return crop GHG emissions <unit: t/cell>  of `lu`+`lm` in `yr_idx` 
     as (np array|pd.DataFrame) depending on aggregate (True|False).
@@ -254,6 +322,29 @@ def get_ghg_matrices(data:Data, yr_idx, aggregate=True):
         return ghg_df
 
 
+def get_irrpast_energy_ghg_matrices(data: Data) -> np.ndarray:
+    """The irrigated pasture energy and lifecycle fields inside g_mrj <unit: t/cell>, (m, r, j): every agGHG_irrpast.h5
+    field except the soil field, on the irrigated livestock land uses. `get_ghg_lvstk` adds them with no scope-1 filter."""
+    g_mrj = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
+    energy_cols = [c for c in data.AGGHG_IRRPAST.columns if 'CO2E' in c and c not in settings.CROP_GHG_SCOPE_1]
+    m = data.LANDMANS.index('irr')
+    for j, lu in enumerate(data.AGRICULTURAL_LANDUSES):
+        if lu in data.LU_LVSTK:
+            irrpast = data.agghg_irrpast(lu, 'irr')       # block-aggregated per (lm, lu) at RESFACTOR > 1, as get_ghg_lvstk reads it
+            g_mrj[m, :, j] = (irrpast[energy_cols].sum(axis=1).to_numpy() / 1000 * data.REAL_AREA).astype(np.float32)
+    return g_mrj
+
+
+def get_ghg_matrices_parts(data: Data, yr_idx) -> dict[str, np.ndarray]:
+    """g_mrj <unit: t/cell> as its named sub-terms (AG_GHG_SUBTERMS); they sum to `get_ghg_matrices`."""
+    total = get_ghg_matrices(data, yr_idx)
+    energy = get_irrpast_energy_ghg_matrices(data)
+    return {
+        'Crop and livestock emissions': total - energy,
+        'Irrigated pasture energy and lifecycle fields': energy,
+    }
+
+
 # ---------------------------------------------------------------------------
 # GHG transition: unallocated natural → livestock natural
 # ---------------------------------------------------------------------------
@@ -307,7 +398,7 @@ def get_ghg_transition_emissions_from_base_year(data: Data, base_year: int) -> d
     }
 
 
-def get_asparagopsis_effect_g_mrj(data:Data, yr_idx):
+def get_asparagopsis_effect_g_mrj(data:Data, yr_idx, separate=False):
     """
     Applies the effects of using asparagopsis to the GHG data
     for all relevant agricultural land uses.
@@ -315,6 +406,7 @@ def get_asparagopsis_effect_g_mrj(data:Data, yr_idx):
     Parameters
     - data: The input data containing GHG and land use information.
     - yr_idx: The index of the year to calculate the effects for.
+    - separate: True -> return {sub-term: matrix} (AG_MAN_GHG_SUBTERMS).
 
     Returns
     - new_g_mrj: The matrix <unit: t/cell> containing the updated GHG data with the effects of using asparagopsis.
@@ -329,7 +421,7 @@ def get_asparagopsis_effect_g_mrj(data:Data, yr_idx):
     new_g_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
 
     if not settings.AG_MANAGEMENTS['Asparagopsis taxiformis']:
-        return new_g_mrj
+        return {'Enteric CH4': new_g_mrj} if separate else new_g_mrj
 
     # Update values in the new matrix, taking into account the CH4 reduction of asparagopsis
     for lu_idx, lu in enumerate(land_uses):
@@ -352,10 +444,10 @@ def get_asparagopsis_effect_g_mrj(data:Data, yr_idx):
                 )
                 new_g_mrj[m, :, lu_idx] = -reduction_amnt
 
-    return new_g_mrj
+    return {'Enteric CH4': new_g_mrj} if separate else new_g_mrj
 
 
-def get_precision_agriculture_effect_g_mrj(data:Data, yr_idx):
+def get_precision_agriculture_effect_g_mrj(data:Data, yr_idx, separate=False):
     """
     Applies the effects of using precision agriculture to the GHG data
     for all relevant agr. land uses.
@@ -363,6 +455,7 @@ def get_precision_agriculture_effect_g_mrj(data:Data, yr_idx):
     Parameters
     - data: The input data containing the necessary information.
     - yr_idx: The index of the year to calculate the effects for.
+    - separate: True -> return {sub-term: matrix} (AG_MAN_GHG_SUBTERMS).
 
     Returns
     - new_g_mrj: The matrix <unit: t/cell> containing the updated GHG data after applying the effects of precision agriculture.
@@ -370,12 +463,13 @@ def get_precision_agriculture_effect_g_mrj(data:Data, yr_idx):
 
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture']
     yr_cal = data.YR_CAL_BASE + yr_idx
+    soil, energy = 'Soil N2O', 'Energy and lifecycle (CHEM_APPL, CROP_MGT, PEST_PROD)'
 
-    # Set up the effects matrix
-    new_g_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+    # Set up the effects matrix, one per sub-term
+    parts = {name: np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32) for name in (soil, energy)}
 
     if not settings.AG_MANAGEMENTS['Precision Agriculture']:
-        return new_g_mrj
+        return parts if separate else sum_parts(parts)
 
     # Update values in the new matrix
     for lu_idx, lu in enumerate(land_uses):
@@ -402,15 +496,15 @@ def get_precision_agriculture_effect_g_mrj(data:Data, yr_idx):
                         / 1000            # convert to tonnes
                         * data.REAL_AREA  # adjust for resfactor
                     )
-                    new_g_mrj[m, :, lu_idx] -= reduction_amnt
+                    parts[soil if co2e_type == 'CO2E_KG_HA_SOIL' else energy][m, :, lu_idx] -= reduction_amnt
 
-    if np.isnan(new_g_mrj).any():
+    if any(np.isnan(arr).any() for arr in parts.values()):
         raise ValueError("Error in data: NaNs detected in agricultural management options' GHG effect matrix.")
 
-    return new_g_mrj
+    return parts if separate else sum_parts(parts)
 
 
-def get_ecological_grazing_effect_g_mrj(data:Data, yr_idx):
+def get_ecological_grazing_effect_g_mrj(data:Data, yr_idx, separate=False):
     """
     Applies the effects of using ecological grazing to the GHG data
     for all relevant agricultural land uses.
@@ -418,6 +512,7 @@ def get_ecological_grazing_effect_g_mrj(data:Data, yr_idx):
     Parameters
     - data: The input data containing relevant information for calculations.
     - yr_idx: The index of the year for which the calculations are performed.
+    - separate: True -> return {sub-term: matrix} (AG_MAN_GHG_SUBTERMS).
 
     Returns
     - new_g_mrj: The matrix <unit: t/cell> containing the updated GHG data after applying ecological grazing effects.
@@ -426,11 +521,11 @@ def get_ecological_grazing_effect_g_mrj(data:Data, yr_idx):
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing']
     yr_cal = data.YR_CAL_BASE + yr_idx
 
-    # Set up the effects matrix
-    new_g_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+    # Set up the effects matrix, one per sub-term
+    parts = {name: np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32) for name in ('Leaching and runoff N2O', 'Soil carbon')}
 
     if not settings.AG_MANAGEMENTS['Ecological Grazing']:
-        return new_g_mrj
+        return parts if separate else sum_parts(parts)
 
     # Update values in the new matrix
     for lu_idx, lu in enumerate(land_uses):
@@ -451,7 +546,7 @@ def get_ecological_grazing_effect_g_mrj(data:Data, yr_idx):
                     / 1000            # convert to tonnes
                     * data.REAL_AREA  # adjust for resfactor
                 )
-                new_g_mrj[m, :, lu_idx] -= leach_reduction_amnt
+                parts['Leaching and runoff N2O'][m, :, lu_idx] -= leach_reduction_amnt
 
             # Subtract soil carbon benefit
             soil_multiplier = lu_data.loc[yr_cal, 'IMPACTS_soil_carbon'] - 1
@@ -459,21 +554,21 @@ def get_ecological_grazing_effect_g_mrj(data:Data, yr_idx):
                 soil_reduction_amnt = (
                     data.SOIL_CARBON_AVG_T_CO2_HA_PER_YR
                     * soil_multiplier
-                    * data.REAL_AREA 
+                    * data.REAL_AREA
                 )
-                new_g_mrj[m, :, lu_idx] -= soil_reduction_amnt
+                parts['Soil carbon'][m, :, lu_idx] -= soil_reduction_amnt
 
-    return new_g_mrj
+    return parts if separate else sum_parts(parts)
 
 
-def get_savanna_burning_effect_g_mrj(data:Data):
+def get_savanna_burning_effect_g_mrj(data:Data, separate=False):
     """
     Applies the effects of using savanna burning to the GHG data
     for all relevant agr. land uses.
 
     Parameters
     - data: The input data containing relevant information.
-    - g_mrj: The savanna burning factor.
+    - separate: True -> return {sub-term: matrix} (AG_MAN_GHG_SUBTERMS).
 
     Returns
     - sb_g_mrj: The GHG data <unit: t/cell> with the effects of savanna burning applied.
@@ -481,19 +576,21 @@ def get_savanna_burning_effect_g_mrj(data:Data):
     nlus = len(settings.AG_MANAGEMENTS_TO_LAND_USES["Savanna Burning"])
     sb_g_mrj = np.zeros((data.NLMS, data.NCELLS, nlus)).astype(np.float32)
 
+    # One sub-term: the AEA total (avoided CH4 and N2O plus sequestered CO2) all sits on the LULUCF row, so the
+    # per-gas columns of cell_savanna_burning.h5 are not needed to split it
     if not settings.AG_MANAGEMENTS['Savanna Burning']:
-        return sb_g_mrj
+        return {'Avoided CH4 and N2O, sequestered CO2': sb_g_mrj} if separate else sb_g_mrj
 
     for m, j in itertools.product(range(data.NLMS), range(nlus)):
         # sb_g_mrj[m, :, j] = -data.SAVBURN_TOTAL_TCO2E_HA * data.REAL_AREA
-        sb_g_mrj[m, :, j] = np.where( data.SAVBURN_ELIGIBLE, 
-                                     -data.SAVBURN_TOTAL_TCO2E_HA * data.REAL_AREA, 
+        sb_g_mrj[m, :, j] = np.where( data.SAVBURN_ELIGIBLE,
+                                     -data.SAVBURN_TOTAL_TCO2E_HA * data.REAL_AREA,
                                       0
                                     )
-    return sb_g_mrj
+    return {'Avoided CH4 and N2O, sequestered CO2': sb_g_mrj} if separate else sb_g_mrj
 
 
-def get_agtech_ei_effect_g_mrj(data:Data, yr_idx):
+def get_agtech_ei_effect_g_mrj(data:Data, yr_idx, separate=False):
     """
     Applies the effects of using AgTech EI to the GHG data
     for all relevant agr. land uses.
@@ -501,18 +598,20 @@ def get_agtech_ei_effect_g_mrj(data:Data, yr_idx):
     Parameters
     - data: The input data containing the necessary information.
     - yr_idx: The index of the year to calculate the effects for.
+    - separate: True -> return {sub-term: matrix} (AG_MAN_GHG_SUBTERMS).
 
     Returns
     - new_g_mrj: The matrix <unit: t/cell> containing the updated GHG data after applying the AgTech EI effects.
     """
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['AgTech EI']
     yr_cal = data.YR_CAL_BASE + yr_idx
+    soil, energy = 'Soil N2O', 'Energy and lifecycle (CHEM_APPL, CROP_MGT, PEST_PROD, IRRIG)'
 
-    # Set up the effects matrix
-    new_g_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+    # Set up the effects matrix, one per sub-term
+    parts = {name: np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32) for name in (soil, energy)}
 
     if not settings.AG_MANAGEMENTS['AgTech EI']:
-        return new_g_mrj
+        return parts if separate else sum_parts(parts)
 
     # Update values in the new matrix
     for lu_idx, lu in enumerate(land_uses):
@@ -534,12 +633,12 @@ def get_agtech_ei_effect_g_mrj(data:Data, yr_idx):
 
                 if reduction_perc != 0:
                     reduction_amnt = (
-                        np.nan_to_num(data.AGGHG_CROPS[co2e_type, lm, lu].to_numpy().copy(), 0) 
+                        np.nan_to_num(data.AGGHG_CROPS[co2e_type, lm, lu].to_numpy().copy(), 0)
                         * reduction_perc
                         / 1000            # convert to tonnes
                         * data.REAL_AREA  # adjust for resfactor
                     )
-                    new_g_mrj[m, :, lu_idx] -= reduction_amnt
+                    parts[soil if co2e_type == 'CO2E_KG_HA_SOIL' else energy][m, :, lu_idx] -= reduction_amnt
 
             # Subtract extra 'CO2e_KG_HA_IRRIG' carbon for irrigated land uses
             if m == 1:
@@ -555,17 +654,17 @@ def get_agtech_ei_effect_g_mrj(data:Data, yr_idx):
 
                 if reduction_perc != 0:
                     reduction_amnt = (
-                        np.nan_to_num(data.AGGHG_CROPS['CO2E_KG_HA_IRRIG', lm, lu].to_numpy().copy(), 0) 
+                        np.nan_to_num(data.AGGHG_CROPS['CO2E_KG_HA_IRRIG', lm, lu].to_numpy().copy(), 0)
                         * reduction_perc
                         / 1000            # convert to tonnes
                         * data.REAL_AREA  # adjust for resfactor
                     )
-                    new_g_mrj[m, :, lu_idx] -= reduction_amnt
+                    parts[energy][m, :, lu_idx] -= reduction_amnt
 
-    return new_g_mrj
+    return parts if separate else sum_parts(parts)
 
 
-def get_biochar_effect_g_mrj(data:Data, yr_idx):
+def get_biochar_effect_g_mrj(data:Data, yr_idx, separate=False):
     """
     Applies the effects of using Biochar to the GHG data
     for all relevant agr. land uses.
@@ -573,18 +672,20 @@ def get_biochar_effect_g_mrj(data:Data, yr_idx):
     Parameters
     - data: The input data containing the necessary information.
     - yr_idx: The index of the year to calculate the effects for.
+    - separate: True -> return {sub-term: matrix} (AG_MAN_GHG_SUBTERMS).
 
     Returns
     - new_g_mrj: The matrix <unit: t/cell> containing the updated GHG data after applying the Biochar effects.
     """
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Biochar']
     yr_cal = data.YR_CAL_BASE + yr_idx
+    soil, energy, soc = 'Soil N2O', 'Energy (CROP_MGT)', 'Soil carbon'
 
-    # Set up the effects matrix
-    new_g_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+    # Set up the effects matrix, one per sub-term
+    parts = {name: np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32) for name in (soil, energy, soc)}
 
     if not settings.AG_MANAGEMENTS['Biochar']:
-        return new_g_mrj
+        return parts if separate else sum_parts(parts)
 
     # Update values in the new matrix
     for lu_idx, lu in enumerate(land_uses):
@@ -604,12 +705,12 @@ def get_biochar_effect_g_mrj(data:Data, yr_idx):
 
                 if reduction_perc != 0:
                     reduction_amnt = (
-                        np.nan_to_num(data.AGGHG_CROPS[co2e_type, lm, lu].to_numpy().copy(), 0) 
+                        np.nan_to_num(data.AGGHG_CROPS[co2e_type, lm, lu].to_numpy().copy(), 0)
                         * reduction_perc
                         / 1000            # convert to tonnes
                         * data.REAL_AREA  # adjust for resfactor
                     )
-                    new_g_mrj[m, :, lu_idx] -= reduction_amnt
+                    parts[soil if co2e_type == 'CO2E_KG_HA_SOIL' else energy][m, :, lu_idx] -= reduction_amnt
 
             # Subtract soil carbon benefit
             soil_multiplier = lu_data.loc[yr_cal, 'IMPACTS_soil_carbon'] - 1
@@ -619,18 +720,19 @@ def get_biochar_effect_g_mrj(data:Data, yr_idx):
                     * soil_multiplier
                     * data.REAL_AREA
                 )
-                new_g_mrj[m, :, lu_idx] -= soil_reduction_amnt
+                parts[soc][m, :, lu_idx] -= soil_reduction_amnt
 
-    return new_g_mrj
+    return parts if separate else sum_parts(parts)
 
 
-def get_beef_hir_effect_g_mrj(data: Data, yr_idx):
+def get_beef_hir_effect_g_mrj(data: Data, yr_idx, separate=False):
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef']
-    g_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
-    
-    # GHG abatement from Land Use Change 
+    regrowth = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
+    destocking = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
+
+    # GHG abatement from Land Use Change
     for j_idx, lu in enumerate(land_uses):
-        g_mrj_effect[:, :, j_idx] -= (
+        regrowth[:, :, j_idx] -= (
             (
                 data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR
                 * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[data.DESC2AGLU[lu]])
@@ -642,20 +744,22 @@ def get_beef_hir_effect_g_mrj(data: Data, yr_idx):
         ) * data.REAL_AREA 
 
     # GHG abatement from livestock density reduction
-    for lm_idx, lm in enumerate(data.LANDMANS):         
+    for lm_idx, lm in enumerate(data.LANDMANS):
         for j_idx, lu in enumerate(land_uses):
-            g_mrj_effect[lm_idx, :, j_idx] -= get_ghg_lvstk(data, lu, lm, yr_idx, True) * settings.HIR_PRODUCTIVITY_CONTRIBUTION
+            destocking[lm_idx, :, j_idx] -= get_ghg_lvstk(data, lu, lm, yr_idx, True) * settings.HIR_PRODUCTIVITY_CONTRIBUTION
 
-    return g_mrj_effect
+    parts = {'Regrowth carbon': regrowth, 'Destocking livestock emissions': destocking}
+    return parts if separate else sum_parts(parts)
 
 
-def get_sheep_hir_effect_g_mrj(data: Data, yr_idx):
+def get_sheep_hir_effect_g_mrj(data: Data, yr_idx, separate=False):
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep']
-    g_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
-    
+    regrowth = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
+    destocking = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
+
     # GHG abatement from Land Use Change
     for j_idx, lu in enumerate(land_uses):
-        g_mrj_effect[:, :, j_idx] -= (
+        regrowth[:, :, j_idx] -= (
             (
                 data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR
                 * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[data.DESC2AGLU[lu]])
@@ -669,10 +773,32 @@ def get_sheep_hir_effect_g_mrj(data: Data, yr_idx):
     # GHG abatement from livestock density reduction
     for lm_idx, lm in enumerate(data.LANDMANS):
         for j_idx, lu in enumerate(land_uses):
-            g_mrj_effect[lm_idx, :, j_idx] -= get_ghg_lvstk(data, lu, lm, yr_idx, True) * settings.HIR_PRODUCTIVITY_CONTRIBUTION
+            destocking[lm_idx, :, j_idx] -= get_ghg_lvstk(data, lu, lm, yr_idx, True) * settings.HIR_PRODUCTIVITY_CONTRIBUTION
 
 
-    return g_mrj_effect
+    parts = {'Regrowth carbon': regrowth, 'Destocking livestock emissions': destocking}
+    return parts if separate else sum_parts(parts)
+
+def get_hir_baseline_t(data: Data, yr_idx) -> dict:
+    """The existing-HIR-project baseline on each GHG row (t CO2e, negative = reduction), for settings.HIR_BASELINE:
+    {'HIR_BASELINE_AG_t': destocking, 'HIR_BASELINE_LULUCF_t': regrowth}. LUTO's own HIR effect per cell (full
+    adoption) x the share of the cell under existing projects (held flat after the baseline FY) x the cell's base-year
+    share in the option's land use. LUTO's HIR counts on each row only above it, as its plantings do."""
+    out = {'HIR_BASELINE_AG_t': 0.0, 'HIR_BASELINE_LULUCF_t': 0.0}
+    if getattr(data, "HIR_BASELINE_HA", None) is None:          # off, or a Data pickled before the setting existed
+        return out
+    hb = data.HIR_BASELINE_HA
+    fy = min(data.YR_CAL_BASE + yr_idx, hb['baseline_fy'])
+    if fy < hb['first_fy']:
+        return out
+    frac = np.minimum(hb['ha'][fy] / data.REAL_AREA, 1.0)
+    base = data.ag_dvars[data.YR_CAL_BASE]
+    for am, fn in (('HIR - Beef', get_beef_hir_effect_g_mrj), ('HIR - Sheep', get_sheep_hir_effect_g_mrj)):
+        j = data.DESC2AGLU[settings.AG_MANAGEMENTS_TO_LAND_USES[am][0]]
+        for name, arr in fn(data, yr_idx, separate=True).items():
+            out[f'HIR_BASELINE_{AG_MAN_GHG_SUBTERMS[am][name]}_t'] += float((arr[:, :, 0] * base[:, :, j] * frac).sum())
+    return out
+
 
 def get_utility_solar_pv_effect_g_mrj(data: Data) -> np.ndarray:
     """
@@ -714,29 +840,33 @@ def get_onshore_wind_effect_g_mrj(data:Data) -> np.ndarray:
     # Return zeros - no direct emissions impact from wind installation
     return new_g_mrj
 
-def get_agricultural_management_ghg_matrices(data:Data, yr_idx) -> dict[str, np.ndarray]:
+def get_agricultural_management_ghg_matrices(data:Data, yr_idx, separate=False) -> dict[str, np.ndarray]:
     """
     Calculate the greenhouse gas (GHG) matrices for different agricultural management practices.
 
     Args:
         data: The input data for the calculations.
         yr_idx: The year index.
+        separate: True -> every value is a {sub-term: matrix} dict (AG_MAN_GHG_SUBTERMS) that sums to the matrix.
 
     Returns
         A dictionary containing the GHG matrices <unit: t/cell> for different agricultural management practices.
         The keys of the dictionary represent the management practices, and the values are numpy arrays.
 
     """
-    asparagopsis_data = get_asparagopsis_effect_g_mrj(data, yr_idx)                         
-    precision_agriculture_data = get_precision_agriculture_effect_g_mrj(data, yr_idx)       
-    eco_grazing_data = get_ecological_grazing_effect_g_mrj(data, yr_idx)                    
-    sav_burning_ghg_impact = get_savanna_burning_effect_g_mrj(data)                         
-    agtech_ei_ghg_impact = get_agtech_ei_effect_g_mrj(data, yr_idx)                         
-    biochar_ghg_impact = get_biochar_effect_g_mrj(data, yr_idx)                             
-    beef_hir_ghg_impact = get_beef_hir_effect_g_mrj(data, yr_idx)                                   
-    sheep_hir_ghg_impact = get_sheep_hir_effect_g_mrj(data, yr_idx)
+    asparagopsis_data = get_asparagopsis_effect_g_mrj(data, yr_idx, separate)
+    precision_agriculture_data = get_precision_agriculture_effect_g_mrj(data, yr_idx, separate)
+    eco_grazing_data = get_ecological_grazing_effect_g_mrj(data, yr_idx, separate)
+    sav_burning_ghg_impact = get_savanna_burning_effect_g_mrj(data, separate)
+    agtech_ei_ghg_impact = get_agtech_ei_effect_g_mrj(data, yr_idx, separate)
+    biochar_ghg_impact = get_biochar_effect_g_mrj(data, yr_idx, separate)
+    beef_hir_ghg_impact = get_beef_hir_effect_g_mrj(data, yr_idx, separate)
+    sheep_hir_ghg_impact = get_sheep_hir_effect_g_mrj(data, yr_idx, separate)
     utility_solar_ghg_impact = get_utility_solar_pv_effect_g_mrj(data)
-    onshore_wind_ghg_impact = get_onshore_wind_effect_g_mrj(data)                                 
+    onshore_wind_ghg_impact = get_onshore_wind_effect_g_mrj(data)
+    if separate:
+        utility_solar_ghg_impact = {'No direct emissions': utility_solar_ghg_impact}
+        onshore_wind_ghg_impact = {'No direct emissions': onshore_wind_ghg_impact}
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,

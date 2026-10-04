@@ -18,6 +18,7 @@
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
 import os
+import re
 import sparse
 import xarray as xr
 import numpy as np
@@ -486,6 +487,10 @@ class Data:
             os.path.join(settings.INPUT_DIR, "climate_change_impacts_" + settings.RCP + "_CO2_FERT_" + settings.CO2_FERT.upper() + ".h5"), where=self.MASK
         )
         
+        # The impact files are multipliers relative to 2010: their years are {2020, 2050, 2080} and 2010 is 1 by
+        # construction. The anchor is a property of the files, not of the model's base year.
+        self.CLIMATE_CHANGE_IMPACT_ANCHOR_YEAR = 2010
+
         # Convert to xarray DataArray for easier indexing.
         self.CLIMATE_CHANGE_IMPACT_xr = self.get_climate_change_impact_xr()
 
@@ -682,7 +687,22 @@ class Data:
             "cropping":     pd.read_excel(biochar_file, sheet_name='Biochar (cropping)', index_col='Year').rename(columns=bundle_rename),
             "horticulture": pd.read_excel(biochar_file, sheet_name='Biochar (horticulture)', index_col='Year').rename(columns=bundle_rename),
         }
-        
+
+        # Observed ag-management adoption caps: {(option, land use): Series of cap fractions by year}, or None when off
+        self.AG_MAN_OBSERVED_CAPS = None
+        if settings.AG_MANAGEMENT_OBSERVED_CAPS is not None:
+            caps = pd.read_csv(os.path.join(settings.INPUT_DIR, settings.AG_MANAGEMENT_OBSERVED_CAPS))
+            unknown = {(am, lu) for am, lu in zip(caps['option'], caps['land_use'])
+                       if lu not in settings.AG_MANAGEMENTS_TO_LAND_USES.get(am, [])}
+            if unknown:
+                raise ValueError(f"{settings.AG_MANAGEMENT_OBSERVED_CAPS}: unknown (option, land use) pairs {sorted(unknown)}.")
+            if not caps['cap_fraction'].between(0, 1).all():
+                raise ValueError(f"{settings.AG_MANAGEMENT_OBSERVED_CAPS}: cap_fraction must lie in [0, 1].")
+            self.AG_MAN_OBSERVED_CAPS = {
+                key: grp.set_index('year_end')['cap_fraction'].sort_index()
+                for key, grp in caps.groupby(['option', 'land_use'])
+            }
+
         # Load soil carbon data, convert C to CO2e (x 44/12), and average over years
         self.SOIL_CARBON_AVG_T_CO2_HA_PER_YR = (
             pd.read_hdf(os.path.join(settings.INPUT_DIR, "soil_carbon_t_ha.h5"), where=self.MASK).to_numpy(dtype=np.float32) 
@@ -802,7 +822,9 @@ class Data:
         if settings.PRODUCTIVITY_TREND == 'BAU':
             fpath = os.path.join(settings.INPUT_DIR, "yieldincreases_bau2022.csv")
             productivity_trend = pd.read_csv(fpath, header=[0, 1]).astype(np.float32)
-            productivity_trend.index = productivity_trend.index + self.YR_CAL_BASE  # Adjust year to absolute year
+            # The csv has no year column: row 0 is 2010 (multiplier 1.0, cumulative growth since then). The
+            # first year is a property of the file, not of the model's base year.
+            productivity_trend.index = productivity_trend.index + 2010  # Adjust year to absolute year
             productivity_trend.index.name = 'Year'
             
             # Convert to xarray for easier accessing.
@@ -1107,6 +1129,12 @@ class Data:
         # Read water yield data
         self.WATER_YIELD_DR_FILE = pd.read_hdf(wyield_fname_dr, where=self.MASK).T.values
         self.WATER_YIELD_SR_FILE = pd.read_hdf(wyield_fname_sr, where=self.MASK).T.values
+
+        # The files carry no year labels (columns 0..90): their rows are the years the file name gives, 2010-2100.
+        self.WATER_YIELD_FILE_YEARS = list(range(2010, 2101))
+        for f in (self.WATER_YIELD_DR_FILE, self.WATER_YIELD_SR_FILE):
+            if f.shape[0] != len(self.WATER_YIELD_FILE_YEARS):
+                raise ValueError(f"Water yield file has {f.shape[0]} years, expected {len(self.WATER_YIELD_FILE_YEARS)} (2010-2100).")
         
         
         # Water yield from outside LUTO study area.
@@ -1277,16 +1305,17 @@ class Data:
                       f"{len(bad)} year(s) from {bad.index.min()}, min {bad.min():,.0f}", flush=True)
             self.DEMAND_C = self.DEMAND_C.clip(lower=0)
 
-        # Convert to numpy array of shape (91, 26)
+        # Convert to numpy array of shape (years, commodities); read it by year through D_CY_xr, which keeps
+        # the file's own year labels (DEMAND_C.columns)
         self.D_CY = self.DEMAND_C.to_numpy(dtype = np.float32).T
         self.D_CY_xr = xr.DataArray(
-            self.D_CY, 
-            dims=['year','Commodity'], 
+            self.D_CY,
+            dims=['year','Commodity'],
             coords={
-                'year':self.YR_CAL_BASE + np.arange(self.D_CY.shape[0]), 
+                'year':self.DEMAND_C.columns.astype(int).to_numpy(),
                 'Commodity':self.COMMODITIES
             }
-        ) 
+        )
 
         # Price elasticity data
         demand_supply_elasticity = pd.read_csv(f'{settings.INPUT_DIR}/demand_elasticity.csv')
@@ -1324,8 +1353,8 @@ class Data:
                                                              'Emission Source',
                                                              'Total GHG Emissions (tCO2e)']]
 
-        # Get the GHG constraints for luto, shape is (91, 1)
-        self.OFF_LAND_GHG_EMISSION_C = self.OFF_LAND_GHG_EMISSION.groupby(['YEAR']).sum(numeric_only=True).values
+        # Get the GHG constraints for luto: total tCO2e per year, indexed by year
+        self.OFF_LAND_GHG_EMISSION_C = self.OFF_LAND_GHG_EMISSION.groupby('YEAR')['Total GHG Emissions (tCO2e)'].sum()
 
         # Read the carbon price per tonne over the years (indexed by the relevant year)
         if settings.CARBON_PRICES_FIELD == 'CONSTANT':
@@ -1353,10 +1382,16 @@ class Data:
         ###############################################################
         print("├── Loading GHG targets data", flush=True)
         if settings.GHG_EMISSIONS_LIMITS != 'off':
-            self.GHG_TARGETS = pd.read_excel(
-                os.path.join(settings.INPUT_DIR, "GHG_targets.xlsx"), sheet_name="Data", index_col="YEAR"
-            )
-            self.GHG_TARGETS = self.GHG_TARGETS[settings.GHG_TARGETS_DICT[settings.GHG_EMISSIONS_LIMITS]].to_dict()
+            self.GHG_TARGETS = self.load_ghg_targets(os.path.join(settings.INPUT_DIR, 'ghg_targets'))
+            missing = sorted(set(settings.SIM_YEARS) - set(self.GHG_TARGETS.index))
+            if missing:
+                raise ValueError(f"GHG target series have no row for SIM_YEARS {missing} (input/ghg_targets covers "
+                                 f"{self.GHG_TARGETS.index.min()}-{self.GHG_TARGETS.index.max()}).")
+
+        # Existing HIR projects (hectares per cell by registration FY), for the HIR baseline on the two GHG rows
+        self.HIR_BASELINE_HA = None
+        if settings.GHG_EMISSIONS_LIMITS != 'off' and settings.HIR_BASELINE is not None:
+            self.HIR_BASELINE_HA = self.load_hir_baseline_area(os.path.join(settings.INPUT_DIR, settings.HIR_BASELINE))
 
 
 
@@ -1955,7 +1990,7 @@ class Data:
     def get_climate_change_impact_xr(self) -> xr.DataArray:
         """
         CLIMATE_CHANGE_IMPACT as a (year, cell, lm, lu) DataArray.
-        The YRS_CAL_BASE (2010) is not included in the climate change impact data,
+        The anchor year (CLIMATE_CHANGE_IMPACT_ANCHOR_YEAR, 2010) is not included in the climate change impact data,
         so it is added here with a multiplier of 1.
         """
         cci_xr = (
@@ -1968,7 +2003,7 @@ class Data:
         cci_xr_base_year = (
             cci_xr
             .isel(year=0, drop=True)
-            .assign_coords(year=self.YR_CAL_BASE)
+            .assign_coords(year=self.CLIMATE_CHANGE_IMPACT_ANCHOR_YEAR)
             .expand_dims('year')
             .notnull()
             .astype(np.float32)
@@ -3226,6 +3261,110 @@ class Data:
             )
         return self.CARBON_PRICES[yr_cal]
 
+    def load_hir_baseline_area(self, hir_dir: str) -> dict:
+        """Hectares of existing ACCU HIR projects on each cell, cumulative by registration FY up to the baseline FY
+        (held flat after it), from the files `luto/tools/ag_mgt_caps.py` writes:
+          - hir_project_cells.csv: the share of each full-resolution cell (NLUM land-cell index) inside each mapped
+            project's Carbon Estimation Area. Overlapping projects are clipped at the whole cell.
+          - hir_scaling.csv: the scale factor for the unmapped projects (all / mapped issuance to the baseline FY).
+        Full-resolution cells are summed into the RESFACTOR block of the cell that represents them; a block with no
+        cell in the model drops its area (reported in 'dropped_ha')."""
+        cells = pd.read_csv(os.path.join(hir_dir, 'hir_project_cells.csv'))
+        scaling = pd.read_csv(os.path.join(hir_dir, 'hir_scaling.csv')).iloc[0]
+        rf = settings.RESFACTOR
+        rows, cols = np.nonzero(self.NLUM_MASK)                                   # the file's cell index order
+        block = np.full((rows.max() // rf + 1, cols.max() // rf + 1), -1, dtype=np.int64)
+        block[rows[self.MASK] // rf, cols[self.MASK] // rf] = np.arange(self.NCELLS)
+
+        baseline_fy = int(scaling['baseline_fy'])
+        ha, dropped = {}, {}
+        for fy in range(int(cells['fy_registered'].min()), baseline_fy + 1):
+            sel = cells['fy_registered'] <= fy
+            frac = cells.loc[sel].groupby('cell')['fraction'].sum().clip(upper=1)
+            px = frac.index.to_numpy()
+            px_ha = frac.to_numpy() * self.REAL_AREA_NO_RESFACTOR[px] * float(scaling['scale_factor'])
+            cell = block[rows[px] // rf, cols[px] // rf]
+            ha[fy] = np.bincount(cell[cell >= 0], weights=px_ha[cell >= 0], minlength=self.NCELLS)
+            dropped[fy] = float(px_ha[cell < 0].sum())
+        return {'ha': ha, 'dropped_ha': dropped, 'baseline_fy': baseline_fy, 'first_fy': min(ha),
+                'scale_factor': float(scaling['scale_factor'])}
+
+    def load_ghg_targets(self, target_dir: str) -> pd.DataFrame:
+        """The two GHG constraints' series, one row per LUTO year (luto_year = financial year ending that year), in t CO2e.
+
+        Read from the files `luto/tools/ghg_targets.py` writes (NIR 2024 history, DCCEEW 2025 projections; the
+        file contract is stage2_contract.md):
+          - AG_t: the agriculture series (NIR sector 3).
+          - LULUCF_MOD_t, LULUCF_EXO_t: modelled and exogenous LULUCF; net LULUCF is their sum. MOD is 0: direct
+            clearing is exogenous, and LUTO's clearing (term 4) and plantings count as additional to EXO.
+          - AG_EXO_t: exogenous agriculture on the AG row (the sector 3 categories LUTO does not model), from
+            series_agriculture_exogenous.csv; 0 if that file is absent (target folders built before it existed).
+          - PLANTINGS_BASELINE_t: the baseline new-plantings removals in the year (negative), from the LEAN row of
+            plantings_baseline.csv: rate x (year - anchor year), 0 up to the anchor year. LUTO's plantings count on
+            the LULUCF row only above it.
+          - AG_TOLERANCE_t: the AG benchmark tolerance (tolerances.csv), NaN where none is given.
+          - role: 'BINDING' years carry the two rows; every other year is a benchmark, reported but not imposed.
+        """
+        def series(fname):
+            df = pd.read_csv(os.path.join(target_dir, fname))
+            if not (df['luto_year'] == df['year_end']).all():
+                raise ValueError(f"{fname}: luto_year differs from year_end; the target files key LUTO year Y to the FY ending Y.")
+            if df['value_t_co2e'].isna().any():
+                raise ValueError(f"{fname}: blank values for years {df.loc[df['value_t_co2e'].isna(), 'luto_year'].tolist()}.")
+            return df.set_index('luto_year')
+
+        ag = series('series_agriculture.csv')
+        mod = series('series_lulucf_modelled.csv')
+        exo = series('series_lulucf_exogenous.csv')
+        for name, df in (('LULUCF_MOD', mod), ('LULUCF_EXO', exo)):
+            if not (df.index.equals(ag.index) and (df['role'] == ag['role']).all()):
+                raise ValueError(f"GHG target series AG and {name} disagree on their years or roles.")
+
+        targets = pd.DataFrame({
+            'AG_t': ag['value_t_co2e'],
+            'LULUCF_MOD_t': mod['value_t_co2e'],
+            'LULUCF_EXO_t': exo['value_t_co2e'],
+            'role': ag['role'],
+            'status_AG': ag['status'],
+            'status_LULUCF_MOD': mod['status'],
+        })
+
+        ag_exo_file = os.path.join(target_dir, 'series_agriculture_exogenous.csv')
+        targets['AG_EXO_t'] = series('series_agriculture_exogenous.csv')['value_t_co2e'].reindex(targets.index) if os.path.exists(ag_exo_file) else 0.0
+        if targets['AG_EXO_t'].isna().any():
+            raise ValueError("series_agriculture_exogenous.csv does not cover every year of the target series.")
+
+        baseline = pd.read_csv(os.path.join(target_dir, 'plantings_baseline.csv'))
+        lean = baseline[baseline['definition'].str.startswith('annual change') & baseline['status'].str.contains('(LEAN)', regex=False)]
+        if len(lean) != 1:
+            raise ValueError(f"plantings_baseline.csv: expected one LEAN annual-change row, found {len(lean)}.")
+        lean = lean.iloc[0]
+        anchor = re.search(r'(\d{4})', lean['carried_forward'])
+        if anchor is None:
+            raise ValueError(f"plantings_baseline.csv: no anchor year in carried_forward '{lean['carried_forward']}'.")
+        self.GHG_PLANTINGS_BASELINE = {
+            'quantity': lean['quantity'],
+            'rate_t_per_yr': float(lean['value']) * 1000,               # kt CO2e / yr per yr -> t
+            'anchor_year': int(anchor.group(1)),
+            'status': lean['status'],
+        }
+        targets['PLANTINGS_BASELINE_t'] = [
+            self.GHG_PLANTINGS_BASELINE['rate_t_per_yr'] * max(0, yr - self.GHG_PLANTINGS_BASELINE['anchor_year'])
+            for yr in targets.index
+        ]
+
+        tol = pd.read_csv(os.path.join(target_dir, 'tolerances.csv'), dtype={'year_end': str}).query('series == "AG"')
+        targets['AG_TOLERANCE_t'] = (tol.assign(year=tol['year_end'].astype(int)).set_index('year')['tolerance_kt'] * 1000).reindex(targets.index)
+
+        self.GHG_LULUCF_BUDGET = pd.read_csv(os.path.join(target_dir, 'budget.csv')).iloc[0].to_dict()   # reported; the cumulative budget is not imposed yet
+        return targets
+
+    def get_water_yield_file_row(self, yr_cal: int) -> int:
+        """The row of the SSP water yield files (WATER_YIELD_DR_FILE / _SR_FILE) that holds calendar year `yr_cal`."""
+        if yr_cal not in self.WATER_YIELD_FILE_YEARS:
+            raise ValueError(f"Water yield data not given for year {yr_cal}; the files cover 2010-2100.")
+        return self.WATER_YIELD_FILE_YEARS.index(yr_cal)
+
     def get_water_nl_yield_for_yr_idx(
         self,
         yr_idx: int,
@@ -3241,11 +3380,11 @@ class Data:
         """
         water_dr_yield = (
             water_dr_yield if water_dr_yield is not None
-            else self.WATER_YIELD_DR_FILE[yr_idx]
+            else self.WATER_YIELD_DR_FILE[self.get_water_yield_file_row(self.YR_CAL_BASE + yr_idx)]
         )
         water_sr_yield = (
             water_sr_yield if water_sr_yield is not None
-            else self.WATER_YIELD_SR_FILE[yr_idx]
+            else self.WATER_YIELD_SR_FILE[self.get_water_yield_file_row(self.YR_CAL_BASE + yr_idx)]
         )
         dr_prop = self.DEEP_ROOTED_PROPORTION
 
