@@ -928,6 +928,13 @@ class Data:
         self.AGGHG_LVSTK = pd.read_hdf(os.path.join(settings.INPUT_DIR, "agGHG_lvstk.h5"), where=self.MASK)
         self.AGGHG_IRRPAST = pd.read_hdf(os.path.join(settings.INPUT_DIR, "agGHG_irrpast.h5"), where=self.MASK)
 
+        # A cell without the sheep per-head data the stubble consumers read carries no stubble sheep: its stubble rate is 0
+        # for quantity, revenue, cost, GHG and water alike (coarsen_guarded_arrays applies the same rule to a block's fine
+        # cells). A NaN rate stays NaN for the guard.
+        if stubble_raw is not None:
+            stubble_raw = self.get_stubble_effective_rate(stubble_raw)
+            self.STUBBLE_DSE_HA = np.nan_to_num(stubble_raw)
+
 
         # Raw transition cost matrix. In AUD/ha and ordered lexicographically.
         self.AG_TMATRIX = np.load(os.path.join(settings.INPUT_DIR, "ag_tmatrix.npy"))
@@ -2595,6 +2602,17 @@ class Data:
             return c['FEED_REQ'], c['PASTURE_KG_DM_HA'], c['SAFE_PUR']
         safe_pur = self.SAFE_PUR_NATL if vegtype == 'natural land' else self.SAFE_PUR_MODL
         return self.FEED_REQ, self.PASTURE_KG_DM_HA, safe_pur
+
+    def get_stubble_effective_rate(self, rate: np.ndarray) -> np.ndarray:
+        """The stubble rate at the model's cells, 0 where the sheep per-head data the stubble consumers read is missing
+        (AGEC_LVSTK STUBBLE_SHEEP_AGEC_FIELDS, the AGGHG_LVSTK sources, WATER_DELIVERY_PRICE); NaN stays NaN."""
+        agghg = self.AGGHG_LVSTK.loc[:, ('SHEEP', slice(None))]
+        sources = [c for c in agghg.columns if not settings.USE_GHG_SCOPE_1 or c[1] in settings.LVSTK_GHG_SCOPE_1]
+        water_price = pd.read_hdf(os.path.join(settings.INPUT_DIR, "water_delivery_price.h5"), where=self.MASK).to_numpy(dtype=np.float64)
+        sheep_data = (np.isfinite(self.AGEC_LVSTK.loc[:, [(f, 'SHEEP') for f in STUBBLE_SHEEP_AGEC_FIELDS]].to_numpy(dtype=np.float64)).all(axis=1)
+                      & np.isfinite(agghg[sources].to_numpy(dtype=np.float64)).all(axis=1)
+                      & np.isfinite(water_price))
+        return np.where(sheep_data | ~np.isfinite(rate), rate, 0.0)
 
     def lvstk_k(self, lu: str, lm: str) -> np.ndarray:
         """The stocking calibration k of the livestock type of `lu`, for (lu, lm); FEED_REQ without LVSTK_K_FILE."""
