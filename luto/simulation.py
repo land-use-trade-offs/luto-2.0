@@ -451,9 +451,11 @@ def get_ghg_split(data: Data, target_year: int, solution, inputs: RowInputs) -> 
 
     # term 1: the ag land uses (all on AG)
     energy = float(np.dot(ag_ghg.get_irrpast_energy_ghg_matrices(data).ravel(), solution.ag_X_mrj.ravel()))
+    stubble = float(np.dot(ag_ghg.get_stubble_ghg_matrices(data).ravel(), solution.ag_X_mrj.ravel()))
     total_1 = float(np.dot(inputs.ag_g_mrj.ravel(), solution.ag_X_mrj.ravel()))
-    lines += [('AG', 1, 'Agricultural land uses', 'Crop and livestock emissions', total_1 - energy),
-              ('AG', 1, 'Agricultural land uses', 'Irrigated pasture energy and lifecycle fields', energy)]
+    lines += [('AG', 1, 'Agricultural land uses', 'Crop and livestock emissions', total_1 - energy - stubble),
+              ('AG', 1, 'Agricultural land uses', 'Irrigated pasture energy and lifecycle fields', energy),
+              ('AG', 1, 'Agricultural land uses', 'Stubble-grazing sheep', stubble)]
 
     # term 2: the ag-management options, sub-term by sub-term
     am_parts = ag_ghg.get_agricultural_management_ghg_matrices(data, target_index, separate=True)

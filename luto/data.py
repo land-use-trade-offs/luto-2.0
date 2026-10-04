@@ -43,6 +43,10 @@ from dataclasses import dataclass
 
 
 
+# The sheep per-head fields the stubble consumers read (quantity, revenue, cost, water)
+STUBBLE_SHEEP_AGEC_FIELDS = ['QC', 'WR_DRN', 'F1', 'Q1', 'P1', 'F2', 'Q2', 'P2', 'F3', 'Q3', 'P3']
+
+
 def dict2matrix(d, fromlist, tolist):
     """Return 0-1 matrix mapping 'from-vectors' to 'to-vectors' using dict d."""
     A = np.zeros((len(tolist), len(fromlist)), dtype=np.int8)
@@ -321,8 +325,17 @@ class Data:
             'SHEEP - NATURAL LAND WOOL'
         ]
         
+        # Sheep grazing cereal stubble (settings.STUBBLE_DSE_FILE): its own products on each cereal land use, so that
+        # cereal columns carry sheep meat, wool and live exports into the sheep commodities' demand rows. One set per
+        # stubble land use ('SHEEP - STUBBLE WINTER MEAT', ...), so each product has one land use and its quantity can
+        # follow that land use's cells; the names never contain both words of a crop commodity.
+        self.LU_STUBBLE = settings.STUBBLE_LAND_USES if settings.STUBBLE_DSE_FILE else []
+        self.LU2PR_STUBBLE = {lu: [f'SHEEP - STUBBLE {lu.split()[0].upper()} {x}' for x in ('LEXP', 'MEAT', 'WOOL')]
+                              for lu in self.LU_STUBBLE}
+        self.PR_STUBBLE = [pr for prs in self.LU2PR_STUBBLE.values() for pr in prs]
+
         # Sort each product category alphabetically, then concatenate
-        self.PRODUCTS = self.PR_CROPS + self.PR_LVSTK
+        self.PRODUCTS = self.PR_CROPS + self.PR_LVSTK + self.PR_STUBBLE
         self.PRODUCTS.sort()
 
         # Get number of products
@@ -335,6 +348,8 @@ class Data:
             for PR in self.PR_LVSTK:
                 if lu.upper() in PR:
                     self.LU2PR_DICT[lu] = self.LU2PR_DICT[lu] + [PR]
+        for lu in self.LU_STUBBLE:
+            self.LU2PR_DICT[lu] = self.LU2PR_DICT[lu] + self.LU2PR_STUBBLE[lu]
 
         # A reverse dictionary for convenience.
         self.PR2LU_DICT = {pr: key for key, val in self.LU2PR_DICT.items() for pr in val}
@@ -356,7 +371,7 @@ class Data:
         self.COMMODITIES = { ( s.replace(' - NATURAL LAND', '')
                                 .replace(' - MODIFIED LAND', '')
                                 .lower() )
-                                for s in self.PRODUCTS }
+                                for s in self.PR_CROPS + self.PR_LVSTK }     # the stubble products are sheep commodities
         self.COMMODITIES = list(self.COMMODITIES)
         self.COMMODITIES.sort()
         self.CM_CROPS = [s for s in self.COMMODITIES if s in [k.lower() for k in self.LU_CROPS]]
@@ -376,7 +391,7 @@ class Data:
             else:
                 head = key.split()[0]
                 tail = key.split()[1]
-            for PR in self.PR_LVSTK:
+            for PR in self.PR_LVSTK + self.PR_STUBBLE:
                 if tail==0 and head.upper() in PR:
                     self.CM2PR_DICT[key] = self.CM2PR_DICT[key] + [PR]
                 elif (head.upper()) in PR and (tail.upper() in PR):
@@ -627,6 +642,26 @@ class Data:
 
         feed_req_raw = pd.read_hdf(os.path.join(settings.INPUT_DIR, "feed_req.h5"), where=self.MASK).to_numpy()
         self.FEED_REQ = np.nan_to_num(feed_req_raw)
+
+        # The stocking calibration k per livestock type, in place of FEED_REQ: one value per (cell, type), each cell
+        # carrying its SA2's k for that type. Without a file every type takes FEED_REQ (the model as before).
+        if settings.LVSTK_K_FILE:
+            lvstk_k = pd.read_hdf(os.path.join(settings.INPUT_DIR, settings.LVSTK_K_FILE), where=self.MASK)
+            lvstk_k_raw = {lvstype: lvstk_k[lvstype].to_numpy() for lvstype in ('BEEF', 'SHEEP', 'DAIRY')}     # for the NaN guard
+            self.LVSTK_K = {lvstype: np.nan_to_num(k) for lvstype, k in lvstk_k_raw.items()}
+        else:
+            lvstk_k_raw = None
+            self.LVSTK_K = {lvstype: self.FEED_REQ for lvstype in ('BEEF', 'SHEEP', 'DAIRY')}
+
+        # The stubble carrying rate <unit: DSE per ha, annualised>, read on every cell and applied on the cereal land uses
+        # only (quantity.get_stubble_yield_pot); 0 where no file is given
+        if settings.STUBBLE_DSE_FILE:
+            stubble_raw = pd.read_hdf(os.path.join(settings.INPUT_DIR, settings.STUBBLE_DSE_FILE), where=self.MASK).to_numpy()   # for the NaN guard
+            self.STUBBLE_DSE_HA = np.nan_to_num(stubble_raw)
+        else:
+            stubble_raw = None
+            self.STUBBLE_DSE_HA = np.zeros(self.NCELLS, dtype=np.float32)
+
         self.PASTURE_KG_DM_HA = pd.read_hdf(
             os.path.join(settings.INPUT_DIR, "pasture_kg_dm_ha.h5"), where=self.MASK
         ).to_numpy()
@@ -893,6 +928,13 @@ class Data:
         self.AGGHG_LVSTK = pd.read_hdf(os.path.join(settings.INPUT_DIR, "agGHG_lvstk.h5"), where=self.MASK)
         self.AGGHG_IRRPAST = pd.read_hdf(os.path.join(settings.INPUT_DIR, "agGHG_irrpast.h5"), where=self.MASK)
 
+        # A cell without the sheep per-head data the stubble consumers read carries no stubble sheep: its stubble rate is 0
+        # for quantity, revenue, cost, GHG and water alike (coarsen_guarded_arrays applies the same rule to a block's fine
+        # cells). A NaN rate stays NaN for the guard.
+        if stubble_raw is not None:
+            stubble_raw = self.get_stubble_effective_rate(stubble_raw)
+            self.STUBBLE_DSE_HA = np.nan_to_num(stubble_raw)
+
 
         # Raw transition cost matrix. In AUD/ha and ordered lexicographically.
         self.AG_TMATRIX = np.load(os.path.join(settings.INPUT_DIR, "ag_tmatrix.npy"))
@@ -1111,7 +1153,7 @@ class Data:
         self.WATER_DELIVERY_PRICE = np.nan_to_num(water_delivery_price_raw)
 
         # NaN guard: every eligible entry of the arrays the agricultural economics read must carry data.
-        self.check_eligible_nan(feed_req_raw, water_delivery_price_raw)
+        self.check_eligible_nan(feed_req_raw, water_delivery_price_raw, lvstk_k_raw, stubble_raw)
        
 
         # Water yields -- run off from a cell into catchment by deep-rooted, shallow-rooted, and natural land
@@ -2142,15 +2184,25 @@ class Data:
             pasture         a * PASTURE_KG_DM_HA        SAFE_PUR
             capacity        pasture * SAFE_PUR          FEED_REQ
             head            capacity * FEED_REQ         livestock QC, WR, F, GHG, livestock climate multiplier
+                            (capacity * k with LVSTK_K_FILE; k is in the capacity class, as FEED_REQ)
             head x F        head * F_k                  Q_k
             head x F x Q    head * F_k * Q_k            P_k
+        Stubble (STUBBLE_DSE_FILE), per (lm, stubble land use) over the block's land-use cells eligible for it:
+            area            a                           STUBBLE_DSE_HA
+            stubble         a * STUBBLE_DSE_HA          k_sheep (LVSTK_K['SHEEP'])
+            (STUBBLE_DSE_HA is the effective rate: 0 on cells without the sheep per-head data the stubble consumers
+            read, which carry no stubble sheep at RESFACTOR 1, so a coarse entry has stubble head only with data)
+            stubble head    a * STUBBLE_DSE_HA * k      sheep QC, WR, F, GHG (head x F, head x F x Q for Q, P as above)
+                            stubble head * WR_DRN       WATER_DELIVERY_PRICE
         A block whose weights sum to zero over cells with data (e.g. zero Yield) takes the area-weighted mean;
         its coarse product is zero either way.
 
         The crop arrays and the climate multiplier are indexed by (lm, lu) and are updated in place. The livestock
         inputs are shared by the four (lm, lu) entries of an animal, each with its own eligible cells and head, so
         their coarse values are returned per (lm, lu), read through `agec_lvstk`, `agghg_lvstk`, `agghg_irrpast`,
-        `lvstk_pasture` and `water_delivery_price`. The shared attributes keep their centre-cell values.
+        `lvstk_pasture`, `lvstk_k` and `water_delivery_price`. The stubble arrays are one set per (lm, stubble land use),
+        as each stubble land use has its own products, kept in STUBBLE_COARSE and read through `stubble`. The shared
+        attributes keep their centre-cell values.
         """
         crop_class = {
             'Yield': 'area', 'AC': 'area', 'FLC': 'area', 'FOC': 'area', 'FDC': 'area', 'WR': 'area',
@@ -2211,10 +2263,23 @@ class Data:
                     'AGGHG_LVSTK': self.AGGHG_LVSTK.loc[:, (animal, slice(None))].to_numpy(copy=True),
                     'AGGHG_IRRPAST': {c: as_float(self.AGGHG_IRRPAST[c].to_numpy()) for c in irrpast_cols} if lm == 'irr' else None,
                     'FEED_REQ': as_float(self.FEED_REQ),
+                    'LVSTK_K': as_float(self.LVSTK_K[animal]),
                     'PASTURE_KG_DM_HA': as_float(self.PASTURE_KG_DM_HA),
                     'SAFE_PUR': as_float(self.SAFE_PUR_NATL if vegtype == 'natural land' else self.SAFE_PUR_MODL),
                     'WATER_DELIVERY_PRICE': as_float(water_price_centre),
                 }
+
+        # Stubble: one set per (lm, stubble land use), sheep values per stubble head.
+        stubble_js = [self.DESC2AGLU[lu] for lu in self.LU_STUBBLE]
+        sheep_agec_cols = self.AGEC_LVSTK.loc[:, (slice(None), 'SHEEP')].columns
+        sheep_agghg_cols = self.AGGHG_LVSTK.loc[:, ('SHEEP', slice(None))].columns
+        stubble = {(lm, lu): {
+            'STUBBLE_DSE_HA': as_float(self.STUBBLE_DSE_HA),
+            'K_SHEEP': as_float(self.LVSTK_K['SHEEP']),
+            'AGEC_LVSTK': self.AGEC_LVSTK.loc[:, sheep_agec_cols].to_numpy(dtype=np.float64, copy=True),
+            'AGGHG_LVSTK': self.AGGHG_LVSTK.loc[:, sheep_agghg_cols].to_numpy(dtype=np.float64, copy=True),
+            'WATER_DELIVERY_PRICE': as_float(water_price_centre),
+        } for lm in self.LANDMANS for lu in self.LU_STUBBLE}
 
         for s, e, c0, c1 in bands:
             if c1 == c0:
@@ -2273,6 +2338,12 @@ class Data:
             safe_pur = {'natural land': read("safe_pur_natl.h5").to_numpy(dtype=np.float64),
                         'modified land': read("safe_pur_modl.h5").to_numpy(dtype=np.float64)}
             water_price = read("water_delivery_price.h5").to_numpy(dtype=np.float64)
+            if settings.LVSTK_K_FILE:
+                lvstk_k = read(settings.LVSTK_K_FILE)
+                k_fine = {t: lvstk_k[t].to_numpy(dtype=np.float64) for t in ('BEEF', 'SHEEP', 'DAIRY')}
+                del lvstk_k
+            else:
+                k_fine = {t: feed_req for t in ('BEEF', 'SHEEP', 'DAIRY')}          # LVSTK_K is FEED_REQ without a file
             for m, lm in enumerate(self.LANDMANS):
                 for lu in self.LU_LVSTK:
                     j = self.DESC2AGLU[lu]
@@ -2283,7 +2354,7 @@ class Data:
                     out = lvstk[lm, lu]
                     w = {'area': a, 'pasture': a * pasture}
                     w['capacity'] = w['pasture'] * safe_pur[vegtype]
-                    w['head'] = w['capacity'] * feed_req
+                    w['head'] = w['capacity'] * k_fine[animal]
                     wr = fine(agec_lvstk, ('WR_DRN', animal)) * settings.LIVESTOCK_DRINKING_WATER
                     if lm == 'irr':
                         wr = wr + fine(agec_lvstk, ('WR_IRR', animal))
@@ -2311,9 +2382,42 @@ class Data:
                             cci_c[c0:c1][eligible, i] = block_mean(fine(cci, col), w['head'], elig)[eligible]
 
                     out['FEED_REQ'][c0:c1][eligible] = block_mean(feed_req, w['capacity'], elig)[eligible]
+                    out['LVSTK_K'][c0:c1][eligible] = block_mean(k_fine[animal], w['capacity'], elig)[eligible]
                     out['PASTURE_KG_DM_HA'][c0:c1][eligible] = block_mean(pasture, a, elig)[eligible]
                     out['SAFE_PUR'][c0:c1][eligible] = block_mean(safe_pur[vegtype], w['pasture'], elig)[eligible]
                     out['WATER_DELIVERY_PRICE'][c0:c1][eligible] = block_mean(water_price, w['water'], elig)[eligible]
+
+            if stubble:
+                rate = read(settings.STUBBLE_DSE_FILE).to_numpy(dtype=np.float64)
+                # Effective rate: 0 on cells without the sheep per-head data (no stubble sheep there at RESFACTOR 1); a NaN
+                # rate stays NaN for the guard.
+                sources = [c for c in sheep_agghg_cols if not settings.USE_GHG_SCOPE_1 or c[1] in settings.LVSTK_GHG_SCOPE_1]
+                sheep_data = (np.isfinite(np.column_stack([fine(agec_lvstk, (f, 'SHEEP')) for f in STUBBLE_SHEEP_AGEC_FIELDS])).all(axis=1)
+                              & np.isfinite(np.column_stack([fine(agghg_lvstk, c) for c in sources])).all(axis=1)
+                              & np.isfinite(water_price))
+                rate = np.where(sheep_data | ~np.isfinite(rate), rate, 0.0)
+                for (lm, lu), out in stubble.items():
+                    m, j = self.LANDMANS.index(lm), self.DESC2AGLU[lu]
+                    elig, eligible = x_mrj_full[m, s:e, j] & land_use, self.EXCLUDE[m, c0:c1, j]
+                    if not eligible.any():
+                        continue
+                    w_rate = a * rate
+                    w_head = w_rate * k_fine['SHEEP']
+                    out['STUBBLE_DSE_HA'][c0:c1][eligible] = block_mean(rate, a, elig)[eligible]
+                    out['K_SHEEP'][c0:c1][eligible] = block_mean(k_fine['SHEEP'], w_rate, elig)[eligible]
+                    for i, (field, _) in enumerate(sheep_agec_cols):
+                        cls = weight_class(lvstk_class, field)
+                        if cls == 'head_F':
+                            wt = w_head * fine(agec_lvstk, (f'F{field[1]}', 'SHEEP'))
+                        elif cls == 'head_FQ':
+                            wt = w_head * fine(agec_lvstk, (f'F{field[1]}', 'SHEEP')) * fine(agec_lvstk, (f'Q{field[1]}', 'SHEEP'))
+                        else:
+                            wt = {'area': a, 'head': w_head}[cls]
+                        out['AGEC_LVSTK'][c0:c1][eligible, i] = block_mean(fine(agec_lvstk, (field, 'SHEEP')), wt, elig)[eligible]
+                    for i, col in enumerate(sheep_agghg_cols):
+                        out['AGGHG_LVSTK'][c0:c1][eligible, i] = block_mean(fine(agghg_lvstk, col), w_head, elig)[eligible]
+                    w_water = w_head * fine(agec_lvstk, ('WR_DRN', 'SHEEP')) * settings.LIVESTOCK_DRINKING_WATER
+                    out['WATER_DELIVERY_PRICE'][c0:c1][eligible] = block_mean(water_price, w_water, elig)[eligible]
 
         self.AGEC_CROPS = pd.DataFrame(agec_c, index=self.AGEC_CROPS.index, columns=self.AGEC_CROPS.columns)
         self.AGGHG_CROPS = pd.DataFrame(agghg_c, index=self.AGGHG_CROPS.index, columns=self.AGGHG_CROPS.columns)
@@ -2328,12 +2432,18 @@ class Data:
                     irrpast[col] = v
                 out['AGGHG_IRRPAST'] = irrpast
 
+        for out in stubble.values():
+            out['AGEC_LVSTK'] = pd.DataFrame(out['AGEC_LVSTK'], index=self.AGEC_LVSTK.index, columns=sheep_agec_cols)
+            out['AGGHG_LVSTK'] = pd.DataFrame(out['AGGHG_LVSTK'], index=self.AGGHG_LVSTK.index, columns=sheep_agghg_cols)
+        self.STUBBLE_COARSE = stubble
+
         self.CLIMATE_CHANGE_IMPACT = pd.DataFrame(cci_c, index=self.CLIMATE_CHANGE_IMPACT.index, columns=self.CLIMATE_CHANGE_IMPACT.columns)
         self.CLIMATE_CHANGE_IMPACT_xr = self.get_climate_change_impact_xr()
         return lvstk
 
 
-    def check_eligible_nan(self, feed_req_raw: np.ndarray, water_delivery_price_raw: np.ndarray) -> None:
+    def check_eligible_nan(self, feed_req_raw: np.ndarray, water_delivery_price_raw: np.ndarray,
+                           lvstk_k_raw: Optional[dict] = None, stubble_raw: Optional[np.ndarray] = None) -> None:
         """
         NaN guard. Raise if an array the agricultural economics read is NaN in an eligible (lm, cell, lu) entry,
         before the cost, revenue, quantity and GHG code turns the NaN into zero (`fillna(0)`, `np.nan_to_num`,
@@ -2342,7 +2452,13 @@ class Data:
 
         The same at every RESFACTOR: after `coarsen_guarded_arrays`, an eligible coarse entry is NaN only if no
         eligible fine cell in its block has data. `feed_req_raw` and `water_delivery_price_raw` are those two
-        arrays before their `np.nan_to_num` (at RESFACTOR > 1 the per-(lm, lu) arrays keep the NaN).
+        arrays before their `np.nan_to_num` (at RESFACTOR > 1 the per-(lm, lu) arrays keep the NaN); so are
+        `lvstk_k_raw` (per type, with LVSTK_K_FILE) and `stubble_raw` (with STUBBLE_DSE_FILE). With a k file, LVSTK_K is
+        checked on each livestock (lm, lu); with a stubble file, STUBBLE_DSE_HA on the eligible entries of each stubble
+        land use, per (lm, lu), and with both, k_sheep where the stubble rate is positive (where it is 0 there are no stubble sheep).
+        The sheep per-head fields on stubble cells are not checked at RESFACTOR 1: a cell without sheep data carries no
+        stubble sheep by design; at RESFACTOR > 1 they are checked wherever a coarse entry has stubble head above zero
+        (k_sheep x rate > 0).
         """
         coarse = getattr(self, 'LVSTK_COARSE', None)
         climate_pairs = {c[:2] for c in self.CLIMATE_CHANGE_IMPACT.columns}
@@ -2386,9 +2502,35 @@ class Data:
                     check('PASTURE_KG_DM_HA', lm, lu, pasture, eligible)
                     check('SAFE_PUR_NATL' if vegtype == 'natural land' else 'SAFE_PUR_MODL', lm, lu, safe_pur, eligible)
                     check('WATER_DELIVERY_PRICE', lm, lu, water_price, eligible)
+                    if lvstk_k_raw is not None:
+                        check('LVSTK_K', lm, lu, lvstk_k_raw[animal] if coarse is None else self.lvstk_k(lu, lm), eligible)
                 if (lm, lu) in climate_pairs:
                     climate_nan = np.where(self.CLIMATE_CHANGE_IMPACT[lm, lu].isna().any(axis=1).to_numpy(), np.nan, 0.0)
                     check('CLIMATE_CHANGE_IMPACT (allocated)', lm, lu, climate_nan, self.AG_L_MRJ[m, :, j] > 0)
+
+        if stubble_raw is not None:
+            for (m, lm), stubble_lu in [((m, lm), lu) for m, lm in enumerate(self.LANDMANS) for lu in self.LU_STUBBLE]:
+                eligible = self.EXCLUDE[m, :, self.DESC2AGLU[stubble_lu]]
+                st = self.stubble(stubble_lu, lm)
+                rate = stubble_raw if coarse is None else st['STUBBLE_DSE_HA']
+                check('STUBBLE_DSE_HA', lm, stubble_lu, rate, eligible)
+                # A real k file carries k wherever the stubble rate is positive; where the rate is 0 there are no stubble sheep.
+                if lvstk_k_raw is not None:
+                    check('LVSTK_K (stubble rate > 0)', lm, stubble_lu, lvstk_k_raw['SHEEP'] if coarse is None else st['K_SHEEP'],
+                          eligible & (np.nan_to_num(np.asarray(rate, dtype=np.float64)) > 0))
+                # RESFACTOR > 1: a coarse entry with stubble head above zero needs the sheep per-head fields it uses
+                # (aggregation must not leave positive head with no per-head data behind it). At RESFACTOR 1 a cell
+                # without sheep data carries no stubble sheep, by design.
+                if coarse is not None:
+                    head = np.nan_to_num(np.asarray(st['K_SHEEP'] * st['STUBBLE_DSE_HA'], dtype=np.float64))
+                    positive = eligible & (head > 0)
+                    for f in STUBBLE_SHEEP_AGEC_FIELDS:
+                        check(f'AGEC_LVSTK {f} (stubble head > 0)', lm, stubble_lu, st['AGEC_LVSTK'][f, 'SHEEP'], positive)
+                    agghg = st['AGGHG_LVSTK']
+                    sources = [c for c in agghg.columns if c[0] == 'SHEEP' and (not settings.USE_GHG_SCOPE_1 or c[1] in settings.LVSTK_GHG_SCOPE_1)]
+                    for col in sources:
+                        check(f'AGGHG_LVSTK {col[1]} (stubble head > 0)', lm, stubble_lu, agghg[col], positive)
+                    check('WATER_DELIVERY_PRICE (stubble head > 0)', lm, stubble_lu, st['WATER_DELIVERY_PRICE'], positive)
 
         self.raise_nan_report(found, 'guarded arrays, eligible (allocated for the climate multiplier)')
 
@@ -2460,6 +2602,33 @@ class Data:
             return c['FEED_REQ'], c['PASTURE_KG_DM_HA'], c['SAFE_PUR']
         safe_pur = self.SAFE_PUR_NATL if vegtype == 'natural land' else self.SAFE_PUR_MODL
         return self.FEED_REQ, self.PASTURE_KG_DM_HA, safe_pur
+
+    def get_stubble_effective_rate(self, rate: np.ndarray) -> np.ndarray:
+        """The stubble rate at the model's cells, 0 where the sheep per-head data the stubble consumers read is missing
+        (AGEC_LVSTK STUBBLE_SHEEP_AGEC_FIELDS, the AGGHG_LVSTK sources, WATER_DELIVERY_PRICE); NaN stays NaN."""
+        agghg = self.AGGHG_LVSTK.loc[:, ('SHEEP', slice(None))]
+        sources = [c for c in agghg.columns if not settings.USE_GHG_SCOPE_1 or c[1] in settings.LVSTK_GHG_SCOPE_1]
+        water_price = pd.read_hdf(os.path.join(settings.INPUT_DIR, "water_delivery_price.h5"), where=self.MASK).to_numpy(dtype=np.float64)
+        sheep_data = (np.isfinite(self.AGEC_LVSTK.loc[:, [(f, 'SHEEP') for f in STUBBLE_SHEEP_AGEC_FIELDS]].to_numpy(dtype=np.float64)).all(axis=1)
+                      & np.isfinite(agghg[sources].to_numpy(dtype=np.float64)).all(axis=1)
+                      & np.isfinite(water_price))
+        return np.where(sheep_data | ~np.isfinite(rate), rate, 0.0)
+
+    def lvstk_k(self, lu: str, lm: str) -> np.ndarray:
+        """The stocking calibration k of the livestock type of `lu`, for (lu, lm); FEED_REQ without LVSTK_K_FILE."""
+        animal, _ = ag_quantity.lvs_veg_types(lu)
+        coarse = getattr(self, 'LVSTK_COARSE', None)
+        return self.LVSTK_K[animal] if coarse is None else coarse[lm, lu]['LVSTK_K']
+
+    def stubble(self, lu: str, lm: str) -> dict:
+        """The arrays the stubble sheep of stubble land use `lu` read for `lm`: K_SHEEP, STUBBLE_DSE_HA, AGEC_LVSTK and
+        AGGHG_LVSTK (indexed by (field, 'SHEEP') and ('SHEEP', source)) and WATER_DELIVERY_PRICE; block-aggregated per
+        (lm, lu) at RESFACTOR > 1."""
+        coarse = getattr(self, 'STUBBLE_COARSE', None)
+        if coarse:
+            return coarse[lm, lu]
+        return {'K_SHEEP': self.LVSTK_K['SHEEP'], 'STUBBLE_DSE_HA': self.STUBBLE_DSE_HA, 'AGEC_LVSTK': self.AGEC_LVSTK,
+                'AGGHG_LVSTK': self.AGGHG_LVSTK, 'WATER_DELIVERY_PRICE': self.WATER_DELIVERY_PRICE}
 
 
 
