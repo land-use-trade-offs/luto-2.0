@@ -145,29 +145,30 @@ def get_cost_lvstk(data:Data, lu, lm, yr_idx):
 
     # Get the yield potential, i.e. the total number of head per hectare.
     yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
+    agec = data.agec_lvstk(lu, lm)
 
     # Variable costs - quantity-dependent costs as costs per head x heads per hectare.
-    costs_q = data.AGEC_LVSTK['QC', lvstype] * yield_pot * data.QC_COST_MULTS.loc[yr_cal, lvstype_capital]
+    costs_q = agec['QC', lvstype] * yield_pot * data.QC_COST_MULTS.loc[yr_cal, lvstype_capital]
 
     # Variable costs - area-dependent costs per hectare.
-    costs_a = data.AGEC_LVSTK['AC', lvstype] * data.AC_COST_MULTS.loc[yr_cal, lvstype_capital]
+    costs_a = agec['AC', lvstype] * data.AC_COST_MULTS.loc[yr_cal, lvstype_capital]
 
     # Fixed costs
-    costs_flc = data.AGEC_LVSTK['FLC', lvstype] * data.FLC_COST_MULTS.loc[yr_cal, lvstype_capital]   # Fixed labour costs.
-    costs_foc = data.AGEC_LVSTK['FOC', lvstype] * data.FOC_COST_MULTS.loc[yr_cal, lvstype_capital]   # Fixed operating costs.
-    costs_fdc = data.AGEC_LVSTK['FDC', lvstype] * data.FDC_COST_MULTS.loc[yr_cal, lvstype_capital]   # Fixed depreciation costs.
+    costs_flc = agec['FLC', lvstype] * data.FLC_COST_MULTS.loc[yr_cal, lvstype_capital]   # Fixed labour costs.
+    costs_foc = agec['FOC', lvstype] * data.FOC_COST_MULTS.loc[yr_cal, lvstype_capital]   # Fixed operating costs.
+    costs_fdc = agec['FDC', lvstype] * data.FDC_COST_MULTS.loc[yr_cal, lvstype_capital]   # Fixed depreciation costs.
 
     # Water costs in $/ha calculated as water requirements (ML/head) x heads per hectare x delivery price ($/ML)
     if lm == 'irr': # Irrigation water if required.
-        WR_IRR = data.AGEC_LVSTK['WR_IRR', lvstype]
+        WR_IRR = agec['WR_IRR', lvstype]
     elif lm == 'dry': # No irrigation water if not required.
         WR_IRR = 0
     else: # Passed lm is neither `dry` nor `irr`.
         raise KeyError(f"Unknown {lm} land management. Check `lm` key.")
 
     # Water delivery costs equal drinking water plus irrigation water req per head * yield (head/ha)
-    costs_w = (data.AGEC_LVSTK['WR_DRN', lvstype] * settings.LIVESTOCK_DRINKING_WATER + WR_IRR) * yield_pot
-    costs_w *= data.WATER_DELIVERY_PRICE * data.WP_COST_MULTS[yr_cal]  # $/ha
+    costs_w = (agec['WR_DRN', lvstype] * settings.LIVESTOCK_DRINKING_WATER + WR_IRR) * yield_pot
+    costs_w *= data.water_delivery_price(lu, lm) * data.WP_COST_MULTS[yr_cal]  # $/ha
 
     # Convert costs to $ per cell including resfactor.
     costs_a *= data.REAL_AREA
@@ -357,18 +358,20 @@ def get_ecological_grazing_effect_c_mrj(data:Data, yr_idx):
     for j_idx, lu in enumerate(land_uses):
         lvstype, _ = lvs_veg_types(lu)
 
-        # Get effects on operating costs
-        operating_mult = data.ECOLOGICAL_GRAZING_DATA[lu].loc[yr_cal, 'Operating_cost_multiplier']
-        operating_c_effect = data.AGEC_LVSTK['FOC', lvstype] * (operating_mult - 1) * data.REAL_AREA
+        for m, lm in enumerate(data.LANDMANS):
+            agec = data.agec_lvstk(lu, lm)
 
-        # Get effects on labour costs
-        labour_mult = data.ECOLOGICAL_GRAZING_DATA[lu].loc[yr_cal, 'Labour_cost_mulitiplier']
-        labour_c_effect = data.AGEC_LVSTK['FLC', lvstype] * (labour_mult - 1) * data.REAL_AREA
+            # Get effects on operating costs
+            operating_mult = data.ECOLOGICAL_GRAZING_DATA[lu].loc[yr_cal, 'Operating_cost_multiplier']
+            operating_c_effect = agec['FOC', lvstype] * (operating_mult - 1) * data.REAL_AREA
 
-        # Combine for total cost effect
-        total_c_effect = operating_c_effect + labour_c_effect
+            # Get effects on labour costs
+            labour_mult = data.ECOLOGICAL_GRAZING_DATA[lu].loc[yr_cal, 'Labour_cost_mulitiplier']
+            labour_c_effect = agec['FLC', lvstype] * (labour_mult - 1) * data.REAL_AREA
 
-        for m in range(data.NLMS):
+            # Combine for total cost effect
+            total_c_effect = operating_c_effect + labour_c_effect
+
             new_c_mrj[m, :, j_idx] = total_c_effect
 
     return new_c_mrj

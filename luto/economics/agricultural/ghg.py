@@ -116,14 +116,15 @@ def get_ghg_lvstk( data:Data    # Data object.
 
     # Get the yield potential, i.e. the total number of livestock head per hectare.
     yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
+    agghg_lvstk = data.agghg_lvstk(lu, lm)
 
     # Get GHG emissions by source in kg CO2e per head of livestock.  settings.LVSTK_GHG_SCOPE_1
     # Note: ghg_rs (r -> each cell, s -> each GHG source)
     if settings.USE_GHG_SCOPE_1:
-        ghg_raw = data.AGGHG_LVSTK.loc[:, (data.AGGHG_LVSTK.columns.get_level_values(0) == lvstype) &
-                                          (data.AGGHG_LVSTK.columns.get_level_values(1).isin(settings.LVSTK_GHG_SCOPE_1))]
+        ghg_raw = agghg_lvstk.loc[:, (agghg_lvstk.columns.get_level_values(0) == lvstype) &
+                                     (agghg_lvstk.columns.get_level_values(1).isin(settings.LVSTK_GHG_SCOPE_1))]
     else:
-        ghg_raw = data.AGGHG_LVSTK.loc[:, (lvstype, slice(None)) ]
+        ghg_raw = agghg_lvstk.loc[:, (lvstype, slice(None)) ]
 
     # Get the names for each GHG source
     ghg_name_s = [ i[1] for i in ghg_raw.columns ]
@@ -134,7 +135,7 @@ def get_ghg_lvstk( data:Data    # Data object.
 
     # Add pasture irrigation emissions.
     if lm == 'irr':
-        ghg_lvstk_irr = data.AGGHG_IRRPAST
+        ghg_lvstk_irr = data.agghg_irrpast(lu, lm)
         ghg_lvstk_irr_cols = [i for i in ghg_lvstk_irr.columns if 'CO2E' in i]
         
         ghg_rs = pd.concat([ghg_rs, ghg_lvstk_irr[ghg_lvstk_irr_cols]], axis = 1)
@@ -343,7 +344,7 @@ def get_asparagopsis_effect_g_mrj(data:Data, yr_idx):
                 yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
 
                 reduction_amnt = (
-                    data.AGGHG_LVSTK[lvstype, "CO2E_KG_HEAD_ENTERIC"].to_numpy()
+                    data.agghg_lvstk(lu, lm)[lvstype, "CO2E_KG_HEAD_ENTERIC"].to_numpy()
                     * yield_pot
                     * ch4_reduction_perc
                     / 1000            # convert to tonnes
@@ -444,7 +445,7 @@ def get_ecological_grazing_effect_g_mrj(data:Data, yr_idx):
                 yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
 
                 leach_reduction_amnt = (
-                    data.AGGHG_LVSTK[lvstype, 'CO2E_KG_HEAD_IND_LEACH_RUNOFF'].to_numpy()
+                    data.agghg_lvstk(lu, lm)[lvstype, 'CO2E_KG_HEAD_IND_LEACH_RUNOFF'].to_numpy()
                     * yield_pot       # convert to HAs
                     * leach_reduction_perc
                     / 1000            # convert to tonnes
