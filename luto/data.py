@@ -620,9 +620,8 @@ class Data:
         ###############################################################
         print("├── Loading livestock related data", flush=True)
 
-        self.FEED_REQ = np.nan_to_num(
-            pd.read_hdf(os.path.join(settings.INPUT_DIR, "feed_req.h5"), where=self.MASK).to_numpy()
-        )
+        feed_req_raw = pd.read_hdf(os.path.join(settings.INPUT_DIR, "feed_req.h5"), where=self.MASK).to_numpy()
+        self.FEED_REQ = np.nan_to_num(feed_req_raw)
         self.PASTURE_KG_DM_HA = pd.read_hdf(
             os.path.join(settings.INPUT_DIR, "pasture_kg_dm_ha.h5"), where=self.MASK
         ).to_numpy()
@@ -1078,9 +1077,11 @@ class Data:
         )
 
         # Spatially explicit costs of water delivery per ML.
-        self.WATER_DELIVERY_PRICE = np.nan_to_num(
-                pd.read_hdf(os.path.join(settings.INPUT_DIR, "water_delivery_price.h5"), where=self.MASK).to_numpy()
-        )
+        water_delivery_price_raw = pd.read_hdf(os.path.join(settings.INPUT_DIR, "water_delivery_price.h5"), where=self.MASK).to_numpy()
+        self.WATER_DELIVERY_PRICE = np.nan_to_num(water_delivery_price_raw)
+
+        # NaN guard: every eligible entry of the arrays the agricultural economics read must carry data.
+        self.check_eligible_nan(feed_req_raw, water_delivery_price_raw)
        
 
         # Water yields -- run off from a cell into catchment by deep-rooted, shallow-rooted, and natural land
@@ -2287,6 +2288,106 @@ class Data:
         self.CLIMATE_CHANGE_IMPACT = pd.DataFrame(cci_c, index=self.CLIMATE_CHANGE_IMPACT.index, columns=self.CLIMATE_CHANGE_IMPACT.columns)
         self.CLIMATE_CHANGE_IMPACT_xr = self.get_climate_change_impact_xr()
         return lvstk
+
+
+    def check_eligible_nan(self, feed_req_raw: np.ndarray, water_delivery_price_raw: np.ndarray) -> None:
+        """
+        NaN guard. Raise if an array the agricultural economics read is NaN in an eligible (lm, cell, lu) entry,
+        before the cost, revenue, quantity and GHG code turns the NaN into zero (`fillna(0)`, `np.nan_to_num`,
+        a sum that skips NaN); and if the climate multiplier is NaN in an allocated entry (AG_L_MRJ > 0), which
+        `get_ccimpact` fills with 1. Checked per (lm, lu), on the values its consumers read.
+
+        The same at every RESFACTOR: after `coarsen_guarded_arrays`, an eligible coarse entry is NaN only if no
+        eligible fine cell in its block has data. `feed_req_raw` and `water_delivery_price_raw` are those two
+        arrays before their `np.nan_to_num` (at RESFACTOR > 1 the per-(lm, lu) arrays keep the NaN).
+        """
+        coarse = getattr(self, 'LVSTK_COARSE', None)
+        climate_pairs = {c[:2] for c in self.CLIMATE_CHANGE_IMPACT.columns}
+        found = []
+
+        def check(name, lm, lu, values, where):
+            bad = where & np.isnan(np.asarray(values, dtype=np.float64))
+            if bad.any():
+                found.append((name, lm, lu, bad))
+
+        for m, lm in enumerate(self.LANDMANS):
+            for lu in self.LU_CROPS + self.LU_LVSTK:
+                j = self.DESC2AGLU[lu]
+                eligible = self.EXCLUDE[m, :, j]
+                if lu in self.LU_CROPS:
+                    if ('Yield', lm, lu) not in self.AGEC_CROPS.columns:
+                        continue                    # (lm, lu) does not occur; its matrices are zeros
+                    for f in ['Yield', 'AC', 'QC', 'FLC', 'FOC', 'FDC', 'P1'] + (['WR', 'WP'] if lm == 'irr' else []):
+                        check(f'AGEC_CROPS {f}', lm, lu, self.AGEC_CROPS[f, lm, lu], eligible)
+                    for t in [c[0] for c in self.AGGHG_CROPS.columns if c[1:] == (lm, lu)]:
+                        check(f'AGGHG_CROPS {t}', lm, lu, self.AGGHG_CROPS[t, lm, lu], eligible)
+                else:
+                    animal, vegtype = ag_quantity.lvs_veg_types(lu)
+                    agec = self.agec_lvstk(lu, lm)
+                    fields = ['AC', 'QC', 'FLC', 'FOC', 'FDC', 'WR_DRN'] + (['WR_IRR'] if lm == 'irr' else [])
+                    fields += [f'{p}{k}' for k in '123' if (f'F{k}', animal) in agec.columns for p in 'FQP']
+                    for f in fields:
+                        check(f'AGEC_LVSTK {f}', lm, lu, agec[f, animal], eligible)
+                    agghg = self.agghg_lvstk(lu, lm)
+                    for t in [c[1] for c in agghg.columns if c[0] == animal]:
+                        check(f'AGGHG_LVSTK {t}', lm, lu, agghg[animal, t], eligible)
+                    if lm == 'irr':
+                        irrpast = self.agghg_irrpast(lu, lm)
+                        for t in [c for c in irrpast.columns if 'CO2E' in c]:
+                            check(f'AGGHG_IRRPAST {t}', lm, lu, irrpast[t], eligible)
+                    feed_req, pasture, safe_pur = self.lvstk_pasture(lu, lm)
+                    water_price = self.water_delivery_price(lu, lm)
+                    if coarse is None:
+                        feed_req, water_price = feed_req_raw, water_delivery_price_raw
+                    check('FEED_REQ', lm, lu, feed_req, eligible)
+                    check('PASTURE_KG_DM_HA', lm, lu, pasture, eligible)
+                    check('SAFE_PUR_NATL' if vegtype == 'natural land' else 'SAFE_PUR_MODL', lm, lu, safe_pur, eligible)
+                    check('WATER_DELIVERY_PRICE', lm, lu, water_price, eligible)
+                if (lm, lu) in climate_pairs:
+                    climate_nan = np.where(self.CLIMATE_CHANGE_IMPACT[lm, lu].isna().any(axis=1).to_numpy(), np.nan, 0.0)
+                    check('CLIMATE_CHANGE_IMPACT (allocated)', lm, lu, climate_nan, self.AG_L_MRJ[m, :, j] > 0)
+
+        self.raise_nan_report(found, 'guarded arrays, eligible (allocated for the climate multiplier)')
+
+
+    def check_ag_man_nan(self, effects: dict[str, dict[str, np.ndarray]], yr_cal: int) -> None:
+        """
+        NaN guard on the ag-management effect matrices, which `check_eligible_nan` does not see (they also read
+        the option bundles and the adoption costs). `effects` is {'cost': {am: (lm, cell, lu of am)}, ...}. Raise if
+        an effect is NaN on an eligible entry of its land use, before `get_economic_mrj` turns the NaN into zero.
+        """
+        found = []
+        for what, by_am in effects.items():
+            for am, lus in self.AGMAN2LU.items():
+                if am not in by_am:
+                    continue
+                for k, j in enumerate(lus):
+                    for m, lm in enumerate(self.LANDMANS):
+                        bad = self.EXCLUDE[m, :, j] & np.isnan(np.asarray(by_am[am][m, :, k], dtype=np.float64))
+                        if bad.any():
+                            found.append((f'{am} {what} effect ({yr_cal})', lm, self.AGLU2DESC[j], bad))
+        self.raise_nan_report(found, 'ag-management effect matrices, eligible')
+
+
+    def raise_nan_report(self, found: list, what: str) -> None:
+        """Raise the NaN guard's report for `found` [(array, lm, lu, bad cells)]: counts by array, lm and lu, and by region."""
+        if not found:
+            return
+
+        sa2 = self.AGGHG_IRRPAST['SA2_ID'].to_numpy()
+        by_lu = pd.DataFrame([(n, lm, lu, int(b.sum())) for n, lm, lu, b in found], columns=['array', 'lm', 'lu', 'entries'])
+        by_region = (
+            pd.concat([pd.DataFrame({'array': n, 'SA2_ID': sa2[b], 'NRM': self.REGION_NRM_NAME[b]}) for n, _, _, b in found])
+            .groupby(['array', 'SA2_ID', 'NRM']).size().rename('entries').reset_index()
+            .sort_values(['array', 'entries'], ascending=[True, False])
+        )
+        raise ValueError(
+            f"NaN guard (RES{settings.RESFACTOR}): {by_lu['entries'].sum():,} NaN entries in "
+            f"{by_lu['array'].nunique()} {what} "
+            f"under {len(by_lu)} (array, lm, lu) combinations.\n"
+            f"By array, land management and land use:\n{by_lu.to_string(index=False)}\n"
+            f"By array and region ({len(by_region):,} rows, first 50):\n{by_region.head(50).to_string(index=False)}"
+        )
 
 
     # The livestock inputs as read for one (lu, lm): the shared attributes at RESFACTOR 1, the per-(lm, lu)
