@@ -5,6 +5,197 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20261005 — RESFACTOR > 1: why `data.MASK` keeps every block with a land-use cell, and what is still read at the centre cell
+
+### TL;DR
+
+A coarse cell is built from three rules that were changed at different times and no longer agree. The cell SET and the
+base-year SHARES come from the whole block; ELIGIBILITY comes from the whole block but as a yes / no; the ECONOMICS still
+come from the centre cell alone. Found while reviewing the draft stack PR #201 – #206 (2010 inputs, local, RES10).
+
+- **9,587 crop entries at RES10 are eligible with no data** on `master` (PR #200) and `jinzhu`: some cell of the block allows
+  the crop, the centre cell does not, so the centre's cost / yield / GHG is NaN and reaches the solver as a zero-cost,
+  zero-output land use. None exists at RES1. Reproduced exactly from `x_mrj.npy` and `agec_crops.h5`.
+- **`x_mrj.npy` is flagged on cells the model never uses**: all 2,737,674 non-land-use cells carry flags (13.1 M entries),
+  because it is built per SA2 over every land cell. Harmless at RES1, it leaks into any block aggregate.
+- **Eligibility is still binary.** `EXCLUDE` at RES > 1 is a block fraction cut by `> 0`: one eligible cell opens the whole
+  reachable share of the block.
+
+### The story behind `data.MASK` (Jinzhu)
+
+1. **Centre picking came first.** The coarse cell was its centre cell: land use, eligibility, economics. Centre picking is
+   a random sample of the block, so the widespread land uses keep their representative cells while the small ones (apples)
+   are easily missed, and are under-represented in the base year.
+2. **The consequence was an abrupt first step.** The apple area was under-estimated while its demand was unchanged, so the
+   first simulated year had to over-allocate transitions into apples to meet demand: a jump in the first transition that
+   is an artefact of the resampling.
+3. **So the cell set became "any land-use cell in the block".** `data.MASK` keeps the centre of every block holding ≥ 1
+   land-use cell. Taken alone that inflates one fine cell to the whole block (1 → 25 at RES5), so the base year is carried
+   as FRACTIONS: `AG_L_MRJ` (`get_exact_resfactored_lumap_mrj`) gives every (lm, lu) its count of fine cells / RESFACTOR²,
+   and that total is what the node-balance rows conserve — ag + non-ag = Σ base shares, the block's land-use fraction.
+
+`data.MASK` itself is only the selector (which coarse cells exist); `data.LUMASK` is per FINE cell and correctly binary.
+The fraction lives in `AG_L_MRJ`.
+
+### The three rules today
+
+| what | rule at RESFACTOR > 1 | where |
+|---|---|---|
+| cell set | centre of every block with ≥ 1 land-use cell | `data.MASK` |
+| base-year shares, Σ = ag + non-ag | fine-cell count / RESFACTOR², exact | `AG_L_MRJ`, node balance |
+| eligibility | any cell of the block allows it (binary) — since `2ef796b5`, 2026-07-01; centre cell before | `EXCLUDE`, `data.py:903` |
+| economics, GHG, pasture, climate, water price | centre cell (`where=self.MASK`) | `data.py:211–212, 486, 645–654, 884–886, 1099` |
+| cell area | centre cell's area × RESFACTOR² (TODO in the code) | `REAL_AREA`, `data.py:435` |
+
+Before July eligibility and economics were both the centre cell: crude, but consistent — among the ~104,000 crop entries
+eligible at the centre cell at RES10, none lacks data. Moving eligibility alone to the block opened the gap.
+
+### One block (RES10, block row 128, col 364, dryland Winter cereals)
+
+An SA2 boundary crosses the block: 77 fine cells allow winter cereals and carry a cost (AC 101 – 131, mean 121 $/ha), 4 of
+them grow it in 2010; 23 do not allow it and have no data, the centre cell (Beef - modified land) among them. At RES1 the 23
+are never read. At RES10 the block is eligible, holds a 4 % base share, and reads NaN.
+
+| eligibility rule | eligible crop entries with NaN at the centre (RES10) |
+|---|---|
+| centre cell | 0 |
+| any cell of the block (`master`, `jinzhu`) | 9,587 |
+| any LAND-USE cell of the block (PR #201, `& self.LUMASK`) | 8,671 (centre a land-use cell in 6,352) |
+
+### The block weighting of PR #202 — DRAFT, not implemented
+
+This describes Nick's draft PR #202 (`fix/coarse-economics-aggregation`, `Data.coarsen_guarded_arrays`), read on
+2026-10-05. It is NOT in `master` or `jinzhu`: both still read every input below at the centre cell. Recorded so the idea
+is not re-derived; the PR may change before it is merged.
+
+**The idea.** A coarse value is the mean of the block's fine values, each fine cell weighted by whatever the value is
+"per" — so the coarse PRODUCT equals the block total of the fine products. A plain mean does not:
+
+| | Yield (t/ha) | QC ($/t) | cost ($), 1 ha each |
+|---|---|---|---|
+| cell A | 1 | 10 | 10 |
+| cell B | 9 | 20 | 180 |
+| block | | | **190** |
+
+Plain means: 2 ha × 5 t/ha × 15 $/t = 150 (wrong: B grows nine times the tonnes, so its $/t counts nine times). QC weighted
+by tonnes: (1·10 + 9·20) / 10 = 19, and 2 × 5 × 19 = 190.
+
+**Which input is weighted by what, and why.** The rule is one sentence: a value given "per X" is averaged with each
+fine cell counting in proportion to how much X it has.
+
+| input layer | it is a value per … | so each fine cell counts by its … | why |
+|---|---|---|---|
+| crop yield; per-hectare costs (area, labour, operating, depreciation); water requirement per ha; crop and irrigated-pasture emissions per ha; pasture growth per ha | hectare | area | a bigger cell holds more hectares |
+| crop cost per tonne, crop price, crop climate multiplier | tonne | tonnes grown (area × yield) | a high-yield cell grows more tonnes, so its price or cost applies to more of the output |
+| crop water price | ML | water used (area × water requirement) | a thirsty cell buys more water |
+| safe pasture utilisation rate | kg of pasture | pasture grown (area × pasture growth) | the rate applies to more feed where more grows |
+| feed requirement per head | kg of usable feed | usable feed (pasture grown × utilisation rate) | it converts feed to head, so it counts where the feed is |
+| livestock cost per head, drinking / irrigation water per head, livestock emissions per head, livestock climate multiplier, share of the herd giving each product | head | head carried (usable feed, converted by the feed requirement) | a cell carrying more animals contributes more head |
+| product yield per head (meat, wool, milk …) | producing animal | head × the share giving that product | only the animals that give the product count |
+| product price | unit of product | product made (head × share × yield) | a cell making more product sells more of it |
+| water delivery price (livestock) | ML | water used by the herd (head × water per head) | as for crops |
+
+The livestock rows build on each other (pasture → usable feed → head → product), which is why the coarse values multiplied
+together still give the block total. A block whose weights sum to zero takes the area-weighted mean (its product is zero
+either way).
+
+**Which cells are averaged.** Per (lm, lu): the block's fine cells that are land-use cells (`LUMASK`), ELIGIBLE for that
+(lm, lu) in `x_mrj`, and carry data. Dry and irr are never averaged together — each is its own mean over its own eligible
+cells, which is why one shared livestock table becomes one per (lm, lu):
+
+| | cell 1 | cell 2 | cell 3 | cell 4 | coarse FOC |
+|---|---|---|---|---|---|
+| FOC ($/ha), 100 ha each | 10 | 20 | 30 | 40 | |
+| dry eligible | yes | yes | yes | yes | 25 |
+| irr eligible | no | no | yes | yes | 35 |
+
+Centre picking gives ONE number for both (20 if the centre is cell 2). This is the reason `cost.py`'s livestock functions
+move the `data.LANDMANS` loop outward and read `data.agec_lvstk(lu, lm)`: the loop does no weighting, it reads the table
+the load step made. The dry / irr RATIO is not in the weights — it is in the land-use shares (`AG_L_MRJ`, then the solver's
+x): cost = area × (share_dry × 25 + share_irr × 35).
+
+**The assumption underneath.** The mean runs over cells that are ELIGIBLE, not cells where the land use IS. It assumes the
+coarse cell's share is spread evenly (by the weight) over the eligible part of the block, so it equals RF1 exactly only
+when every eligible cell is fully used.
+
+**Review notes for the PR (not yet posted).** (1) Prefer `data.ATTRIBUTE` over the accessor methods `agec_lvstk` /
+`agghg_lvstk` / `agghg_irrpast` / `lvstk_pasture` / `water_delivery_price`. (2) In `get_ecological_grazing_effect_c_mrj`
+the two multiplier lookups do not depend on lm and belong outside the lm loop. (3) It reads the full-resolution tables at
+every coarse load — move behind a `_cache` file like `match_GBF8_bio_layers` (`input/_cache/…_RES<rf>.nc`, atomic write),
+keyed on the source files, `lumap` and `x_mrj` so the 2021 rebase cannot leave it stale. (4) It reads `EXCLUDE` as a
+boolean; a fractional `EXCLUDE` needs `> 0` there.
+
+### The NaN rule: NaN means NOT ALLOWED — an upper bound of zero, never a value of zero (Jinzhu)
+
+NaN is a legitimate entry of LUTO's inputs: it marks what is impossible or disallowed. It must never be filled with 0 —
+a zero VALUE is a land use that costs and produces nothing; the right reading is a zero UPPER BOUND on that column.
+
+- **The transition matrix already follows it.** The bounds read `~np.isnan(T_MAT)` as a 0 / 1 reach multiplier
+  (`get_ag2ag_ub`, `get_non_ag_ub_matrices`): a NaN transition gets no arc. Nothing fills it.
+- **The crop economics carry the same meaning, and the code ignores it.** In the 2010 inputs a NaN in `agec_crops.h5`
+  coincides with the land use being disallowed in `x_mrj` (RES10: no entry eligible at the centre cell is NaN; in the
+  example block all 23 ineligible cells are NaN). The economics modules then fill it (`np.nan_to_num`, `fillna(0)`),
+  turning "disallowed" into "free". That fill is what let the 9,587 entries through unnoticed.
+- **Three treatments, only one of them the rule.** Fill with 0 (today): wrong. Raise an error (draft PR #203's guard):
+  safe, but stops a run on what is often just "not allowed here". Upper bound 0: the rule.
+- **Where a zero bound is not enough.** A coarse cell that HOLDS the land use in the base year has its bound raised to the
+  base share (`clamp_dvar_bound`), so the model still needs a cost and a yield for it — the winter-cereals block: 4 % held,
+  NaN at the centre. That is a real gap and needs a real value (the block mean) or an error.
+
+Proposed handling, not implemented: (1) average over the block's eligible cells (PR #202), which removes almost all of
+them; (2) an eligible entry still NaN with NO base-year share → upper bound 0, count logged; (3) still NaN WITH a
+base-year share → raise, because land that exists has no data.
+
+### Retiring centre picking for the OTHER inputs — plan, not implemented
+
+The draft stack aggregates only the agricultural tables (crop / livestock economics, their GHG, pasture and stocking,
+the climate multiplier, water delivery price; stream length in #204). Those are the tables being rebuilt for the 2021
+rebase, and the only ones where centre picking yields MISSING data: they are split by (lm, lu) and NaN where the land use
+does not occur. `data.py` still has ~58 centre-picked reads (`where=self.MASK`, `[self.MASK]`, `cell=self.MASK`) against
+~15 block aggregates.
+
+**The other inputs are simpler.** They carry one value per cell, with no dry / irr or land-use dimension, so they need no
+per-(lm, lu) table and no nested weights — one rule per kind:
+
+| input | shape | rule |
+|---|---|---|
+| water yield (deep / shallow rooted) | cell × year | mean over the block's land-use cells, weighted by area |
+| carbon sequestration per ha | cell | same |
+| biodiversity quality / connectivity | cell | same |
+| EP / CP establishment costs | cell | same |
+| cell area, stream length | cell, a total | sum over the block (`REAL_AREA` is still centre area × RESFACTOR², `data.py:435`) |
+| eligibility, no-go regions | cell, a mask | fraction of the block's land-use cells |
+| species / vegetation layers | cell × item | several already block fractions (`data.py:1525–1599`); GBF8 is interpolated at the centre |
+| region IDs (state, NRM, SA2, water region) | cell, a category | cannot be averaged: majority label, or fractional membership (a modelling decision) |
+
+A single block mean assumes every land use is spread evenly over the block; the per-land-use form (mean over the cells
+eligible for it, as PR #202 does) is the refinement if a comparison shows it matters.
+
+**Cost: cache, do not recompute.** A coarse value depends only on the fine input, `lumap`, `x_mrj` and RESFACTOR — not on
+the scenario — so it is built once and reused, on the pattern of `match_GBF8_bio_layers`
+(`input/_cache/cache_<what>_<keys>_RES<rf>.nc`, built if absent, written to a temp file and `os.replace`d). Unlike the
+GBF8 cache it must be keyed on the SOURCE files as well (hash or mtime of the input, `lumap.h5`, `x_mrj.npy`): the 2021
+rebase rebuilds all three and a stale cache would be silently wrong.
+
+**First step.** Measure, per input, how far the coarse total is from the RF1 total (RES5 / RES10). Inputs with strong
+gradients inside a block (water yield, carbon) are the likely large ones; that ranks the work and gives each change its test.
+
+### Where the stack stands, and what is open
+
+- PR #201 masks eligibility to land-use cells; PR #202 replaces the centre-cell economics by the weighted mean over the
+  block's eligible fine cells (weights nested so coarse products equal block totals); PR #203 stops the build on an
+  eligible entry with no data. Read, not run: the "matches RF1 to 4e-7" claim is unverified here.
+- **Open — `EXCLUDE` as a fraction.** The upper bound is `EXCLUDE × reachable share`; kept as a fraction it would cap a
+  land use at its eligible share. The denominator must be the block's LAND-USE cells, not RESFACTOR² (the reachable share
+  is already a fraction of the block: dividing both by RESFACTOR² discounts the non-land-use cells twice). One fraction per
+  block is exact only if eligibility and source land use are unrelated within the block; the exact form is per
+  (source, target). The no-go regions are still centre-cell (`data.py:582–583`).
+- **Open — impact.** Not measured: whether any solved year placed area on the 9,587 entries beyond the base year's
+  116,635 ha (the stack's figure; 20.78 Mha is open to them).
+- **Open — load time.** PR #202 reads the full-resolution tables at every coarse load; not timed.
+
+---
+
 ## 20260930 — solving engines at RES5: cuOpt's GPU barrier is 2.7–3.6× faster without GBF8; Gurobi CPU stays the engine
 
 ### TL;DR
