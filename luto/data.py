@@ -486,9 +486,6 @@ class Data:
             os.path.join(settings.INPUT_DIR, "climate_change_impacts_" + settings.RCP + "_CO2_FERT_" + settings.CO2_FERT.upper() + ".h5"), where=self.MASK
         )
         
-        # Convert to xarray DataArray for easier indexing.
-        self.CLIMATE_CHANGE_IMPACT_xr = self.get_climate_change_impact_xr()
-
         ###############################################################
         # Regional coverage layers, mainly for regional reporting.
         ###############################################################
@@ -1943,34 +1940,6 @@ class Data:
                 
 
 
-    def get_climate_change_impact_xr(self) -> xr.DataArray:
-        """
-        CLIMATE_CHANGE_IMPACT as a (year, cell, lm, lu) DataArray.
-        The YRS_CAL_BASE (2010) is not included in the climate change impact data,
-        so it is added here with a multiplier of 1.
-        """
-        cci_xr = (
-                xr.DataArray(self.CLIMATE_CHANGE_IMPACT)
-                .unstack('dim_1')
-                .rename({'dim_1_level_0':'lm', 'dim_1_level_1':'lu', 'dim_1_level_2':'year', 'CELL_ID':'cell'})
-                .assign_coords(cell=range(self.NCELLS))     # Cell index from now will be from 0 to NCELLS-1
-            )
-
-        cci_xr_base_year = (
-            cci_xr
-            .isel(year=0, drop=True)
-            .assign_coords(year=self.YR_CAL_BASE)
-            .expand_dims('year')
-            .notnull()
-            .astype(np.float32)
-        )
-
-        return xr.concat(
-            [cci_xr_base_year, cci_xr],
-            dim='year'
-        )
-
-
     def get_exact_resfactored_lumap_mrj(self):
         """
         Rather than picking the center cell when resfactoring the lumap, this function
@@ -2285,7 +2254,6 @@ class Data:
                 out['AGGHG_IRRPAST'] = irrpast
 
         self.CLIMATE_CHANGE_IMPACT = pd.DataFrame(cci_c, index=self.CLIMATE_CHANGE_IMPACT.index, columns=self.CLIMATE_CHANGE_IMPACT.columns)
-        self.CLIMATE_CHANGE_IMPACT_xr = self.get_climate_change_impact_xr()
         return lvstk
 
 
