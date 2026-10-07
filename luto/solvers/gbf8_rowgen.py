@@ -25,10 +25,12 @@ RES5); all ~10.6 k of them are ~5 × 10⁹ entries, ~350 GB. Most never bind, so
 matter, found round by round. Per step:
 
   0. SCREEN (before the solve). Every cell's ag + non-ag shares sum to its base, so per cell
-         floor_r = Σ lb·c + (base_r − Σ lb) · min c        the least habitat any feasible point leaves it
-         ceil_r  = base_r · max c                           the most
-     (min / max c over the cell's open ag / non-ag columns, an ag column's contribution lowered / raised by every
-     negative / positive ag-mgt effect it may host). Per species floor_s = W_s · floor, ceil_s = W_s · ceil:
+         floor_r = Σ lb·c + the free share (base_r − Σ lb) on the WORST columns first, each up to its room (ub − lb)
+         ceil_r  = Σ lb·c + the free share on the BEST columns first, each up to its room
+     (the cell's open ag / non-ag columns, an ag column's contribution lowered / raised by every negative / positive
+     ag-mgt effect it may host; the upper bounds are fractional and carry the transition rules — the share of the
+     cell's land uses that can reach the target — so the ceiling does not put a whole cell on a land use only part
+     of it can move to). Per species floor_s = W_s · floor, ceil_s = W_s · ceil:
          SAFE          floor_s ≥ rhs      met at every feasible point: no row, ever
          UNATTAINABLE  ceil_s  < rhs      met at none: no row (it would make the step infeasible), still scored (D11)
          OPEN          otherwise          a candidate row
@@ -311,10 +313,15 @@ class GBF8RowGen:
 
 def cell_floor_ceiling(cols: xr.Dataset, support: ColSupport, c: np.ndarray, ncells: int) -> tuple[np.ndarray, np.ndarray]:
     """Per cell: the least and the most habitat (contribution × share, dimensionless) any feasible point can give it —
-    every cell's ag + non-ag shares sum to its base (node balance), locked shares (lb) stay."""
+    every cell's ag + non-ag shares sum to its base (node balance), locked shares (lb) stay, and no column holds more
+    than its upper bound. The bounds are fractional and carry the transition rules (a target's ub is the base-year
+    share of the cell's land uses that can reach it; Destocked is capped at the livestock-on-natural share, Riparian
+    Plantings at the stream-buffer share), so the ceiling fills the cell's columns from the best contribution down,
+    each up to its ub, until the cell's share is used — and the floor the same from the worst up."""
     block = cols['block'].values
     cell = cols['cell'].values
     lb = cols['lb'].values.astype(np.float64)
+    ub = cols['ub'].values.astype(np.float64)
     base = cols['base'].values.astype(np.float64)
 
     # ── an ag column's contribution, lowered (raised) by every negative (positive) ag-mgt effect it may host ──
@@ -329,17 +336,34 @@ def cell_floor_ceiling(cols: xr.Dataset, support: ColSupport, c: np.ndarray, nce
     land = np.flatnonzero(np.isin(block, ('ag', 'nonag')))                  # the columns whose shares sum to the cell's base
     base_r = np.bincount(cell[land], weights=base[land], minlength=ncells)
     lb_r = np.bincount(cell[land], weights=lb[land], minlength=ncells)
-    locked_r = np.bincount(cell[land], weights=lb[land] * eff_lo[land], minlength=ncells)
-    open_ = land[cols['ub'].values[land] > 0]
+    free_r = np.maximum(base_r - lb_r, 0.0)                                 # the share of the cell that is not locked
+    open_ = land[ub[land] > 0]
     min_c = np.full(ncells, np.inf)
     max_c = np.full(ncells, -np.inf)
     np.minimum.at(min_c, cell[open_], eff_lo[open_])
     np.maximum.at(max_c, cell[open_], eff_hi[open_])
     min_c[~np.isfinite(min_c)] = 0.0
     max_c[~np.isfinite(max_c)] = 0.0
-    # ── the floor: the locked share at its own contribution, the rest at the least; the ceiling: all of it at the most ──
-    floor_r = locked_r + np.maximum(base_r - lb_r, 0.0) * min_c
-    ceil_r = base_r * max_c
+
+    # ── the free share laid on the open columns in order of contribution, each up to its room (ub − lb) ──
+    room = np.maximum(ub - lb, 0.0)
+
+    def fill(value: np.ndarray, best_first: bool, rest: np.ndarray) -> np.ndarray:
+        """Per cell: the free share on the open columns, best (or worst) ``value`` first, each up to its room; a share
+        no room covers is scored at ``rest`` (the cell's own best / worst contribution), so the bound stays a bound."""
+        order = np.lexsort((-value[open_] if best_first else value[open_], cell[open_]))
+        col = open_[order]
+        cell_of = cell[col]
+        used = np.cumsum(room[col])
+        first = np.r_[True, cell_of[1:] != cell_of[:-1]]
+        before = used - room[col] - np.maximum.accumulate(np.where(first, used - room[col], 0.0))   # room already used in this cell
+        take = np.clip(free_r[cell_of] - before, 0.0, room[col])
+        left = np.maximum(free_r - np.bincount(cell_of, weights=take, minlength=ncells), 0.0)
+        return np.bincount(cell_of, weights=take * value[col], minlength=ncells) + left * rest
+
+    # ── the floor: the locked share at its least, the free share worst first; the ceiling: at its most, best first ──
+    floor_r = np.bincount(cell[land], weights=lb[land] * eff_lo[land], minlength=ncells) + fill(eff_lo, False, min_c)
+    ceil_r = np.bincount(cell[land], weights=lb[land] * eff_hi[land], minlength=ncells) + fill(eff_hi, True, max_c)
     return floor_r, ceil_r
 
 
