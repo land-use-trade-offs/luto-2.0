@@ -44,7 +44,8 @@ ROW_SCHEMA = xr.Dataset(dict(
     scale=(('row',), np.empty(0, dtype=np.float64)),
     active=(('row',), np.empty(0, dtype=bool)),
     redundant=(('row',), np.empty(0, dtype=bool)),
-    slack_col=(('row',), np.empty(0, dtype=np.int32))))                  # the row's shortfall column (settings.ELASTIC_FAMILIES), -1 = hard
+    slack_col=(('row',), np.empty(0, dtype=np.int32)),                   # the row's shortfall column (row_builder.relax), -1 = hard
+    slack_col_up=(('row',), np.empty(0, dtype=np.int32))))               # an equality row's second one — the column that RAISES it (demand = …), -1 = none
 
 ROW_FILL = {field: None if var.dtype == object else -1 for field, var in ROW_SCHEMA.data_vars.items()}   # what a family does not carry (only the labels and ints are ever missing)
 
@@ -84,8 +85,22 @@ def rows_where(table: xr.Dataset, **fields) -> np.ndarray:
     return mask
 
 
+def shortfall(rows: xr.Dataset, x: np.ndarray, idx=None) -> np.ndarray:
+    """The fraction of its target each row ``idx`` (default: every row) misses at ``x``: its shortfall column(s) over
+    the unit (``slack_unit``) — NaN where the row has none (a hard row), the sum of both where an equality row was
+    relaxed both ways (``row_builder.relax``). Every reader of a shortfall value comes through here."""
+    idx = np.arange(rows.sizes['row']) if idx is None else np.asarray(idx)
+    lo, up = rows['slack_col'].values[idx], rows['slack_col_up'].values[idx]
+    out = np.full(idx.size, np.nan)
+    on = lo >= 0
+    out[on] = x[lo[on]] / slack_unit(rows['rhs'].values[idx][on])
+    both = on & (up >= 0)
+    out[both] += x[up[both]] / slack_unit(rows['rhs'].values[idx][both])
+    return out
+
+
 def slack_unit(rhs) -> np.ndarray:
-    """The unit of a shortfall column (``row_builder.add_elastic``, ``gbf8_rowgen``): |rhs| of its scaled row, 1 where
+    """The unit of a shortfall column (``LutoSolver.relax``): |rhs| of its scaled row, 1 where
     rhs = 0. The column carries the size of the target missed, s' in [0, |rhs|] on a GBF row, at coefficient ±1 and the
     penalty / unit — the same LP as a·x + rhs·s >= rhs with s the fraction missed, s = s' / unit — so the scaled rhs (up to
     ~1e5) never sits in the matrix beside the row's own entries (down to SOLVER_COEFF_MIN): a ~1e9 range within one row,

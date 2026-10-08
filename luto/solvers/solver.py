@@ -46,11 +46,14 @@ gurenv.start()
 
 
 class LutoSolver:
-    """The Gurobi model of one step — the column table, the row table, A and obj — returns the raw x."""
+    """The Gurobi model of one step — the column table, the row table, A and obj, as given — returns the raw x.
+    Stateless with respect to the tables: it is built from them and never changes them (the rows' Gurobi handles and
+    the duals go onto its own shallow copy of the row table, ``self.rows``); a step that changes its tables — a row
+    added, relaxed or dropped — builds a new one (``rowgen.solve_rounds``)."""
 
     def __init__(self, cols: xr.Dataset, rows: xr.Dataset, A, obj: np.ndarray, inputs: RowInputs):
         self.cols = cols
-        self.rows = rows
+        self.rows = rows.copy()         # shallow: the solve's outputs (``constr``, ``pi``) land here, not on the step's table
         self.A = A                      # (row x col) scipy CSR: row i of A is row i of the row table
         self.obj = obj                  # (col,) the objective coefficient of every column (million AUD, row_builder.get_obj)
         self.landmans = inputs.landmans         # the land-management names in m order: how a variable's name spells m
@@ -58,6 +61,7 @@ class LutoSolver:
         self.gurobi_model = gp.Model(f"LUTO {settings.VERSION}", env=gurenv)
         self.x = None                           # ONE MVar over the column table: every column, in Var.index order
         self._vars = None                       # model.getVars() in Var.index order (materialised once, for addMConstr)
+        self.last_x = None                      # the last solve's value of every column (``solve``)
 
     def formulate(self):
         """The model: every row of the column table as a variable, every row of the row table as a constraint, the objective."""
@@ -93,7 +97,7 @@ class LutoSolver:
                                      for from_m, from_j, k, local_r in zip(t['from_m'], t['from_j'], t['k'], t['local_r'])],
             'nonag2ag':   lambda t: [f"F_n2a_{from_k}[{m},{local_r},{j}]"
                                      for from_k, m, local_r, j in zip(t['from_k'], t['m'], t['local_r'], t['j'])],
-            'slack':      lambda t: [f"S_{i}" for i in range(len(t['cell']))],       # an elastic row's shortfall (row_builder.add_elastic)
+            'slack':      lambda t: [f"S_{i}" for i in range(len(t['cell']))],       # a relaxed row's shortfall column (row_builder.relax)
         }
      
         block_of_col = cols['block'].values
@@ -140,45 +144,29 @@ class LutoSolver:
         self.gurobi_model.setObjective(obj @ self.x, sense)
         print(f"│   └── objective: {int((obj != 0).sum()):,} nonzero coefficients over {obj.size:,} variables")
 
-    def set_cost_scale(self, scale: float) -> None:
-        """The objective's economic part × ``scale`` on the live model, the elastic shortfall columns (block ``slack``)
-        and any variable outside the column table (GBF8 row generation's shortfalls) untouched —
-        settings.ELASTIC_PASS1_COST_SCALE; ``scale`` = 1 restores ``self.obj``."""
-        coef = self.obj.astype(np.float64)
-        coef[self.cols['block'].values != 'slack'] *= scale
-        self.x.Obj = coef
-        self.gurobi_model.update()
+    def solve_with_retries(self, target_year: int, params=None):
+        """Run the ``params`` ladder (default settings.RETRY_PARAMS) against the current model. Returns (accepted, x, status)
+        — x the raw solution vector over the column table (None when the solve left no solution).
 
-    def remove_constraints_by_name(self, names) -> None:
-        """Drop rows: flagged inactive on the row table (it never shrinks, so a dropped row stays
-        describable), then removed from the Gurobi model."""
-        if not names:
-            return
-        T = self.rows
-        hit = np.isin(T['name'].values, np.asarray(sorted(set(names)), dtype=object)) & T['active'].values
-        if not hit.any():
-            return
-        T['active'] = (('row',), T['active'].values & ~hit)
-        self.gurobi_model.remove(list(T['constr'].values[hit]))
-        self.gurobi_model.update()
+        ``params`` is a list of (NumericFocus, Method, Crossover, Presolve, BarHomogeneous) tuples tried in order; only
+        GRB.OPTIMAL is accepted.
+        """
+        x, status = None, None
+        for nf, method, crossover, presolve, barhomogenous in (settings.RETRY_PARAMS if params is None else params):
+            print(f"Trying NumericFocus={nf}, Method={method}, Crossover={crossover}, Presolve={presolve}, BarHomogeneous={barhomogenous} for year {target_year}...", flush=True)
+            self.gurobi_model.Params.NumericFocus    = nf
+            self.gurobi_model.Params.Method          = method
+            self.gurobi_model.Params.Crossover       = crossover
+            self.gurobi_model.Params.Presolve        = presolve
+            self.gurobi_model.Params.BarHomogeneous  = barhomogenous
 
-    def restore_constraints_by_name(self, names) -> None:
-        """Put dropped rows back: added to the Gurobi model again from the row table (same row, rhs,
-        sense and name; new handles, appended after the existing rows), flagged active."""
-        if not names:
-            return
-        T = self.rows
-        hit = np.isin(T['name'].values, np.asarray(sorted(set(names)), dtype=object)) & ~T['active'].values
-        if not hit.any():
-            return
-        constrs = self.gurobi_model.addMConstr(self.A[hit], self._vars, np.asarray(T['sense'].values[hit], dtype='<U1'), T['rhs'].values[hit]).tolist()
-        self.gurobi_model.setAttr('ConstrName', constrs, T['name'].values[hit].tolist())
-        handles = T['constr'].values.copy()
-        handles[hit] = constrs
-        T['constr'] = (('row',), handles)
-        T['active'] = (('row',), T['active'].values | hit)
-        T['redundant'] = (('row',), T['redundant'].values & ~hit)             # a row put back is in the model, whatever dropped it
-        self.gurobi_model.update()
+            x = self.solve()
+            status = self.gurobi_model.Status
+            if x is not None and status == GRB.OPTIMAL:
+                print(f"Optimal solution found with NumericFocus={nf}, Method={method}", flush=True)
+                return True, x, status
+            print(f"Non-optimal status {status} with NumericFocus={nf}, Method={method}; retrying with next attempt if available.", flush=True)
+        return False, x, status
 
     def solve(self) -> np.ndarray | None:
         """Optimise; the value of every column (float64, in Var.index order = the column table's), or None
@@ -189,4 +177,5 @@ class LutoSolver:
             print(f"No solution available (Status={self.gurobi_model.Status}, SolCount=0).\n", flush=True)
             return None
         print("Completed solve.\n", flush=True)
-        return self.x.X
+        self.last_x = np.asarray(self.x.X, dtype=np.float64)
+        return self.last_x

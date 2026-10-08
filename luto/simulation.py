@@ -40,14 +40,12 @@ from gurobipy import GRB
 from luto import settings
 from luto.data import Data
 from luto.solvers.col_builder import get_cols
-from luto.solvers.gbf8_rowgen import GBF8RowGen
+from luto.solvers.rowgen import RowGen, solve_step
 from luto.solvers.row_inputs import RowInputs, get_economics, get_row_inputs
-from luto.solvers.row_builder import add_elastic, elastic_absorbs, get_rows, get_obj
+from luto.solvers.row_builder import elastic_absorbs, get_rows, get_obj
 from luto.solvers.row_bounds import STATUS, drop_redundant_rows, get_row_bounds, report_row_bounds
-from luto.solvers.row_table import slack_unit
-from luto.solvers.solver import LutoSolver
 from luto.solvers.post_solve import post_solve
-from luto.solvers.tools import record_shadow_prices
+from luto.solvers.tools import record_shadow_prices, report_shortfall, save_model_to_disk
 from luto.tools.write import write_outputs
 from luto.tools import (
     LogToFile,
@@ -237,7 +235,7 @@ def solve_timeseries(
             save_data_to_disk(data, str(base_ckpt))
             print(f"Saved base checkpoint for year {years_to_run[0]}: {base_ckpt}", flush=True)
 
-    carry = set()                                                                            # GBF8 row generation: the species whose rows the next step starts with
+    carry = set()                                                                            # row generation: the targets whose rows the next step starts with
 
     for base_year, target_year in zip(years_to_run[:-1], years_to_run[1:]):
         print( "-------------------------------------------------", flush=True)
@@ -253,12 +251,20 @@ def solve_timeseries(
         inputs = get_row_inputs(data, base_year, target_year)                               # the coefficient streams and targets
         A, rows = get_rows(inputs, cols, col_support)                                       # the matrix, and the row table on the same rows
 
-        # ─────────────── 3. GBF8 row generation: the screen (settings.GBF8_ROW_GENERATION) ───────────────
+        # ─────────────── 3. row generation: the biodiversity targets and their screen (settings.BIO_ROW_GENERATION) ───────────────
         #     built here, while the column support still holds cell2col / ag_mrj2col
         rowgen = None
-        if settings.GBF8_ROW_GENERATION and settings.GBF8_TARGET != 'off':
-            rowgen = GBF8RowGen(data, inputs, cols, col_support, base_year, target_year, carry)
+        bio_on = any(target != 'off' for target in (settings.GBF2_TARGET, settings.GBF3_NVIS_TARGET, settings.GBF4_TARGET_SNES,
+                                                    settings.GBF4_TARGET_ECNES, settings.GBF8_TARGET))
+        if settings.BIO_ROW_GENERATION and bio_on:
+            rowgen = RowGen(data, inputs, cols, col_support, base_year, target_year, carry)
         col_support.cell2col = col_support.ag_mrj2col = col_support.nonag_rk2col = None     # freed before the solve (GBs at RES1); the masks and the regions stay for post_solve
+        if rowgen is not None and rowgen.blocked.any() and settings.BOUND_PROP_ON_IMPOSSIBLE == 'stop':
+            print('!' * 100, flush=True)
+            print(f"Year {target_year}: {int(rowgen.blocked.sum()):,} hard biodiversity target(s) cannot be met at any feasible point (the screen), so no solve can succeed. "
+                  f"Stopping before the model is built.", flush=True)
+            print('!' * 100, flush=True)
+            break
 
         # ─────────────── 4. the pre-solve diagnosis: bound propagation over the rows ───────────────
         bounds = get_row_bounds(A, rows, cols)                                              # every row's interval over the column box, and its verdict
@@ -273,24 +279,13 @@ def solve_timeseries(
             print('!' * 100, flush=True)
             break
 
-        # ─────────────── 5. the objective, and the model ───────────────
+        # ─────────────── 5. the objective ───────────────
         obj = get_obj(get_economics(data, base_year, target_year), cols, inputs)            # million AUD; the economy streams (~300 MB at RES5, ~7 GB at RES1) die with the call
-        A, rows, cols, obj = add_elastic(A, rows, cols, obj)                                # settings.ELASTIC_FAMILIES: a shortfall column per row of those families
-        luto_solver = LutoSolver(cols, rows, A, obj, inputs)                                # A x T, obj · x; the inputs name m and am_idx in the variable names
-        luto_solver.formulate()
-        save_model_to_disk(luto_solver.gurobi_model, data.path, base_year, target_year)     # BEFORE solving (see save_model_to_disk for why)
-        two_pass = rowgen is not None or (settings.ELASTIC_DROP_SHORT and (cols['block'].values == 'slack').any())
-        if two_pass and settings.ELASTIC_PASS1_COST_SCALE != 1:                             # feasibility-first pass 1: pass 2 restores the cost
-            luto_solver.set_cost_scale(settings.ELASTIC_PASS1_COST_SCALE)
-            print(f"Year {target_year}: pass 1 feasibility-first — the cost × {settings.ELASTIC_PASS1_COST_SCALE:g}", flush=True)
 
-        # ─────────────── 6. the solve ───────────────
-        if rowgen is None:
-            accepted, x, status = solve_with_retries(luto_solver, target_year)
-        else:
-            accepted, x, status = rowgen.solve(luto_solver, target_year, solve_with_retries)   # the GBF8 rows round by round, then the hard pass
-        if accepted and settings.ELASTIC_DROP_SHORT and (cols['block'].values == 'slack').any():
-            accepted, x, status = solve_elastic_hard_pass(luto_solver, x, target_year, out_dir)  # the elastic rows left short dropped, the rest hard
+        # ─────────────── 6. the solve: the tables are the state, a solver is built from them for every solve ───────────────
+        accepted, x, status, luto_solver = solve_step(A, rows, cols, obj, inputs, rowgen, target_year, out_dir,
+                                                      on_first_model=lambda model: save_model_to_disk(model, data.path, base_year, target_year))   # the debug MPS, BEFORE the first solve
+        cols, obj = luto_solver.cols, luto_solver.obj                                        # the final tables: with the shortfall columns, the dropped rows off
 
         if not accepted:
             print(f'Processing for {target_year} completed in {round(time.time() - start_time)} seconds\n\n' , flush=True)
@@ -311,90 +306,16 @@ def solve_timeseries(
         data.last_year = target_year                                                            # only a solved and stored year: the writers report through it
 
         record_shadow_prices(luto_solver, target_year, out_dir)
-        if not settings.ELASTIC_DROP_SHORT:                                                   # under the hard pass, pass 1's shortfall was written before the re-solve
+        if not settings.ELASTIC_DROP_SHORT:                                                   # under the two-pass step, pass 1's shortfall was written before the drop
             report_shortfall(x, luto_solver.rows, target_year, out_dir)
         if rowgen is not None:
-            rowgen.report(luto_solver, out_dir)
-            carry = rowgen.carry_next(luto_solver)
+            rowgen.report(luto_solver.rows, out_dir)
+            carry = rowgen.carry_next(luto_solver.rows)
 
         if checkpoint_path is not None:
             save_checkpoint(data, checkpoint_path, target_year)
 
         print(f'Processing for {target_year} completed in {round(time.time() - start_time)} seconds\n\n' , flush=True)
-
-
-def solve_elastic_hard_pass(luto_solver: LutoSolver, x: np.ndarray, target_year: int, out_dir: str):
-    """settings.ELASTIC_DROP_SHORT — pass 2 of the elastic families: the rows pass 1 (``x``) left short are removed, every
-    other elastic row made hard (its shortfall column's ub = 0), and the year solved again. Pass 1's shortfall is
-    written first (shortfall_<year>.csv, with ``dropped``). Returns (accepted, x, status) as ``solve_with_retries``."""
-    rows = luto_solver.rows
-    on = np.flatnonzero((rows['slack_col'].values >= 0) & rows['active'].values)
-    s = x[rows['slack_col'].values[on]] / slack_unit(rows['rhs'].values[on])               # the fraction of the target missed
-    short = on[s > 1e-6]
-    report_shortfall(x, rows, target_year, out_dir, dropped=short)
-    feasibility_first = settings.ELASTIC_PASS1_COST_SCALE != 1
-    if short.size == 0 and not feasibility_first:                                         # pass 1 missed nothing: its solution is the hard one
-        print(f"Year {target_year}: no elastic row falls short — pass 1's solution is kept", flush=True)
-        return True, x, luto_solver.gurobi_model.Status
-    if feasibility_first:                                                                 # pass 1 minimised the shortfall; pass 2 is at full cost
-        luto_solver.set_cost_scale(1.0)
-
-    # ── the rows left short removed; every shortfall column fixed at 0, so each remaining elastic row is hard ──
-    model = luto_solver.gurobi_model
-    slack_vars = luto_solver.x[rows['slack_col'].values[on]].tolist()
-    model.setAttr('UB', slack_vars, [0.0] * len(slack_vars))
-    if short.size:
-        luto_solver.remove_constraints_by_name(rows['name'].values[short].tolist())
-    print(f"Year {target_year}: {short.size:,} elastic row(s) cannot be met together with the year — removed; "
-          f"the other {on.size - short.size:,} made hard, solving again", flush=True)
-    return solve_with_retries(luto_solver, target_year)
-
-
-def report_shortfall(x: np.ndarray, rows, target_year: int, out_dir: str, dropped=None) -> None:
-    """The elastic rows (settings.ELASTIC_FAMILIES) and how much of each target the solution misses: shortfall_<year>.csv
-    (s = the target's size moved — a fraction of it on a GBF row, possibly > 1 on another; raw = in the row's own units,
-    restored by its scale: a floor lowered or a ceiling raised by that much), and the count in the log."""
-    on = np.flatnonzero(rows['slack_col'].values >= 0)
-    if on.size == 0:
-        return
-    rhs, scale = rows['rhs'].values[on], rows['scale'].values[on]
-    s = x[rows['slack_col'].values[on]] / slack_unit(rhs)                                   # the column carries unit · s
-    gbf = np.array([f.startswith('GBF') for f in rows['family'].values[on]], dtype=bool)
-    df = pd.DataFrame({'family': rows['family'].values[on], 'sense': rows['sense'].values[on], 'region': rows['region'].values[on],
-                       'GBF_target': rows['GBF_target'].values[on], 'name': rows['name'].values[on],
-                       'shortfall_frac': s, 'target_raw': rhs * scale,
-                       'shortfall_raw': s * np.where(gbf, rhs, np.abs(rhs)) * scale,   # the bound moved (add_elastic's m · s), in raw units
-                       'dropped': np.isin(on, [] if dropped is None else dropped)})    # settings.ELASTIC_DROP_SHORT: removed before the hard pass
-    df.sort_values('shortfall_frac', ascending=False).to_csv(f"{out_dir}/shortfall_{target_year}.csv", index=False)
-    short = df[df['shortfall_frac'] > 1e-6]
-    print(f"Year {target_year}: {len(short):,} of {on.size:,} elastic rows fall short (sum of fractions missed {s.sum():.3f})"
-          + ''.join(f"\n    {r.family} {r.region} {r.GBF_target}: {r.shortfall_frac:.1%} of the target missed"
-                    for r in short.sort_values('shortfall_frac', ascending=False).head(10).itertuples()), flush=True)
-
-
-def solve_with_retries(luto_solver: LutoSolver, target_year: int):
-    """Run the RETRY_PARAMS ladder against the current model. Returns (accepted, x, status) — x the raw solution
-    vector over the column table (None when the solve left no solution).
-
-    settings.RETRY_PARAMS is a list of (NumericFocus, Method, Crossover, Presolve,
-    BarHomogeneous) tuples tried in order; only GRB.OPTIMAL is accepted.
-    """
-    x, status = None, None
-    for nf, method, crossover, presolve, barhomogenous in settings.RETRY_PARAMS:
-        print(f"Trying NumericFocus={nf}, Method={method}, Crossover={crossover}, Presolve={presolve}, BarHomogeneous={barhomogenous} for year {target_year}...", flush=True)
-        luto_solver.gurobi_model.Params.NumericFocus    = nf
-        luto_solver.gurobi_model.Params.Method          = method
-        luto_solver.gurobi_model.Params.Crossover       = crossover
-        luto_solver.gurobi_model.Params.Presolve        = presolve
-        luto_solver.gurobi_model.Params.BarHomogeneous  = barhomogenous
-
-        x = luto_solver.solve()
-        status = luto_solver.gurobi_model.Status
-        if x is not None and status == GRB.OPTIMAL:
-            print(f"Optimal solution found with NumericFocus={nf}, Method={method}", flush=True)
-            return True, x, status
-        print(f"Non-optimal status {status} with NumericFocus={nf}, Method={method}; retrying with next attempt if available.", flush=True)
-    return False, x, status
 
 
 def store_solution(data: Data, target_year: int, solution, obj_val: float, inputs: RowInputs) -> None:
@@ -480,47 +401,6 @@ def save_checkpoint(data: Data, checkpoint_path: Path, target_year: int) -> None
         if CHECKPOINT_RE.match(old.name) and old != final_path:
             old.unlink()
     print(f"Saved checkpoint for year {target_year}: {final_path}", flush=True)
-
-
-def save_model_to_disk(gurobi_model, out_dir: str, base_year: int, target_year: int) -> None:
-    """Write the year's Gurobi model to MPS, replacing the previous year's file.
-
-    Written BEFORE the solve, unconditionally — the same reasoning as the unreachable-rows CSV. The
-    model is most valuable exactly when the year does not finish, and the cases that most need a
-    post-mortem are the ones that never reach the failure branch at all: a wall-time kill, an OOM,
-    or INF_OR_UNBD where Gurobi cannot even classify what went wrong.
-
-    Only the latest year is kept. At ~800 MB per model there is no point accumulating one per year,
-    and the interesting model is always the one that just failed. Written to a temp name and
-    renamed, so an interrupted write cannot leave a truncated file that looks valid.
-
-    Plain .mps, NOT .mps.gz/.bz2 — this Gurobi build ships without compression codecs and any
-    compressed extension raises "Unable to write to file". Run_Archive.zip compresses it anyway.
-
-    Constraint names matter here: MPS is whitespace-delimited, so a single name containing a space
-    makes Gurobi discard EVERY name in the file and emit c0, c1, c2 ... which makes the artefact
-    useless for attributing a failure. Every `name=` in solver.py must therefore stay
-    space-free (see the `.replace(" ", "_")` on the regional-adoption rows).
-    """
-    dest = Path(out_dir) / f"debug_model_{base_year}_{target_year}.mps"
-    # The temp name must KEEP the .mps extension: Gurobi picks the writer from the extension, so
-    # "....mps.tmp" fails with "Unknown file type" and the save is silently lost.
-    tmp = dest.with_name(f"{dest.stem}.tmp{dest.suffix}")
-    try:
-        os.makedirs(out_dir, exist_ok=True)
-        gurobi_model.write(str(tmp))
-        # `tmp` must be excluded here: it ends in .mps (Gurobi picks its writer from the extension,
-        # so it has to) which means this very glob matches the file just written, and deleting it
-        # makes the rename below fail with "cannot find the file specified".
-        for stale in Path(out_dir).glob("debug_model_*.mps"):
-            if stale not in (dest, tmp):
-                stale.unlink()
-        tmp.replace(dest)
-        print(f"Saved model to {dest} ({dest.stat().st_size / 1e6:,.0f} MB)", flush=True)
-    except Exception as exc:
-        # Never let a diagnostic artefact take the run down with it.
-        print(f"WARNING: could not save model to {dest}: {exc}", flush=True)
-        tmp.unlink(missing_ok=True)
 
 
 def save_data_to_disk(data: Data, path: str, compress_level=3) -> None:

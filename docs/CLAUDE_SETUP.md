@@ -80,7 +80,7 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 - `AMORTISATION_PERIOD`: Period for cost amortization in years (default: 30)
 
 ### Environmental Constraints
-Every constraint is hard by default: there are no soft / penalised options; the one exception is opt-in — `ELASTIC_FAMILIES` (default `[]`) gives each row of the listed families a shortfall column at `ELASTIC_PENALTY` AUD per target missed in full (`row_builder.add_elastic`; the column carries the amount missed in the row's own units, |rhs| · s at coefficient ±1 with the penalty / |rhs| — `row_table.slack_unit`, every reader divides by it — so the scaled rhs stays out of the matrix), the rows that fall short listed in `out_<year>/shortfall_<year>.csv`.
+Every constraint is hard by default: there are no soft / penalised options; the one exception is opt-in — `ELASTIC_FAMILIES` (default `[]`) gives each row of the listed families a shortfall column at `ELASTIC_PENALTY` AUD per target missed in full (`row_builder.relax`, a pure function on the tables — the one mechanism for an up-front row and for one `rowgen` generates; the column carries the amount missed in the row's own units, |rhs| · s at coefficient ±1 with the penalty / |rhs| — `row_table.slack_unit`, every reader divides by it — so the scaled rhs stays out of the matrix), the rows that fall short listed in `out_<year>/shortfall_<year>.csv`.
 - `GHG_EMISSIONS_LIMITS`: Greenhouse gas targets ('off', 'low', 'medium', 'high')
 - `WATER_LIMITS`: Water yield constraints ('on' or 'off')
 - `WATER_CLIMATE_CHANGE_IMPACT`: Apply climate change to water yields ('on' or 'off')

@@ -19,6 +19,8 @@
 
 import gurobipy as gp
 import numpy as np
+
+from pathlib import Path
 import pandas as pd
 
 from luto.solvers import row_table
@@ -46,8 +48,8 @@ PRICED = {                                      # the priced families, in the CS
 
 def _priced_rows(T, family: str) -> np.ndarray:
     """The rows of one family the shadow prices cover, as row indices in table order: the ACTIVE rows, and the rows
-    dropped before the build as redundant (priced 0) — empty where the family was not built. A row removed by name
-    (``LutoSolver.remove_constraints_by_name``) is neither, and gets no price."""
+    dropped before the build as redundant (priced 0) — empty where the family was not built. A row the step dropped
+    (``active`` off, not redundant) is neither, and gets no price."""
     return np.flatnonzero((T['family'].values == family) & (T['active'].values | T['redundant'].values))
 
 
@@ -119,11 +121,7 @@ def record_shadow_prices(luto_solver, target_year, out_dir) -> None:
     # an elastic row (settings.ELASTIC_FAMILIES) that fell short is priced by the penalty alone (P / target, the real
     # marginal cost being infinite): no price for it (NaN), flagged short with the fraction missed; a met elastic row
     # (s = 0) is priced as a hard row — the penalty is inactive there
-    slack_col = T['slack_col'].values[rows]
-    shortfall = np.full(rows.size, np.nan)
-    elastic = slack_col >= 0
-    if elastic.any():
-        shortfall[elastic] = luto_solver.x[slack_col[elastic]].X / row_table.slack_unit(T['rhs'].values[rows][elastic])   # the fraction missed
+    shortfall = row_table.shortfall(T, luto_solver.last_x, rows)                        # the fraction missed; NaN on a hard row
     short = shortfall > 1e-6                                                         # NaN (a hard row) is never short
     shadow_price[short] = np.nan
     shadow_price_AUD[short] = np.nan
@@ -132,3 +130,66 @@ def record_shadow_prices(luto_solver, target_year, out_dir) -> None:
                            pi_rescaled=pi, scale=scale, shadow_price=shadow_price, shadow_price_AUD=shadow_price_AUD,
                            unit=unit, dropped=dropped, shortfall_frac=shortfall, short=short))
     df.to_csv(f"{out_dir}/shadow_prices_{target_year}.csv", index=False)
+
+
+def report_shortfall(x: np.ndarray, rows, target_year: int, out_dir: str, dropped=None) -> None:
+    """The elastic rows (settings.ELASTIC_FAMILIES) and how much of each target the solution misses: shortfall_<year>.csv
+    (s = the target's size moved — a fraction of it on a GBF row, possibly > 1 on another; raw = in the row's own units,
+    restored by its scale: a floor lowered or a ceiling raised by that much), and the count in the log."""
+    on = np.flatnonzero(rows['slack_col'].values >= 0)                                    # every relaxed row (an equality row's two columns count as one)
+    if on.size == 0:
+        return
+    rhs, scale = rows['rhs'].values[on], rows['scale'].values[on]
+    s = row_table.shortfall(rows, x, on)                                                   # the fraction of the target missed
+    gbf = np.array([f.startswith('GBF') for f in rows['family'].values[on]], dtype=bool)
+    df = pd.DataFrame({'family': rows['family'].values[on], 'sense': rows['sense'].values[on], 'region': rows['region'].values[on],
+                       'GBF_target': rows['GBF_target'].values[on], 'name': rows['name'].values[on],
+                       'shortfall_frac': s, 'target_raw': rhs * scale,
+                       'shortfall_raw': s * np.where(gbf, rhs, np.abs(rhs)) * scale,   # the bound moved (relax's m · s), in raw units
+                       'dropped': np.isin(on, [] if dropped is None else dropped)})    # settings.ELASTIC_DROP_SHORT: removed before the hard pass
+    df.sort_values('shortfall_frac', ascending=False).to_csv(f"{out_dir}/shortfall_{target_year}.csv", index=False)
+    short = df[df['shortfall_frac'] > 1e-6]
+    print(f"Year {target_year}: {len(short):,} of {on.size:,} elastic rows fall short (sum of fractions missed {s.sum():.3f})"
+          + ''.join(f"\n    {r.family} {r.region} {r.GBF_target}: {r.shortfall_frac:.1%} of the target missed"
+                    for r in short.sort_values('shortfall_frac', ascending=False).head(10).itertuples()), flush=True)
+
+
+def save_model_to_disk(gurobi_model, out_dir: str, base_year: int, target_year: int) -> None:
+    """Write the year's Gurobi model to MPS, replacing the previous year's file.
+
+    Written BEFORE the solve, unconditionally — the same reasoning as the unreachable-rows CSV. The
+    model is most valuable exactly when the year does not finish, and the cases that most need a
+    post-mortem are the ones that never reach the failure branch at all: a wall-time kill, an OOM,
+    or INF_OR_UNBD where Gurobi cannot even classify what went wrong.
+
+    Only the latest year is kept. At ~800 MB per model there is no point accumulating one per year,
+    and the interesting model is always the one that just failed. Written to a temp name and
+    renamed, so an interrupted write cannot leave a truncated file that looks valid.
+
+    Plain .mps, NOT .mps.gz/.bz2 — this Gurobi build ships without compression codecs and any
+    compressed extension raises "Unable to write to file". Run_Archive.zip compresses it anyway.
+
+    Constraint names matter here: MPS is whitespace-delimited, so a single name containing a space
+    makes Gurobi discard EVERY name in the file and emit c0, c1, c2 ... which makes the artefact
+    useless for attributing a failure. Every `name=` in solver.py must therefore stay
+    space-free (see the `.replace(" ", "_")` on the regional-adoption rows).
+    """
+    dest = Path(out_dir) / f"debug_model_{base_year}_{target_year}.mps"
+    # The temp name must KEEP the .mps extension: Gurobi picks the writer from the extension, so
+    # "....mps.tmp" fails with "Unknown file type" and the save is silently lost.
+    tmp = dest.with_name(f"{dest.stem}.tmp{dest.suffix}")
+    try:
+        os.makedirs(out_dir, exist_ok=True)
+        gurobi_model.write(str(tmp))
+        # `tmp` must be excluded here: it ends in .mps (Gurobi picks its writer from the extension,
+        # so it has to) which means this very glob matches the file just written, and deleting it
+        # makes the rename below fail with "cannot find the file specified".
+        for stale in Path(out_dir).glob("debug_model_*.mps"):
+            if stale not in (dest, tmp):
+                stale.unlink()
+        tmp.replace(dest)
+        print(f"Saved model to {dest} ({dest.stat().st_size / 1e6:,.0f} MB)", flush=True)
+    except Exception as exc:
+        # Never let a diagnostic artefact take the run down with it.
+        print(f"WARNING: could not save model to {dest}: {exc}", flush=True)
+        tmp.unlink(missing_ok=True)

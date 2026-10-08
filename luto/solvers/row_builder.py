@@ -36,28 +36,27 @@ from luto.solvers.row_table import ROW_FILL, ROW_SCHEMA, make_part, slack_unit
 def get_rows(inputs: RowInputs, cols: xr.Dataset, support: ColSupport) -> tuple[sparse.csr_matrix, xr.Dataset]:
     """The row space of every family as its block of A and its table."""
 
-    bio_on = any(target != 'off' for target in (
-            settings.GBF2_TARGET,
-            settings.GBF3_NVIS_TARGET,
-            settings.GBF4_TARGET_SNES,
-            settings.GBF4_TARGET_ECNES,
-            settings.GBF8_TARGET)
-    )
-    
-    if bio_on:
-        # (cell x column) @ (column x column) = (cell x column)
-        bio_S = support.cell2col @ sparse.diags(bio_contribution(inputs, cols))  
-    else:
-        bio_S = None   
-    
+    bio_on = any(target != 'off' for target in (settings.GBF2_TARGET, settings.GBF3_NVIS_TARGET, settings.GBF4_TARGET_SNES,
+                                                settings.GBF4_TARGET_ECNES, settings.GBF8_TARGET))
+    if not bio_on:
+        gbf = [(None, None)] * 5
+    elif settings.BIO_ROW_GENERATION:                                      # the rows are generated during the solve (rowgen)
+        print('│   ├── The biodiversity targets by row generation: no row built up front ...')
+        gbf = [(None, None)] * 5
+    else:                                                                  # every family: its targets, then the ONE builder
+        bio_S = support.cell2col @ sparse.diags(bio_contribution(inputs, cols))   # (cell x column) @ (column x column) = (cell x column)
+        gbf = [
+            build_GBF_rows('GBF2', get_GBF2_targets(inputs), bio_S),
+            build_GBF_rows('GBF3_NVIS', get_GBF3_NVIS_targets(inputs, support), bio_S),
+            build_GBF_rows('GBF4_SNES', get_GBF4_SNES_targets(inputs, support), bio_S),
+            build_GBF_rows('GBF4_ECNES', get_GBF4_ECNES_targets(inputs, support), bio_S),
+            build_GBF_rows('GBF8', get_GBF8_targets(inputs, support), bio_S),
+        ]
+
     parts = [
         get_demand(inputs, cols, support),
         get_ghg(inputs, cols),
-        get_GBF2(inputs, bio_S),
-        get_GBF3_NVIS(inputs, support, bio_S),
-        get_GBF4_SNES(inputs, support, bio_S),
-        get_GBF4_ECNES(inputs, support, bio_S),
-        get_GBF8(inputs, support, bio_S),
+        *gbf,
         get_ag_mgt_adoption(inputs, cols),
         get_regional_adoption_ag(inputs, cols),
         get_regional_adoption_nonag(inputs, cols),
@@ -240,19 +239,28 @@ def get_obj(econ: EconomicInputs, cols: xr.Dataset, inputs: RowInputs) -> np.nda
     return obj
 
 
-def add_elastic(A: sparse.csr_matrix, rows: xr.Dataset, cols: xr.Dataset, obj: np.ndarray):
-    """Every active row of a settings.ELASTIC_FAMILIES family gets its own shortfall column (block ``slack``):
-    a·x + rhs·s >= rhs on the scaled row, s the fraction of the target missed (sign-flipped on a < row), at
-    settings.ELASTIC_PENALTY AUD per target missed in full (million AUD in the objective, as every objective coefficient).
-    The column carries s in the row's own units, s' = unit · s (``row_table.slack_unit``: |rhs|) — coefficient ±1, ub and
-    penalty rescaled to match — so the scaled rhs never enters the matrix; a reader divides by the unit.
-    ``rows['slack_col']`` names the column."""
-    on = np.flatnonzero(np.isin(rows['family'].values, settings.ELASTIC_FAMILIES) & rows['active'].values)
-    if on.size == 0:
+# ═══════════════════════════ the table operations of a step: relax, append, fix, scale ═══════════════════════════
+#
+# The tables (A, rows, cols, obj) are the only state of a step; every operation here returns new tables and the solver
+# is built from them afresh (LutoSolver is stateless). Used by rowgen.solve_step / solve_rounds.
+
+def relax(A: sparse.csr_matrix, rows: xr.Dataset, cols: xr.Dataset, obj: np.ndarray, idx):
+    """The rows ``idx`` may fall short: each gets its own shortfall column (block ``slack``) — a·x + rhs·s >= rhs on
+    the scaled row, s the fraction of the target missed (sign-flipped on a < row), at settings.ELASTIC_PENALTY AUD per
+    target missed in full (million AUD in the objective, as every objective coefficient). The column carries s in the
+    row's own units, s' = unit · s (``row_table.slack_unit``: |rhs|) — coefficient ±1, ub and penalty rescaled to match
+    — so the scaled rhs never enters the matrix; a reader divides by the unit (``row_table.shortfall``). ``rows['slack_col']``
+    names the column. An EQUALITY row (a demand row: production = demand) gets two, a·x + s⁺ − s⁻ = rhs, each at the
+    penalty — ``slack_col`` the one that lowers it, ``slack_col_up`` the one that raises it — so a demand that cannot be
+    met in either direction shows up in the diagnosis. The structural rows (node balance, source cap, ag-mgt link) are
+    never relaxed: a cell cannot hold more than its area. The ONE mechanism for every row that may fall short, built up
+    front (settings.ELASTIC_FAMILIES) or generated."""
+    idx = np.asarray(idx, dtype=np.int64)
+    idx = idx[(rows['slack_col'].values[idx] < 0) & rows['active'].values[idx]]   # not twice, not a dropped row
+    if idx.size == 0:
         return A, rows, cols, obj
-    sense = rows['sense'].values[on]
-    assert not (sense == '=').any(), 'an elastic family has an equality row'
-    n_col, n = cols.sizes['col'], on.size
+    sense = rows['sense'].values[idx]
+    n_col, n = cols.sizes['col'], idx.size
     # One unit of s moves the row's bound by the target's size, signed by the row's direction (a·x + m·s >= rhs lowers
     # a floor, a·x - m·s <= rhs raises a ceiling):
     #   GBF row:   m = rhs, s in [0, 1] — the fraction of the target area missed; rhs <= 0 means the land outside LUTO
@@ -260,32 +268,64 @@ def add_elastic(A: sparse.csr_matrix, rows: xr.Dataset, cols: xr.Dataset, obj: n
     #   other row: m = |rhs|, s in [0, inf) — a GHG limit (rhs = limit - off-land emissions) is negative under net
     #              sequestration, where rhs itself would make s TIGHTEN the row, and a ceiling can be overshot by more
     #              than its own size
-    rhs = rows['rhs'].values[on]
-    gbf = np.array([f.startswith('GBF') for f in rows['family'].values[on]], dtype=bool)
+    #   = row:     the first column as a >= row's (lowers it), a second with the opposite sign (raises it)
+    rhs = rows['rhs'].values[idx]
+    family = rows['family'].values[idx].astype(str)
+    gbf = np.char.startswith(family, 'GBF')
     if ((rhs == 0) & ~gbf).any():
-        print(f"│   elastic: {((rhs == 0) & ~gbf).sum():,} non-GBF row(s) with a target of 0 cannot be relaxed", flush=True)
+        print(f"│   elastic: {int(((rhs == 0) & ~gbf).sum()):,} non-GBF row(s) with a target of 0 cannot be relaxed", flush=True)
     # The column carries s' = unit · s (unit = |m|, row_table.slack_unit): m·s = sign(m)·s', so the coefficient is ±1 (0
     # where m = 0: the row cannot be relaxed), the ub × unit and the penalty / unit — the same LP, m kept out of the matrix
     unit = slack_unit(rhs)
     coef = (np.where(sense == '<', -1.0, 1.0) * np.where(gbf, np.sign(rhs), (rhs != 0).astype(np.float64))).astype(A.dtype)   # A's dtype (float32): hstack would upcast the whole matrix to float64
-    A = sparse.hstack([A, sparse.csr_matrix((coef, (on, np.arange(n))), shape=(A.shape[0], n))], format='csr', dtype=A.dtype)
-    slack = xr.Dataset({v: (('col',), np.full(n, 'slack' if v == 'block' else 0.0 if cols[v].dtype.kind == 'f' else -1,
+    eq = np.flatnonzero(sense == '=')                                        # the equality rows' second column, raising the row
+    k = n + eq.size
+    col_of = np.concatenate([idx, idx[eq]])
+    entry = np.concatenate([coef, -coef[eq]])
+    A = sparse.hstack([A, sparse.csr_matrix((entry, (col_of, np.arange(k))), shape=(A.shape[0], k))], format='csr', dtype=A.dtype)
+    slack = xr.Dataset({v: (('col',), np.full(k, 'slack' if v == 'block' else 0.0 if cols[v].dtype.kind == 'f' else -1,
                                               dtype=cols[v].dtype)) for v in cols.data_vars})
-    slack['ub'] = (('col',), np.where(gbf, unit, np.inf).astype(cols['ub'].dtype))    # GBF: at most the whole target (s = 1)
+    slack['ub'] = (('col',), np.concatenate([np.where(gbf, unit, np.inf), np.full(eq.size, np.inf)]).astype(cols['ub'].dtype))   # GBF: at most the whole target (s = 1)
     cols = xr.concat([cols, slack], 'col')
     penalty = settings.ELASTIC_PENALTY / 1e6 * (-1 if settings.OBJECTIVE == 'maxprofit' else 1)   # AUD -> million AUD, a cost per target missed
-    obj = np.concatenate([obj, (penalty / unit).astype(obj.dtype)])
+    obj = np.concatenate([obj, (penalty / unit).astype(obj.dtype), (penalty / unit[eq]).astype(obj.dtype)])
     slack_col = rows['slack_col'].values.copy()
-    slack_col[on] = n_col + np.arange(n)
-    rows = rows.assign(slack_col=(('row',), slack_col))
-    print(f"│   elastic: {n:,} rows of {sorted(set(rows['family'].values[on]))} get a shortfall column "
-          f"at {settings.ELASTIC_PENALTY:,.0f} AUD per target missed", flush=True)
+    slack_col[idx] = n_col + np.arange(n)
+    slack_col_up = rows['slack_col_up'].values.copy()
+    slack_col_up[idx[eq]] = n_col + n + np.arange(eq.size)
+    rows = rows.assign(slack_col=(('row',), slack_col), slack_col_up=(('row',), slack_col_up))
+    print(f"│   elastic: {n:,} row(s) of {sorted(set(family.tolist()))} get a shortfall column "
+          f"at {settings.ELASTIC_PENALTY:,.0f} AUD per target missed" + (f" ({eq.size:,} equality rows: one each way)" if eq.size else ""), flush=True)
     return A, rows, cols, obj
 
 
+def append_rows(A: sparse.csr_matrix, rows: xr.Dataset, block: sparse.csr_matrix, table: xr.Dataset):
+    """Rows generated during the step (``rowgen``): the block under A — widened to A's columns, a shortfall column added
+    since the block was laid being 0 in it — and the table under the row table (row i of A is row i of the table)."""
+    if block.shape[1] < A.shape[1]:
+        block = sparse.hstack([block, sparse.csr_matrix((block.shape[0], A.shape[1] - block.shape[1]), dtype=block.dtype)], format='csr')
+    return sparse.vstack([A, block], format='csr'), xr.concat([rows, table], dim='row', fill_value=ROW_FILL)
+
+
+def fix_slack(cols: xr.Dataset) -> xr.Dataset:
+    """Every shortfall column fixed at 0: every relaxed row still active is hard from here on (pass 2)."""
+    ub = cols['ub'].values.copy()
+    ub[cols['block'].values == 'slack'] = 0.0
+    return cols.assign(ub=(('col',), ub))
+
+
+def scale_cost(obj: np.ndarray, cols: xr.Dataset, scale: float) -> np.ndarray:
+    """The objective with its economic part × ``scale``, the shortfall columns' penalties untouched
+    (settings.ELASTIC_PASS1_COST_SCALE: pass 1 feasibility-first); ``scale`` = 1 is ``obj`` itself."""
+    if scale == 1:
+        return obj
+    out = obj.astype(np.float64)
+    out[cols['block'].values != 'slack'] *= scale
+    return out
+
 
 def elastic_absorbs(rows: xr.Dataset, bounds: xr.Dataset) -> np.ndarray:
-    """Per row: True where add_elastic's shortfall column can make the row hold, so an IMPOSSIBLE verdict on it need not
+    """Per row: True where the row's shortfall column (settings.ELASTIC_FAMILIES, ``relax``) can make it hold, so an IMPOSSIBLE verdict on it need not
     stop the year. A non-GBF row's slack is unbounded (m = |rhs|), so it absorbs anything unless rhs == 0; a GBF row's
     slack stops at s = 1, where the floor has fallen to 0 — it absorbs only if rhs > 0 and the row can still reach 0
     (hi_implied >= 0, on the scaled row as the bounds are)."""
@@ -402,35 +442,69 @@ def get_ghg(inputs: RowInputs, cols: xr.Dataset):
     return make_part('ghg', A, rhs, '<', ["ghg_emissions_limit_ub"], scale)
 
 
-def get_GBF2(inputs: RowInputs, bio_S: sparse.csr_matrix):
-    """One row: Σ_r mask_area[r] · (the bio contribution of cell r's columns) ≥ target."""
+def get_bio_targets(inputs: RowInputs, support: ColSupport) -> tuple[pd.DataFrame, sparse.csr_matrix]:
+    """Every family's targets as ONE table (a ``family`` column added; a label column a family has not is None) and
+    ONE (target × cell) weight matrix, in the model's row order — what row generation (``rowgen``) works from."""
+    tables, weights = [], []
+    for family, got in (('GBF2', get_GBF2_targets(inputs)),
+                        ('GBF3_NVIS', get_GBF3_NVIS_targets(inputs, support)),
+                        ('GBF4_SNES', get_GBF4_SNES_targets(inputs, support)),
+                        ('GBF4_ECNES', get_GBF4_ECNES_targets(inputs, support)),
+                        ('GBF8', get_GBF8_targets(inputs, support))):
+        if got is None:
+            continue
+        targets, W = got
+        tables.append(targets.assign(family=family))
+        weights.append(W)
+    assert tables, 'row generation with no biodiversity target'
+    targets = pd.concat(tables, ignore_index=True)
+    for field in ('region', 'GBF_target', 'GBF4_presence'):
+        targets[field] = targets[field].astype(object).where(targets[field].notna(), None) if field in targets else None
+    return targets, sparse.vstack(weights, format='csr')
+
+
+def build_GBF_rows(family: str, family_targets, bio_S: sparse.csr_matrix):
+    """A family's rows from its targets (those with `row`): W @ bio_S, contracted and rescaled row by row — the same for
+    every family. Every column of the table beside `rhs`, `name` and `row` is a label of the rows. (None, None) for a
+    family with no row."""
+    if family_targets is None:
+        return None, None
+    targets, W = family_targets
+    on = np.flatnonzero(targets['row'].values)                             # the targets the family builds a row for
+    if on.size == 0:
+        return None, None
+    targets = targets.iloc[on]
+    A, rhs, scale = contract(W[on] @ bio_S, targets['rhs'].values.astype(np.float64), rescale=True)
+    labels = {field: targets[field].values for field in targets.columns if field not in ('rhs', 'name', 'row')}
+    return make_part(family, A, rhs, '>', targets['name'].tolist(), scale, **labels)
+
+
+def get_GBF2_targets(inputs: RowInputs):
+    """One target: Σ_r mask_area[r] · (the bio contribution of cell r's columns) ≥ target."""
     if settings.GBF2_TARGET == "off":
         print("│   ├── TURNING OFF constraints for biodiversity GBF 2...")
-        return None, None
+        return None
     print(f'│   ├── Adding constraints for biodiversity GBF 2: {inputs.limits["GBF2"]:15,.0f}')
-    A, rhs, scale = contract(weight_rows([inputs.GBF2_mask_area_r], inputs.ncells) @ bio_S, [inputs.limits["GBF2"]], rescale=True)
-    return make_part('GBF2', A, rhs, '>', ["bio_GBF2_priority_degraded_area_limit"], scale)
+    targets = pd.DataFrame({'rhs': [inputs.limits["GBF2"]], 'name': ["bio_GBF2_priority_degraded_area_limit"], 'row': [True]})
+    return targets, weight_rows([inputs.GBF2_mask_area_r], inputs.ncells)
 
 
-def get_GBF3_NVIS(inputs: RowInputs, support: ColSupport, bio_S: sparse.csr_matrix):
-    """One row per (region, group) with a target ≥ 0 and a cell: Σ_r area[group, r] · (the bio contribution of cell r's columns) ≥ target; IBRA bioregions in 'IBRA_REG' mode."""
+def get_GBF3_NVIS_targets(inputs: RowInputs, support: ColSupport):
+    """One target per (region, group) with a cell: W = the pre-1750 area of the group; IBRA bioregions in 'IBRA_REG' mode.
+    A row is built where the level is ≥ 0 (GBF3 keeps a row at a ZERO level; a negative one is met by the land outside LUTO)."""
     if settings.GBF3_NVIS_TARGET == "off":
         print("│   ├── TURNING OFF constraints for biodiversity GBF 3 NVIS")
-        return None, None
+        return None
     print("│   ├── Adding constraints for biodiversity GBF 3 NVIS...")
     layers = inputs.GBF3_NVIS_pre_1750_area_vr                           # xr [group, cell]
-    targets = inputs.limits["GBF3_NVIS"]
+    levels = inputs.limits["GBF3_NVIS"]
     layer = 'ibra' if settings.GBF3_NVIS_REGION_MODE == 'IBRA_REG' else 'nrm'   # the region layer the targets are set on
     region_of_cell = support.region2cell[layer].values                     # the NRM / IBRA region of every cell
     regions = set(region_of_cell)                                          # the regions the layer knows
     weights = []
-    rhs = []
-    names = []
-    kept = []
+    records = []
     for region, group in inputs.GBF3_NVIS_region_group:
-        target = targets.sel(layer=(region, group)).item()
-        if target < 0:                                                   # GBF3 still adds a row for a ZERO target
-            continue
+        level = levels.sel(layer=(region, group)).item()
         weight_row = layers.sel(group=group, drop=True).data
         if region != "AUSTRALIA":                                        # regional scope: mask the cells outside the region
             if region not in regions:
@@ -439,34 +513,28 @@ def get_GBF3_NVIS(inputs: RowInputs, support: ColSupport, bio_S: sparse.csr_matr
         if not (weight_row > 0).any():
             continue
         weights.append(weight_row)
-        rhs.append(target)
-        names.append(f"bio_GBF3_NVIS_limit_{region}_{group}".replace(" ", "_"))
-        kept.append((region, group))
-    print(f"│   │   └── {len(kept)} constraint(s) added, {len(inputs.GBF3_NVIS_region_group) - len(kept)} skipped")
+        records.append((region, group, level, f"bio_GBF3_NVIS_limit_{region}_{group}".replace(" ", "_"), level >= 0))
+    print(f"│   │   └── {sum(r[-1] for r in records)} constraint(s) added, {len(inputs.GBF3_NVIS_region_group) - sum(r[-1] for r in records)} skipped (no cell, or a level the land outside LUTO meets)")
     if not weights:
-        return None, None
-    A, rhs, scale = contract(weight_rows(weights, inputs.ncells) @ bio_S, rhs, rescale=True)
-    return make_part('GBF3_NVIS', A, rhs, '>', names, scale, region=[region for region, _ in kept], GBF_target=[group for _, group in kept])
+        return None
+    return pd.DataFrame(records, columns=['region', 'GBF_target', 'rhs', 'name', 'row']), weight_rows(weights, inputs.ncells)
 
 
-def get_GBF4_SNES(inputs: RowInputs, support: ColSupport, bio_S: sparse.csr_matrix):
-    """One row per (region, species, presence) with a target > 0 and a cell: Σ_r area[species, r] · (the bio contribution of cell r's columns) ≥ target."""
+def get_GBF4_SNES_targets(inputs: RowInputs, support: ColSupport):
+    """One target per (region, species, presence) with a cell: W = the area of the species. A row is built where the level
+    is > 0 (a level the land outside LUTO already meets gets none)."""
     if settings.GBF4_TARGET_SNES == 'off':
         print('│   ├── TURNING OFF constraints for biodiversity GBF 4 SNES...')
-        return None, None
+        return None
     print("│   ├── Adding constraints for biodiversity GBF 4 SNES ...")
     layers = inputs.GBF4_SNES_pre_1750_area_sr                           # xr [layer=(species, presence), cell]
-    targets = inputs.limits["GBF4_SNES"]
+    levels = inputs.limits["GBF4_SNES"]
     region_of_cell = support.region2cell['nrm'].values                     # the NRM region of every cell
     regions = set(region_of_cell)                                          # the regions the layer knows
     weights = []
-    rhs = []
-    names = []
-    kept = []
+    records = []
     for region, species, presence in inputs.GBF4_SNES_region_species:
-        target = targets.sel(layer=(region, species, presence)).item()
-        if target <= 0:                                                  # GBF4 skips a ZERO target
-            continue
+        level = levels.sel(layer=(region, species, presence)).item()
         weight_row = layers.sel(layer=(species, presence), drop=True).values
         if region != "AUSTRALIA":                                        # NRM scope: mask the cells outside the region
             if region not in regions:
@@ -475,35 +543,28 @@ def get_GBF4_SNES(inputs: RowInputs, support: ColSupport, bio_S: sparse.csr_matr
         if not (weight_row > 0).any():
             continue
         weights.append(weight_row)
-        rhs.append(target)
-        names.append(f"bio_GBF4_SNES_limit_{region}_{species}_{presence}".replace(" ", "_"))
-        kept.append((region, species, presence))
-    print(f"│   │   └── {len(kept)} constraint(s) added, {len(inputs.GBF4_SNES_region_species) - len(kept)} skipped")
+        records.append((region, species, presence, level, f"bio_GBF4_SNES_limit_{region}_{species}_{presence}".replace(" ", "_"), level > 0))
+    print(f"│   │   └── {sum(r[-1] for r in records)} constraint(s) added, {len(inputs.GBF4_SNES_region_species) - sum(r[-1] for r in records)} skipped (no cell, or a level the land outside LUTO meets)")
     if not weights:
-        return None, None
-    A, rhs, scale = contract(weight_rows(weights, inputs.ncells) @ bio_S, rhs, rescale=True)
-    return make_part('GBF4_SNES', A, rhs, '>', names, scale,
-                     region=[key[0] for key in kept], GBF_target=[key[1] for key in kept], GBF4_presence=[key[2] for key in kept])
+        return None
+    return pd.DataFrame(records, columns=['region', 'GBF_target', 'GBF4_presence', 'rhs', 'name', 'row']), weight_rows(weights, inputs.ncells)
 
 
-def get_GBF4_ECNES(inputs: RowInputs, support: ColSupport, bio_S: sparse.csr_matrix):
-    """One row per (region, community, presence) with a target > 0 and a cell: Σ_r area[community, r] · (the bio contribution of cell r's columns) ≥ target."""
+def get_GBF4_ECNES_targets(inputs: RowInputs, support: ColSupport):
+    """One target per (region, community, presence) with a cell: W = the area of the community. A row is built where the level
+    is > 0 (a level the land outside LUTO already meets gets none)."""
     if settings.GBF4_TARGET_ECNES == 'off':
         print('│   ├── TURNING OFF constraints for biodiversity GBF 4 ECNES...')
-        return None, None
+        return None
     print("│   ├── Adding constraints for biodiversity GBF 4 ECNES ...")
     layers = inputs.GBF4_ECNES_pre_1750_area_sr                          # xr [layer=(community, presence), cell]
-    targets = inputs.limits["GBF4_ECNES"]
+    levels = inputs.limits["GBF4_ECNES"]
     region_of_cell = support.region2cell['nrm'].values                     # the NRM region of every cell
     regions = set(region_of_cell)                                          # the regions the layer knows
     weights = []
-    rhs = []
-    names = []
-    kept = []
+    records = []
     for region, community, presence in inputs.GBF4_ECNES_region_species:
-        target = targets.sel(layer=(region, community, presence)).item()
-        if target <= 0:                                                  # GBF4 skips a ZERO target
-            continue
+        level = levels.sel(layer=(region, community, presence)).item()
         weight_row = layers.sel(layer=(community, presence), drop=True).values
         if region != "AUSTRALIA":                                        # NRM scope: mask the cells outside the region
             if region not in regions:
@@ -512,38 +573,28 @@ def get_GBF4_ECNES(inputs: RowInputs, support: ColSupport, bio_S: sparse.csr_mat
         if not (weight_row > 0).any():
             continue
         weights.append(weight_row)
-        rhs.append(target)
-        names.append(f"bio_GBF4_ECNES_limit_{region}_{community}_{presence}".replace(" ", "_"))
-        kept.append((region, community, presence))
-    print(f"│   │   └── {len(kept)} constraint(s) added, {len(inputs.GBF4_ECNES_region_species) - len(kept)} skipped")
+        records.append((region, community, presence, level, f"bio_GBF4_ECNES_limit_{region}_{community}_{presence}".replace(" ", "_"), level > 0))
+    print(f"│   │   └── {sum(r[-1] for r in records)} constraint(s) added, {len(inputs.GBF4_ECNES_region_species) - sum(r[-1] for r in records)} skipped (no cell, or a level the land outside LUTO meets)")
     if not weights:
-        return None, None
-    A, rhs, scale = contract(weight_rows(weights, inputs.ncells) @ bio_S, rhs, rescale=True)
-    return make_part('GBF4_ECNES', A, rhs, '>', names, scale,
-                     region=[key[0] for key in kept], GBF_target=[key[1] for key in kept], GBF4_presence=[key[2] for key in kept])
+        return None
+    return pd.DataFrame(records, columns=['region', 'GBF_target', 'GBF4_presence', 'rhs', 'name', 'row']), weight_rows(weights, inputs.ncells)
 
 
-def get_GBF8(inputs: RowInputs, support: ColSupport, bio_S: sparse.csr_matrix):
-    """One row per (region, species) with a target > 0 and a cell: Σ_r area[species, r] · (the bio contribution of cell r's columns) ≥ target."""
+def get_GBF8_targets(inputs: RowInputs, support: ColSupport):
+    """One target per (region, species) with a cell: W = suitability × LDS × area of the species. A row is built where
+    the level is > 0 (a level the land outside LUTO already meets gets none — most species at a low level)."""
     if settings.GBF8_TARGET == "off":
         print('│   ├── TURNING OFF constraints for biodiversity GBF 8 ...')
-        return None, None
-    if settings.GBF8_ROW_GENERATION:                                       # the rows are generated during the solve (gbf8_rowgen)
-        print('│   ├── GBF 8 by row generation: no rows built up front ...')
-        return None, None
+        return None
     print("│   ├── Adding constraints for biodiversity GBF 8 ...")
     layers = inputs.GBF8_pre_1750_area_sr                                # xr [species, cell]
-    targets = inputs.limits["GBF8"]
+    levels = inputs.limits["GBF8"]
     region_of_cell = support.region2cell['nrm'].values                     # the NRM region of every cell
     regions = set(region_of_cell)                                          # the regions the layer knows
     weights = []
-    rhs = []
-    names = []
-    kept = []
+    records = []
     for region, species in inputs.GBF8_region_species:
-        target = targets.sel(layer=(region, species)).item()
-        if target <= 0:                                                  # GBF8 skips a ZERO target
-            continue
+        level = levels.sel(layer=(region, species)).item()
         weight_row = layers.sel(species=species, drop=True).data
         if region != "AUSTRALIA":                                        # NRM scope: mask the cells outside the region
             if region not in regions:
@@ -552,14 +603,11 @@ def get_GBF8(inputs: RowInputs, support: ColSupport, bio_S: sparse.csr_matrix):
         if not (weight_row > 0).any():
             continue
         weights.append(weight_row)
-        rhs.append(target)
-        names.append(f"bio_GBF8_limit_{region}_{species}".replace(" ", "_"))
-        kept.append((region, species))
-    print(f"│   │   └── {len(kept)} constraint(s) added, {len(inputs.GBF8_region_species) - len(kept)} skipped")
+        records.append((region, species, level, f"bio_GBF8_limit_{region}_{species}".replace(" ", "_"), level > 0))
+    print(f"│   │   └── {sum(r[-1] for r in records)} constraint(s) added, {len(inputs.GBF8_region_species) - sum(r[-1] for r in records)} skipped (no cell, or a level the land outside LUTO meets)")
     if not weights:
-        return None, None
-    A, rhs, scale = contract(weight_rows(weights, inputs.ncells) @ bio_S, rhs, rescale=True)
-    return make_part('GBF8', A, rhs, '>', names, scale, region=[region for region, _ in kept], GBF_target=[species for _, species in kept])
+        return None
+    return pd.DataFrame(records, columns=['region', 'GBF_target', 'rhs', 'name', 'row']), weight_rows(weights, inputs.ncells)
 
 
 def get_ag_mgt_adoption(inputs: RowInputs, cols: xr.Dataset):

@@ -5,6 +5,74 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20261008 — one matrix, one handle: every target is a row, `ELASTIC_FAMILIES` relaxes rows by family, two passes separate what cannot hold from what is expensive
+
+### TL;DR
+
+The model is ONE matrix, rows × columns. Every row belongs to a family (the `family` label of the row table), every
+column to a block (`block` on the column table). The five biodiversity families (GBF2, GBF3 NVIS, GBF4 SNES / ECNES,
+GBF8) are rows of the same form as the demand, water and GHG rows — `Σ_r W[target, r] · (the bio contribution of cell r's
+columns) ≥ rhs` — and since the 2026-10-08 refactor (`luto/solvers/rowgen.py`, `row_builder.get_<family>_targets`,
+`row_builder.relax`) they are built, relaxed and dropped by the same code as any other row. `ELASTIC_FAMILIES` is the
+one handle: it names the families whose rows get a shortfall column at `ELASTIC_PENALTY`; the two-pass step
+(`rowgen.solve_step`) then says which of those rows cannot hold together and solves the year without them.
+
+### The mental model
+
+| piece | what it is |
+|---|---|
+| the matrix | A (rows × columns, scipy CSR) with the row table and the column table beside it; a row's family and a column's block are labels, nothing else distinguishes them |
+| GBF8's rows | the same rows, too many to hold (~5 × 10⁹ entries at RES5), so generated on demand: a screen (floor / ceiling per cell over the column box) classes every target safe / unattainable / open before any solve, and the rounds add the open ones short at the current point; a small family (SNES, ECNES, NVIS) goes in whole in round 0 and costs one solve, as built up front |
+| the handle | `ELASTIC_FAMILIES`: every row of a listed family gets a shortfall column, `a·x + rhs·s ≥ rhs`, `s` the fraction of the target missed (an equality row — demand — gets one column each way: production short of, or over, the demand); `row_builder.relax` is a pure function on the tables, `row_table.shortfall` the one reader |
+| the two passes | pass 1 (barrier, no crossover, the cost × `ELASTIC_PASS1_COST_SCALE`) minimises the penalty: the rows it leaves short are switched off (`active`), every other relaxed row made hard; pass 2 at full cost is never infeasible (pass 1's point meets every kept row). Reported in `shortfall_<year>.csv` (every relaxed row, the fraction missed, `dropped`) and, for generated rows, `rowgen_<year>.csv` |
+| the solver | stateless: built from the tables for every solve (one build per round, 1–2 min at RES5; barrier has no warm start to lose), never changes them |
+
+### What the two passes identify — and that it takes TWO RUNS to separate infeasible from expensive
+
+| pass-1 cost scale | the rows dropped |
+|---|---|
+| 0 (feasibility-first) | the rows that cannot be met TOGETHER with the rest of the step: the infeasible set. Every other relaxed row is met by proof (pass 1 met it at zero cost) |
+| 1 (the twin) | the rows not worth the penalty: the infeasible AND the expensive set together |
+
+The expensive set is the difference of the two runs. This is how the study's ladders and their `_cost1` twins were read
+(`jinzhu_inspect_code/Make_Carla_runs`), and the combined KEY run with every family on (GBF8 20 % natives, SNES 45 %,
+ECNES 50 %, NVIS 70 / 60 %) and its twin were the first runs to do it for all families at once (the old code dropped the
+elastic families' expensive rows and GBF8's impossible ones in ONE run — two rules — and crashed when both mechanisms
+were on: `design_20261009.md` §2).
+
+### What "infeasible" means here, and how to attribute it
+
+A dropped row is a member of a GROUP that cannot all hold; it may be feasible alone. GBF8 50 % (fixed screen): the 81
+species pass 1 dropped each reach their target with the 229 kept species held (two tested: 53.5 % and 53.5 % against 50),
+but not together. Attribution is by holding one family hard and relaxing the rest, or by lifting one family: the 81 held
+together with the kept species — 81 short with every row, 65 without the water rows, **1 without the demand rows** — so
+what blocks them is the food and fibre demand the model must still meet, not water. One run names a set; two or three
+runs name the family it leans on.
+
+### The diagnostic, and its limits
+
+* List every policy family — `ghg`, `water`, `demand`, `renewable`, the GBF families, the adoption limits, the regional
+  caps — with the cost scale at 0, and pass 1 says what cannot hold together, family by family. The year still finishes
+  (pass 2), so the solution beside the diagnosis is "the year without those rows".
+* The structural rows — node balance, source cap, ag-management link, the renewable ceiling — are never relaxed: a cell
+  cannot hold more than its area. `relax` does not refuse them; the setting has to.
+* Fractions of the target make families comparable by construction (a 1 % miss on winter cereals weighs as a 1 % miss on
+  a species). The reported set is the cheapest in those terms, not every conflict.
+* Validated: each family alone, before and after the refactor, the same model to the solver's tolerance (objective within
+  2e-7, the same binding rows, 99.97–100 % of the area on the same land use; GBF8 bit-identical) —
+  `jinzhu_inspect_code/Make_Carla_runs/doc/validation/`. NOT yet exercised by any run: relaxing a non-GBF family (water,
+  GHG, demand, renewable) through the refactored code; a multi-step run (the carry of binding rows between years).
+
+### The settings that drive it
+
+`BIO_ROW_GENERATION` (every biodiversity family through the generator), `ELASTIC_FAMILIES`, `ELASTIC_DROP_SHORT` (two
+passes), `ELASTIC_PASS1_COST_SCALE` (0: infeasible set; 1: infeasible + expensive), `ELASTIC_PASS1_PARAMS` (barrier, no
+crossover, no simplex fallback), `ROWGEN_SHORT_TOL` (a shortfall over 1e-4 of the target is a miss; an interior point's
+residue is ~1e-6), `ROWGEN_EAGER_MAX_ENTRIES` (eager / lazy per family by size), `ROWGEN_BATCH_*`. `GBF8_ROW_GENERATION`
+and `GBF8_ROWGEN_*` are gone. Branch `refactor/general-rowgen`, not merged.
+
+---
+
 ## 20261005 — RESFACTOR > 1: why `data.MASK` keeps every block with a land-use cell, and what is still read at the centre cell
 
 ### TL;DR
