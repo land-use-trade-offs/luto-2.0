@@ -1153,10 +1153,12 @@ class Data:
         # Load the natural land carbon data.
         nat_land_CO2 = pd.read_hdf(os.path.join(settings.INPUT_DIR, "natural_land_t_co2_ha.h5"), where=self.MASK)
         
-        # Get the carbon stock of unallowcated natural land
-        self.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR = np.array(
+        # Get the carbon stock of unallowcated natural land (t CO2e/ha): the one-off loss on clearing
+        self.CO2E_STOCK_UNALL_NATURAL_TCO2_HA = np.array(
             nat_land_CO2['NATURAL_LAND_TREES_DEBRIS_SOIL_TCO2_HA'] - (nat_land_CO2['NATURAL_LAND_AGB_DEBRIS_TCO2_HA'] * (100 - fire_risk) / 100),  # everyting minus the fire DAMAGE
-        ) / settings.CARBON_EFFECTS_WINDOW
+        )
+        # Annualised over the regrowth window (t CO2e/ha/yr): HIR and Destocked regrowth only, not clearing
+        self.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR = self.CO2E_STOCK_UNALL_NATURAL_TCO2_HA / settings.CARBON_EFFECTS_WINDOW
         
         
         ###############################################################

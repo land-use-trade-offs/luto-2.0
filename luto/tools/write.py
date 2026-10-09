@@ -2738,6 +2738,15 @@ def write_ghg(data: Data, yr_cal: int, path: str):
                         region_NRM=('cell', data.REGION_NRM_NAME))
         ghg_t_smrj = ghg_t_smrj / gap
 
+        # The annualised total must equal the GHG row's transition term (stored by simulation.store_solution)
+        row_total = data.prod_data.get(yr_cal, {}).get('GHG_TRANSITION')
+        if row_total is not None:
+            out_total = float(ghg_t_smrj.sum(dtype=np.float64))
+            if abs(out_total - row_total) > 1e-5 * max(abs(row_total), 1.0):
+                raise ValueError(f"Transition GHG {yr_cal}: output total {out_total:.6g} t CO2e != GHG row term {row_total:.6g} t CO2e")
+        else:
+            print(f"WARNING: transition GHG {yr_cal}: no stored GHG row term (older checkpoint), output total not checked", flush=True)
+
         xr_ghg_transition = add_all(ghg_t_smrj, ['lm', 'Type'])
 
         ghg_trans_df, ghg_trans_df_AUS = to_region_and_aus_df(xr_ghg_transition, ['Type', 'lm', 'lu'], yr_cal, region_levels=['region_state', 'region_NRM'])

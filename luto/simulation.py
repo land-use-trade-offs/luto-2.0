@@ -418,10 +418,13 @@ def store_solution(data: Data, target_year: int, solution, obj_val: float, input
     for am, lus in inputs.agman2lu.items():                                                 # the enabled options; the GHG effect is [m, r, j_idx] over the option's land uses
         for j_idx, j in enumerate(lus):
             ghg += float(np.dot(inputs.ag_man_g_mrj[am][:, :, j_idx].ravel(), solution.ag_man_X_mrj[am][:, :, j].ravel()))
+    ghg_transition = 0.0
     for src, g in inputs.trans_ghg_ag2ag.items():                                           # [to_m, local_r, to_j], as the flows are keyed
-        ghg += float(np.dot(g.ravel(), solution.dvar_D_ag2ag_mrj[src].ravel()))
+        ghg_transition += float(np.dot(g.ravel(), solution.dvar_D_ag2ag_mrj[src].ravel()))
+    ghg += ghg_transition
     ghg += float(np.asarray(inputs.offland_ghg).ravel()[0])
     data.add_production_data(target_year, 'GHG', ghg)
+    data.add_production_data(target_year, 'GHG_TRANSITION', ghg_transition)                 # the row's transition term; write_ghg checks its output against it
 
     # Production from the stored dvars, the way the base year's is (data.py, at load): t / KL per commodity — every share
     # counted (threshold 0: the map clean-up that drops a cell's slivers under 1 % would leave the total 0.1–0.8 % under
