@@ -336,7 +336,7 @@ def get_asparagopsis_effect_g_mrj(data:Data, yr_idx):
 
         if ch4_reduction_perc != 0:
             for lm in data.LANDMANS:
-                m = 0 if lm == 'irr' else 1
+                m = 0 if lm == 'dry' else 1
                 # Subtract enteric fermentation emissions multiplied by reduction multiplier
                 lvstype, vegtype = lvs_veg_types(lu)
 
