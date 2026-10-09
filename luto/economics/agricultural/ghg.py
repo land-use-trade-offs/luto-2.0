@@ -336,7 +336,7 @@ def get_asparagopsis_effect_g_mrj(data:Data, yr_idx):
 
         if ch4_reduction_perc != 0:
             for lm in data.LANDMANS:
-                m = 0 if lm == 'irr' else 1
+                m = 0 if lm == 'dry' else 1
                 # Subtract enteric fermentation emissions multiplied by reduction multiplier
                 lvstype, vegtype = lvs_veg_types(lu)
 
@@ -554,7 +554,7 @@ def get_agtech_ei_effect_g_mrj(data:Data, yr_idx):
 
                 if reduction_perc != 0:
                     reduction_amnt = (
-                        np.nan_to_num(data.AGGHG_CROPS['CO2E_KG_HA_IRRIG', lm, lu].copy().to_numpy(), 0) 
+                        np.nan_to_num(data.AGGHG_CROPS['CO2E_KG_HA_IRRIG', lm, lu].to_numpy().copy(), 0) 
                         * reduction_perc
                         / 1000            # convert to tonnes
                         * data.REAL_AREA  # adjust for resfactor

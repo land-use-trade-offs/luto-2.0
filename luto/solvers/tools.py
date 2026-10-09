@@ -74,13 +74,14 @@ def record_shadow_prices(luto_solver, target_year, out_dir) -> None:
         return
 
     # ── the duals: Constr.Pi is a clean basic dual only when the accepted solve left a simplex basis; CBasis raises
-    #    GurobiError on a barrier-only solve (no basis) → duals unreliable, skip the year. One handle off the table
-    #    probes it — never `model.getConstrs()`, a Python list of every row of the model ──
+    #    on a barrier-only solve (no basis) — GurobiError, or AttributeError from gurobipy 13's Constr.__getattr__ —
+    #    → duals unreliable, skip the year. One handle off the table probes it — never `model.getConstrs()`, a
+    #    Python list of every row of the model ──
     built = rows[T['active'].values[rows]]                                          # the priced rows in the model (the rest were dropped before the build)
     try:
         if built.size:
             _ = T['constr'].values[built[0]].CBasis
-    except gp.GurobiError:
+    except (gp.GurobiError, AttributeError):
         print(f"Skipping shadow prices for {target_year}: accepted solve has no simplex basis "
               f"(barrier-only) — duals would be unreliable.")
         return
@@ -114,7 +115,20 @@ def record_shadow_prices(luto_solver, target_year, out_dir) -> None:
     shadow_price = pi * 1e6 / scale
     shadow_price_AUD = pi * 1e6 * rhs
     shadow_price_AUD[dropped] = 0.0                                                  # not -0.0 where the rhs is negative
+
+    # an elastic row (settings.ELASTIC_FAMILIES) that fell short is priced by the penalty alone (P / target, the real
+    # marginal cost being infinite): no price for it (NaN), flagged short with the fraction missed; a met elastic row
+    # (s = 0) is priced as a hard row — the penalty is inactive there
+    slack_col = T['slack_col'].values[rows]
+    shortfall = np.full(rows.size, np.nan)
+    elastic = slack_col >= 0
+    if elastic.any():
+        shortfall[elastic] = luto_solver.x[slack_col[elastic]].X / row_table.slack_unit(T['rhs'].values[rows][elastic])   # the fraction missed
+    short = shortfall > 1e-6                                                         # NaN (a hard row) is never short
+    shadow_price[short] = np.nan
+    shadow_price_AUD[short] = np.nan
+
     df = pd.DataFrame(dict(year=target_year, constraint=constraint, region=region, item=item, presence=presence,
                            pi_rescaled=pi, scale=scale, shadow_price=shadow_price, shadow_price_AUD=shadow_price_AUD,
-                           unit=unit, dropped=dropped))
+                           unit=unit, dropped=dropped, shortfall_frac=shortfall, short=short))
     df.to_csv(f"{out_dir}/shadow_prices_{target_year}.csv", index=False)

@@ -80,7 +80,7 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 - `AMORTISATION_PERIOD`: Period for cost amortization in years (default: 30)
 
 ### Environmental Constraints
-Every constraint is hard: there are no soft / penalised options.
+Every constraint is hard by default: there are no soft / penalised options; the one exception is opt-in — `ELASTIC_FAMILIES` (default `[]`) gives each row of the listed families a shortfall column at `ELASTIC_PENALTY` AUD per target missed in full (`row_builder.add_elastic`; the column carries the amount missed in the row's own units, |rhs| · s at coefficient ±1 with the penalty / |rhs| — `row_table.slack_unit`, every reader divides by it — so the scaled rhs stays out of the matrix), the rows that fall short listed in `out_<year>/shortfall_<year>.csv`.
 - `GHG_EMISSIONS_LIMITS`: Greenhouse gas targets ('off', 'low', 'medium', 'high')
 - `WATER_LIMITS`: Water yield constraints ('on' or 'off')
 - `WATER_CLIMATE_CHANGE_IMPACT`: Apply climate change to water yields ('on' or 'off')
@@ -98,7 +98,7 @@ Every constraint is hard: there are no soft / penalised options.
   - `GBF4_TARGET_ECNES`: Ecological Community NES targets ('off', 'medium', 'high', 'SPECIFIED', or 'CSV_DEFINED')
   - `GBF4_SNES_TARGETS_OVERRIDE`: dict letting a few species carry a different target from the rest (empty = no override)
   - `GBF4_SNES_CAP_MARGIN`: safety margin (percentage points, default 2.0) subtracted from each species' `ATTAINABLE_LEVEL` when clamping an interpolated SNES target, to keep a feasibility buffer (effective cap = `ATTAINABLE_LEVEL - GBF4_SNES_CAP_MARGIN`)
-  - `GBF8_TARGET`: Species conservation targets ('on' or 'off')
+  - `GBF8_TARGET`: Species conservation targets ('off', 'medium', 'high', or 'CSV_DEFINED')
 
 ### Renewable Energy Settings
 - `RENEWABLES_OPTIONS`: Dict controlling which renewable energy types are enabled, e.g. `{'Utility Solar PV': True, 'Onshore Wind': True}`. Set values to `False` to disable individual types. Also drives the corresponding `AG_MANAGEMENTS` entries.

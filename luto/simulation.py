@@ -31,6 +31,7 @@ import time
 import threading
 import joblib
 import numpy as np
+import pandas as pd
 
 from contextlib import contextmanager
 from pathlib import Path
@@ -39,9 +40,11 @@ from gurobipy import GRB
 from luto import settings
 from luto.data import Data
 from luto.solvers.col_builder import get_cols
+from luto.solvers.gbf8_rowgen import GBF8RowGen
 from luto.solvers.row_inputs import RowInputs, get_economics, get_row_inputs
-from luto.solvers.row_builder import get_rows, get_obj
+from luto.solvers.row_builder import add_elastic, elastic_absorbs, get_rows, get_obj
 from luto.solvers.row_bounds import STATUS, drop_redundant_rows, get_row_bounds, report_row_bounds
+from luto.solvers.row_table import slack_unit
 from luto.solvers.solver import LutoSolver
 from luto.solvers.post_solve import post_solve
 from luto.solvers.tools import record_shadow_prices
@@ -226,67 +229,147 @@ def solve_timeseries(
     ``data_<year>.lz4`` checkpoints are written (the run's own output directory when
     called from `run()`); pass None to disable checkpointing.
     """
-    # Save the base-year state before any solving so a retry can re-attempt the
-    # first target year. Skipped on resume (file already exists from a prior run).
+    # ═══ the base-year checkpoint: saved before any solving, so a retry can re-attempt the first target year ═══
+    #     (skipped on resume: the file already exists from a prior run)
     if checkpoint_path is not None:
         base_ckpt = checkpoint_path / f"data_{years_to_run[0]}.lz4"
         if not base_ckpt.exists():
             save_data_to_disk(data, str(base_ckpt))
             print(f"Saved base checkpoint for year {years_to_run[0]}: {base_ckpt}", flush=True)
 
+    carry = set()                                                                            # GBF8 row generation: the species whose rows the next step starts with
+
     for base_year, target_year in zip(years_to_run[:-1], years_to_run[1:]):
         print( "-------------------------------------------------", flush=True)
         print( f"Running for year {target_year}"   , flush=True)
         print( "-------------------------------------------------\n", flush=True)
-
         start_time = time.time()
+        out_dir = f"{data.path}/out_{target_year}"
 
-        # ── the columns: the unknowns ──
+        # ─────────────── 1. the columns: the unknowns ───────────────
         cols, col_support = get_cols(data, base_year)                                       # the column table, and what the row side reads beside it
 
-        # ── the rows: the constraints ──
+        # ─────────────── 2. the rows: the constraints ───────────────
         inputs = get_row_inputs(data, base_year, target_year)                               # the coefficient streams and targets
         A, rows = get_rows(inputs, cols, col_support)                                       # the matrix, and the row table on the same rows
-        col_support.cell2col = col_support.ag_mrj2col = col_support.nonag_rk2col = None     # read by get_rows only: freed before the solve (GBs at RES1), the masks and the regions stay for post_solve
 
-        # ── the pre-solve diagnosis: bound propagation over the rows ──
+        # ─────────────── 3. GBF8 row generation: the screen (settings.GBF8_ROW_GENERATION) ───────────────
+        #     built here, while the column support still holds cell2col / ag_mrj2col
+        rowgen = None
+        if settings.GBF8_ROW_GENERATION and settings.GBF8_TARGET != 'off':
+            rowgen = GBF8RowGen(data, inputs, cols, col_support, base_year, target_year, carry)
+        col_support.cell2col = col_support.ag_mrj2col = col_support.nonag_rk2col = None     # freed before the solve (GBs at RES1); the masks and the regions stay for post_solve
+
+        # ─────────────── 4. the pre-solve diagnosis: bound propagation over the rows ───────────────
         bounds = get_row_bounds(A, rows, cols)                                              # every row's interval over the column box, and its verdict
         drop_redundant_rows(rows, bounds, settings.BOUND_PROP_DROP_FAMILIES)                # opt-in per family: rows every point of the box satisfies never reach the solver
-        report_row_bounds(rows, bounds, target_year, f"{data.path}/out_{target_year}")      # the log table, bound_report_<year>.csv, bound_preflight_<year>.csv
-        n_impossible = int(((bounds['status'].values == STATUS.index('impossible')) | (bounds['status_implied'].values == STATUS.index('impossible'))).sum())
+        report_row_bounds(rows, bounds, target_year, out_dir)                               # the log table, bound_report_<year>.csv, bound_preflight_<year>.csv
+        impossible = (bounds['status'].values == STATUS.index('impossible')) | (bounds['status_implied'].values == STATUS.index('impossible'))
+        n_impossible = int((impossible & ~elastic_absorbs(rows, bounds)).sum())            # an elastic row whose slack can reach the rhs does not stop the year
         if n_impossible and settings.BOUND_PROP_ON_IMPOSSIBLE == 'stop':
             print('!' * 100, flush=True)
             print(f"Year {target_year}: {n_impossible:,} row(s) cannot hold at any point the column box and the rows' own bounds allow, so no solve can succeed "
-                  f"(see {data.path}/out_{target_year}/bound_report_{target_year}.csv). Stopping before the model is built.", flush=True)
+                  f"(see {out_dir}/bound_report_{target_year}.csv). Stopping before the model is built.", flush=True)
             print('!' * 100, flush=True)
             break
 
-        # ── the objective: the coefficient of every column ──
+        # ─────────────── 5. the objective, and the model ───────────────
         obj = get_obj(get_economics(data, base_year, target_year), cols, inputs)            # million AUD; the economy streams (~300 MB at RES5, ~7 GB at RES1) die with the call
-
+        A, rows, cols, obj = add_elastic(A, rows, cols, obj)                                # settings.ELASTIC_FAMILIES: a shortfall column per row of those families
         luto_solver = LutoSolver(cols, rows, A, obj, inputs)                                # A x T, obj · x; the inputs name m and am_idx in the variable names
         luto_solver.formulate()
+        save_model_to_disk(luto_solver.gurobi_model, data.path, base_year, target_year)     # BEFORE solving (see save_model_to_disk for why)
+        two_pass = rowgen is not None or (settings.ELASTIC_DROP_SHORT and (cols['block'].values == 'slack').any())
+        if two_pass and settings.ELASTIC_PASS1_COST_SCALE != 1:                             # feasibility-first pass 1: pass 2 restores the cost
+            luto_solver.set_cost_scale(settings.ELASTIC_PASS1_COST_SCALE)
+            print(f"Year {target_year}: pass 1 feasibility-first — the cost × {settings.ELASTIC_PASS1_COST_SCALE:g}", flush=True)
 
-        # Save the model to disk BEFORE solving (see save_model_to_disk for why).
-        save_model_to_disk(luto_solver.gurobi_model, data.path, base_year, target_year)
-        accepted, x, status = solve_with_retries(luto_solver, target_year)
-
-        if accepted:
-            solution = post_solve(x, cols, col_support, inputs)                                # the LUTO 1-D format
-            store_solution(data, target_year, solution, luto_solver.gurobi_model.ObjVal, inputs)
-            data.last_year = target_year                                                        # only a solved and stored year: the writers report through it
-            record_shadow_prices(luto_solver, target_year, f"{data.path}/out_{target_year}")
-            if checkpoint_path is not None:
-                save_checkpoint(data, checkpoint_path, target_year)
-
-        print(f'Processing for {target_year} completed in {round(time.time() - start_time)} seconds\n\n' , flush=True)
+        # ─────────────── 6. the solve ───────────────
+        if rowgen is None:
+            accepted, x, status = solve_with_retries(luto_solver, target_year)
+        else:
+            accepted, x, status = rowgen.solve(luto_solver, target_year, solve_with_retries)   # the GBF8 rows round by round, then the hard pass
+        if accepted and settings.ELASTIC_DROP_SHORT and (cols['block'].values == 'slack').any():
+            accepted, x, status = solve_elastic_hard_pass(luto_solver, x, target_year, out_dir)  # the elastic rows left short dropped, the rest hard
 
         if not accepted:
+            print(f'Processing for {target_year} completed in {round(time.time() - start_time)} seconds\n\n' , flush=True)
             print('!' * 100, flush=True)
             print(f"Solver status for year {target_year}: {SOLVER_STATUS_MSGS.get(status, f'unexpected status {status}')}", flush=True)
             print('!' * 100, flush=True)
             print('\n', flush=True)
             break
+
+        # ─────────────── 7. the solution: stored, reported, checkpointed ───────────────
+        solution = post_solve(x, cols, col_support, inputs)                                    # the LUTO 1-D format
+        slack = cols['block'].values == 'slack'                                               # the elastic rows' shortfall columns (settings.ELASTIC_FAMILIES)
+        penalty = float(obj[slack] @ x[slack]) if slack.any() else 0.0                      # million AUD: the penalty in the objective, bookkeeping not money
+        if penalty:
+            print(f"Year {target_year}: objective {luto_solver.gurobi_model.ObjVal:,.2f} includes the elastic penalty {penalty:,.2f} (million AUD); "
+                  f"stored without it: {luto_solver.gurobi_model.ObjVal - penalty:,.2f}", flush=True)
+        store_solution(data, target_year, solution, luto_solver.gurobi_model.ObjVal - penalty, inputs)
+        data.last_year = target_year                                                            # only a solved and stored year: the writers report through it
+
+        record_shadow_prices(luto_solver, target_year, out_dir)
+        if not settings.ELASTIC_DROP_SHORT:                                                   # under the hard pass, pass 1's shortfall was written before the re-solve
+            report_shortfall(x, luto_solver.rows, target_year, out_dir)
+        if rowgen is not None:
+            rowgen.report(luto_solver, out_dir)
+            carry = rowgen.carry_next(luto_solver)
+
+        if checkpoint_path is not None:
+            save_checkpoint(data, checkpoint_path, target_year)
+
+        print(f'Processing for {target_year} completed in {round(time.time() - start_time)} seconds\n\n' , flush=True)
+
+
+def solve_elastic_hard_pass(luto_solver: LutoSolver, x: np.ndarray, target_year: int, out_dir: str):
+    """settings.ELASTIC_DROP_SHORT — pass 2 of the elastic families: the rows pass 1 (``x``) left short are removed, every
+    other elastic row made hard (its shortfall column's ub = 0), and the year solved again. Pass 1's shortfall is
+    written first (shortfall_<year>.csv, with ``dropped``). Returns (accepted, x, status) as ``solve_with_retries``."""
+    rows = luto_solver.rows
+    on = np.flatnonzero((rows['slack_col'].values >= 0) & rows['active'].values)
+    s = x[rows['slack_col'].values[on]] / slack_unit(rows['rhs'].values[on])               # the fraction of the target missed
+    short = on[s > 1e-6]
+    report_shortfall(x, rows, target_year, out_dir, dropped=short)
+    feasibility_first = settings.ELASTIC_PASS1_COST_SCALE != 1
+    if short.size == 0 and not feasibility_first:                                         # pass 1 missed nothing: its solution is the hard one
+        print(f"Year {target_year}: no elastic row falls short — pass 1's solution is kept", flush=True)
+        return True, x, luto_solver.gurobi_model.Status
+    if feasibility_first:                                                                 # pass 1 minimised the shortfall; pass 2 is at full cost
+        luto_solver.set_cost_scale(1.0)
+
+    # ── the rows left short removed; every shortfall column fixed at 0, so each remaining elastic row is hard ──
+    model = luto_solver.gurobi_model
+    slack_vars = luto_solver.x[rows['slack_col'].values[on]].tolist()
+    model.setAttr('UB', slack_vars, [0.0] * len(slack_vars))
+    if short.size:
+        luto_solver.remove_constraints_by_name(rows['name'].values[short].tolist())
+    print(f"Year {target_year}: {short.size:,} elastic row(s) cannot be met together with the year — removed; "
+          f"the other {on.size - short.size:,} made hard, solving again", flush=True)
+    return solve_with_retries(luto_solver, target_year)
+
+
+def report_shortfall(x: np.ndarray, rows, target_year: int, out_dir: str, dropped=None) -> None:
+    """The elastic rows (settings.ELASTIC_FAMILIES) and how much of each target the solution misses: shortfall_<year>.csv
+    (s = the target's size moved — a fraction of it on a GBF row, possibly > 1 on another; raw = in the row's own units,
+    restored by its scale: a floor lowered or a ceiling raised by that much), and the count in the log."""
+    on = np.flatnonzero(rows['slack_col'].values >= 0)
+    if on.size == 0:
+        return
+    rhs, scale = rows['rhs'].values[on], rows['scale'].values[on]
+    s = x[rows['slack_col'].values[on]] / slack_unit(rhs)                                   # the column carries unit · s
+    gbf = np.array([f.startswith('GBF') for f in rows['family'].values[on]], dtype=bool)
+    df = pd.DataFrame({'family': rows['family'].values[on], 'sense': rows['sense'].values[on], 'region': rows['region'].values[on],
+                       'GBF_target': rows['GBF_target'].values[on], 'name': rows['name'].values[on],
+                       'shortfall_frac': s, 'target_raw': rhs * scale,
+                       'shortfall_raw': s * np.where(gbf, rhs, np.abs(rhs)) * scale,   # the bound moved (add_elastic's m · s), in raw units
+                       'dropped': np.isin(on, [] if dropped is None else dropped)})    # settings.ELASTIC_DROP_SHORT: removed before the hard pass
+    df.sort_values('shortfall_frac', ascending=False).to_csv(f"{out_dir}/shortfall_{target_year}.csv", index=False)
+    short = df[df['shortfall_frac'] > 1e-6]
+    print(f"Year {target_year}: {len(short):,} of {on.size:,} elastic rows fall short (sum of fractions missed {s.sum():.3f})"
+          + ''.join(f"\n    {r.family} {r.region} {r.GBF_target}: {r.shortfall_frac:.1%} of the target missed"
+                    for r in short.sort_values('shortfall_frac', ascending=False).head(10).itertuples()), flush=True)
 
 
 def solve_with_retries(luto_solver: LutoSolver, target_year: int):
