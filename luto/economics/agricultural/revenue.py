@@ -338,10 +338,12 @@ def get_savanna_burning_effect_r_mrj(data:Data, yr_idx: int):
     Applies the effects of using EDS savanna burning to the revenue data
     for all relevant agr. land uses.
 
-    Since EDSSB has no effect on revenue, return an array of zeros.
+    Carbon revenue: abatement (minus the GHG effect, `get_savanna_burning_effect_g_mrj`)
+    x carbon price, $ per cell per yr; positive tonnes x price as for EP and CP
+    (`non_agricultural/revenue.py:38,144`).
     """
     ghg_effect = get_savanna_burning_effect_g_mrj(data)
-    return ghg_effect * data.get_carbon_price_by_yr_idx(yr_idx)
+    return -ghg_effect * data.get_carbon_price_by_yr_idx(yr_idx)
 
 
 def get_agtech_ei_effect_r_mrj(data:Data, r_mrj, yr_idx):

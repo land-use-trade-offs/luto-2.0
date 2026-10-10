@@ -8,7 +8,7 @@
 
 ## When to Use
 
-- You want to call `arr_to_xr()` or other helpers in `luto/tools/Manual_jupyter_books/helpers/` without a full simulation run.
+- You want to call `arr_to_xr()` or other helpers in `luto/tools/__init__.py` (`arr_to_xr`, `mrj_to_xr`) without a full simulation run.
 - You are inspecting or debugging a 1D numpy array in spatial context (plotting, reprojecting, etc.).
 - You are prototyping new code that takes a `data` argument and need a quick `data` object to test with.
 
@@ -33,7 +33,7 @@ import luto.settings as settings
 import luto.economics.agricultural.quantity as ag_quantity
 import luto.economics.non_agricultural.quantity as non_ag_quantity
 import luto.economics.agricultural.water as ag_water
-from luto.tools.Manual_jupyter_books.helpers import arr_to_xr
+from luto.tools import arr_to_xr
 
 from collections import defaultdict
 from typing import Any, Literal, Optional
@@ -153,7 +153,7 @@ class fakedata():
 data = fakedata()
 
 # Convert any 1D array to a georeferenced xarray DataArray
-from luto.tools.Manual_jupyter_books.helpers import arr_to_xr
+from luto.tools import arr_to_xr
 da = arr_to_xr(data, my_1d_array)
 da.plot()
 ```
