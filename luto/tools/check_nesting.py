@@ -31,7 +31,12 @@ entries only. A coarse cell reports in its centre cell's state, so the RESFACTOR
 state; two rows are reported apart and not gated:
 - 'lost blocks': RESFACTOR 1 cells whose block has no coarse cell (its centre cell is not land);
 - 'state assignment': the RESFACTOR 1 totals in each cell's own state less the same in its block's state.
-Gated: national |RF - RF1| <= 1e-4 x |RF1|; by state |RF - RF1| <= max(5e-4 x |RF1|, 10) (head, t, or kl for milk).
+- 'REAL_AREA basis': AG_L_MRJ x REAL_AREA is the allocated count x the centre cell's area, not the allocated cells'
+  own area; the term is the coarse per-ha value x that difference, computed directly, by state and nationally, with
+  its residual against (raw - net).
+Gated: head and GHG on the raw totals; production net of the REAL_AREA basis term (the coarse per-ha value x the
+allocated cells' area); national |RF - RF1| <= 1e-4 x |RF1|; by state |RF - RF1| <= max(5e-4 x |RF1|, 10) (head, t,
+or kl for milk). Base-year cost and water requirement are reported, raw and net, not gated.
 
 Usage (from the repo root, inputs and other settings from luto/settings.py):
     python -m luto.tools.check_nesting 10 20 [--out DIR] [--tol 1e-4]
@@ -180,56 +185,122 @@ def compare(fine: dict, coarse: dict, rf: int) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def base_year_totals(mats: dict) -> dict:
-    """{(quantity, group): per-cell base-year value}: AG_L_MRJ x the matrices, summed over lm and the group's land uses."""
-    X = mats['base_dvars']
+def base_year_totals(mats: dict, alloc_area: np.ndarray = None) -> dict:
+    """{(quantity, group): (raw, net)}, per-cell base-year values summed over lm and the group's land uses.
+    raw: AG_L_MRJ x the matrices. net (RESFACTOR > 1, given `alloc_area`, the (lm, cell, lu) area of the allocated fine
+    cells): the coarse per-ha value (matrix / REAL_AREA) x that area, i.e. the total without the REAL_AREA basis term
+    (allocated count x the centre cell's area against the allocated cells' own areas). At RESFACTOR 1 net = raw."""
+    X, RA = mats['base_dvars'], mats['real_area']
     landuses, products = mats['landuses'], mats['products']
     out = {}
+
+    def add(key, M, j):
+        raw = (X[:, :, j] * M).sum(axis=0)
+        net = raw if alloc_area is None else (M / RA * alloc_area[:, :, j]).sum(axis=0)
+        r0, n0 = out.get(key, (0, 0))
+        out[key] = (r0 + raw, n0 + net)
+
     for lu in mats['lu_lvstk']:
         j = landuses.index(lu)
         animal = lu.split(' - ')[0].upper()
-        out[('head', animal)] = out.get(('head', animal), 0) + (X[:, :, j] * mats['head'][:, :, j]).sum(axis=0)
-        out[('GHG t', animal)] = out.get(('GHG t', animal), 0) + (X[:, :, j] * mats['GHG'][:, :, j]).sum(axis=0)
+        add(('head', animal), mats['head'][:, :, j], j)
+        add(('GHG t', animal), mats['GHG'][:, :, j], j)
+        add(('cost', animal), mats['cost'][:, :, j], j)
+        add(('water requirement', animal), mats['water requirement'][:, :, j], j)
     for lu in mats['stubble_landuses']:
         j = landuses.index(lu)
-        out[('head', 'SHEEP stubble')] = out.get(('head', 'SHEEP stubble'), 0) + (X[:, :, j] * mats['stubble head'][:, :, j]).sum(axis=0)
+        add(('head', 'SHEEP stubble'), mats['stubble head'][:, :, j], j)
     for lu in landuses:
         if lu not in mats['lu_lvstk'] and not lu.startswith('Unallocated'):
             j = landuses.index(lu)
-            out[('GHG t', 'CROPS')] = out.get(('GHG t', 'CROPS'), 0) + (X[:, :, j] * mats['GHG'][:, :, j]).sum(axis=0)
+            add(('GHG t', 'CROPS'), mats['GHG'][:, :, j], j)
+            add(('cost', 'CROPS'), mats['cost'][:, :, j], j)
+            add(('water requirement', 'CROPS'), mats['water requirement'][:, :, j], j)
     for k, pr in enumerate(products):
         j = int(np.nonzero(mats['lu2pr'][k])[0][0])
-        out[('production', pr)] = (X[:, :, j] * mats['production'][:, :, k]).sum(axis=0)
+        add(('production', pr), mats['production'][:, :, k], j)
     return out
 
 
+GATED_RAW = ('head', 'GHG t')           # gated on the raw totals
+GATED_NET = ('production',)             # gated net of the REAL_AREA basis term (R-365)
+
+
 def fidelity(fine: dict, coarse: dict, rf: int) -> pd.DataFrame:
-    """One row per (quantity, group, state), with 'AUS', 'lost blocks' and 'state assignment' rows."""
+    """One row per (quantity, group, state) with 'AUS', and rows apart, not gated: 'lost blocks', 'state assignment <state>'
+    and 'REAL_AREA basis' / 'REAL_AREA basis <state>'. Head and GHG are gated on raw totals, production net of the
+    REAL_AREA basis term; cost and water requirement are reported, not gated."""
     f2c = block_of_fine_cells(fine['nlum_mask'], coarse['mask'], rf)[fine['lumask']]
     kept = f2c >= 0
     st_block = np.where(kept, coarse['state'][np.maximum(f2c, 0)], '')
     st_own = fine['state']
-    T1, Tn = base_year_totals(fine), base_year_totals(coarse)
+    n_lm, n_lu, n_coarse = len(fine['landmans']), len(fine['landuses']), coarse['real_area'].size
+    alloc_area = np.zeros((n_lm, n_coarse, n_lu))
+    for m in range(n_lm):
+        for j in range(n_lu):
+            k = kept & (fine['lumap'] == j) & (fine['lmmap'] == m)
+            if k.any():
+                alloc_area[m, :, j] = np.bincount(f2c[k], weights=fine['real_area'][k], minlength=n_coarse)
+    T1, Tn = base_year_totals(fine), base_year_totals(coarse, alloc_area)
     rows = []
     for key in T1:
-        v1, vn = np.asarray(T1[key], dtype=np.float64), np.asarray(Tn[key], dtype=np.float64)
+        v1 = np.asarray(T1[key][0], dtype=np.float64)
+        raw, net = (np.asarray(x, dtype=np.float64) for x in Tn[key])
+        gated, use_net = key[0] in GATED_RAW + GATED_NET, key[0] in GATED_NET
         rf1 = pd.Series(v1[kept]).groupby(st_block[kept]).sum()
-        rfn = pd.Series(vn).groupby(coarse['state']).sum()
+        s_raw, s_net = pd.Series(raw).groupby(coarse['state']).sum(), pd.Series(net).groupby(coarse['state']).sum()
         own = pd.Series(v1).groupby(st_own).sum()
-        states = sorted(set(rf1.index) | set(rfn.index) | set(own.index))
+        states = sorted(set(rf1.index) | set(s_raw.index) | set(own.index))
+
+        def at(series, s):
+            return float(series.sum()) if s == 'AUS' else float(series.get(s, 0.0))
+
         for s in states + ['AUS']:
-            a = float(rf1.sum()) if s == 'AUS' else float(rf1.get(s, 0.0))
-            b = float(rfn.sum()) if s == 'AUS' else float(rfn.get(s, 0.0))
+            a, r, n = at(rf1, s), at(s_raw, s), at(s_net, s)
+            b = n if use_net else r
             tol = FIDELITY_NATIONAL_TOL * abs(a) if s == 'AUS' else max(FIDELITY_STATE_TOL * abs(a), FIDELITY_STATE_FLOOR)
-            rows.append(dict(quantity=key[0], group=key[1], state=s, rf1=a, rf=b, diff=b - a,
-                             rel=(b - a) / a if a else 0.0, tol=tol, gated=True, ok=abs(b - a) <= tol))
-        rows.append(dict(quantity=key[0], group=key[1], state='lost blocks', rf1=float(v1[~kept].sum()), rf=0.0,
+            rows.append(dict(quantity=key[0], group=key[1], state=s, basis='net' if use_net else 'raw', rf1=a, rf=b,
+                             diff=b - a, rel=(b - a) / a if a else 0.0, raw_diff=r - a, net_diff=n - a,
+                             tol=tol if gated else np.nan, gated=gated, ok=(abs(b - a) <= tol) if gated else True))
+        # The REAL_AREA basis term on its own: sum over lm of matrix / REAL_AREA x (AG_L_MRJ x REAL_AREA - allocated area)
+        basis = basis_term(coarse, alloc_area, key)
+        s_basis = pd.Series(basis).groupby(coarse['state']).sum()
+        for s in states + ['AUS']:
+            v = at(s_basis, s)
+            rows.append(dict(quantity=key[0], group=key[1], state='REAL_AREA basis' + ('' if s == 'AUS' else f' {s}'),
+                             basis='', rf1=np.nan, rf=np.nan, diff=v, rel=np.nan, raw_diff=np.nan, net_diff=np.nan,
+                             residual=v - (at(s_raw, s) - at(s_net, s)), tol=np.nan, gated=False, ok=True))
+        rows.append(dict(quantity=key[0], group=key[1], state='lost blocks', basis='', rf1=float(v1[~kept].sum()), rf=0.0,
                          diff=-float(v1[~kept].sum()), rel=np.nan, tol=np.nan, gated=False, ok=True))
+        centre_state = pd.Series(v1).groupby(np.where(kept, st_block, st_own)).sum()
         for s in states:
-            d = float(own.get(s, 0.0)) - float(pd.Series(v1).groupby(np.where(kept, st_block, st_own)).sum().get(s, 0.0))
-            rows.append(dict(quantity=key[0], group=key[1], state=f'state assignment {s}', rf1=np.nan, rf=np.nan,
-                             diff=d, rel=np.nan, tol=np.nan, gated=False, ok=True))
+            rows.append(dict(quantity=key[0], group=key[1], state=f'state assignment {s}', basis='', rf1=np.nan, rf=np.nan,
+                             diff=float(own.get(s, 0.0)) - float(centre_state.get(s, 0.0)), rel=np.nan, tol=np.nan,
+                             gated=False, ok=True))
     return pd.DataFrame(rows)
+
+
+def basis_term(mats: dict, alloc_area: np.ndarray, key: tuple) -> np.ndarray:
+    """The REAL_AREA basis term of `key` per coarse cell, computed directly: sum over lm and the group's land uses of
+    matrix / REAL_AREA x (AG_L_MRJ x REAL_AREA - the allocated cells' area)."""
+    X, RA = mats['base_dvars'], mats['real_area']
+    landuses = mats['landuses']
+    q, g = key
+    mat = {'head': 'head', 'GHG t': 'GHG', 'cost': 'cost', 'water requirement': 'water requirement'}.get(q, q)
+    if q == 'production':
+        k = mats['products'].index(g)
+        pairs = [(mats['production'][:, :, k], int(np.nonzero(mats['lu2pr'][k])[0][0]))]
+    elif q == 'head' and g == 'SHEEP stubble':
+        pairs = [(mats['stubble head'][:, :, landuses.index(lu)], landuses.index(lu)) for lu in mats['stubble_landuses']]
+    elif g == 'CROPS':
+        pairs = [(mats[mat][:, :, j], j) for j, lu in enumerate(landuses) if lu not in mats['lu_lvstk'] and not lu.startswith('Unallocated')]
+    else:
+        lus = [lu for lu in mats['lu_lvstk'] if lu.split(' - ')[0].upper() == g]
+        pairs = [(mats[mat][:, :, landuses.index(lu)], landuses.index(lu)) for lu in lus]
+    out = np.zeros(RA.size)
+    for M, j in pairs:
+        out += (M / RA * (X[:, :, j] * RA - alloc_area[:, :, j])).sum(axis=0)
+    return out
 
 
 def main() -> int:
@@ -269,7 +340,12 @@ def main() -> int:
         gated = fd[fd['gated']]
         nat = gated[gated['state'] == 'AUS']
         print(f'\nRESFACTOR {rf}: base-year fidelity, national (tolerance {FIDELITY_NATIONAL_TOL:g} relative):')
-        print(nat[['quantity', 'group', 'rf1', 'rf', 'diff', 'rel', 'ok']].to_string(index=False, float_format=lambda v: f'{v:.6e}'))
+        print(nat[['quantity', 'group', 'basis', 'rf1', 'rf', 'diff', 'rel', 'raw_diff', 'ok']]
+              .to_string(index=False, float_format=lambda v: f'{v:.6e}'))
+        ra = fd[fd['state'] == 'REAL_AREA basis']
+        print(f'RESFACTOR {rf}: REAL_AREA basis (not gated; computed directly, against raw - net the largest |residual| '
+              f'over all rows is {fd["residual"].abs().max():.3e}):')
+        print(ra[['quantity', 'group', 'diff', 'residual']].to_string(index=False, float_format=lambda v: f'{v:.6e}'))
         lost = fd[fd['state'] == 'lost blocks']
         print(f'RESFACTOR {rf}: lost blocks (not gated):')
         print(lost[['quantity', 'group', 'rf1']].to_string(index=False, float_format=lambda v: f'{v:.6e}'))
