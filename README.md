@@ -1,7 +1,7 @@
 # LUTO2: The Land-Use Trade-Offs Model Version 2.0
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.14](https://img.shields.io/badge/python-3.14-blue.svg)](https://www.python.org/downloads/)
 [![Version](https://img.shields.io/github/v/release/land-use-trade-offs/luto-2.0?label=Version&color=green)](https://github.com/land-use-trade-offs/luto-2.0/releases/latest)
 
 ## Introduction
@@ -95,9 +95,6 @@ luto/                                    # Main package directory
     │   ├── create_grid_search_plots.py  # Grid search result plotting
     │   ├── helpers.py                   # Task run utilities
     │   └── parameters.py                # Task run parameters
-    ├── Manual_jupyter_books/            # Documentation notebooks
-    │   ├── helpers/                     # Notebook helper functions
-    │   └── asset/                       # Notebook assets and data descriptions
     ├── report/                          # Reporting and visualization system
     │   ├── VUE_modules/                 # Vue.js 3 interactive reporting dashboard
     │   │   ├── assets/                  # Shapefiles and styling assets (NRM, state, AEMO REZ)
@@ -210,11 +207,11 @@ The settings (`BOUND_PROP_REL_TOL`, `BOUND_PROP_DROP_FAMILIES`, `BOUND_PROP_ON_I
 ## System Requirements
 
 **Minimum Requirements:**
-- Python 3.12 (pinned in `requirements.yml`)
+- Python 3.14 (pinned in `requirements.yml`)
 - 16 GB RAM at `RESFACTOR >= 10`; 32 GB or more for `RESFACTOR = 5`. Full resolution (`RESFACTOR = 1`) is an HPC workload — budget several hundred GB and expect the write/report phase to dominate peak memory.
 - 50 GB available disk space for input data and outputs
-- GUROBI optimization solver license (academic licenses available); `gurobipy` is pinned to 13.0.0
-- CPLEX is **planned** as an alternative solving engine. The `cplex` / `docplex` Python bindings ship in `requirements.yml`; using them additionally requires a licensed IBM ILOG CPLEX Optimization Studio 22.2 installation. GUROBI remains the only engine the model solves with today
+- GUROBI optimization solver license (academic licenses available); `gurobipy` is pinned to 13.0.3
+- We are working on support for other solving engines, such as IBM CPLEX and NVIDIA cuOpt (see [Other solving engines](#other-solving-engines-in-progress)). GUROBI is the only engine the model solves with today
 
 **Supported Operating Systems:**
 - Windows 10/11
@@ -244,11 +241,21 @@ LUTO2 currently solves with GUROBI. Follow these steps:
 # 2) Place your gurobi.lic file in the appropriate directory
 ```
 
-**CPLEX (planned).** We plan to support CPLEX as a second solving engine, so that a run can be
-solved with either engine. The `cplex` and `docplex` packages are already part of
-`requirements.yml`; a licensed IBM ILOG CPLEX Optimization Studio 22.2 installation is needed to
-provide the native solver runtime. Nothing in the model reads CPLEX yet — no settings switch
-exists, and every run goes through GUROBI.
+#### Other solving engines (in progress)
+
+We are working on letting a run solve with engines other than GUROBI:
+
+- **IBM CPLEX**, a commercial LP solver on the CPU and the engine the original LUTO used. The `cplex` and `docplex`
+  packages are already in `requirements.yml`; the native runtime needs a licensed IBM ILOG CPLEX Optimization
+  Studio 22.2 installation.
+- **NVIDIA cuOpt**, an open-source, GPU-accelerated solver. Its first-order LP method (PDLP) can make very large
+  models, such as full-resolution LUTO years, much faster on a GPU, with a looser default precision than barrier.
+
+The model build is what makes this practical. Each year's LP is handed to the solver as plain arrays: the column
+table (bounds), one scipy CSR matrix `A`, the row table (rhs, sense) and the objective vector. So a new engine only
+needs a small adapter in `luto/solvers/solver.py`; the model code (`col_builder`, `row_builder`, `row_bounds`,
+`post_solve`) doesn't change. A saved `debug_model_*.mps` file already loads in other engines, which is how we compare
+them. Nothing in the model selects an engine yet: there is no engine setting, and every run goes through GUROBI.
 
 ### 4. Obtain Input Data
 The LUTO2 input database is approximately 40 GB and contains sensitive data. 
@@ -286,7 +293,7 @@ settings.GBF3_NVIS_TARGET = 'off'                       # 'off', 'medium', 'high
 settings.GBF3_NVIS_REGION_MODE = 'NRM'                  # 'AUSTRALIA', 'NRM', or 'IBRA_REG'
 settings.GBF4_TARGET_SNES = 'off'                       # 'off', 'medium', 'high', 'SPECIFIED', or 'CSV_DEFINED'
 settings.GBF4_TARGET_ECNES = 'off'                      # 'off', 'medium', 'high', 'SPECIFIED', or 'CSV_DEFINED'
-settings.GBF8_TARGET = 'off'                            # 'off', 'medium', 'high', or 'USER_DEFINED'
+settings.GBF8_TARGET = 'off'                            # 'off', 'medium', 'high', or 'CSV_DEFINED'
 
 settings.DYNAMIC_PRICE = True                           # Demand elasticity-based dynamic pricing
 
@@ -375,12 +382,12 @@ LUTO2 behavior can be customized through the `luto.settings` module. Key paramet
   - Must match available ages in NetCDF input data
   - Default: 60 years (based on S-curve carbon accumulation pattern)
 - `GBF2_TARGET`: Global Biodiversity Framework Target 2 ('off', 'low', 'medium', 'high')
-- `GBF3_NVIS_TARGET`: Conservation targets for vegetation groups ('off', 'medium', 'high', 'USER_DEFINED')
+- `GBF3_NVIS_TARGET`: Conservation targets for vegetation groups ('off', 'medium', 'high', 'SPECIFIED', or 'CSV_DEFINED')
 - `GBF3_NVIS_REGION_MODE`: Spatial framing of the GBF3 targets — 'AUSTRALIA', 'NRM', or 'IBRA_REG'. IBRA bioregion targets are served by this mode; there is no separate IBRA setting
-- `GBF4_TARGET_SNES`: Species of National Environmental Significance ('off', 'USER_DEFINED', or 'dict')
-- `GBF4_TARGET_ECNES`: Ecological Communities of National Environmental Significance ('off', 'USER_DEFINED', or 'dict')
+- `GBF4_TARGET_SNES`: Species of National Environmental Significance ('off', 'medium', 'high', 'SPECIFIED', or 'CSV_DEFINED')
+- `GBF4_TARGET_ECNES`: Ecological Communities of National Environmental Significance ('off', 'medium', 'high', 'SPECIFIED', or 'CSV_DEFINED')
 - `GBF4_SNES_TARGETS_OVERRIDE` / `GBF4_SNES_CAP_MARGIN`: Per-species target overrides, and the safety margin subtracted from each species' attainable level to keep a feasibility buffer
-- `GBF8_TARGET`: Species and group targets ('on' or 'off')
+- `GBF8_TARGET`: Species climate-suitability targets ('off', 'medium', 'high', or 'CSV_DEFINED')
 
 ### Renewable Energy Constraints
 - `RENEWABLES_OPTIONS`: Dict of renewable energy types and whether each is enabled (e.g., `{'Utility Solar PV': True, 'Onshore Wind': True}`). Set values to `False` to disable individual types.

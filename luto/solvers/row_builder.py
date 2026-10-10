@@ -28,7 +28,7 @@ import luto.tools as tools
 from luto import settings
 from luto.solvers.col_builder import ColSupport
 from luto.solvers.row_inputs import EconomicInputs, RowInputs
-from luto.solvers.row_table import ROW_FILL, ROW_SCHEMA, make_part
+from luto.solvers.row_table import ROW_FILL, ROW_SCHEMA, make_part, slack_unit
 
 
 # ═══════════════════════════ get_rows: the row space of one step ═══════════════════════════
@@ -239,6 +239,60 @@ def get_obj(econ: EconomicInputs, cols: xr.Dataset, inputs: RowInputs) -> np.nda
     obj[np.abs(obj) < settings.SOLVER_COEFF_MIN] = 0.0                         # floor the scaled coefficient
     return obj
 
+
+def add_elastic(A: sparse.csr_matrix, rows: xr.Dataset, cols: xr.Dataset, obj: np.ndarray):
+    """Every active row of a settings.ELASTIC_FAMILIES family gets its own shortfall column (block ``slack``):
+    a·x + rhs·s >= rhs on the scaled row, s the fraction of the target missed (sign-flipped on a < row), at
+    settings.ELASTIC_PENALTY AUD per target missed in full (million AUD in the objective, as every objective coefficient).
+    The column carries s in the row's own units, s' = unit · s (``row_table.slack_unit``: |rhs|) — coefficient ±1, ub and
+    penalty rescaled to match — so the scaled rhs never enters the matrix; a reader divides by the unit.
+    ``rows['slack_col']`` names the column."""
+    on = np.flatnonzero(np.isin(rows['family'].values, settings.ELASTIC_FAMILIES) & rows['active'].values)
+    if on.size == 0:
+        return A, rows, cols, obj
+    sense = rows['sense'].values[on]
+    assert not (sense == '=').any(), 'an elastic family has an equality row'
+    n_col, n = cols.sizes['col'], on.size
+    # One unit of s moves the row's bound by the target's size, signed by the row's direction (a·x + m·s >= rhs lowers
+    # a floor, a·x - m·s <= rhs raises a ceiling):
+    #   GBF row:   m = rhs, s in [0, 1] — the fraction of the target area missed; rhs <= 0 means the land outside LUTO
+    #              already meets it, and a slack that could only tighten the row stays 0
+    #   other row: m = |rhs|, s in [0, inf) — a GHG limit (rhs = limit - off-land emissions) is negative under net
+    #              sequestration, where rhs itself would make s TIGHTEN the row, and a ceiling can be overshot by more
+    #              than its own size
+    rhs = rows['rhs'].values[on]
+    gbf = np.array([f.startswith('GBF') for f in rows['family'].values[on]], dtype=bool)
+    if ((rhs == 0) & ~gbf).any():
+        print(f"│   elastic: {((rhs == 0) & ~gbf).sum():,} non-GBF row(s) with a target of 0 cannot be relaxed", flush=True)
+    # The column carries s' = unit · s (unit = |m|, row_table.slack_unit): m·s = sign(m)·s', so the coefficient is ±1 (0
+    # where m = 0: the row cannot be relaxed), the ub × unit and the penalty / unit — the same LP, m kept out of the matrix
+    unit = slack_unit(rhs)
+    coef = (np.where(sense == '<', -1.0, 1.0) * np.where(gbf, np.sign(rhs), (rhs != 0).astype(np.float64))).astype(A.dtype)   # A's dtype (float32): hstack would upcast the whole matrix to float64
+    A = sparse.hstack([A, sparse.csr_matrix((coef, (on, np.arange(n))), shape=(A.shape[0], n))], format='csr', dtype=A.dtype)
+    slack = xr.Dataset({v: (('col',), np.full(n, 'slack' if v == 'block' else 0.0 if cols[v].dtype.kind == 'f' else -1,
+                                              dtype=cols[v].dtype)) for v in cols.data_vars})
+    slack['ub'] = (('col',), np.where(gbf, unit, np.inf).astype(cols['ub'].dtype))    # GBF: at most the whole target (s = 1)
+    cols = xr.concat([cols, slack], 'col')
+    penalty = settings.ELASTIC_PENALTY / 1e6 * (-1 if settings.OBJECTIVE == 'maxprofit' else 1)   # AUD -> million AUD, a cost per target missed
+    obj = np.concatenate([obj, (penalty / unit).astype(obj.dtype)])
+    slack_col = rows['slack_col'].values.copy()
+    slack_col[on] = n_col + np.arange(n)
+    rows = rows.assign(slack_col=(('row',), slack_col))
+    print(f"│   elastic: {n:,} rows of {sorted(set(rows['family'].values[on]))} get a shortfall column "
+          f"at {settings.ELASTIC_PENALTY:,.0f} AUD per target missed", flush=True)
+    return A, rows, cols, obj
+
+
+
+def elastic_absorbs(rows: xr.Dataset, bounds: xr.Dataset) -> np.ndarray:
+    """Per row: True where add_elastic's shortfall column can make the row hold, so an IMPOSSIBLE verdict on it need not
+    stop the year. A non-GBF row's slack is unbounded (m = |rhs|), so it absorbs anything unless rhs == 0; a GBF row's
+    slack stops at s = 1, where the floor has fallen to 0 — it absorbs only if rhs > 0 and the row can still reach 0
+    (hi_implied >= 0, on the scaled row as the bounds are)."""
+    on = np.isin(rows['family'].values, settings.ELASTIC_FAMILIES) & rows['active'].values
+    rhs = rows['rhs'].values
+    gbf = np.char.startswith(rows['family'].values.astype(str), 'GBF')
+    return on & np.where(gbf, (rhs > 0) & (bounds['hi_implied'].values >= 0), rhs != 0)
 
 # ═══════════════════════════ the demand rows ═══════════════════════════
 
@@ -473,6 +527,9 @@ def get_GBF8(inputs: RowInputs, support: ColSupport, bio_S: sparse.csr_matrix):
     """One row per (region, species) with a target > 0 and a cell: Σ_r area[species, r] · (the bio contribution of cell r's columns) ≥ target."""
     if settings.GBF8_TARGET == "off":
         print('│   ├── TURNING OFF constraints for biodiversity GBF 8 ...')
+        return None, None
+    if settings.GBF8_ROW_GENERATION:                                       # the rows are generated during the solve (gbf8_rowgen)
+        print('│   ├── GBF 8 by row generation: no rows built up front ...')
         return None, None
     print("│   ├── Adding constraints for biodiversity GBF 8 ...")
     layers = inputs.GBF8_pre_1750_area_sr                                # xr [species, cell]
@@ -719,7 +776,8 @@ def get_renewable(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
     j            = cols['j'].values
     am_idx       = cols['am_idx'].values
     state_of_cell = support.region2cell['state'].values                  # the state of every cell
-    states       = sorted(set(state_of_cell) - {None, 'Australian Capital Territory'})   # the states the rows are written for, by name; ACT folded into NSW below
+    states       = sorted({s for s in set(state_of_cell) if isinstance(s, str)} - {'Australian Capital Territory'})   # the states the rows are written for, by name; ACT folded into NSW below
+                                                                         # (a cell without a state is None in cell_regions, but xarray 2026.7 stores None as NaN: keep names only)
     in_ag        = cols['block'].values == 'ag'
 
     # ── per type: its columns' yield, and the columns the exclusion masks keep out ──

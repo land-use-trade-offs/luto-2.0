@@ -32,7 +32,6 @@ import luto.settings as settings
 import luto.economics.agricultural.quantity as ag_quantity
 import luto.economics.non_agricultural.quantity as non_ag_quantity
 import luto.economics.agricultural.water as ag_water
-from luto.tools.Manual_jupyter_books.helpers import arr_to_xr
 
 from collections import defaultdict
 from typing import Any, Literal, Optional
@@ -154,7 +153,7 @@ class Data:
 
         # Mask out non-agricultural, non-environmental plantings land (i.e., -1) from lumap 
         self.LUMASK = self.LUMAP_NO_RESFACTOR != self.MASK_LU_CODE                                                      # 1D (ij flattend);  `True` for land uses; `False` for desert, urban, water, etc
-        self.LUMASK_2D_FULLRES = np.nan_to_num(arr_to_xr(self, self.LUMASK))
+        self.LUMASK_2D_FULLRES = np.nan_to_num(tools.arr_to_xr(self, self.LUMASK))
         
 
         # Return combined land-use and resfactor mask
@@ -196,7 +195,7 @@ class Data:
             raise KeyError("Resfactor setting invalid")
         
         # Get the 2D MASK
-        self.MASK_2D = np.nan_to_num(arr_to_xr(self, self.MASK))
+        self.MASK_2D = np.nan_to_num(tools.arr_to_xr(self, self.MASK))
         
         
         # Get the lon/lat coordinates.
@@ -519,7 +518,7 @@ class Data:
         )        
         
         self.REGION_NRM_CODE = REGION_NRM_r['NRM_CODE']
-        self.REGION_NRM_NAME = REGION_NRM_r['NRM_NAME'].values
+        self.REGION_NRM_NAME = REGION_NRM_r['NRM_NAME'].to_numpy()
         
         REGION_STATE_r = pd.read_hdf(
             os.path.join(settings.INPUT_DIR, "REGION_STATE_r.h5"), where=self.MASK
@@ -1154,10 +1153,12 @@ class Data:
         # Load the natural land carbon data.
         nat_land_CO2 = pd.read_hdf(os.path.join(settings.INPUT_DIR, "natural_land_t_co2_ha.h5"), where=self.MASK)
         
-        # Get the carbon stock of unallowcated natural land
-        self.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR = np.array(
+        # Get the carbon stock of unallowcated natural land (t CO2e/ha): the one-off loss on clearing
+        self.CO2E_STOCK_UNALL_NATURAL_TCO2_HA = np.array(
             nat_land_CO2['NATURAL_LAND_TREES_DEBRIS_SOIL_TCO2_HA'] - (nat_land_CO2['NATURAL_LAND_AGB_DEBRIS_TCO2_HA'] * (100 - fire_risk) / 100),  # everyting minus the fire DAMAGE
-        ) / settings.CARBON_EFFECTS_WINDOW
+        )
+        # Annualised over the regrowth window (t CO2e/ha/yr): HIR and Destocked regrowth only, not clearing
+        self.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR = self.CO2E_STOCK_UNALL_NATURAL_TCO2_HA / settings.CARBON_EFFECTS_WINDOW
         
         
         ###############################################################

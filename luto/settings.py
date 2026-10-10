@@ -77,6 +77,8 @@ with rapid accumulation in the first few decades, then slowing down as it approa
 
 For example, by setting the CARBON_EFFECTS_WINDOW to 50 years, LUTO will take the total co2 sequestration
 for the first 50 years after planting and then use the average as the annual sequestration rate in the model.
+
+It annualises regrowth (plantings, soil carbon, HIR, Destocked) and is not applied to clearing.
 '''
 
 
@@ -238,6 +240,40 @@ What a year does when some row is IMPOSSIBLE over the column box (bound_report_<
  - 'solve' : report it and solve anyway
 '''
 
+ELASTIC_FAMILIES = []
+'''
+Row families solved elastic: each row gets a shortfall variable at ELASTIC_PENALTY instead of making the year
+infeasible; the rows that fall short are listed in out_<year>/shortfall_<year>.csv. Empty = every row hard.
+Available: 'GBF2', 'GBF3_NVIS', 'GBF4_SNES', 'GBF4_ECNES', 'GBF8', 'ghg', 'water', 'demand', 'renewable',
+           'ag_mgt_adoption', 'regional_adoption_ag', 'regional_adoption_nonag', 'regional_adoption_nonag_sum',
+           'renewable_ceiling', 'source_cap_ag', 'source_cap_nonag'
+'''
+
+ELASTIC_DROP_SHORT = False
+'''
+True: the elastic solve is PASS 1 of two (the two-pass step). The rows it leaves short are removed (their targets
+cannot be met together with the rest of the year — still scored by the writers), every other elastic row is made hard
+(its shortfall column fixed at 0), and the year is solved again; that solution is the one stored. Never infeasible:
+pass 1's solution meets every row kept. out_<year>/shortfall_<year>.csv keeps pass 1's shortfall, with `dropped`.
+False: the elastic solve is stored as it is (the rows short at the penalty's price). GBF8 under GBF8_ROW_GENERATION
+runs its own two passes and is not touched by this.
+'''
+
+ELASTIC_PASS1_COST_SCALE = 1.0
+'''
+The economic part of the objective in PASS 1 of the two-pass step (ELASTIC_DROP_SHORT, and GBF8 row generation's own
+pass 1), as a factor on it; the shortfall penalty (ELASTIC_PENALTY) is untouched. 1.0: pass 1 trades cost against
+shortfall, so a row left short is one whose target costs more than the penalty to meet — an ECONOMIC verdict, not a
+proof of infeasibility. A small factor (e.g. 1e-4): FEASIBILITY-FIRST — the penalty outweighs the cost by ~1/factor,
+so pass 1 minimises the shortfall with the cost only breaking ties, and the rows it leaves short are the ones that
+cannot be met together with the rest of the year. Pass 2 then restores the full cost (and runs even when nothing is
+short, so the stored solution and objective are the full-cost ones): every row kept is met at least cost.
+'''
+
+ELASTIC_PENALTY = 1e10
+'''AUD per unit of shortfall (1e10 = 10 bn AUD for a target missed in full): large enough that a target is missed only
+where it cannot be met, not merely where meeting it is expensive; larger widens the objective's range (conditioning).'''
+
 
 
 
@@ -312,7 +348,7 @@ that 1 tripled solve time, 3 led to numerical problems.
 
 RETRY_PARAMS = [
     (0, 2, -1, -1, -1),   # NF, Method, Crossover, Presolve, BarHomogeneous
-    (0, 1,  0, -1, 0 ),
+    # (0, 1,  0, -1, 0 ), # Fallback to dual simplex, which is VERY SLOW !!
 ]
 '''
 List of solve attempts to try in order, per year. Each entry MUST be a
@@ -1218,6 +1254,21 @@ GBF8_TARGETS_DICT = {
     'medium': {2030: 30, 2050: 30, 2100: 30},
     'high':   {2030: 30, 2050: 50, 2100: 50},
 }
+
+GBF8_ROW_GENERATION = False
+'''
+True: the GBF8 rows are not built up front (all ~10.6 k species are ~5 × 10⁹ entries at RES5) but generated per step
+(luto/solvers/gbf8_rowgen.py): a screen proves most species safe or unattainable before the solve; pass 1 adds, round
+by round, the open species short at the current solution, each with a shortfall variable at ELASTIC_PENALTY, until no
+species without a row is short; pass 2 drops the rows of the species pass 1 left short (they cannot be met together
+with the step; still scored) and re-solves with every other GBF8 row hard. Every species' target is then met, proven
+unattainable, or dropped. Per year: out_<year>/GBF8_rowgen_<year>.csv and GBF8_rowgen_rounds_<year>.csv.
+Only with GBF8_TARGET on; 'GBF8' in ELASTIC_FAMILIES has no effect then (the generated rows carry their own shortfall).
+'''
+GBF8_ROWGEN_BATCH_MIN = 20          # rows added per round: GBF8_ROWGEN_BATCH_SHARE of the species short,
+GBF8_ROWGEN_BATCH_SHARE = 0.05      # at least GBF8_ROWGEN_BATCH_MIN and at most GBF8_ROWGEN_BATCH_MAX (the hardest first);
+GBF8_ROWGEN_BATCH_MAX = 100         # a round costs one full solve, and the hardest few lift most of the rest
+GBF8_ROWGEN_MAX_ROUNDS = 30         # per pass: a pass that reaches it stops NOT converged (said in the log)
 
 
 

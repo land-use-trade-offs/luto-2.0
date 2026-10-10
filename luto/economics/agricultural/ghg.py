@@ -265,6 +265,10 @@ def get_ghg_transition_emissions(data: Data, from_m: int, from_j: int, cells=Non
     priced+amortised $ version is the GHG component of the transition cost (base multiplies it); the
     raw dict is also trans_ghg_ag2ag.
 
+    Each component is the full stock loss of the move, t CO2e per cell (stock × (1 - h_to) × area,
+    one-off); the GHG row spreads it over the step (`row_inputs.get_row_inputs`), the transition cost
+    prices it once.
+
     This is the source-keyed per-cell emissions used by the delta GHG term (Σ flow_ghg·D).
     """
     if cells is None:
@@ -272,7 +276,7 @@ def get_ghg_transition_emissions(data: Data, from_m: int, from_j: int, cells=Non
     n = len(cells)
     N_AG = data.N_AG_LUS
     area  = data.REAL_AREA[cells]
-    stock = data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR[cells]
+    stock = data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA[cells]
     bio   = data.BIO_HABITAT_CONTRIBUTION_LOOK_UP
     unalloc_j     = data.DESC2AGLU["Unallocated - natural land"]
     lvstk_natural = set(int(x) for x in data.LU_LVSTK_NATURAL)
@@ -554,7 +558,7 @@ def get_agtech_ei_effect_g_mrj(data:Data, yr_idx):
 
                 if reduction_perc != 0:
                     reduction_amnt = (
-                        np.nan_to_num(data.AGGHG_CROPS['CO2E_KG_HA_IRRIG', lm, lu].copy().to_numpy(), 0) 
+                        np.nan_to_num(data.AGGHG_CROPS['CO2E_KG_HA_IRRIG', lm, lu].to_numpy().copy(), 0) 
                         * reduction_perc
                         / 1000            # convert to tonnes
                         * data.REAL_AREA  # adjust for resfactor

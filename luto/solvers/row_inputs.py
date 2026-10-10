@@ -203,8 +203,12 @@ def get_row_inputs(data: Data, base_year: int, target_year: int) -> RowInputs:
     # ── 1. transition GHG emissions, SOURCE-KEYED over each source's base-year cells: the physical
     #       parallel of the per-arc transition cost, so the emissions of a move are charged against
     #       its own source. The GHG row sums Σ flow_ghg·D; an arc's ``local_r`` indexes this cell axis.
+    #       The leaves are the full stock loss of each move; the row takes the step's clearing spread
+    #       over the step's years (R-198), so each solve year carries one year of it. step_years equals
+    #       tools.write.get_year_gap(data, target_year) once the year is stored.
+    step_years = target_year - base_year
     trans_ghg_ag2ag = {
-        src: arr.astype(np.float32)
+        src: (arr / step_years).astype(np.float32)
         for src, arr in ag_ghg.get_ghg_transition_emissions_from_base_year(data, base_year).items()
     }
 
