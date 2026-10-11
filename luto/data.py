@@ -3431,7 +3431,9 @@ class Data:
             project's Carbon Estimation Area. Overlapping projects are clipped at the whole cell.
           - hir_scaling.csv: the scale factor for the unmapped projects (all / mapped issuance to the baseline FY).
         Full-resolution cells are summed into the RESFACTOR block of the cell that represents them; a block with no
-        cell in the model drops its area (reported in 'dropped_ha')."""
+        cell in the model drops its area (reported in 'dropped_ha'). 'ha_mj' holds, for each HIR option's land use j
+        and each lm, the same hectares counted only on the full-resolution cells allocated to (lm, j) in the base year,
+        so a block's baseline is the project area on the option's own cells at every RESFACTOR."""
         cells = pd.read_csv(os.path.join(hir_dir, 'hir_project_cells.csv'))
         scaling = pd.read_csv(os.path.join(hir_dir, 'hir_scaling.csv')).iloc[0]
         rf = settings.RESFACTOR
@@ -3440,7 +3442,8 @@ class Data:
         block[rows[self.MASK] // rf, cols[self.MASK] // rf] = np.arange(self.NCELLS)
 
         baseline_fy = int(scaling['baseline_fy'])
-        ha, dropped = {}, {}
+        hir_js = sorted({self.DESC2AGLU[settings.AG_MANAGEMENTS_TO_LAND_USES[am][0]] for am in ('HIR - Beef', 'HIR - Sheep')})
+        ha, ha_mj, dropped = {}, {}, {}
         for fy in range(int(cells['fy_registered'].min()), baseline_fy + 1):
             sel = cells['fy_registered'] <= fy
             frac = cells.loc[sel].groupby('cell')['fraction'].sum().clip(upper=1)
@@ -3448,8 +3451,13 @@ class Data:
             px_ha = frac.to_numpy() * self.REAL_AREA_NO_RESFACTOR[px] * float(scaling['scale_factor'])
             cell = block[rows[px] // rf, cols[px] // rf]
             ha[fy] = np.bincount(cell[cell >= 0], weights=px_ha[cell >= 0], minlength=self.NCELLS)
+            ha_mj[fy] = {}
+            for m in range(self.NLMS):
+                for j in hir_js:
+                    on = (cell >= 0) & (self.LUMAP_NO_RESFACTOR[px] == j) & (self.LMMAP_NO_RESFACTOR[px] == m)
+                    ha_mj[fy][m, j] = np.bincount(cell[on], weights=px_ha[on], minlength=self.NCELLS)
             dropped[fy] = float(px_ha[cell < 0].sum())
-        return {'ha': ha, 'dropped_ha': dropped, 'baseline_fy': baseline_fy, 'first_fy': min(ha),
+        return {'ha': ha, 'ha_mj': ha_mj, 'dropped_ha': dropped, 'baseline_fy': baseline_fy, 'first_fy': min(ha),
                 'scale_factor': float(scaling['scale_factor'])}
 
     def load_ghg_targets(self, target_dir: str) -> pd.DataFrame:

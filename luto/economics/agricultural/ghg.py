@@ -817,8 +817,10 @@ def get_sheep_hir_effect_g_mrj(data: Data, yr_idx, separate=False):
 def get_hir_baseline_t(data: Data, yr_idx) -> dict:
     """The existing-HIR-project baseline on each GHG row (t CO2e, negative = reduction), for settings.HIR_BASELINE:
     {'HIR_BASELINE_AG_t': destocking, 'HIR_BASELINE_LULUCF_t': regrowth}. LUTO's own HIR effect per cell (full
-    adoption) x the share of the cell under existing projects (held flat after the baseline FY) x the cell's base-year
-    share in the option's land use. LUTO's HIR counts on each row only above it, as its plantings do."""
+    adoption) x the share of the cell under existing projects on the option's own (lm, land use) cells (held flat
+    after the baseline FY). At RESFACTOR > 1 that is the project area on the block's allocated cells of the option's
+    land use, not the block's project share x its share in the land use, which assumed projects spread evenly over the
+    block's land uses. LUTO's HIR counts on each row only above it, as its plantings do."""
     out = {'HIR_BASELINE_AG_t': 0.0, 'HIR_BASELINE_LULUCF_t': 0.0}
     if getattr(data, "HIR_BASELINE_HA", None) is None:          # off, or a Data pickled before the setting existed
         return out
@@ -826,12 +828,11 @@ def get_hir_baseline_t(data: Data, yr_idx) -> dict:
     fy = min(data.YR_CAL_BASE + yr_idx, hb['baseline_fy'])
     if fy < hb['first_fy']:
         return out
-    frac = np.minimum(hb['ha'][fy] / data.REAL_AREA, 1.0)
-    base = data.ag_dvars[data.YR_CAL_BASE]
     for am, fn in (('HIR - Beef', get_beef_hir_effect_g_mrj), ('HIR - Sheep', get_sheep_hir_effect_g_mrj)):
         j = data.DESC2AGLU[settings.AG_MANAGEMENTS_TO_LAND_USES[am][0]]
+        share = np.stack([np.minimum(hb['ha_mj'][fy][m, j] / data.REAL_AREA, 1.0) for m in range(data.NLMS)])   # (lm, cell)
         for name, arr in fn(data, yr_idx, separate=True).items():
-            out[f'HIR_BASELINE_{AG_MAN_GHG_SUBTERMS[am][name]}_t'] += float((arr[:, :, 0] * base[:, :, j] * frac).sum())
+            out[f'HIR_BASELINE_{AG_MAN_GHG_SUBTERMS[am][name]}_t'] += float((arr[:, :, 0] * share).sum())
     return out
 
 
