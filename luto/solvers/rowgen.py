@@ -225,7 +225,7 @@ class RowGen:
 
 # ═══════════════════════════ the step: one pass, or pass 1 → the drop → pass 2 ═══════════════════════════
 
-def solve_step(A, rows, cols, obj, inputs: RowInputs, rowgen: "RowGen | None", target_year: int, out_dir: str, on_first_model=None):
+def solve_step(row_matrix, rows, cols, obj, inputs: RowInputs, rowgen: "RowGen | None", target_year: int, out_dir: str, on_first_model=None):
     """The solve of one step over its tables — ONE policy for every row that may fall short, whether built up front
     (settings.ELASTIC_FAMILIES: relaxed here, first) or generated during the step (``rowgen``, relaxed as it is added):
 
@@ -240,19 +240,19 @@ def solve_step(A, rows, cols, obj, inputs: RowInputs, rowgen: "RowGen | None", t
 
     The tables are the only state: every operation returns new ones and every solve builds a fresh ``LutoSolver`` from
     them. ``on_first_model`` is called with the first Gurobi model built (the debug MPS). Returns (accepted, x, status,
-    solver) — the last solver, built from the final tables (``solver.cols`` / ``rows`` / ``A`` / ``obj``), x over its columns."""
-    A, rows, cols, obj = relax(A, rows, cols, obj, np.flatnonzero(np.isin(rows['family'].values, settings.ELASTIC_FAMILIES) & rows['active'].values))
+    solver) — the last solver, built from the final tables (``solver.cols`` / ``rows`` / ``row_matrix`` / ``obj``), x over its columns."""
+    row_matrix, rows, cols, obj = relax(row_matrix, rows, cols, obj, np.flatnonzero(np.isin(rows['family'].values, settings.ELASTIC_FAMILIES) & rows['active'].values))
     relaxable = (rows['slack_col'].values >= 0).any() or (rowgen is not None and (rowgen.open & (rowgen.mode == 'may_drop')).any())
     two_pass = settings.ELASTIC_DROP_SHORT and relaxable
     if not two_pass:
-        accepted, x, status, solver, *_ = solve_rounds(A, rows, cols, obj, inputs, rowgen, target_year, 1, settings.RETRY_PARAMS, 1.0, on_first_model)
+        accepted, x, status, solver, *_ = solve_rounds(row_matrix, rows, cols, obj, inputs, rowgen, target_year, 1, settings.RETRY_PARAMS, 1.0, on_first_model)
         return accepted, x, status, solver
 
     # ── pass 1 ──
     scale = settings.ELASTIC_PASS1_COST_SCALE
     if scale != 1:
         print(f"Year {target_year}: pass 1 feasibility-first — the cost × {scale:g}", flush=True)
-    accepted, x, status, solver, A, rows, cols, obj = solve_rounds(A, rows, cols, obj, inputs, rowgen, target_year, 1, settings.ELASTIC_PASS1_PARAMS, scale, on_first_model)
+    accepted, x, status, solver, row_matrix, rows, cols, obj = solve_rounds(row_matrix, rows, cols, obj, inputs, rowgen, target_year, 1, settings.ELASTIC_PASS1_PARAMS, scale, on_first_model)
     if not accepted:
         return accepted, x, status, solver
 
@@ -276,15 +276,15 @@ def solve_step(A, rows, cols, obj, inputs: RowInputs, rowgen: "RowGen | None", t
           + f"; the other {on.size - short.size:,} made hard, the full cost restored — pass 2", flush=True)
 
     # ── pass 2 ──
-    accepted, x, status, solver, *_ = solve_rounds(A, rows, cols, obj, inputs, rowgen, target_year, 2, settings.RETRY_PARAMS, 1.0, None)
+    accepted, x, status, solver, *_ = solve_rounds(row_matrix, rows, cols, obj, inputs, rowgen, target_year, 2, settings.RETRY_PARAMS, 1.0, None)
     return accepted, x, status, solver
 
 
-def solve_rounds(A, rows, cols, obj, inputs: RowInputs, rowgen: "RowGen | None", target_year: int, npass: int, params, cost_scale: float, on_first_model=None):
+def solve_rounds(row_matrix, rows, cols, obj, inputs: RowInputs, rowgen: "RowGen | None", target_year: int, npass: int, params, cost_scale: float, on_first_model=None):
     """One pass over the tables: without row generation one solve; with it, round by round — the rows of the targets due
     appended (``append_rows``; in pass 1 a may-drop target's row relaxed), a fresh solver built and solved, every target
     scored, the open ones short and without a row joining the next round — until none is short.
-    Returns (accepted, x, status, solver, A, rows, cols, obj): the last solver and the tables it was built from."""
+    Returns (accepted, x, status, solver, row_matrix, rows, cols, obj): the last solver and the tables it was built from."""
     idx = rowgen.round0() if (rowgen is not None and npass == 1) else np.zeros(0, dtype=np.int64)
     score, solver = None, None
     for rnd in range(settings.ROWGEN_MAX_ROUNDS if rowgen is not None else 1):
@@ -293,15 +293,15 @@ def solve_rounds(A, rows, cols, obj, inputs: RowInputs, rowgen: "RowGen | None",
         if rowgen is not None and idx.size:
             block, table, idx = rowgen.rows_for(idx)
             first = rows.sizes['row']
-            A, rows = append_rows(A, rows, block, table)
+            row_matrix, rows = append_rows(row_matrix, rows, block, table)
             rowgen.placed(idx, first, rnd, npass)
             if npass == 1:
-                A, rows, cols, obj = relax(A, rows, cols, obj, first + np.flatnonzero(rowgen.mode[idx] == 'may_drop'))
+                row_matrix, rows, cols, obj = relax(row_matrix, rows, cols, obj, first + np.flatnonzero(rowgen.mode[idx] == 'may_drop'))
             nnz = int(block.nnz)
         t_add = time.time() - t
         if solver is not None:
             solver.gurobi_model.dispose()                                                    # the previous round's model: freed before the next is built
-        solver = LutoSolver(cols, rows, A, scale_cost(obj, cols, cost_scale), inputs)
+        solver = LutoSolver(cols, rows, row_matrix, scale_cost(obj, cols, cost_scale), inputs)
         solver.formulate()
         if on_first_model is not None:
             on_first_model(solver.gurobi_model)
@@ -310,12 +310,12 @@ def solve_rounds(A, rows, cols, obj, inputs: RowInputs, rowgen: "RowGen | None",
         accepted, x, status = solver.solve_with_retries(target_year, params)
         t_solve = time.time() - t
         if rowgen is None:
-            return accepted, x, status, solver, A, rows, cols, obj
+            return accepted, x, status, solver, row_matrix, rows, cols, obj
         rec = dict(pass_=npass, round=rnd, added=int(idx.size), added_entries=nnz, rows=int(((rowgen.row_of >= 0) & ~rowgen.dropped).sum()),
                    status=int(status) if status is not None else None, add_s=round(t_add, 1), solve_s=round(t_solve))
         if not accepted:
             rowgen.rounds.append(rec)
-            return accepted, x, status, solver, A, rows, cols, obj
+            return accepted, x, status, solver, row_matrix, rows, cols, obj
         score = rowgen.score(x)
         short_out = rowgen.short_without_row(score)
         s = rowgen.shortfall(rows, x) if npass == 1 else np.zeros(0)
@@ -332,7 +332,7 @@ def solve_rounds(A, rows, cols, obj, inputs: RowInputs, rowgen: "RowGen | None",
         print(f"│   row generation, {target_year}: pass {npass} stopped at the round cap ({settings.ROWGEN_MAX_ROUNDS}) with "
               f"{short_out.size:,} open targets short and without a row — NOT converged", flush=True)
     rowgen.final = score
-    return accepted, x, status, solver, A, rows, cols, obj
+    return accepted, x, status, solver, row_matrix, rows, cols, obj
 
 
 # ═══════════════════════════ the screen and the starting point ═══════════════════════════

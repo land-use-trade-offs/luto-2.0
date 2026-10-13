@@ -46,15 +46,15 @@ gurenv.start()
 
 
 class LutoSolver:
-    """The Gurobi model of one step — the column table, the row table, A and obj, as given — returns the raw x.
+    """The Gurobi model of one step — the column table, the row table, row_matrix and obj, as given — returns the raw x.
     Stateless with respect to the tables: it is built from them and never changes them (the rows' Gurobi handles and
     the duals go onto its own shallow copy of the row table, ``self.rows``); a step that changes its tables — a row
     added, relaxed or dropped — builds a new one (``rowgen.solve_rounds``)."""
 
-    def __init__(self, cols: xr.Dataset, rows: xr.Dataset, A, obj: np.ndarray, inputs: RowInputs):
+    def __init__(self, cols: xr.Dataset, rows: xr.Dataset, row_matrix, obj: np.ndarray, inputs: RowInputs):
         self.cols = cols
         self.rows = rows.copy()         # shallow: the solve's outputs (``constr``, ``pi``) land here, not on the step's table
-        self.A = A                      # (row x col) scipy CSR: row i of A is row i of the row table
+        self.row_matrix = row_matrix    # (row x col) scipy CSR: row i of row_matrix is row i of the row table
         self.obj = obj                  # (col,) the objective coefficient of every column (million AUD, row_builder.get_obj)
         self.landmans = inputs.landmans         # the land-management names in m order: how a variable's name spells m
         self.options = list(inputs.agman2lu)    # the ag-management options in am_idx order: how a variable's name spells am_idx
@@ -120,8 +120,8 @@ class LutoSolver:
         T = self.rows
         active = T['active'].values
         built = np.flatnonzero(active)
-        A = self.A if active.all() else self.A[built]
-        constrs = model.addMConstr(A, self._vars, np.asarray(T['sense'].values[built], dtype='<U1'), T['rhs'].values[built]).tolist()
+        row_matrix = self.row_matrix if active.all() else self.row_matrix[built]
+        constrs = model.addMConstr(row_matrix, self._vars, np.asarray(T['sense'].values[built], dtype='<U1'), T['rhs'].values[built]).tolist()
         model.setAttr('ConstrName', constrs, T['name'].values[built].tolist())
         handles = np.full(T.sizes['row'], None, dtype=object)
         handles[built] = constrs

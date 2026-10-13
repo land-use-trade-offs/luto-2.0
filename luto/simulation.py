@@ -249,7 +249,7 @@ def solve_timeseries(
 
         # ─────────────── 2. the rows: the constraints ───────────────
         inputs = get_row_inputs(data, base_year, target_year)                               # the coefficient streams and targets
-        A, rows = get_rows(inputs, cols, col_support)                                       # the matrix, and the row table on the same rows
+        row_matrix, rows = get_rows(inputs, cols, col_support)                              # the matrix, and the row table on the same rows
 
         # ─────────────── 3. row generation: the biodiversity targets and their screen (settings.BIO_ROW_GENERATION) ───────────────
         #     built here, while the column support still holds cell2col / ag_mrj2col
@@ -267,7 +267,7 @@ def solve_timeseries(
             break
 
         # ─────────────── 4. the pre-solve diagnosis: bound propagation over the rows ───────────────
-        bounds = get_row_bounds(A, rows, cols)                                              # every row's interval over the column box, and its verdict
+        bounds = get_row_bounds(row_matrix, rows, cols)                                     # every row's interval over the column box, and its verdict
         drop_redundant_rows(rows, bounds, settings.BOUND_PROP_DROP_FAMILIES)                # opt-in per family: rows every point of the box satisfies never reach the solver
         report_row_bounds(rows, bounds, target_year, out_dir)                               # the log table, bound_report_<year>.csv, bound_preflight_<year>.csv
         impossible = (bounds['status'].values == STATUS.index('impossible')) | (bounds['status_implied'].values == STATUS.index('impossible'))
@@ -283,7 +283,7 @@ def solve_timeseries(
         obj = get_obj(get_economics(data, base_year, target_year), cols, inputs)            # million AUD; the economy streams (~300 MB at RES5, ~7 GB at RES1) die with the call
 
         # ─────────────── 6. the solve: the tables are the state, a solver is built from them for every solve ───────────────
-        accepted, x, status, luto_solver = solve_step(A, rows, cols, obj, inputs, rowgen, target_year, out_dir,
+        accepted, x, status, luto_solver = solve_step(row_matrix, rows, cols, obj, inputs, rowgen, target_year, out_dir,
                                                       on_first_model=lambda model: save_model_to_disk(model, data.path, base_year, target_year))   # the debug MPS, BEFORE the first solve
         cols, obj = luto_solver.cols, luto_solver.obj                                        # the final tables: with the shortfall columns, the dropped rows off
 

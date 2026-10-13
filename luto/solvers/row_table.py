@@ -50,10 +50,10 @@ ROW_SCHEMA = xr.Dataset(dict(
 ROW_FILL = {field: None if var.dtype == object else -1 for field, var in ROW_SCHEMA.data_vars.items()}   # what a family does not carry (only the labels and ints are ever missing)
 
 
-def make_part(family: str, A: sparse.csr_matrix, rhs, sense, names, scale=None, **labels) -> tuple[sparse.csr_matrix, xr.Dataset]:
-    """One family's rows, as the pair (A, table)"""
+def make_part(family: str, row_matrix: sparse.csr_matrix, rhs, sense, names, scale=None, **labels) -> tuple[sparse.csr_matrix, xr.Dataset]:
+    """One family's rows, as the pair (row_matrix, table)"""
 
-    n_rows = A.shape[0]
+    n_rows = row_matrix.shape[0]
     unknown = set(labels) - set(ROW_SCHEMA.data_vars)
     assert not unknown, f'{family}: label field(s) {unknown} are not in the row schema'
 
@@ -71,7 +71,7 @@ def make_part(family: str, A: sparse.csr_matrix, rhs, sense, names, scale=None, 
              active=(('row',), np.ones(n_rows, dtype=bool)),
              redundant=(('row',), np.zeros(n_rows, dtype=bool))))
 
-    return A, table
+    return row_matrix, table
 
 
 # ── the queries: how the rest of the model asks the table what it holds ──────────────────────────

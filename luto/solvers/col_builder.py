@@ -52,19 +52,19 @@ def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSupport]:
 
     # ── 1. the cell index for each (from_m, from_j) for ag, or (from_k) for non-ag ──
     """
-    The (from_m, from_j), or (from_k), divides the base-year dvars into global indexed cells.
-    These indexes are used to scatter the transition variables.
-    E.g., Dry-Apples exist in [1000, 11001, 25302] position, so its ag2ag arc only needs to be created for these three cells.
-    So we do not need to create a full-size (water x NCELLS x LUs) to represent its arc.
+    Each source, (from_m, from_j) for ag or (from_k) for non-ag, maps to the global indices of the cells that hold it in the base year.
+    These indices are used to scatter the transition variables back onto the cells.
+    E.g., if Dry-Apples exists only in cells [1000, 11001, 25302], its ag2ag arcs need to be created for these three cells only,
+    so no full-size (water x NCELLS x LUs) array is needed to represent the arcs of a source.
     """
     trans_source_ag         = ag_transition.get_base_dvar_mj_cell_map(data, base_year)          # (from_m, from_j): global cell indices
     trans_source_nonag      = non_ag_transition.get_base_nonag_dvar_k_cell_map(data, base_year) # from_k: global cell indices
 
     # ── 2. the upper and lower bounds of each target: (to_m, to_j) for ag, or (to_k) for non-ag ──
     """
-    These mrj/rk matrices are full-size (water x NCELLS x LUs for ag and ag-mgt, NCELLS x LUs for non-ag).
-    They say how much of a cell each target may hold, summed over every source that can reach it.
-    E.g., if a cell holds 0.6 Dry-Beef and 0.4 Dry-Sheep and both can move to Dry-Apples, the ub of Dry-Apples in this cell is 1.0.
+    These mrj/rk arrays are full-size (water x NCELLS x LUs for ag and ag-mgt, NCELLS x LUs for non-ag).
+    They give how much of a cell each target may hold, summed over every source that can reach it.
+    E.g., if a cell holds 0.6 Dry-Beef and 0.4 Dry-Sheep, and both can move to Dry-Apples, the ub of Dry-Apples in that cell is 1.0.
     """
     trans_ub_ag_mrj         = get_trans_ub_ag_mrj(data, base_year)                              # upper bound of every ag target (ag2ag + nonag2ag), raised to the base; ag has no lower bound
     trans_ub_nonag_rk       = get_trans_ub_nonag_rk(data, base_year)                            # upper bound of every non-ag target, raised to the base
@@ -73,24 +73,24 @@ def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSupport]:
 
     # ── 3. clamp base dvars to avoid errors during presolve ──
     """
-    The base-year dvar can exceed lb/ub by tolerance, but presolve does not.
-    So, comparing base dvars to their lb/ub, clamp them to [lb, ub] and log the clipping.
+    A base-year dvar can fall outside [lb, ub] by a solver tolerance, which presolve does not accept.
+    So the base dvars are compared with their bounds, clamped to [lb, ub], and the clipping is logged.
     """
     dvar_base_ag_mrj        = tools.clamp_dvar_bound(data.ag_dvars[base_year], 0.0, trans_ub_ag_mrj, 'Ag base clipped to [0,ub]')
     dvar_base_nonag_rk      = tools.clamp_dvar_bound(data.non_ag_dvars[base_year], trans_lb_nonag_rk, trans_ub_nonag_rk, 'NonAg base clipped to [lb,ub]')
 
     # ── 4. feasibility: an entry gets a column exactly where its upper bound is above zero ──
     """
-    As long as the ub is larger than zero, the column is feasible.
-    The masks are full-size like the bounds (water x NCELLS x LUs for ag, NCELLS x LUs for non-ag), False where there is no column.
+    An entry is feasible, and gets a column, wherever its ub is greater than zero.
+    The masks are full-size, like the bounds (water x NCELLS x LUs for ag, NCELLS x LUs for non-ag), and are False where there is no column.
     """
     feasible_ag_mrj         = trans_ub_ag_mrj > 0                                               # which ag (m, j) a cell may hold: reachable from a source here, or already held (the ub is raised to the base)
     feasible_nonag_rk       = trans_ub_nonag_rk > 0                                             # which non-ag k a cell may hold: every feasible entry, enabled land use or not
 
     # ── 5. the arcs: each source's own upper bound, above zero, on its own cells ──
     """
-    Staying in the same (m, j) is not a transition, so the ag2ag arc's own entry is dropped.
-    The mrj/rk is not full-size (water x NCELLS x LUs) but only the cells that have a base-year dvar.
+    Staying in the same (m, j) is not a transition, so a source's ag2ag arc onto itself is dropped.
+    These masks are not full-size (water x NCELLS x LUs): each covers only the cells that hold its source in the base year (local_r).
     """
     valid_ag2ag             = get_arc_ag2ag_src(data, base_year, trans_source_ag)               # {source: bool (to_m, local_r, to_j)}
     valid_nonag2ag          = get_arc_nonag2ag_src(data, base_year, trans_source_nonag)         # {source: bool (to_m, local_r, to_j)}
@@ -102,11 +102,11 @@ def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSupport]:
 
     # ── 7. the blocks and the column space: every block's columns laid back to back in Var.index order, each block enumerated from its mask ──
     """
-    The mrj/rk are full-size (water x NCELLS x LUs) masks filled with False where the block has no column.
-    Why full-size? Because all data comes in full-size, these full-size masks make it a simple extraction to get the inputs for each block.
-    Otherwise, complex index references would be needed to map the input to the column space.
+    The mrj/rk masks are full-size (water x NCELLS x LUs for ag, NCELLS x LUs for non-ag), False where the block has no column.
+    Why full-size? All input data comes full-size, so with full-size masks the inputs of each block are a simple extraction.
+    Otherwise, complex index references would be needed to map the inputs onto the column space.
 
-    The "_cols" are the attributes array of each column: from_m, from_j, lb, ub, ..., which will be used to create the gp.Variable vector.
+    Each "_cols" holds the attribute arrays of its block's columns (from_m, from_j, lb, ub, ...), which are used to create the Gurobi variable vector.
     """
     valid_ag_mrj,   ag_cols      = ag_space(feasible_ag_mrj, trans_ub_ag_mrj, dvar_base_ag_mrj)
     valid_nonag_rk, nonag_cols   = nonag_space(data, feasible_nonag_rk, trans_lb_nonag_rk, trans_ub_nonag_rk, dvar_base_nonag_rk)

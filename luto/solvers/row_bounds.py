@@ -39,7 +39,7 @@ UNIT = {                                                                        
 
 # ═══════════════════════════ get_row_bounds: the verdict of every row ═══════════════════════════
 
-def get_row_bounds(A: sparse.csr_matrix, rows: xr.Dataset, cols: xr.Dataset) -> xr.Dataset:
+def get_row_bounds(row_matrix: sparse.csr_matrix, rows: xr.Dataset, cols: xr.Dataset) -> xr.Dataset:
     """Every row's interval and verdict, as a table on the row table's own ``row`` dim: over the column box (``lo`` /
     ``hi`` / ``status``) and under the bounds the rows imply (``lo_implied`` / ``hi_implied`` / ``status_implied``),
     with the ``margin`` both are judged within (all in the table's scaled row space) and ``empty``; attrs
@@ -51,7 +51,7 @@ def get_row_bounds(A: sparse.csr_matrix, rows: xr.Dataset, cols: xr.Dataset) -> 
     sense = rows['sense'].values
 
     # ── 1. the interval over the box: lo = A⁺·lb + A⁻·ub, hi = A⁺·ub + A⁻·lb, and the magnitude of the terms S = Σ|a|·|bound| ──
-    lo, hi, S = row_intervals(A, lb, ub)
+    lo, hi, S = row_intervals(row_matrix, lb, ub)
 
     # ── 2. the margin: relative to S, because the rounding of a sum grows with its terms (a water row nets yields
     #       against uses), and never under the solver's own tolerance — so IMPOSSIBLE is beyond anything the engine accepts ──
@@ -63,20 +63,20 @@ def get_row_bounds(A: sparse.csr_matrix, rows: xr.Dataset, cols: xr.Dataset) -> 
     # ── 4. the bounds the rows imply: all-positive < / = rows bound each of their columns (2a), all-ones rows bound
     #       their columns together (2b), and with them the sum of every cell's node-balance rows, Σ X = Σ base (2c: an
     #       all-ones row too, so it joins both); the margin rides on every implying rhs, so the bounds hold at anything the solver accepts ──
-    source, unit = implying_rows(A, sense)
-    C, rhs_C, margin_C, conservation = conservation_rows(A, rows, margin)
+    source, unit = implying_rows(row_matrix, sense)
+    C, rhs_C, margin_C, conservation = conservation_rows(row_matrix, rows, margin)
     source_rows, unit_rows = np.flatnonzero(source), np.flatnonzero(unit)
-    ub_implied = implied_ub(sparse.vstack([A[source_rows], C], format='csr'), np.concatenate([rhs[source_rows], rhs_C]),
+    ub_implied = implied_ub(sparse.vstack([row_matrix[source_rows], C], format='csr'), np.concatenate([rhs[source_rows], rhs_C]),
                             np.concatenate([margin[source_rows], margin_C]), lb, ub)
-    group_of_col, room_of_group = unit_groups(sparse.vstack([A[unit_rows], C], format='csr'), np.concatenate([rhs[unit_rows], rhs_C]),
+    group_of_col, room_of_group = unit_groups(sparse.vstack([row_matrix[unit_rows], C], format='csr'), np.concatenate([rhs[unit_rows], rhs_C]),
                                               np.concatenate([margin[unit_rows], margin_C]), lb)
-    lo_implied, hi_implied = grouped_intervals(A, lb, ub_implied, group_of_col, room_of_group)
+    lo_implied, hi_implied = grouped_intervals(row_matrix, lb, ub_implied, group_of_col, room_of_group)
 
     # ── 5. the verdict under them: a row that implied a bound keeps its box verdict — no row is judged by what it implied ──
     status_implied = np.where(source | unit, status, row_verdict(sense, rhs, lo_implied, hi_implied, margin)).astype(np.int8)
 
     # ── 6. the column preflight: columns no row touches, bounds no point can satisfy ──
-    in_rows = np.bincount(A.indices, minlength=A.shape[1])
+    in_rows = np.bincount(row_matrix.indices, minlength=row_matrix.shape[1])
     preflight = {}
     block_of_col = cols['block'].values
     for block in pd.unique(block_of_col):                               # the blocks, in table order
@@ -95,17 +95,17 @@ def get_row_bounds(A: sparse.csr_matrix, rows: xr.Dataset, cols: xr.Dataset) -> 
              hi_implied=(('row',), hi_implied),
              status_implied=(('row',), status_implied),
              margin=(('row',), margin),
-             empty=(('row',), np.diff(A.indptr) == 0)),
+             empty=(('row',), np.diff(row_matrix.indptr) == 0)),
         attrs=dict(preflight=preflight, conservation=conservation))
 
 
-def row_intervals(A, lb: np.ndarray, ub: np.ndarray, chunk_nnz: int = 50_000_000) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def row_intervals(row_matrix, lb: np.ndarray, ub: np.ndarray, chunk_nnz: int = 50_000_000) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """lo, hi and S of every row over the box, float64 — Gurobi reads the float32 coefficients as doubles, so this is
     the model the engine sees — and 0 on an empty row. Every lb is finite, so lo meets −inf only through a negative
-    entry on an infinite ub and hi +inf only through a positive one: the two never meet in one sum. A is walked in slabs
+    entry on an infinite ub and hi +inf only through a positive one: the two never meet in one sum. row_matrix is walked in slabs
     of whole rows of about ``chunk_nnz`` entries, so the per-entry arrays stay bounded."""
-    n_rows = A.shape[0]
-    indptr = A.indptr.astype(np.int64)
+    n_rows = row_matrix.shape[0]
+    indptr = row_matrix.indptr.astype(np.int64)
     lo = np.zeros(n_rows)
     hi = np.zeros(n_rows)
     S = np.zeros(n_rows)
@@ -115,8 +115,8 @@ def row_intervals(A, lb: np.ndarray, ub: np.ndarray, chunk_nnz: int = 50_000_000
         r1 = int(np.searchsorted(indptr, indptr[r0] + chunk_nnz, side='right')) - 1
         r1 = min(max(r1, r0 + 1), n_rows)                                  # a row wider than a slab still advances, alone
         e0, e1 = indptr[r0], indptr[r1]
-        a = A.data[e0:e1].astype(np.float64)
-        col = A.indices[e0:e1]
+        a = row_matrix.data[e0:e1].astype(np.float64)
+        col = row_matrix.indices[e0:e1]
         lb_e, ub_e = lb[col], ub[col]
         with np.errstate(invalid='ignore'):
             lo_e = np.where(a > 0, a * lb_e, a * ub_e)
@@ -156,24 +156,24 @@ def row_verdict(sense: np.ndarray, rhs: np.ndarray, lo: np.ndarray, hi: np.ndarr
     return status
 
 
-def implying_rows(A, sense: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def implying_rows(row_matrix, sense: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """The rows bounds are read off: ``source`` — every entry > 0, sense < or = (a cap: source cap, a regional cap,
     a demand ceiling, a cell's conservation row) — and ``unit``, the source rows whose every entry is exactly 1."""
-    n_rows = A.shape[0]
+    n_rows = row_matrix.shape[0]
     min_a = np.full(n_rows, np.inf)
     max_a = np.full(n_rows, -np.inf)
-    nonempty = np.flatnonzero(np.diff(A.indptr) > 0)
+    nonempty = np.flatnonzero(np.diff(row_matrix.indptr) > 0)
     if nonempty.size:
-        starts = A.indptr[:-1][nonempty]
-        min_a[nonempty] = np.minimum.reduceat(A.data, starts)
-        max_a[nonempty] = np.maximum.reduceat(A.data, starts)
+        starts = row_matrix.indptr[:-1][nonempty]
+        min_a[nonempty] = np.minimum.reduceat(row_matrix.data, starts)
+        max_a[nonempty] = np.maximum.reduceat(row_matrix.data, starts)
     le_or_eq = (sense == '<') | (sense == '=')
     source = le_or_eq & np.isfinite(min_a) & (min_a > 0)
     unit = source & (min_a == 1.0) & (max_a == 1.0)
     return source, unit
 
 
-def conservation_rows(A: sparse.csr_matrix, rows: xr.Dataset, margin: np.ndarray) -> tuple[sparse.csr_matrix, np.ndarray, np.ndarray, dict]:
+def conservation_rows(row_matrix: sparse.csr_matrix, rows: xr.Dataset, margin: np.ndarray) -> tuple[sparse.csr_matrix, np.ndarray, np.ndarray, dict]:
     """(2c) What a cell's node-balance rows say TOGETHER, one row per cell: the sum of its restored rows (row × scale).
     Every arc leaves one node of the cell (+1 on that row) and lands on another (−1 on that one), so the arcs cancel
     and the sum is Σ X = Σ base over the cell's ag and non-ag columns — the cell's total is what it held, an all-ones
@@ -183,11 +183,11 @@ def conservation_rows(A: sparse.csr_matrix, rows: xr.Dataset, margin: np.ndarray
     margin), and the counts."""
     node_rows = np.flatnonzero(row_table.rows_where(rows, family='node_balance_ag') | row_table.rows_where(rows, family='node_balance_nonag'))   # the node-balance rows, ag and non-ag: each carries its cell
     if not node_rows.size:
-        return sparse.csr_matrix((0, A.shape[1])), np.empty(0), np.empty(0), dict(cells=0, unit=0)
+        return sparse.csr_matrix((0, row_matrix.shape[1])), np.empty(0), np.empty(0), dict(cells=0, unit=0)
     cell = rows['cell'].values[node_rows]
     G = sparse.csr_matrix((rows['scale'].values[node_rows], (cell, np.arange(node_rows.size))),
                           shape=(int(cell.max()) + 1, node_rows.size))                      # (cell x node row) the row's scale where the row sits in the cell: G @ · sums a cell's restored rows
-    C = (G @ A[node_rows].astype(np.float64)).tocsr()
+    C = (G @ row_matrix[node_rows].astype(np.float64)).tocsr()
     C.eliminate_zeros()                                                                     # the arcs: +1 and −1 on one column
     _, unit = implying_rows(C, np.full(C.shape[0], '=', dtype=object))
     whole = np.bincount(cell, weights=~rows['active'].values[node_rows], minlength=C.shape[0]) == 0   # no node row of the cell flagged off
@@ -226,7 +226,7 @@ def unit_groups(U, rhs: np.ndarray, margin: np.ndarray, lb: np.ndarray) -> tuple
     return group_of_col, room
 
 
-def grouped_intervals(A, lb: np.ndarray, ub: np.ndarray, group_of_col: np.ndarray, room_of_group: np.ndarray,
+def grouped_intervals(row_matrix, lb: np.ndarray, ub: np.ndarray, group_of_col: np.ndarray, room_of_group: np.ndarray,
                       chunk_nnz: int = 50_000_000) -> tuple[np.ndarray, np.ndarray]:
     """(2b) lo and hi of every row with each group's columns bounded together: over one group a row's entries reach at
     most Σ a·lb + min(Σ a⁺·(ub − lb), room · max a⁺) and at least Σ a·lb + max(Σ a⁻·(ub − lb), room · min a⁻) — a
@@ -235,7 +235,7 @@ def grouped_intervals(A, lb: np.ndarray, ub: np.ndarray, group_of_col: np.ndarra
     none = np.iinfo(np.int64).max
     order = np.argsort(np.where(group_of_col >= 0, group_of_col, none), kind='stable')
     group_sorted = group_of_col[order]
-    Ap = A[:, order].tocsr()
+    Ap = row_matrix[:, order].tocsr()
     Ap.sort_indices()
     lb_p, ub_p = lb[order], ub[order]
     n_rows = Ap.shape[0]

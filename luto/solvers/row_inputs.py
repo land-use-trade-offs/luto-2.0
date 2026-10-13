@@ -58,6 +58,7 @@ class RowInputs:
     ncells: int                                                         # ... and cells
     agman2lu: dict                                                      # {option: [land-use codes]} — the (option, lu) slots of the ag-mgt inputs, in slot order
     savanna_eligible_r: np.ndarray                                      # cells eligible for savanna burning: the read-back zeroes irr savanna columns outside them
+    
     mask_gbf2_solar: np.ndarray                                         # cells solar is kept out of by the GBF2 mask: no am column there, and the renewable row leaves them out
     mask_gbf2_wind: np.ndarray                                          # the same for wind
     mask_mnes_solar: np.ndarray                                         # cells solar is kept out of by the EPBC MNES mask: the column exists, the renewable row leaves them out
