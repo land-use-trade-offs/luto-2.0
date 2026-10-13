@@ -2448,7 +2448,7 @@ class Data:
         eligible fine cell in its block has data. `feed_req_raw` and `water_delivery_price_raw` are those two
         arrays before their `np.nan_to_num` (at RESFACTOR > 1 the per-(lm, lu) arrays keep the NaN); so are
         `lvstk_k_raw` (per type, with LVSTK_K_FILE) and `stubble_raw` (with STUBBLE_DSE_FILE). With a k file, LVSTK_K is
-        checked on each livestock (lm, lu); with a stubble file, STUBBLE_DSE_HA on the eligible entries of each stubble
+        checked on each livestock (lm, lu) in place of FEED_REQ, which no model quantity then reads; with a stubble file, STUBBLE_DSE_HA on the eligible entries of each stubble
         land use, per (lm, lu), and with both, k_sheep where the stubble rate is positive (where it is 0 there are no stubble sheep).
         The sheep per-head fields on stubble cells are not checked at RESFACTOR 1: a cell without sheep data carries no
         stubble sheep by design; at RESFACTOR > 1 they are checked wherever a coarse entry has stubble head above zero
@@ -2492,7 +2492,8 @@ class Data:
                     water_price = self.water_delivery_price(lu, lm)
                     if coarse is None:
                         feed_req, water_price = feed_req_raw, water_delivery_price_raw
-                    check('FEED_REQ', lm, lu, feed_req, eligible)
+                    if lvstk_k_raw is None:             # with a k file the stocking rate reads k, not FEED_REQ
+                        check('FEED_REQ', lm, lu, feed_req, eligible)
                     check('PASTURE_KG_DM_HA', lm, lu, pasture, eligible)
                     check('SAFE_PUR_NATL' if vegtype == 'natural land' else 'SAFE_PUR_MODL', lm, lu, safe_pur, eligible)
                     check('WATER_DELIVERY_PRICE', lm, lu, water_price, eligible)
