@@ -236,7 +236,7 @@ The transition system is **source-keyed**: costs and feasibility are sliced per 
 | `arc_*_src` (3 dicts) | `col_builder.get_arc_{ag2ag,nonag2ag,ag2nonag}_src` | `ag_transition.get_ag2ag_ub_src`, `non_ag_transition.get_nonag2ag_ub_src` | `T_MAT`, `EXCLUDE`, `NO_GO_*_AG`, base dvars | `ag_tmatrix.npy`, `x_mrj.npy`, `no_go_areas/` |
 | `ag_source_cells` / `nonag_source_cells` | 416 / 421 | `ag_transition.get_base_dvar_mj_cell_map`, `non_ag_transition.get_base_nonag_dvar_k_cell_map` | base-year dvars | — (runtime state) |
 | `ag_man_limits` | `get_ag_man_limits` 620 | `ag_transition.get_agricultural_management_adoption_limits` | AM bundles | AM bundle `.xlsx` |
-| `ag_man_lb_mrj` | `get_ag_man_lb_mrj` 533 | `ag_transition.get_lower_bound_agricultural_management_matrices` | base-year AM dvars | — (runtime state) |
+| `ag_man_lb_mrj` | `get_ag_man_lb_mrj` 533 | `ag_transition.get_trans_lb_ag_man` | base-year AM dvars | — (runtime state) |
 | `dvar_base_ag_mrj` / `dvar_base_non_ag_rk` | `get_cols` §2 | `data.ag_dvars`, `data.non_ag_dvars` | `lumaps`, `lmmaps` | `lumap.h5`, `lmmap.h5` (base year only; later years are runtime state) |
 
 ### 4.8 Renewable energy

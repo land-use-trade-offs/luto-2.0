@@ -365,7 +365,7 @@ def get_agricultural_management_adoption_limits(data: Data, yr_idx) -> Dict[str,
     return ag_management_data
 
 
-def get_lower_bound_agricultural_management_matrices(data: Data, base_year) -> dict[str, dict]:
+def get_trans_lb_ag_man(data: Data, base_year) -> dict[str, dict]:
     """{am: (NLMS, NCELLS, N_AG_LUS) lower bound} for the next solve: the base-year adoption, clamped to its host ag dvar (the
     am ≤ ag link is a row, so a reported am can exceed ag by FeasibilityTol) and floor-truncated to ROUND_DECIMALS."""
 

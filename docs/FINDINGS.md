@@ -893,7 +893,7 @@ its solver-world host dvar go to 0, so its lower bound is clamped from its true 
 
 ### Mechanics
 
-- `get_lower_bound_agricultural_management_matrices` (`transitions.py:665`):
+- `get_trans_lb_ag_man` (`transitions.py:665`):
   `tools.clamp_dvar_bound(am_dvar, 0.0, ag_dvar, f'Ag man lb clamped [{am}]')`, where
   `ag_dvar = get_folded_base_ag_dvar(data, base_year)` (`:658`). The docstring at `:642-646` already
   states it: *"an am fraction whose host sliver was folded away is clamped to 0 — its land now lives
@@ -3235,7 +3235,7 @@ the normal-equation matrix `AA'` near-singular.
 `data.ag_man_dvars[yr]` stores the raw floor-truncated Gurobi output.  The
 `min(am_dvar, ag_dvar)` clamping that prevents am from exceeding its host ag variable
 happens only at LB-derivation time inside
-`get_lower_bound_agricultural_management_matrices()`, not at save time.
+`get_trans_lb_ag_man()`, not at save time.
 
 Evidence: after the 2020 barrier solve, 1,346 cells per AM have `am_dvar > ag_dvar` by up
 to `9.14e-3` (≤ `FEASIBILITY_TOLERANCE`).  After the 2025/2030 dual-simplex solves,
@@ -3457,7 +3457,7 @@ is 1 (they're allowed to stay and grow), not 0 (transition matrix gate is for ne
 
 ### 3 — Ag management LB simplification
 
-The old `get_lower_bound_agricultural_management_matrices` logic had three stacked caps:
+The old `get_trans_lb_ag_man` logic had three stacked caps:
 per-cell area cap, sum-overflow scaling, and `min(am_lb, ag_lb)` capping. This was replaced
 by a single `am_dvar_true = min(am_dvar, ag_dvar)` clamp before floor-truncation.
 
