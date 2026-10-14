@@ -118,7 +118,6 @@ def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSupport]:
     
     # ── 8. summarise all columns into an xr.Dataset container. ──
     col_space = column_space(ag_cols, nonag_cols, am_cols, ag2ag_cols, ag2nonag_cols, nonag2ag_cols)   # every column labelled with its block
-
     print(f"Column space: {col_space.sizes['col']:,} columns", flush=True)
     
     blocks_table = (
@@ -126,31 +125,46 @@ def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSupport]:
         .groupby(col_space['block'].values, sort=False)
         .size()
         .rename_axis('block')
-        .reset_index(name='columns') 
-    )  # in the column space's order
+        .reset_index(name='columns')
+        .to_markdown(index=False, tablefmt='psql', intfmt=',')
+        .split('\n') 
+    ) 
     
-    for line in blocks_table.to_markdown(index=False, tablefmt='psql', intfmt=',').split('\n'):
+    for line in blocks_table:
         print(f"│   {line}", flush=True)
 
-    # ── 9. the space: the column space, and beside it the handles — the mask every block was enumerated from, the region pair,
-    #       the cell incidence and the position → column grids ──
-    region2cell = cell_regions(data)                                                # the region layers on cell; a column's region is the layer read at its cell
+    # ── 9. the support of the SUM families: the region of every cell, and the cell → column incidence ──
+    """
+    region2cell: for each cell, the region it sits in, one layer per region type (state, nrm, water_region; ibra in
+    IBRA mode), None where a cell has none. A column's region is the layer read at its cell. Used by the regional
+    rows: water, renewable targets, and the GBF targets set per region.
 
-    # for each cell, which variables sit in it: the column space's ``cell`` field as a (cell x col) matrix, 1 where they do
-    block    = col_space['block'].values
-    cell     = col_space['cell'].values                                                 # the cell each gp Variable (column) sits in, one per column
-    n_col    = col_space.sizes['col']                                                   # num of gp Variables (columns)
+    cell2col: a 2-D array (cell x col), mapping for each cell which unknown variables are attached to it. This helps
+    regional gathering: adding a regional limit, or a species target that only exists in certain cells, is a product
+    with it. Used by the GBF families and the renewable ceiling; freed before the solve (GBs at RES1).
+    """
+    region2cell = cell_regions(data)
+
+    cell     = col_space['cell'].values                                                 # the cell each column sits in, one per column
+    n_col    = col_space.sizes['col']                                                   # the number of columns (gp Variables)
     cell2col = sparse.csr_matrix(
         (np.ones(n_col, dtype=np.float32), (cell, np.arange(n_col, dtype=np.int32))),
         shape=(data.NCELLS, n_col)
     )
 
-    # for each mrj / rk position, which ag / non-ag variable it is: every ag / non-ag column written at its own
-    # (m, cell, j) / (cell, k), -1 where the position has none (no arcs, no am)
+    # ── 10. the support of the JOIN families: the position → column grids ──
+    """
+    ag_mrj2col (lm, cell, lu) and nonag_rk2col (cell, nonag_lu): for each input position, the column index of its ag /
+    non-ag variable, -1 where it has none. This helps looking a specific variable up by where it is: the demand rows
+    (a commodity's columns), the ag-mgt link (the host of an am column), source cap and node balance (the node an arc
+    leaves or lands on), and the screen. Freed with cell2col before the solve.
+    """
+    block        = col_space['block'].values
+    
     ag           = np.flatnonzero(block == 'ag')
     ag_mrj2col   = np.full(valid_ag_mrj.shape, -1, dtype=np.int32)
     ag_mrj2col[col_space['m'].values[ag], cell[ag], col_space['j'].values[ag]] = ag
-    
+
     nonag        = np.flatnonzero(block == 'nonag')
     nonag_rk2col = np.full(valid_nonag_rk.shape, -1, dtype=np.int32)
     nonag_rk2col[cell[nonag], col_space['k'].values[nonag]] = nonag

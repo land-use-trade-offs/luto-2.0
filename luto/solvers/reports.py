@@ -17,17 +17,19 @@
 # You should have received a copy of the GNU General Public License along with
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
+import os
+
 import gurobipy as gp
 import numpy as np
 
 from pathlib import Path
 import pandas as pd
 
-from luto.solvers import row_table
+from luto.solvers import tables
 
 
 # ---------------------------------------------------------------------------- #
-# Shadow prices (called by simulation.py after an ACCEPTED solve)              #
+# The readers after a solve: shadow prices, the shortfall, the debug MPS       #
 # ---------------------------------------------------------------------------- #
 
 PRICED = {                                      # the priced families, in the CSV's order: family -> (its 'constraint' label, the unit of its rhs)
@@ -46,16 +48,16 @@ PRICED = {                                      # the priced families, in the CS
 }
 
 
-def _priced_rows(T, family: str) -> np.ndarray:
+def _priced_rows(table, family: str) -> np.ndarray:
     """The rows of one family the shadow prices cover, as row indices in table order: the ACTIVE rows, and the rows
     dropped before the build as redundant (priced 0) — empty where the family was not built. A row the step dropped
     (``active`` off, not redundant) is neither, and gets no price."""
-    return np.flatnonzero((T['family'].values == family) & (T['active'].values | T['redundant'].values))
+    return np.flatnonzero((table['family'].values == family) & (table['active'].values | table['redundant'].values))
 
 
-def _label(T, field: str, rows: np.ndarray) -> np.ndarray:
+def _label(table, field: str, rows: np.ndarray) -> np.ndarray:
     """One label field of the row table at ``rows``, '' where the row's family has none."""
-    labels = T[field].values[rows]
+    labels = table[field].values[rows]
     return np.where(labels == None, '', labels).astype(object)   # noqa: E711 — an object array against None
 
 
@@ -69,8 +71,8 @@ def record_shadow_prices(luto_solver, target_year, out_dir) -> None:
     labels read off its columns. Probes the simplex basis once first (barrier-only solves have unreliable duals → skip the year). The file is written fresh
     per year, so a resume / re-run simply overwrites the year's file.
     """
-    T = luto_solver.rows
-    rows = np.concatenate([_priced_rows(T, family) for family in PRICED])          # the CSV's rows, family by family in PRICED's order
+    table = luto_solver.rows
+    rows = np.concatenate([_priced_rows(table, family) for family in PRICED])          # the CSV's rows, family by family in PRICED's order
     if not rows.size:
         print(f"No active constraints to record shadow prices for {target_year}.")
         return
@@ -79,29 +81,29 @@ def record_shadow_prices(luto_solver, target_year, out_dir) -> None:
     #    on a barrier-only solve (no basis) — GurobiError, or AttributeError from gurobipy 13's Constr.__getattr__ —
     #    → duals unreliable, skip the year. One handle off the table probes it — never `model.getConstrs()`, a
     #    Python list of every row of the model ──
-    built = rows[T['active'].values[rows]]                                          # the priced rows in the model (the rest were dropped before the build)
+    built = rows[table['active'].values[rows]]                                          # the priced rows in the model (the rest were dropped before the build)
     try:
         if built.size:
-            _ = T['constr'].values[built[0]].CBasis
+            _ = table['constr'].values[built[0]].CBasis
     except (gp.GurobiError, AttributeError):
         print(f"Skipping shadow prices for {target_year}: accepted solve has no simplex basis "
               f"(barrier-only) — duals would be unreliable.")
         return
-    pi = np.full(T.sizes['row'], np.nan)
+    pi = np.full(table.sizes['row'], np.nan)
     pi[rows] = 0.0
-    pi[built] = luto_solver.gurobi_model.getAttr('Pi', T['constr'].values[built].tolist())
-    T['pi'] = (('row',), pi)
+    pi[built] = luto_solver.gurobi_model.getAttr('Pi', table['constr'].values[built].tolist())
+    table['pi'] = (('row',), pi)
 
     # ── the record: every column read off the table at the priced rows ──
-    family  = T['family'].values[rows]
-    name    = T['name'].values[rows]
-    scale   = T['scale'].values[rows]
-    rhs     = T['rhs'].values[rows]
-    dropped = T['redundant'].values[rows]
+    family  = table['family'].values[rows]
+    name    = table['name'].values[rows]
+    scale   = table['scale'].values[rows]
+    rhs     = table['rhs'].values[rows]
+    dropped = table['redundant'].values[rows]
     pi      = pi[rows]
-    constraint = np.array([PRICED[f][0] for f in family], dtype=object)
-    unit       = np.array([PRICED[f][1] for f in family], dtype=object)
-    region, item, presence = _label(T, 'region', rows), _label(T, 'GBF_target', rows), _label(T, 'GBF4_presence', rows)
+    constraint = np.array([PRICED[fam][0] for fam in family], dtype=object)
+    unit       = np.array([PRICED[fam][1] for fam in family], dtype=object)
+    region, item, presence = _label(table, 'region', rows), _label(table, 'GBF_target', rows), _label(table, 'GBF4_presence', rows)
     # what each family reports where the table's own labels are not the CSV's
     on = family == 'GBF2'
     region[on] = 'Australia'
@@ -109,10 +111,10 @@ def record_shadow_prices(luto_solver, target_year, out_dir) -> None:
     item[on] = name[on]                                                              # the row name says which region / cap ...
     region[on] = ''                                                                  # ... so the region column stays empty (the table's own region label is the id)
     on = family == 'demand'
-    item[on] = _label(T, 'demand_commodity', rows)[on]
-    presence[on] = _label(T, 'demand_bound', rows)[on]                               # eq / lower / upper: a commodity's paired bounds stay distinguishable
+    item[on] = _label(table, 'demand_commodity', rows)[on]
+    presence[on] = _label(table, 'demand_bound', rows)[on]                               # eq / lower / upper: a commodity's paired bounds stay distinguishable
     on = family == 'renewable'
-    constraint[on] = np.asarray(luto_solver.options, dtype=object)[T['am_idx'].values[rows][on]]   # the renewable type (its region is the state)
+    constraint[on] = np.asarray(luto_solver.options, dtype=object)[table['am_idx'].values[rows][on]]   # the renewable type (its region is the state)
 
     shadow_price = pi * 1e6 / scale
     shadow_price_AUD = pi * 1e6 * rhs
@@ -121,7 +123,7 @@ def record_shadow_prices(luto_solver, target_year, out_dir) -> None:
     # an elastic row (settings.ELASTIC_FAMILIES) that fell short is priced by the penalty alone (P / target, the real
     # marginal cost being infinite): no price for it (NaN), flagged short with the fraction missed; a met elastic row
     # (s = 0) is priced as a hard row — the penalty is inactive there
-    shortfall = row_table.shortfall(T, luto_solver.last_x, rows)                        # the fraction missed; NaN on a hard row
+    shortfall = tables.shortfall(table, luto_solver.last_x, rows)                        # the fraction missed; NaN on a hard row
     short = shortfall > 1e-6                                                         # NaN (a hard row) is never short
     shadow_price[short] = np.nan
     shadow_price_AUD[short] = np.nan
@@ -140,16 +142,16 @@ def report_shortfall(x: np.ndarray, rows, target_year: int, out_dir: str, droppe
     if on.size == 0:
         return
     rhs, scale = rows['rhs'].values[on], rows['scale'].values[on]
-    s = row_table.shortfall(rows, x, on)                                                   # the fraction of the target missed
-    gbf = np.array([f.startswith('GBF') for f in rows['family'].values[on]], dtype=bool)
+    shortfall_frac = tables.shortfall(rows, x, on)                                      # the fraction of the target missed
+    gbf = np.array([fam.startswith('GBF') for fam in rows['family'].values[on]], dtype=bool)
     df = pd.DataFrame({'family': rows['family'].values[on], 'sense': rows['sense'].values[on], 'region': rows['region'].values[on],
                        'GBF_target': rows['GBF_target'].values[on], 'name': rows['name'].values[on],
-                       'shortfall_frac': s, 'target_raw': rhs * scale,
-                       'shortfall_raw': s * np.where(gbf, rhs, np.abs(rhs)) * scale,   # the bound moved (relax's m · s), in raw units
+                       'shortfall_frac': shortfall_frac, 'target_raw': rhs * scale,
+                       'shortfall_raw': shortfall_frac * np.where(gbf, rhs, np.abs(rhs)) * scale,   # the bound moved (relax's m · s), in raw units
                        'dropped': np.isin(on, [] if dropped is None else dropped)})    # settings.ELASTIC_DROP_SHORT: removed before the hard pass
     df.sort_values('shortfall_frac', ascending=False).to_csv(f"{out_dir}/shortfall_{target_year}.csv", index=False)
     short = df[df['shortfall_frac'] > 1e-6]
-    print(f"Year {target_year}: {len(short):,} of {on.size:,} elastic rows fall short (sum of fractions missed {s.sum():.3f})"
+    print(f"Year {target_year}: {len(short):,} of {on.size:,} elastic rows fall short (sum of fractions missed {shortfall_frac.sum():.3f})"
           + ''.join(f"\n    {r.family} {r.region} {r.GBF_target}: {r.shortfall_frac:.1%} of the target missed"
                     for r in short.sort_values('shortfall_frac', ascending=False).head(10).itertuples()), flush=True)
 

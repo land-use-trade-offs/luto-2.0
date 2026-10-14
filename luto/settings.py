@@ -240,7 +240,7 @@ What a year does when some row is IMPOSSIBLE over the column box (bound_report_<
 
 ELASTIC_FAMILIES = []
 '''
-Row families solved elastic: each row gets a shortfall column at ELASTIC_PENALTY (row_builder.relax) instead of
+Row families solved elastic: each row gets a shortfall column at ELASTIC_PENALTY (tables.relax) instead of
 making the year infeasible; the rows that fall short are listed in out_<year>/shortfall_<year>.csv. Empty = every row
 hard. ONE mechanism for every policy family, so listing them all with ELASTIC_PASS1_COST_SCALE = 0 is an infeasibility
 diagnosis: pass 1 names the rows, family by family, that cannot hold together. An equality row (demand) gets a column
@@ -261,12 +261,20 @@ False: the elastic solve is stored as it is (the rows short at the penalty's pri
 fall short, built up front or generated (BIO_ROW_GENERATION): one drop point.
 '''
 
+ELASTIC_DROP_TOL = 1e-4
+'''
+The drop of the two-pass step (ELASTIC_DROP_SHORT, step.solve_step): after pass 1 a relaxed row — built up front or
+generated — is switched off when its shortfall is over this fraction of its target. Pass 1 is an interior point
+(ELASTIC_PASS1_PARAMS: barrier without crossover), whose residue is ~1e-6: a shortfall under this is residue, not a miss.
+(ROWGEN_SHORT_TOL, in the row-generation block, only says whether a target is short at a solution, for the rounds.)
+'''
+
 ELASTIC_PASS1_PARAMS = [(0, 2, 0, -1, -1)]
 '''
 The solve attempts of PASS 1 of the two-pass step (as RETRY_PARAMS: NumericFocus, Method, Crossover, Presolve,
 BarHomogeneous). Barrier WITHOUT crossover: pass 1 only has to say which rows fall short, an interior point says it,
 and crossover on a 7 M-column model has run for hours; no simplex fallback (a failed barrier stops the year rather than
-running 20 h of simplex). A shortfall under ROWGEN_SHORT_TOL of the target is barrier residue, not a miss. Pass 2 uses
+running 20 h of simplex). A shortfall under ELASTIC_DROP_TOL of the target is barrier residue, not a miss. Pass 2 uses
 RETRY_PARAMS.
 '''
 
@@ -1273,7 +1281,7 @@ generated per step (luto/solvers/rowgen.py): a screen proves a target safe or un
 rounds add, from the targets without a row, the ones short at the current solution until none is. A family in
 ELASTIC_FAMILIES may fall short (its generated rows are relaxed as the up-front ones are); under ELASTIC_DROP_SHORT
 pass 1 then finds, for every relaxed row at once, the targets that cannot be met together with the step, and pass 2
-re-solves with those dropped and every other row hard (rowgen.solve_step — one drop point for every family). A
+re-solves with those dropped and every other row hard (step.solve_step — one drop point for every family). A
 hard family's target proven unattainable stops the year (BOUND_PROP_ON_IMPOSSIBLE). A family whose open rows would
 take at most ROWGEN_EAGER_MAX_ENTRIES entries goes in whole in round 0 (one solve, as built up front); GBF8 (all ~10.6 k
 species are ~5 × 10⁹ entries at RES5) is batched. Per year: out_<year>/rowgen_<year>.csv and rowgen_rounds_<year>.csv.
@@ -1283,8 +1291,8 @@ ROWGEN_BATCH_MIN = 20               # a lazy family's rows added per round: ROWG
 ROWGEN_BATCH_SHARE = 0.05           # at least ROWGEN_BATCH_MIN and at most ROWGEN_BATCH_MAX (the hardest first);
 ROWGEN_BATCH_MAX = 100              # a round costs one full solve, and the hardest few lift most of the rest
 ROWGEN_MAX_ROUNDS = 30              # per pass: a pass that reaches it stops NOT converged (said in the log)
-ROWGEN_SHORT_TOL = 1e-4             # relative: a target is short when its score is under its target by more than this; a
-                                    # relaxed row is dropped after pass 1 when its shortfall is over this (barrier residue is ~1e-6)
+ROWGEN_SHORT_TOL = 1e-4             # relative: a target is short when its score is under its target by more than this
+ROWGEN_SCREEN_TOL = 1e-6            # relative: the screen must clear a target by more than this to call it safe / unattainable
 
 
 

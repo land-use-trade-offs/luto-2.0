@@ -13,9 +13,9 @@ The model is ONE matrix, rows × columns. Every row belongs to a family (the `fa
 column to a block (`block` on the column table). The five biodiversity families (GBF2, GBF3 NVIS, GBF4 SNES / ECNES,
 GBF8) are rows of the same form as the demand, water and GHG rows — `Σ_r W[target, r] · (the bio contribution of cell r's
 columns) ≥ rhs` — and since the 2026-10-08 refactor (`luto/solvers/rowgen.py`, `row_builder.get_<family>_targets`,
-`row_builder.relax`) they are built, relaxed and dropped by the same code as any other row. `ELASTIC_FAMILIES` is the
+`tables.relax`) they are built, relaxed and dropped by the same code as any other row. `ELASTIC_FAMILIES` is the
 one handle: it names the families whose rows get a shortfall column at `ELASTIC_PENALTY`; the two-pass step
-(`rowgen.solve_step`) then says which of those rows cannot hold together and solves the year without them.
+(`step.solve_step`; `rowgen.solve_step` until the 2026-10-14 refactor) then says which of those rows cannot hold together and solves the year without them.
 
 ### The mental model
 
@@ -23,7 +23,7 @@ one handle: it names the families whose rows get a shortfall column at `ELASTIC_
 |---|---|
 | the matrix | A (rows × columns, scipy CSR) with the row table and the column table beside it; a row's family and a column's block are labels, nothing else distinguishes them |
 | GBF8's rows | the same rows, too many to hold (~5 × 10⁹ entries at RES5), so generated on demand: a screen (floor / ceiling per cell over the column box) classes every target safe / unattainable / open before any solve, and the rounds add the open ones short at the current point; a small family (SNES, ECNES, NVIS) goes in whole in round 0 and costs one solve, as built up front |
-| the handle | `ELASTIC_FAMILIES`: every row of a listed family gets a shortfall column, `a·x + rhs·s ≥ rhs`, `s` the fraction of the target missed (an equality row — demand — gets one column each way: production short of, or over, the demand); `row_builder.relax` is a pure function on the tables, `row_table.shortfall` the one reader |
+| the handle | `ELASTIC_FAMILIES`: every row of a listed family gets a shortfall column, `a·x + rhs·s ≥ rhs`, `s` the fraction of the target missed (an equality row — demand — gets one column each way: production short of, or over, the demand); `tables.relax` is a pure function on the tables, `tables.shortfall` the one reader |
 | the two passes | pass 1 (barrier, no crossover, the cost × `ELASTIC_PASS1_COST_SCALE`) minimises the penalty: the rows it leaves short are switched off (`active`), every other relaxed row made hard; pass 2 at full cost is never infeasible (pass 1's point meets every kept row). Reported in `shortfall_<year>.csv` (every relaxed row, the fraction missed, `dropped`) and, for generated rows, `rowgen_<year>.csv` |
 | the solver | stateless: built from the tables for every solve (one build per round, 1–2 min at RES5; barrier has no warm start to lose), never changes them |
 
@@ -67,8 +67,9 @@ runs name the family it leans on.
 
 `BIO_ROW_GENERATION` (every biodiversity family through the generator), `ELASTIC_FAMILIES`, `ELASTIC_DROP_SHORT` (two
 passes), `ELASTIC_PASS1_COST_SCALE` (0: infeasible set; 1: infeasible + expensive), `ELASTIC_PASS1_PARAMS` (barrier, no
-crossover, no simplex fallback), `ROWGEN_SHORT_TOL` (a shortfall over 1e-4 of the target is a miss; an interior point's
-residue is ~1e-6), `ROWGEN_EAGER_MAX_ENTRIES` (eager / lazy per family by size), `ROWGEN_BATCH_*`. `GBF8_ROW_GENERATION`
+crossover, no simplex fallback), `ELASTIC_DROP_TOL` (the drop: a shortfall over 1e-4 of the target is a miss; an interior
+point's residue is ~1e-6; `ROWGEN_SHORT_TOL` played this part until the 2026-10-14 refactor and now only says whether a
+target is short at a solution, for the rounds), `ROWGEN_EAGER_MAX_ENTRIES` (eager / lazy per family by size), `ROWGEN_BATCH_*`. `GBF8_ROW_GENERATION`
 and `GBF8_ROWGEN_*` are gone. Branch `refactor/general-rowgen`, not merged.
 
 ---

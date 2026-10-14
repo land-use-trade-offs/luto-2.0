@@ -31,6 +31,7 @@ import luto.settings as settings
 from gurobipy import GRB
 
 from luto import tools
+from luto.solvers.tables import Tables, scale_cost
 from luto.solvers.row_inputs import RowInputs
 
 
@@ -49,7 +50,7 @@ class LutoSolver:
     """The Gurobi model of one step — the column table, the row table, row_matrix and obj, as given — returns the raw x.
     Stateless with respect to the tables: it is built from them and never changes them (the rows' Gurobi handles and
     the duals go onto its own shallow copy of the row table, ``self.rows``); a step that changes its tables — a row
-    added, relaxed or dropped — builds a new one (``rowgen.solve_rounds``)."""
+    added, relaxed or dropped — builds a new one (``build_solver``, below)."""
 
     def __init__(self, cols: xr.Dataset, rows: xr.Dataset, row_matrix, obj: np.ndarray, inputs: RowInputs):
         self.cols = cols
@@ -85,19 +86,19 @@ class LutoSolver:
         )
 
         names_of = {                                                                # the name of every column of a block, from its fields
-            'ag':         lambda t: [f"X_ag_{lm_name[m]}_{j}_{r}" 
-                                     for m, j, r in zip(t['m'], t['j'], t['cell'])],
-            'nonag':      lambda t: [f"X_non_ag_{k}_{r}" 
-                                     for k, r in zip(t['k'], t['cell'])],
-            'am':         lambda t: [f"X_ag_man_{lm_name[m]}_{snake_of_option[am_idx]}_{j}_{r}".replace(" ", "_")
-                                     for am_idx, m, j, r in zip(t['am_idx'], t['m'], t['j'], t['cell'])],
-            'ag2ag':      lambda t: [f"F_a2a_{from_m}_{from_j}[{m},{local_r},{j}]"
-                                     for from_m, from_j, m, local_r, j in zip(t['from_m'], t['from_j'], t['m'], t['local_r'], t['j'])],
-            'ag2nonag':   lambda t: [f"F_a2n_{from_m}_{from_j}[{k},{local_r}]"
-                                     for from_m, from_j, k, local_r in zip(t['from_m'], t['from_j'], t['k'], t['local_r'])],
-            'nonag2ag':   lambda t: [f"F_n2a_{from_k}[{m},{local_r},{j}]"
-                                     for from_k, m, local_r, j in zip(t['from_k'], t['m'], t['local_r'], t['j'])],
-            'slack':      lambda t: [f"S_{i}" for i in range(len(t['cell']))],       # a relaxed row's shortfall column (row_builder.relax)
+            'ag':         lambda fields: [f"X_ag_{lm_name[m]}_{j}_{r}" 
+                                     for m, j, r in zip(fields['m'], fields['j'], fields['cell'])],
+            'nonag':      lambda fields: [f"X_non_ag_{k}_{r}" 
+                                     for k, r in zip(fields['k'], fields['cell'])],
+            'am':         lambda fields: [f"X_ag_man_{lm_name[m]}_{snake_of_option[am_idx]}_{j}_{r}".replace(" ", "_")
+                                     for am_idx, m, j, r in zip(fields['am_idx'], fields['m'], fields['j'], fields['cell'])],
+            'ag2ag':      lambda fields: [f"F_a2a_{from_m}_{from_j}[{m},{local_r},{j}]"
+                                     for from_m, from_j, m, local_r, j in zip(fields['from_m'], fields['from_j'], fields['m'], fields['local_r'], fields['j'])],
+            'ag2nonag':   lambda fields: [f"F_a2n_{from_m}_{from_j}[{k},{local_r}]"
+                                     for from_m, from_j, k, local_r in zip(fields['from_m'], fields['from_j'], fields['k'], fields['local_r'])],
+            'nonag2ag':   lambda fields: [f"F_n2a_{from_k}[{m},{local_r},{j}]"
+                                     for from_k, m, local_r, j in zip(fields['from_k'], fields['m'], fields['local_r'], fields['j'])],
+            'slack':      lambda fields: [f"S_{idx}" for idx in range(len(fields['cell']))],       # a relaxed row's shortfall column (tables.relax)
         }
      
         block_of_col = cols['block'].values
@@ -117,16 +118,16 @@ class LutoSolver:
         model.update()                       # the ONE update before the first row: every variable exists
         self._vars = model.getVars()
         assert len(self._vars) == self.cols.sizes['col'], 'the model must hold exactly the columns of the space'
-        T = self.rows
-        active = T['active'].values
+        table = self.rows
+        active = table['active'].values
         built = np.flatnonzero(active)
         row_matrix = self.row_matrix if active.all() else self.row_matrix[built]
-        constrs = model.addMConstr(row_matrix, self._vars, np.asarray(T['sense'].values[built], dtype='<U1'), T['rhs'].values[built]).tolist()
-        model.setAttr('ConstrName', constrs, T['name'].values[built].tolist())
-        handles = np.full(T.sizes['row'], None, dtype=object)
+        constrs = model.addMConstr(row_matrix, self._vars, np.asarray(table['sense'].values[built], dtype='<U1'), table['rhs'].values[built]).tolist()
+        model.setAttr('ConstrName', constrs, table['name'].values[built].tolist())
+        handles = np.full(table.sizes['row'], None, dtype=object)
         handles[built] = constrs
-        T['constr'] = (('row',), handles)
-        family = T['family'].values
+        table['constr'] = (('row',), handles)
+        family = table['family'].values
         families = pd.DataFrame([dict(family=name, constraints=int((family == name).sum()) - int(((family == name) & ~active).sum()),
                                       **{'dropped before the build': int(((family == name) & ~active).sum())})
                                  for name in pd.unique(family)])                                   # the families, in table order
@@ -179,3 +180,13 @@ class LutoSolver:
         print("Completed solve.\n", flush=True)
         self.last_x = np.asarray(self.x.X, dtype=np.float64)
         return self.last_x
+
+
+def build_solver(tables: Tables, inputs: RowInputs, cost_scale: float = 1.0, on_first_model=None) -> LutoSolver:
+    """A solver over the tables, its model built: the economic part of the cost × ``cost_scale`` (``tables.scale_cost``;
+    the tables keep the raw obj); ``on_first_model`` (the debug MPS), when given, called with the Gurobi model."""
+    solver = LutoSolver(tables.cols, tables.rows, tables.row_matrix, scale_cost(tables.obj, tables.cols, cost_scale), inputs)
+    solver.formulate()
+    if on_first_model is not None:
+        on_first_model(solver.gurobi_model)
+    return solver

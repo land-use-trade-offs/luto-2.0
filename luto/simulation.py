@@ -40,12 +40,14 @@ from gurobipy import GRB
 from luto import settings
 from luto.data import Data
 from luto.solvers.col_builder import get_cols
-from luto.solvers.rowgen import RowGen, solve_step
+from luto.solvers.rowgen import RowGen
+from luto.solvers.step import solve_step
 from luto.solvers.row_inputs import RowInputs, get_economics, get_row_inputs
-from luto.solvers.row_builder import elastic_absorbs, get_rows, get_obj
+from luto.solvers.row_builder import get_rows, get_obj
 from luto.solvers.row_bounds import STATUS, drop_redundant_rows, get_row_bounds, report_row_bounds
 from luto.solvers.post_solve import post_solve
-from luto.solvers.tools import record_shadow_prices, report_shortfall, save_model_to_disk
+from luto.solvers.reports import record_shadow_prices, report_shortfall, save_model_to_disk
+from luto.solvers.tables import Tables, elastic_absorbs
 from luto.tools.write import write_outputs
 from luto.tools import (
     LogToFile,
@@ -283,7 +285,7 @@ def solve_timeseries(
         obj = get_obj(get_economics(data, base_year, target_year), cols, inputs)            # million AUD; the economy streams (~300 MB at RES5, ~7 GB at RES1) die with the call
 
         # ─────────────── 6. the solve: the tables are the state, a solver is built from them for every solve ───────────────
-        accepted, x, status, luto_solver = solve_step(row_matrix, rows, cols, obj, inputs, rowgen, target_year, out_dir,
+        accepted, x, status, luto_solver = solve_step(Tables(row_matrix, rows, cols, obj), inputs, rowgen, target_year, out_dir,
                                                       on_first_model=lambda model: save_model_to_disk(model, data.path, base_year, target_year))   # the debug MPS, BEFORE the first solve
         cols, obj = luto_solver.cols, luto_solver.obj                                        # the final tables: with the shortfall columns, the dropped rows off
 
