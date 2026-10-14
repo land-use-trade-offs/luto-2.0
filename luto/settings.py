@@ -301,6 +301,9 @@ where it cannot be met, not merely where meeting it is expensive; larger widens 
 # Geographical raster writing parameters
 # ---------------------------------------------------------------------------- #
 WRITE_OUTPUTS = True                        # Whether to write outputs (e.g., GeoTIFFs) at the end of the run. Set to False to skip output writing (e.g. when doing a quick test run or debugging IIS infeasibility).
+WRITE_DEBUG_MPS = False                     # True: every year's first Gurobi model is written to <run>/debug_model_<base>_<year>.mps BEFORE the solve (solvers/reports.save_model_to_disk),
+                                            #   for the post-mortem of a year that never finishes. ~5 GB and ~1 min per year at RES5, on the run's own disk — a debugging
+                                            #   mode, off for a study wave (the file is kept unless the job deletes it).
 
 WRITE_REPORT_MAX_MEM_MB = 64 * 1024         # The maximum memory (in MB) to use for writing report layers.
                                             #   Estimated based on the 0.5 GB MEM usage when RESFACTOR = 13

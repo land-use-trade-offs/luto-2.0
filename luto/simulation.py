@@ -285,8 +285,8 @@ def solve_timeseries(
         obj = get_obj(get_economics(data, base_year, target_year), cols, inputs)            # million AUD; the economy streams (~300 MB at RES5, ~7 GB at RES1) die with the call
 
         # ─────────────── 6. the solve: the tables are the state, a solver is built from them for every solve ───────────────
-        accepted, x, status, luto_solver = solve_step(Tables(row_matrix, rows, cols, obj), inputs, rowgen, target_year, out_dir,
-                                                      on_first_model=lambda model: save_model_to_disk(model, data.path, base_year, target_year))   # the debug MPS, BEFORE the first solve
+        on_first_model = (lambda model: save_model_to_disk(model, data.path, base_year, target_year)) if settings.WRITE_DEBUG_MPS else None   # the debug MPS, BEFORE the first solve (off by default: ~5 GB a year)
+        accepted, x, status, luto_solver = solve_step(Tables(row_matrix, rows, cols, obj), inputs, rowgen, target_year, out_dir, on_first_model=on_first_model)
         cols, obj = luto_solver.cols, luto_solver.obj                                        # the final tables: with the shortfall columns, the dropped rows off
 
         if not accepted:

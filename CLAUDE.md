@@ -250,6 +250,7 @@ Every constraint is hard by default: there are no soft / penalised options (the 
 
 - `WRITE_REPORT_MAX_MEM_GB`: Max memory for report generation (default: 64)
 - `WRITE_CHUNK_SIZE`: Chunk size for NetCDF writing (default: 4096)
+- `WRITE_DEBUG_MPS`: write every year's first Gurobi model to `<run>/debug_model_<base>_<year>.mps` before the solve, for the post-mortem of a year that never finishes (default: False — ~5 GB and ~1 min per year at RES5; `solvers/reports.save_model_to_disk`; 2026-10-15)
 
 ## Data Flow
 
