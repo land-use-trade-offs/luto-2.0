@@ -395,14 +395,14 @@ def get_trans_lb_ag_man(data: Data, base_year) -> dict[str, dict]:
 
 def get_regional_adoption_limits(data: Data, yr_cal: int):
     """Per-region adoption caps: (ag [reg_id, lu_code, lu_name, reg_ind, area_ha], non-ag [same], non-ag SUM [reg_id, reg_ind, area_ha]) —
-    the per-LU lists in 'on' mode, the SUM list in 'NON_AG_CAP' mode, all three empty when 'off'."""
+    the per-LU lists in 'individual_cap' mode, the SUM list in 'non_ag_sum_cap' mode, all three empty when 'off'."""
     if settings.REGIONAL_ADOPTION_CONSTRAINTS == "off":
         return [], [], []
 
     ag_reg_adoption_constrs = []
     non_ag_reg_adoption_constrs = []
 
-    # Per-LU (ag + non-ag) caps from xlsx — only populated in 'on' mode
+    # Per-LU (ag + non-ag) caps from xlsx — only populated in 'individual_cap' mode
     for reg_id, lu_name, area_limit_ha in data.get_regional_adoption_limit_ha_by_year(yr_cal):
         reg_ind = np.where(data.REGIONAL_ADOPTION_ZONES == reg_id)[0]
 
@@ -415,7 +415,7 @@ def get_regional_adoption_limits(data: Data, yr_cal: int):
         else:
             raise ValueError(f"Regional adoption constraint exists for unrecognised land use: {lu_name}")
 
-    # SUM-of-non-ag per-region cap — only populated in 'NON_AG_CAP' mode
+    # SUM-of-non-ag per-region cap — only populated in 'non_ag_sum_cap' mode
     non_ag_reg_adoption_sum_constrs = [
         [reg_id, reg_ind, area_limit_ha]
         for reg_id, reg_ind, area_limit_ha

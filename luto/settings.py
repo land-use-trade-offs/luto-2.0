@@ -438,17 +438,19 @@ Land-use and vector file pairs to exclude land-use from being utilised in that a
 - The value is the path to the ESRI shapefile.
 '''
 
-REGIONAL_ADOPTION_CONSTRAINTS = 'off'            
+REGIONAL_ADOPTION_CONSTRAINTS = 'off'
 '''
-Adoption mode for non-ag land uses.
+Regional adoption caps, one mode:
 - 'off': no regional adoption constraints
-- 'on', user needs to set the percentage targets in 'input/regional_adoption_zones.xlsx'
-- 'NON_AG_CAP', the SUM of all non-ag land uses can not exceed a certain percentage (REGIONAL_ADOPTION_NON_AG_CAP) in every region
+- 'individual_cap': a cap per (region, land use), ag and non-ag alike; the user sets the percentage targets in
+  'input/regional_adoption_zones.xlsx' (sheet REGIONAL_ADOPTION_ZONE; a row with a blank or negative target is no cap)
+- 'non_ag_sum_cap': the SUM of all non-ag land uses can not exceed a percentage (REGIONAL_ADOPTION_NON_AG_CAP) of
+  each region (REGIONAL_ADOPTION_NON_AG_REGION); no xlsx involved
 '''
 
 REGIONAL_ADOPTION_ZONE = 'NRM_CODE'              # 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
 '''
-The regional adoption zone is the spatial unit used to enforce regional adoption constraints.
+The regional adoption zone is the spatial unit of the 'individual_cap' mode (the sheet read from the xlsx).
 The options are:
   - 'ABARES_AAGIS': Australian Bureau of Agricultural and Resource Economics and Sciences (ABARES) Agricultural and Agribusiness Geographic Information System (AAGIS) regions.
   - 'LGA_CODE': Local Government Area code.
@@ -460,7 +462,7 @@ The options are:
 
 REGIONAL_ADOPTION_NON_AG_REGION = 'NRM'
 '''
-The regional adoption zone for non-agricultural land uses when using the 'NON_AG_CAP' mode.
+The regional adoption zone for non-agricultural land uses when using the 'non_ag_sum_cap' mode.
 The options are the same as REGIONAL_ADOPTION_ZONE:
 - 'NRM': Natural Resource Management code.
 - 'State': Australian state regions.
@@ -470,17 +472,17 @@ The options are the same as REGIONAL_ADOPTION_ZONE:
 REGIONAL_ADOPTION_NON_AG_CAP = 15
 '''
 None or numbers between 0-100 (both inclusive);
- Only work under 'REGIONAL_ADOPTION_CONSTRAINTS = NON_AG_CAP'.
+ Only work under 'REGIONAL_ADOPTION_CONSTRAINTS = non_ag_sum_cap'.
  E.g., 15 means the combined area of all non-ag land uses can not exceed 15% of each region's area.
 '''
 
 REGIONAL_ADOPTION_NON_AG_CAP_REGIONS = []
 '''
-Scope of the NON_AG_CAP: which regions (names from REGIONAL_ADOPTION_NON_AG_REGION, e.g. NRM names like
+Scope of the non_ag_sum_cap: which regions (names from REGIONAL_ADOPTION_NON_AG_REGION, e.g. NRM names like
 'North East', 'Goulburn Broken') the SUM-of-non-ag cap is applied to.
 - []  (empty)  -> cap ALL regions (default / original behaviour).
 - ['North East', 'Goulburn Broken'] -> cap ONLY these regions; everywhere else is uncapped.
-Only used under 'REGIONAL_ADOPTION_CONSTRAINTS = NON_AG_CAP'.
+Only used under 'REGIONAL_ADOPTION_CONSTRAINTS = non_ag_sum_cap'.
 '''
 
 REGIONAL_ADOPTION_NON_AG_CAP_OVERRIDE = {}
@@ -488,7 +490,7 @@ REGIONAL_ADOPTION_NON_AG_CAP_OVERRIDE = {}
 Per-region cap percentages that OVERRIDE the uniform REGIONAL_ADOPTION_NON_AG_CAP for named regions.
 Maps region name -> percentage (0-100), e.g. {'Goulburn Broken': 10, 'North East': 20}. A region not in
 this dict uses REGIONAL_ADOPTION_NON_AG_CAP. Applied within the REGIONAL_ADOPTION_NON_AG_CAP_REGIONS scope
-(or all regions if that list is empty). Only used under 'REGIONAL_ADOPTION_CONSTRAINTS = NON_AG_CAP'.
+(or all regions if that list is empty). Only used under 'REGIONAL_ADOPTION_CONSTRAINTS = non_ag_sum_cap'.
 '''
                                         
 

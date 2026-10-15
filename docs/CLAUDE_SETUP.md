@@ -127,7 +127,7 @@ Every constraint is hard by default: there are no soft / penalised options; the 
 
 ### No-Go Areas & Regional Adoption
 - `EXCLUDE_NO_GO_LU`: Enforce no-go area constraints (True/False)
-- `REGIONAL_ADOPTION_CONSTRAINTS`: Regional adoption limits ('off', 'on', 'NON_AG_CAP')
+- `REGIONAL_ADOPTION_CONSTRAINTS`: Regional adoption limits, one mode: 'off', 'individual_cap' (a cap per (region, land use), ag and non-ag, from `input/regional_adoption_zones.xlsx`), 'non_ag_sum_cap' (the sum of all non-ag land uses ≤ `REGIONAL_ADOPTION_NON_AG_CAP` % of each region). Renamed 2026-10-15 from 'on' / 'NON_AG_CAP'
 - `REGIONAL_ADOPTION_ZONE`: Zone type ('ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT')
 - `REGIONAL_ADOPTION_NON_AG_CAP`: uniform sum-of-non-ag cap % per region (only under `NON_AG_CAP`)
 - `REGIONAL_ADOPTION_NON_AG_CAP_REGIONS`: scope of the cap — `[]` caps all regions (default); a list of region names caps only those, leaving the rest uncapped

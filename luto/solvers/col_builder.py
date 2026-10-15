@@ -145,29 +145,30 @@ def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSupport]:
     """
     region2cell = cell_regions(data)
 
-    cell     = col_space['cell'].values                                                 # the cell each column sits in, one per column
-    n_col    = col_space.sizes['col']                                                   # the number of columns (gp Variables)
     cell2col = sparse.csr_matrix(
-        (np.ones(n_col, dtype=np.float32), (cell, np.arange(n_col, dtype=np.int32))),
-        shape=(data.NCELLS, n_col)
+        (
+            np.ones(col_space.sizes['col'], dtype=np.float32),
+            (col_space['cell'].values, np.arange(col_space.sizes['col'], dtype=np.int32))
+        ),
+        shape=(data.NCELLS, col_space.sizes['col'])
     )
 
     # ── 10. the support of the JOIN families: the position → column grids ──
     """
     ag_mrj2col (lm, cell, lu) and nonag_rk2col (cell, nonag_lu): for each input position, the column index of its ag /
-    non-ag variable, -1 where it has none. This helps looking a specific variable up by where it is: the demand rows
-    (a commodity's columns), the ag-mgt link (the host of an am column), source cap and node balance (the node an arc
-    leaves or lands on), and the screen. Freed with cell2col before the solve.
-    """
-    block        = col_space['block'].values
+    non-ag variable, -1 where it has none. 
     
-    ag           = np.flatnonzero(block == 'ag')
+    This helps looking a specific variable up by where it is: the demand rows(a commodity's columns), the ag-mgt link
+    (the host of an am column), source cap and node balance (the node an arcleaves or lands on), and the screen. Freed 
+    with cell2col before the solve.
+    """
+    ag           = np.flatnonzero(col_space['block'].values == 'ag')
     ag_mrj2col   = np.full(valid_ag_mrj.shape, -1, dtype=np.int32)
-    ag_mrj2col[col_space['m'].values[ag], cell[ag], col_space['j'].values[ag]] = ag
+    ag_mrj2col[col_space['m'].values[ag], col_space['cell'].values[ag], col_space['j'].values[ag]] = ag
 
-    nonag        = np.flatnonzero(block == 'nonag')
+    nonag        = np.flatnonzero(col_space['block'].values == 'nonag')
     nonag_rk2col = np.full(valid_nonag_rk.shape, -1, dtype=np.int32)
-    nonag_rk2col[cell[nonag], col_space['k'].values[nonag]] = nonag
+    nonag_rk2col[col_space['cell'].values[nonag], col_space['k'].values[nonag]] = nonag
 
     return col_space, ColSupport(
         valid_ag_mrj=valid_ag_mrj,

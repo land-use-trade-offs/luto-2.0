@@ -591,7 +591,7 @@ class Data:
             self.REGIONAL_ADOPTION_ZONES = None
             self.REGIONAL_ADOPTION_TARGETS = None
 
-        elif settings.REGIONAL_ADOPTION_CONSTRAINTS == "on":
+        elif settings.REGIONAL_ADOPTION_CONSTRAINTS == "individual_cap":
             # Per-landuse caps (both ag and non-ag) read from the xlsx, scoped to REGIONAL_ADOPTION_ZONE.
             self.REGIONAL_ADOPTION_ZONES = pd.read_hdf(
                 os.path.join(settings.INPUT_DIR, "regional_adoption_zones.h5"), where=self.MASK
@@ -622,7 +622,7 @@ class Data:
                     f"{settings.REGIONAL_ADOPTION_ZONE} not in {list(lost_zones)}"
                 ).reset_index(drop=True)
 
-        elif settings.REGIONAL_ADOPTION_CONSTRAINTS == "NON_AG_CAP":
+        elif settings.REGIONAL_ADOPTION_CONSTRAINTS == "non_ag_sum_cap":
             # SUM-of-all-non-ag cap per region (NRM or State, controlled by REGIONAL_ADOPTION_NON_AG_REGION).
             # No xlsx involved; ag dvars are unconstrained by this mode.
             self.REGIONAL_ADOPTION_ZONES = None
@@ -631,7 +631,8 @@ class Data:
         else:
             raise ValueError(
                 f"Unknown REGIONAL_ADOPTION_CONSTRAINTS={settings.REGIONAL_ADOPTION_CONSTRAINTS!r}. "
-                "Expected one of: 'off', 'on', 'NON_AG_CAP'."
+                "Expected one of: 'off', 'individual_cap', 'non_ag_sum_cap' "
+                "(renamed 2026-10-15: 'on' -> 'individual_cap', 'NON_AG_CAP' -> 'non_ag_sum_cap')."
             )
 
 
@@ -2734,14 +2735,14 @@ class Data:
     def get_regional_adoption_percent_by_year(self, yr: int):
         """
         Get the per-landuse regional adoption percentage for each region for the given year.
-        Only active under REGIONAL_ADOPTION_CONSTRAINTS == 'on'.
+        Only active under REGIONAL_ADOPTION_CONSTRAINTS == 'individual_cap'.
 
         Return a list of tuples where each tuple contains 
         - the region ID, 
         - landuse name, 
         - the adoption percentage.
         """
-        if settings.REGIONAL_ADOPTION_CONSTRAINTS != "on":
+        if settings.REGIONAL_ADOPTION_CONSTRAINTS != "individual_cap":
             return ()
         
         reg_adop_limits = []
@@ -2759,14 +2760,14 @@ class Data:
     def get_regional_adoption_limit_ha_by_year(self, yr: int):
         """
         Get the per-landuse regional adoption area for each region for the given year.
-        Only active under REGIONAL_ADOPTION_CONSTRAINTS == 'on'.
+        Only active under REGIONAL_ADOPTION_CONSTRAINTS == 'individual_cap'.
 
         Return a list of tuples where each tuple contains
         - the region ID,
         - landuse name,
         - the adoption area (ha).
         """
-        if settings.REGIONAL_ADOPTION_CONSTRAINTS != "on":
+        if settings.REGIONAL_ADOPTION_CONSTRAINTS != "individual_cap":
             return ()
         
         reg_adop_limits = self.get_regional_adoption_percent_by_year(yr)
@@ -2779,7 +2780,7 @@ class Data:
 
     def get_regional_adoption_non_ag_sum_limit_ha_by_year(self, yr: int):
         """
-        Under REGIONAL_ADOPTION_CONSTRAINTS == 'NON_AG_CAP', return per-region area caps
+        Under REGIONAL_ADOPTION_CONSTRAINTS == 'non_ag_sum_cap', return per-region area caps
         (ha) on the SUM of all non-ag land uses.
 
         The region partition is selected by REGIONAL_ADOPTION_NON_AG_REGION:
@@ -2789,7 +2790,7 @@ class Data:
         Returns a list of (region_name, reg_ind, area_limit_ha) tuples. The percentage
         cap (REGIONAL_ADOPTION_NON_AG_CAP) is uniform across all regions and years.
         """
-        if settings.REGIONAL_ADOPTION_CONSTRAINTS != 'NON_AG_CAP':
+        if settings.REGIONAL_ADOPTION_CONSTRAINTS != 'non_ag_sum_cap':
             return ()
         if settings.REGIONAL_ADOPTION_NON_AG_CAP is None:
             return ()

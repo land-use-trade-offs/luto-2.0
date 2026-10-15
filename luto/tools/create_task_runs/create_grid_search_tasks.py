@@ -79,7 +79,7 @@ grid_search = {
 
     # --------------- Social license ---------------
     'EXCLUDE_NO_GO_LU': [False],                                            # True or False
-    'REGIONAL_ADOPTION_CONSTRAINTS': ['off'],                               # 'off' = core (LUF Report 2026); 'NON_AG_CAP' = lower-priority sensitivity
+    'REGIONAL_ADOPTION_CONSTRAINTS': ['off'],                               # 'off' = core (LUF Report 2026); 'non_ag_sum_cap' = lower-priority sensitivity; 'individual_cap' = per-LU caps from the xlsx
     'REGIONAL_ADOPTION_NON_AG_CAP': [15],                                   # Default value (not active when REGIONAL_ADOPTION_CONSTRAINTS='off')
     'REGIONAL_ADOPTION_NON_AG_REGION': ['NRM'],                             # 'NRM' or 'IBRA' — region scope for the cap
     'REGIONAL_ADOPTION_ZONE': ['NRM_CODE'],                                 # One of 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'

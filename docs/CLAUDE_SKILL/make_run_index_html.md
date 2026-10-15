@@ -32,7 +32,7 @@ Row-per-run CSV. Required columns:
 | `global_run_idx` | Integer; maps to `Run_G####` folder name (zero-padded to 4 digits) |
 | `local_run_idx` | Integer index within the scenario group |
 | `PRODUCTIVITY_TREND` | `BAU` / `MEDIUM` / `HIGH` |
-| `REGIONAL_ADOPTION_CONSTRAINTS` | `off` / `NON_AG_CAP` |
+| `REGIONAL_ADOPTION_CONSTRAINTS` | `off` / `individual_cap` / `non_ag_sum_cap` (runs before 2026-10-15: `on` / `NON_AG_CAP`) |
 | `REGIONAL_ADOPTION_NON_AG_CAP` | Threshold % (integer or float) |
 | `HCAS_CONTRIBUTION_PERCENTILE` | `USER_DEFINED` / `AG_UNIFORM` |
 | `BIO_CONTRIBUTION_LDS` | Float (e.g. `0.75`, `0.8`, `0.85`) |
@@ -484,7 +484,9 @@ def make_index(task_root_dir):
     <select id="filter-regional">
       <option value="">All</option>
       <option value="off">off</option>
-      <option value="NON_AG_CAP">NON_AG_CAP</option>
+      <option value="individual_cap">individual_cap</option>
+      <option value="non_ag_sum_cap">non_ag_sum_cap</option>
+      <option value="NON_AG_CAP">NON_AG_CAP (before 2026-10-15)</option>
     </select>
   </label>
   <label>Status:
