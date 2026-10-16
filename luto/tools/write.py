@@ -627,7 +627,9 @@ def write_dvar_and_mosaic_map(data: Data, yr_cal, path):
     ag_map_argmax = ag_map_argmax.expand_dims(lu=['ALL'])
     ag_map_argmax = xr.where(ag_mask.values[None, None, :], ag_map_argmax, np.nan)
     
-    am_argmax_ALL = am_map.sum(['lm','lu']).argmax(dim='am').expand_dims(lm=['ALL']).astype(np.float32)
+    code_of_am = np.array([data.AGMAN2IDX[am] + 1 for am in am_map['am'].values], dtype=np.float32)   # each option's fixed map code (COLOR_AM): its position in settings.AG_MANAGEMENTS + 1; 0 is 'No management'
+    am_argmax_ALL = am_map.sum(['lm','lu']).argmax(dim='am')                                          # the dominant option, as a position on am_map's am dim (the enabled options only)
+    am_argmax_ALL = am_argmax_ALL.copy(data=code_of_am[am_argmax_ALL.values]).expand_dims(lm=['ALL']).astype(np.float32)
     am_argmax_dry = am_argmax_ALL.where(~lm_map).drop_vars('lm').assign_coords(lm=['dry']).astype(np.float32)
     am_argmax_irr = am_argmax_ALL.where(lm_map).drop_vars('lm').assign_coords(lm=['irr']).astype(np.float32)
     am_argmax_lm = xr.concat([am_argmax_ALL, am_argmax_dry, am_argmax_irr], dim='lm')
@@ -636,7 +638,7 @@ def write_dvar_and_mosaic_map(data: Data, yr_cal, path):
         for lu_code, lu_desc in data.AGLU2DESC.items()
         if lu_code != -1 # Exclude NoData (cells outside LUTO study area)
     ], dim='lu')
-    am_argmax = xr.concat([am_argmax_lu.sum('lu', skipna=True).expand_dims(lu=['ALL']), am_argmax_lu], dim='lu')
+    am_argmax = xr.concat([am_argmax_lm.expand_dims(lu=['ALL']), am_argmax_lu], dim='lu')     # lu=ALL is the cell's dominant option itself: rebuilding it from the per-lu slices left 0 ('No management') where the cell's lumap is non-ag, or of the other lm
     am_argmax = am_argmax.expand_dims(am=['ALL'])
     am_argmax = xr.where(am_mask.values[None,None,None,:], am_argmax, np.nan)
     

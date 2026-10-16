@@ -56,7 +56,8 @@ class RowInputs:
     n_ag_lus: int                                                       # ... ag land uses ...
     n_nonag_lus: int                                                    # ... non-ag land uses ...
     ncells: int                                                         # ... and cells
-    agman2lu: dict                                                      # {option: [land-use codes]} — the (option, lu) slots of the ag-mgt inputs, in slot order
+    agman2lu: dict                                                      # {option: [land-use codes]} — the (option, lu) slots of the ag-mgt inputs, in slot order (enabled options only)
+    am_options: list                                                    # every ag-mgt option, enabled or not, in settings.AG_MANAGEMENTS order: am_idx is a position in it, fixed across runs
     savanna_eligible_r: np.ndarray                                      # cells eligible for savanna burning: the read-back zeroes irr savanna columns outside them
     
     mask_gbf2_solar: np.ndarray                                         # cells solar is kept out of by the GBF2 mask: no am column there, and the renewable row leaves them out
@@ -310,6 +311,7 @@ def get_row_inputs(data: Data, base_year: int, target_year: int) -> RowInputs:
         n_nonag_lus=data.N_NON_AG_LUS,
         ncells=data.NCELLS,
         agman2lu=data.AGMAN2LU,
+        am_options=list(data.AGMAN2IDX),
         savanna_eligible_r=np.flatnonzero(data.SAVBURN_ELIGIBLE == 1),
         mask_gbf2_solar=get_mask_gbf2_solar(data),
         mask_gbf2_wind=get_mask_gbf2_wind(data),

@@ -370,8 +370,9 @@ def report_row_bounds(rows: xr.Dataset, bounds: xr.Dataset, target_year: int, ou
         unit=[UNIT.get(f, 'share') for f in family],
         empty=bounds['empty'].values[listed],
         dropped=rows['redundant'].values[listed]))
-    for field in ('region', 'GBF_target', 'GBF4_presence', 'demand_commodity', 'demand_bound', 'am_idx'):
+    for field in ('region', 'GBF_target', 'GBF4_presence', 'demand_commodity', 'demand_bound'):
         report[field] = rows[field].values[listed]
+    report['ag_management'] = np.array([*settings.AG_MANAGEMENTS, None], dtype=object)[rows['am_idx'].values[listed]]   # the option by name; am_idx -1 (no option) reads the last: None
     os.makedirs(out_dir, exist_ok=True)
     report.to_csv(f"{out_dir}/bound_report_{target_year}.csv", index=False)
 

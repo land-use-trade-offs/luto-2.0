@@ -28,7 +28,7 @@ from scipy import sparse
 # The ONE declaration of the row table: every field at its dtype, as an empty table. ``get_rows`` stacks the families'
 # tables onto it (``xr.concat``), so a field no family carries this step is still there; a family passes only the
 # labels it has (``make_part``), and the rest is filled — -1 on an int field, None on a label. The ints: ``cell`` (every
-# row of a per-cell family), ``m, j, k`` (the (lm, lu) / non-ag lu the row is about), ``am_idx`` (the ag-mgt option),
+# row of a per-cell family), ``m, j, k`` (the (lm, lu) / non-ag lu the row is about), ``am_idx`` (the ag-mgt option, its fixed index in settings.AG_MANAGEMENTS),
 # ``from_m, from_j, from_k, local_r`` (a source cap's source). The labels, as they are (one shared str per row):
 # ``family`` (the family's name: nothing on the table is a code, and it carries no index — a family's rows are the mask
 # ``rows['family'].values == name``), ``region`` (the region a GBF / regional-cap / water / renewable row is about),

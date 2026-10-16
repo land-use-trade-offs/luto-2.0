@@ -429,11 +429,11 @@ def start_point(data, cols: xr.Dataset, inputs: RowInputs, base_year: int) -> np
     x0 = np.where(np.isin(cols['block'].values, ('ag', 'nonag')), cols['base'].values, 0.0).astype(np.float64)
     am = np.flatnonzero(cols['block'].values == 'am')
     am_idx, m, cell, j, j_idx = (cols[field].values[am] for field in ('am_idx', 'm', 'cell', 'j', 'j_idx'))
-    for option_idx, (option, lus) in enumerate(inputs.agman2lu.items()):
+    for option, lus in inputs.agman2lu.items():
         shares = data.ag_man_dvars[base_year].get(option)              # the option's base-year shares, (lm, cell, lu)
         if shares is None:
             continue
-        on = am_idx == option_idx
+        on = am_idx == inputs.am_options.index(option)
         lu = j[on] if shares.shape[-1] != len(lus) else j_idx[on]              # the stored arrays carry the full lu axis, or the option's own
         x0[am[on]] = np.asarray(shares)[m[on], cell[on], lu]
     return x0

@@ -87,7 +87,6 @@ def gather(cols: xr.Dataset, inputs: RowInputs, ag_coeff_mrj, am_coeff_mrj: dict
            ag2ag_coeff: dict = None, ag2nonag_coeff: dict = None, nonag2ag_coeff: dict = None) -> np.ndarray:
     """
     Create a row of coefficients over the columns: every column reads its block's input at its own fields.
-    The inputs name the ``am_idx`` field (the keys of their agman2lu, in order).
     """
     block   = cols['block'].values
     m       = cols['m'].values
@@ -102,16 +101,17 @@ def gather(cols: xr.Dataset, inputs: RowInputs, ag_coeff_mrj, am_coeff_mrj: dict
     cell    = cols['cell'].values
     coeff   = np.zeros(cols.sizes['col'], dtype=np.float32)   # the row: one coefficient per column
 
-    # assign ag/nonag coefficients: an ag column at its (m, cell, j), a non-ag column at its (cell, k)
+    # assign ag/nonag coefficients
     on = block == 'ag'
     coeff[on] = ag_coeff_mrj[m[on], cell[on], j[on]]
+    
     on = block == 'nonag'
     coeff[on] = nonag_coeff_rk[cell[on], k[on]]
 
-    # assign ag-man coefficients: an option's columns at their (m, cell, j_idx)
+    # assign ag-man coefficients
     am = np.flatnonzero(block == 'am')
-    for option_idx, option in enumerate(inputs.agman2lu):
-        on = am[am_idx[am] == option_idx]
+    for option in inputs.agman2lu:
+        on = am[am_idx[am] == inputs.am_options.index(option)]
         coeff[on] = am_coeff_mrj[option][m[on], cell[on], j_idx[on]]
 
     # assign ag2ag arc coefficients: a source's arcs at their (to_m, local_r, to_j)
@@ -239,38 +239,36 @@ def get_obj(econ: EconomicInputs, cols: xr.Dataset, inputs: RowInputs) -> np.nda
     return obj
 
 
-# ═══════════════════════════ the demand rows ═══════════════════════════
-
 
 def get_demand(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
     """
     Add `N_products` rows, each represeting a commodity's demand constraint.
     """
-    print("│   ├── Adding <hard> demand constraints (equality where lb==ub, else lower + upper)...")
+    print("│   ├── Adding demand constraints (equality where lb==ub, else lower + upper)...")
 
     # Get the active products of every ag land use: {ag_idx: [product_idx, ...]} — the unallocated mod/nat are skipped
-    active_p   = {lu: p for lu in range(inputs.n_ag_lus) if (p := np.flatnonzero(inputs.lu2pr_pj[:, lu])).size}
+    lu2pr = {lu: p for lu in range(inputs.n_ag_lus) if (p := np.flatnonzero(inputs.lu2pr_pj[:, lu])).size}
     
-    # Containers for the production block
+    # Containers for the production block in COO format.
     row_idx = []
     col_idx = []
     vals = []
 
-    def put(commodity_coeffs: np.ndarray, columns: np.ndarray):
+    def put(commodity_coeffs: np.ndarray, cell2colspace_r: np.ndarray):
         """One (commodity × column) coefficient block into the COO lists — its nonzero support; the contract drops."""
-        for c_idx in range(inputs.ncms):
-            keep = commodity_coeffs[c_idx] != 0
-            row_idx.append(np.full(int(keep.sum()), c_idx, dtype=np.int32))
-            col_idx.append(columns[keep])
-            vals.append(commodity_coeffs[c_idx][keep])
+        block = sparse.coo_matrix(commodity_coeffs)                      # row = the commodity, col = the cells indexes
+        row_idx.append(block.row)
+        col_idx.append(cell2colspace_r[block.col])                       # cell position -> column-space index
+        vals.append(block.data)
 
     # the production for ag
-    for lu, p in active_p.items():
+    for lu, p in lu2pr.items():
         for lm in range(inputs.nlms):
             cells = np.flatnonzero(support.valid_ag_mrj[lm, :, lu])
             # (commodity × products) @ (products × cell) = (commodity × cell)
             commodity_coeffs = inputs.pr2cm_cp[:, p] @ inputs.ag_q_mrp[lm, cells, :][:, p].T
-            put(commodity_coeffs, support.ag_mrj2col[lm, cells, lu])
+            cell2colspace_r = support.ag_mrj2col[lm, cells, lu]          # the column-space index of every cell in `cells`
+            put(commodity_coeffs, cell2colspace_r)
 
     # the production for ag-mgt: per (option, land use, lm), its columns and their cells read off the table
     am     = np.flatnonzero(cols['block'].values == 'am')
@@ -278,22 +276,25 @@ def get_demand(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
     j_idx  = cols['j_idx'].values[am]
     am_m   = cols['m'].values[am]
     am_r   = cols['cell'].values[am]
-    for option_idx, (option, lus) in enumerate(inputs.agman2lu.items()):
+    for option, lus in inputs.agman2lu.items():
+        option_idx = inputs.am_options.index(option)                     # the option's fixed am_idx
         for lu_idx, lu in enumerate(lus):
-            if lu not in active_p:  # Unallocated mod/nat land has no products
+            if lu not in lu2pr:  # Unallocated mod/nat land has no products
                 continue
-            p = active_p[lu]
+            p = lu2pr[lu]
             for lm in range(inputs.nlms):
                 on = (am_idx == option_idx) & (j_idx == lu_idx) & (am_m == lm)
                 cells = am_r[on]
                 # (commodity × products) @ (products × cell) = (commodity × cell)
                 commodity_coeffs = inputs.pr2cm_cp[:, p] @ inputs.ag_man_q_mrp[option][lm, cells, :][:, p].T
-                put(commodity_coeffs, am[on])
+                cell2colspace_r = am[on]                                 # the column-space index of every cell in `cells`
+                put(commodity_coeffs, cell2colspace_r)
 
     # the production for non-ag
     for lu in range(inputs.n_nonag_lus):
         cells = np.flatnonzero(support.valid_nonag_rk[:, lu])
-        put(inputs.non_ag_q_crk[:, cells, lu], support.nonag_rk2col[cells, lu])
+        cell2colspace_r = support.nonag_rk2col[cells, lu]               # the column-space index of every cell in `cells`
+        put(inputs.non_ag_q_crk[:, cells, lu], cell2colspace_r)
     
     q_block = sparse.csr_matrix(
         (np.concatenate(vals), (np.concatenate(row_idx), np.concatenate(col_idx))),
@@ -323,15 +324,13 @@ def get_demand(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
     return make_part('demand', row_matrix, rhs, np.array(senses, dtype=object), names, scale, demand_commodity=key_commodity, demand_bound=key_bound)
 
 
-# ═══════════════════════════ the policy rows ═══════════════════════════
-
 
 def get_ghg(inputs: RowInputs, cols: xr.Dataset):
     """One global row: Σ ghg · X over the ag, ag-mgt, non-ag columns and the ag → ag arcs ≤ limit − offland."""
     if settings.GHG_EMISSIONS_LIMITS == "off":
         print("│   ├── TURNING OFF GHG emissions constraints ...")
         return None, None
-    print(f"│   ├── Adding <hard> constraints for GHG emissions: {inputs.limits['ghg']:,.0f} tCO2e")
+    print(f"│   ├── Adding constraints for GHG emissions: {inputs.limits['ghg']:,.0f} tCO2e")
 
     # land-use, ag-management and non-ag emissions on the accounting columns, transition emissions on the ag → ag arcs
     coeff = gather(cols, inputs, inputs.ag_g_mrj, inputs.ag_man_g_mrj, inputs.non_ag_g_rk, ag2ag_coeff=inputs.trans_ghg_ag2ag)
@@ -511,7 +510,8 @@ def get_ag_mgt_adoption(inputs: RowInputs, cols: xr.Dataset):
     names = []
     key_am = []
     key_lu = []
-    for option_idx, (option, lus) in enumerate(inputs.agman2lu.items()):
+    for option, lus in inputs.agman2lu.items():
+        option_idx = inputs.am_options.index(option)                     # the option's fixed am_idx
         for lu_idx, j in enumerate(lus):
             row = len(names)
             adoption_limit = float(inputs.ag_man_limits[option][j])
@@ -651,23 +651,17 @@ def get_water(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
         return None, None
     print("│   ├── Adding constraints for water usage limits...")
     coeff = gather(cols, inputs, inputs.ag_w_mrj, inputs.ag_man_w_mrj, inputs.non_ag_w_rk)
-    row_idx = []
-    col_idx = []
-    vals = []
-    rhs = []
-    names = []
-    region_ids = []
-    region_names = []
-    for region_id, water_limit_raw in inputs.limits["water"].items():
-        region_name = inputs.water_region_names[region_id]
-        region_names.append(region_name)
-        on = (support.region2cell['water_region'].values == region_name)[cols['cell'].values] & (coeff != 0)   # the region's columns (those in its cells) with a net yield
-        row_idx.append(np.full(int(on.sum()), len(names)))
-        col_idx.append(np.flatnonzero(on))
-        vals.append(coeff[on])
-        rhs.append(water_limit_raw)
-        names.append(f"water_yield_limit_{region_name}".replace(" ", "_"))
-        region_ids.append(region_id)
+
+    # ── the rows: one per region with a limit, in the limits' order ──
+    region_ids = list(inputs.limits["water"].keys())
+    region_names = [inputs.water_region_names[region_id] for region_id in region_ids]
+    rhs = list(inputs.limits["water"].values())
+    names = [f"water_yield_limit_{region_name}".replace(" ", "_") for region_name in region_names]
+
+    # ── the entries: every column on its region's row ──
+    row_of_cell = pd.Index(region_names).get_indexer(support.region2cell['water_region'].values)   # the row of every cell's region, -1 where it has none or no limit
+    row_of_col = row_of_cell[cols['cell'].values]
+    on = (row_of_col >= 0) & (coeff != 0)                                # the columns in a region with a limit, with a net yield
     for line in pd.DataFrame({
         'water region': region_names, 
         'target inside LUTO study area (ML)': rhs}
@@ -675,7 +669,7 @@ def get_water(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
         print(f"│   │   {line}")
     if not names:
         return None, None
-    row_matrix = sparse.csr_matrix((np.concatenate(vals), (np.concatenate(row_idx), np.concatenate(col_idx))), shape=(len(names), cols.sizes['col']))
+    row_matrix = sparse.csr_matrix((coeff[on], (row_of_col[on], np.flatnonzero(on))), shape=(len(names), cols.sizes['col']))
     row_matrix, rhs, scale = contract(row_matrix, rhs, rescale=True)
     return make_part('water', row_matrix, rhs, '>', names, scale, region=region_ids)
 
@@ -686,7 +680,7 @@ def get_renewable(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
         print("│   ├── TURNING OFF renewable energy constraints ...")
         return None, None
     print("│   ├── Adding constraints for renewable energy production targets ...")
-    options = list(inputs.agman2lu)
+    options = list(inputs.agman2lu)                                      # the enabled options
     re_types = {                                                         # the enabled types only: the options are the enabled ag managements
         option: re_data for option, re_data in {
             'Utility Solar PV': dict(energy_r=inputs.renewable_solar_r, gbf2_mask_idx=inputs.mask_gbf2_solar, mnes_mask_idx=inputs.mask_mnes_solar),
@@ -701,7 +695,7 @@ def get_renewable(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
     energy_of_type = {}
     excluded_of_type = {}
     for option, re_data in re_types.items():
-        on_type = cols['am_idx'].values == options.index(option)
+        on_type = cols['am_idx'].values == inputs.am_options.index(option)
         energy_of_type[option] = np.where(on_type, re_data['energy_r'][cols['cell'].values], np.float32(0.0)).astype(np.float32)   # float32 yield per cell
         excluded_r = np.zeros(inputs.ncells, dtype=bool)
         if settings.EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS:
@@ -736,7 +730,7 @@ def get_renewable(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
             vals.append(energy_of_type[am][on])
             rhs.append(inputs.limits[f"renewable_{am}"][state_name] - inputs.limits[f"renewable_{am}_exist"][state_name])   # raw MWh; row-rescaled below
             names.append(f"renewable_{am}_target_{state_name}".replace(" ", "_"))
-            key_am.append(options.index(am))
+            key_am.append(inputs.am_options.index(am))
             key_state.append(state_name)
     if not names:
         return None, None
@@ -751,7 +745,7 @@ def get_renewable(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
 def get_ag_mgt_link(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
     """One row per am column: X_am − X_ag ≤ 0 (an ag-mgt column cannot exceed the ag column it sits on)."""
     print("│   ├── Adding ag-management link (X_am ≤ X_ag) constraints...")
-    options  = list(inputs.agman2lu)
+    options  = inputs.am_options                                                        # the names of the am_idx codes
     am_cols  = np.flatnonzero(cols['block'].values == 'am')                            # one row per am column, in table order ...
     am_idx   = cols['am_idx'].values[am_cols]
     m        = cols['m'].values[am_cols]
@@ -784,9 +778,10 @@ def get_renewable_ceiling(inputs: RowInputs, cols: xr.Dataset, support: ColSuppo
     names = []
     key_am = []
     key_cell = []
-    for option_idx, option in enumerate(inputs.agman2lu):
+    for option in inputs.agman2lu:
         if option not in settings.RENEWABLES_OPTIONS:
             continue
+        option_idx = inputs.am_options.index(option)                     # the option's fixed am_idx
         am_name = tools.am_name_snake_case(option)
         exist_r = inputs.exist_renewable_solar_r if option == "Utility Solar PV" else inputs.exist_renewable_wind_r   # the total across ALL data years: the ceiling never decreases between periods, so lb(t) <= ceiling always holds
         on_option = (cols['am_idx'].values == option_idx).astype(np.float32)   # 1 on the option's columns

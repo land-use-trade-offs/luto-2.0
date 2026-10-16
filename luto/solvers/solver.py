@@ -58,7 +58,7 @@ class LutoSolver:
         self.row_matrix = row_matrix    # (row x col) scipy CSR: row i of row_matrix is row i of the row table
         self.obj = obj                  # (col,) the objective coefficient of every column (million AUD, row_builder.get_obj)
         self.landmans = inputs.landmans         # the land-management names in m order: how a variable's name spells m
-        self.options = list(inputs.agman2lu)    # the ag-management options in am_idx order: how a variable's name spells am_idx
+        self.options = inputs.am_options        # every ag-management option in am_idx order (settings.AG_MANAGEMENTS): how a variable's name spells am_idx
         self.gurobi_model = gp.Model(f"LUTO {settings.VERSION}", env=gurenv)
         self.x = None                           # ONE MVar over the column table: every column, in Var.index order
         self._vars = None                       # model.getVars() in Var.index order (materialised once, for addMConstr)

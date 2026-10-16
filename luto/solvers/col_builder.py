@@ -313,7 +313,7 @@ def am_space(data: Data, feasible_ag_mrj: np.ndarray, mask_gbf2_solar: np.ndarra
         valid[slot] = slot_valid
 
     j_of_slot      = np.array([j for _, j in slots], dtype=np.int32)                   # the land-use code of each (am, lu) slot
-    am_idx_of_slot = np.array([option for option, lu_codes in enumerate(data.AGMAN2LU.values()) for _ in lu_codes], dtype=np.int32)     # the slot's option, as an index into agman2lu
+    am_idx_of_slot = np.array([data.AGMAN2IDX[option] for option, lu_codes in data.AGMAN2LU.items() for _ in lu_codes], dtype=np.int32)  # the slot's option, as its fixed index (its position in settings.AG_MANAGEMENTS)
     j_idx_of_slot  = np.array([position for lu_codes in data.AGMAN2LU.values() for position in range(len(lu_codes))], dtype=np.int32)   # the land use's position within its option: the last axis of the per-option effect arrays [m, r, j_idx]
 
     # the column (gp.Var) view: where the ag-mgt slot exists; nothing reads an am column by grid position
@@ -443,7 +443,7 @@ def column_space(ag_cols: dict, nonag_cols: dict, am_cols: dict, ag2ag_cols: dic
              j      =(('col',), field('j', np.int32, -1)),
              k      =(('col',), field('k', np.int32, -1)),                                   # the non-ag land use it lands on: own (nonag), TO field (ag2nonag)
              slot   =(('col',), field('slot', np.int32, -1)),                                # the (am, lu) slot of an ag-mgt column ...
-             am_idx =(('col',), field('am_idx', np.int32, -1)),                              # ... its option, as a position in the inputs' agman2lu ...
+             am_idx =(('col',), field('am_idx', np.int32, -1)),                              # ... its option, as its fixed index: its position in settings.AG_MANAGEMENTS (RowInputs.am_options) ...
              j_idx  =(('col',), field('j_idx', np.int32, -1)),                               # ... and its land use's position within the option (the last axis of the per-option effect arrays)
              from_m =(('col',), field('from_m', np.int32, -1)),                              # where an arc comes from
              from_j =(('col',), field('from_j', np.int32, -1)),

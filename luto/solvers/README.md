@@ -34,7 +34,7 @@ rows are the mask `rows['family'].values == name`; there is no index.
 ## 4. Both tables are 1-D, with attributes per position
 
 A column has `lb`, `ub`, `base` and the fields that say where it reads its input — `m, j` (ag land management, land
-use), `k` (non-ag land use), `am_idx, j_idx` (the ag-management slot), `from_m, from_j, from_k, local_r` (where an arc
+use), `k` (non-ag land use), `am_idx, j_idx` (the ag-management slot: `am_idx` the option's fixed position in `settings.AG_MANAGEMENTS`, enabled or not), `from_m, from_j, from_k, local_r` (where an arc
 comes from), `cell` (every column) and `block`. A row has the same int fields where its family has them, plus the
 labels `region`, `GBF_target`, `GBF4_presence`, `demand_commodity`, `demand_bound`. A field a block or family does not
 carry is filled: −1 on an int, `None` on a label. Nothing on either table is a code.

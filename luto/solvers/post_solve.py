@@ -56,7 +56,6 @@ def post_solve(x: np.ndarray, cols: xr.Dataset, col_support: ColSupport, inputs:
     n_nonag_lus = inputs.n_nonag_lus
     ncells      = inputs.ncells
     agman2lu    = inputs.agman2lu
-    options     = list(agman2lu)                                         # the am_idx field's names
 
     # ── 1. the decision variables: x scattered back through the table's fields (float64 -> float32) ──
     block   = cols['block'].values
@@ -85,9 +84,9 @@ def post_solve(x: np.ndarray, cols: xr.Dataset, col_support: ColSupport, inputs:
     # ag-management. Savanna eligibility is applied to BOTH lm here, while variable creation applied
     # it to dry only: irr savanna vars outside the eligible cells report 0.
     am = block == 'am'
-    am_of_col = np.asarray(options, dtype=object)[am_idx[am]]
+    am_of_col = np.asarray(inputs.am_options, dtype=object)[am_idx[am]]    # the am_idx field's names
     reported = ~((am_of_col == "Savanna Burning") & (m[am] == 1) & ~np.isin(cell[am], inputs.savanna_eligible_r))
-    for option in options:
+    for option in agman2lu:
         dry_cols = reported & (am_of_col == option) & (m[am] == 0)
         irr_cols = reported & (am_of_col == option) & (m[am] == 1)
         am_X_dry_sol_rj[option][cell[am][dry_cols], j[am][dry_cols]] = x[am][dry_cols]

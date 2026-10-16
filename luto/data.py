@@ -1698,6 +1698,12 @@ class Data:
         (the code view of AG_MAN_LU_DESC). A property, so a Data pickled before it existed has it too."""
         return {am: [self.DESC2AGLU[lu] for lu in lus] for am, lus in self.AG_MAN_LU_DESC.items()}
 
+    @property
+    def AGMAN2IDX(self) -> dict[str, int]:
+        """{ag-management option: its fixed index} for EVERY option, enabled or not: its position in settings.AG_MANAGEMENTS.
+        Switching an option off never moves another one, as a disabled non-ag land use keeps its k."""
+        return {am: idx for idx, am in enumerate(settings.AG_MANAGEMENTS)}
+
     def get_NVIS_sparse_array(self) -> xr.DataArray:
         """
         Load the full NVIS sparse array from disk and return as a sparse-backed xr.DataArray.

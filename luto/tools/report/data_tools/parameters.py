@@ -84,18 +84,6 @@ COMMODITIES_ALL = [
 
 
 
-# Define land use code for am and non-ag land uses
-AM_SELECT = [i for i in settings.AG_MANAGEMENTS if settings.AG_MANAGEMENTS[i]]
-AM_DESELECT = [i for i in settings.AG_MANAGEMENTS if not settings.AG_MANAGEMENTS[i]]
-AM_MAP_CODES = {i:(AM_SELECT.index(i) + 1) for i in AM_SELECT}
-
-NON_AG_SELECT = [i for i in settings.NON_AG_LAND_USES if settings.NON_AG_LAND_USES[i]]
-NON_AG_DESELECT = [i for i in settings.NON_AG_LAND_USES if not settings.NON_AG_LAND_USES[i]]
-NON_AG_MAP_CODES = {i:(NON_AG_SELECT.index(i) + 1) for i in NON_AG_SELECT}
-
-AM_NON_AG_CODES = {**AM_MAP_CODES, **NON_AG_MAP_CODES}
-AM_NON_AG_REMOVED_DESC = AM_DESELECT + NON_AG_DESELECT
-
 
 
 # Define the renaming of the Agricultural-Managment and Non-Agricultural 
@@ -449,81 +437,108 @@ COLOR_AG = {
 
 
 # Agricultural Management — ammap_colors.csv
+# The map code is FIXED: an option's position in settings.AG_MANAGEMENTS + 1, enabled or not (write.write_dvar_and_mosaic_map)
+AM_HEX = {
+    'Asparagopsis taxiformis': '#00a9e6',
+    'Precision Agriculture':   '#e69800',
+    'Ecological Grazing':      '#00a884',
+    'Savanna Burning':         '#d69dbc',
+    'AgTech EI':               '#343434',
+    'Biochar':                 '#8B6914',
+    'HIR - Beef':              '#68ba77',
+    'HIR - Sheep':             '#4f8079',
+    'Utility Solar PV':        '#FFD966',
+    'Onshore Wind':            '#7EB8D4',
+}
 COLOR_AM = {
-    -1: ('Non-Agricultural Land',   '#e1e1e1'),
-     0: ('No management',           '#cccccc'),
-     1: ('Asparagopsis taxiformis', '#00a9e6'),
-     2: ('Precision Agriculture',   '#e69800'),
-     3: ('Ecological Grazing',      '#00a884'),
-     4: ('Savanna Burning',         '#d69dbc'),
-     5: ('AgTech EI',               '#343434'),
-     6: ('Biochar',                 '#8B6914'),
-     7: ('HIR - Beef',              '#68ba77'),
-     8: ('HIR - Sheep',             '#4f8079'),
-     9: ('Utility Solar PV',        '#FFD966'),
-    10: ('Onshore Wind',            '#7EB8D4'),
+    -1: ('Non-Agricultural Land', '#e1e1e1'),
+     0: ('No management',         '#cccccc'),
+    **{idx + 1: (am, AM_HEX[am]) for idx, am in enumerate(settings.AG_MANAGEMENTS)},
 }
 
 
 # Non-agricultural land uses — non_ag_colors.csv
+# The map code is FIXED: NON_AGRICULTURAL_LU_BASE_CODE + the land use's position in settings.NON_AG_LAND_USES, enabled or not
+NON_AG_HEX = {
+    'Environmental Plantings':       '#7dba5a',
+    'Riparian Plantings':            '#3a86c8',
+    'Sheep Agroforestry':            '#b57fd4',
+    'Beef Agroforestry':             '#e07b54',
+    'Carbon Plantings (Block)':      '#2d6a4f',
+    'Sheep Carbon Plantings (Belt)': '#52b788',
+    'Beef Carbon Plantings (Belt)':  '#95d5b2',
+    'BECCS':                         '#888fa3',
+    'Destocked - natural land':      '#c9b45a',
+}
 COLOR_NON_AG = {
-      -1: ('Non-Agricultural Land',           '#e1e1e1'),
-       0: ('Other Agricultural Land',         '#ffebbe'),
-     100: ('Environmental Plantings',         '#7dba5a'),
-     101: ('Riparian Plantings',              '#3a86c8'),
-     102: ('Sheep Agroforestry',              '#b57fd4'),
-     103: ('Beef Agroforestry',               '#e07b54'),
-     104: ('Carbon Plantings (Block)',        '#2d6a4f'),
-     105: ('Sheep Carbon Plantings (Belt)',   '#52b788'),
-     106: ('Beef Carbon Plantings (Belt)',    '#95d5b2'),
-     107: ('BECCS',                           '#888fa3'),
-     108: ('Destocked - natural land',        '#c9b45a'),
+    -1: ('Non-Agricultural Land',   '#e1e1e1'),
+     0: ('Other Agricultural Land', '#ffebbe'),
+    **{settings.NON_AGRICULTURAL_LU_BASE_CODE + k: (lu, NON_AG_HEX[lu]) for k, lu in enumerate(settings.NON_AG_LAND_USES)},
 }
 
 
 # Grouped land-use overview map — lumap_colors_grouped.csv
-# Each lu_code maps to its display group name and color.
-COLOR_LUMAP = {
-      -1: ('Non-Agricultural Land',       '#e1e1e1'),
-      -2: ('Non-Agricultural Land',       '#e1e1e1'),
-       0: ('Crops',                       '#7a8ef5'),
-       3: ('Crops',                       '#7a8ef5'),
-       4: ('Crops',                       '#7a8ef5'),
-       7: ('Crops',                       '#7a8ef5'),
-       8: ('Crops',                       '#7a8ef5'),
-       9: ('Crops',                       '#7a8ef5'),
-      10: ('Crops',                       '#7a8ef5'),
-      11: ('Crops',                       '#7a8ef5'),
-      12: ('Crops',                       '#7a8ef5'),
-      13: ('Crops',                       '#7a8ef5'),
-      16: ('Crops',                       '#7a8ef5'),
-      17: ('Crops',                       '#7a8ef5'),
-      18: ('Crops',                       '#7a8ef5'),
-      19: ('Crops',                       '#7a8ef5'),
-      20: ('Crops',                       '#7a8ef5'),
-      21: ('Crops',                       '#7a8ef5'),
-      24: ('Crops',                       '#7a8ef5'),
-      25: ('Crops',                       '#7a8ef5'),
-      26: ('Crops',                       '#7a8ef5'),
-      27: ('Crops',                       '#7a8ef5'),
-       1: ('Livestock',                   '#ffa77f'),
-       2: ('Livestock',                   '#ffa77f'),
-       5: ('Livestock',                   '#ffa77f'),
-       6: ('Livestock',                   '#ffa77f'),
-      14: ('Livestock',                   '#ffa77f'),
-      15: ('Livestock',                   '#ffa77f'),
-      22: ('Unallocated - modified land', '#00e6a9'),
-      23: ('Unallocated - natural land',  '#ffebbe'),
-     100: ('Environmental plantings',     '#778f45'),
-     101: ('Riparian Plantings',          '#005ce6'),
-     102: ('Sheep Agroforestry',          '#c500ff'),
-     103: ('Beef Agroforestry',           '#ff0000'),
-     104: ('Carbon Plantings (Block)',    '#267300'),
-     105: ('Carbon Plantings (Block)',    '#267300'),
-     106: ('Carbon Plantings (Block)',    '#267300'),
-     107: ('BECCS',                       '#686868'),
-     108: ('Destocked - natural land',    '#e0e048'),
+# The map code is FIXED: an ag land use's position in ag_landuses.csv (AG_LANDUSE), a non-ag land use
+# NON_AGRICULTURAL_LU_BASE_CODE + its position in settings.NON_AG_LAND_USES; each is drawn in its group's colour
+LUMAP_GROUP = {
+    'Apples':                        'Crops',
+    'Beef - modified land':          'Livestock',
+    'Beef - natural land':           'Livestock',
+    'Citrus':                        'Crops',
+    'Cotton':                        'Crops',
+    'Dairy - modified land':         'Livestock',
+    'Dairy - natural land':          'Livestock',
+    'Grapes':                        'Crops',
+    'Hay':                           'Crops',
+    'Nuts':                          'Crops',
+    'Other non-cereal crops':        'Crops',
+    'Pears':                         'Crops',
+    'Plantation fruit':              'Crops',
+    'Rice':                          'Crops',
+    'Sheep - modified land':         'Livestock',
+    'Sheep - natural land':          'Livestock',
+    'Stone fruit':                   'Crops',
+    'Sugar':                         'Crops',
+    'Summer cereals':                'Crops',
+    'Summer legumes':                'Crops',
+    'Summer oilseeds':               'Crops',
+    'Tropical stone fruit':          'Crops',
+    'Unallocated - modified land':   'Unallocated - modified land',
+    'Unallocated - natural land':    'Unallocated - natural land',
+    'Vegetables':                    'Crops',
+    'Winter cereals':                'Crops',
+    'Winter legumes':                'Crops',
+    'Winter oilseeds':               'Crops',
+    'Environmental Plantings':       'Environmental plantings',
+    'Riparian Plantings':            'Riparian Plantings',
+    'Sheep Agroforestry':            'Sheep Agroforestry',
+    'Beef Agroforestry':             'Beef Agroforestry',
+    'Carbon Plantings (Block)':      'Carbon Plantings (Block)',
+    'Sheep Carbon Plantings (Belt)': 'Carbon Plantings (Block)',
+    'Beef Carbon Plantings (Belt)':  'Carbon Plantings (Block)',
+    'BECCS':                         'BECCS',
+    'Destocked - natural land':      'Destocked - natural land',
 }
+LUMAP_GROUP_HEX = {
+    'Crops':                       '#7a8ef5',
+    'Livestock':                   '#ffa77f',
+    'Unallocated - modified land': '#00e6a9',
+    'Unallocated - natural land':  '#ffebbe',
+    'Environmental plantings':     '#778f45',
+    'Riparian Plantings':          '#005ce6',
+    'Sheep Agroforestry':          '#c500ff',
+    'Beef Agroforestry':           '#ff0000',
+    'Carbon Plantings (Block)':    '#267300',
+    'BECCS':                       '#686868',
+    'Destocked - natural land':    '#e0e048',
+}
+COLOR_LUMAP = {
+    -1: ('Non-Agricultural Land', '#e1e1e1'),
+    -2: ('Non-Agricultural Land', '#e1e1e1'),
+    **{j: (LUMAP_GROUP[lu], LUMAP_GROUP_HEX[LUMAP_GROUP[lu]]) for j, lu in enumerate(AG_LANDUSE)},
+    **{settings.NON_AGRICULTURAL_LU_BASE_CODE + k: (LUMAP_GROUP[lu], LUMAP_GROUP_HEX[LUMAP_GROUP[lu]]) for k, lu in enumerate(settings.NON_AG_LAND_USES)},
+}
+
 
 # Land management — lm_colors.csv
 COLOR_LM = {
