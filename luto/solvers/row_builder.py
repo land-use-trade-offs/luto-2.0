@@ -60,7 +60,7 @@ def get_rows(inputs: RowInputs, cols: xr.Dataset, support: ColSupport) -> tuple[
     if bio_on and settings.BIO_ROW_GENERATION:                             # the rows are generated during the solve (rowgen)
         print('│   ├── The biodiversity targets by row generation: no row built up front ...')
     elif bio_on:                                                           # every family: its targets, then the ONE builder
-        bio_S = support.cell2col @ sparse.diags(bio_contribution(inputs, cols))   # (cell x column) @ (column x column) = (cell x column)
+        bio_S = support.cell2col @ sparse.diags(get_bio_contribution(inputs, cols))   # (cell x column) @ (column x column) = (cell x column)
         parts += [build_GBF_rows('GBF2', get_GBF2_targets(inputs), bio_S)]
         parts += [build_GBF_rows('GBF3_NVIS', get_GBF3_NVIS_targets(inputs, support), bio_S)]
         parts += [build_GBF_rows('GBF4_SNES', get_GBF4_SNES_targets(inputs, support), bio_S)]
@@ -163,20 +163,18 @@ def weight_rows(weights, ncells: int) -> sparse.csr_matrix:
 def contract(block: sparse.csr_matrix, rhs=None, rescale: bool = False) -> tuple[sparse.csr_matrix, np.ndarray, np.ndarray]:
     """
     1. Drop tiny coefficients (abs < SOLVER_COEFF_MIN) and eliminate zeros.
-    2. Sort the indices of every row (Gurobi requires it).
+    2. Sort the indices of every row (a product such as ``W @ bio_S`` leaves them unsorted): every block leaves in one layout.
     3. If ``rescale`` is True, geometrically rescale every row and the RHS.
-    The block is modified in place (every caller hands over a freshly built block), and returned with float32 coefficients.
+    The block is a CSR matrix, modified in place (every caller hands over a freshly built block), and returned with float32 coefficients.
     """
 
-    block = block.tocsr()                   # a CSR block is returned as it is: no copy
     # Drop tiny coefficients and eliminate zeros
-    block.data[~(np.abs(block.data) >= settings.SOLVER_COEFF_MIN)] = 0.0   # the drop; NaN fails the test
+    block.data[np.abs(block.data) < settings.SOLVER_COEFF_MIN] = 0.0       # the drop
     block.eliminate_zeros()
-    # Sort the indices of every row
     block.sort_indices()
     
     # Skip rescaling if not requested
-    rhs = None if rhs is None else np.asarray(rhs, dtype=np.float64)
+    rhs = None if rhs is None else np.asarray(rhs, dtype=np.float64)       # keep rhs as float64 to avoid larger number overflow; the target can be very larger due to regional aggregation
     if not rescale:
         block.data = block.data.astype(np.float32, copy=False)             # float32 like the rescaled rows: one float64 block would upcast the whole stacked row_matrix
         return block, rhs, np.ones(block.shape[0], dtype=np.float64)
@@ -189,21 +187,19 @@ def contract(block: sparse.csr_matrix, rhs=None, rescale: bool = False) -> tuple
 
     # the row's factor: the geometric mean of the two, so both land around RESCALE_FACTOR
     scale = np.sqrt(row_max * rhs_abs)
-    scale[rhs_abs == 0] = row_max[rhs_abs == 0]                            # rhs = 0: the coefficients alone set it
-    scale[row_max == 0] = settings.RESCALE_FACTOR                          # empty row: factor 1, the rhs is kept as it is
+    scale[rhs_abs == 0] = row_max[rhs_abs == 0]                            # rhs = 0: the row max is the scaler
+    scale[row_max == 0] = settings.RESCALE_FACTOR                          # all-zero row (every entry under SOLVER_COEFF_MIN): RESCALE_FACTOR, so factor 1 below
     scale /= settings.RESCALE_FACTOR
 
     # divide every entry by its row's factor
-    row_of_entry = np.repeat(np.arange(block.shape[0]), np.diff(block.indptr))   # the row each stored entry sits in
-    block.data /= scale[row_of_entry]                                      # in place, in the data's own precision ...
+    block.data /= np.repeat(scale, np.diff(block.indptr))                  # a per-row broadcast (each row's factor over its slice of data, the sparse A / scale[:, None]); in place, in the data's own precision ...
     block.data = block.data.astype(np.float32, copy=False)                 # ... then float32 (no copy when it already is)
     block.data[np.abs(block.data) < settings.SOLVER_COEFF_MIN] = 0.0       # floor the scaled row
     block.eliminate_zeros()
-    block.sort_indices()
     return block, rhs / scale, scale
 
 
-def bio_contribution(inputs: RowInputs, cols: xr.Dataset) -> np.ndarray:
+def get_bio_contribution(inputs: RowInputs, cols: xr.Dataset) -> np.ndarray:
     """Get the biodiversity contribution of every column"""
     # Ag contribution
     ag_j = np.asarray(inputs.biodiv_contr_ag_j, dtype=np.float32)
@@ -223,19 +219,19 @@ def bio_contribution(inputs: RowInputs, cols: xr.Dataset) -> np.ndarray:
 
 def get_obj(econ: EconomicInputs, cols: xr.Dataset, inputs: RowInputs) -> np.ndarray:
     """The objective coefficient of every column (on ``col``), as Gurobi takes it: the operating economics on
-    the accounting columns and the transition costs, negated, on the arcs — raw AUD, float32 — through the
-    coefficient contract (the SOLVER_COEFF_MIN drop), then scaled to million AUD and floored again, because
-    the scaling can push a coefficient under the floor."""
+    the accounting columns and the transition costs, negated, on the arcs — raw AUD, float32 — scaled to million AUD
+    and floored: a coefficient under SOLVER_COEFF_MIN million AUD (100 AUD) is dropped."""
     # ── one gather over the six blocks: the operating economics on the accounting columns, the transition costs on the arcs ──
     obj = gather(cols, inputs, econ.ag_obj_mrj, econ.ag_man_objs, econ.non_ag_obj_rk,
                  econ.flow_cost_ag2ag, econ.flow_cost_ag2nonag, econ.flow_cost_nonag2ag)
-    arcs = np.isin(cols['block'].values, ('ag2ag', 'ag2nonag', 'nonag2ag'))   # the arc blocks: a transition is a COST, so it enters negated
+    
+    # the arc blocks: a transition is a COST, so it enters negated
+    arcs = np.isin(cols['block'].values, ('ag2ag', 'ag2nonag', 'nonag2ag'))   
     obj[arcs] = -obj[arcs]
 
-    # ── the contract: the drop on the raw coefficient, the scaling to million AUD, the floor on the scaled one ──
-    obj[~(np.abs(obj) >= settings.SOLVER_COEFF_MIN)] = 0.0                     # the drop; NaN fails the test too
+    # ── the scaling to million AUD, floor to make a health obj range ──
     obj = obj * (1.0 / 1e6)                                                    # raw AUD -> million AUD (float32, a reciprocal multiply as gurobipy did)
-    obj[np.abs(obj) < settings.SOLVER_COEFF_MIN] = 0.0                         # floor the scaled coefficient
+    obj[np.abs(obj) < settings.SOLVER_COEFF_MIN] = 0.0                         # the floor: |obj| < SOLVER_COEFF_MIN million AUD (100 AUD)
     return obj
 
 
@@ -300,7 +296,6 @@ def get_demand(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
         (np.concatenate(vals), (np.concatenate(row_idx), np.concatenate(col_idx))),
         shape=(inputs.ncms, cols.sizes['col'])
     )
-    q_block, _, _ = contract(q_block)
 
     # ── the bound rows ──
     commodity = []                                                       # the row's commodity: which production row it copies

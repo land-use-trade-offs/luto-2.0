@@ -5,6 +5,98 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20261016 — the livestock-economics gap: consistent at RES1, a block-aggregation artefact at RES > 1
+
+### TL;DR
+
+`AGEC_LVSTK` (`agec_lvstk.h5`) is NaN in EVERY livestock column (beef, sheep and dairy at once), and so are `FEED_REQ`
+and `WP`, in the SA2s where the CSIRO livestock map has no livestock. **At full resolution the inputs agree:** none of
+those cells holds livestock in 2010, and `x_mrj` (`EXCLUDE`) forbids livestock in all of them. So no livestock column
+ever reads the gap at RES1, and no SA2 needs to be filled. **At RES > 1 they disagree:** `EXCLUDE` is permitted where
+ANY full-res cell of the block permits it, while `AGEC_LVSTK` is read at the block's centre cell. A block whose centre
+falls in a gap SA2, but which contains livestock land elsewhere, gets livestock columns with zero yield, cost and
+revenue. The fix is the block averaging of 20261005 ("Retiring centre picking"; PR #202), not a nearest-neighbour SA2
+fill. Not implemented.
+
+### Where the NaN comes from (raw script, read only)
+
+`N:\Data-Master\LUTO_2.0_input_data\Scripts\script_2_assemble_agricultural_data.py`
+(on the share `\\shares.deakin.edu.au\school-les-m\Planet-A\...`):
+
+| line | what it does |
+|---|---|
+| 86 | loads `lmap`, the CSIRO livestock map (`Profit_map/From_CSIRO/20210910/lmap.h5`): rows only where livestock is mapped |
+| 346 | `FEED_REQ` = mean `feed_req_factor` per SA2, from `lmap` |
+| 348–470 | dairy / beef / sheep economics (`F*`, `Q*`, `P*`, `AC`, `QC`, `FOC`, `FLC`, `FDC`, water) = `lmap` grouped by SA2; gaps filled only for irrigation water (SA2 → SA4 → state → national mean) and drinking water (national mean) |
+| 493– | `ludf.merge(..., how='left', on='SA2_ID')`: an SA2 absent from `lmap` gets NaN in every livestock column |
+| 641–663 | the check "data everywhere it's needed" (NLUM livestock SA2s with no economics): commented out, but it would pass (below) |
+| 669 | writes `cell_livestock_data.h5`, which `dataprep.py:282` reads and copies to `agec_lvstk.h5` unchanged |
+
+### At full resolution (`../raw_data`, `input/x_mrj.npy`)
+
+- 68,921 of 6,956,407 cells (0.99 %) have no livestock economics, in 1,027 of 2,189 SA2s. Every one of those SA2s is
+  missing whole: none is partly covered. They are small (median 6 cells, largest 27,879), so mostly urban.
+- 2010 land use of the gap cells: Non-agricultural land 64,418, Unallocated - natural land 4,289, a few hundred crop
+  cells. **No livestock cell.**
+- `x_mrj` permits no livestock land use (any lm) in any gap cell. Livestock is absent from the SA2 in NLUM, so the
+  SA2 rule bans it, and no cell's own 2010 land use is livestock.
+
+So the CSIRO map and NLUM agree on where livestock is, the NaN means "no livestock here", and the permission mask
+already says the same. A nearest-neighbour fill would put livestock economics on urban SA2s where livestock is banned.
+
+### At RES10 (2010 → 2020, default settings): the artefact
+
+- 182 of 49,027 cells have a centre cell in a gap SA2; their centre-cell land use is Unallocated - natural land 178,
+  Vegetables 3, Sheep - modified land 1.
+- `data.EXCLUDE` (block average of `x_mrj` > 0) still permits livestock in many of them, and 57 HOLD livestock in 2010
+  as block shares (`AG_L_MRJ`, the base-year share map, not a permission): 43,572 ha, about 0.03 % of the national
+  livestock area. Every one is a column with zero yield, cost and revenue:
+
+  | land use | `EXCLUDE` allows (cells) | held in 2010 (cells) | held in 2010 (ha) |
+  |---|---|---|---|
+  | Beef - modified land | 82 | 29 | 14,912 |
+  | Beef - natural land | 67 | 31 | 13,433 |
+  | Dairy - modified land | 32 | 11 | 3,596 |
+  | Dairy - natural land | 15 | 3 | 426 |
+  | Sheep - modified land | 22 | 9 | 10,285 |
+  | Sheep - natural land | 27 | 5 | 920 |
+
+- **HIR makes it matter under a GHG target.** HIR (on Beef / Sheep - natural land) credits regrowth sequestration of
+  S × (`HIR_CEILING_PERCENTAGE` − h) × area per year (`ghg.py:626`, `:651`), independent of livestock. In a zero-yield
+  cell it gives up no livestock profit, so it is sequestration for the maintenance cost alone: the cheapest HIR land in
+  the model. Not checked whether any run placed HIR there.
+
+### How each reader treats the NaN
+
+| reader | treatment |
+|---|---|
+| `cost.get_cost_matrix` (base ag cost) | `fillna(0)` |
+| `data.py:645` `FEED_REQ` | `np.nan_to_num`, so the yield is 0 |
+| `cost.get_beef_hir_effect_c_mrj` / `get_sheep_hir_effect_c_mrj` | unfilled: NaN × factor + maintenance = NaN (366 NaN per option, 95 at real am columns, RES10), which `row_inputs.get_economic_mrj`'s blanket `np.nan_to_num` on the objective zeroes, maintenance cost included |
+
+At RES1 these fills only touch entries that have no column, so they are harmless. At RES > 1 they are the "fill with
+0" that the NaN rule of 20261005 calls wrong, on the artefact cells.
+
+### Open
+
+- **The fix exists on `feature/nan-guard`** (Nick, 2026-10-02, based on `jinzhu` at `410cfcbe`; NOT merged into
+  `jinzhu` as of 2026-10-16):
+  - `a43f0ee2`: coarse `EXCLUDE` counts land-use cells (`LUMASK`) only.
+  - `1f858af0`: every eligible coarse (lm, cell, lu) entry of the economics, GHG, pasture and climate arrays becomes a
+    nested weighted mean over the block's eligible fine cells with data. The livestock inputs are kept per (lm, lu)
+    (`LVSTK_COARSE`, read through `Data.agec_lvstk` and the other accessors). Its message counts this artefact:
+    255 livestock entries at RES10.
+  - `4c8f1515` / `c7320bf8`: a guard that raises on NaN in an eligible entry, for the ag economics inputs and the
+    ag-management effects (HIR included).
+  - `ea0d6423`: `check_nan_guard` injection tests.
+- The 2026-10-16 HIR fill in `cost.py` was reverted the same day: after `1f858af0` an eligible HIR entry has real coarse
+  costs, and the fill would hide NaN from the guard. The blanket `np.nan_to_num` on the objective in
+  `row_inputs.get_economic_mrj` was deleted and then restored the same day: until the merge it is what keeps the
+  artefact cells' NaN HIR cost (RES > 1) from reaching the solver. Nick's branch keeps it too, behind its guard.
+- Optionally check an existing GHG-target run for HIR in the artefact cells.
+
+---
+
 ## 20261008 — one matrix, one handle: every target is a row, `ELASTIC_FAMILIES` relaxes rows by family, two passes separate what cannot hold from what is expensive
 
 ### TL;DR

@@ -24,7 +24,7 @@ For each `(region, species/community, presence)` triplet:
   land budget, renewables, etc. remain active)
 - Add **one** constraint: `sum(val_vector × dvar) >= lb_raw` (built as
   `weight_rows([val_vector]) @ bio_S` — `bio_S` the biodiversity contribution laid on the
-  support, `row_builder.bio_contribution` — then `contract`ed, exactly as `get_GBF4_SNES` /
+  support, `row_builder.get_bio_contribution` — then `contract`ed, exactly as `get_GBF4_SNES` /
   `get_GBF4_ECNES` build it)
 - Solve with barrier (15-min cap per worker)
 - Record: `status`, `tightness`, `coeff_ratio`, `n_cells`, solve time
@@ -419,7 +419,7 @@ for attr in dir(run_settings):
 from scipy import sparse
 from luto.solvers.col_builder import get_cols
 from luto.solvers.row_inputs import get_economics, get_row_inputs
-from luto.solvers.row_builder import bio_contribution, contract, get_obj, get_rows, weight_rows
+from luto.solvers.row_builder import get_bio_contribution, contract, get_obj, get_rows, weight_rows
 from luto.solvers.solver import LutoSolver
 
 print(f"[idx={idx}] Loading {CHECKPOINT} ...", flush=True)
@@ -518,7 +518,7 @@ else:
     # One row, built the way row_builder.get_GBF4_SNES / _ECNES builds it: the region-masked layer as a
     # weight row over cells, times the biodiversity contribution laid on the support (bio_S), then
     # row-rescaled with the target.
-    bio_S  = col_support.cell2col @ sparse.diags(bio_contribution(input_data, cols))
+    bio_S  = col_support.cell2col @ sparse.diags(get_bio_contribution(input_data, cols))
     masked = val_vector if region == "AUSTRALIA" else np.where(reg_matrix == region, val_vector, 0)
     row, rhs, _scale = contract(weight_rows([masked], input_data.ncells) @ bio_S, [lb_raw], rescale=True)
     constr = model.addMConstr(row, solver.x, '>', rhs).tolist()

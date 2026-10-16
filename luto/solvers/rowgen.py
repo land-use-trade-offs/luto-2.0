@@ -28,7 +28,7 @@ from scipy import sparse
 
 from luto import settings
 from luto.solvers.col_builder import ColSupport
-from luto.solvers.row_builder import bio_contribution, build_GBF_rows, get_bio_targets
+from luto.solvers.row_builder import get_bio_contribution, build_GBF_rows, get_bio_targets
 from luto.solvers.row_inputs import RowInputs
 from luto.solvers.row_table import ROW_FILL
 from luto.solvers.solver import build_solver
@@ -73,7 +73,7 @@ class RowGen:
 
     def _screen(self, inputs: RowInputs, cols: xr.Dataset, support: ColSupport) -> None:
         """1b. The screen: every target safe / unattainable / open, from the least and the most habitat of every cell."""
-        self.bio_coeff = bio_contribution(inputs, cols)                        # the habitat contribution of every column
+        self.bio_coeff = get_bio_contribution(inputs, cols)                    # the habitat contribution of every column
         self.bio_S = (support.cell2col @ sparse.diags(self.bio_coeff)).tocsr()  # (cell × col), as get_rows lays it
         floor_r, ceil_r = cell_floor_ceiling(cols, support, self.bio_coeff.astype(np.float64), self.ncells)
         floor, ceiling = self.W @ floor_r, self.W @ ceil_r
