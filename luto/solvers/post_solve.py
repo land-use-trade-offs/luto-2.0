@@ -96,7 +96,7 @@ def post_solve(x: np.ndarray, cols: xr.Dataset, col_support: ColSupport, inputs:
     ag_man_X_mrj = {am: np.stack((am_X_dry_sol_rj[am], am_X_irr_sol_rj[am])) for am in agman2lu}
 
     # ── 2. the transition deltas: the gross flows the objective charged, SOURCE-KEYED so reporting can
-    #       attribute the true from → to flows. Leaf axes mirror the flow_cost dicts ([to_m, local_r, to_j]
+    #       attribute the true from → to flows. Leaf axes mirror the flow_obj dicts ([to_m, local_r, to_j]
     #       for ag targets, [local_r, k] for non-ag targets); local_r indexes the source's cell list.
     #       Every arc is written at its own fields in its source's array, shaped like the source's arc mask (the column side).
     from_m  = cols['from_m'].values

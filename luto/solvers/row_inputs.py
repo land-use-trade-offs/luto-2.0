@@ -372,9 +372,9 @@ class EconomicInputs:
     ag_obj_mrj: np.ndarray                                              # operating economics per agricultural (m, r, j)
     non_ag_obj_rk: np.ndarray                                           # operating economics per non-agricultural (r, k)
     ag_man_objs: dict                                                   # {am: operating economics of the option [m, r, j_idx]}
-    flow_cost_ag2ag: dict                                               # {(from_m, from_j): ndarray[to_m, local_r, to_j]}
-    flow_cost_ag2nonag: dict                                            # {(from_m, from_j): ndarray[local_r, to_k]} — NaN where the land use has no transition cost
-    flow_cost_nonag2ag: dict                                            # {from_k: ndarray[to_m, local_r, to_j]}
+    flow_obj_ag2ag: dict                                                # {(from_m, from_j): ndarray[to_m, local_r, to_j]} — the transition cost, signed for the objective
+    flow_obj_ag2nonag: dict                                             # {(from_m, from_j): ndarray[local_r, to_k]} — the same; NaN where the land use has no transition cost
+    flow_obj_nonag2ag: dict                                             # {from_k: ndarray[to_m, local_r, to_j]} — the same
 
 
 def get_economic_mrj(
@@ -389,7 +389,7 @@ def get_economic_mrj(
     ) -> tuple[np.ndarray, np.ndarray, dict[str, np.ndarray]]:
     """Operating economics per ag (m, r, j), non-ag (r, k) and ag-management option: revenue − production cost
     under maxprofit, production cost under mincost. The land-use transition cost is not here — it is charged per
-    arc (``flow_cost_*``); the two non-flow terms that are, are ``non_ag_t_rk`` and the ag-management adoption cost."""
+    arc (``flow_obj_*``, signed for the objective); the two non-flow terms that are, are ``non_ag_t_rk`` and the ag-management adoption cost."""
     print('Getting base year economic matrix...', flush=True)
 
     if settings.OBJECTIVE == "maxprofit":
@@ -404,7 +404,7 @@ def get_economic_mrj(
         }
 
     elif settings.OBJECTIVE == "mincost":
-        # Pre-calculate sum of production costs (land-use transition cost enters via flow_cost in the solver)
+        # Pre-calculate sum of production costs (land-use transition cost enters per arc, via flow_obj_*)
         ag_obj_mrj = ag_c_mrj
         non_ag_obj_rk = non_ag_c_rk + non_ag_t_rk
 
@@ -497,11 +497,14 @@ def get_economics(data: Data, base_year: int, target_year: int) -> EconomicInput
         if k in per_k:
             flow_cost_nonag2ag[k] = per_k[k].astype(np.float32)
 
+    # ── the transition cost signed for the objective, as get_economic_mrj signs the operating terms ──
+    # maxprofit: a cost lowers the profit (−cost); mincost: a cost is added to the cost minimised (+cost)
+    sign = np.float32(-1.0 if settings.OBJECTIVE == "maxprofit" else 1.0)
     return EconomicInputs(
         ag_obj_mrj=ag_obj_mrj,
         non_ag_obj_rk=non_ag_obj_rk,
         ag_man_objs=ag_man_objs,
-        flow_cost_ag2ag=flow_cost_ag2ag,
-        flow_cost_ag2nonag=flow_cost_ag2nonag,
-        flow_cost_nonag2ag=flow_cost_nonag2ag,
+        flow_obj_ag2ag={src: sign * cost for src, cost in flow_cost_ag2ag.items()},
+        flow_obj_ag2nonag={src: sign * cost for src, cost in flow_cost_ag2nonag.items()},
+        flow_obj_nonag2ag={src: sign * cost for src, cost in flow_cost_nonag2ag.items()},
     )

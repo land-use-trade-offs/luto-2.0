@@ -61,11 +61,11 @@ def get_rows(inputs: RowInputs, cols: xr.Dataset, support: ColSupport) -> tuple[
         print('│   ├── The biodiversity targets by row generation: no row built up front ...')
     elif bio_on:                                                           # every family: its targets, then the ONE builder
         bio_S = support.cell2col @ sparse.diags(get_bio_contribution(inputs, cols))   # (cell x column) @ (column x column) = (cell x column)
-        parts += [build_GBF_rows('GBF2', get_GBF2_targets(inputs), bio_S)]
-        parts += [build_GBF_rows('GBF3_NVIS', get_GBF3_NVIS_targets(inputs, support), bio_S)]
-        parts += [build_GBF_rows('GBF4_SNES', get_GBF4_SNES_targets(inputs, support), bio_S)]
-        parts += [build_GBF_rows('GBF4_ECNES', get_GBF4_ECNES_targets(inputs, support), bio_S)]
-        parts += [build_GBF_rows('GBF8', get_GBF8_targets(inputs, support), bio_S)]
+        parts += [build_GBF_rows('GBF2',        get_GBF2_targets(inputs), bio_S)]
+        parts += [build_GBF_rows('GBF3_NVIS',   get_GBF3_NVIS_targets(inputs, support), bio_S)]
+        parts += [build_GBF_rows('GBF4_SNES',   get_GBF4_SNES_targets(inputs, support), bio_S)]
+        parts += [build_GBF_rows('GBF4_ECNES',  get_GBF4_ECNES_targets(inputs, support), bio_S)]
+        parts += [build_GBF_rows('GBF8',        get_GBF8_targets(inputs, support), bio_S)]
 
 
     # the space: every family's block into the ONE matrix and its table into the ONE row table, in the order above
@@ -219,15 +219,15 @@ def get_bio_contribution(inputs: RowInputs, cols: xr.Dataset) -> np.ndarray:
 
 def get_obj(econ: EconomicInputs, cols: xr.Dataset, inputs: RowInputs) -> np.ndarray:
     """The objective coefficient of every column (on ``col``), as Gurobi takes it: the operating economics on
-    the accounting columns and the transition costs, negated, on the arcs — raw AUD, float32 — scaled to million AUD
-    and floored: a coefficient under SOLVER_COEFF_MIN million AUD (100 AUD) is dropped."""
+    the accounting columns and the transition costs on the arcs, both signed for the objective in ``get_economics``
+    — raw AUD, float32 — scaled to million AUD and floored: a coefficient under SOLVER_COEFF_MIN million AUD
+    (100 AUD) is dropped."""
     # ── one gather over the six blocks: the operating economics on the accounting columns, the transition costs on the arcs ──
-    obj = gather(cols, inputs, econ.ag_obj_mrj, econ.ag_man_objs, econ.non_ag_obj_rk,
-                 econ.flow_cost_ag2ag, econ.flow_cost_ag2nonag, econ.flow_cost_nonag2ag)
-    
-    # the arc blocks: a transition is a COST, so it enters negated
-    arcs = np.isin(cols['block'].values, ('ag2ag', 'ag2nonag', 'nonag2ag'))   
-    obj[arcs] = -obj[arcs]
+    obj = gather(
+        cols, inputs, econ.ag_obj_mrj, 
+        econ.ag_man_objs, econ.non_ag_obj_rk, 
+        econ.flow_obj_ag2ag, econ.flow_obj_ag2nonag, econ.flow_obj_nonag2ag
+    )
 
     # ── the scaling to million AUD, floor to make a health obj range ──
     obj = obj * (1.0 / 1e6)                                                    # raw AUD -> million AUD (float32, a reciprocal multiply as gurobipy did)

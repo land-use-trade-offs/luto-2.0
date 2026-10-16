@@ -136,7 +136,7 @@ class LutoSolver:
 
     def _setup_objective(self):
         """Objective obj · x: the coefficient of every column as given (``row_builder.get_obj``: million AUD,
-        dropped and floored — the coefficient contract is done there)."""
+        floored at SOLVER_COEFF_MIN, every term signed for ``settings.OBJECTIVE``)."""
         print(f"├── Setting up the objective function to {settings.OBJECTIVE}...")
         obj = self.obj
         sense = {"mincost": GRB.MINIMIZE, "maxprofit": GRB.MAXIMIZE}.get(settings.OBJECTIVE)
