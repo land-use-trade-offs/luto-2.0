@@ -216,28 +216,37 @@ def am_mrj_to_xr(data, am_mrj_dict: dict, threshold: float = 0.01) -> xr.DataArr
     )
 
 
-def arr_to_2d(data, arr: np.ndarray) -> tuple[np.ndarray, dict]:
-    """Place a 1D cell array on its 2D grid (NODATA -> NaN); returns the grid and its geo metadata.
+def arr_to_2d(data, arr: np.ndarray, fill: float = np.nan, dtype=np.float32) -> tuple[np.ndarray, dict]:
+    """Place a 1D cell array on its 2D grid; returns the grid and its geo metadata.
 
     `arr` is a full-res 1D array (len = data.LUMASK.size), a full-res array over the LUTO cells
-    (len = data.LUMASK.sum()), or a resfactored array (len = data.NCELLS).
+    (len = data.LUMASK.sum()), or a resfactored array (len = data.NCELLS). Cells outside the array
+    (ocean, and the cells it does not cover) are `fill` — NaN for a map; 0 for a sum over the grid.
+    A resfactored grid keeps LUMAP's codes at the coarse cells outside the model (-1 for non-ag land).
     """
     if arr.size == data.LUMASK.size:
         geo_meta = data.GEO_META_FULLRES
-        arr_2d = np.full(data.NLUM_MASK.shape, data.NODATA).astype(np.float32)
-        np.place(arr_2d, data.NLUM_MASK, arr)
+        arr_2d = np.full(data.NLUM_MASK.shape, fill, dtype=dtype)
+        arr_2d[*data.FULLRES_1D_TO_2D] = arr
     elif arr.size == data.LUMASK.sum():
         geo_meta = data.GEO_META_FULLRES
-        arr_2d = np.full(data.NLUM_MASK.shape, data.NODATA).astype(np.float32)
-        mask_2d = np.zeros(data.NLUM_MASK.shape, dtype=bool)
-        mask_2d[data.NLUM_MASK.astype(bool)] = data.LUMASK
-        np.place(arr_2d, mask_2d, arr)
+        arr_2d = np.full(data.NLUM_MASK.shape, fill, dtype=dtype)
+        arr_2d[*data.FULLRES_1D_TO_2D[:, data.LUMASK]] = arr
     else:
         geo_meta = data.GEO_META
-        arr_2d = data.LUMAP_2D_RESFACTORED.copy().astype(np.float32)
-        arr_2d[*data.COORD_ROW_COL_RESFACTORED] = arr
+        arr_2d = data.LUMAP_2D_RESFACTORED.astype(dtype)
+        arr_2d[data.LUMAP_2D_RESFACTORED == data.NODATA] = fill
+        arr_2d[*data.RES_1D_TO_2D] = arr
 
-    return np.where(arr_2d == data.NODATA, np.nan, arr_2d), geo_meta
+    return arr_2d, geo_meta
+
+
+def block_sum(data, arr: np.ndarray) -> np.ndarray:
+    """Sum a full-res 1D array (len = the full-res land cells) over the block of each model cell: float64, one value
+    per model cell (len = NCELLS). Cells in no modelled block (FULL2RES_IDX_MAP == -1) are left out. NaN is not
+    skipped — a NaN cell makes its block NaN."""
+    in_block = data.FULL2RES_IDX_MAP >= 0
+    return np.bincount(data.FULL2RES_IDX_MAP[in_block], weights=np.asarray(arr, dtype=np.float64)[in_block], minlength=data.RES_1D_TO_2D.shape[1])
 
 
 def arr_to_xr(data, arr: np.ndarray) -> xr.DataArray:

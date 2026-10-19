@@ -153,50 +153,62 @@ class Data:
 
         # Mask out non-agricultural, non-environmental plantings land (i.e., -1) from lumap 
         self.LUMASK = self.LUMAP_NO_RESFACTOR != self.MASK_LU_CODE                                                      # 1D (ij flattend);  `True` for land uses; `False` for desert, urban, water, etc
-        self.LUMASK_2D_FULLRES = np.nan_to_num(tools.arr_to_xr(self, self.LUMASK))
-        
 
-        # Return combined land-use and resfactor mask
+
+        # The spatial lookups. Every 1D array is over the full-res land cells (len = LUMASK.size) or over the model
+        # cells (len = NCELLS), and every spatial operation goes through these:
+        #   - FULLRES_1D_TO_2D (2, n land cells): (row, col) of each full-res land cell on the full-res grid
+        #   - RES_1D_TO_2D (2, NCELLS): (row, col) of each model cell on the resfactored grid (LUMAP_2D_RESFACTORED)
+        #   - FULL2RES_IDX_MAP (n land cells,): the model cell each full-res land cell falls in, -1 if none
+        #   - MASK (n land cells,): True at the full-res cell each model cell reads its inputs from
+        # 1D -> 2D is `grid[*one_d_to_2d] = arr` (tools.arr_to_2d); full-res -> model cells is a sum by
+        # FULL2RES_IDX_MAP (tools.block_sum).
+        self.FULLRES_1D_TO_2D = np.vstack(np.nonzero(self.NLUM_MASK))
+
         if settings.RESFACTOR > 1:
-            
-            # Get 2D coarsed array, where True means the res*res neighbourhood having >=1 land-use cells
-            rf_mask = self.NLUM_MASK.copy()
-            have_lu_cells = xr.DataArray(self.LUMASK_2D_FULLRES, dims=['y', 'x']).coarsen(y=settings.RESFACTOR, x=settings.RESFACTOR, boundary='pad').sum()
-            have_lu_cells = np.repeat(np.repeat(have_lu_cells.data, settings.RESFACTOR, axis=0), settings.RESFACTOR, axis=1)
-            have_lu_cells = have_lu_cells[:self.LUMASK_2D_FULLRES.shape[0], :self.LUMASK_2D_FULLRES.shape[1]]
-            have_lu_cell_downsampled = have_lu_cells[settings.RESFACTOR//2::settings.RESFACTOR, settings.RESFACTOR//2::settings.RESFACTOR]
+            rf = settings.RESFACTOR
+            fullres_rows, fullres_cols = self.FULLRES_1D_TO_2D
 
-            # Get 2D fullres array, where True means 
-            #   - the cell is the center of a res*res neighbourhood AND
-            #   - having >=1 land-use cells
-            lu_mask_fullres = np.zeros_like(rf_mask, dtype=bool)
-            lu_mask_fullres[settings.RESFACTOR//2::settings.RESFACTOR, settings.RESFACTOR//2::settings.RESFACTOR] = have_lu_cell_downsampled
+            # The block of every full-res land cell, numbered row-major on a grid of whole RF x RF blocks
+            n_block_rows = -(-self.NLUM_MASK.shape[0] // rf)
+            n_block_cols = -(-self.NLUM_MASK.shape[1] // rf)
+            block_of_cell = (fullres_rows // rf) * n_block_cols + fullres_cols // rf
 
-            # Get the coords (row, col) of the cells that are the center of a res*res neighbourhood having >=1 land-use cells
-            self.COORD_ROW_COL_FULLRES = np.vstack(np.nonzero(rf_mask & lu_mask_fullres))   # (2, n): the row and col index of every hit
-            self.COORD_ROW_COL_RESFACTORED = (self.COORD_ROW_COL_FULLRES - (settings.RESFACTOR//2)) // settings.RESFACTOR
-            
-            # Get the 1D MASK for resfactoring all input datasets
-            #   - the length is the number cells in Australia (land only).
-            #   - the True values are the center of a res*res neighbourhood having >=1 land-use cells
-            rf_mask[self.COORD_ROW_COL_FULLRES[0], self.COORD_ROW_COL_FULLRES[1]] = 2
-            self.MASK = np.where(rf_mask[np.nonzero(self.NLUM_MASK)] == 2, True, False)
-            
-            self.LUMAP_2D_RESFACTORED = self.LUMAP_2D_FULLRES[settings.RESFACTOR//2::settings.RESFACTOR, settings.RESFACTOR//2::settings.RESFACTOR]
+            # A block is a model cell if it holds >= 1 land-use cell AND its centre cell is land (a block whose
+            # centre falls outside the grid or on ocean is not modelled; its land-use cells are dropped)
+            has_land_use = np.bincount(block_of_cell, weights=self.LUMASK, minlength=n_block_rows * n_block_cols) > 0
+            centre_rows = np.arange(n_block_rows) * rf + rf // 2
+            centre_cols = np.arange(n_block_cols) * rf + rf // 2
+            centre_is_land = np.zeros((n_block_rows, n_block_cols), dtype=bool)
+            inside_rows, inside_cols = centre_rows < self.NLUM_MASK.shape[0], centre_cols < self.NLUM_MASK.shape[1]
+            centre_is_land[np.ix_(inside_rows, inside_cols)] = self.NLUM_MASK[np.ix_(centre_rows[inside_rows], centre_cols[inside_cols])] == 1
+            model_blocks = np.flatnonzero(has_land_use & centre_is_land.ravel())                     # row-major, so in model-cell order
+            self.RES_1D_TO_2D = np.vstack(np.divmod(model_blocks, n_block_cols))
+
+            # Each full-res land cell reads its block's model-cell index (-1: block not modelled)
+            model_cell_of_block = np.full(n_block_rows * n_block_cols, -1, dtype=np.int32)
+            model_cell_of_block[model_blocks] = np.arange(model_blocks.size)
+            self.FULL2RES_IDX_MAP = model_cell_of_block[block_of_cell]
+
+            # MASK: the centre cell of each model cell, among the full-res land cells
+            fullres_idx_2d = np.full(self.NLUM_MASK.shape, -1, dtype=np.int64)
+            fullres_idx_2d[fullres_rows, fullres_cols] = np.arange(fullres_rows.size)
+            self.MASK = np.zeros(fullres_rows.size, dtype=bool)
+            self.MASK[fullres_idx_2d[self.RES_1D_TO_2D[0] * rf + rf // 2, self.RES_1D_TO_2D[1] * rf + rf // 2]] = True
+
+            self.LUMAP_2D_RESFACTORED = self.LUMAP_2D_FULLRES[rf//2::rf, rf//2::rf]
             self.GEO_META = self.update_geo_meta()
-            
+
         elif settings.RESFACTOR == 1:
+            # A block is one cell: the model cells are the land-use cells
             self.MASK = self.LUMASK
+            self.RES_1D_TO_2D = self.FULLRES_1D_TO_2D[:, self.LUMASK]
+            self.FULL2RES_IDX_MAP = np.where(self.LUMASK, np.cumsum(self.LUMASK) - 1, -1).astype(np.int32)
             self.GEO_META = self.GEO_META_FULLRES
             self.LUMAP_2D_RESFACTORED = self.LUMAP_2D_FULLRES
-            self.COORD_ROW_COL_FULLRES = np.vstack(np.nonzero(self.NLUM_MASK == 1))       # (2, n): the row and col index of every hit
-            self.COORD_ROW_COL_RESFACTORED = self.COORD_ROW_COL_FULLRES
         else:
             raise KeyError("Resfactor setting invalid")
-        
-        # Get the 2D MASK
-        self.MASK_2D = np.nan_to_num(tools.arr_to_xr(self, self.MASK))
-        
+
         
         # Get the lon/lat coordinates.
         self.COORD_LON_LAT_2D_FULLRES = self.get_coord(np.nonzero(self.NLUM_MASK), self.GEO_META_FULLRES['transform'])     # 2D array([lon, ...], [lat, ...]);  lon/lat coordinates for each cell in Australia (land only)
@@ -1971,63 +1983,45 @@ class Data:
     
     def get_resfactored_average_fraction(self, arr: np.ndarray, use_valid_cell_count: bool = True) -> np.ndarray:
         '''
-        Calculate the average value for each resfactored cell, given the input arr is masked by the land-use mask
-        (has a length of the number of cells in the full-resolution 1D array, i.e., 6956407).
+        The block average of a full-res 1D array (len = the full-res land cells, 6956407), one value per model cell.
 
         Args:
-            arr (np.ndarray): A 1D array containing the values for the full-resolution array, should be the length
-                of the number of cells in the full-resolution array (i.e., 6956407).
-            use_valid_cell_count (bool): If True (default), divide by the number of valid NLUM cells in each
-                coarsened block. This preserves the per-valid-cell average (e.g. habitat fraction) and prevents
-                edge/coastal blocks with fewer valid cells from being artificially dwarfed vs RES1.
-                If False, divide by RESFACTOR² (all cells in block), which gives the fraction relative
-                to the full coarse cell area — required for lumap dvars where REAL_AREA is the full coarse cell.
+            arr (np.ndarray): A 1D array over the full-res land cells.
+            use_valid_cell_count (bool): If True (default), divide by the number of the block's cells where `arr` > 0
+                (1 where there are none): the average over the cells that carry a value, e.g. a habitat fraction,
+                so coastal blocks with fewer cells are not dwarfed against RES1.
+                If False, divide by RESFACTOR² (all cells of a full block): the fraction of the whole coarse cell,
+                required for lumap dvars, where REAL_AREA is the full coarse cell.
 
         Returns:
-            np.ndarray: A 1D array containing the average values for each cell in the
-            resfactored array, with the same length as the number of cells in the resfactored array.
+            np.ndarray: float32, one value per model cell (len = NCELLS).
         '''
-        arr_2d = np.zeros_like(self.LUMAP_2D_FULLRES, dtype=np.float32)
-        np.place(arr_2d, self.NLUM_MASK, arr)
-
-        arr_2d_xr = xr.DataArray(arr_2d, dims=['y', 'x'])
-        arr_sum = arr_2d_xr.coarsen(x=settings.RESFACTOR, y=settings.RESFACTOR, boundary='pad').sum()
-
+        arr = np.asarray(arr)
+        arr = np.where(np.isnan(arr), 0, arr) if arr.dtype.kind == 'f' else arr                 # NaN cells add nothing (as xarray's sum skipped them)
+        block_total = tools.block_sum(self, arr)
         if use_valid_cell_count:
-            presence_2d = np.zeros_like(self.LUMAP_2D_FULLRES, dtype=np.float32)
-            np.place(presence_2d, self.NLUM_MASK, (arr > 0).astype(np.float32))
-            presence_2d_xr = xr.DataArray(presence_2d, dims=['y', 'x'])
-            denom = presence_2d_xr.coarsen(x=settings.RESFACTOR, y=settings.RESFACTOR, boundary='pad').sum()
-            denom = denom.where(denom > 0, other=1)
+            denom = tools.block_sum(self, arr > 0)
+            denom[denom == 0] = 1
         else:
             denom = settings.RESFACTOR ** 2
+        return (block_total / denom).astype(np.float32)
 
-        arr_2d_xr_resfactored = (arr_sum / denom).values[0:self.LUMAP_2D_RESFACTORED.shape[0], 0:self.LUMAP_2D_RESFACTORED.shape[1]]
-        result = arr_2d_xr_resfactored[self.COORD_ROW_COL_RESFACTORED[0], self.COORD_ROW_COL_RESFACTORED[1]]
-        return result[self.MASK] if settings.RESFACTOR == 1 else result
-    
-    
+
     def get_resfactored_sum(self, arr: np.ndarray) -> np.ndarray:
         '''
-        Calculate the sum for each resfactored cell, given the input arr is masked by the land-use mask
-        (has a length of the number of cells in the full-resolution 1D array, i.e., 6956407).
+        The block sum of a full-res 1D array over its land-use cells (LUMASK; the other cells do not count), one value
+        per model cell.
 
         Args:
-            arr (np.ndarray): A 1D array containing the values for the full-resolution array, should be the length
-                of the number of cells in the full-resolution array (i.e., 6956407).
+            arr (np.ndarray): A 1D array over the full-res land cells (len = 6956407).
         Returns:
-            np.ndarray: A 1D array containing the sum for each cell in the
-            resfactored array, with the same length as the number of cells in the resfactored array.
+            np.ndarray: float32, one value per model cell (len = NCELLS).
         '''
-        arr_2d = np.zeros_like(self.LUMAP_2D_FULLRES, dtype=np.float32)
-        np.place(arr_2d, self.NLUM_MASK, arr)
-        arr_2d_xr = xr.DataArray(arr_2d, dims=['y', 'x']) * self.LUMASK_2D_FULLRES  # Ensure outside LUTO cells are zeroed out and don't contribute to the sum
-        arr_sum = arr_2d_xr.coarsen(x=settings.RESFACTOR, y=settings.RESFACTOR, boundary='pad').sum()
-        result = arr_sum.values[self.COORD_ROW_COL_RESFACTORED[0], self.COORD_ROW_COL_RESFACTORED[1]]
-        # At RF1, COORD_ROW_COL_RESFACTORED spans all NLUM cells (6956407); apply MASK to return only LUTO cells
-        return result[self.MASK] if settings.RESFACTOR == 1 else result
+        arr = np.asarray(arr)
+        arr = np.where(np.isnan(arr), 0, arr) if arr.dtype.kind == 'f' else arr                 # NaN cells add nothing (as xarray's sum skipped them)
+        return tools.block_sum(self, arr * self.LUMASK).astype(np.float32)
 
-    
+
     def get_resfactored_lumap(self) -> np.ndarray:
         """
         Coarsens the LUMAP to the specified resolution factor.
@@ -2101,7 +2095,7 @@ class Data:
         rows, cols = np.nonzero(self.NLUM_MASK)
         n_block_cols = -(-self.NLUM_MASK.shape[1] // rf)
         fine_key = (rows // rf) * n_block_cols + cols // rf
-        coarse_key = self.COORD_ROW_COL_RESFACTORED[0] * n_block_cols + self.COORD_ROW_COL_RESFACTORED[1]
+        coarse_key = self.RES_1D_TO_2D[0] * n_block_cols + self.RES_1D_TO_2D[1]
         pos = np.minimum(np.searchsorted(coarse_key, fine_key), self.NCELLS - 1)
         f2c = np.where(coarse_key[pos] == fine_key, pos, -1)
         area = self.REAL_AREA_NO_RESFACTOR.astype(np.float64)
@@ -2112,7 +2106,7 @@ class Data:
         band_cells = 250_000
         n_block_rows = -(-self.NLUM_MASK.shape[0] // rf)
         fine_at = np.searchsorted(rows, np.arange(n_block_rows + 1) * rf)
-        coarse_at = np.searchsorted(self.COORD_ROW_COL_RESFACTORED[0], np.arange(n_block_rows + 1))
+        coarse_at = np.searchsorted(self.RES_1D_TO_2D[0], np.arange(n_block_rows + 1))
         bands, b0 = [], 0
         for b in range(1, n_block_rows + 1):
             if fine_at[b] - fine_at[b0] >= band_cells or b == n_block_rows:
