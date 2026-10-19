@@ -117,23 +117,22 @@ def get_yield_pot(data, lvstype, vegtype, lm, yr_idx):
     grassfed_factor = {'BEEF': 0.85, 'SHEEP': 0.85, 'DAIRY': 0.65}
     denominator = (365 * dse_per_head[lvstype] * grassfed_factor[lvstype])
 
-    # Base potential.
-    yield_pot = data.FEED_REQ * data.PASTURE_KG_DM_HA / denominator
-
-    # Multiply potential by appropriate SAFE_PUR (safe pasture utilisation rate).
-    if vegtype == 'natural land':
-        yield_pot *= data.SAFE_PUR_NATL
-    elif vegtype == 'modified land':
-        yield_pot *= data.SAFE_PUR_MODL
-    else:
+    if vegtype not in ('natural land', 'modified land'):
         raise KeyError(f"Land cover type '{vegtype}' not identified.")
+    lu = f'{lvstype.capitalize()} - {vegtype}'
+    feed_req, pasture_kg_dm_ha, safe_pur = data.lvstk_pasture(lu, lm)
+
+    # Base potential.
+    yield_pot = feed_req * pasture_kg_dm_ha / denominator
+
+    # Multiply potential by appropriate SAFE_PUR (safe pasture utilisation rate; NATL or MODL by vegtype).
+    yield_pot *= safe_pur
 
     # Multiply livestock yield potential by appropriate irrigation factor (i.e., 2).
     if lm == 'irr':
         yield_pot *= 2
 
     # Apply climate change yield impact multiplier. Essentially changes the number of head per hectare by a multiplier i.e., 1.2 = a 20% increase.
-    lu = f'{lvstype.capitalize()} - {vegtype}'
     yield_pot *= get_ccimpact(data, lu, lm, yr_idx)
 
 
@@ -163,37 +162,38 @@ def get_quantity_lvstk(data, pr, lm, yr_idx):
 
     # Get the yield potential. Since [20251027], here uses a constant multiplier from settings for production intensification
     yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
+    agec = data.agec_lvstk(f'{lvstype.capitalize()} - {vegtype}', lm)
 
     # Determine base quantity case-by-case.
 
     # Beef yields just beef (1) and live exports (3) (both in tonnes of meat per ha).
     if lvstype == 'BEEF': # (F1 * Q1) or (F3 * Q3).
         if 'MEAT' in pr:
-            quantity = ( data.AGEC_LVSTK['F1', lvstype]
-                       * data.AGEC_LVSTK['Q1', lvstype] )
+            quantity = ( agec['F1', lvstype]
+                       * agec['Q1', lvstype] )
         elif 'LEXP' in pr:
-            quantity = ( data.AGEC_LVSTK['F3', lvstype]
-                       * data.AGEC_LVSTK['Q3', lvstype] )
+            quantity = ( agec['F3', lvstype]
+                       * agec['Q3', lvstype] )
         else:
             raise KeyError(f"Unknown {lvstype} product. Check `pr` key.")
 
     elif lvstype == 'SHEEP': # (F1 * Q1), (F2 * Q2), (F3 * Q3).
         if 'MEAT' in pr:
-            quantity = ( data.AGEC_LVSTK['F1', lvstype]
-                       * data.AGEC_LVSTK['Q1', lvstype] )
+            quantity = ( agec['F1', lvstype]
+                       * agec['Q1', lvstype] )
         elif 'WOOL' in pr:
-            quantity = ( data.AGEC_LVSTK['F2', lvstype]
-                       * data.AGEC_LVSTK['Q2', lvstype] )
+            quantity = ( agec['F2', lvstype]
+                       * agec['Q2', lvstype] )
         elif 'LEXP' in pr:
-            quantity = ( data.AGEC_LVSTK['F3', lvstype]
-                       * data.AGEC_LVSTK['Q3', lvstype] )
+            quantity = ( agec['F3', lvstype]
+                       * agec['Q3', lvstype] )
         else:
             raise KeyError(f"Unknown {lvstype} product. Check `pr` key.")
 
     elif lvstype == 'DAIRY': # (F1 * Q1).
         if 'DAIRY' in pr: 
-            quantity = ( data.AGEC_LVSTK['F1', lvstype]
-                       * data.AGEC_LVSTK['Q1', lvstype] 
+            quantity = ( agec['F1', lvstype]
+                       * agec['Q1', lvstype] 
                        / 1000 ) # Convert to KL
         else:
             raise KeyError(f"Unknown {lvstype} product. Check `pr` key.")
