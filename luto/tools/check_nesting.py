@@ -223,7 +223,7 @@ def base_year_totals(mats: dict, alloc_area: np.ndarray = None) -> dict:
 
 
 GATED_RAW = ('head', 'GHG t')           # gated on the raw totals
-GATED_NET = ('production',)             # gated net of the REAL_AREA basis term (R-365)
+GATED_NET = ('production',)             # gated net of the REAL_AREA basis term
 
 
 def fidelity(fine: dict, coarse: dict, rf: int) -> pd.DataFrame:
