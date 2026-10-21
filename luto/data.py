@@ -967,7 +967,7 @@ class Data:
             ]) > 0
 
             # The agricultural economics, GHG, pasture and climate arrays above were read at each block's
-            # centre cell. Re-derive them from the block's eligible fine cells (see coarsen_guarded_arrays).
+            # centre cell. Re-derive them from the block's fine cells: allocated in the base year, else eligible (see coarsen_guarded_arrays).
             self.LVSTK_COARSE = self.coarsen_guarded_arrays(x_mrj_full)
 
 
@@ -2139,12 +2139,17 @@ class Data:
         centre cell, while EXCLUDE and AG_L_MRJ are block aggregates. An eligible coarse entry whose centre
         cell has no data is NaN, and the NaN becomes a zero-cost, zero-output land use.
 
-        Each eligible coarse (lm, cell, lu) entry is replaced by the weighted mean over the block's fine cells
-        that are eligible for (lm, lu), are land-use cells (LUMASK, the cells RESFACTOR 1 models) and carry
-        data, with the weight its class requires. The weights nest, so each coarse product equals the block total
-        of the fine products, e.g. sum(a) * mean_a(Yield) * mean_(a*Yield)(QC) = sum(a * Yield * QC). Entries
-        that are not eligible keep their centre-cell value. An eligible entry is NaN only if no eligible fine
-        cell in its block has data. EXCLUDE counts the same cells.
+        Each eligible coarse (lm, cell, lu) entry is replaced by the weighted mean over its cell set in the block,
+        over the cells that carry data, with the weight its class requires. The cell set is:
+            - the block's fine cells allocated to (lm, lu) in the base year (LUMAP_NO_RESFACTOR, LMMAP_NO_RESFACTOR,
+              the cells AG_L_MRJ counts), where the block has any: the coarse product equals the block's RESFACTOR 1
+              base-year total;
+            - otherwise the block's fine cells that are eligible for (lm, lu) and are land-use cells (LUMASK, the
+              cells RESFACTOR 1 models): the coarse product equals the block total over them.
+        Allocated cells outside the eligible set are left out (reported if any). The weights nest over either set,
+        e.g. sum(a) * mean_a(Yield) * mean_(a*Yield)(QC) = sum(a * Yield * QC). Entries that are not eligible keep
+        their centre-cell value. An eligible entry is NaN only if no cell of its set carries data. EXCLUDE counts the
+        eligible cells, whatever the cell set.
 
         Weight classes (a = fine cell area):
             area            a                           Yield, AC, FLC, FOC, FDC, WR, crop and irrigated-pasture GHG, PASTURE_KG_DM_HA
@@ -2157,7 +2162,7 @@ class Data:
                             (capacity * k with LVSTK_K_FILE; k is in the capacity class, as FEED_REQ)
             head x F        head * F_k                  Q_k
             head x F x Q    head * F_k * Q_k            P_k
-        Stubble (STUBBLE_DSE_FILE), per (lm, stubble land use) over the block's land-use cells eligible for it:
+        Stubble (STUBBLE_DSE_FILE), per (lm, stubble land use) over its cell set (as above):
             area            a                           STUBBLE_DSE_HA
             stubble         a * STUBBLE_DSE_HA          k_sheep (LVSTK_K['SHEEP'])
             (STUBBLE_DSE_HA is the effective rate: 0 on cells without the sheep per-head data the stubble consumers
@@ -2166,6 +2171,11 @@ class Data:
                             stubble head * WR_DRN       WATER_DELIVERY_PRICE
         A block whose weights sum to zero over cells with data (e.g. zero Yield) takes the area-weighted mean;
         its coarse product is zero either way.
+
+        The weights are the same in every year: each year column of the climate multiplier is averaged over the same
+        cell set with the production (crops) or head (livestock, without the multiplier) weight. Crop production and
+        livestock head nest in every year; livestock production and GHG nest where the multiplier does not co-vary
+        with F x Q or the per-head GHG factor inside the block, and exactly while the multiplier is 1 (2010).
 
         The crop arrays and the climate multiplier are indexed by (lm, lu) and are updated in place. The livestock
         inputs are shared by the four (lm, lu) entries of an animal, each with its own eligible cells and head, so
@@ -2195,6 +2205,8 @@ class Data:
         pos = np.minimum(np.searchsorted(coarse_key, fine_key), self.NCELLS - 1)
         f2c = np.where(coarse_key[pos] == fine_key, pos, -1)
         area = self.REAL_AREA_NO_RESFACTOR.astype(np.float64)
+        lumap_fine, lmmap_fine = self.LUMAP_NO_RESFACTOR, self.LMMAP_NO_RESFACTOR       # base-year allocation, the cells AG_L_MRJ counts
+        n_alloc_outside = 0
 
         # The fine inputs are read in bands of whole block rows (about `band_cells` fine cells each), so peak memory
         # stays near one band (agec_crops alone is ~19 GB at full resolution). Fine cells are row-major, so a band is
@@ -2259,9 +2271,9 @@ class Data:
             a = area[s:e]
             land_use = self.LUMASK[s:e]
 
-            def block_mean(v, w, elig):
-                # Weighted mean of fine v over each block's cells in elig with finite v and w; NaN if there are none.
-                k = elig & ok & np.isfinite(v) & np.isfinite(w)
+            def block_mean(v, w, cells):
+                # Weighted mean of fine v over each block's cells in `cells` with finite v and w; NaN if there are none.
+                k = cells & ok & np.isfinite(v) & np.isfinite(w)
                 c = c_loc[k]
                 num = np.bincount(c, weights=w[k] * v[k], minlength=c1 - c0)
                 den = np.bincount(c, weights=w[k], minlength=c1 - c0)
@@ -2272,6 +2284,17 @@ class Data:
                 np.divide(num, den, out=out, where=den > 0)
                 return out
 
+            def cell_set(m, j):
+                # The fine cells (m, j) averages over: allocated in the base year where the block has any, else eligible.
+                nonlocal n_alloc_outside
+                elig = x_mrj_full[m, s:e, j] & land_use
+                alloc = (lumap_fine[s:e] == j) & (lmmap_fine[s:e] == m)
+                n_alloc_outside += int((alloc & ok & ~elig).sum())
+                alloc &= elig
+                has_alloc = np.zeros(c1 - c0, dtype=bool)
+                has_alloc[c_loc[alloc & ok]] = True
+                return np.where(has_alloc[np.where(ok, c_loc, 0)], alloc, elig)
+
             read = lambda fname: pd.read_hdf(path(fname), start=s, stop=e)
             fine = lambda df, col: df[col].to_numpy(dtype=np.float64)
 
@@ -2281,7 +2304,7 @@ class Data:
             cci = read(cci_file)
             for lm, lu in crop_pairs:
                 m, j = self.LANDMANS.index(lm), self.DESC2AGLU[lu]
-                elig, eligible = x_mrj_full[m, s:e, j] & land_use, self.EXCLUDE[m, c0:c1, j]
+                cells, eligible = cell_set(m, j), self.EXCLUDE[m, c0:c1, j]
                 if not eligible.any():
                     continue
                 weights = {'area': a, 'production': a * fine(agec_crops, ('Yield', lm, lu))}
@@ -2290,13 +2313,13 @@ class Data:
                 for i, col in enumerate(self.AGEC_CROPS.columns):
                     if col[1:] == (lm, lu):
                         w = weights[weight_class(crop_class, col[0])]
-                        agec_c[c0:c1][eligible, i] = block_mean(fine(agec_crops, col), w, elig)[eligible]
+                        agec_c[c0:c1][eligible, i] = block_mean(fine(agec_crops, col), w, cells)[eligible]
                 for i, col in enumerate(self.AGGHG_CROPS.columns):
                     if col[1:] == (lm, lu):
-                        agghg_c[c0:c1][eligible, i] = block_mean(fine(agghg_crops, col), a, elig)[eligible]
+                        agghg_c[c0:c1][eligible, i] = block_mean(fine(agghg_crops, col), a, cells)[eligible]
                 for i, col in enumerate(self.CLIMATE_CHANGE_IMPACT.columns):
                     if col[:2] == (lm, lu):
-                        cci_c[c0:c1][eligible, i] = block_mean(fine(cci, col), weights['production'], elig)[eligible]
+                        cci_c[c0:c1][eligible, i] = block_mean(fine(cci, col), weights['production'], cells)[eligible]
             del agec_crops, agghg_crops
 
             # Livestock: per (lm, lu), since an animal's inputs serve both land managements and both vegetation types.
@@ -2318,7 +2341,7 @@ class Data:
                 for lu in self.LU_LVSTK:
                     j = self.DESC2AGLU[lu]
                     animal, vegtype = ag_quantity.lvs_veg_types(lu)
-                    elig, eligible = x_mrj_full[m, s:e, j] & land_use, self.EXCLUDE[m, c0:c1, j]
+                    cells, eligible = cell_set(m, j), self.EXCLUDE[m, c0:c1, j]
                     if not eligible.any():
                         continue
                     out = lvstk[lm, lu]
@@ -2338,24 +2361,24 @@ class Data:
                             wt = w['head'] * fine(agec_lvstk, (f'F{field[1]}', animal)) * fine(agec_lvstk, (f'Q{field[1]}', animal))
                         else:
                             wt = w[cls]
-                        out['AGEC_LVSTK'][c0:c1][eligible, i] = block_mean(fine(agec_lvstk, (field, animal)), wt, elig)[eligible]
+                        out['AGEC_LVSTK'][c0:c1][eligible, i] = block_mean(fine(agec_lvstk, (field, animal)), wt, cells)[eligible]
 
                     for i, col in enumerate(self.AGGHG_LVSTK.loc[:, (animal, slice(None))].columns):
-                        out['AGGHG_LVSTK'][c0:c1][eligible, i] = block_mean(fine(agghg_lvstk, col), w['head'], elig)[eligible]
+                        out['AGGHG_LVSTK'][c0:c1][eligible, i] = block_mean(fine(agghg_lvstk, col), w['head'], cells)[eligible]
 
                     if lm == 'irr':
                         for col in irrpast_cols:
-                            out['AGGHG_IRRPAST'][col][c0:c1][eligible] = block_mean(fine(agghg_irrpast, col), a, elig)[eligible]
+                            out['AGGHG_IRRPAST'][col][c0:c1][eligible] = block_mean(fine(agghg_irrpast, col), a, cells)[eligible]
 
                     for i, col in enumerate(self.CLIMATE_CHANGE_IMPACT.columns):
                         if col[:2] == (lm, lu):
-                            cci_c[c0:c1][eligible, i] = block_mean(fine(cci, col), w['head'], elig)[eligible]
+                            cci_c[c0:c1][eligible, i] = block_mean(fine(cci, col), w['head'], cells)[eligible]
 
-                    out['FEED_REQ'][c0:c1][eligible] = block_mean(feed_req, w['capacity'], elig)[eligible]
-                    out['LVSTK_K'][c0:c1][eligible] = block_mean(k_fine[animal], w['capacity'], elig)[eligible]
-                    out['PASTURE_KG_DM_HA'][c0:c1][eligible] = block_mean(pasture, a, elig)[eligible]
-                    out['SAFE_PUR'][c0:c1][eligible] = block_mean(safe_pur[vegtype], w['pasture'], elig)[eligible]
-                    out['WATER_DELIVERY_PRICE'][c0:c1][eligible] = block_mean(water_price, w['water'], elig)[eligible]
+                    out['FEED_REQ'][c0:c1][eligible] = block_mean(feed_req, w['capacity'], cells)[eligible]
+                    out['LVSTK_K'][c0:c1][eligible] = block_mean(k_fine[animal], w['capacity'], cells)[eligible]
+                    out['PASTURE_KG_DM_HA'][c0:c1][eligible] = block_mean(pasture, a, cells)[eligible]
+                    out['SAFE_PUR'][c0:c1][eligible] = block_mean(safe_pur[vegtype], w['pasture'], cells)[eligible]
+                    out['WATER_DELIVERY_PRICE'][c0:c1][eligible] = block_mean(water_price, w['water'], cells)[eligible]
 
             if stubble:
                 rate = read(settings.STUBBLE_DSE_FILE).to_numpy(dtype=np.float64)
@@ -2368,13 +2391,13 @@ class Data:
                 rate = np.where(sheep_data | ~np.isfinite(rate), rate, 0.0)
                 for (lm, lu), out in stubble.items():
                     m, j = self.LANDMANS.index(lm), self.DESC2AGLU[lu]
-                    elig, eligible = x_mrj_full[m, s:e, j] & land_use, self.EXCLUDE[m, c0:c1, j]
+                    cells, eligible = cell_set(m, j), self.EXCLUDE[m, c0:c1, j]
                     if not eligible.any():
                         continue
                     w_rate = a * rate
                     w_head = w_rate * k_fine['SHEEP']
-                    out['STUBBLE_DSE_HA'][c0:c1][eligible] = block_mean(rate, a, elig)[eligible]
-                    out['K_SHEEP'][c0:c1][eligible] = block_mean(k_fine['SHEEP'], w_rate, elig)[eligible]
+                    out['STUBBLE_DSE_HA'][c0:c1][eligible] = block_mean(rate, a, cells)[eligible]
+                    out['K_SHEEP'][c0:c1][eligible] = block_mean(k_fine['SHEEP'], w_rate, cells)[eligible]
                     for i, (field, _) in enumerate(sheep_agec_cols):
                         cls = weight_class(lvstk_class, field)
                         if cls == 'head_F':
@@ -2383,12 +2406,14 @@ class Data:
                             wt = w_head * fine(agec_lvstk, (f'F{field[1]}', 'SHEEP')) * fine(agec_lvstk, (f'Q{field[1]}', 'SHEEP'))
                         else:
                             wt = {'area': a, 'head': w_head}[cls]
-                        out['AGEC_LVSTK'][c0:c1][eligible, i] = block_mean(fine(agec_lvstk, (field, 'SHEEP')), wt, elig)[eligible]
+                        out['AGEC_LVSTK'][c0:c1][eligible, i] = block_mean(fine(agec_lvstk, (field, 'SHEEP')), wt, cells)[eligible]
                     for i, col in enumerate(sheep_agghg_cols):
-                        out['AGGHG_LVSTK'][c0:c1][eligible, i] = block_mean(fine(agghg_lvstk, col), w_head, elig)[eligible]
+                        out['AGGHG_LVSTK'][c0:c1][eligible, i] = block_mean(fine(agghg_lvstk, col), w_head, cells)[eligible]
                     w_water = w_head * fine(agec_lvstk, ('WR_DRN', 'SHEEP')) * settings.LIVESTOCK_DRINKING_WATER
-                    out['WATER_DELIVERY_PRICE'][c0:c1][eligible] = block_mean(water_price, w_water, elig)[eligible]
+                    out['WATER_DELIVERY_PRICE'][c0:c1][eligible] = block_mean(water_price, w_water, cells)[eligible]
 
+        if n_alloc_outside:
+            print(f"│   ⚠ WARNING: coarsen_guarded_arrays: {n_alloc_outside:,} allocated (lm, lu) fine-cell entries are not eligible; left out of their cell sets", flush=True)
         self.AGEC_CROPS = pd.DataFrame(agec_c, index=self.AGEC_CROPS.index, columns=self.AGEC_CROPS.columns)
         self.AGGHG_CROPS = pd.DataFrame(agghg_c, index=self.AGGHG_CROPS.index, columns=self.AGGHG_CROPS.columns)
         for (lm, lu), out in lvstk.items():
@@ -2423,7 +2448,7 @@ class Data:
         eligible fine cell in its block has data. `feed_req_raw` and `water_delivery_price_raw` are those two
         arrays before their `np.nan_to_num` (at RESFACTOR > 1 the per-(lm, lu) arrays keep the NaN); so are
         `lvstk_k_raw` (per type, with LVSTK_K_FILE) and `stubble_raw` (with STUBBLE_DSE_FILE). With a k file, LVSTK_K is
-        checked on each livestock (lm, lu); with a stubble file, STUBBLE_DSE_HA on the eligible entries of each stubble
+        checked on each livestock (lm, lu) in place of FEED_REQ, which no model quantity then reads; with a stubble file, STUBBLE_DSE_HA on the eligible entries of each stubble
         land use, per (lm, lu), and with both, k_sheep where the stubble rate is positive (where it is 0 there are no stubble sheep).
         The sheep per-head fields on stubble cells are not checked at RESFACTOR 1: a cell without sheep data carries no
         stubble sheep by design; at RESFACTOR > 1 they are checked wherever a coarse entry has stubble head above zero
@@ -2467,7 +2492,8 @@ class Data:
                     water_price = self.water_delivery_price(lu, lm)
                     if coarse is None:
                         feed_req, water_price = feed_req_raw, water_delivery_price_raw
-                    check('FEED_REQ', lm, lu, feed_req, eligible)
+                    if lvstk_k_raw is None:             # with a k file the stocking rate reads k, not FEED_REQ
+                        check('FEED_REQ', lm, lu, feed_req, eligible)
                     check('PASTURE_KG_DM_HA', lm, lu, pasture, eligible)
                     check('SAFE_PUR_NATL' if vegtype == 'natural land' else 'SAFE_PUR_MODL', lm, lu, safe_pur, eligible)
                     check('WATER_DELIVERY_PRICE', lm, lu, water_price, eligible)
@@ -3406,7 +3432,9 @@ class Data:
             project's Carbon Estimation Area. Overlapping projects are clipped at the whole cell.
           - hir_scaling.csv: the scale factor for the unmapped projects (all / mapped issuance to the baseline FY).
         Full-resolution cells are summed into the RESFACTOR block of the cell that represents them; a block with no
-        cell in the model drops its area (reported in 'dropped_ha')."""
+        cell in the model drops its area (reported in 'dropped_ha'). 'ha_mj' holds, for each HIR option's land use j
+        and each lm, the same hectares counted only on the full-resolution cells allocated to (lm, j) in the base year,
+        so a block's baseline is the project area on the option's own cells at every RESFACTOR."""
         cells = pd.read_csv(os.path.join(hir_dir, 'hir_project_cells.csv'))
         scaling = pd.read_csv(os.path.join(hir_dir, 'hir_scaling.csv')).iloc[0]
         rf = settings.RESFACTOR
@@ -3415,7 +3443,8 @@ class Data:
         block[rows[self.MASK] // rf, cols[self.MASK] // rf] = np.arange(self.NCELLS)
 
         baseline_fy = int(scaling['baseline_fy'])
-        ha, dropped = {}, {}
+        hir_js = sorted({self.DESC2AGLU[settings.AG_MANAGEMENTS_TO_LAND_USES[am][0]] for am in ('HIR - Beef', 'HIR - Sheep')})
+        ha, ha_mj, dropped = {}, {}, {}
         for fy in range(int(cells['fy_registered'].min()), baseline_fy + 1):
             sel = cells['fy_registered'] <= fy
             frac = cells.loc[sel].groupby('cell')['fraction'].sum().clip(upper=1)
@@ -3423,8 +3452,13 @@ class Data:
             px_ha = frac.to_numpy() * self.REAL_AREA_NO_RESFACTOR[px] * float(scaling['scale_factor'])
             cell = block[rows[px] // rf, cols[px] // rf]
             ha[fy] = np.bincount(cell[cell >= 0], weights=px_ha[cell >= 0], minlength=self.NCELLS)
+            ha_mj[fy] = {}
+            for m in range(self.NLMS):
+                for j in hir_js:
+                    on = (cell >= 0) & (self.LUMAP_NO_RESFACTOR[px] == j) & (self.LMMAP_NO_RESFACTOR[px] == m)
+                    ha_mj[fy][m, j] = np.bincount(cell[on], weights=px_ha[on], minlength=self.NCELLS)
             dropped[fy] = float(px_ha[cell < 0].sum())
-        return {'ha': ha, 'dropped_ha': dropped, 'baseline_fy': baseline_fy, 'first_fy': min(ha),
+        return {'ha': ha, 'ha_mj': ha_mj, 'dropped_ha': dropped, 'baseline_fy': baseline_fy, 'first_fy': min(ha),
                 'scale_factor': float(scaling['scale_factor'])}
 
     def load_ghg_targets(self, target_dir: str) -> pd.DataFrame:

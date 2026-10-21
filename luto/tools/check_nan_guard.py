@@ -13,7 +13,8 @@ Tests of the NaN guards (`Data.check_eligible_nan`, `Data.check_ag_man_nan`) by 
    - half of them, the centre cell excluded: the aggregation fills the entry, so the build must pass.
    With STUBBLE_DSE_FILE, the same for the fine stubble rate on one block's cells eligible for (dry, Winter cereals).
 
-With LVSTK_K_FILE, the array classes include the per-type k (capacity class) and, with STUBBLE_DSE_FILE as well, k_sheep
+With LVSTK_K_FILE, the array classes include the per-type k (capacity class) in place of FEED_REQ (a NaN in FEED_REQ must
+then not be reported) and, with STUBBLE_DSE_FILE as well, k_sheep
 on a stubble entry with a positive rate (a NaN there must fire; on an entry with rate 0 it must not); with STUBBLE_DSE_FILE,
 the stubble rate, and at RESFACTOR > 1 the stubble-head invariant: a NaN in a
 sheep per-head field of a coarse entry with stubble head above zero must fire, and on an entry with zero stubble head
@@ -110,7 +111,6 @@ def test_classes(data) -> bool:
         ('area (irrigated pasture GHG)', 'AGGHG_IRRPAST CO2E_KG_HA_IRRIG', 'irr', BEEF, lambda: lvstk('irr', BEEF, 'AGGHG_IRRPAST'), 'CO2E_KG_HA_IRRIG', False),
         ('area (pasture)', 'PASTURE_KG_DM_HA', 'dry', BEEF, lambda: lvstk('dry', BEEF, 'PASTURE_KG_DM_HA'), None, False),
         ('pasture', 'SAFE_PUR_MODL', 'dry', BEEF, lambda: lvstk('dry', BEEF, 'SAFE_PUR'), None, False),
-        ('capacity', 'FEED_REQ', 'dry', BEEF, lambda: lvstk('dry', BEEF, 'FEED_REQ'), None, False),
         ('head', 'AGEC_LVSTK QC', 'dry', BEEF, lambda: lvstk('dry', BEEF, 'AGEC_LVSTK'), ('QC', 'BEEF'), False),
         ('head (GHG)', 'AGGHG_LVSTK CO2E_KG_HEAD_ENTERIC', 'dry', BEEF, lambda: lvstk('dry', BEEF, 'AGGHG_LVSTK'), ('BEEF', 'CO2E_KG_HEAD_ENTERIC'), False),
         ('head x F', 'AGEC_LVSTK Q1', 'dry', BEEF, lambda: lvstk('dry', BEEF, 'AGEC_LVSTK'), ('Q1', 'BEEF'), False),
@@ -119,8 +119,10 @@ def test_classes(data) -> bool:
         ('climate, crop (allocated)', 'CLIMATE_CHANGE_IMPACT (allocated)', 'dry', 'Winter cereals', lambda: data.CLIMATE_CHANGE_IMPACT, ('dry', 'Winter cereals', '2050'), True),
         ('climate, livestock (allocated)', 'CLIMATE_CHANGE_IMPACT (allocated)', 'dry', BEEF, lambda: data.CLIMATE_CHANGE_IMPACT, ('dry', BEEF, '2050'), True),
     ]
-    if settings.LVSTK_K_FILE:
+    if settings.LVSTK_K_FILE:               # with a k file the guard checks k in place of FEED_REQ
         cases.append(('capacity (k)', 'LVSTK_K', 'dry', BEEF, lambda: lvstk('dry', BEEF, 'LVSTK_K'), None, False))
+    else:
+        cases.append(('capacity', 'FEED_REQ', 'dry', BEEF, lambda: lvstk('dry', BEEF, 'FEED_REQ'), None, False))
     if data.LU_STUBBLE:
         cases.append(('area (stubble rate)', 'STUBBLE_DSE_HA', 'dry', stubble_lu, lambda: stubble('dry', 'STUBBLE_DSE_HA'), None, 'stubble'))
         if settings.LVSTK_K_FILE:
@@ -161,6 +163,22 @@ def test_classes(data) -> bool:
             print(msg, flush=True)
     data.check_eligible_nan(*raws)
     print('array classes: restored, the guard passes again.', flush=True)
+
+    if settings.LVSTK_K_FILE:               # negative case: with a k file, NaN FEED_REQ, no FEED_REQ report
+        feed = lvstk('dry', BEEF, 'FEED_REQ')
+        r = entry(data.LANDMANS.index('dry'), BEEF, False)
+        old, feed[r] = feed[r], np.nan
+        try:
+            data.check_eligible_nan(*raws)
+            msg = None
+        except ValueError as e:
+            msg = str(e)
+        feed[r] = old
+        ok = msg is None or 'FEED_REQ' not in msg
+        ok_all &= ok
+        print(f"{'PASS' if ok else 'FAIL'} | capacity (k file set) | NaN FEED_REQ not reported | cell {r}", flush=True)
+        if not ok:
+            print(msg, flush=True)
 
     if data.LU_STUBBLE and settings.LVSTK_K_FILE:  # negative case: stubble rate 0, NaN k_sheep, no k_sheep report
         zero = stubble_cells(0, 'rate_zero')
