@@ -57,7 +57,7 @@ def build_matrices(resfactor: int) -> dict:
         'production': np.asarray(ag_quantity.get_quantity_matrices(data, 0)),
         'production 2050 (diagnostic)': np.asarray(ag_quantity.get_quantity_matrices(data, 2050 - data.YR_CAL_BASE)),
         'exclude': np.asarray(data.EXCLUDE).astype(bool),
-        'real_area': np.asarray(data.REAL_AREA, dtype=np.float64),
+        'real_area': np.asarray(data.REAL_AREA.values, dtype=np.float64),
         'lu2pr': np.asarray(data.LU2PR),
         'mask': np.asarray(data.MASK),
         'landmans': list(data.LANDMANS),

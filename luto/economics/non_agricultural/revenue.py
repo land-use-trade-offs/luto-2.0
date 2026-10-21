@@ -35,7 +35,7 @@ def get_rev_env_plantings(data: Data, yr_cal: int) -> np.ndarray:
         The revenue produced by environmental plantings for each cell. A 1-D array indexed by cell.
     """
     # Multiply carbon reduction by carbon price for each cell and adjust for resfactor.
-    return data.EP_BLOCK_AVG_T_CO2_HA_PER_YR * data.REAL_AREA * data.get_carbon_price_by_year(yr_cal)
+    return data.EP_BLOCK_AVG_T_CO2_HA_PER_YR.values * data.REAL_AREA.values * data.get_carbon_price_by_year(yr_cal)
 
 
 def get_rev_rip_plantings(data: Data, yr_cal: int) -> np.ndarray:
@@ -51,7 +51,7 @@ def get_rev_rip_plantings(data: Data, yr_cal: int) -> np.ndarray:
     np.ndarray
         The revenue produced by riparian plantings for each cell. A 1-D array indexed by cell.
     """
-    return data.EP_RIP_AVG_T_CO2_HA_PER_YR * data.REAL_AREA * data.get_carbon_price_by_year(yr_cal)
+    return data.EP_RIP_AVG_T_CO2_HA_PER_YR.values * data.REAL_AREA.values * data.get_carbon_price_by_year(yr_cal)
 
 
 def get_rev_agroforestry_base(data: Data, yr_cal: int) -> np.ndarray:
@@ -67,7 +67,7 @@ def get_rev_agroforestry_base(data: Data, yr_cal: int) -> np.ndarray:
     np.ndarray
         The revenue produced by agroforestry for each cell. A 1-D array indexed by cell.
     """
-    return data.EP_BELT_AVG_T_CO2_HA_PER_YR * data.REAL_AREA * data.get_carbon_price_by_year(yr_cal)
+    return data.EP_BELT_AVG_T_CO2_HA_PER_YR.values * data.REAL_AREA.values * data.get_carbon_price_by_year(yr_cal)
 
 
 def get_rev_sheep_agroforestry(
@@ -141,7 +141,7 @@ def get_rev_carbon_plantings_block(data: Data, yr_cal: int) -> np.ndarray:
         The cost of carbon plantings (block) for each cell. A 1-D array indexed by cell.
     """
     # Multiply carbon reduction by carbon price for each cell and adjust for resfactor.
-    return data.CP_BLOCK_AVG_T_CO2_HA_PER_YR * data.REAL_AREA * data.get_carbon_price_by_year(yr_cal)
+    return data.CP_BLOCK_AVG_T_CO2_HA_PER_YR.values * data.REAL_AREA.values * data.get_carbon_price_by_year(yr_cal)
 
 
 def get_rev_carbon_plantings_belt_base(data: Data, yr_cal: int) -> np.ndarray:
@@ -157,7 +157,7 @@ def get_rev_carbon_plantings_belt_base(data: Data, yr_cal: int) -> np.ndarray:
         The cost of carbon plantings (belt) for each cell. A 1-D array indexed by cell.
     """
     # Multiply carbon reduction by carbon price for each cell and adjust for resfactor.
-    return data.CP_BELT_AVG_T_CO2_HA_PER_YR * data.REAL_AREA * data.get_carbon_price_by_year(yr_cal)
+    return data.CP_BELT_AVG_T_CO2_HA_PER_YR.values * data.REAL_AREA.values * data.get_carbon_price_by_year(yr_cal)
 
 
 def get_rev_sheep_carbon_plantings_belt(
@@ -230,8 +230,8 @@ def get_rev_beccs(data: Data, yr_cal: int) -> np.ndarray:
     -------
     np.ndarray
     """
-    base_rev = np.nan_to_num(data.BECCS_REV_AUD_HA_YR) * data.BECCS_REV_MULTS[yr_cal] * data.REAL_AREA
-    return base_rev + np.nan_to_num(data.BECCS_TCO2E_HA_YR) * data.REAL_AREA * data.get_carbon_price_by_year(yr_cal)
+    base_rev = np.nan_to_num(data.BECCS_REV_AUD_HA_YR.values) * data.BECCS_REV_MULTS[yr_cal] * data.REAL_AREA.values
+    return base_rev + np.nan_to_num(data.BECCS_TCO2E_HA_YR.values) * data.REAL_AREA.values * data.get_carbon_price_by_year(yr_cal)
 
 
 def get_rev_destocked(data: Data, ag_r_mrj: np.ndarray) -> np.ndarray:

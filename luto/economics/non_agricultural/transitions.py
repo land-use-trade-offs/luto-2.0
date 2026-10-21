@@ -50,10 +50,10 @@ def get_env_plant_transitions_from_ag(
 
     result = {}
     for (from_m, from_j), cell_idx in mj_cell_map.items():
-        est_costs  = tools.amortise(data.EP_EST_COST_HA[cell_idx] * est_mults * data.REAL_AREA[cell_idx]).astype(np.float32)
-        t_cost     = tools.amortise(np.nan_to_num(t_j[from_j]) * data.REAL_AREA[cell_idx]).astype(np.float32)
+        est_costs  = tools.amortise(data.EP_EST_COST_HA.sel(cell=cell_idx).values * est_mults * data.REAL_AREA.sel(cell=cell_idx).values).astype(np.float32)
+        t_cost     = tools.amortise(np.nan_to_num(t_j[from_j]) * data.REAL_AREA.sel(cell=cell_idx).values).astype(np.float32)
         w_rm_irrig = (
-            (irr_scalar * data.REAL_AREA[cell_idx]).astype(np.float32)
+            (irr_scalar * data.REAL_AREA.sel(cell=cell_idx).values).astype(np.float32)
             if from_m == 1
             else np.zeros(len(cell_idx), dtype=np.float32)
         )
@@ -81,13 +81,13 @@ def get_rip_plant_transitions_from_ag(
 
     result = {}
     for (from_m, from_j), cell_idx in mj_cell_map.items():
-        est_costs    = tools.amortise(data.RP_EST_COST_HA[cell_idx] * est_mults * data.REAL_AREA[cell_idx]).astype(np.float32)
-        t_cost       = tools.amortise(np.nan_to_num(t_j[from_j]) * data.REAL_AREA[cell_idx]).astype(np.float32)
+        est_costs    = tools.amortise(data.RP_EST_COST_HA.sel(cell=cell_idx).values * est_mults * data.REAL_AREA.sel(cell=cell_idx).values).astype(np.float32)
+        t_cost       = tools.amortise(np.nan_to_num(t_j[from_j]) * data.REAL_AREA.sel(cell=cell_idx).values).astype(np.float32)
         w_rm_irrig   = (
-            (irr_scalar * data.REAL_AREA[cell_idx]).astype(np.float32)
+            (irr_scalar * data.REAL_AREA.sel(cell=cell_idx).values).astype(np.float32)
             if from_m == 1 else np.zeros(len(cell_idx), dtype=np.float32)
         )
-        fencing_cost = (data.RP_FENCING_LENGTH[cell_idx] * fence_scalar * data.REAL_AREA[cell_idx]).astype(np.float32)
+        fencing_cost = (data.RP_FENCING_LENGTH.sel(cell=cell_idx).values * fence_scalar * data.REAL_AREA.sel(cell=cell_idx).values).astype(np.float32)
 
         if separate:
             result[(from_m, from_j)] = {
@@ -114,14 +114,14 @@ def get_sheep_agroforestry_transitions_from_ag(
 
     result = {}
     for (from_m, from_j), cell_idx in mj_cell_map.items():
-        est_costs           = (tools.amortise(data.AF_EST_COST_HA[cell_idx] * est_mults * data.REAL_AREA[cell_idx]) * settings.AF_PROPORTION).astype(np.float32)
-        ag_to_af_t          = (tools.amortise(np.nan_to_num(t_af_j[from_j]) * data.REAL_AREA[cell_idx]) * settings.AF_PROPORTION).astype(np.float32)
-        ag_to_sheep_t       = (tools.amortise(np.nan_to_num(t_sheep_j[from_j]) * data.REAL_AREA[cell_idx]) * (1 - settings.AF_PROPORTION)).astype(np.float32)
+        est_costs           = (tools.amortise(data.AF_EST_COST_HA.sel(cell=cell_idx).values * est_mults * data.REAL_AREA.sel(cell=cell_idx).values) * settings.AF_PROPORTION).astype(np.float32)
+        ag_to_af_t          = (tools.amortise(np.nan_to_num(t_af_j[from_j]) * data.REAL_AREA.sel(cell=cell_idx).values) * settings.AF_PROPORTION).astype(np.float32)
+        ag_to_sheep_t       = (tools.amortise(np.nan_to_num(t_sheep_j[from_j]) * data.REAL_AREA.sel(cell=cell_idx).values) * (1 - settings.AF_PROPORTION)).astype(np.float32)
         w_rm_irrig          = (
-            (irr_scalar * data.REAL_AREA[cell_idx]).astype(np.float32)
+            (irr_scalar * data.REAL_AREA.sel(cell=cell_idx).values).astype(np.float32)
             if from_m == 1 else np.zeros(len(cell_idx), dtype=np.float32)
         )
-        fencing_cost        = (fence_scalar * data.REAL_AREA[cell_idx]).astype(np.float32)
+        fencing_cost        = (fence_scalar * data.REAL_AREA.sel(cell=cell_idx).values).astype(np.float32)
 
         if separate:
             result[(from_m, from_j)] = {
@@ -149,14 +149,14 @@ def get_beef_agroforestry_transitions_from_ag(
 
     result = {}
     for (from_m, from_j), cell_idx in mj_cell_map.items():
-        est_costs    = (tools.amortise(data.AF_EST_COST_HA[cell_idx] * est_mults * data.REAL_AREA[cell_idx]) * settings.AF_PROPORTION).astype(np.float32)
-        ag_to_af_t   = (tools.amortise(np.nan_to_num(t_af_j[from_j]) * data.REAL_AREA[cell_idx]) * settings.AF_PROPORTION).astype(np.float32)
-        ag_to_beef_t = (tools.amortise(np.nan_to_num(t_beef_j[from_j]) * data.REAL_AREA[cell_idx]) * (1 - settings.AF_PROPORTION)).astype(np.float32)
+        est_costs    = (tools.amortise(data.AF_EST_COST_HA.sel(cell=cell_idx).values * est_mults * data.REAL_AREA.sel(cell=cell_idx).values) * settings.AF_PROPORTION).astype(np.float32)
+        ag_to_af_t   = (tools.amortise(np.nan_to_num(t_af_j[from_j]) * data.REAL_AREA.sel(cell=cell_idx).values) * settings.AF_PROPORTION).astype(np.float32)
+        ag_to_beef_t = (tools.amortise(np.nan_to_num(t_beef_j[from_j]) * data.REAL_AREA.sel(cell=cell_idx).values) * (1 - settings.AF_PROPORTION)).astype(np.float32)
         w_rm_irrig   = (
-            (irr_scalar * data.REAL_AREA[cell_idx]).astype(np.float32)
+            (irr_scalar * data.REAL_AREA.sel(cell=cell_idx).values).astype(np.float32)
             if from_m == 1 else np.zeros(len(cell_idx), dtype=np.float32)
         )
-        fencing_cost = (fence_scalar * data.REAL_AREA[cell_idx]).astype(np.float32)
+        fencing_cost = (fence_scalar * data.REAL_AREA.sel(cell=cell_idx).values).astype(np.float32)
 
         if separate:
             result[(from_m, from_j)] = {
@@ -181,10 +181,10 @@ def get_carbon_plantings_block_from_ag(
 
     result = {}
     for (from_m, from_j), cell_idx in mj_cell_map.items():
-        est_costs  = tools.amortise(data.CP_EST_COST_HA[cell_idx] * est_mults * data.REAL_AREA[cell_idx]).astype(np.float32)
-        t_cost     = tools.amortise(np.nan_to_num(t_j[from_j]) * data.REAL_AREA[cell_idx]).astype(np.float32)
+        est_costs  = tools.amortise(data.CP_EST_COST_HA.sel(cell=cell_idx).values * est_mults * data.REAL_AREA.sel(cell=cell_idx).values).astype(np.float32)
+        t_cost     = tools.amortise(np.nan_to_num(t_j[from_j]) * data.REAL_AREA.sel(cell=cell_idx).values).astype(np.float32)
         w_rm_irrig = (
-            (irr_scalar * data.REAL_AREA[cell_idx]).astype(np.float32)
+            (irr_scalar * data.REAL_AREA.sel(cell=cell_idx).values).astype(np.float32)
             if from_m == 1 else np.zeros(len(cell_idx), dtype=np.float32)
         )
 
@@ -212,14 +212,14 @@ def get_sheep_carbon_plantings_belt_from_ag(
 
     result = {}
     for (from_m, from_j), cell_idx in mj_cell_map.items():
-        est_costs     = (tools.amortise(data.CP_EST_COST_HA[cell_idx] * est_mults * data.REAL_AREA[cell_idx]) * settings.CP_BELT_PROPORTION).astype(np.float32)
-        ag_to_cp_t    = (tools.amortise(np.nan_to_num(t_cp_j[from_j]) * data.REAL_AREA[cell_idx]) * settings.CP_BELT_PROPORTION).astype(np.float32)
-        ag_to_sheep_t = (tools.amortise(np.nan_to_num(t_sheep_j[from_j]) * data.REAL_AREA[cell_idx]) * (1 - settings.CP_BELT_PROPORTION)).astype(np.float32)
+        est_costs     = (tools.amortise(data.CP_EST_COST_HA.sel(cell=cell_idx).values * est_mults * data.REAL_AREA.sel(cell=cell_idx).values) * settings.CP_BELT_PROPORTION).astype(np.float32)
+        ag_to_cp_t    = (tools.amortise(np.nan_to_num(t_cp_j[from_j]) * data.REAL_AREA.sel(cell=cell_idx).values) * settings.CP_BELT_PROPORTION).astype(np.float32)
+        ag_to_sheep_t = (tools.amortise(np.nan_to_num(t_sheep_j[from_j]) * data.REAL_AREA.sel(cell=cell_idx).values) * (1 - settings.CP_BELT_PROPORTION)).astype(np.float32)
         w_rm_irrig    = (
-            (irr_scalar * data.REAL_AREA[cell_idx]).astype(np.float32)
+            (irr_scalar * data.REAL_AREA.sel(cell=cell_idx).values).astype(np.float32)
             if from_m == 1 else np.zeros(len(cell_idx), dtype=np.float32)
         )
-        fencing_cost  = (fence_scalar * data.REAL_AREA[cell_idx]).astype(np.float32)
+        fencing_cost  = (fence_scalar * data.REAL_AREA.sel(cell=cell_idx).values).astype(np.float32)
 
         if separate:
             result[(from_m, from_j)] = {
@@ -247,14 +247,14 @@ def get_beef_carbon_plantings_belt_from_ag(
 
     result = {}
     for (from_m, from_j), cell_idx in mj_cell_map.items():
-        est_costs    = (tools.amortise(data.CP_EST_COST_HA[cell_idx] * est_mults * data.REAL_AREA[cell_idx]) * settings.CP_BELT_PROPORTION).astype(np.float32)
-        ag_to_cp_t   = (tools.amortise(np.nan_to_num(t_cp_j[from_j]) * data.REAL_AREA[cell_idx]) * settings.CP_BELT_PROPORTION).astype(np.float32)
-        ag_to_beef_t = (tools.amortise(np.nan_to_num(t_beef_j[from_j]) * data.REAL_AREA[cell_idx]) * (1 - settings.CP_BELT_PROPORTION)).astype(np.float32)
+        est_costs    = (tools.amortise(data.CP_EST_COST_HA.sel(cell=cell_idx).values * est_mults * data.REAL_AREA.sel(cell=cell_idx).values) * settings.CP_BELT_PROPORTION).astype(np.float32)
+        ag_to_cp_t   = (tools.amortise(np.nan_to_num(t_cp_j[from_j]) * data.REAL_AREA.sel(cell=cell_idx).values) * settings.CP_BELT_PROPORTION).astype(np.float32)
+        ag_to_beef_t = (tools.amortise(np.nan_to_num(t_beef_j[from_j]) * data.REAL_AREA.sel(cell=cell_idx).values) * (1 - settings.CP_BELT_PROPORTION)).astype(np.float32)
         w_rm_irrig   = (
-            (irr_scalar * data.REAL_AREA[cell_idx]).astype(np.float32)
+            (irr_scalar * data.REAL_AREA.sel(cell=cell_idx).values).astype(np.float32)
             if from_m == 1 else np.zeros(len(cell_idx), dtype=np.float32)
         )
-        fencing_cost = (fence_scalar * data.REAL_AREA[cell_idx]).astype(np.float32)
+        fencing_cost = (fence_scalar * data.REAL_AREA.sel(cell=cell_idx).values).astype(np.float32)
 
         if separate:
             result[(from_m, from_j)] = {
@@ -283,12 +283,12 @@ def get_destocked_from_ag(
         is_eligible  = not np.isnan(t_j_raw[from_j])   # NaN means non-lvstk-natural, zero cost
         hcas_mult    = HCAS_benefit_mult.get(from_j, 0.0)  # LU_LVSTK_NATURAL contains int codes
 
-        t_cost       = tools.amortise(np.nan_to_num(t_j_raw[from_j]) * data.REAL_AREA[cell_idx]).astype(np.float32)
-        removal_cost = tools.amortise(hcas_mult * data.EP_EST_COST_HA[cell_idx] * data.REAL_AREA[cell_idx]).astype(np.float32)
+        t_cost       = tools.amortise(np.nan_to_num(t_j_raw[from_j]) * data.REAL_AREA.sel(cell=cell_idx).values).astype(np.float32)
+        removal_cost = tools.amortise(hcas_mult * data.EP_EST_COST_HA.sel(cell=cell_idx).values * data.REAL_AREA.sel(cell=cell_idx).values).astype(np.float32)
         est_costs    = t_cost + removal_cost
 
         w_rm_irrig   = (
-            (irr_scalar * data.REAL_AREA[cell_idx]).astype(np.float32)
+            (irr_scalar * data.REAL_AREA.sel(cell=cell_idx).values).astype(np.float32)
             if (from_m == 1 and is_eligible) else np.zeros(len(cell_idx), dtype=np.float32)
         )
 
@@ -387,19 +387,19 @@ def get_env_plantings_to_ag(
     result = {}
     for k, cell_idx in k_cell_map.items():
         # Base transition cost: same for both lm slices (EP source is always dryland)
-        base_cost_rj = tools.amortise(np.nan_to_num(base_ep_to_ag_t) * data.REAL_AREA[cell_idx, np.newaxis]).astype(np.float32)  # (n, N_AG_LUS)
+        base_cost_rj = tools.amortise(np.nan_to_num(base_ep_to_ag_t) * data.REAL_AREA.values[cell_idx, np.newaxis]).astype(np.float32)  # (n, N_AG_LUS)
         base_cost_mrj = np.stack([base_cost_rj, base_cost_rj], axis=0)  # (NLMS, n, N_AG_LUS)
 
         # Water license: source water req = 0 (nonag), so delta = full target req
         water_cost_mrj = np.nan_to_num(
             w_mrj[:, cell_idx, :]                          # (NLMS, n, N_AG_LUS)
-            * data.WATER_LICENCE_PRICE[cell_idx, np.newaxis]  # (n, 1) → broadcasts
+            * data.WATER_LICENCE_PRICE.sel(cell=cell_idx).values[:, np.newaxis]  # (n, 1) → broadcasts
             * data.WATER_LICENSE_COST_MULTS[target_year]
             * settings.INCLUDE_WATER_LICENSE_COSTS
         ).astype(np.float32)
 
         # New irrigation setup: nonag source is always dryland → lm=1 always pays this
-        new_irrig_r = tools.amortise(irr_scalar * data.REAL_AREA[cell_idx]).astype(np.float32)  # (n,)
+        new_irrig_r = tools.amortise(irr_scalar * data.REAL_AREA.sel(cell=cell_idx).values).astype(np.float32)  # (n,)
         water_cost_mrj[1] += new_irrig_r[:, np.newaxis]
 
         if separate:
@@ -532,19 +532,19 @@ def get_destocked_to_ag_base(
     # --- Transition cost: Destocked's OWN T_MAT row; dryland source (both target lm equal) ---
     t_j = data.T_MAT.sel(from_lu='Destocked - natural land', to_lu=data.AGRICULTURAL_LANDUSES).values  # (N_AG_LUS,)
     t_j = np.nan_to_num(t_j) * data.TRANS_COST_MULTS[target_year]
-    trans_rj  = tools.amortise(t_j[np.newaxis, :] * data.REAL_AREA[cell_idx, np.newaxis]).astype(np.float32)  # (n, N_AG_LUS)
+    trans_rj  = tools.amortise(t_j[np.newaxis, :] * data.REAL_AREA.values[cell_idx, np.newaxis]).astype(np.float32)  # (n, N_AG_LUS)
     trans_mrj = np.stack([trans_rj, trans_rj], axis=0)                                                        # (NLMS, n, N_AG_LUS)
 
     # --- Water license cost: destocked source dryland (req 0) → delta = full target req ---
     w_mrj = ag_water.get_wreq_matrices(data, yr_idx)
     water_mrj = np.nan_to_num(
         w_mrj[:, cell_idx, :]
-        * data.WATER_LICENCE_PRICE[cell_idx, np.newaxis]
+        * data.WATER_LICENCE_PRICE.sel(cell=cell_idx).values[:, np.newaxis]
         * data.WATER_LICENSE_COST_MULTS[target_year]
         * settings.INCLUDE_WATER_LICENSE_COSTS
     ).astype(np.float32)
     new_irrig_r = tools.amortise(
-        settings.NEW_IRRIG_COST * data.IRRIG_COST_MULTS[target_year] * data.REAL_AREA[cell_idx]
+        settings.NEW_IRRIG_COST * data.IRRIG_COST_MULTS[target_year] * data.REAL_AREA.sel(cell=cell_idx).values
     ).astype(np.float32)
     water_mrj[1] += new_irrig_r[:, np.newaxis]
 
@@ -634,7 +634,7 @@ def get_non_ag_ub_matrices(data: Data, base_dvar_nonag_rk, base_dvar_ag_mrj) -> 
 
     # 5. Riparian Plantings physical cap: UB ≤ stream-buffer fraction of the cell.
     RP_j = data.NON_AGRICULTURAL_LANDUSES.index('Riparian Plantings')
-    t_rk[:, RP_j] = np.minimum(t_rk[:, RP_j], data.RP_PROPORTION)
+    t_rk[:, RP_j] = np.minimum(t_rk[:, RP_j], data.RP_PROPORTION.values)
 
     return t_rk.astype(np.float32)
 

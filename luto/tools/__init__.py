@@ -124,10 +124,10 @@ def get_ag_to_ag_water_delta_matrix(data, from_m, from_j, cells, w_mrj, yr_idx) 
     the caller amortises explicitly (see transitions.py).
     """
     yr_cal   = data.YR_CAL_BASE + yr_idx
-    area     = data.REAL_AREA[cells]
+    area     = data.REAL_AREA.sel(cell=cells).values
     w_target = w_mrj[:, cells, :] * settings.INCLUDE_WATER_LICENSE_COSTS
     w_base   = w_mrj[from_m, cells, from_j]
-    w_cost   = (w_target - w_base[None, :, None]) * data.WATER_LICENCE_PRICE[cells, None] * data.WATER_LICENSE_COST_MULTS[yr_cal]
+    w_cost   = (w_target - w_base[None, :, None]) * data.WATER_LICENCE_PRICE.sel(cell=cells).values[:, None] * data.WATER_LICENSE_COST_MULTS[yr_cal]
     if from_m == 0:    # was dryland → irrigation setup when switching to irrigated (m=1)
         w_cost[1] += settings.NEW_IRRIG_COST    * data.IRRIG_COST_MULTS[yr_cal] * area[:, None]
     else:              # was irrigated → teardown when switching to dryland (m=0)

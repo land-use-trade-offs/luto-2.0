@@ -67,7 +67,7 @@ def get_bio_quality_score_mrj(data: Data, bio_quality_raw: np.ndarray = None, bi
         b_mrj[:, :, j] = (
             bq_lds -                                                       # Biodiversity score after Late Dry Season (LDS) burning
             (bq_raw * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[j]))     # Biodiversity degradation for land-use j
-        ) * data.REAL_AREA
+        ) * data.REAL_AREA.values
 
     return b_mrj
 
@@ -135,8 +135,8 @@ def get_savanna_burning_effect_b_mrj(data: Data, bio_quality_raw: np.ndarray = N
     new_b_mrj = np.zeros((data.NLMS, data.NCELLS, nlus), dtype=np.float32)
 
     eds_sav_burning_biodiv_benefits = np.where(
-        data.SAVBURN_ELIGIBLE,
-        bq_raw * (1 - settings.BIO_CONTRIBUTION_LDS) * data.REAL_AREA,
+        data.SAVBURN_ELIGIBLE.values,
+        bq_raw * (1 - settings.BIO_CONTRIBUTION_LDS) * data.REAL_AREA.values,
         0
     ).astype(np.float32)
 
@@ -373,7 +373,7 @@ def get_GBF2_MASK_area(data:Data) -> np.ndarray:
     """The GBF2 priority-degraded-area mask weighted by real area, per cell; empty when GBF2 is off."""
     if settings.GBF2_TARGET == 'off':
         return np.empty(0)
-    return data.BIO_GBF2_MASK * data.REAL_AREA
+    return data.BIO_GBF2_MASK * data.REAL_AREA.values
 
 def get_GBF3_NVIS_matrices_vr(data:Data) -> xr.DataArray:
     """
@@ -386,7 +386,7 @@ def get_GBF3_NVIS_matrices_vr(data:Data) -> xr.DataArray:
     """
     if settings.GBF3_NVIS_TARGET == 'off':
         return np.empty(0)
-    return data.GBF3_NVIS_LAYERS_LDS * data.REAL_AREA
+    return data.GBF3_NVIS_LAYERS_LDS * data.REAL_AREA.values
 
 
 def get_GBF3_IBRA_matrices_vr(data:Data) -> np.ndarray:
@@ -398,7 +398,7 @@ def get_GBF3_IBRA_matrices_vr(data:Data) -> np.ndarray:
     np.ndarray
         indexed (v, r) where v is IBRA bioregion and r is cell
     """
-    return data.GBF3_IBRA_LAYERS_LDS * data.REAL_AREA
+    return data.GBF3_IBRA_LAYERS_LDS * data.REAL_AREA.values
 
 
 def get_GBF4_SNES_matrix_sr(data: Data) -> xr.DataArray:
@@ -413,7 +413,7 @@ def get_GBF4_SNES_matrix_sr(data: Data) -> xr.DataArray:
     """
     if settings.GBF4_TARGET_SNES == 'off':
         return np.empty(0)
-    return data.GBF4_SNES_LAYERS_LDS * data.REAL_AREA
+    return data.GBF4_SNES_LAYERS_LDS * data.REAL_AREA.values
 
 
 def get_GBF4_ECNES_matrix_sr(data: Data) -> xr.DataArray:
@@ -428,7 +428,7 @@ def get_GBF4_ECNES_matrix_sr(data: Data) -> xr.DataArray:
     """
     if settings.GBF4_TARGET_ECNES == 'off':
         return np.empty(0)
-    return data.GBF4_ECNES_LAYERS_LDS * data.REAL_AREA
+    return data.GBF4_ECNES_LAYERS_LDS * data.REAL_AREA.values
 
 
 def get_GBF8_matrix_sr(data: Data, target_year: int) -> xr.DataArray:
@@ -446,7 +446,7 @@ def get_GBF8_matrix_sr(data: Data, target_year: int) -> xr.DataArray:
     # get_GBF8_bio_layers_by_yr (same single-application convention as the
     # GBF3/GBF4 *_LAYERS_LDS attributes) — only the area weighting happens here.
     bio_layers = data.get_GBF8_bio_layers_by_yr(target_year)  # numpy (n_species, n_cells)
-    base = (bio_layers * data.REAL_AREA).astype(np.float32)
+    base = (bio_layers * data.REAL_AREA.values).astype(np.float32)
     return xr.DataArray(
         base,
         dims=['species', 'cell'],
@@ -505,7 +505,7 @@ def get_ag_management_biodiversity_contribution(
         }
     if settings.AG_MANAGEMENTS['Savanna Burning']:
         am_contr_dict['Savanna Burning'] = {
-            j_idx: np.where(data.SAVBURN_ELIGIBLE, (1 - settings.BIO_CONTRIBUTION_LDS), 0).astype(np.float32)
+            j_idx: np.where(data.SAVBURN_ELIGIBLE.values, (1 - settings.BIO_CONTRIBUTION_LDS), 0).astype(np.float32)
             for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Savanna Burning'])
         }
     if settings.AG_MANAGEMENTS['AgTech EI']:

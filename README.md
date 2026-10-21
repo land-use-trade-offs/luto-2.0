@@ -115,7 +115,6 @@ luto/                                    # Main package directory
     │   └── create_report_layers.py      # Generate map layer files
     ├── inspect_iis.py                   # Decode IIS / .ilp files from infeasible solves
     ├── mem_monitor.py                   # Memory profiling decorator and live plot
-    ├── spatializers.py                  # Spatial data processing and upsampling
     └── write.py                         # Output writing functions
 
 input/                                   # Input data directory (requires separate download)

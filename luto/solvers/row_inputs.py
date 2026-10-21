@@ -100,7 +100,7 @@ class RowInputs:
     GBF8_region_species: list                                           # GBF8 constraint pairs - list[(region, species)]
 
     commodity_names: list[str]                                          # commodity names (data.COMMODITIES order)
-    offland_ghg: np.ndarray                                             # target-year GHG emissions from off-land commodities (tCO2e); 0.0 when GHG limits are off
+    offland_ghg: xr.DataArray | float                                   # target-year GHG emissions from off-land commodities (tCO2e, 0-d); 0.0 when GHG limits are off
     lu2pr_pj: np.ndarray                                                # conversion matrix: product (p) × land use (j)
     pr2cm_cp: np.ndarray                                                # conversion matrix: commodity (c) × product (p)
     limits: dict                                                        # raw constraint targets for the target year (see get_limits)
@@ -125,7 +125,7 @@ def get_limits(data: Data, yr_cal: int) -> dict[str, Any]:
 
     # Clamped again here, not only in Data.__init__: a resumed run loads a pickled Data and never
     # re-runs __init__, so a checkpoint written before the clamp existed would still carry negatives.
-    limits['demand'] = np.maximum(data.D_CY[yr_cal - data.YR_CAL_BASE], 0.0)
+    limits['demand'] = data.DEMAND_C.sel(year=yr_cal).clip(min=0)            # over Commodity
 
     if settings.WATER_LIMITS == 'on':
         limits['water'] = data.WATER_YIELD_TARGETS
@@ -297,7 +297,7 @@ def get_row_inputs(data: Data, base_year: int, target_year: int) -> RowInputs:
     # ── 6. the year's targets, and the off-land emissions the GHG cap must leave room for ──
     limits = get_limits(data, target_year)
     offland_ghg = (
-        data.OFF_LAND_GHG_EMISSION_C[target_index]                         # raw tCO2e (row-rescaled in the solver)
+        data.OFF_LAND_GHG_EMISSION_C.sel(year=target_year)                 # raw tCO2e (row-rescaled in the solver)
         if settings.GHG_EMISSIONS_LIMITS != 'off'
         else 0.0
     )
@@ -312,7 +312,7 @@ def get_row_inputs(data: Data, base_year: int, target_year: int) -> RowInputs:
         ncells=data.NCELLS,
         agman2lu=data.AGMAN2LU,
         am_options=list(data.AGMAN2IDX),
-        savanna_eligible_r=np.flatnonzero(data.SAVBURN_ELIGIBLE == 1),
+        savanna_eligible_r=np.flatnonzero(data.SAVBURN_ELIGIBLE.values == 1),
         mask_gbf2_solar=get_mask_gbf2_solar(data),
         mask_gbf2_wind=get_mask_gbf2_wind(data),
         mask_mnes_solar=get_mask_mnes_solar(data),
@@ -355,7 +355,7 @@ def get_row_inputs(data: Data, base_year: int, target_year: int) -> RowInputs:
         lu2pr_pj=data.LU2PR,
         pr2cm_cp=data.PR2CM,
         limits=limits,
-        real_area=data.REAL_AREA,
+        real_area=data.REAL_AREA.values,
         ag_mask_proportion_r=data.AG_MASK_PROPORTION_R,
         trans_ghg_ag2ag=trans_ghg_ag2ag,
     )

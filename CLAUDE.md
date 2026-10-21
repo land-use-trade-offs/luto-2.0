@@ -156,7 +156,6 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
   - Saves tree planting carbon data at specific ages (50, 60, 70, 80, 90 years)
   - Uses compressed NetCDF encoding with chunking for efficient storage
   - Format: `tCO2_ha_{type}.nc` where type is ep_block, ep_belt, ep_rip, cp_block, cp_belt, hir_block, hir_rip
-- **`luto/tools/spatializers.py`**: Spatial data processing and upsampling
 - **`luto/tools/write.py`**: Output writing and file generation
 
 ### Utilities

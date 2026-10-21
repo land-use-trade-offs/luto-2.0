@@ -107,7 +107,7 @@ def get_transition_matrices_ag2ag(data: Data, yr_idx: int, from_m: int, from_j: 
         cells = np.arange(data.NCELLS)
     n = len(cells)
     N_AG = data.N_AG_LUS
-    area = data.REAL_AREA[cells]                                                    # (n,)
+    area = data.REAL_AREA.sel(cell=cells).values                                                    # (n,)
 
     # ── Establishment: source only enters via the T_MAT[from_j] row ──
     t_ij  = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu=data.AGRICULTURAL_LANDUSES).values * data.TRANS_COST_MULTS[yr_cal]
@@ -404,7 +404,7 @@ def get_regional_adoption_limits(data: Data, yr_cal: int):
 
     # Per-LU (ag + non-ag) caps from xlsx — only populated in 'individual_cap' mode
     for reg_id, lu_name, area_limit_ha in data.get_regional_adoption_limit_ha_by_year(yr_cal):
-        reg_ind = np.where(data.REGIONAL_ADOPTION_ZONES == reg_id)[0]
+        reg_ind = np.where(data.REGIONAL_ADOPTION_ZONES.values == reg_id)[0]
 
         if lu_name in data.DESC2AGLU:
             lu_code = data.DESC2AGLU[lu_name]

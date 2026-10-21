@@ -306,7 +306,7 @@ def get_demand(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
     key_bound = []
     for c_idx, c_name in enumerate(inputs.commodity_names):
         lb, ub = settings.DEMAND_BOUNDS[c_name]
-        demand = inputs.limits['demand'][c_idx]
+        demand = np.float32(inputs.limits['demand'].sel(Commodity=c_name))
         bounds = [('eq', '=', lb)] if lb == ub else [('lower', '>', lb), ('upper', '<', ub)]
         for bound, sense, factor in bounds:
             commodity.append(c_idx)

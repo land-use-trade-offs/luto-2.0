@@ -295,7 +295,7 @@ def am_space(data: Data, feasible_ag_mrj: np.ndarray, mask_gbf2_solar: np.ndarra
 
     valid = np.zeros((len(slots), data.NLMS, data.NCELLS), dtype=bool)
     lb_smr = np.zeros((len(slots), data.NLMS, data.NCELLS), dtype=np.float32)
-    savanna_mask = data.SAVBURN_ELIGIBLE == 1                                          # cells eligible for savanna burning
+    savanna_mask = data.SAVBURN_ELIGIBLE.values == 1                                          # cells eligible for savanna burning
 
     for slot, (am, j) in enumerate(slots):
         slot_valid = feasible_ag_mrj[:, :, j].copy()                                 # (lm, cell): where the ag column exists
@@ -465,7 +465,7 @@ def cell_regions(data: Data) -> xr.Dataset:
         ibra_names = np.array([*data.REGION_IBRA_NAMES, None], dtype=object)               # code -1 (no bioregion) reads the last: None
         ibra = dict(ibra=(('cell',), ibra_names[np.asarray(data.REGION_IBRA_CODE)]))
     return xr.Dataset(
-        dict(state        =(('cell',), np.array([state_of_code.get(code) for code in np.asarray(data.REGION_STATE_CODE).tolist()], dtype=object)),
+        dict(state        =(('cell',), np.array([state_of_code.get(code) for code in data.REGION_STATE_CODE.values.tolist()], dtype=object)),
              nrm          =(('cell',), np.asarray(data.REGION_NRM_NAME, dtype=object)),
              water_region =(('cell',), np.array([data.WATER_REGION_NAMES.get(region_id) for region_id in np.asarray(data.WATER_REGION_ID).tolist()], dtype=object)),
              **ibra),
