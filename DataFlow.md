@@ -156,7 +156,7 @@ charged in the solver against per-source delta vars (`input_data.py:639-643`).
 | `ag_g_mrj` | `get_ag_g_mrj` 233 | `ag_ghg.get_ghg_matrices` | `AGGHG_CROPS`, `AGGHG_LVSTK`, `AGGHG_IRRPAST`, `SOIL_CARBON_AVG_T_CO2_HA_PER_YR`, `SAVBURN_ELIGIBLE`, `SAVBURN_TOTAL_TCO2E_HA`, `CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR`, `BIO_HABITAT_CONTRIBUTION_LOOK_UP` | `agGHG_crops.h5`, `agGHG_lvstk.h5`, `agGHG_irrpast.h5`, `soil_carbon_t_ha.h5`, `cell_savanna_burning.h5`, `natural_land_t_co2_ha.h5`, `fire_risk.h5`, `bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv` |
 | `non_ag_g_rk` | `get_non_ag_g_rk` 239 | `non_ag_ghg.get_ghg_matrix` | `{EP,CP}_*_AVG_T_CO2_HA_PER_YR`, `BECCS_TCO2E_HA_YR`, `CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR`, `BIO_HABITAT_CONTRIBUTION_LOOK_UP`, `LU_LVSTK_NATURAL` | `tCO2_ha_*.nc`, `cell_BECCS_df.h5`, `natural_land_t_co2_ha.h5`, `fire_risk.h5` — full trace in §6-§7 |
 | `ag_man_g_mrj` | `get_ag_man_g_mrj` 585 | `ag_ghg.get_agricultural_management_ghg_matrices` | the five AM bundle dicts | AM bundle `.xlsx` files |
-| `flow_ghg_ag2ag` | inline 1071 | `ag_ghg.get_ghg_transition_emissions_from_base_year` | `CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR`, `BIO_HABITAT_CONTRIBUTION_LOOK_UP` | `natural_land_t_co2_ha.h5` |
+| `flow_ghg_ag2ag` | inline 1071 | `ag_ghg.get_ghg_transition_emissions_from_base_year` | `CO2E_STOCK_UNALL_NATURAL_TCO2_HA` (full stock loss; the row divides by the step length), `BIO_HABITAT_CONTRIBUTION_LOOK_UP` | `natural_land_t_co2_ha.h5` |
 | `offland_ghg` | inline 1330 | — (direct, `/ GHG scale`) | `OFF_LAND_GHG_EMISSION_C` | `agGHG_lvstk_off_land.csv` |
 
 ### 4.3 Water
@@ -475,13 +475,15 @@ L2 subset kept.
 
 ```python
 nat_land_CO2 = pd.read_hdf(".../natural_land_t_co2_ha.h5", where=self.MASK)
-self.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR = np.array(
+self.CO2E_STOCK_UNALL_NATURAL_TCO2_HA = np.array(
     nat_land_CO2['NATURAL_LAND_TREES_DEBRIS_SOIL_TCO2_HA']
     - nat_land_CO2['NATURAL_LAND_AGB_DEBRIS_TCO2_HA'] * (100 - fire_risk) / 100   # minus fire DAMAGE
-) / settings.CARBON_EFFECTS_WINDOW
+)
+self.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR = self.CO2E_STOCK_UNALL_NATURAL_TCO2_HA / settings.CARBON_EFFECTS_WINDOW
 ```
 
-The `/ CARBON_EFFECTS_WINDOW` lives **here**, not in `ghg.py` — see §7.
+The `/ CARBON_EFFECTS_WINDOW` lives **here**, not in `ghg.py` — see §7. HIR and Destocked read the
+annualised `_PER_YR`; clearing (`get_ghg_transition_emissions`) reads the undivided stock.
 
 `HIR` layers (`tCO2_ha_hir_{block,rip}.nc`) are prepared through L2 but are not currently loaded in
 `data.py`; the HIR mask was retired on 2026-06-16 (`dataprep.py:904-906`).

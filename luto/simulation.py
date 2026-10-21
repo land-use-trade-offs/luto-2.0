@@ -346,10 +346,13 @@ def store_solution(data: Data, target_year: int, solution, obj_val: float, input
         for j_idx, j in enumerate(lus):
             for ag_man_g_mrj in (inputs.ag_man_g_mrj_ag, inputs.ag_man_g_mrj_lulucf):
                 ghg += float(np.dot(ag_man_g_mrj[am][:, :, j_idx].ravel(), solution.ag_man_X_mrj[am][:, :, j].ravel()))
+    ghg_transition = 0.0
     for src, g in inputs.trans_ghg_ag2ag.items():                                           # [to_m, local_r, to_j], as the flows are keyed
-        ghg += float(np.dot(g.ravel(), solution.dvar_D_ag2ag_mrj[src].ravel()))
+        ghg_transition += float(np.dot(g.ravel(), solution.dvar_D_ag2ag_mrj[src].ravel()))
+    ghg += ghg_transition
     ghg += inputs.offland_ghg
     data.add_production_data(target_year, 'GHG', ghg)
+    data.add_production_data(target_year, 'GHG_TRANSITION', ghg_transition)                 # the row's transition term; write_ghg checks its output against it
     if settings.GHG_EMISSIONS_LIMITS != 'off':
         data.add_production_data(target_year, 'GHG_split', get_ghg_split(data, target_year, solution, inputs))
 

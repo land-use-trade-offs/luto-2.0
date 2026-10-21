@@ -77,6 +77,8 @@ with rapid accumulation in the first few decades, then slowing down as it approa
 
 For example, by setting the CARBON_EFFECTS_WINDOW to 50 years, LUTO will take the total co2 sequestration
 for the first 50 years after planting and then use the average as the annual sequestration rate in the model.
+
+It annualises regrowth (plantings, soil carbon, HIR, Destocked) and is not applied to clearing.
 '''
 
 
