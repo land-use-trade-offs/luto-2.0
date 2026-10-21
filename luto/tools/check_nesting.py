@@ -310,6 +310,7 @@ def main() -> int:
     parser.add_argument('--tol', type=float, default=1e-4, help='relative error above which a 2010 block fails')
     args = parser.parse_args()
     assert all(rf > 1 for rf in args.resfactors), 'RESFACTOR 1 is the reference'
+    os.makedirs(args.out, exist_ok=True)                 # before the builds: a missing folder no longer fails the run at the end
 
     fine = build_matrices(1)
     failed = False
