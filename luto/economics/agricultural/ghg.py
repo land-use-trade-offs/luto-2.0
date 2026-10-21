@@ -29,7 +29,7 @@ import pandas as pd
 
 from luto.data import Data
 from luto import settings
-from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types
+from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types, get_stubble_yield_pot
 from functools import lru_cache
 
 
@@ -40,6 +40,7 @@ from functools import lru_cache
 AG_GHG_SUBTERMS = {
     'Crop and livestock emissions': 'AG',
     'Irrigated pasture energy and lifecycle fields': 'AG',
+    'Stubble-grazing sheep': 'AG',
 }
 AG_MAN_GHG_SUBTERMS = {
     'Asparagopsis taxiformis': {
@@ -149,8 +150,31 @@ def get_ghg_crop(data:Data, lu, lm, aggregate):
         # Reset the dataframe index
         ghg_rs.reset_index(drop=True, inplace=True)
 
+        # Sheep grazing the stubble of a cereal land use
+        if lu in data.LU_STUBBLE:
+            ghg_rs = pd.concat([ghg_rs, get_ghg_stubble(data, lu, lm)], axis=1)
+
         # Return greenhouse gas emissions by individual source or summed over all sources (default)
         return ghg_rs if aggregate == False else ghg_rs.sum(axis=1).values
+
+
+def get_ghg_stubble(data:Data, lu, lm) -> pd.DataFrame:
+    """Return the emissions <unit: t/cell> of the sheep grazing the stubble of cereal land use `lu`, by source: the
+    sheep per-head factors (AGGHG_LVSTK; the scope-1 fields when settings.USE_GHG_SCOPE_1) at the stubble stocking
+    rate. Sources are named 'STUBBLE_SHEEP_<field>'. Provisional: the cell's sheep factors, pending the emission
+    factor rebuild."""
+    agghg = data.stubble(lu, lm)['AGGHG_LVSTK']
+    if settings.USE_GHG_SCOPE_1:
+        ghg_raw = agghg.loc[:, (agghg.columns.get_level_values(0) == 'SHEEP') &
+                               (agghg.columns.get_level_values(1).isin(settings.LVSTK_GHG_SCOPE_1))]
+    else:
+        ghg_raw = agghg.loc[:, ('SHEEP', slice(None))]
+    head_cell = get_stubble_yield_pot(data, lu, lm) * data.REAL_AREA
+    ghg_rs = pd.DataFrame(
+        np.nan_to_num(ghg_raw.to_numpy() / 1000 * head_cell[:, np.newaxis]),   # no sheep data: no stubble sheep
+        columns=pd.MultiIndex.from_tuples([(f'STUBBLE_SHEEP_{src}', lm, lu) for _, src in ghg_raw.columns]),
+    )
+    return ghg_rs
 
 
 
@@ -335,13 +359,24 @@ def get_irrpast_energy_ghg_matrices(data: Data) -> np.ndarray:
     return g_mrj
 
 
+def get_stubble_ghg_matrices(data: Data) -> np.ndarray:
+    """The stubble-grazing sheep emissions inside g_mrj <unit: t/cell>, (m, r, j): on the cereal land uses only."""
+    g_mrj = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
+    for lu in data.LU_STUBBLE:
+        for m, lm in enumerate(data.LANDMANS):
+            g_mrj[m, :, data.DESC2AGLU[lu]] = get_ghg_stubble(data, lu, lm).sum(axis=1).to_numpy()
+    return g_mrj
+
+
 def get_ghg_matrices_parts(data: Data, yr_idx) -> dict[str, np.ndarray]:
     """g_mrj <unit: t/cell> as its named sub-terms (AG_GHG_SUBTERMS); they sum to `get_ghg_matrices`."""
     total = get_ghg_matrices(data, yr_idx)
     energy = get_irrpast_energy_ghg_matrices(data)
+    stubble = get_stubble_ghg_matrices(data)
     return {
-        'Crop and livestock emissions': total - energy,
+        'Crop and livestock emissions': total - energy - stubble,
         'Irrigated pasture energy and lifecycle fields': energy,
+        'Stubble-grazing sheep': stubble,
     }
 
 

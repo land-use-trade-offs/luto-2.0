@@ -98,6 +98,11 @@ def get_ccimpact(data, lu, lm, yr_idx):
     return f(yr_cal)
 
 
+# Feed per head <unit: DSE> and the share of it from pasture, by livestock type
+DSE_PER_HEAD = {'BEEF': 8, 'SHEEP': 1.5, 'DAIRY': 17}
+GRASSFED_FACTOR = {'BEEF': 0.85, 'SHEEP': 0.85, 'DAIRY': 0.65}
+
+
 def get_yield_pot(data, lvstype, vegtype, lm, yr_idx):
     """
     Return the yield potential <unit: head/ha> for livestock by land cover type.
@@ -114,17 +119,15 @@ def get_yield_pot(data, lvstype, vegtype, lm, yr_idx):
     """
 
     # Factors varying as a function of `lvstype`.
-    dse_per_head = {'BEEF': 8, 'SHEEP': 1.5, 'DAIRY': 17}
-    grassfed_factor = {'BEEF': 0.85, 'SHEEP': 0.85, 'DAIRY': 0.65}
-    denominator = (365 * dse_per_head[lvstype] * grassfed_factor[lvstype])
+    denominator = (365 * DSE_PER_HEAD[lvstype] * GRASSFED_FACTOR[lvstype])
 
     if vegtype not in ('natural land', 'modified land'):
         raise KeyError(f"Land cover type '{vegtype}' not identified.")
     lu = f'{lvstype.capitalize()} - {vegtype}'
-    feed_req, pasture_kg_dm_ha, safe_pur = data.lvstk_pasture(lu, lm)
+    _, pasture_kg_dm_ha, safe_pur = data.lvstk_pasture(lu, lm)
 
-    # Base potential.
-    yield_pot = feed_req * pasture_kg_dm_ha / denominator
+    # Base potential: the type's stocking calibration k (FEED_REQ without a per-type file; block-aggregated at RESFACTOR > 1).
+    yield_pot = data.lvstk_k(lu, lm) * pasture_kg_dm_ha / denominator
 
     # Multiply potential by appropriate SAFE_PUR (safe pasture utilisation rate; NATL or MODL by vegtype).
     yield_pot *= safe_pur
@@ -138,6 +141,28 @@ def get_yield_pot(data, lvstype, vegtype, lm, yr_idx):
 
 
     return yield_pot
+
+
+def get_stubble_yield_pot(data, lu, lm):
+    """
+    Return sheep grazing cereal stubble <unit: head/ha of cereal>: k_sheep x STUBBLE_DSE_HA / (DSE per head x grassfed
+    factor), the pasture basis with the stubble carrying rate (DSE per ha, annualised) in place of the pasture feed.
+    No irrigation factor and no climate multiplier. 0 without a stubble file. (`lu`, `lm`) select the block-aggregated
+    values at RESFACTOR > 1 (Data.stubble); at RESFACTOR 1 every stubble land use and lm has the same cell values.
+    """
+    s = data.stubble(lu, lm)
+    return s['K_SHEEP'] * s['STUBBLE_DSE_HA'] / (DSE_PER_HEAD['SHEEP'] * GRASSFED_FACTOR['SHEEP'])
+
+
+def get_quantity_stubble(data, pr, lm):
+    """Return the stubble-sheep yield of `pr` ('SHEEP - STUBBLE <LU> MEAT', 'WOOL' or 'LEXP', one set per stubble land
+    use) <unit: t/cell>, per cell of its cereal land use: the sheep per-head quantities (F x Q, AGEC_LVSTK) times the
+    stubble stocking rate."""
+    fq = {'MEAT': ('F1', 'Q1'), 'WOOL': ('F2', 'Q2'), 'LEXP': ('F3', 'Q3')}[pr.split()[-1]]
+    lu = data.PR2LU_DICT[pr]
+    agec = data.stubble(lu, lm)['AGEC_LVSTK']
+    quantity = agec[fq[0], 'SHEEP'] * agec[fq[1], 'SHEEP']
+    return np.nan_to_num((quantity * get_stubble_yield_pot(data, lu, lm) * data.REAL_AREA).to_numpy(copy=True))   # writable (get_quantity scales it in place); no sheep data: 0
 
 
 def get_quantity_lvstk(data, pr, lm, yr_idx):
@@ -259,13 +284,16 @@ def get_quantity(data, pr, lm, yr_idx):
         q = get_quantity_crop(data, pr.capitalize(), lm, yr_idx)
     elif pr in data.PR_LVSTK:
         q = get_quantity_lvstk(data, pr, lm, yr_idx)
+    elif pr in data.PR_STUBBLE:
+        q = get_quantity_stubble(data, pr, lm)
     elif pr in data.AGRICULTURAL_LANDUSES:              # Must be unallocated land use product, so return zeroes.
         q = np.zeros((data.NCELLS)).astype(np.float32)
     else:
         raise KeyError(f"Land use '{pr}' not found in data.")
 
-    # Apply productivity increase multiplier by product. 
-    q *= data.PRODUCTIVITY_MUL_xr.sel(lm=lm, product=pr, year=data.YR_CAL_BASE + yr_idx).item()
+    # Apply productivity increase multiplier by product (stubble sheep take the modified-land sheep product's).
+    pr_trend = 'SHEEP - MODIFIED LAND ' + pr.split()[-1] if pr in data.PR_STUBBLE else pr
+    q *= data.PRODUCTIVITY_MUL_xr.sel(lm=lm, product=pr_trend, year=data.YR_CAL_BASE + yr_idx).item()
 
     return q
 

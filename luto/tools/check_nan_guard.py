@@ -11,6 +11,13 @@ Tests of the NaN guards (`Data.check_eligible_nan`, `Data.check_ag_man_nan`) by 
    (dry, Winter cereals), in memory (pd.read_hdf is patched, `input/` is not written).
    - all of the block's eligible cells: the aggregated entry has no data, so the build must fail with the guard;
    - half of them, the centre cell excluded: the aggregation fills the entry, so the build must pass.
+   With STUBBLE_DSE_FILE, the same for the fine stubble rate on one block's cells eligible for (dry, Winter cereals).
+
+With LVSTK_K_FILE, the array classes include the per-type k (capacity class) and, with STUBBLE_DSE_FILE as well, k_sheep
+on a stubble entry with a positive rate (a NaN there must fire; on an entry with rate 0 it must not); with STUBBLE_DSE_FILE,
+the stubble rate, and at RESFACTOR > 1 the stubble-head invariant: a NaN in a
+sheep per-head field of a coarse entry with stubble head above zero must fire, and on an entry with zero stubble head
+must not.
 
 Usage (from the repo root, inputs and other settings from luto/settings.py):
     python -m luto.tools.check_nan_guard [--resfactor N]
@@ -42,14 +49,22 @@ def report_ok(msg, name, lm, lu, extra=(), single=True) -> bool:
 
 
 def raw_inputs(data):
-    """FEED_REQ and WATER_DELIVERY_PRICE before their np.nan_to_num, as `Data.__init__` passes them to the guard."""
-    read = lambda f: pd.read_hdf(os.path.join(settings.INPUT_DIR, f), where=data.MASK).to_numpy()
-    return read('feed_req.h5'), read('water_delivery_price.h5')
+    """The arrays `Data.__init__` passes to the guard before their np.nan_to_num: FEED_REQ, WATER_DELIVERY_PRICE, the
+    per-type k (with LVSTK_K_FILE, else None) and the stubble rate (with STUBBLE_DSE_FILE, else None). Writable copies."""
+    read = lambda f: pd.read_hdf(os.path.join(settings.INPUT_DIR, f), where=data.MASK)
+    k_raw = None
+    if settings.LVSTK_K_FILE:
+        k = read(settings.LVSTK_K_FILE)
+        k_raw = {t: np.array(k[t].to_numpy(), dtype=np.float64) for t in ('BEEF', 'SHEEP', 'DAIRY')}
+    stubble_raw = np.array(read(settings.STUBBLE_DSE_FILE).to_numpy(), dtype=np.float64) if settings.STUBBLE_DSE_FILE else None
+    return (np.array(read('feed_req.h5').to_numpy()), np.array(read('water_delivery_price.h5').to_numpy()), k_raw, stubble_raw)
 
 
 def test_classes(data) -> bool:
-    feed_raw, wdp_raw = (np.array(a) for a in raw_inputs(data))       # writable copies
+    raws = raw_inputs(data)
+    feed_raw, wdp_raw, k_raw, stubble_raw = raws
     coarse = getattr(data, 'LVSTK_COARSE', None)
+    stubble_lu = FINE_LU                     # the stubble land use the stubble cases use (one of STUBBLE_LAND_USES)
     if coarse is None:                       # RESFACTOR 1: the consumers read the attributes; make them writable float copies
         for name in ('PASTURE_KG_DM_HA', 'SAFE_PUR_NATL', 'SAFE_PUR_MODL'):
             setattr(data, name, np.array(getattr(data, name), dtype=np.float64))   # PASTURE_KG_DM_HA is integer at RF1
@@ -60,9 +75,28 @@ def test_classes(data) -> bool:
         return {'AGEC_LVSTK': data.AGEC_LVSTK, 'AGGHG_LVSTK': data.AGGHG_LVSTK, 'AGGHG_IRRPAST': data.AGGHG_IRRPAST,
                 'FEED_REQ': feed_raw, 'PASTURE_KG_DM_HA': data.PASTURE_KG_DM_HA,
                 'SAFE_PUR': data.SAFE_PUR_MODL if 'modified' in lu else data.SAFE_PUR_NATL,
-                'WATER_DELIVERY_PRICE': wdp_raw}[key]
+                'WATER_DELIVERY_PRICE': wdp_raw, 'LVSTK_K': k_raw[lu.split()[0].upper()] if k_raw else None}[key]
+
+    def stubble(lm, key):                   # the stubble array the guard reads for (lm, stubble_lu)
+        if coarse is not None:
+            return data.STUBBLE_COARSE[lm, stubble_lu][key]
+        return {'STUBBLE_DSE_HA': stubble_raw, 'K_SHEEP': k_raw['SHEEP'] if k_raw else None}[key]
+
+    def stubble_cells(m, head):              # eligible for (m, stubble_lu); with head (coarse) or rate > 0 or == 0
+        elig = data.EXCLUDE[m, :, data.DESC2AGLU[stubble_lu]]
+        if head is None:
+            return np.nonzero(elig)[0]
+        if head in ('rate_positive', 'rate_zero'):
+            rate = np.nan_to_num(np.asarray(stubble(data.LANDMANS[m], 'STUBBLE_DSE_HA'), dtype=np.float64))
+            return np.nonzero(elig & ((rate > 0) if head == 'rate_positive' else (rate == 0)))[0]
+        st = data.STUBBLE_COARSE[data.LANDMANS[m], stubble_lu]
+        h = np.nan_to_num(np.asarray(st['K_SHEEP'] * st['STUBBLE_DSE_HA'], dtype=np.float64))
+        return np.nonzero(elig & ((h > 0) if head == 'positive' else (h == 0)))[0]
 
     def entry(m, lu, allocated):            # a cell in the middle of the eligible (or allocated) cells of (m, lu)
+        if allocated in ('stubble', 'stubble_head', 'stubble_rate'):
+            cells = stubble_cells(m, {'stubble': None, 'stubble_head': 'positive', 'stubble_rate': 'rate_positive'}[allocated])
+            return int(cells[len(cells) // 2])
         j = data.DESC2AGLU[lu]
         cells = np.nonzero((data.AG_L_MRJ[m, :, j] > 0) if allocated else data.EXCLUDE[m, :, j])[0]
         return int(cells[len(cells) // 2])
@@ -85,6 +119,15 @@ def test_classes(data) -> bool:
         ('climate, crop (allocated)', 'CLIMATE_CHANGE_IMPACT (allocated)', 'dry', 'Winter cereals', lambda: data.CLIMATE_CHANGE_IMPACT, ('dry', 'Winter cereals', '2050'), True),
         ('climate, livestock (allocated)', 'CLIMATE_CHANGE_IMPACT (allocated)', 'dry', BEEF, lambda: data.CLIMATE_CHANGE_IMPACT, ('dry', BEEF, '2050'), True),
     ]
+    if settings.LVSTK_K_FILE:
+        cases.append(('capacity (k)', 'LVSTK_K', 'dry', BEEF, lambda: lvstk('dry', BEEF, 'LVSTK_K'), None, False))
+    if data.LU_STUBBLE:
+        cases.append(('area (stubble rate)', 'STUBBLE_DSE_HA', 'dry', stubble_lu, lambda: stubble('dry', 'STUBBLE_DSE_HA'), None, 'stubble'))
+        if settings.LVSTK_K_FILE:
+            cases.append(('stubble rate > 0 (k_sheep)', 'LVSTK_K (stubble rate > 0)', 'dry', stubble_lu, lambda: stubble('dry', 'K_SHEEP'), None, 'stubble_rate'))
+        if coarse is not None:              # the stubble-head invariant
+            cases.append(('stubble head > 0 (per-head field)', 'AGEC_LVSTK P1 (stubble head > 0)', 'dry', stubble_lu,
+                          lambda: data.STUBBLE_COARSE['dry', stubble_lu]['AGEC_LVSTK'], ('P1', 'SHEEP'), 'stubble_head'))
     ok_all = True
     for cls, name, lm, lu, get, col, allocated in cases:
         r = entry(data.LANDMANS.index(lm), lu, allocated)
@@ -97,7 +140,7 @@ def test_classes(data) -> bool:
         else:
             old, obj[r] = obj[r], np.nan
         try:
-            data.check_eligible_nan(feed_raw, wdp_raw)
+            data.check_eligible_nan(*raws)
             msg = None
         except ValueError as e:
             msg = str(e)
@@ -108,14 +151,56 @@ def test_classes(data) -> bool:
         sa2, nrm = int(data.AGGHG_IRRPAST['SA2_ID'].iat[r]), data.REGION_NRM_NAME[r]
         # At RESFACTOR 1 a livestock input is one array per cell (or per animal) shared by several (lm, lu): the NaN is
         # then reported once for each of them that is eligible on the cell. At RESFACTOR > 1 each (lm, lu) has its own copy.
-        shared = coarse is None and lu in data.LU_LVSTK
+        # The stubble rate and k_sheep are also one array per cell at RESFACTOR 1, checked for each (lm, stubble land use)
+        # (and k_sheep for the sheep land uses); at RESFACTOR > 1 the stubble arrays are one copy per (lm, lu).
+        shared = coarse is None and (lu in data.LU_LVSTK or str(allocated).startswith('stubble'))
         ok = report_ok(msg, name, lm, lu, (sa2, nrm), single=not shared)
         ok_all &= ok
         print(f"{'PASS' if ok else 'FAIL'} | {cls:30s} | {name:36s} | {lm} | {lu:22s} | cell {r} | SA2 {sa2} | {nrm}", flush=True)
         if not ok:
             print(msg, flush=True)
-    data.check_eligible_nan(feed_raw, wdp_raw)
+    data.check_eligible_nan(*raws)
     print('array classes: restored, the guard passes again.', flush=True)
+
+    if data.LU_STUBBLE and settings.LVSTK_K_FILE:  # negative case: stubble rate 0, NaN k_sheep, no k_sheep report
+        zero = stubble_cells(0, 'rate_zero')
+        if zero.size:
+            k = stubble('dry', 'K_SHEEP')
+            r = int(zero[len(zero) // 2])
+            old, k[r] = k[r], np.nan
+            try:
+                data.check_eligible_nan(*raws)
+                msg = None
+            except ValueError as e:
+                msg = str(e)
+            k[r] = old
+            ok = msg is None or 'LVSTK_K (stubble rate > 0)' not in msg     # at RF1 the sheep land uses may report it as LVSTK_K
+            ok_all &= ok
+            print(f"{'PASS' if ok else 'FAIL'} | stubble rate = 0 (k_sheep) | NaN k_sheep not reported for stubble | cell {r}", flush=True)
+            if not ok:
+                print(msg, flush=True)
+        else:
+            print('SKIP | stubble rate = 0 (k_sheep) | no eligible stubble entry with rate 0', flush=True)
+
+    if data.LU_STUBBLE and coarse is not None:  # invariant, negative case: zero stubble head, NaN per-head field, no report
+        zero = stubble_cells(0, 'zero')
+        if zero.size:
+            agec = data.STUBBLE_COARSE['dry', stubble_lu]['AGEC_LVSTK']
+            r, ci = int(zero[len(zero) // 2]), agec.columns.get_loc(('P1', 'SHEEP'))
+            old, agec.iat[r, ci] = agec.iat[r, ci], np.nan
+            try:
+                data.check_eligible_nan(*raws)
+                msg = None
+            except ValueError as e:
+                msg = str(e)
+            agec.iat[r, ci] = old
+            ok = msg is None
+            ok_all &= ok
+            print(f"{'PASS' if ok else 'FAIL'} | stubble head = 0 (per-head field) | NaN not reported, by design | cell {r}", flush=True)
+            if msg:
+                print(msg, flush=True)
+        else:
+            print('SKIP | stubble head = 0 (per-head field) | no eligible stubble entry with zero head', flush=True)
     return ok_all
 
 
@@ -167,9 +252,10 @@ def test_ag_man(data) -> bool:
     return ok_all
 
 
-def build_with_fine_nan(share: str):
+def build_with_fine_nan(share: str, target: str = 'crops'):
     """Build `Data` with NaN in the fine agec_crops rows of one block's eligible cells for (FINE_LM, FINE_LU)
-    ('all' of them, or 'half' without the centre cell). Returns the guard message, or None if the build passed."""
+    ('all' of them, or 'half' without the centre cell); with target 'stubble', in the fine stubble rate of the same
+    cells (FINE_LU is a stubble land use). Returns the guard message, or None if the build passed."""
     import rasterio
     from luto.data import Data
 
@@ -179,7 +265,10 @@ def build_with_fine_nan(share: str):
     rows, cols = np.nonzero(nlum)
     lus = pd.read_csv(os.path.join(settings.INPUT_DIR, 'ag_landuses.csv'), header=None)[0].to_list()
     lumask = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'lumap.h5')).to_numpy() != -1
-    eligible = np.load(os.path.join(settings.INPUT_DIR, 'x_mrj.npy'))[['dry', 'irr'].index(FINE_LM), :, lus.index(FINE_LU)] & lumask
+    x_mrj = np.load(os.path.join(settings.INPUT_DIR, 'x_mrj.npy'))[['dry', 'irr'].index(FINE_LM)]
+    eligible = x_mrj[:, lus.index(FINE_LU)] & lumask
+    fname, what = (settings.STUBBLE_DSE_FILE, f'the stubble of ({FINE_LM}, {FINE_LU})') if target == 'stubble' else ('agec_crops.h5', f'({FINE_LM}, {FINE_LU})')
+    del x_mrj
     key = (rows // rf) * -(-nlum.shape[1] // rf) + cols // rf
     is_centre = ((rows % rf) == rf // 2) & ((cols % rf) == rf // 2)
     count = pd.Series(eligible).groupby(key).sum()
@@ -189,27 +278,38 @@ def build_with_fine_nan(share: str):
     cells = np.nonzero((key == block) & eligible)[0]
     if share == 'all':
         inject = cells
+    elif target == 'stubble':                               # the rate is one array per cell: leave every other stubble entry its cells
+        x_all = np.load(os.path.join(settings.INPUT_DIR, 'x_mrj.npy'))
+        other = np.any([x_all[m, :, lus.index(lu)] for m in (0, 1) for lu in settings.STUBBLE_LAND_USES
+                        if (m, lu) != (['dry', 'irr'].index(FINE_LM), FINE_LU)], axis=0)
+        del x_all
+        inject = cells[~is_centre[cells] & ~other[cells]][: len(cells) // 2]
     else:
         inject = cells[~is_centre[cells]][: len(cells) // 2]
-    print(f'fine level ({share}): block {block}, {len(cells)} eligible fine cells for ({FINE_LM}, {FINE_LU}); '
+    print(f'fine level, {target} ({share}): block {block}, {len(cells)} eligible fine cells for {what}; '
           f'NaN in {len(inject)} (centre cell included: {bool(is_centre[inject].any())})', flush=True)
 
     read_hdf = pd.read_hdf
 
+    def set_nan(df, loc):
+        if isinstance(df, pd.Series):                       # the stubble rate
+            df.iloc[loc] = np.nan
+        else:
+            df.iloc[loc, df.columns.get_indexer([c for c in df.columns if c[1:] == (FINE_LM, FINE_LU)])] = np.nan
+
     def patched(path, *a, **k):
         df = read_hdf(path, *a, **k)
-        if not str(path).endswith('agec_crops.h5'):
+        if not str(path).endswith(fname):
             return df
         if 'where' in k:                                    # the centre-cell read
-            full = read_hdf(path).copy()
-            cols_ = full.columns.get_indexer([c for c in full.columns if c[1:] == (FINE_LM, FINE_LU)])
-            full.iloc[inject, cols_] = np.nan
+            full = read_hdf(path).astype(np.float64) if target == 'stubble' else read_hdf(path).copy()
+            set_nan(full, inject)
             return full[np.asarray(k['where'])]
         s0 = k.get('start') or 0                            # a band read (start / stop) or a whole-table read
         loc = inject[(inject >= s0) & (inject < s0 + len(df))] - s0
         if loc.size:
-            df = df.copy()
-            df.iloc[loc, df.columns.get_indexer([c for c in df.columns if c[1:] == (FINE_LM, FINE_LU)])] = np.nan
+            df = df.astype(np.float64) if target == 'stubble' else df.copy()
+            set_nan(df, loc)
         return df
 
     pd.read_hdf = patched
@@ -256,6 +356,22 @@ def main() -> int:
         if msg:
             print(msg, flush=True)
         results['fine level, half'] = ok
+
+        if settings.STUBBLE_DSE_FILE:
+            msg = build_with_fine_nan('all', 'stubble')
+            ok = msg is not None and report_ok(msg, 'STUBBLE_DSE_HA', FINE_LM, FINE_LU, single=False)
+            print(f"{'PASS' if ok else 'FAIL'} | fine level, stubble rate, all eligible cells NaN | the guard "
+                  f"{'fired' if msg else 'did not fire'}", flush=True)
+            if msg:
+                print(msg, flush=True)
+            results['fine level, stubble rate, all'] = ok
+            msg = build_with_fine_nan('half', 'stubble')
+            ok = msg is None
+            print(f"{'PASS' if ok else 'FAIL'} | fine level, stubble rate, half the eligible cells NaN | the build "
+                  f"{'passed' if ok else 'failed'}", flush=True)
+            if msg:
+                print(msg, flush=True)
+            results['fine level, stubble rate, half'] = ok
 
     print('\n' + '\n'.join(f"{'PASS' if v else 'FAIL'} | {k}" for k, v in results.items()), flush=True)
     return 0 if all(results.values()) else 1
