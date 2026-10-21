@@ -87,8 +87,9 @@ def get_wyield_matrices(
     """
     w_yield_mrj = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)).astype(np.float32)
 
-    w_yield_dr = data.WATER_YIELD_DR_FILE[yr_idx] if water_dr_yield is None else water_dr_yield
-    w_yield_sr = data.WATER_YIELD_SR_FILE[yr_idx] if water_sr_yield is None else water_sr_yield
+    w_row = data.get_water_yield_file_row(data.YR_CAL_BASE + yr_idx)
+    w_yield_dr = data.WATER_YIELD_DR_FILE[w_row] if water_dr_yield is None else water_dr_yield
+    w_yield_sr = data.WATER_YIELD_SR_FILE[w_row] if water_sr_yield is None else water_sr_yield
     w_yield_nl = data.get_water_nl_yield_for_yr_idx(yr_idx, w_yield_dr, w_yield_sr)
 
 
