@@ -2,7 +2,7 @@
 
 `fakedata` is a lightweight stand-in for the full `luto.data.Data` object. It loads only the spatial masking and geo-metadata needed to use LUTO helpers (e.g. `arr_to_xr()`), so you can inspect arrays and prototype code without loading gigabytes of simulation inputs.
 
-> **Note:** `fakedata` lives in `jinzhu_inspect_code/fakeData.py` which is not tracked by git. Always copy the full class code below when setting it up in a new notebook or script.
+> **Note:** `fakedata` is not part of the `luto` package. Copy the full class code below into your own notebook or script, outside `luto/`. Its masking section is copied from `Data.__init__` ("Masking and spatial coarse graining"), so if that section of `luto/data.py` changes, copy it again.
 
 ---
 
@@ -20,47 +20,29 @@ Copy this into your notebook or script:
 
 ```python
 import os
-import xarray as xr
-import numpy as np
-import pandas as pd
-import rasterio
-import rasterio.features
-import geopandas as gpd
-import netCDF4  # necessary for running luto in Denethor
-
-from luto import tools
-import luto.settings as settings
-import luto.economics.agricultural.quantity as ag_quantity
-import luto.economics.non_agricultural.quantity as non_ag_quantity
-import luto.economics.agricultural.water as ag_water
-from luto.tools import arr_to_xr
-
-from collections import defaultdict
-from typing import Any, Literal, Optional
-from affine import Affine
-from scipy.interpolate import interp1d
 from math import ceil
-from dataclasses import dataclass
-from scipy.ndimage import distance_transform_edt, maximum_filter
+
+import numpy as np
+import rasterio
+import xarray as xr
+from affine import Affine
+
+import luto.settings as settings
 
 
 class fakedata():
     """
-    Sets up output containers (lumaps, lmmaps, etc) and loads all LUTO data, adjusted
-    for resfactor.
+    A stand-in for `luto.data.Data` that loads only the masks, the cell mappings and the geo metadata. The masking
+    section is copied from `Data.__init__` ("Masking and spatial coarse graining"); re-copy it if that section changes.
     """
 
     def __init__(self):
 
         # Path for write module - overwrite when provided with a base and target year
         self.path = None
-
-        # The latest simulation year;
-        #   For simulation between 2010-2050, if the run stops at 2030, then it will be 2030
-        #   The last_year is updated in the solve_timeseries.simulation module
         self.last_year = None
 
-        # Setup output containers
+        # Output containers, as on Data
         self.lumaps = {}
         self.lmmaps = {}
         self.ammaps = {}
@@ -70,69 +52,96 @@ class fakedata():
         self.prod_data = {}
         self.obj_vals = {}
 
-        print('')
-        print(f'Data Initialization at RES{settings.RESFACTOR}')
+        print(f'Fake Data Initialization at RES{settings.RESFACTOR}')
 
         self.YR_CAL_BASE = 2010  # The base year, i.e. where year index yr_idx == 0.
 
         ###############################################################
-        # Masking and spatial coarse graining.
+        # Masking and spatial coarse graining (copied from Data.__init__).
         ###############################################################
-        print("├── Setting up masking and spatial course graining data", flush=True)
-
-        # Set resfactor multiplier
         self.RESMULT = settings.RESFACTOR ** 2
-
-        # Set the nodata and non-ag code
         self.NODATA = -9999
         self.MASK_LU_CODE = -1
 
-        # Load LUMAP without resfactor
-        self.LUMAP_NO_RESFACTOR = pd.read_hdf(os.path.join(settings.INPUT_DIR, "lumap.h5")).to_numpy().astype(np.int8)
+        self.LUMAP_NO_RESFACTOR = xr.load_dataarray(os.path.join(settings.INPUT_DIR, "lumap.nc")).astype(np.int8)
 
-        # NLUM mask.
         with rasterio.open(os.path.join(settings.INPUT_DIR, "NLUM_2010-11_mask.tif")) as rst:
             self.NLUM_MASK = rst.read(1).astype(np.int8)
             self.LUMAP_2D_FULLRES = np.full_like(self.NLUM_MASK, self.NODATA, dtype=np.int16)
-            np.place(self.LUMAP_2D_FULLRES, self.NLUM_MASK == 1, self.LUMAP_NO_RESFACTOR)
+            np.place(self.LUMAP_2D_FULLRES, self.NLUM_MASK == 1, self.LUMAP_NO_RESFACTOR.values)
             self.GEO_META_FULLRES = rst.meta
             self.GEO_META_FULLRES['dtype'] = 'float32'
             self.GEO_META_FULLRES['nodata'] = self.NODATA
 
-        # Mask out non-agricultural, non-environmental plantings land (i.e., -1) from lumap
-        self.LUMASK = self.LUMAP_NO_RESFACTOR != self.MASK_LU_CODE
-        self.LUMASK_2D_FULLRES = np.nan_to_num(arr_to_xr(self, self.LUMASK))
+        self.LUMASK = self.LUMAP_NO_RESFACTOR.values != self.MASK_LU_CODE
+        self.FULLRES_1D_TO_2D = np.vstack(np.nonzero(self.NLUM_MASK))
 
-        # Return combined land-use and resfactor mask
         if settings.RESFACTOR > 1:
+            fullres_rows, fullres_cols = self.FULLRES_1D_TO_2D
 
-            rf_mask = self.NLUM_MASK.copy()
-            have_lu_cells = maximum_filter(self.LUMASK_2D_FULLRES, size=settings.RESFACTOR)
-            have_lu_cell_downsampled = have_lu_cells[settings.RESFACTOR//2::settings.RESFACTOR, settings.RESFACTOR//2::settings.RESFACTOR]
+            # The block of every full-res land cell, numbered row-major on a grid of whole RF x RF blocks
+            n_block_rows = ceil(self.NLUM_MASK.shape[0] / settings.RESFACTOR)
+            n_block_cols = ceil(self.NLUM_MASK.shape[1] / settings.RESFACTOR)
+            block_id_of_cell = (fullres_rows // settings.RESFACTOR) * n_block_cols + fullres_cols // settings.RESFACTOR
 
-            lu_mask_fullres = np.zeros_like(rf_mask, dtype=bool)
-            lu_mask_fullres[settings.RESFACTOR//2::settings.RESFACTOR, settings.RESFACTOR//2::settings.RESFACTOR] = have_lu_cell_downsampled
+            # A block is a model cell if it holds >= 1 land-use cell
+            has_land_use = np.bincount(block_id_of_cell, weights=self.LUMASK, minlength=n_block_rows * n_block_cols) > 0
+            model_blocks = np.flatnonzero(has_land_use)
 
-            self.COORD_ROW_COL_FULLRES = np.argwhere(rf_mask & lu_mask_fullres).T
-            self.COORD_ROW_COL_RESFACTORED = (self.COORD_ROW_COL_FULLRES - (settings.RESFACTOR//2)) // settings.RESFACTOR
+            # Each model cell's representative cell: the block's centre cell where the centre is land; for a coastal
+            # block whose centre is sea, the block's land-use cell nearest the centre
+            fullres_idx_2d = np.full(self.NLUM_MASK.shape, -1, dtype=np.int64)
+            fullres_idx_2d[fullres_rows, fullres_cols] = np.arange(fullres_rows.size)
+            block_rows, block_cols = np.divmod(model_blocks, n_block_cols)
+            centre_rows = block_rows * settings.RESFACTOR + settings.RESFACTOR // 2
+            centre_cols = block_cols * settings.RESFACTOR + settings.RESFACTOR // 2
+            inside_grid = (centre_rows < self.NLUM_MASK.shape[0]) & (centre_cols < self.NLUM_MASK.shape[1])
+            representative_cell = np.full(model_blocks.size, -1, dtype=np.int64)
+            representative_cell[inside_grid] = fullres_idx_2d[centre_rows[inside_grid], centre_cols[inside_grid]]
 
-            rf_mask[self.COORD_ROW_COL_FULLRES[0], self.COORD_ROW_COL_FULLRES[1]] = 2
-            self.MASK = np.where(rf_mask[np.nonzero(self.NLUM_MASK)] == 2, True, False)
+            needs_substitute = np.zeros(n_block_rows * n_block_cols, dtype=bool)
+            needs_substitute[model_blocks[representative_cell < 0]] = True
+            candidate_cells = np.flatnonzero(self.LUMASK & needs_substitute[block_id_of_cell])
+            candidate_blocks = block_id_of_cell[candidate_cells]
+            distance_to_centre = ((fullres_rows[candidate_cells] - (candidate_blocks // n_block_cols * settings.RESFACTOR + settings.RESFACTOR // 2)) ** 2
+                                  + (fullres_cols[candidate_cells] - (candidate_blocks % n_block_cols * settings.RESFACTOR + settings.RESFACTOR // 2)) ** 2)
+            nearest_first = np.lexsort((candidate_cells, distance_to_centre, candidate_blocks))
+            substitute_blocks, first = np.unique(candidate_blocks[nearest_first], return_index=True)
+            position_of_block = np.full(n_block_rows * n_block_cols, -1, dtype=np.int64)
+            position_of_block[model_blocks] = np.arange(model_blocks.size)
+            representative_cell[position_of_block[substitute_blocks]] = candidate_cells[nearest_first[first]]
+
+            # The model cells in the full-res order of their representative cells
+            in_read_order = np.argsort(representative_cell)
+            model_blocks, representative_cell = model_blocks[in_read_order], representative_cell[in_read_order]
+            self.RES_1D_TO_2D = np.vstack(np.divmod(model_blocks, n_block_cols))
+
+            # Each full-res land cell reads its block's model-cell index (-1: block not modelled)
+            model_cell_id_of_block = np.full(n_block_rows * n_block_cols, -1, dtype=np.int32)
+            model_cell_id_of_block[model_blocks] = np.arange(model_blocks.size)
+            self.FULL2RES_IDX_MAP = model_cell_id_of_block[block_id_of_cell]
+
+            # MASK: the representative cell of each model cell, among the full-res land cells
+            self.MASK = np.zeros(fullres_rows.size, dtype=bool)
+            self.MASK[representative_cell] = True
 
             self.LUMAP_2D_RESFACTORED = self.LUMAP_2D_FULLRES[settings.RESFACTOR//2::settings.RESFACTOR, settings.RESFACTOR//2::settings.RESFACTOR]
             self.GEO_META = self.update_geo_meta()
 
         elif settings.RESFACTOR == 1:
             self.MASK = self.LUMASK
+            self.RES_1D_TO_2D = self.FULLRES_1D_TO_2D[:, self.LUMASK]
+            self.FULL2RES_IDX_MAP = np.where(self.LUMASK, np.cumsum(self.LUMASK) - 1, -1).astype(np.int32)
             self.GEO_META = self.GEO_META_FULLRES
             self.LUMAP_2D_RESFACTORED = self.LUMAP_2D_FULLRES
-            self.COORD_ROW_COL_FULLRES = np.argwhere(self.NLUM_MASK == 1).T
-            self.COORD_ROW_COL_RESFACTORED = self.COORD_ROW_COL_FULLRES
         else:
             raise KeyError("Resfactor setting invalid")
 
-        print(f"│   - Total land cells in full resolution: {self.NLUM_MASK.sum()}")
-        print(f"│   - Total land cells in resfactored resolution: {self.MASK.sum()}")
+        # Data reads it off REAL_AREA; here the model cells are counted directly
+        self.NCELLS = int(self.MASK.sum())
+
+        print(f"   - Total land cells in full resolution: {self.NLUM_MASK.sum()}")
+        print(f"   - Total model cells at RES{settings.RESFACTOR}: {self.NCELLS}")
 
     def update_geo_meta(self):
         meta = self.GEO_META_FULLRES.copy()
@@ -165,15 +174,17 @@ da.plot()
 | Attribute | Description |
 |---|---|
 | `NLUM_MASK` | 2D raster mask (0=ocean, 1=land) |
-| `LUMASK` | 1D boolean mask — `True` for valid land-use cells |
-| `LUMAP_NO_RESFACTOR` | 1D land-use map at full resolution |
+| `LUMASK` | 1D boolean mask over the full-res land cells: `True` for land-use cells |
+| `LUMAP_NO_RESFACTOR` | 1D land-use map at full resolution (DataArray, from `lumap.nc`) |
 | `LUMAP_2D_FULLRES` | 2D land-use map at full resolution |
 | `LUMAP_2D_RESFACTORED` | 2D land-use map at resfactored resolution |
-| `MASK` | 1D boolean mask at resfactored resolution |
+| `FULLRES_1D_TO_2D` | (row, col) of every full-res land cell, shape (2, n) |
+| `RES_1D_TO_2D` | (row, col) of every model cell on the resfactored grid, shape (2, NCELLS) |
+| `FULL2RES_IDX_MAP` | for every full-res land cell, the index of its block's model cell (-1: block not modelled) |
+| `MASK` | 1D boolean mask over the full-res land cells: the cell each model cell's inputs are read at (the block centre, or for a coastal block with a sea centre the land-use cell nearest it) |
+| `NCELLS` | number of model cells |
 | `GEO_META_FULLRES` | Rasterio geo-metadata at full resolution |
 | `GEO_META` | Rasterio geo-metadata adjusted for `RESFACTOR` |
-| `COORD_ROW_COL_FULLRES` | (row, col) coords of valid cells at full resolution |
-| `COORD_ROW_COL_RESFACTORED` | (row, col) coords of valid cells at resfactored resolution |
 | `NODATA` | Nodata value (`-9999`) |
 | `RESMULT` | `RESFACTOR ** 2` |
 | `YR_CAL_BASE` | Base year (`2010`) |
@@ -187,9 +198,9 @@ da.plot()
 
 | Array size | Meaning | Branch in `arr_to_xr` |
 |---|---|---|
-| `data.LUMASK.size` | Full-res all-land 1D | Uses `GEO_META_FULLRES`, fills via `NLUM_MASK` |
-| `data.LUMASK.sum()` | Full-res valid-LU 1D | Same as above, zero-fills non-LU cells first |
-| anything else | Resfactored 1D | Uses `data.GEO_META`, places into `LUMAP_2D_RESFACTORED` |
+| `data.LUMASK.size` | Full-res all-land 1D | Uses `GEO_META_FULLRES`, placed at `FULLRES_1D_TO_2D` |
+| `data.LUMASK.sum()` | Full-res valid-LU 1D | Same, at the land-use cells `FULLRES_1D_TO_2D[:, LUMASK]` |
+| anything else (`data.NCELLS`) | Resfactored 1D | Uses `data.GEO_META`, placed at `RES_1D_TO_2D` on `LUMAP_2D_RESFACTORED` |
 
 ---
 
