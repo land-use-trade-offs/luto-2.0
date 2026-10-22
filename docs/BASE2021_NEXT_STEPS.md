@@ -3,6 +3,15 @@
 A short note for agreeing the next steps before anything is rebuilt. Every figure states where it was measured and on what
 code. "RES" is `RESFACTOR`.
 
+## Questions for you
+
+1. **The base-year design** ([section 2](#2-base-year-design)): are you happy to move to 2020-21 on the NLUM v7.1 map, with
+   livestock placed against the inventory and the two emission rows, before anything is rebuilt?
+2. **Where the build tools live** ([section 6](#6-proposals-for-your-decision)): a separate repository writing NetCDF into
+   `input/Nick_build/`, with LUTO only reading the files. Does that work for you, or would you prefer something else?
+3. **The shape of the remaining work** ([section 6](#6-proposals-for-your-decision)): the proposed order of one-change PRs, and
+   whether the coarse-resolution fixes should be tests for your refactor rather than PRs.
+
 ## 1. Status
 
 **In `jinzhu`.** Every PR we had open is merged: #227 (NaN guard), #228 (coarse stream length), #229 (two GHG rows), #230
@@ -111,7 +120,6 @@ are happy to rerun all three on your branch at RES5 once it settles.
   gains the settings to read them.
   - Inputs are rebuilt from public sources where one exists (ABS, ABARES, NIR, DCCEEW, the Clean Energy Regulator). The rest
     are carried from the existing input build and recorded as such.
-  - Could you share the NetCDF layout you are using (variable names, dimensions, coordinates), so the tools write it directly?
 - **Order of the remaining PRs**, each one change from the latest `jinzhu`:
   1. the GHG targets path (section 5);
   2. the HIR water fix (independent of coarsening and the base year);
