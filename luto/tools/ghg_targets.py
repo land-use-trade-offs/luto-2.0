@@ -8,7 +8,7 @@ Sources (public, downloaded at run time, sha256-checked against pinned values):
 Run as a plain script from the repo root (do NOT use `python -m luto.tools...`: that imports
 luto/tools/__init__.py, which imports luto.settings and the model stack):
 
-    python luto/tools/ghg_targets.py --out input/ghg_targets --scope-matrix input/ghg_targets/scope_matrix.csv [--cache DIR]
+    python luto/tools/ghg_targets.py --out input/Nick_build/ghg_targets --scope-matrix input/Nick_build/ghg_targets/scope_matrix.csv [--cache DIR]
 
 Dependencies: Python stdlib, pandas, openpyxl (both in requirements.yml). No luto imports.
 Output is deterministic: sorted rows, fixed float formatting, LF line endings, no run timestamps.

@@ -1496,10 +1496,10 @@ class Data:
         ###############################################################
         print("├── Loading GHG targets data", flush=True)
         if settings.GHG_EMISSIONS_LIMITS != 'off':
-            self.GHG_TARGETS = self.load_ghg_targets(os.path.join(settings.INPUT_DIR, 'ghg_targets'))
+            self.GHG_TARGETS = self.load_ghg_targets(os.path.join(settings.INPUT_DIR, 'Nick_build', 'ghg_targets'))
             missing = sorted(set(settings.SIM_YEARS) - set(self.GHG_TARGETS.index))
             if missing:
-                raise ValueError(f"GHG target series have no row for SIM_YEARS {missing} (input/ghg_targets covers "
+                raise ValueError(f"GHG target series have no row for SIM_YEARS {missing} (input/Nick_build/ghg_targets covers "
                                  f"{self.GHG_TARGETS.index.min()}-{self.GHG_TARGETS.index.max()}).")
 
         # Existing HIR projects (hectares per cell by registration FY), for the HIR baseline on the two GHG rows

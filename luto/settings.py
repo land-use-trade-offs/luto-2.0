@@ -845,7 +845,7 @@ GHG_TARGETS_DICT = {
 GHG_EMISSIONS_LIMITS = 'low'         # 'off', 'low', or 'high'
 '''
 Any level but 'off' adds two GHG rows in the years the target series bind: agriculture-sector emissions and net
-LULUCF, each against its own series in input/ghg_targets/ (NIR 2024 history, DCCEEW 2025 baseline projections,
+LULUCF, each against its own series in input/Nick_build/ghg_targets/ (NIR 2024 history, DCCEEW 2025 baseline projections,
 built by luto/tools/ghg_targets.py). In the other years the series are benchmarks, reported in
 GHG_emissions_split_<yr>.csv but not imposed. 'off' adds no GHG row.
 
