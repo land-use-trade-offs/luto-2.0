@@ -810,17 +810,17 @@ EGGS_AVG_WEIGHT = 60  # Average weight of an egg in grams
 LVSTK_K_FILE = None
 '''
 The per-type stocking calibration k, in place of FEED_REQ in the stocking rate (quantity.get_yield_pot).
-- None: every livestock type takes FEED_REQ (feed_req.h5), as before.
-- A file name (relative to INPUT_DIR, or an absolute path): an h5 table (key 'lvstk_k', one row per full-resolution
-  cell, the same index as feed_req.h5) with float columns 'BEEF', 'SHEEP' and 'DAIRY': each cell's SA2 k per type.
+- None: every livestock type takes FEED_REQ (feed_req.nc), as before.
+- A file name (relative to INPUT_DIR, or an absolute path): a NetCDF file with float variables 'BEEF', 'SHEEP' and
+  'DAIRY' over `cell` (every full-resolution land cell, the same cells as feed_req.nc): each cell's SA2 k per type.
 '''
 
 STUBBLE_DSE_FILE = None
 '''
 Sheep grazing cereal stubble, a co-product of the cereal land uses (STUBBLE_LAND_USES).
 - None: no stubble sheep; the product list is as before.
-- A file name (relative to INPUT_DIR, or an absolute path): an h5 table (key 'stubble_dse_ha', one row per
-  full-resolution cell) holding the stubble carrying rate in DSE per ha, annualised. Cereal cells then carry
+- A file name (relative to INPUT_DIR, or an absolute path): a NetCDF file with one float variable over `cell` (every
+  full-resolution land cell) holding the stubble carrying rate in DSE per ha, annualised. Cereal cells then carry
   k_sheep x rate / (DSE per head x grassfed factor) sheep per ha, whose meat, wool and live exports (products
   'SHEEP - STUBBLE <WINTER|SUMMER> MEAT / WOOL / LEXP', one set per stubble land use) count toward the sheep demand
   rows and whose emissions sit on the agriculture row. Per-head economics and emission factors are the cell's sheep

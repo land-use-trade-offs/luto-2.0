@@ -58,9 +58,9 @@ def get_ghg_env_plantings(data: Data, aggregate) -> np.ndarray|pd.DataFrame:
     
     # Tonnes of CO2e per ha, adjusted for resfactor
     if aggregate==True:
-        return -data.EP_BLOCK_AVG_T_CO2_HA_PER_YR * data.REAL_AREA
+        return -data.EP_BLOCK_AVG_T_CO2_HA_PER_YR.values * data.REAL_AREA.values
     elif aggregate==False:
-        return pd.DataFrame(-data.EP_BLOCK_AVG_T_CO2_HA_PER_YR * data.REAL_AREA, columns=['ENV_PLANTINGS'])
+        return pd.DataFrame(-data.EP_BLOCK_AVG_T_CO2_HA_PER_YR.values * data.REAL_AREA.values, columns=['ENV_PLANTINGS'])
     else:
         # If the aggregate arguments is not in [True,False]. That must be someting wrong
         raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
@@ -83,9 +83,9 @@ def get_ghg_rip_plantings(data: Data, aggregate) -> np.ndarray|pd.DataFrame:
 
     # Tonnes of CO2e per ha, adjusted for resfactor
     if aggregate==True:
-        return -data.EP_RIP_AVG_T_CO2_HA_PER_YR * data.REAL_AREA
+        return -data.EP_RIP_AVG_T_CO2_HA_PER_YR.values * data.REAL_AREA.values
     elif aggregate==False:
-        return pd.DataFrame(-data.EP_RIP_AVG_T_CO2_HA_PER_YR * data.REAL_AREA, columns=['RIP_PLANTINGS'])
+        return pd.DataFrame(-data.EP_RIP_AVG_T_CO2_HA_PER_YR.values * data.REAL_AREA.values, columns=['RIP_PLANTINGS'])
     else:
         raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
 
@@ -105,7 +105,7 @@ def get_ghg_agroforestry_base(data: Data) -> np.ndarray:
     """
     
     # Tonnes of CO2e per ha, adjusted for resfactor
-    return -data.EP_BELT_AVG_T_CO2_HA_PER_YR * data.REAL_AREA
+    return -data.EP_BELT_AVG_T_CO2_HA_PER_YR.values * data.REAL_AREA.values
     
 
 def get_ghg_sheep_agroforestry(
@@ -206,9 +206,9 @@ def get_ghg_carbon_plantings_block(data, aggregate) -> np.ndarray|pd.DataFrame:
     
     # Tonnes of CO2e per ha, adjusted for resfactor
     if aggregate==True:
-        return -data.CP_BLOCK_AVG_T_CO2_HA_PER_YR * data.REAL_AREA
+        return -data.CP_BLOCK_AVG_T_CO2_HA_PER_YR.values * data.REAL_AREA.values
     elif aggregate==False:
-        return pd.DataFrame(-data.CP_BLOCK_AVG_T_CO2_HA_PER_YR * data.REAL_AREA, columns=['CARBON_PLANTINGS_BLOCK'])
+        return pd.DataFrame(-data.CP_BLOCK_AVG_T_CO2_HA_PER_YR.values * data.REAL_AREA.values, columns=['CARBON_PLANTINGS_BLOCK'])
     else:
         raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
     
@@ -228,7 +228,7 @@ def get_ghg_carbon_plantings_belt_base(data) -> np.ndarray:
     Since carbon plantings reduces carbon in the air, each value will be <= 0.
     """
     # Tonnes of CO2e per ha, adjusted for resfactor
-    return -data.CP_BELT_AVG_T_CO2_HA_PER_YR * data.REAL_AREA
+    return -data.CP_BELT_AVG_T_CO2_HA_PER_YR.values * data.REAL_AREA.values
     
 
 def get_ghg_sheep_carbon_plantings_belt(
@@ -328,9 +328,9 @@ def get_ghg_beccs(data, aggregate) -> np.ndarray|pd.DataFrame:
 
     # Tonnes of CO2e per ha, adjusted for resfactor
     if aggregate==True:
-        return -np.nan_to_num(data.BECCS_TCO2E_HA_YR) * data.REAL_AREA
+        return -np.nan_to_num(data.BECCS_TCO2E_HA_YR.values) * data.REAL_AREA.values
     elif aggregate==False:
-        return pd.DataFrame(-np.nan_to_num(data.BECCS_TCO2E_HA_YR) * data.REAL_AREA, columns=['BECCS'])
+        return pd.DataFrame(-np.nan_to_num(data.BECCS_TCO2E_HA_YR.values) * data.REAL_AREA.values, columns=['BECCS'])
     else:
         raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
     
@@ -360,9 +360,9 @@ def get_ghg_destocked_land(
     
     for from_lu in data.LU_LVSTK_NATURAL:
         penalty_ghg_r[lumap_BASE_YR == from_lu] = (
-            data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR[lumap_BASE_YR == from_lu]
+            data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR.sel(cell=lumap_BASE_YR == from_lu).values
             * (data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[from_lu] - 1)
-            * data.REAL_AREA[lumap_BASE_YR == from_lu]
+            * data.REAL_AREA.values[lumap_BASE_YR == from_lu]
         )
 
     if aggregate==True:

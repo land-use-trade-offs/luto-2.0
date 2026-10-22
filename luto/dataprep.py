@@ -24,6 +24,7 @@ import numpy as np
 import xarray as xr
 import pandas as pd
 import shutil, os, time, h5py, subprocess, sys
+import sparse
 
 from luto import settings
 
@@ -99,6 +100,11 @@ def create_new_dataset(refresh=False):
 
     
     # Demand and elasticity data
+    # TODO (2026-10-20): OUTDATED demand file — this name no longer exists on N:; LUTO runs on the copy already in
+    # input/ (demand_projections.h5 / .nc). N: now holds only Michalis' update, ..._2026-07-20.csv, which is NOT adopted:
+    # under IMPORT_TREND = 'Trend' its imports exceed domestic use + exports for several commodities, so demand goes
+    # negative (default scenario 2050: sheep meat −9.3 Mt; also citrus, pears, hay, tropical stone fruit, other non-cereal
+    # crops, cotton) and data.py clamps it to 0. Talk with Michalis before switching to it.
     shutil.copyfile(f'{demand_scenarios_inpath}/All_LUTO_demand_scenarios_with_convergences.csv',  raw_data + 'All_LUTO_demand_scenarios_with_convergences.csv')
     shutil.copyfile(f'{demand_elasticity_inpath}/20260311_values for runs.csv', outpath + 'demand_elasticity.csv')
     shutil.copyfile(f'{luto_1D_inpath}/20260220_CNS25 Pathways AusTIMES data.xlsx', outpath + 'AusTIMES_demand_multiplier.xlsx')
@@ -121,45 +127,93 @@ def create_new_dataset(refresh=False):
     shutil.copyfile(luto_1D_inpath + 'ag_price_multipliers_20240612.xlsx', outpath + 'ag_price_multipliers.xlsx')
     shutil.copyfile(luto_1D_inpath + 'cost_multipliers_20240612.xlsx', outpath + 'cost_multipliers.xlsx')
 
-    pd.read_hdf(luto_2D_inpath + 'cell_savanna_burning.h5').to_hdf(outpath + 'cell_savanna_burning.h5', key='cell_savanna_burning', mode='w', format='table', index=False, complevel=9)
+    savburn = pd.read_hdf(luto_2D_inpath + 'cell_savanna_burning.h5'
+        ).reset_index(drop=True
+        ).rename_axis('cell'
+        ).to_xarray(
+        ).drop_vars('cell')
+    savburn.to_netcdf(
+        outpath + 'cell_savanna_burning.nc',
+        encoding={var: {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (6956407,)} for var in savburn.data_vars}
+    )
         
         
     # Save tree planting carbon sequestration data; only save the sequestration at tree age of [50, 60, 70, 80, 90] years
     sel_ages = [50, 60, 70, 80, 90]
-    ds = xr.open_dataset(luto_3D_inpath + 'tCO2_ha_ep_block.nc').sel(age=sel_ages).assign_coords(age=sel_ages, cell=range(6956407))
-    ds.to_netcdf(outpath + 'tCO2_ha_ep_block.nc', encoding={var: {'zlib': True, 'complevel': 5, 'chunksizes':(1, 6956407)} for var in ds.data_vars})
-    ds = xr.open_dataset(luto_3D_inpath + 'tCO2_ha_ep_rip.nc').sel(age=sel_ages).assign_coords(age=sel_ages, cell=range(6956407))
-    ds.to_netcdf(outpath + 'tCO2_ha_ep_rip.nc', encoding={var: {'zlib': True, 'complevel': 5, 'chunksizes':(1, 6956407)} for var in ds.data_vars})
-    ds = xr.open_dataset(luto_3D_inpath + 'tCO2_ha_ep_belt.nc').sel(age=sel_ages).assign_coords(age=sel_ages, cell=range(6956407))
-    ds.to_netcdf(outpath + 'tCO2_ha_ep_belt.nc', encoding={var: {'zlib': True, 'complevel': 5, 'chunksizes':(1, 6956407)} for var in ds.data_vars})
-    ds = xr.open_dataset(luto_3D_inpath + 'tCO2_ha_cp_block.nc').sel(age=sel_ages).assign_coords(age=sel_ages, cell=range(6956407))
-    ds.to_netcdf(outpath + 'tCO2_ha_cp_block.nc', encoding={var: {'zlib': True, 'complevel': 5, 'chunksizes':(1, 6956407)} for var in ds.data_vars})
-    ds = xr.open_dataset(luto_3D_inpath + 'tCO2_ha_cp_belt.nc').sel(age=sel_ages).assign_coords(age=sel_ages, cell=range(6956407))
-    ds.to_netcdf(outpath + 'tCO2_ha_cp_belt.nc', encoding={var: {'zlib': True, 'complevel': 5, 'chunksizes':(1, 6956407)} for var in ds.data_vars})
-    ds = xr.open_dataset(luto_3D_inpath + 'tCO2_ha_hir_block.nc').sel(age=sel_ages).assign_coords(age=sel_ages, cell=range(6956407))
-    ds.to_netcdf(outpath + 'tCO2_ha_hir_block.nc', encoding={var: {'zlib': True, 'complevel': 5, 'chunksizes':(1, 6956407)} for var in ds.data_vars})
-    ds = xr.open_dataset(luto_3D_inpath + 'tCO2_ha_hir_rip.nc').sel(age=sel_ages).assign_coords(age=sel_ages, cell=range(6956407))
-    ds.to_netcdf(outpath + 'tCO2_ha_hir_rip.nc', encoding={var: {'zlib': True, 'complevel': 5, 'chunksizes':(1, 6956407)} for var in ds.data_vars})
+    ds = xr.open_dataset(luto_3D_inpath + 'tCO2_ha_ep_block.nc'
+        ).sel(age=sel_ages
+        ).assign_coords(age=sel_ages, cell=range(6956407))
+    ds.to_netcdf(
+        outpath + 'tCO2_ha_ep_block.nc',
+        encoding={var: {'zlib': True, 'complevel': 5, 'chunksizes':(1, 6956407)} for var in ds.data_vars}
+    )
+    ds = xr.open_dataset(luto_3D_inpath + 'tCO2_ha_ep_rip.nc'
+        ).sel(age=sel_ages
+        ).assign_coords(age=sel_ages, cell=range(6956407))
+    ds.to_netcdf(
+        outpath + 'tCO2_ha_ep_rip.nc',
+        encoding={var: {'zlib': True, 'complevel': 5, 'chunksizes':(1, 6956407)} for var in ds.data_vars}
+    )
+    ds = xr.open_dataset(luto_3D_inpath + 'tCO2_ha_ep_belt.nc'
+        ).sel(age=sel_ages
+        ).assign_coords(age=sel_ages, cell=range(6956407))
+    ds.to_netcdf(
+        outpath + 'tCO2_ha_ep_belt.nc',
+        encoding={var: {'zlib': True, 'complevel': 5, 'chunksizes':(1, 6956407)} for var in ds.data_vars}
+    )
+    ds = xr.open_dataset(luto_3D_inpath + 'tCO2_ha_cp_block.nc'
+        ).sel(age=sel_ages
+        ).assign_coords(age=sel_ages, cell=range(6956407))
+    ds.to_netcdf(
+        outpath + 'tCO2_ha_cp_block.nc',
+        encoding={var: {'zlib': True, 'complevel': 5, 'chunksizes':(1, 6956407)} for var in ds.data_vars}
+    )
+    ds = xr.open_dataset(luto_3D_inpath + 'tCO2_ha_cp_belt.nc'
+        ).sel(age=sel_ages
+        ).assign_coords(age=sel_ages, cell=range(6956407))
+    ds.to_netcdf(
+        outpath + 'tCO2_ha_cp_belt.nc',
+        encoding={var: {'zlib': True, 'complevel': 5, 'chunksizes':(1, 6956407)} for var in ds.data_vars}
+    )
+    ds = xr.open_dataset(luto_3D_inpath + 'tCO2_ha_hir_block.nc'
+        ).sel(age=sel_ages
+        ).assign_coords(age=sel_ages, cell=range(6956407))
+    ds.to_netcdf(
+        outpath + 'tCO2_ha_hir_block.nc',
+        encoding={var: {'zlib': True, 'complevel': 5, 'chunksizes':(1, 6956407)} for var in ds.data_vars}
+    )
+    ds = xr.open_dataset(luto_3D_inpath + 'tCO2_ha_hir_rip.nc'
+        ).sel(age=sel_ages
+        ).assign_coords(age=sel_ages, cell=range(6956407))
+    ds.to_netcdf(
+        outpath + 'tCO2_ha_hir_rip.nc',
+        encoding={var: {'zlib': True, 'complevel': 5, 'chunksizes':(1, 6956407)} for var in ds.data_vars}
+    )
 
 
-    # Save Water yield data to HDF5 in table format, so we can apply queries at reading time
-    with h5py.File(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp126_2010-2100_DR_ML_HA_mean.h5', 'r') as f:
-        pd.DataFrame(f['Water_yield_GCM-Ensemble_ssp126_2010-2100_DR_ML_HA_mean'][:]).T.to_hdf(outpath + 'water_yield_ssp126_2010-2100_dr_ml_ha.h5', key='water', mode='w', format='table', index=False, complevel=9)
-    with h5py.File(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp126_2010-2100_SR_ML_HA_mean.h5', 'r') as f:
-        pd.DataFrame(f['Water_yield_GCM-Ensemble_ssp126_2010-2100_SR_ML_HA_mean'][:]).T.to_hdf(outpath + 'water_yield_ssp126_2010-2100_sr_ml_ha.h5', key='water', mode='w', format='table', index=False, complevel=9)
-    with h5py.File(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp245_2010-2100_DR_ML_HA_mean.h5', 'r') as f:
-        pd.DataFrame(f['Water_yield_GCM-Ensemble_ssp245_2010-2100_DR_ML_HA_mean'][:]).T.to_hdf(outpath + 'water_yield_ssp245_2010-2100_dr_ml_ha.h5', key='water', mode='w', format='table', index=False, complevel=9)
-    with h5py.File(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp245_2010-2100_SR_ML_HA_mean.h5', 'r') as f:
-        pd.DataFrame(f['Water_yield_GCM-Ensemble_ssp245_2010-2100_SR_ML_HA_mean'][:]).T.to_hdf(outpath + 'water_yield_ssp245_2010-2100_sr_ml_ha.h5', key='water', mode='w', format='table', index=False, complevel=9)
-    with h5py.File(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp370_2010-2100_DR_ML_HA_mean.h5', 'r') as f:
-        pd.DataFrame(f['Water_yield_GCM-Ensemble_ssp370_2010-2100_DR_ML_HA_mean'][:]).T.to_hdf(outpath + 'water_yield_ssp370_2010-2100_dr_ml_ha.h5', key='water', mode='w', format='table', index=False, complevel=9)
-    with h5py.File(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp370_2010-2100_SR_ML_HA_mean.h5', 'r') as f:
-        pd.DataFrame(f['Water_yield_GCM-Ensemble_ssp370_2010-2100_SR_ML_HA_mean'][:]).T.to_hdf(outpath + 'water_yield_ssp370_2010-2100_sr_ml_ha.h5', key='water', mode='w', format='table', index=False, complevel=9)
-    with h5py.File(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp585_2010-2100_DR_ML_HA_mean.h5', 'r') as f:
-        pd.DataFrame(f['Water_yield_GCM-Ensemble_ssp585_2010-2100_DR_ML_HA_mean'][:]).T.to_hdf(outpath + 'water_yield_ssp585_2010-2100_dr_ml_ha.h5', key='water', mode='w', format='table', index=False, complevel=9)
-    with h5py.File(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp585_2010-2100_SR_ML_HA_mean.h5', 'r') as f:
-        pd.DataFrame(f['Water_yield_GCM-Ensemble_ssp585_2010-2100_SR_ML_HA_mean'][:]).T.to_hdf(outpath + 'water_yield_ssp585_2010-2100_sr_ml_ha.h5', key='water', mode='w', format='table', index=False, complevel=9)
-        
+    # Save the water yield data to NetCDF, one file per SSP: DR_ML_HA and SR_ML_HA (deep- / shallow-rooted, ML/ha) over
+    # (year, cell); a chunk is one year of every cell
+    for ssp in ['126', '245', '370', '585']:
+        dr_name = f'Water_yield_GCM-Ensemble_ssp{ssp}_2010-2100_DR_ML_HA_mean'
+        with h5py.File(luto_4D_inpath + dr_name + '.h5', 'r') as dr_file:
+            dr_ml_ha = dr_file[dr_name][:]
+        sr_name = f'Water_yield_GCM-Ensemble_ssp{ssp}_2010-2100_SR_ML_HA_mean'
+        with h5py.File(luto_4D_inpath + sr_name + '.h5', 'r') as sr_file:
+            sr_ml_ha = sr_file[sr_name][:]
+        xr.Dataset(
+            {
+                'DR_ML_HA': (['year', 'cell'], dr_ml_ha),
+                'SR_ML_HA': (['year', 'cell'], sr_ml_ha),
+            },
+            coords={'year': np.arange(2010, 2101)},
+        ).to_netcdf(
+            outpath + f'water_yield_ssp{ssp}_2010_2100_ml_ha.nc',
+            encoding={
+                'DR_ML_HA': {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (1, 6956407)},
+                'SR_ML_HA': {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (1, 6956407)},
+            },
+        )
+
     # Save water use from domestic and industrial sectors for each watershed
     shutil.copyfile(water_domestic_use + 'Water_Use_Agriculture_ML.csv', outpath + 'Water_Use_Agriculture_ML.csv')
     shutil.copyfile(water_domestic_use + 'Water_Use_Domestic.csv', outpath + 'Water_Use_Domestic.csv')
@@ -181,18 +235,92 @@ def create_new_dataset(refresh=False):
     # Copy biodiversity GBF-2 files
     shutil.copyfile(bio_GBF2_inpath + 'Biodiversity_conserve_performance.xlsx', outpath + 'Biodiversity_conserve_performance.xlsx')
 
-    # Copy biodiversity GBF-3 data (sparse .npz replaces the dense .nc for runtime use)
-    shutil.copyfile(bio_GBF3_NVIS_inpath + '/NVIS7_0_AUST_PRE_MVS_sparse.npz', outpath + 'bio_GBF3_NVIS_MVS_sparse.npz')
-    shutil.copyfile(bio_GBF3_NVIS_inpath + '/NVIS7_0_AUST_PRE_MVG_sparse.npz', outpath + 'bio_GBF3_NVIS_MVG_sparse.npz')
-    shutil.copyfile(bio_GBF3_NVIS_inpath + '/NVIS7_0_AUST_PRE_MVS_groups.npy',  outpath + 'bio_GBF3_NVIS_MVS_groups.npy')
-    shutil.copyfile(bio_GBF3_NVIS_inpath + '/NVIS7_0_AUST_PRE_MVG_groups.npy',  outpath + 'bio_GBF3_NVIS_MVG_groups.npy')
+    # Biodiversity GBF-3 (NVIS) and GBF-4 (SNES / ECNES) layers are sparse: each is stored as its sparse.COO's parts,
+    #   COO_COORDS (axis, nnz): the label and cell index of each non-zero value; COO_DATA (nnz): the values.
+    #   data.py (read_sparse_layer) rebuilds the sparse.COO from them and the shape / fill value in the attributes.
+
+    # GBF-3 NVIS major vegetation subgroups (MVS): a sparse (group, cell) layer
+    coo = sparse.load_npz(bio_GBF3_NVIS_inpath + '/NVIS7_0_AUST_PRE_MVS_sparse.npz')
+    groups = np.load(bio_GBF3_NVIS_inpath + '/NVIS7_0_AUST_PRE_MVS_groups.npy', allow_pickle=True).astype(str)
+    chunk = min(coo.nnz, 2**20)                                     # 2**20 values per chunk
+    xr.Dataset(
+        {
+            'COO_COORDS': (['axis', 'nnz'], coo.coords),
+            'COO_DATA': ('nnz', coo.data),
+        },
+        coords={'group': groups},
+        attrs={'shape': list(coo.shape), 'dims': ['group', 'cell'], 'fill_value': coo.fill_value},
+    ).to_netcdf(
+        outpath + 'bio_GBF3_NVIS_MVS_sparse.nc',
+        encoding={
+            'COO_COORDS': {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (1, chunk)},
+            'COO_DATA': {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (chunk,)},
+        },
+    )
+
+    # GBF-3 NVIS major vegetation groups (MVG): a sparse (group, cell) layer
+    coo = sparse.load_npz(bio_GBF3_NVIS_inpath + '/NVIS7_0_AUST_PRE_MVG_sparse.npz')
+    groups = np.load(bio_GBF3_NVIS_inpath + '/NVIS7_0_AUST_PRE_MVG_groups.npy', allow_pickle=True).astype(str)
+    chunk = min(coo.nnz, 2**20)                                     # 2**20 values per chunk
+    xr.Dataset(
+        {
+            'COO_COORDS': (['axis', 'nnz'], coo.coords),
+            'COO_DATA': ('nnz', coo.data),
+        },
+        coords={'group': groups},
+        attrs={'shape': list(coo.shape), 'dims': ['group', 'cell'], 'fill_value': coo.fill_value},
+    ).to_netcdf(
+        outpath + 'bio_GBF3_NVIS_MVG_sparse.nc',
+        encoding={
+            'COO_COORDS': {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (1, chunk)},
+            'COO_DATA': {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (chunk,)},
+        },
+    )
+
+    # GBF-4 species of national environmental significance (SNES): a sparse (species, presence, cell) layer
+    coo = sparse.load_npz(bio_GBF4_inpath + 'bio_DCCEEW_SNES_sparse.npz')
+    species = np.load(bio_GBF4_inpath + 'bio_DCCEEW_SNES_species.npy', allow_pickle=True).astype(str)
+    presence = np.array(['LIKELY', 'LIKELY_AND_MAYBE'])
+    chunk = min(coo.nnz, 2**20)                                     # 2**20 values per chunk
+    xr.Dataset(
+        {
+            'COO_COORDS': (['axis', 'nnz'], coo.coords),
+            'COO_DATA': ('nnz', coo.data),
+        },
+        coords={'species': species, 'presence': presence},
+        attrs={'shape': list(coo.shape), 'dims': ['species', 'presence', 'cell'], 'fill_value': coo.fill_value},
+    ).to_netcdf(
+        outpath + 'bio_GBF4_SNES_sparse.nc',
+        encoding={
+            'COO_COORDS': {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (1, chunk)},
+            'COO_DATA': {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (chunk,)},
+        },
+    )
+
+    # GBF-4 ecological communities of national environmental significance (ECNES): a sparse (species, presence, cell)
+    #   layer; the communities are labelled 'species', as in SNES
+    coo = sparse.load_npz(bio_GBF4_inpath + 'bio_DCCEEW_ECNES_sparse.npz')
+    species = np.load(bio_GBF4_inpath + 'bio_DCCEEW_ECNES_species.npy', allow_pickle=True).astype(str)
+    presence = np.array(['LIKELY', 'LIKELY_AND_MAYBE'])
+    chunk = min(coo.nnz, 2**20)                                     # 2**20 values per chunk
+    xr.Dataset(
+        {
+            'COO_COORDS': (['axis', 'nnz'], coo.coords),
+            'COO_DATA': ('nnz', coo.data),
+        },
+        coords={'species': species, 'presence': presence},
+        attrs={'shape': list(coo.shape), 'dims': ['species', 'presence', 'cell'], 'fill_value': coo.fill_value},
+    ).to_netcdf(
+        outpath + 'bio_GBF4_ECNES_sparse.nc',
+        encoding={
+            'COO_COORDS': {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (1, chunk)},
+            'COO_DATA': {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (chunk,)},
+        },
+    )
+
     shutil.copyfile(bio_GBF3_NVIS_inpath + '/BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS.csv', outpath + 'BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS.csv')
 
-    # Copy biodiversity GBF-4 files (sparse .npz replaces the dense .nc for runtime use)
-    shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_SNES_sparse.npz', outpath + 'bio_GBF4_SNES_sparse.npz')
-    shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_ECNES_sparse.npz', outpath + 'bio_GBF4_ECNES_sparse.npz')
-    shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_SNES_species.npy', outpath + 'bio_GBF4_SNES_sparse_species.npy')
-    shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_ECNES_species.npy', outpath + 'bio_GBF4_ECNES_sparse_species.npy')
+    # Copy biodiversity GBF-4 files (the sparse layers are written above)
     shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_SNES_target_ALL_REGIONS.csv', outpath + 'BIODIVERSITY_GBF4_TARGET_SNES.csv')
     shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_ECNES_target_ALL_REGIONS.csv', outpath + 'BIODIVERSITY_GBF4_TARGET_ECNES.csv')
     
@@ -308,7 +436,7 @@ def create_new_dataset(refresh=False):
     cci_raw = pd.read_hdf(raw_data + 'SA2_climate_damage_mult.h5')
 
     # Read in demand data
-    demand = pd.read_csv(raw_data + 'All_LUTO_demand_scenarios_with_convergences.csv')
+    demand = pd.read_csv(raw_data + 'All_LUTO_demand_scenarios_with_convergences.csv')      # TODO: outdated, see "Demand and elasticity data" above
 
 
     ############### Save the layer of states
@@ -341,8 +469,14 @@ def create_new_dataset(refresh=False):
     # Read in the 2010 land-use mapping, -1 indicates cells outside the LUTO study area
     lumap = lmap['LU_ID_LUTO']
 
-    # Save to file (int8)
-    lumap.to_hdf(outpath + 'lumap.h5', key='lumap', mode='w', format='table', index=False, complevel=9)
+    # Save to file
+    lumap.reset_index(drop=True
+        ).rename_axis('cell'
+        ).to_xarray(
+        ).drop_vars('cell'
+        ).to_netcdf(
+        outpath + 'lumap.nc', encoding={'LU_ID_LUTO': {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (6956407,)}}
+    )
     
     # Get the index indicating the cells inside/outside LUTO study area
     natural_cells = np.logical_not(bioph['NATURAL_AREA_INC_WATER'].values)          # 0 is natural, 1 is non-natural; so we flip the values to make 1 natural
@@ -357,15 +491,40 @@ def create_new_dataset(refresh=False):
     # lmmap = lmap['IRRIGATION'].to_numpy()
 
     # Save to file (int8)
-    lmap['IRRIGATION'].to_hdf(outpath + 'lmmap.h5', key='lmmap', mode='w', format='table', index=False, complevel=9)
+    lmap['IRRIGATION'].reset_index(drop=True
+        ).rename_axis('cell'
+        ).to_xarray(
+        ).drop_vars('cell'
+        ).to_netcdf(
+        outpath + 'lmmap.nc', encoding={'IRRIGATION': {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (6956407,)}}
+    )
     
     
     ################# Spatial coverage for regional reporting
-    REGION_NRM_r = zones[['NRM_CODE', 'NRM_NAME']]  # NRM regions
-    REGION_NRM_r.to_hdf(outpath + 'REGION_NRM_r.h5', key='REGION_NRM_r', mode='w', format='table', index=False, complevel=9)
-    
-    REGION_STATE_r = zones[['STE_CODE11', 'STE_NAME11']]  # State regions
-    REGION_STATE_r.to_hdf(outpath + 'REGION_STATE_r.h5', key='REGION_STATE_r', mode='w', format='table', index=False, complevel=9)
+    #   The region CODE per cell, and each code's NAME once (over the code), not a name string per cell
+    nrm_code2name = zones[['NRM_CODE', 'NRM_NAME']].drop_duplicates(
+        ).set_index('NRM_CODE')['NRM_NAME'].astype(str
+        ).sort_index()
+    xr.Dataset(
+        {'NRM_CODE': ('cell', zones['NRM_CODE'].to_numpy()), 
+         'NRM_NAME': ('code', nrm_code2name.to_numpy())},
+        coords={'code': nrm_code2name.index.to_numpy()},
+    ).to_netcdf(
+        outpath + 'region_nrm.nc',
+        encoding={'NRM_CODE': {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (6956407,)}}
+    )
+
+    state_code2name = zones[['STE_CODE11', 'STE_NAME11']].drop_duplicates(
+        ).set_index('STE_CODE11')['STE_NAME11'].astype(str
+        ).sort_index()
+    xr.Dataset(
+        {'STE_CODE11': ('cell', zones['STE_CODE11'].to_numpy()), 
+         'STE_NAME11': ('code', state_code2name.to_numpy())},
+        coords={'code': state_code2name.index.to_numpy()},
+    ).to_netcdf(
+        outpath + 'region_state.nc',
+        encoding={'STE_CODE11': {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (6956407,)}}
+    )
 
     ################# Regional adoption constraints
     
@@ -381,7 +540,16 @@ def create_new_dataset(refresh=False):
     
     # Get the codes for regional adoption zones 
     regional_adoption_zones = zones[code2name.keys()]
-    regional_adoption_zones.to_hdf(outpath + 'regional_adoption_zones.h5', key='regional_adoption_zones', mode='w', format='table', index=False, complevel=9)
+    regional_adoption_zones = regional_adoption_zones.reset_index(drop=True
+        ).rename_axis('cell'
+        ).to_xarray(
+        ).drop_vars('cell')
+    regional_adoption_zones.to_netcdf(
+        outpath + 'regional_adoption_zones.nc',
+        encoding={
+            var: {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (6956407,)} 
+            for var in regional_adoption_zones.data_vars
+    })
 
 
     # Get the regional adoption zone names
@@ -424,7 +592,16 @@ def create_new_dataset(refresh=False):
     # real_area = zones['CELL_HA'].to_numpy()
 
     # Save to file
-    zones['CELL_HA'].to_hdf(outpath + 'real_area.h5', key='real_area', mode='w', format='table', index=False, complevel=9)
+    zones['CELL_HA'].reset_index(drop=True
+        ).rename_axis('cell'
+        ).to_xarray(
+        ).drop_vars('cell'
+        ).to_netcdf(
+            outpath + 'real_area.nc', 
+            encoding={
+                'CELL_HA': {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (6956407,)}
+            }
+    )
     
     
     ############### IBRA region and subregion categorical maps 
@@ -512,17 +689,45 @@ def create_new_dataset(refresh=False):
     ############### Livestock spatial data
 
     # Save out feed requirement
-    lvstk['FEED_REQ'].to_hdf(outpath + 'feed_req.h5', key='feed_req', mode='w', format='table', index=False, complevel=9) ############### Check - just for mapped livestock
+    lvstk['FEED_REQ'].reset_index(drop=True
+        ).rename('FEED_REQ'
+        ).rename_axis('cell'
+        ).to_xarray(
+        ).drop_vars('cell'
+        ).to_netcdf(
+        outpath + 'feed_req.nc', encoding={'FEED_REQ': {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (6956407,)}}
+    ) ############### Check - just for mapped livestock
 
     # Round off and save out pasture productivity
     pasture_kg = lvstk['PASTURE_KG_DM_HA'].round(0).astype(np.int16)
-    pasture_kg.to_hdf(outpath + 'pasture_kg_dm_ha.h5', key='pasture_kg_dm_ha', mode='w', format='table', index=False, complevel=9)
+    pasture_kg.reset_index(drop=True
+        ).rename('PASTURE_KG_DM_HA'
+        ).rename_axis('cell'
+        ).to_xarray(
+        ).drop_vars('cell'
+        ).to_netcdf(
+        outpath + 'pasture_kg_dm_ha.nc', encoding={'PASTURE_KG_DM_HA': {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (6956407,)}}
+    )
 
     # Save out safe pasture utilisation rate - natural land
-    lvstk['SAFE_PUR_NATL'].to_hdf(outpath + 'safe_pur_natl.h5', key='safe_pur_natl', mode='w', format='table', index=False, complevel=9)
+    lvstk['SAFE_PUR_NATL'].reset_index(drop=True
+        ).rename('SAFE_PUR_NATL'
+        ).rename_axis('cell'
+        ).to_xarray(
+        ).drop_vars('cell'
+        ).to_netcdf(
+        outpath + 'safe_pur_natl.nc', encoding={'SAFE_PUR_NATL': {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (6956407,)}}
+    )
 
     # Save out safe pasture utilisation rate - modified land
-    lvstk['SAFE_PUR_MODL'].to_hdf(outpath + 'safe_pur_modl.h5', key='safe_pur_modl', mode='w', format='table', index=False, complevel=9)
+    lvstk['SAFE_PUR_MODL'].reset_index(drop=True
+        ).rename('SAFE_PUR_MODL'
+        ).rename_axis('cell'
+        ).to_xarray(
+        ).drop_vars('cell'
+        ).to_netcdf(
+        outpath + 'safe_pur_modl.nc', encoding={'SAFE_PUR_MODL': {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (6956407,)}}
+    )
 
 
 
@@ -530,11 +735,25 @@ def create_new_dataset(refresh=False):
     ############### Water delivery and license price data
 
     # Get water delivery price from the livestock data (crops is same) and save to file
-    lvstk['WP'].to_hdf(outpath + 'water_delivery_price.h5', key='water_delivery_price', mode='w', format='table', index=False, complevel=9)
+    lvstk['WP'].reset_index(drop=True
+        ).rename('WP'
+        ).rename_axis('cell'
+        ).to_xarray(
+        ).drop_vars('cell'
+        ).to_netcdf(
+        outpath + 'water_delivery_price.nc', encoding={'WP': {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (6956407,)}}
+    )
 
     # Get water license price and save to file
     # bioph['WATER_PRICE_ML_BOM'].to_hdf(outpath + 'water_licence_price.h5', key='water_licence_price', mode='w', format='table', index=False, complevel=9)
-    bioph['WATER_PRICE_ML_ABARES'].to_hdf(outpath + 'water_licence_price.h5', key='water_licence_price', mode='w', format='table', index=False, complevel=9)
+    bioph[['WATER_PRICE_ML_ABARES']].reset_index(drop=True
+        ).rename_axis('cell'
+        ).to_xarray(
+        ).drop_vars('cell'
+        ).to_netcdf(
+        outpath + 'water_licence_price.nc',
+        encoding={'WATER_PRICE_ML_ABARES': {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (6956407,)}}
+    )
 
 
 
@@ -542,7 +761,13 @@ def create_new_dataset(refresh=False):
     ############### Soil organic carbon data
 
     # Get soil organic carbon data and save to file
-    bioph['SOC_T_HA_TOP_30CM'].to_hdf(outpath + 'soil_carbon_t_ha.h5', key='soil_carbon_t_ha', mode='w', format='table', index=False, complevel=9)
+    bioph['SOC_T_HA_TOP_30CM'].reset_index(drop=True
+        ).rename_axis('cell'
+        ).to_xarray(
+        ).drop_vars('cell'
+        ).to_netcdf(
+        outpath + 'soil_carbon_t_ha.nc', encoding={'SOC_T_HA_TOP_30CM': {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (6956407,)}}
+    )
 
 
 
@@ -609,8 +834,15 @@ def create_new_dataset(refresh=False):
         lumap.values[ag_cells].astype(np.int64),
     ] = True
 
-    # Save to file
-    np.save(outpath + 'x_mrj.npy', x_mrj)
+    # Save to NetCDF: (lm, cell, lu), lm and lu labelled; a chunk is every cell of one (lm, lu)
+    xr.DataArray(
+            x_mrj, 
+            dims=('lm', 'cell', 'lu'), 
+            coords={'lm': ['dry', 'irr'], 'lu': ag_landuses}, name='X_MRJ'
+        ).to_netcdf(
+            outpath + 'x_mrj.nc', 
+            encoding={'X_MRJ': {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (1, 6956407, 1)}}
+    )
 
 
     ############### Get water yield historical baseline data
@@ -618,8 +850,15 @@ def create_new_dataset(refresh=False):
     # Select historical (1970 - 2000) water yield under deep rooted and shallow rooted vegetation
     water_yield_baselines = bioph[['WATER_YIELD_HIST_SR_ML_HA', 'WATER_YIELD_HIST_DR_ML_HA', 'DEEP_ROOTED_PROPORTION']]
 
-    # Save to file
-    water_yield_baselines.to_hdf(outpath + 'water_yield_baselines.h5', key='water_yield_baselines', mode='w', format='table', index=False, complevel=9)
+    # Save to NetCDF: one variable per column over cell; a chunk is every cell
+    water_yield_baselines_ds = water_yield_baselines.reset_index(drop=True
+        ).rename_axis('cell'
+        ).to_xarray(
+        ).drop_vars('cell')
+    water_yield_baselines_ds.to_netcdf(
+        outpath + 'water_yield_baselines.nc',
+        encoding={var: {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (6956407,)} for var in water_yield_baselines_ds.data_vars}
+    )
 
 
 
@@ -633,11 +872,20 @@ def create_new_dataset(refresh=False):
                       .agg(HR_RIVREG_NAME = ('HR_RIVREG_NAME', 'first'),
                            WATER_YIELD_HIST_BASELINE_ML = ('WATER_YIELD_HIST_BASELINE_ML', 'sum'))
 
-    # Save to HDF5 file.
-    rivreg_lut.to_hdf(outpath + 'rivreg_lut.h5', key='rivreg_lut', mode='w', format='table', index=False, complevel=9)
-
-    # Save river region ID map to file
-    zones['HR_RIVREG_ID'].to_hdf(outpath + 'rivreg_id.h5', key='rivreg_id', mode='w', format='table', index=False, complevel=9)
+    # Save to NetCDF, one file per region type (the regional water yields are added to it below): the river region of
+    # every cell, and the LUT over region_id
+    water_region = xr.Dataset(
+        {
+            'HR_RIVREG_ID': ('cell', zones['HR_RIVREG_ID'].to_numpy()),
+            'NAME': ('region_id', rivreg_lut['HR_RIVREG_NAME'].astype(str).to_numpy()),
+            'HIST_BASELINE_ML': ('region_id', rivreg_lut['WATER_YIELD_HIST_BASELINE_ML'].to_numpy()),
+        },
+        coords={'region_id': rivreg_lut['HR_RIVREG_ID'].to_numpy()},
+    )
+    water_region.to_netcdf(
+        outpath + 'water_region_rivreg.nc',
+        encoding={'HR_RIVREG_ID': {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (6956407,)}}
+    )
 
 
     # Create a LUT of drainage division ID, name, and historical baseline water yield.
@@ -646,10 +894,20 @@ def create_new_dataset(refresh=False):
              WATER_YIELD_HIST_BASELINE_ML = ('WATER_YIELD_HIST_BASELINE_ML', 'sum'))
 
 
-    draindiv_lut.to_hdf(outpath + 'draindiv_lut.h5', key='draindiv_lut', mode='w', format='table', index=False, complevel=9)
-
-    # Save drainage division ID map to file
-    zones['HR_DRAINDIV_ID'].to_hdf(outpath + 'draindiv_id.h5', key='draindiv_id', mode='w', format='table', index=False, complevel=9)
+    # Save to NetCDF, one file per region type (the regional water yields are added to it below): the drainage
+    # division of every cell, and the LUT over region_id
+    water_region = xr.Dataset(
+        {
+            'HR_DRAINDIV_ID': ('cell', zones['HR_DRAINDIV_ID'].to_numpy()),
+            'NAME': ('region_id', draindiv_lut['HR_DRAINDIV_NAME'].astype(str).to_numpy()),
+            'HIST_BASELINE_ML': ('region_id', draindiv_lut['WATER_YIELD_HIST_BASELINE_ML'].to_numpy()),
+        },
+        coords={'region_id': draindiv_lut['HR_DRAINDIV_ID'].to_numpy()},
+    )
+    water_region.to_netcdf(
+        outpath + 'water_region_draindiv.nc',
+        encoding={'HR_DRAINDIV_ID': {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (6956407,)}}
+    )
 
 
 
@@ -713,16 +971,46 @@ def create_new_dataset(refresh=False):
     water_yield_outside_LUTO = water_yield_outside_LUTO.sort_index(axis=1, level=1)
     water_yield_outside_LUTO_dd = water_yield_outside_LUTO['Drainage division']
     water_yield_outside_LUTO_rr = water_yield_outside_LUTO['River region']
-    water_yield_outside_LUTO_dd.to_hdf(os.path.join(outpath, 'water_yield_outside_LUTO_study_area_2010_2100_dd_ml.h5'), key='water_yield_outside_LUTO_study_area_2010_2100_dd_ml', mode='w', format='table', complevel=9)
-    water_yield_outside_LUTO_rr.to_hdf(os.path.join(outpath, 'water_yield_outside_LUTO_study_area_2010_2100_rr_ml.h5'), key='water_yield_outside_LUTO_study_area_2010_2100_rr_ml', mode='w', format='table', complevel=9)
+    # Add to the region-type files: the yield (ML) outside the LUTO study area over (year, region_id, ssp)
+    water_yield_outside_LUTO_dd.stack(['Region_ID', 'ssp'], future_stack=True
+        ).rename_axis(['year', 'region_id', 'ssp']
+        ).rename('OUTSIDE_LUTO_ML'
+        ).to_xarray(
+        ).to_netcdf(
+            outpath + 'water_region_draindiv.nc',
+            mode='a'
+        )
+    water_yield_outside_LUTO_rr.stack(['Region_ID', 'ssp'], future_stack=True
+        ).rename_axis(['year', 'region_id', 'ssp']
+        ).rename('OUTSIDE_LUTO_ML'
+        ).to_xarray(
+        ).to_netcdf(
+            outpath + 'water_region_rivreg.nc',
+            mode='a'
+        )
 
     water_yield_all_AUS = water_yield_df.query('water_zone == "all_AUS_lands"')
     water_yield_all_AUS = water_yield_all_AUS.pivot( index=['Year'], columns=['Region_type', 'Region_ID','ssp'], values='Water_yield_ML')
     water_yield_all_AUS = water_yield_all_AUS.sort_index(axis=1, level=1)
     water_yield_all_AUS_dd = water_yield_all_AUS['Drainage division']
     water_yield_all_AUS_rr = water_yield_all_AUS['River region']
-    water_yield_all_AUS_dd.to_hdf(os.path.join(outpath, 'water_yield_natural_land_2010_2100_dd_ml.h5'), key='water_yield_natural_land_2010_2100_dd_ml', mode='w', format='table', complevel=9)
-    water_yield_all_AUS_rr.to_hdf(os.path.join(outpath, 'water_yield_natural_land_2010_2100_rr_ml.h5'), key='water_yield_natural_land_2010_2100_rr_ml', mode='w', format='table', complevel=9)
+    # Add to the region-type files: the yield (ML) of all lands as natural land over (year, region_id, ssp)
+    water_yield_all_AUS_dd.stack(['Region_ID', 'ssp'], future_stack=True
+        ).rename_axis(['year', 'region_id', 'ssp']
+        ).rename('NATURAL_LAND_ML'
+        ).to_xarray(
+        ).to_netcdf(
+            outpath + 'water_region_draindiv.nc',
+            mode='a'
+        )
+    water_yield_all_AUS_rr.stack(['Region_ID', 'ssp'], future_stack=True
+        ).rename_axis(['year', 'region_id', 'ssp']
+        ).rename('NATURAL_LAND_ML'
+        ).to_xarray(
+        ).to_netcdf(
+            outpath + 'water_region_rivreg.nc',
+            mode='a'
+        )
 
     # Calculate water yield for each drainage division and river region based on historical baseline
     water_yield_hist_baseline_ml_ha = water_yield_baselines.eval(
@@ -744,13 +1032,16 @@ def create_new_dataset(refresh=False):
     
     water_yield_outside_LUTO_hist_df = pd.concat([water_yield_outside_LUTO_hist_dd_df, water_yield_outside_LUTO_hist_rr_df], ignore_index=True)
     water_yield_outside_LUTO_hist_df = water_yield_outside_LUTO_hist_df.query('Region_ID != 0')
-    water_yield_outside_LUTO_hist_df.to_hdf(
-        os.path.join(outpath, 'water_yield_outside_LUTO_study_area_hist_1970_2000.h5'), 
-        key='water_yield_outside_LUTO_study_area_hist_1970_2000', 
-        mode='w', 
-        format='table', 
-        complevel=9
-    )
+    # Add to the region-type files: the historical (1970-2000) yield (ML) outside the LUTO study area over region_id
+    for region_type, region_file in [('Drainage Division', 'water_region_draindiv.nc'), ('River Region', 'water_region_rivreg.nc')]:
+        water_yield_outside_LUTO_hist_df.query(f'Region_Type == "{region_type}"'
+            ).set_index('Region_ID')['Water Yield (ML)'].rename_axis('region_id'
+            ).rename('OUTSIDE_LUTO_HIST_ML'
+            ).to_xarray(
+            ).to_netcdf(
+                outpath + region_file,
+                mode='a'
+            )
 
 
 
@@ -766,13 +1057,23 @@ def create_new_dataset(refresh=False):
         'DCCEEW_NCI',
     ]].copy()
     
-    bio_PRIORITY_RANK_AND_AREA_CONNECTIVITY.to_hdf(
-        outpath + 'bio_OVERALL_PRIORITY_RANK_AND_AREA_CONNECTIVITY.h5',
-        key='bio_PRIORITY_RANK_AND_AREA_CONNECTIVITY', 
-        mode='w', 
-        format='table', 
-        index=False, 
-        complevel=9
+    # Save to NetCDF: the priority over (ssp, cell), the two connectivity layers over cell; a chunk is every cell (one SSP)
+    bio_priority = bio_PRIORITY_RANK_AND_AREA_CONNECTIVITY.reset_index(drop=True).rename_axis('cell')
+    bio_priority_ds = xr.Dataset({
+        'BIODIV_PRIORITY': xr.concat(
+            [bio_priority[f'BIODIV_PRIORITY_SSP{ssp}'].to_xarray() for ssp in ['126', '245', '370', '585']],
+            dim=pd.Index(['126', '245', '370', '585'], name='ssp')
+        ),
+        'NATURAL_AREA_CONNECTIVITY': bio_priority['NATURAL_AREA_CONNECTIVITY'].to_xarray(),
+        'DCCEEW_NCI': bio_priority['DCCEEW_NCI'].to_xarray(),
+    })
+    bio_priority_ds.drop_vars('cell').to_netcdf(
+        outpath + 'bio_OVERALL_PRIORITY_RANK_AND_AREA_CONNECTIVITY.nc',
+        encoding={
+            'BIODIV_PRIORITY': {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (1, 6956407)},
+            'NATURAL_AREA_CONNECTIVITY': {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (6956407,)},
+            'DCCEEW_NCI': {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (6956407,)},
+        }
     )
     
     
@@ -888,7 +1189,13 @@ def create_new_dataset(refresh=False):
     stream_length_m_cell = bioph['RIP_LENGTH_M_CELL'].copy()
 
     # Save to file
-    stream_length_m_cell.to_hdf(outpath + 'stream_length_m_cell.h5', key='stream_length_m_cell', mode='w', format='table', index=False, complevel=9)
+    stream_length_m_cell.reset_index(drop=True
+        ).rename_axis('cell'
+        ).to_xarray(
+        ).drop_vars('cell'
+        ).to_netcdf(
+        outpath + 'stream_length_m_cell.nc', encoding={'RIP_LENGTH_M_CELL': {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (6956407,)}}
+    )
 
 
 
@@ -903,7 +1210,14 @@ def create_new_dataset(refresh=False):
     s['NATURAL_LAND_AGB_TCO2_HA'] = bioph['NATURAL_LAND_AGB_TCO2_HA']
     s['NATURAL_LAND_AGB_DEBRIS_TCO2_HA'] = bioph['NATURAL_LAND_AGB_DEBRIS_TCO2_HA']
     s['NATURAL_LAND_TREES_DEBRIS_SOIL_TCO2_HA'] = bioph['NATURAL_LAND_TREES_DEBRIS_SOIL_TCO2_HA']
-    s.to_hdf(outpath + 'natural_land_t_co2_ha.h5', key='natural_land_t_co2_ha', mode='w', format='table', index=False, complevel=9)
+    s = s.reset_index(drop=True
+        ).rename_axis('cell'
+        ).to_xarray(
+        ).drop_vars('cell')
+    s.to_netcdf(
+        outpath + 'natural_land_t_co2_ha.nc',
+        encoding={var: {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (6956407,)} for var in s.data_vars}
+    )
 
     
     # # MASK for Human Induced Regrowth; stop using HIR mask at 2025-06-16 after meeting with Carbon Market Institute (CMI)
@@ -911,8 +1225,18 @@ def create_new_dataset(refresh=False):
     # np.save(outpath + 'hir_mask.npy', hir_mask)  # shape: (6956407,)
 
     # Fire risk low, medium, and high and save to file
-    s = bioph[['FD_RISK_PERC_5TH', 'FD_RISK_MEDIAN', 'FD_RISK_PERC_95TH']].copy()
-    s.to_hdf(outpath + 'fire_risk.h5', key='fire_risk', mode='w', format='table', index=False, complevel=9)
+    #   FD_RISK over (fire_risk, cell): the levels are the settings.FIRE_RISK options
+    s = xr.concat(
+        [bioph[col].reset_index(drop=True
+            ).rename_axis('cell'
+            ).to_xarray(
+            ).drop_vars('cell') for col in ['FD_RISK_PERC_5TH', 'FD_RISK_MEDIAN', 'FD_RISK_PERC_95TH']],
+        dim=pd.Index(['low', 'med', 'high'], name='fire_risk')
+    ).rename('FD_RISK')
+    s.to_netcdf(
+        outpath + 'fire_risk.nc',
+        encoding={'FD_RISK': {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (1, 6956407)}}
+    )
 
 
     # Adjust the establishment costs using CPI; Source https://www.abs.gov.au/statistics/economy/price-indexes-and-inflation/consumer-price-index-australia/latest-release
@@ -920,11 +1244,21 @@ def create_new_dataset(refresh=False):
     bioph['EP_EST_COST_HA_CPI_ADJ'] = bioph['EP_EST_COST_HA'] * 99.2 / 118.8
     bioph['CP_EST_COST_HA_CPI_ADJ'] = bioph['CP_EST_COST_HA'] * 99.2 / 118.8
 
-    # Average establishment costs for Environmental Plantings ($/ha) and save to file
-    bioph['EP_EST_COST_HA_CPI_ADJ'].to_hdf(outpath + 'ep_est_cost_ha.h5', key='ep_est_cost_ha', mode='w', format='table', index=False, complevel=9)
-
-    # Average establishment costs for Carbon Plantings ($/ha) and save to file
-    bioph['CP_EST_COST_HA_CPI_ADJ'].to_hdf(outpath + 'cp_est_cost_ha.h5', key='cp_est_cost_ha', mode='w', format='table', index=False, complevel=9)
+    # Average establishment costs for Environmental Plantings and Carbon Plantings ($/ha) and save to file
+    est_cost = xr.Dataset({
+        'EP_EST_COST_HA': bioph['EP_EST_COST_HA_CPI_ADJ'].reset_index(drop=True
+            ).rename_axis('cell'
+            ).to_xarray(
+            ).drop_vars('cell'),
+        'CP_EST_COST_HA': bioph['CP_EST_COST_HA_CPI_ADJ'].reset_index(drop=True
+            ).rename_axis('cell'
+            ).to_xarray(
+            ).drop_vars('cell'),
+    })
+    est_cost.to_netcdf(
+        outpath + 'plantings_est_cost_ha.nc',
+        encoding={var: {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (6956407,)} for var in est_cost.data_vars}
+    )
 
 
 
@@ -977,10 +1311,17 @@ def create_new_dataset(refresh=False):
         # Sort land use in lexicographical order
         cci.sort_index(axis = 1, inplace = True)
 
-        # Write to HDF5 file.
-        fname = outpath + 'climate_change_impacts_' + rcp + '_' + co2_on_off + '.h5'
-        kname = 'climate_change_impacts_' + rcp
-        cci.to_hdf(fname, key=kname, mode='w', format='table', index=False, complevel=9)
+        # Write to NetCDF: CLIMATE_CHANGE_IMPACT over (column, cell), the columns labelled (lm, lu, year)
+        fname = outpath + 'climate_change_impacts_' + rcp + '_' + co2_on_off + '.nc'
+        xr.DataArray(
+            cci.to_numpy().T,
+            dims=['column', 'cell'],
+            name='CLIMATE_CHANGE_IMPACT',
+            coords={level: ('column', cci.columns.get_level_values(i)) for i, level in enumerate(['lm', 'lu', 'year'])}
+        ).to_netcdf(
+            fname,
+            encoding={'CLIMATE_CHANGE_IMPACT': {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (1, 6956407)}}
+        )
 
     # Parallelise the process
     jobs = ([delayed(process_climate_impacts)(on_off, rcp, cci_raw, concordance, luid_desc, outpath ) for on_off in CO2F_dict for rcp in rcps])
@@ -1020,8 +1361,16 @@ def create_new_dataset(refresh=False):
     # Sort land use in lexicographical order
     agec_crops.sort_index(axis = 1, inplace = True)
 
-    # Save to HDF5
-    agec_crops.to_hdf(outpath + 'agec_crops.h5', key='agec_crops', mode='w', format='table', index=False, complevel=9)
+    # Save to NetCDF: AGEC_CROPS over (column, cell), the columns labelled (field, lm, lu)
+    xr.DataArray(
+        agec_crops.to_numpy().T,
+        dims=['column', 'cell'],
+        name='AGEC_CROPS',
+        coords={level: ('column', agec_crops.columns.get_level_values(i)) for i, level in enumerate(['field', 'lm', 'lu'])}
+    ).to_netcdf(
+        outpath + 'agec_crops.nc',
+        encoding={'AGEC_CROPS': {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (1, 6956407)}}
+    )
 
 
 
@@ -1040,8 +1389,16 @@ def create_new_dataset(refresh=False):
     # Make and set the multi-index.
     agec_lvstk.columns = pd.MultiIndex.from_tuples(cols)
 
-    # Save to HDF5
-    agec_lvstk.to_hdf(outpath + 'agec_lvstk.h5', key='agec_lvstk', mode='w', format='table', index=False, complevel=9)
+    # Save to NetCDF: AGEC_LVSTK over (column, cell), the columns labelled (field, animal)
+    xr.DataArray(
+        agec_lvstk.to_numpy().T,
+        dims=['column', 'cell'],
+        name='AGEC_LVSTK',
+        coords={level: ('column', agec_lvstk.columns.get_level_values(i)) for i, level in enumerate(['field', 'animal'])}
+    ).to_netcdf(
+        outpath + 'agec_lvstk.nc',
+        encoding={'AGEC_LVSTK': {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (1, 6956407)}}
+    )
 
 
 
@@ -1079,8 +1436,16 @@ def create_new_dataset(refresh=False):
     # Sort land use in lexicographical order
     agGHG_crops.sort_index(axis = 1, inplace = True)
 
-    # Save to HDF5
-    agGHG_crops.to_hdf(outpath + 'agGHG_crops.h5', key='agGHG_crops', mode='w', format='table', index=False, complevel=9)
+    # Save to NetCDF: AGGHG_CROPS over (column, cell), the columns labelled (field, lm, lu)
+    xr.DataArray(
+        agGHG_crops.to_numpy().T,
+        dims=['column', 'cell'],
+        name='AGGHG_CROPS',
+        coords={level: ('column', agGHG_crops.columns.get_level_values(i)) for i, level in enumerate(['field', 'lm', 'lu'])}
+    ).to_netcdf(
+        outpath + 'agGHG_crops.nc',
+        encoding={'AGGHG_CROPS': {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (1, 6956407)}}
+    )
 
 
 
@@ -1090,7 +1455,8 @@ def create_new_dataset(refresh=False):
                                                                          on = ['SA2_ID', 'LU_ID', 'IRRIGATION'],
                                                                          how = 'left' )
 
-    agGHGmap['REAL_AREA'] = pd.read_hdf('input/real_area.h5')
+    with xr.open_dataset(outpath + 'real_area.nc') as real_area:
+        agGHGmap['REAL_AREA'] = real_area['CELL_HA'].values
 
     agGHGmap = agGHGmap.query('5 <= LU_ID <= 25')
     print('Number of NaNs =', agGHGmap[agGHGmap.isna().any(axis=1)].shape[0])
@@ -1154,14 +1520,29 @@ def create_new_dataset(refresh=False):
     # Sort land use in lexicographical order
     agGHG_lvstk.sort_index(axis = 1, inplace = True)
 
-    # Save to HDF5
-    agGHG_lvstk.to_hdf(outpath + 'agGHG_lvstk.h5', key='agGHG_lvstk', mode='w', format='table', index=False, complevel=9)
+    # Save to NetCDF: AGGHG_LVSTK over (column, cell), the columns labelled (animal, field) = (LIVESTOCK, INDICATOR)
+    xr.DataArray(
+        agGHG_lvstk.to_numpy().T,
+        dims=['column', 'cell'],
+        name='AGGHG_LVSTK',
+        coords={level: ('column', agGHG_lvstk.columns.get_level_values(i)) for i, level in enumerate(['animal', 'field'])}
+    ).to_netcdf(
+        outpath + 'agGHG_lvstk.nc',
+        encoding={'AGGHG_LVSTK': {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (1, 6956407)}}
+    )
 
     # Copy over irrigated pasture emissions
     agGHG_irrpast = concordance.merge( irrpastGHG, on = 'SA2_ID', how = 'left' )
 
-    # Save to HDF5
-    agGHG_irrpast.to_hdf(outpath + 'agGHG_irrpast.h5', key='agGHG_irrpast', mode='w', format='table', index=False, complevel=9)
+    # Save to NetCDF: one variable per column over cell (the columns differ in dtype)
+    agGHG_irrpast = agGHG_irrpast.reset_index(drop=True
+        ).rename_axis('cell'
+        ).to_xarray(
+        ).drop_vars('cell')
+    agGHG_irrpast.to_netcdf(
+        outpath + 'agGHG_irrpast.nc',
+        encoding={var: {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (6956407,)} for var in agGHG_irrpast.data_vars}
+    )
 
 
     # CODE to Check total livestock GHG emissions - see N:\Data-Master\LUTO_2.0_input_data\Scripts\2_assemble_agricultural_data.py
@@ -1241,8 +1622,16 @@ def create_new_dataset(refresh=False):
                          columns = ['YEAR'],
                           values = ['DOMESTIC', 'EXPORTS', 'IMPORTS', 'FEED', 'PRODUCTION'])
 
-    # Save to HDF5
-    demand.to_hdf(outpath + 'demand_projections.h5', key = 'demand_projections', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    # Save to NetCDF: one variable per quantity (DOMESTIC, EXPORTS, IMPORTS, FEED, PRODUCTION) over the scenario
+    # levels x Commodity x year; a chunk is one scenario's every commodity and every year
+    demand_ds = demand.stack('YEAR', future_stack=True
+        ).to_xarray(
+        ).rename(COMMODITY='Commodity', YEAR='year')     # LUTO's dimension names
+    demand_chunks = tuple(demand_ds.sizes[dim] if dim in ('Commodity', 'year') else 1 for dim in demand_ds['PRODUCTION'].dims)
+    demand_ds.to_netcdf(
+        outpath + 'demand_projections.nc',
+        encoding={var: {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': demand_chunks} for var in demand_ds.data_vars}
+    )
 
 
 
@@ -1292,8 +1681,15 @@ def create_new_dataset(refresh=False):
     cell_xy = cell_xy.merge(BECCS_raw.iloc[:, -6:], how = 'left', on = ['X', 'Y'])
     cell_xy = cell_xy.drop(columns = ['X', 'Y', 'CELL_HA'])
 
-    # Save to HDF5 file
-    cell_xy.to_hdf(outpath + 'cell_BECCS_df.h5', key='cell_BECCS_df', mode='w', format='table', index=False, complevel=9)
+    # Save to NetCDF file
+    cell_xy = cell_xy.reset_index(drop=True
+        ).rename_axis('cell'
+        ).to_xarray(
+        ).drop_vars('cell')
+    cell_xy.to_netcdf(
+        outpath + 'cell_BECCS.nc',
+        encoding={var: {'zlib': True, 'complevel': 9, 'shuffle': True, 'chunksizes': (6956407,)} for var in cell_xy.data_vars}
+    )
 
 
     # Observed ag-management adoption caps and the existing-HIR-project cells (CER register, CEA files, ABS 4627.0),

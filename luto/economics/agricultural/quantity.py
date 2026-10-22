@@ -78,7 +78,7 @@ def get_ccimpact(data, lu, lm, yr_idx):
     """
 
     # Check if land-use exists in CLIMATE_CHANGE_IMPACT (e.g., dryland Pears/Rice do not occur), if not return ones
-    if lu not in {t[0] for t in data.CLIMATE_CHANGE_IMPACT[lm].columns}:
+    if (lm, lu) not in data.CLIMATE_CHANGE_IMPACT.indexes['column'].droplevel('year'):
         return np.ones((data.NCELLS))
 
     # Convert year index to calendar year to match the climate impact data which is by calendar year.
@@ -86,10 +86,10 @@ def get_ccimpact(data, lu, lm, yr_idx):
 
     # Interpolate climate change damage for lu, lm, and year for each cell using a linear function.
     anchor = data.CLIMATE_CHANGE_IMPACT_ANCHOR_YEAR          # The year the file's multipliers are relative to (2010)
-    xs = {t[2] for t in data.CLIMATE_CHANGE_IMPACT.columns}  # Returns set {2020, 2050, 2080}
+    xs = set(data.CLIMATE_CHANGE_IMPACT['year'].values.tolist())  # Returns set {2020, 2050, 2080}
     xs.add(anchor)                                           # Adds the anchor year and returns set {2010, 2020, 2050, 2080}
     xs = sorted(xs)                                          # Returns list and ensures sorted lowest to highest [2010, 2020, 2050, 2080]
-    yys = data.CLIMATE_CHANGE_IMPACT[lm, lu].fillna(1)       # Grabs the column and replaces NaNs with ones to avoid issues with calculating water use limits
+    yys = data.CLIMATE_CHANGE_IMPACT.sel(lm=lm, lu=lu).to_pandas().T.fillna(1)   # The (cell, year) columns, NaNs replaced with ones to avoid issues with calculating water use limits
     yys.insert(0, str(anchor), 1)                            # Insert a new column for the anchor year with value of 1 to ensure no climate change impact there
     yys = yys.astype(np.float32)
 
@@ -161,8 +161,8 @@ def get_quantity_stubble(data, pr, lm):
     fq = {'MEAT': ('F1', 'Q1'), 'WOOL': ('F2', 'Q2'), 'LEXP': ('F3', 'Q3')}[pr.split()[-1]]
     lu = data.PR2LU_DICT[pr]
     agec = data.stubble(lu, lm)['AGEC_LVSTK']
-    quantity = agec[fq[0], 'SHEEP'] * agec[fq[1], 'SHEEP']
-    return np.nan_to_num((quantity * get_stubble_yield_pot(data, lu, lm) * data.REAL_AREA).to_numpy(copy=True))   # writable (get_quantity scales it in place); no sheep data: 0
+    quantity = agec.sel(field=fq[0], animal='SHEEP').values * agec.sel(field=fq[1], animal='SHEEP').values
+    return np.nan_to_num(quantity * get_stubble_yield_pot(data, lu, lm) * data.REAL_AREA.values)   # a new array, writable (get_quantity scales it in place); no sheep data: 0
 
 
 def get_quantity_lvstk(data, pr, lm, yr_idx):
@@ -195,31 +195,31 @@ def get_quantity_lvstk(data, pr, lm, yr_idx):
     # Beef yields just beef (1) and live exports (3) (both in tonnes of meat per ha).
     if lvstype == 'BEEF': # (F1 * Q1) or (F3 * Q3).
         if 'MEAT' in pr:
-            quantity = ( agec['F1', lvstype]
-                       * agec['Q1', lvstype] )
+            quantity = ( agec.sel(field='F1', animal=lvstype).to_series()
+                       * agec.sel(field='Q1', animal=lvstype).to_series() )
         elif 'LEXP' in pr:
-            quantity = ( agec['F3', lvstype]
-                       * agec['Q3', lvstype] )
+            quantity = ( agec.sel(field='F3', animal=lvstype).to_series()
+                       * agec.sel(field='Q3', animal=lvstype).to_series() )
         else:
             raise KeyError(f"Unknown {lvstype} product. Check `pr` key.")
 
     elif lvstype == 'SHEEP': # (F1 * Q1), (F2 * Q2), (F3 * Q3).
         if 'MEAT' in pr:
-            quantity = ( agec['F1', lvstype]
-                       * agec['Q1', lvstype] )
+            quantity = ( agec.sel(field='F1', animal=lvstype).to_series()
+                       * agec.sel(field='Q1', animal=lvstype).to_series() )
         elif 'WOOL' in pr:
-            quantity = ( agec['F2', lvstype]
-                       * agec['Q2', lvstype] )
+            quantity = ( agec.sel(field='F2', animal=lvstype).to_series()
+                       * agec.sel(field='Q2', animal=lvstype).to_series() )
         elif 'LEXP' in pr:
-            quantity = ( agec['F3', lvstype]
-                       * agec['Q3', lvstype] )
+            quantity = ( agec.sel(field='F3', animal=lvstype).to_series()
+                       * agec.sel(field='Q3', animal=lvstype).to_series() )
         else:
             raise KeyError(f"Unknown {lvstype} product. Check `pr` key.")
 
     elif lvstype == 'DAIRY': # (F1 * Q1).
         if 'DAIRY' in pr: 
-            quantity = ( agec['F1', lvstype]
-                       * agec['Q1', lvstype] 
+            quantity = ( agec.sel(field='F1', animal=lvstype).to_series()
+                       * agec.sel(field='Q1', animal=lvstype).to_series() 
                        / 1000 ) # Convert to KL
         else:
             raise KeyError(f"Unknown {lvstype} product. Check `pr` key.")
@@ -231,7 +231,7 @@ def get_quantity_lvstk(data, pr, lm, yr_idx):
     quantity *= yield_pot
 
     # Convert quantities in tonnes/ha to tonnes/cell including real_area and resfactor.
-    quantity *= data.REAL_AREA
+    quantity *= data.REAL_AREA.values
 
     return quantity
 
@@ -259,19 +259,19 @@ def get_quantity_crop(data, pr, lm, yr_idx):
     """
     
     # Check if land-use exists in AGEC_CROPS (e.g., dryland Pears/Rice do not occur), if not return zeros
-    if pr not in data.AGEC_CROPS['Yield', lm].columns:
+    if ('Yield', lm, pr) not in data.AGEC_CROPS.indexes['column']:
         quantity = np.zeros((data.NCELLS)).astype(np.float32)
         
     else: # Calculate the quantities
         
         # Get the raw quantities in tonnes/ha from data.
-        quantity = data.AGEC_CROPS['Yield', lm, pr].to_numpy(copy=True)
+        quantity = data.AGEC_CROPS.sel(field='Yield', lm=lm, lu=pr).values.copy()
         
         # Apply climate change yield impact multiplier. Takes land use (lu) as input rather than product (pr) but lu == pr for crops
         quantity *= get_ccimpact(data, pr, lm, yr_idx)
     
         # Convert to tonnes per cell including real_area and resfactor.
-        quantity *= data.REAL_AREA 
+        quantity *= data.REAL_AREA.values 
 
     return quantity
 
@@ -786,7 +786,7 @@ def get_quantity_renewable(data, re_type: str, yr_idx: int):
         * 24
     )
 
-    quantity = yield_per_ha * data.REAL_AREA
+    quantity = yield_per_ha * data.REAL_AREA.values
 
     return quantity.data.astype(np.float32)
 

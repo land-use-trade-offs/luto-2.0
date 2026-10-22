@@ -18,6 +18,7 @@
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
+import xarray as xr
 import luto.data as Data
 
 from typing import Optional
@@ -27,8 +28,8 @@ from luto import settings
 def get_w_net_yield_env_planting(
     data: Data, 
     yr_idx: int, 
-    water_dr_yield: Optional[np.ndarray] = None,
-    water_sr_yield: Optional[np.ndarray] = None
+    water_dr_yield: Optional[xr.DataArray] = None,
+    water_sr_yield: Optional[xr.DataArray] = None
     ) -> np.ndarray:
     """
     Get water yields vector of environmental plantings.
@@ -46,18 +47,17 @@ def get_w_net_yield_env_planting(
     If `water_dr_yield` and `water_sr_yield` are provided, the function will calculate
     the water yields regardless of the `yr_idx`.
     """
-    w_row = data.get_water_yield_file_row(data.YR_CAL_BASE + yr_idx)
-    w_yield_dr = data.WATER_YIELD_DR_FILE[w_row] if water_dr_yield is None else water_dr_yield
-    w_yield_sr = data.WATER_YIELD_SR_FILE[w_row] if water_sr_yield is None else water_sr_yield
+    w_yield_dr = data.get_water_yield('DR', data.YR_CAL_BASE + yr_idx) if water_dr_yield is None else water_dr_yield
+    w_yield_sr = data.get_water_yield('SR', data.YR_CAL_BASE + yr_idx) if water_sr_yield is None else water_sr_yield
     w_yield_nl = data.get_water_nl_yield_for_yr_idx(yr_idx, w_yield_dr, w_yield_sr)
-    wyield = w_yield_nl * data.REAL_AREA
+    wyield = w_yield_nl.values * data.REAL_AREA.values
     return wyield
 
 
 def get_w_net_yield_carbon_plantings_block(
     data: Data, 
     yr_idx: int, 
-    water_dr_yield: Optional[np.ndarray] = None
+    water_dr_yield: Optional[xr.DataArray] = None
     ) -> np.ndarray:
     """
     Get water yields vector of carbon plantings (block arrangement).
@@ -68,15 +68,15 @@ def get_w_net_yield_carbon_plantings_block(
     -------
     1-D array, indexed by cell.
     """
-    w_yield_dr = data.WATER_YIELD_DR_FILE[data.get_water_yield_file_row(data.YR_CAL_BASE + yr_idx)] if water_dr_yield is None else water_dr_yield
-    wyield = w_yield_dr * data.REAL_AREA
+    w_yield_dr = data.get_water_yield('DR', data.YR_CAL_BASE + yr_idx) if water_dr_yield is None else water_dr_yield
+    wyield = w_yield_dr.values * data.REAL_AREA.values
     return wyield
 
 
 def get_w_net_yield_rip_planting(
     data: Data, 
     yr_idx: int, 
-    water_dr_yield: Optional[np.ndarray] = None
+    water_dr_yield: Optional[xr.DataArray] = None
     ) -> np.ndarray:
     """
     Get water yields vector of riparian plantings.
@@ -93,8 +93,8 @@ def get_w_net_yield_rip_planting(
 def get_w_net_yield_agroforestry_base(
     data: Data, 
     yr_idx: int, 
-    water_dr_yield: Optional[np.ndarray] = None,
-    water_sr_yield: Optional[np.ndarray] = None
+    water_dr_yield: Optional[xr.DataArray] = None,
+    water_sr_yield: Optional[xr.DataArray] = None
     ) -> np.ndarray:
     """
     Get water yields vector of agroforestry.
@@ -113,8 +113,8 @@ def get_w_net_yield_sheep_agroforestry(
     ag_w_mrj: np.ndarray, 
     agroforestry_x_r: np.ndarray,
     yr_idx: int,
-    water_dr_yield: Optional[np.ndarray] = None,
-    water_sr_yield: Optional[np.ndarray] = None
+    water_dr_yield: Optional[xr.DataArray] = None,
+    water_sr_yield: Optional[xr.DataArray] = None
 ) -> np.ndarray:
     """
     Parameters
@@ -144,8 +144,8 @@ def get_w_net_yield_beef_agroforestry(
     ag_w_mrj: np.ndarray, 
     agroforestry_x_r: np.ndarray,
     yr_idx: int,
-    water_dr_yield: Optional[np.ndarray] = None,
-    water_sr_yield: Optional[np.ndarray] = None
+    water_dr_yield: Optional[xr.DataArray] = None,
+    water_sr_yield: Optional[xr.DataArray] = None
 ) -> np.ndarray:
     """
     Parameters
@@ -170,7 +170,7 @@ def get_w_net_yield_beef_agroforestry(
     return agroforestry_contr + beef_contr
 
 
-def get_w_net_yield_carbon_plantings_belt_base(data, yr_idx: int, water_dr_yield: Optional[np.ndarray] = None) -> np.ndarray:
+def get_w_net_yield_carbon_plantings_belt_base(data, yr_idx: int, water_dr_yield: Optional[xr.DataArray] = None) -> np.ndarray:
     """
     Get water requirments vector of carbon plantings (belt arrangement).
 
@@ -188,7 +188,7 @@ def get_w_net_yield_sheep_carbon_plantings_belt(
     ag_w_mrj: np.ndarray, 
     cp_belt_x_r: np.ndarray,
     yr_idx: int,
-    water_dr_yield: Optional[np.ndarray] = None
+    water_dr_yield: Optional[xr.DataArray] = None
 ) -> np.ndarray:
     """
     Parameters
@@ -218,7 +218,7 @@ def get_w_net_yield_beef_carbon_plantings_belt(
     ag_w_mrj: np.ndarray, 
     cp_belt_x_r: np.ndarray,
     yr_idx: int,
-    water_dr_yield: Optional[np.ndarray] = None
+    water_dr_yield: Optional[xr.DataArray] = None
 ) -> np.ndarray:
     """
     Parameters
@@ -243,7 +243,7 @@ def get_w_net_yield_beef_carbon_plantings_belt(
     return cp_contr + beef_contr
 
 
-def get_w_net_yield_beccs(data, yr_idx: int, water_dr_yield: Optional[np.ndarray] = None) -> np.ndarray:
+def get_w_net_yield_beccs(data, yr_idx: int, water_dr_yield: Optional[xr.DataArray] = None) -> np.ndarray:
     """
     Get water requirments vector of BECCS.
 
@@ -265,8 +265,8 @@ def get_w_net_yield_matrix(
     data: Data,
     ag_w_mrj: np.ndarray,
     yr_idx: int,
-    water_dr_yield: Optional[np.ndarray] = None,
-    water_sr_yield: Optional[np.ndarray] = None
+    water_dr_yield: Optional[xr.DataArray] = None,
+    water_sr_yield: Optional[xr.DataArray] = None
 ) -> np.ndarray:
     """
     Get the water yields matrix for all non-agricultural land uses.

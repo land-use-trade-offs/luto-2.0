@@ -23,7 +23,7 @@ Run as a plain script from the repo root (no luto imports):
 
     python luto/tools/ag_mgt_caps.py --out input/ag_mgt_caps --input input [--cache DIR]
 
---input is LUTO's input folder, for NLUM_2010-11_mask.tif, lumap.h5, real_area.h5 and ag_landuses.csv.
+--input is LUTO's input folder, for NLUM_2010-11_mask.tif, lumap.nc, real_area.nc and ag_landuses.csv.
 Dependencies: pandas, numpy, geopandas (pyogrio, pyarrow), shapely, rasterio, xlrd (all in requirements.yml).
 Output is deterministic.
 """
@@ -39,6 +39,7 @@ import urllib.request
 import geopandas as gpd
 import numpy as np
 import pandas as pd
+import xarray as xr
 import rasterio
 import shapely
 
@@ -169,7 +170,7 @@ def cea_cells(geoms, transform, shape, land_index):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--out', required=True, help='output folder (e.g. input/ag_mgt_caps)')
-    ap.add_argument('--input', required=True, help="LUTO input folder (NLUM mask, lumap.h5, real_area.h5, ag_landuses.csv)")
+    ap.add_argument('--input', required=True, help="LUTO input folder (NLUM mask, lumap.nc, real_area.nc, ag_landuses.csv)")
     ap.add_argument('--cache', default=None, help='directory to cache downloaded files in')
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
@@ -179,12 +180,12 @@ def main():
         nlum, transform, crs = r.read(1), r.transform, r.crs
     land_index = np.full(nlum.shape, -1, np.int64)
     land_index[np.nonzero(nlum == 1)] = np.arange(int((nlum == 1).sum()))
-    lumap = pd.read_hdf(os.path.join(a.input, 'lumap.h5')).to_numpy()
-    real_area = pd.read_hdf(os.path.join(a.input, 'real_area.h5')).to_numpy()
+    lumap = xr.load_dataarray(os.path.join(a.input, 'lumap.nc')).values
+    real_area = xr.load_dataarray(os.path.join(a.input, 'real_area.nc')).values
     ag_lus = open(os.path.join(a.input, 'ag_landuses.csv')).read().split('\n')
     ag_lus = [lu.strip() for lu in ag_lus if lu.strip()]
     if len(lumap) != len(real_area) or len(lumap) != land_index.max() + 1:
-        raise SystemExit('lumap.h5, real_area.h5 and the NLUM mask disagree on the number of land cells.')
+        raise SystemExit('lumap.nc, real_area.nc and the NLUM mask disagree on the number of land cells.')
 
     # ---- ABS 4627.0: Table 1 Australia, items by 'Commodity description', values in 'Estimate' ----
     abs_raw = pinned('abs_4627_raw', fetch(ABS_4627_URL, a.cache, 'abs_4627_2016-17.xls'))

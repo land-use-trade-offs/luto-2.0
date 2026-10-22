@@ -58,7 +58,7 @@ def get_cost_crop(data:Data, lu, lm, yr_idx):
     """
     
     # Check if land-use exists in AGEC_CROPS (e.g., dryland Pears/Rice do not occur), if not return zeros
-    if lu not in data.AGEC_CROPS['AC', lm].columns:
+    if ('AC', lm, lu) not in data.AGEC_CROPS.indexes['column']:
         costs_t = np.zeros((data.NCELLS))
         # The column name is irrelevant and only used to make the out df the same shape as the rest of crops.
         return pd.DataFrame(
@@ -71,24 +71,24 @@ def get_cost_crop(data:Data, lu, lm, yr_idx):
         
         # Quantity costs
         costs_q = (
-            data.AGEC_CROPS['QC', lm, lu] 
+            data.AGEC_CROPS.sel(field='QC', lm=lm, lu=lu).to_series() 
             * data.QC_COST_MULTS.loc[yr_cal, lu]
             * get_quantity(data, lu.upper(), lm, yr_idx)
         )  # lu.upper() only for crops as needs to be in product format in get_quantity().  
 
         # Area costs.
-        costs_a = data.AGEC_CROPS['AC', lm, lu] * data.AC_COST_MULTS.loc[yr_cal, lu]  # Area costs per hectare.
+        costs_a = data.AGEC_CROPS.sel(field='AC', lm=lm, lu=lu).to_series() * data.AC_COST_MULTS.loc[yr_cal, lu]  # Area costs per hectare.
 
         # Fixed costs
-        costs_flc = data.AGEC_CROPS['FLC', lm, lu] * data.FLC_COST_MULTS.loc[yr_cal, lu]  # Fixed labour costs.
-        costs_foc = data.AGEC_CROPS['FOC', lm, lu] * data.FOC_COST_MULTS.loc[yr_cal, lu]  # Fixed operating costs.
-        costs_fdc = data.AGEC_CROPS['FDC', lm, lu] * data.FDC_COST_MULTS.loc[yr_cal, lu]  # Fixed depreciation costs.
+        costs_flc = data.AGEC_CROPS.sel(field='FLC', lm=lm, lu=lu).to_series() * data.FLC_COST_MULTS.loc[yr_cal, lu]  # Fixed labour costs.
+        costs_foc = data.AGEC_CROPS.sel(field='FOC', lm=lm, lu=lu).to_series() * data.FOC_COST_MULTS.loc[yr_cal, lu]  # Fixed operating costs.
+        costs_fdc = data.AGEC_CROPS.sel(field='FDC', lm=lm, lu=lu).to_series() * data.FDC_COST_MULTS.loc[yr_cal, lu]  # Fixed depreciation costs.
 
         # Water costs as water required in ML per hectare x delivery price per ML.
         if lm == 'irr':
             costs_w = (
-            data.AGEC_CROPS['WR', lm, lu] 
-            * data.AGEC_CROPS['WP', lm, lu] 
+            data.AGEC_CROPS.sel(field='WR', lm=lm, lu=lu).to_series() 
+            * data.AGEC_CROPS.sel(field='WP', lm=lm, lu=lu).to_series() 
             * data.WP_COST_MULTS[yr_cal]
             )
         elif lm == 'dry':
@@ -99,11 +99,11 @@ def get_cost_crop(data:Data, lu, lm, yr_idx):
         # Convert to $/cell including resfactor.
         # Quantity costs which has already been adjusted for REAL_AREA/resfactor via get_quantity
         costs_q *= 1
-        costs_a *= data.REAL_AREA
-        costs_flc *= data.REAL_AREA
-        costs_foc *= data.REAL_AREA
-        costs_fdc *= data.REAL_AREA
-        costs_w *= data.REAL_AREA
+        costs_a *= data.REAL_AREA.values
+        costs_flc *= data.REAL_AREA.values
+        costs_foc *= data.REAL_AREA.values
+        costs_fdc *= data.REAL_AREA.values
+        costs_w *= data.REAL_AREA.values
 
         costs_t = np.stack([costs_q, costs_a, costs_flc, costs_foc, costs_fdc, costs_w]).T
 
@@ -148,35 +148,35 @@ def get_cost_lvstk(data:Data, lu, lm, yr_idx):
     agec = data.agec_lvstk(lu, lm)
 
     # Variable costs - quantity-dependent costs as costs per head x heads per hectare.
-    costs_q = agec['QC', lvstype] * yield_pot * data.QC_COST_MULTS.loc[yr_cal, lvstype_capital]
+    costs_q = agec.sel(field='QC', animal=lvstype).to_series() * yield_pot * data.QC_COST_MULTS.loc[yr_cal, lvstype_capital]
 
     # Variable costs - area-dependent costs per hectare.
-    costs_a = agec['AC', lvstype] * data.AC_COST_MULTS.loc[yr_cal, lvstype_capital]
+    costs_a = agec.sel(field='AC', animal=lvstype).to_series() * data.AC_COST_MULTS.loc[yr_cal, lvstype_capital]
 
     # Fixed costs
-    costs_flc = agec['FLC', lvstype] * data.FLC_COST_MULTS.loc[yr_cal, lvstype_capital]   # Fixed labour costs.
-    costs_foc = agec['FOC', lvstype] * data.FOC_COST_MULTS.loc[yr_cal, lvstype_capital]   # Fixed operating costs.
-    costs_fdc = agec['FDC', lvstype] * data.FDC_COST_MULTS.loc[yr_cal, lvstype_capital]   # Fixed depreciation costs.
+    costs_flc = agec.sel(field='FLC', animal=lvstype).to_series() * data.FLC_COST_MULTS.loc[yr_cal, lvstype_capital]   # Fixed labour costs.
+    costs_foc = agec.sel(field='FOC', animal=lvstype).to_series() * data.FOC_COST_MULTS.loc[yr_cal, lvstype_capital]   # Fixed operating costs.
+    costs_fdc = agec.sel(field='FDC', animal=lvstype).to_series() * data.FDC_COST_MULTS.loc[yr_cal, lvstype_capital]   # Fixed depreciation costs.
 
     # Water costs in $/ha calculated as water requirements (ML/head) x heads per hectare x delivery price ($/ML)
     if lm == 'irr': # Irrigation water if required.
-        WR_IRR = agec['WR_IRR', lvstype]
+        WR_IRR = agec.sel(field='WR_IRR', animal=lvstype).to_series()
     elif lm == 'dry': # No irrigation water if not required.
         WR_IRR = 0
     else: # Passed lm is neither `dry` nor `irr`.
         raise KeyError(f"Unknown {lm} land management. Check `lm` key.")
 
     # Water delivery costs equal drinking water plus irrigation water req per head * yield (head/ha)
-    costs_w = (agec['WR_DRN', lvstype] * settings.LIVESTOCK_DRINKING_WATER + WR_IRR) * yield_pot
+    costs_w = (agec.sel(field='WR_DRN', animal=lvstype).to_series() * settings.LIVESTOCK_DRINKING_WATER + WR_IRR) * yield_pot
     costs_w *= data.water_delivery_price(lu, lm) * data.WP_COST_MULTS[yr_cal]  # $/ha
 
     # Convert costs to $ per cell including resfactor.
-    costs_a *= data.REAL_AREA
-    costs_flc *= data.REAL_AREA
-    costs_foc *= data.REAL_AREA
-    costs_fdc *= data.REAL_AREA
-    costs_w *= data.REAL_AREA
-    costs_q *= data.REAL_AREA
+    costs_a *= data.REAL_AREA.values
+    costs_flc *= data.REAL_AREA.values
+    costs_foc *= data.REAL_AREA.values
+    costs_fdc *= data.REAL_AREA.values
+    costs_w *= data.REAL_AREA.values
+    costs_q *= data.REAL_AREA.values
 
     costs = np.stack([costs_a, costs_flc, costs_foc, costs_fdc, costs_w, costs_q]).T
 
@@ -200,11 +200,11 @@ def get_cost_stubble(data:Data, lu, lm, yr_idx):
     yr_cal = data.YR_CAL_BASE + yr_idx
     head_ha = get_stubble_yield_pot(data, lu, lm)
     s = data.stubble(lu, lm)
-    costs_q = s['AGEC_LVSTK']['QC', 'SHEEP'] * head_ha * data.QC_COST_MULTS.loc[yr_cal, 'Sheep']
-    costs_w = (s['AGEC_LVSTK']['WR_DRN', 'SHEEP'] * settings.LIVESTOCK_DRINKING_WATER * head_ha
+    costs_q = s['AGEC_LVSTK'].sel(field='QC', animal='SHEEP').values * head_ha * data.QC_COST_MULTS.loc[yr_cal, 'Sheep']
+    costs_w = (s['AGEC_LVSTK'].sel(field='WR_DRN', animal='SHEEP').values * settings.LIVESTOCK_DRINKING_WATER * head_ha
                * s['WATER_DELIVERY_PRICE'] * data.WP_COST_MULTS[yr_cal])
     return pd.DataFrame(
-        np.nan_to_num(np.stack([costs_q * data.REAL_AREA, costs_w * data.REAL_AREA]).T),   # no sheep data: no stubble sheep
+        np.nan_to_num(np.stack([costs_q * data.REAL_AREA.values, costs_w * data.REAL_AREA.values]).T),   # no sheep data: no stubble sheep
         columns=pd.MultiIndex.from_product([[lu], [lm], ['Stubble sheep quantity cost', 'Stubble sheep water cost']])
     )
 
@@ -316,7 +316,7 @@ def get_asparagopsis_effect_c_mrj(data:Data, yr_idx):
             lvstype, vegtype = lvs_veg_types(lu)
             yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
             cost_per_animal = data.ASPARAGOPSIS_DATA[lu].loc[yr_cal, 'Annual Cost Per Animal (A$2010/yr)']
-            cost_per_cell = cost_per_animal * yield_pot * data.REAL_AREA
+            cost_per_cell = cost_per_animal * yield_pot * data.REAL_AREA.values
 
             new_c_mrj[m, :, j_idx] = cost_per_cell
 
@@ -347,7 +347,7 @@ def get_precision_agriculture_effect_c_mrj(data:Data, yr_idx):
     for m in range(data.NLMS):
         for j_idx, lu in enumerate(land_uses):
             cost_per_ha = data.PRECISION_AGRICULTURE_DATA[settings.LU2TYPE[lu]].loc[yr_cal, 'AnnCost_per_Ha']
-            new_c_mrj[m, :, j_idx] = cost_per_ha * data.REAL_AREA
+            new_c_mrj[m, :, j_idx] = cost_per_ha * data.REAL_AREA.values
 
     return new_c_mrj
 
@@ -382,11 +382,11 @@ def get_ecological_grazing_effect_c_mrj(data:Data, yr_idx):
 
             # Get effects on operating costs
             operating_mult = data.ECOLOGICAL_GRAZING_DATA[lu].loc[yr_cal, 'Operating_cost_multiplier']
-            operating_c_effect = agec['FOC', lvstype] * (operating_mult - 1) * data.REAL_AREA
+            operating_c_effect = agec.sel(field='FOC', animal=lvstype).to_series() * (operating_mult - 1) * data.REAL_AREA.values
 
             # Get effects on labour costs
             labour_mult = data.ECOLOGICAL_GRAZING_DATA[lu].loc[yr_cal, 'Labour_cost_mulitiplier']
-            labour_c_effect = agec['FLC', lvstype] * (labour_mult - 1) * data.REAL_AREA
+            labour_c_effect = agec.sel(field='FLC', animal=lvstype).to_series() * (labour_mult - 1) * data.REAL_AREA.values
 
             # Combine for total cost effect
             total_c_effect = operating_c_effect + labour_c_effect
@@ -416,7 +416,7 @@ def get_savanna_burning_effect_c_mrj(data:Data, yr_idx: int):
     sav_burning_effect = (
         data.SAVBURN_COST_HA
         * data.SAVBURN_COST_MULTS[data.YR_CAL_BASE + yr_idx]
-        * data.REAL_AREA
+        * data.REAL_AREA.values
     )
 
     for m, j in itertools.product(range(data.NLMS), range(nlus)):
@@ -449,7 +449,7 @@ def get_agtech_ei_effect_c_mrj(data:Data, yr_idx):
     for m in range(data.NLMS):
         for j_idx, lu in enumerate(land_uses):
             cost_per_ha = data.AGTECH_EI_DATA[settings.LU2TYPE[lu]].loc[yr_cal, 'AnnCost_per_Ha']
-            new_c_mrj[m, :, j_idx] = cost_per_ha * data.REAL_AREA
+            new_c_mrj[m, :, j_idx] = cost_per_ha * data.REAL_AREA.values
 
     return new_c_mrj
 
@@ -478,7 +478,7 @@ def get_biochar_effect_c_mrj(data:Data, yr_idx: int):
     for m in range(data.NLMS):
         for j_idx, lu in enumerate(land_uses):
             cost_per_ha = data.BIOCHAR_DATA[settings.LU2TYPE[lu]].loc[yr_cal, 'AnnCost_per_Ha']
-            new_c_mrj[m, :, j_idx] = cost_per_ha * data.REAL_AREA
+            new_c_mrj[m, :, j_idx] = cost_per_ha * data.REAL_AREA.values
 
     return new_c_mrj
 
@@ -506,7 +506,7 @@ def get_beef_hir_effect_c_mrj(data: Data, yr_idx: int):
             c_mrj_effects[m, :, j_idx] += (settings.HIR_PRODUCTIVITY_CONTRIBUTION - 1) * ag_cost_r
 
     # Maintenance cost per hectare
-    mainten_cost_rj = (settings.BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR * data.REAL_AREA)[:,None] * (1 - settings.HIR_PRODUCTIVITY_CONTRIBUTION)
+    mainten_cost_rj = (settings.BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR * data.REAL_AREA.values)[:,None] * (1 - settings.HIR_PRODUCTIVITY_CONTRIBUTION)
     cost_mrj = c_mrj_effects + mainten_cost_rj
 
     
@@ -536,7 +536,7 @@ def get_sheep_hir_effect_c_mrj(data: Data, yr_idx: int):
             c_mrj_effects[m, :, j_idx] += (settings.HIR_PRODUCTIVITY_CONTRIBUTION - 1) * ag_cost_r
 
     # Maintenance cost per hectare
-    mainten_cost_rj = (settings.SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR * data.REAL_AREA)[:,None] * (1 - settings.HIR_PRODUCTIVITY_CONTRIBUTION)
+    mainten_cost_rj = (settings.SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR * data.REAL_AREA.values)[:,None] * (1 - settings.HIR_PRODUCTIVITY_CONTRIBUTION)
     cost_mrj = c_mrj_effects + mainten_cost_rj
     
     return cost_mrj
@@ -582,14 +582,14 @@ def get_utility_solar_pv_effect_c_mrj(data: Data, c_mrj, yr_idx, aggregate: bool
             * 1000                                                  # Convert from AUD/kW to AUD/MW
             * 0.6944                                                # Adjust AUD from 2024 to 2010
             * settings.INSTALL_CAPACITY_MW_HA['Utility Solar PV']   # Convert from AUD/MW to AUD/ha
-            * data.REAL_AREA                                        # Convert from AUD/ha to AUD/cell
+            * data.REAL_AREA.values                                        # Convert from AUD/ha to AUD/cell
         )
         re_cost_install_AUD_ha = tools.amortise(
             re_lyr['Cost_of_install_AUD_kw']
             * 1000                                                  # Convert from AUD/kW to AUD/MW
             * 0.6944                                                # Adjust AUD from 2024 to 2010
             * settings.INSTALL_CAPACITY_MW_HA['Utility Solar PV']   # Convert from AUD/MW to AUD/ha
-            * data.REAL_AREA                                        # Convert from AUD/ha to AUD/cell
+            * data.REAL_AREA.values                                        # Convert from AUD/ha to AUD/cell
         )
 
         opex_mrj[:, :, lu_idx]  = ag_cost_delta + re_cost_operation_AUD_ha.data[None, :]
@@ -646,14 +646,14 @@ def get_onshore_wind_effect_c_mrj(data: Data, c_mrj, yr_idx, aggregate: bool = T
             * 1000                                                  # Convert from AUD/kW to AUD/MW
             * 0.6944                                                # Adjust AUD from 2024 to 2010
             * settings.INSTALL_CAPACITY_MW_HA['Onshore Wind']       # Convert from AUD/MW to AUD/ha
-            * data.REAL_AREA                                        # Convert from AUD/ha to AUD/cell
+            * data.REAL_AREA.values                                        # Convert from AUD/ha to AUD/cell
         )
         re_cost_install_AUD_ha = tools.amortise(
             re_lyr['Cost_of_install_AUD_kw']
             * 1000                                                  # Convert from AUD/kW to AUD/MW
             * 0.6944                                                # Adjust AUD from 2024 to 2010
             * settings.INSTALL_CAPACITY_MW_HA['Onshore Wind']       # Convert from AUD/MW to AUD/ha
-            * data.REAL_AREA                                        # Convert from AUD/ha to AUD/cell
+            * data.REAL_AREA.values                                        # Convert from AUD/ha to AUD/cell
         )
 
         opex_mrj[:, :, lu_idx]  = ag_cost_delta + re_cost_operation_AUD_ha.data[None, :]

@@ -696,7 +696,7 @@ def write_dvar_area(data: Data, yr_cal, path):
         ).assign_coords({'region_state': ('cell', data.REGION_STATE_NAME), 'region_NRM': ('cell', data.REGION_NRM_NAME)})
 
 
-    real_area_r = xr.DataArray(data.REAL_AREA.astype(np.float32), dims=['cell'], coords={'cell': range(data.NCELLS)})
+    real_area_r = xr.DataArray(data.REAL_AREA.values.astype(np.float32), dims=['cell'], coords={'cell': range(data.NCELLS)})
 
     area_ag = (ag_dvar_mrj * real_area_r)
     area_non_ag = (non_ag_rj * real_area_r)
@@ -713,7 +713,7 @@ def write_dvar_area(data: Data, yr_cal, path):
         wind_exist_r  = ag_quantity.get_existing_renewable_dvar_fraction(data, 'Onshore Wind',     yr_cal)
 
         exist_re_dry = xr.DataArray(
-            np.stack([solar_exist_r * data.REAL_AREA, wind_exist_r * data.REAL_AREA], axis=0),
+            np.stack([solar_exist_r * data.REAL_AREA.values, wind_exist_r * data.REAL_AREA.values], axis=0),
             dims=['am', 'cell'],
             coords={
                 'am': ['Utility Solar PV', 'Onshore Wind'],
@@ -886,7 +886,7 @@ def write_quantity(data: Data, yr_cal: int, path: str) -> np.ndarray:
         assert data.YR_CAL_BASE <= yr_cal_sim_pre < yr_cal, f"yr_cal_sim_pre ({yr_cal_sim_pre}) must be >= {data.YR_CAL_BASE} and < {yr_cal}"
         prod_base = np.array(data.prod_data[yr_cal_sim_pre]['Production'])
         prod_targ = np.array(data.prod_data[yr_cal]['Production'])
-        demands = data.D_CY_xr.sel(year=yr_cal).values
+        demands = data.DEMAND_C.sel(year=yr_cal, Commodity=data.COMMODITIES).values
         pd.DataFrame({
             'Commodity': [i[0].capitalize() + i[1:] for i in data.COMMODITIES],
             'Prod_base_year (tonnes, KL)': prod_base,
@@ -1357,8 +1357,8 @@ def write_economics(data: Data, yr_cal, path):
 
         solar_prices = {data.REGION_STATE_NAME2CODE[k]: v for k, v in data.SOLAR_PRICES.query('Year==@yr_cal').set_index('State')['Price_AUD_per_MWh'].items()}
         wind_prices  = {data.REGION_STATE_NAME2CODE[k]: v for k, v in data.WIND_PRICES.query('Year==@yr_cal').set_index('State')['Price_AUD_per_MWh'].items()}
-        solar_exist_rev = ag_quantity.get_exist_renewable_capacity(data, 'Utility Solar PV', yr_cal).values * np.vectorize(solar_prices.get, otypes=[np.float32])(data.REGION_STATE_CODE)
-        wind_exist_rev  = ag_quantity.get_exist_renewable_capacity(data, 'Onshore Wind',     yr_cal).values * np.vectorize(wind_prices.get,  otypes=[np.float32])(data.REGION_STATE_CODE)
+        solar_exist_rev = ag_quantity.get_exist_renewable_capacity(data, 'Utility Solar PV', yr_cal).values * np.vectorize(solar_prices.get, otypes=[np.float32])(data.REGION_STATE_CODE.values)
+        wind_exist_rev  = ag_quantity.get_exist_renewable_capacity(data, 'Onshore Wind',     yr_cal).values * np.vectorize(wind_prices.get,  otypes=[np.float32])(data.REGION_STATE_CODE.values)
         exist_rev_da  = xr.DataArray(
             np.stack([solar_exist_rev, wind_exist_rev], axis=0),
             dims=['am', 'cell'],
@@ -1825,7 +1825,7 @@ def write_transition_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     dims_area = ['From-water-supply', 'To-water-supply', 'From-land-use', 'To-land-use']
 
     def leaf_area(fm, fj, cells):
-        return {None: np.broadcast_to(data.REAL_AREA[cells][None, :, None],
+        return {None: np.broadcast_to(data.REAL_AREA.sel(cell=cells).values[None, :, None],
                                       (data.NLMS, len(cells), data.N_AG_LUS))}
 
     area_region, area_layers = _flow_report(leaf_area, None, dims_area, 'Transition Area (ha)')
@@ -2044,7 +2044,7 @@ def write_transition_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     dims_area = ['From-water-supply', 'To-water-supply', 'From-land-use', 'To-land-use']
 
     def leaf_area(fm, fj, cells):
-        return {None: np.broadcast_to(data.REAL_AREA[cells][:, None],
+        return {None: np.broadcast_to(data.REAL_AREA.sel(cell=cells).values[:, None],
                                       (len(cells), len(nonag_names)))}
 
     area_region, area_layers = _flow_report(leaf_area, None, dims_area, 'Transition Area (ha)')
@@ -2174,7 +2174,7 @@ def write_transition_nonag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         k_cell_map = non_ag_transitions.get_base_nonag_dvar_k_cell_map(data, yr_cal_sim_pre)
         for k, D in dvar_D_nonag2ag.items():
             cells = k_cell_map[k]
-            area_rj = (D * data.REAL_AREA[cells][None, :, None]).sum(axis=0)       # (ncells_k, N_AG_LUS)
+            area_rj = (D * data.REAL_AREA.sel(cell=cells).values[None, :, None]).sum(axis=0)       # (ncells_k, N_AG_LUS)
             full = np.zeros((data.NCELLS, data.N_AG_LUS), dtype=np.float32)
             full[cells] = area_rj
             area_flat[data.NON_AGRICULTURAL_LANDUSES[k]] = full
@@ -2399,7 +2399,7 @@ def write_area_transition_start_end(data: Data, path, yr_cal_end):
     uniq_regions, region_codes = np.unique(data.REGION_NRM_NAME, return_inverse=True)
     pool_area_sums = np.zeros((len(uniq_regions), NPOOL, NPOOL), dtype=np.float64)
     for sl, A in _chained_blocks():
-        np.add.at(pool_area_sums, region_codes[sl], A * data.REAL_AREA[sl][:, None, None])
+        np.add.at(pool_area_sums, region_codes[sl], A * data.REAL_AREA.values[sl][:, None, None])
 
     def _leaf_rows(end_pools_are_ag: bool):
         rows = []
@@ -2488,7 +2488,7 @@ def write_area_transition_start_end(data: Data, path, yr_cal_end):
     arr_a2a = np.zeros((data.NCELLS, len(keys_a2a)), dtype=np.float32)
     arr_a2n = np.zeros((data.NCELLS, len(keys_a2n)), dtype=np.float32)
     for sl, A in _chained_blocks():
-        area_block = A * data.REAL_AREA[sl][:, None, None]
+        area_block = A * data.REAL_AREA.values[sl][:, None, None]
         for col_i, (s_ids, e_ids) in enumerate(sel_a2a):
             arr_a2a[sl, col_i] = area_block[:, s_ids][:, :, e_ids].sum(axis=(1, 2))
         for col_i, (s_ids, e_ids) in enumerate(sel_a2n):
@@ -2537,7 +2537,7 @@ def write_crosstab(data: Data, yr_cal, path):
     lumap_pre = data.lumaps[yr_cal_sim_pre]
     lumap = data.lumaps[yr_cal]
     
-    crosstab_region = pd.crosstab(lumap_pre,  [lumap, data.REGION_NRM_NAME], values=data.REAL_AREA, aggfunc=lambda x:x.sum(), margins = False
+    crosstab_region = pd.crosstab(lumap_pre,  [lumap, data.REGION_NRM_NAME], values=data.REAL_AREA.values, aggfunc=lambda x:x.sum(), margins = False
         ).unstack(
         ).reset_index(
         ).rename(
@@ -2627,7 +2627,13 @@ def write_ghg(data: Data, yr_cal: int, path: str):
 
     # ==================== Off-land Commodity ====================
 
-    offland_ghg = data.OFF_LAND_GHG_EMISSION.query(f'YEAR == {yr_cal}').rename(columns={'YEAR': 'Year'})
+    offland_ghg = (
+        data.OFF_LAND_GHG_EMISSION.sel(year=yr_cal)
+        .to_dataframe('Total GHG Emissions (tCO2e)')
+        .reset_index(drop=True)
+        .rename(columns={'year': 'Year', 'Commodity': 'COMMODITY'})
+        [['Year', 'COMMODITY', 'Emission Type', 'Emission Source', 'Total GHG Emissions (tCO2e)']]
+    )
     offland_ghg.to_csv(os.path.join(path, f'GHG_emissions_offland_commodity_{yr_cal}.csv'), index=False)
 
     # ==================== Agricultural Land-use ====================
@@ -2843,11 +2849,11 @@ def write_water(data: Data, yr_cal, path):
 
     # Get the decision variables
     ag_dvar_mrj = chunk_unify_size(tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
-        ).assign_coords(region_water=('cell', data.WATER_REGION_ID), region_NRM=('cell', data.REGION_NRM_NAME))
+        ).assign_coords(region_water=('cell', data.WATER_REGION_ID.values), region_NRM=('cell', data.REGION_NRM_NAME))
     non_ag_dvar_rj = chunk_unify_size(tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
-        ).assign_coords(region_water=('cell', data.WATER_REGION_ID), region_NRM=('cell', data.REGION_NRM_NAME))
+        ).assign_coords(region_water=('cell', data.WATER_REGION_ID.values), region_NRM=('cell', data.REGION_NRM_NAME))
     am_dvar_mrj = chunk_unify_size(tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
-        ).assign_coords(region_water=('cell', data.WATER_REGION_ID), region_NRM=('cell', data.REGION_NRM_NAME))
+        ).assign_coords(region_water=('cell', data.WATER_REGION_ID.values), region_NRM=('cell', data.REGION_NRM_NAME))
         
     # Get water target and domestic use
     w_limit_inside_luto = xr.DataArray(
@@ -2938,10 +2944,10 @@ def write_water(data: Data, yr_cal, path):
 
 
     # ==================== Get Water Yield outside LUTO Study Region ====================
-    wny_outside_luto_study_area = xr.DataArray(
-        np.array(list(data.WATER_OUTSIDE_LUTO_BY_CCI.loc[data.YR_CAL_BASE].to_dict().values()), dtype=np.float32),
-        dims=['region_water'],
-        coords={'region_water': list(data.WATER_REGION_INDEX_R.keys())},
+    wny_outside_luto_study_area = (
+        data.WATER_OUTSIDE_LUTO_BY_CCI.sel(year=data.YR_CAL_BASE, region_id=list(data.WATER_REGION_INDEX_R.keys()), drop=True)
+        .astype(np.float32)
+        .rename(region_id='region_water')
     )
 
 
@@ -2951,11 +2957,11 @@ def write_water(data: Data, yr_cal, path):
     if settings.WATER_CLIMATE_CHANGE_IMPACT == 'on':
         ag_w_mrj_base = tools.ag_mrj_to_xr(data, ag_water.get_water_net_yield_matrices(data, 0))
         ag_w_mrj_base = add_all(ag_w_mrj_base, ['lm'])
-        wny_outside_luto_study_area_base = np.array(list(data.WATER_OUTSIDE_LUTO_BY_CCI.loc[data.YR_CAL_BASE].to_dict().values()))
+        wny_outside_luto_study_area_base = data.WATER_OUTSIDE_LUTO_BY_CCI.sel(year=data.YR_CAL_BASE, region_id=list(data.WATER_REGION_INDEX_R.keys()), drop=True).rename(region_id='region_water')
     elif settings.WATER_CLIMATE_CHANGE_IMPACT == 'off':
         ag_w_mrj_base = tools.ag_mrj_to_xr(data, ag_water.get_water_net_yield_matrices(data, 0, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR))
         ag_w_mrj_base = add_all(ag_w_mrj_base, ['lm'])
-        wny_outside_luto_study_area_base = np.array(list(data.WATER_OUTSIDE_LUTO_HIST.values()))
+        wny_outside_luto_study_area_base = data.WATER_OUTSIDE_LUTO_HIST.sel(region_id=list(data.WATER_REGION_INDEX_R.keys())).rename(region_id='region_water')
 
     ag_w_mrj_CCI = ag_w_mrj - ag_w_mrj_base
     wny_outside_luto_study_area_CCI = wny_outside_luto_study_area - wny_outside_luto_study_area_base
@@ -2966,7 +2972,7 @@ def write_water(data: Data, yr_cal, path):
     #   we use BASE_YEAR (2010) dvar_mrj to calculate CCI, 
     #   because the CCI calculated with base year (previouse year) 
     #   dvar_mrj includes wny From-land-use change
-    xr_ag_dvar_BASE = tools.ag_mrj_to_xr(data, data.AG_L_MRJ).assign_coords(region_water=('cell', data.WATER_REGION_ID), region_NRM=('cell', data.REGION_NRM_NAME))
+    xr_ag_dvar_BASE = tools.ag_mrj_to_xr(data, data.AG_L_MRJ).assign_coords(region_water=('cell', data.WATER_REGION_ID.values), region_NRM=('cell', data.REGION_NRM_NAME))
     xr_ag_dvar_BASE = add_all(xr_ag_dvar_BASE, ['lm'])
 
     xr_ag_wny_CCI = xr_ag_dvar_BASE * ag_w_mrj_CCI
@@ -3135,7 +3141,7 @@ def write_biodiversity_quality_scores(data: Data, yr_cal, path):
         # so the reported scores are comparable with the run's own BIO_QUALITY_RAW/LDS.
         bio_quality_raw = data.load_bio_quality_layer(backend_layer)[0] * data.CONNECTIVITY_SCORE
         bio_quality_lds = np.where(
-            data.SAVBURN_ELIGIBLE,
+            data.SAVBURN_ELIGIBLE.values,
             bio_quality_raw - (bio_quality_raw * (1 - settings.BIO_CONTRIBUTION_LDS)),
             bio_quality_raw,
         ).astype(np.float32)
@@ -3418,14 +3424,14 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
     # Denominator: total degraded area score at base year, consistent with solver target formula.
     # = (BIO_GBF2_MASK * REAL_AREA * AG_MASK_PROPORTION_R).sum() - BIO_GBF2_BASE_YR.sum()
     degreded_area_weighted_bio_contr = (
-        float((data.BIO_GBF2_MASK * data.REAL_AREA * data.AG_MASK_PROPORTION_R).sum())
+        float((data.BIO_GBF2_MASK * data.REAL_AREA.values * data.AG_MASK_PROPORTION_R).sum())
         - float(data.BIO_GBF2_BASE_YR.sum())
     )
 
     # Savanna-burning correction: LDS-treated cells have a lower effective base-year bio contribution,
     # so their restoration contribution must be increased by (1 - BIO_CONTRIBUTION_LDS) * base_dvar.
     savburn_eligible_r = xr.DataArray(
-        data.SAVBURN_ELIGIBLE.astype(np.float32),
+        data.SAVBURN_ELIGIBLE.values.astype(np.float32),
         dims=['cell'],
         coords={'cell': range(data.NCELLS)}
     ).assign_coords(region_NRM=('cell', data.REGION_NRM_NAME))
@@ -3719,11 +3725,11 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
         )
                 
         nvis_layers_arr = xr.where(
-            data.SAVBURN_ELIGIBLE, nvis_layers_arr * settings.BIO_CONTRIBUTION_LDS, nvis_layers_arr
+            data.SAVBURN_ELIGIBLE.values, nvis_layers_arr * settings.BIO_CONTRIBUTION_LDS, nvis_layers_arr
         ).astype(np.float32)
 
         veg_score_r = xr.DataArray(
-            nvis_layers_arr * data.REAL_AREA[None, :],
+            nvis_layers_arr * data.REAL_AREA.values[None, :],
             dims=['group', 'cell'],
             coords={
                 'group': group,
@@ -4136,10 +4142,10 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
             dtype=np.float32,
         )
         snes_layers_arr = np.where(
-            data.SAVBURN_ELIGIBLE.astype(bool)[None, :],
+            data.SAVBURN_ELIGIBLE.values.astype(bool)[None, :],
             snes_layers_arr * settings.BIO_CONTRIBUTION_LDS,
             snes_layers_arr,
-        ).astype(np.float32) * data.REAL_AREA[None, :]
+        ).astype(np.float32) * data.REAL_AREA.values[None, :]
 
         out_arr = np.empty(0)
         species_names = np.empty(0, dtype=object)
@@ -4590,10 +4596,10 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
             for sp in species_batch
         ], dtype=np.float32)
         rows = np.where(
-            data.SAVBURN_ELIGIBLE.astype(bool)[None, :],
+            data.SAVBURN_ELIGIBLE.values.astype(bool)[None, :],
             rows * settings.BIO_CONTRIBUTION_LDS, rows,
         ).astype(np.float32)
-        rows = (rows * data.REAL_AREA[None, :]).astype(np.float32)
+        rows = (rows * data.REAL_AREA.values[None, :]).astype(np.float32)
         return xr.DataArray(
             rows,
             dims=['species', 'cell'],
@@ -4901,7 +4907,7 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
 
     # Get biodiversity scores for selected species
     bio_scores_sr = xr.DataArray(
-        (data.get_GBF8_bio_layers_by_yr(yr_cal, level='group') * data.REAL_AREA[None,:]).astype(np.float32),
+        (data.get_GBF8_bio_layers_by_yr(yr_cal, level='group') * data.REAL_AREA.values[None,:]).astype(np.float32),
         dims=['group','cell'],
         coords={
             'group': data.BIO_GBF8_GROUPS_NAMES,
@@ -5089,7 +5095,7 @@ def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
     
     # Get biodiversity scores for selected species
     bio_scores_sr = xr.DataArray(
-        (data.get_GBF8_bio_layers_by_yr(yr_cal, level='species') * data.REAL_AREA[None, :]).astype(np.float32),
+        (data.get_GBF8_bio_layers_by_yr(yr_cal, level='species') * data.REAL_AREA.values[None, :]).astype(np.float32),
         dims=['species', 'cell'],
         coords={
             'species': data.BIO_GBF8_SEL_SPECIES,

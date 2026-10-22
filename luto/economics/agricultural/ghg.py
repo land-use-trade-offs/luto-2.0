@@ -128,24 +128,22 @@ def get_ghg_crop(data:Data, lu, lm, aggregate):
     """
     
     # Process GHG_crop only if the land-use (lu) and land management (lm) combination exists (e.g., dryland Pears/Rice do not occur)
-    if lu in data.AGGHG_CROPS['CO2E_KG_HA_CHEM_APPL', lm].columns:
+    if ('CO2E_KG_HA_CHEM_APPL', lm, lu) in data.AGGHG_CROPS.indexes['column']:
 
-        # Get the data column {ghg_rs: r -> each pixel,  s -> each GHG source}
+        # Get the data column {ghg_rs: r -> each pixel,  s -> each GHG source}: the (lm, lu) sources, over (field, cell)
+        ghg_fs = data.AGGHG_CROPS.sel(lm=lm, lu=lu)
         if settings.USE_GHG_SCOPE_1:
-            ghg_rs = data.AGGHG_CROPS.loc[:, (data.AGGHG_CROPS.columns.get_level_values(0).isin(settings.CROP_GHG_SCOPE_1)) & 
-                                             (data.AGGHG_CROPS.columns.get_level_values(1) == lm) & 
-                                             (data.AGGHG_CROPS.columns.get_level_values(2) == lu)]
-        else:
-            ghg_rs = data.AGGHG_CROPS.loc[:, (slice(None), lm, lu)]
+            ghg_fs = ghg_fs.isel(field=np.isin(ghg_fs['field'].values, settings.CROP_GHG_SCOPE_1))
+        ghg_rs = ghg_fs.to_pandas().T.copy()                            # DataFrame (cell, source), its own copy (scaled in place below)
 
         # Convert kg CO2e per ha to tonnes. 
         ghg_rs /= 1000
 
         # Convert tonnes CO2 per ha to tonnes CO2 per cell including resfactor
-        ghg_rs *= data.REAL_AREA[:, np.newaxis]
+        ghg_rs *= data.REAL_AREA.values[:, np.newaxis]
 
         # Convert to MultiIndex with levels [source, lm, lu]
-        ghg_rs.columns = pd.MultiIndex.from_tuples([[col[0], lm, lu] for col in ghg_rs.columns])
+        ghg_rs.columns = pd.MultiIndex.from_tuples([[col, lm, lu] for col in ghg_rs.columns])
 
         # Reset the dataframe index
         ghg_rs.reset_index(drop=True, inplace=True)
@@ -164,15 +162,13 @@ def get_ghg_stubble(data:Data, lu, lm) -> pd.DataFrame:
     rate. Sources are named 'STUBBLE_SHEEP_<field>'. Provisional: the cell's sheep factors, pending the emission
     factor rebuild."""
     agghg = data.stubble(lu, lm)['AGGHG_LVSTK']
-    if settings.USE_GHG_SCOPE_1:
-        ghg_raw = agghg.loc[:, (agghg.columns.get_level_values(0) == 'SHEEP') &
-                               (agghg.columns.get_level_values(1).isin(settings.LVSTK_GHG_SCOPE_1))]
-    else:
-        ghg_raw = agghg.loc[:, ('SHEEP', slice(None))]
-    head_cell = get_stubble_yield_pot(data, lu, lm) * data.REAL_AREA
+    sources = [src for animal, src in agghg.indexes['column']
+               if animal == 'SHEEP' and (not settings.USE_GHG_SCOPE_1 or src in settings.LVSTK_GHG_SCOPE_1)]
+    ghg_raw = np.stack([agghg.sel(animal='SHEEP', field=src).values for src in sources], axis=1)   # (cell, source)
+    head_cell = get_stubble_yield_pot(data, lu, lm) * data.REAL_AREA.values
     ghg_rs = pd.DataFrame(
-        np.nan_to_num(ghg_raw.to_numpy() / 1000 * head_cell[:, np.newaxis]),   # no sheep data: no stubble sheep
-        columns=pd.MultiIndex.from_tuples([(f'STUBBLE_SHEEP_{src}', lm, lu) for _, src in ghg_raw.columns]),
+        np.nan_to_num(ghg_raw / 1000 * head_cell[:, np.newaxis]),   # no sheep data: no stubble sheep
+        columns=pd.MultiIndex.from_tuples([(f'STUBBLE_SHEEP_{src}', lm, lu) for src in sources]),
     )
     return ghg_rs
 
@@ -212,14 +208,13 @@ def get_ghg_lvstk( data:Data    # Data object.
 
     # Get GHG emissions by source in kg CO2e per head of livestock.  settings.LVSTK_GHG_SCOPE_1
     # Note: ghg_rs (r -> each cell, s -> each GHG source)
+    ghg_fs = agghg_lvstk.sel(animal=lvstype)                            # the animal's sources, over (field, cell)
     if settings.USE_GHG_SCOPE_1:
-        ghg_raw = agghg_lvstk.loc[:, (agghg_lvstk.columns.get_level_values(0) == lvstype) &
-                                     (agghg_lvstk.columns.get_level_values(1).isin(settings.LVSTK_GHG_SCOPE_1))]
-    else:
-        ghg_raw = agghg_lvstk.loc[:, (lvstype, slice(None)) ]
+        ghg_fs = ghg_fs.isel(field=np.isin(ghg_fs['field'].values, settings.LVSTK_GHG_SCOPE_1))
+    ghg_raw = ghg_fs.to_pandas().T                                      # DataFrame (cell, source)
 
     # Get the names for each GHG source
-    ghg_name_s = [ i[1] for i in ghg_raw.columns ]
+    ghg_name_s = [ i for i in ghg_raw.columns ]
 
     # Calculate the GHG emissions (kgCO2/head * head/ha = kgCO/ha)
     ghg_rs = ghg_raw * yield_pot[:,np.newaxis]
@@ -228,9 +223,9 @@ def get_ghg_lvstk( data:Data    # Data object.
     # Add pasture irrigation emissions.
     if lm == 'irr':
         ghg_lvstk_irr = data.agghg_irrpast(lu, lm)
-        ghg_lvstk_irr_cols = [i for i in ghg_lvstk_irr.columns if 'CO2E' in i]
+        ghg_lvstk_irr_cols = [i for i in ghg_lvstk_irr.data_vars if 'CO2E' in i]
         
-        ghg_rs = pd.concat([ghg_rs, ghg_lvstk_irr[ghg_lvstk_irr_cols]], axis = 1)
+        ghg_rs = pd.concat([ghg_rs, ghg_lvstk_irr[ghg_lvstk_irr_cols].to_dataframe()], axis = 1)
         ghg_name_s += ghg_lvstk_irr_cols
         
 
@@ -238,7 +233,7 @@ def get_ghg_lvstk( data:Data    # Data object.
     ghg_rs = ghg_rs / 1000
 
     # Convert to tonnes CO2e per cell including resfactor
-    ghg_rs *= data.REAL_AREA[:, np.newaxis]
+    ghg_rs *= data.REAL_AREA.values[:, np.newaxis]
 
     # Convert to MultiIndex with levels [source, lm, lu]
     ghg_rs = pd.DataFrame(ghg_rs)
@@ -350,12 +345,12 @@ def get_irrpast_energy_ghg_matrices(data: Data) -> np.ndarray:
     """The irrigated pasture energy and lifecycle fields inside g_mrj <unit: t/cell>, (m, r, j): every agGHG_irrpast.h5
     field except the soil field, on the irrigated livestock land uses. `get_ghg_lvstk` adds them with no scope-1 filter."""
     g_mrj = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
-    energy_cols = [c for c in data.AGGHG_IRRPAST.columns if 'CO2E' in c and c not in settings.CROP_GHG_SCOPE_1]
+    energy_cols = [c for c in data.AGGHG_IRRPAST.data_vars if 'CO2E' in c and c not in settings.CROP_GHG_SCOPE_1]
     m = data.LANDMANS.index('irr')
     for j, lu in enumerate(data.AGRICULTURAL_LANDUSES):
         if lu in data.LU_LVSTK:
             irrpast = data.agghg_irrpast(lu, 'irr')       # block-aggregated per (lm, lu) at RESFACTOR > 1, as get_ghg_lvstk reads it
-            g_mrj[m, :, j] = (irrpast[energy_cols].sum(axis=1).to_numpy() / 1000 * data.REAL_AREA).astype(np.float32)
+            g_mrj[m, :, j] = (irrpast[energy_cols].to_dataframe()[energy_cols].sum(axis=1).to_numpy() / 1000 * data.REAL_AREA.values).astype(np.float32)
     return g_mrj
 
 
@@ -402,8 +397,8 @@ def get_ghg_transition_emissions(data: Data, from_m: int, from_j: int, cells=Non
         cells = np.arange(data.NCELLS)
     n = len(cells)
     N_AG = data.N_AG_LUS
-    area  = data.REAL_AREA[cells]
-    stock = data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA[cells]
+    area  = data.REAL_AREA.sel(cell=cells).values
+    stock = data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA.sel(cell=cells).values
     bio   = data.BIO_HABITAT_CONTRIBUTION_LOOK_UP
     unalloc_j     = data.DESC2AGLU["Unallocated - natural land"]
     lvstk_natural = set(int(x) for x in data.LU_LVSTK_NATURAL)
@@ -475,11 +470,11 @@ def get_asparagopsis_effect_g_mrj(data:Data, yr_idx, separate=False):
                 yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
 
                 reduction_amnt = (
-                    data.agghg_lvstk(lu, lm)[lvstype, "CO2E_KG_HEAD_ENTERIC"].to_numpy()
+                    data.agghg_lvstk(lu, lm).sel(animal=lvstype, field="CO2E_KG_HEAD_ENTERIC").values
                     * yield_pot
                     * ch4_reduction_perc
                     / 1000            # convert to tonnes
-                    * data.REAL_AREA  # adjust for resfactor
+                    * data.REAL_AREA.values  # adjust for resfactor
                 )
                 new_g_mrj[m, :, lu_idx] = -reduction_amnt
 
@@ -523,17 +518,17 @@ def get_precision_agriculture_effect_g_mrj(data:Data, yr_idx, separate=False):
                 'CO2E_KG_HA_SOIL',
             ]:
                 # Check if land-use/land management combination exists (e.g., dryland Pears/Rice do not occur), if not use zeros
-                if lu not in data.AGGHG_CROPS[data.AGGHG_CROPS.columns[0][0], lm].columns:
+                if (data.AGGHG_CROPS['field'].values[0], lm, lu) not in data.AGGHG_CROPS.indexes['column']:
                     continue
 
                 reduction_perc = 1 - lu_data.loc[yr_cal, co2e_type]
 
                 if reduction_perc != 0:
                     reduction_amnt = (
-                        np.nan_to_num(data.AGGHG_CROPS[co2e_type, lm, lu].to_numpy().copy(), 0)
+                        np.nan_to_num(data.AGGHG_CROPS.sel(field=co2e_type, lm=lm, lu=lu).values.copy(), 0)
                         * reduction_perc
                         / 1000            # convert to tonnes
-                        * data.REAL_AREA  # adjust for resfactor
+                        * data.REAL_AREA.values  # adjust for resfactor
                     )
                     parts[soil if co2e_type == 'CO2E_KG_HA_SOIL' else energy][m, :, lu_idx] -= reduction_amnt
 
@@ -579,11 +574,11 @@ def get_ecological_grazing_effect_g_mrj(data:Data, yr_idx, separate=False):
                 yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
 
                 leach_reduction_amnt = (
-                    data.agghg_lvstk(lu, lm)[lvstype, 'CO2E_KG_HEAD_IND_LEACH_RUNOFF'].to_numpy()
+                    data.agghg_lvstk(lu, lm).sel(animal=lvstype, field='CO2E_KG_HEAD_IND_LEACH_RUNOFF').values
                     * yield_pot       # convert to HAs
                     * leach_reduction_perc
                     / 1000            # convert to tonnes
-                    * data.REAL_AREA  # adjust for resfactor
+                    * data.REAL_AREA.values  # adjust for resfactor
                 )
                 parts['Leaching and runoff N2O'][m, :, lu_idx] -= leach_reduction_amnt
 
@@ -591,9 +586,9 @@ def get_ecological_grazing_effect_g_mrj(data:Data, yr_idx, separate=False):
             soil_multiplier = lu_data.loc[yr_cal, 'IMPACTS_soil_carbon'] - 1
             if soil_multiplier != 0:
                 soil_reduction_amnt = (
-                    data.SOIL_CARBON_AVG_T_CO2_HA_PER_YR
+                    data.SOIL_CARBON_AVG_T_CO2_HA_PER_YR.values
                     * soil_multiplier
-                    * data.REAL_AREA
+                    * data.REAL_AREA.values 
                 )
                 parts['Soil carbon'][m, :, lu_idx] -= soil_reduction_amnt
 
@@ -622,8 +617,8 @@ def get_savanna_burning_effect_g_mrj(data:Data, separate=False):
 
     for m, j in itertools.product(range(data.NLMS), range(nlus)):
         # sb_g_mrj[m, :, j] = -data.SAVBURN_TOTAL_TCO2E_HA * data.REAL_AREA
-        sb_g_mrj[m, :, j] = np.where( data.SAVBURN_ELIGIBLE,
-                                     -data.SAVBURN_TOTAL_TCO2E_HA * data.REAL_AREA,
+        sb_g_mrj[m, :, j] = np.where( data.SAVBURN_ELIGIBLE.values, 
+                                     -data.SAVBURN_TOTAL_TCO2E_HA.values * data.REAL_AREA.values, 
                                       0
                                     )
     return {'Avoided CH4 and N2O, sequestered CO2': sb_g_mrj} if separate else sb_g_mrj
@@ -665,23 +660,23 @@ def get_agtech_ei_effect_g_mrj(data:Data, yr_idx, separate=False):
                 'CO2E_KG_HA_SOIL'
             ]:    
                 # Check if land-use/land management combination exists (e.g., dryland Pears/Rice do not occur), if not use zeros
-                if lu not in data.AGGHG_CROPS[data.AGGHG_CROPS.columns[0][0], lm].columns:
+                if (data.AGGHG_CROPS['field'].values[0], lm, lu) not in data.AGGHG_CROPS.indexes['column']:
                     continue
 
                 reduction_perc = 1 - lu_data.loc[yr_cal, co2e_type]
 
                 if reduction_perc != 0:
                     reduction_amnt = (
-                        np.nan_to_num(data.AGGHG_CROPS[co2e_type, lm, lu].to_numpy().copy(), 0)
+                        np.nan_to_num(data.AGGHG_CROPS.sel(field=co2e_type, lm=lm, lu=lu).values.copy(), 0) 
                         * reduction_perc
                         / 1000            # convert to tonnes
-                        * data.REAL_AREA  # adjust for resfactor
+                        * data.REAL_AREA.values  # adjust for resfactor
                     )
                     parts[soil if co2e_type == 'CO2E_KG_HA_SOIL' else energy][m, :, lu_idx] -= reduction_amnt
 
             # Subtract extra 'CO2e_KG_HA_IRRIG' carbon for irrigated land uses
             if m == 1:
-                if lu not in data.AGGHG_CROPS[data.AGGHG_CROPS.columns[0][0], lm].columns:
+                if (data.AGGHG_CROPS['field'].values[0], lm, lu) not in data.AGGHG_CROPS.indexes['column']:
                     continue
 
                 # Columns names for irrig. CO2e are inconsistent across sheets
@@ -693,10 +688,10 @@ def get_agtech_ei_effect_g_mrj(data:Data, yr_idx, separate=False):
 
                 if reduction_perc != 0:
                     reduction_amnt = (
-                        np.nan_to_num(data.AGGHG_CROPS['CO2E_KG_HA_IRRIG', lm, lu].to_numpy().copy(), 0)
+                        np.nan_to_num(data.AGGHG_CROPS.sel(field='CO2E_KG_HA_IRRIG', lm=lm, lu=lu).values.copy(), 0) 
                         * reduction_perc
                         / 1000            # convert to tonnes
-                        * data.REAL_AREA  # adjust for resfactor
+                        * data.REAL_AREA.values  # adjust for resfactor
                     )
                     parts[energy][m, :, lu_idx] -= reduction_amnt
 
@@ -737,17 +732,17 @@ def get_biochar_effect_g_mrj(data:Data, yr_idx, separate=False):
                 'CO2E_KG_HA_SOIL',
             ]:
                 # Check if land-use/land management combination exists (e.g., dryland Pears/Rice do not occur), if not use zeros
-                if lu not in data.AGGHG_CROPS[data.AGGHG_CROPS.columns[0][0], lm].columns:
+                if (data.AGGHG_CROPS['field'].values[0], lm, lu) not in data.AGGHG_CROPS.indexes['column']:
                     continue
 
                 reduction_perc = 1 - lu_data.loc[yr_cal, co2e_type]
 
                 if reduction_perc != 0:
                     reduction_amnt = (
-                        np.nan_to_num(data.AGGHG_CROPS[co2e_type, lm, lu].to_numpy().copy(), 0)
+                        np.nan_to_num(data.AGGHG_CROPS.sel(field=co2e_type, lm=lm, lu=lu).values.copy(), 0) 
                         * reduction_perc
                         / 1000            # convert to tonnes
-                        * data.REAL_AREA  # adjust for resfactor
+                        * data.REAL_AREA.values  # adjust for resfactor
                     )
                     parts[soil if co2e_type == 'CO2E_KG_HA_SOIL' else energy][m, :, lu_idx] -= reduction_amnt
 
@@ -755,9 +750,9 @@ def get_biochar_effect_g_mrj(data:Data, yr_idx, separate=False):
             soil_multiplier = lu_data.loc[yr_cal, 'IMPACTS_soil_carbon'] - 1
             if soil_multiplier != 0:
                 soil_reduction_amnt = (
-                    data.SOIL_CARBON_AVG_T_CO2_HA_PER_YR
+                    data.SOIL_CARBON_AVG_T_CO2_HA_PER_YR.values
                     * soil_multiplier
-                    * data.REAL_AREA
+                    * data.REAL_AREA.values
                 )
                 parts[soc][m, :, lu_idx] -= soil_reduction_amnt
 
@@ -773,14 +768,14 @@ def get_beef_hir_effect_g_mrj(data: Data, yr_idx, separate=False):
     for j_idx, lu in enumerate(land_uses):
         regrowth[:, :, j_idx] -= (
             (
-                data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR
+                data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR.values
                 * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[data.DESC2AGLU[lu]])
             )
             - (
-                data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR
+                data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR.values
                 * (1 - settings.HIR_CEILING_PERCENTAGE)
             )
-        ) * data.REAL_AREA 
+        ) * data.REAL_AREA.values 
 
     # GHG abatement from livestock density reduction
     for lm_idx, lm in enumerate(data.LANDMANS):
@@ -800,14 +795,14 @@ def get_sheep_hir_effect_g_mrj(data: Data, yr_idx, separate=False):
     for j_idx, lu in enumerate(land_uses):
         regrowth[:, :, j_idx] -= (
             (
-                data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR
+                data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR.values
                 * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[data.DESC2AGLU[lu]])
             )
             - (
-                data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR
+                data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR.values
                 * (1 - settings.HIR_CEILING_PERCENTAGE)
             )
-        ) * data.REAL_AREA 
+        ) * data.REAL_AREA.values 
         
     # GHG abatement from livestock density reduction
     for lm_idx, lm in enumerate(data.LANDMANS):
@@ -834,7 +829,7 @@ def get_hir_baseline_t(data: Data, yr_idx) -> dict:
         return out
     for am, fn in (('HIR - Beef', get_beef_hir_effect_g_mrj), ('HIR - Sheep', get_sheep_hir_effect_g_mrj)):
         j = data.DESC2AGLU[settings.AG_MANAGEMENTS_TO_LAND_USES[am][0]]
-        share = np.stack([np.minimum(hb['ha_mj'][fy][m, j] / data.REAL_AREA, 1.0) for m in range(data.NLMS)])   # (lm, cell)
+        share = np.stack([np.minimum(hb['ha_mj'][fy][m, j] / data.REAL_AREA.values, 1.0) for m in range(data.NLMS)])   # (lm, cell)
         for name, arr in fn(data, yr_idx, separate=True).items():
             out[f'HIR_BASELINE_{AG_MAN_GHG_SUBTERMS[am][name]}_t'] += float((arr[:, :, 0] * share).sum())
     return out

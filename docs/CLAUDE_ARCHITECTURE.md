@@ -63,9 +63,6 @@ This document describes the core architecture, modules, and data flow of LUTO2.
 - Uses compressed NetCDF encoding with chunking for efficient storage
 - Format: `tCO2_ha_{type}.nc` where type is ep_block, ep_belt, ep_rip, cp_block, cp_belt, hir_block, hir_rip
 
-### Spatial Processing (`luto/tools/spatializers.py`)
-- Spatial data processing and upsampling
-
 ### Output Writing (`luto/tools/write.py`)
 - Outputs model results as xarray datasets in NetCDF format
 - Uses hierarchical dimension structure for progressive selection in reporting UI

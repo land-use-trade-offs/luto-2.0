@@ -8,6 +8,13 @@ optimisation actually sees.
 **Verified against**: commit `4ea251d9` (working tree, 2026-08-12). Line numbers are navigation
 anchors, not contracts — re-grep the symbol if a number has drifted.
 
+**Inputs updated 2026-10-20 (S6 — every spatial input as NetCDF):** the L3 file names in §4, the §5
+inventory (its `data.py` / `dataprep.py` line numbers re-anchored for every converted file), the L4
+snippets in §6 and the file names in §7 / §9 describe the working tree of `integrate/nick-stack` on that
+date. The old `.h5` inputs sit in `input/deprecated_h5/` and nothing reads them. **Not refreshed:** the
+solver side — §4's "Builder (line)" column, §8 and the `input_data.py` references describe the solver
+before it was split into `col_builder` / `row_inputs` / `row_builder` (see `luto/solvers/README.md`).
+
 ---
 
 ## Table of Contents
@@ -51,8 +58,8 @@ at — most confusion comes from conflating L1 (the `N:` script that *built* a f
 | **L0** Raw source | `N:/Data-Master/...`, `N:/LUF-Modelling/...` | External datasets: FullCAM, ABARES/ABS, NLUM, DCCEEW, CSIRO, NVIS, AEMO |
 | **L1** Upstream script | `N:/Data-Master/LUTO_2.0_input_data/Scripts/script_*.py` | Heavy spatial assembly → `Input_data/{1D,2D,3D,4D}_*` intermediates |
 | **L2** `luto/dataprep.py` | repo | `create_new_dataset()` — copy, subset, unit-convert, reshape into `input/` |
-| **L3** `input/<file>` | repo `input/` | The model's on-disk contract: `.h5`, `.nc`, `.npy`, `.npz`, `.csv`, `.xlsx`, `.tif` |
-| **L4** `luto/data.py` | repo | `Data.__init__` loads + masks (`where=self.MASK` / `.isel(cell=self.MASK)`), applies risk/CPI/climate adjustments → `Data` attributes |
+| **L3** `input/<file>` | repo `input/` | The model's on-disk contract: `.nc` (every spatial input since 2026-10-20, `x_mrj.nc` included), `.npy` / `.npz` (the small transition tables), `.csv`, `.xlsx`, `.tif` |
+| **L4** `luto/data.py` | repo | `Data.__init__` loads + masks (`.isel(cell=self.MASK)`, then `.assign_coords(cell=0 … NCELLS−1)`), applies risk/CPI/climate adjustments → `Data` attributes, kept as xarray (selected by named dimension downstream) |
 | **L5** `luto/economics/**` | repo | Per-theme matrices: cost, revenue, quantity, GHG, water, biodiversity, transitions |
 | **L6** `luto/solvers/input_data.py` | repo | `get_*` builders + rescaling → `SolverInputData` |
 | **L7** `luto/solvers/solver.py` | repo | `_qsum()` coefficient filter → Gurobi constraint/objective terms |
@@ -61,6 +68,10 @@ Two rules that hold throughout:
 
 - **Masking happens at L4, once.** `self.MASK` (from `NLUM_2010-11_mask.tif` + `RESFACTOR`) is applied
   at load. Everything downstream is indexed by the compact cell index `r` of length `data.NCELLS`.
+- **The `cell` coordinate of a model-cell DataArray is `0 … NCELLS−1`.** The input files carry no `cell`
+  coordinate (selected by position, `isel(cell=MASK)`); every selection is relabelled before it meets
+  another model-cell array, because xarray aligns by label. Derived model-state arrays (`LUMAP`, `LMMAP`,
+  `LUMASK`, `AG_L_MRJ`) stay numpy; `REAL_AREA` is a DataArray (`.values` in numpy arithmetic).
 - **Per-hectare → per-cell happens at L5**, by `× data.REAL_AREA`. If an array is still per-hectare at
   L6 it is a bug.
 
@@ -143,8 +154,8 @@ charged in the solver against per-source delta vars (`input_data.py:639-643`).
 
 | Field | Builder (line) | L5 entry | Key `data.` attributes | L3 files |
 |-------|----------------|----------|------------------------|----------|
-| `economic_contr_mrj` (ag part) | `get_ag_c_mrj` 209 / `get_ag_r_mrj` 221 → `get_economic_mrj` 626 | `ag_cost.get_cost_matrices`, `ag_revenue.get_rev_matrices` | `AGEC_CROPS`, `AGEC_LVSTK`, `CROP_PRICE_MULTIPLIERS`, `LVSTK_PRICE_MULTIPLIERS`, `AC/QC/FOC/FLC/FDC/WP_COST_MULTS`, `WATER_DELIVERY_PRICE`, `SAVBURN_COST_HA`, `REAL_AREA` | `agec_crops.h5`, `agec_lvstk.h5`, `ag_price_multipliers.xlsx`, `cost_multipliers.xlsx`, `water_delivery_price.h5`, `cell_savanna_burning.h5`, `real_area.h5` |
-| `economic_contr_mrj` (non-ag part) | `get_non_ag_c_rk` 215 / `get_non_ag_r_rk` 227 | `non_ag_cost.get_cost_matrix`, `non_ag_revenue.get_rev_matrix` | `BECCS_COSTS_AUD_HA_YR`, `BECCS_REV_AUD_HA_YR`, `BECCS_TCO2E_HA_YR`, `BECCS_{COST,REV}_MULTS`, `MAINT_COST_MULTS`, `{EP,CP}_{BLOCK,BELT,RIP}_AVG_T_CO2_HA_PER_YR` | `cell_BECCS_df.h5`, `cost_multipliers.xlsx`, `tCO2_ha_*.nc` |
+| `economic_contr_mrj` (ag part) | `get_ag_c_mrj` 209 / `get_ag_r_mrj` 221 → `get_economic_mrj` 626 | `ag_cost.get_cost_matrices`, `ag_revenue.get_rev_matrices` | `AGEC_CROPS`, `AGEC_LVSTK`, `CROP_PRICE_MULTIPLIERS`, `LVSTK_PRICE_MULTIPLIERS`, `AC/QC/FOC/FLC/FDC/WP_COST_MULTS`, `WATER_DELIVERY_PRICE`, `SAVBURN_COST_HA`, `REAL_AREA` | `agec_crops.nc`, `agec_lvstk.nc`, `ag_price_multipliers.xlsx`, `cost_multipliers.xlsx`, `water_delivery_price.nc`, `cell_savanna_burning.nc`, `real_area.nc` |
+| `economic_contr_mrj` (non-ag part) | `get_non_ag_c_rk` 215 / `get_non_ag_r_rk` 227 | `non_ag_cost.get_cost_matrix`, `non_ag_revenue.get_rev_matrix` | `BECCS_COSTS_AUD_HA_YR`, `BECCS_REV_AUD_HA_YR`, `BECCS_TCO2E_HA_YR`, `BECCS_{COST,REV}_MULTS`, `MAINT_COST_MULTS`, `{EP,CP}_{BLOCK,BELT,RIP}_AVG_T_CO2_HA_PER_YR` | `cell_BECCS.nc`, `cost_multipliers.xlsx`, `tCO2_ha_*.nc` |
 | `economic_contr_mrj` (am part) | `get_ag_man_c_mrj` 579 / `get_ag_man_r_mrj` 596 / `get_ag_man_t_mrj` 602 | `ag_cost.get_agricultural_management_cost_matrices`, etc. | `ASPARAGOPSIS_DATA`, `ECOLOGICAL_GRAZING_DATA`, `PRECISION_AGRICULTURE_DATA`, `AGTECH_EI_DATA`, `BIOCHAR_DATA`, `RENEWABLE_BUNDLE_{SOLAR,WIND}`, `RENEWABLE_LAYERS`, `SOLAR_PRICES`, `WIND_PRICES` | `20260317_Bundle_{MR,AgTech_NE,AgTech_EI}.xlsx`, `20231107_ECOGRAZE_Bundle.xlsx`, `20260401_Bundle_BC.xlsx`, `renewable_energy_bundle.csv`, `renewable_energy_layers_1D.nc`, `renewable_price_AUD_MWh_{solar,wind}.csv` |
 | `economic_prices` | `get_commodity_prices_target_yr` 676 | `ag_revenue.get_commodity_prices` | `AGEC_CROPS`, `AGEC_LVSTK`, price multipliers, demand-elasticity multipliers when `DYNAMIC_PRICE` | as above + `demand_elasticity.csv` |
 | `economic_target_yr_carbon_price` | `get_target_yr_carbon_price` 684 | — (direct) | `CARBON_PRICES` | `carbon_prices.xlsx` |
@@ -153,10 +164,10 @@ charged in the solver against per-source delta vars (`input_data.py:639-643`).
 
 | Field | Builder (line) | L5 entry | Key `data.` attributes | L3 files |
 |-------|----------------|----------|------------------------|----------|
-| `ag_g_mrj` | `get_ag_g_mrj` 233 | `ag_ghg.get_ghg_matrices` | `AGGHG_CROPS`, `AGGHG_LVSTK`, `AGGHG_IRRPAST`, `SOIL_CARBON_AVG_T_CO2_HA_PER_YR`, `SAVBURN_ELIGIBLE`, `SAVBURN_TOTAL_TCO2E_HA`, `CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR`, `BIO_HABITAT_CONTRIBUTION_LOOK_UP` | `agGHG_crops.h5`, `agGHG_lvstk.h5`, `agGHG_irrpast.h5`, `soil_carbon_t_ha.h5`, `cell_savanna_burning.h5`, `natural_land_t_co2_ha.h5`, `fire_risk.h5`, `bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv` |
-| `non_ag_g_rk` | `get_non_ag_g_rk` 239 | `non_ag_ghg.get_ghg_matrix` | `{EP,CP}_*_AVG_T_CO2_HA_PER_YR`, `BECCS_TCO2E_HA_YR`, `CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR`, `BIO_HABITAT_CONTRIBUTION_LOOK_UP`, `LU_LVSTK_NATURAL` | `tCO2_ha_*.nc`, `cell_BECCS_df.h5`, `natural_land_t_co2_ha.h5`, `fire_risk.h5` — full trace in §6-§7 |
+| `ag_g_mrj` | `get_ag_g_mrj` 233 | `ag_ghg.get_ghg_matrices` | `AGGHG_CROPS`, `AGGHG_LVSTK`, `AGGHG_IRRPAST`, `SOIL_CARBON_AVG_T_CO2_HA_PER_YR`, `SAVBURN_ELIGIBLE`, `SAVBURN_TOTAL_TCO2E_HA`, `CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR`, `BIO_HABITAT_CONTRIBUTION_LOOK_UP` | `agGHG_crops.nc`, `agGHG_lvstk.nc`, `agGHG_irrpast.nc`, `soil_carbon_t_ha.nc`, `cell_savanna_burning.nc`, `natural_land_t_co2_ha.nc`, `fire_risk.nc`, `bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv` |
+| `non_ag_g_rk` | `get_non_ag_g_rk` 239 | `non_ag_ghg.get_ghg_matrix` | `{EP,CP}_*_AVG_T_CO2_HA_PER_YR`, `BECCS_TCO2E_HA_YR`, `CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR`, `BIO_HABITAT_CONTRIBUTION_LOOK_UP`, `LU_LVSTK_NATURAL` | `tCO2_ha_*.nc`, `cell_BECCS.nc`, `natural_land_t_co2_ha.nc`, `fire_risk.nc` — full trace in §6-§7 |
 | `ag_man_g_mrj` | `get_ag_man_g_mrj` 585 | `ag_ghg.get_agricultural_management_ghg_matrices` | the five AM bundle dicts | AM bundle `.xlsx` files |
-| `flow_ghg_ag2ag` | inline 1071 | `ag_ghg.get_ghg_transition_emissions_from_base_year` | `CO2E_STOCK_UNALL_NATURAL_TCO2_HA` (full stock loss; the row divides by the step length), `BIO_HABITAT_CONTRIBUTION_LOOK_UP` | `natural_land_t_co2_ha.h5` |
+| `flow_ghg_ag2ag` | inline 1071 | `ag_ghg.get_ghg_transition_emissions_from_base_year` | `CO2E_STOCK_UNALL_NATURAL_TCO2_HA` (full stock loss; the row divides by the step length), `BIO_HABITAT_CONTRIBUTION_LOOK_UP` | `natural_land_t_co2_ha.nc` |
 | `offland_ghg` | inline 1330 | — (direct, `/ GHG scale`) | `OFF_LAND_GHG_EMISSION_C` | `agGHG_lvstk_off_land.csv` |
 
 ### 4.3 Water
@@ -166,10 +177,10 @@ ones (`WATER_YIELD_HIST_DR/SR`) at `input_data.py:1119-1122` and `1132-1136`.
 
 | Field | Builder (line) | L5 entry | Key `data.` attributes | L3 files |
 |-------|----------------|----------|------------------------|----------|
-| `ag_w_mrj` | `get_ag_w_mrj` 245 | `ag_water.get_water_net_yield_matrices` | `WATER_YIELD_DR_FILE`, `WATER_YIELD_SR_FILE`, `WREQ_DRY_RJ`, `WREQ_IRR_RJ`, `WATER_REGION_ID`, `WATER_REGION_HIST_LEVEL`, `WATER_OUTSIDE_LUTO_BY_CCI`, `WATER_USE_DOMESTIC` | `water_yield_ssp{SSP}_2010-2100_{dr,sr}_ml_ha.h5`, `water_yield_baselines.h5`, `water_yield_outside_LUTO_*.h5`, `water_yield_natural_land_*.h5`, `Water_Use_Domestic.csv`, `rivreg_{id,lut}.h5` / `draindiv_{id,lut}.h5` |
-| `non_ag_w_rk` | `get_non_ag_w_rk` 340 | `non_ag_water.get_w_net_yield_matrix` | `WATER_YIELD_DR_FILE`, `WATER_YIELD_SR_FILE`, `REAL_AREA` | same yield layers |
+| `ag_w_mrj` | `get_ag_w_mrj` 245 | `ag_water.get_water_net_yield_matrices` | `get_water_yield('DR' / 'SR', yr)` (reads one year of `WATER_YIELD_SSP_FILE` when first asked, kept in `WATER_YIELD_BY_YEAR`), `WREQ_DRY_RJ`, `WREQ_IRR_RJ`, `WATER_REGION_ID`, `WATER_REGION_HIST_LEVEL`, `WATER_OUTSIDE_LUTO_BY_CCI`, `WATER_USE_DOMESTIC` | `water_yield_ssp{SSP}_2010_2100_ml_ha.nc`, `water_yield_baselines.nc`, `water_region_{rivreg,draindiv}.nc`, `Water_Use_Domestic.csv` |
+| `non_ag_w_rk` | `get_non_ag_w_rk` 340 | `non_ag_water.get_w_net_yield_matrix` | `get_water_yield('DR' / 'SR', yr)`, `REAL_AREA` | same yield layers |
 | `ag_man_w_mrj` | `get_ag_man_w_mrj` 608 | `ag_water.get_agricultural_management_water_matrices` | AM bundles + `RENEWABLE_BUNDLE_{SOLAR,WIND}` | AM bundle `.xlsx`, `renewable_energy_bundle.csv` |
-| `water_region_indices` / `water_region_names` | 250 / 256 | — (direct) | `WATER_REGION_INDEX_R`, `WATER_REGION_NAMES` | `rivreg_*.h5` or `draindiv_*.h5` per `WATER_REGION_DEF` |
+| `water_region_indices` / `water_region_names` | 250 / 256 | — (direct) | `WATER_REGION_INDEX_R`, `WATER_REGION_NAMES` | `water_region_rivreg.nc` or `water_region_draindiv.nc` per `WATER_REGION_DEF` |
 
 `WATER_LIMITS = 'off'` short-circuits both region getters to `{}`.
 
@@ -177,7 +188,7 @@ ones (`WATER_YIELD_HIST_DR/SR`) at `input_data.py:1119-1122` and `1132-1136`.
 
 | Field | Builder (line) | L5 entry | Key `data.` attributes | L3 files |
 |-------|----------------|----------|------------------------|----------|
-| `ag_b_mrj` | `get_ag_b_mrj` 263 | `ag_biodiversity.get_bio_quality_score_mrj` | `BIO_QUALITY_RAW`, `BIO_QUALITY_LDS`, `BIO_HABITAT_CONTRIBUTION_LOOK_UP`, `SAVBURN_ELIGIBLE` (the quality layers are built in `data.py` from the priority-rank layer × `CONNECTIVITY_SCORE`) | `bio_OVERALL_PRIORITY_RANK_AND_AREA_CONNECTIVITY.h5`, `bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv`, `cell_savanna_burning.h5` |
+| `ag_b_mrj` | `get_ag_b_mrj` 263 | `ag_biodiversity.get_bio_quality_score_mrj` | `BIO_QUALITY_RAW`, `BIO_QUALITY_LDS`, `BIO_HABITAT_CONTRIBUTION_LOOK_UP`, `SAVBURN_ELIGIBLE` (the quality layers are built in `data.py` from the priority-rank layer × `CONNECTIVITY_SCORE`) | `bio_OVERALL_PRIORITY_RANK_AND_AREA_CONNECTIVITY.nc`, `bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv`, `cell_savanna_burning.nc` |
 | `non_ag_b_rk` | `get_non_ag_b_rk` 354 | `non_ag_biodiversity.get_breq_matrix` | `BIO_QUALITY_RAW`, `BIO_HABITAT_CONTRIBUTION_LOOK_UP`, `LU_LVSTK_NATURAL` | as above |
 | `ag_man_b_mrj` | `get_ag_man_b_mrj` 614 | `ag_biodiversity.get_ag_mgt_biodiversity_matrices` | AM bundles, `RENEWABLE_BUNDLE_*` | AM bundle `.xlsx`, `renewable_energy_bundle.csv` |
 | `biodiv_contr_ag_j` | `get_ag_biodiv_contr_j` 269 | `ag_biodiversity.get_ag_biodiversity_contribution` | `BIO_HABITAT_CONTRIBUTION_LOOK_UP` | `bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv` (HCAS `HABITAT_CONDITION.csv`) |
@@ -191,20 +202,20 @@ and the whole stream costs nothing. The `*_region_*` companions are the constrai
 
 | Field | Builder (line) | L5 entry | Key `data.` attributes | L3 files |
 |-------|----------------|----------|------------------------|----------|
-| `GBF2_mask_area_r` | `get_GBF2_mask_area_r` 283 | `ag_biodiversity.get_GBF2_MASK_area` | `BIO_GBF2_MASK`, `BIO_GBF2_MASK_LDS`, `BIO_GBF2_BASE_YR`, `REAL_AREA` | `bio_OVERALL_PRIORITY_RANK_AND_AREA_CONNECTIVITY.h5`, `Biodiversity_conserve_performance.xlsx`, `BIODIVERSITY_GBF2_TOP_RANK_CELL_BIO_SCORES_AND_TARGET.csv` |
-| `GBF3_NVIS_pre_1750_area_vr` | `get_GBF3_NVIS_pre_1750_area_vr` 290 | `ag_biodiversity.get_GBF3_NVIS_matrices_vr` | `GBF3_NVIS_LAYERS_LDS` ← `get_NVIS_sparse_array` (`data.py:1651-1670`) | `bio_GBF3_{GBF3_NVIS_TARGET_CLASS}_sparse.npz` + `_groups.npy` |
+| `GBF2_mask_area_r` | `get_GBF2_mask_area_r` 283 | `ag_biodiversity.get_GBF2_MASK_area` | `BIO_GBF2_MASK`, `BIO_GBF2_MASK_LDS`, `BIO_GBF2_BASE_YR`, `REAL_AREA` | `bio_OVERALL_PRIORITY_RANK_AND_AREA_CONNECTIVITY.nc`, `Biodiversity_conserve_performance.xlsx`, `BIODIVERSITY_GBF2_TOP_RANK_CELL_BIO_SCORES_AND_TARGET.csv` |
+| `GBF3_NVIS_pre_1750_area_vr` | `get_GBF3_NVIS_pre_1750_area_vr` 290 | `ag_biodiversity.get_GBF3_NVIS_matrices_vr` | `GBF3_NVIS_LAYERS_LDS` ← `get_NVIS_sparse_array` → `read_sparse_layer` (`data.py:1718-1760`) | `bio_GBF3_{GBF3_NVIS_TARGET_CLASS}_sparse.nc` |
 | `GBF3_NVIS_region_group` | 297 | — (direct) | `BIO_GBF3_NVIS_SEL` ← `get_NVIS_targets_df` (`data.py:1672-1714`) | `BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS.csv` |
 
 **`GBF3_NVIS_REGION_MODE` does not swap the layer file.** The spatial layers always come from
-`bio_GBF3_{GBF3_NVIS_TARGET_CLASS}_sparse.npz` (`data.py:1664`). The mode — `AUSTRALIA`, `NRM` or
+`bio_GBF3_{GBF3_NVIS_TARGET_CLASS}_sparse.nc` (`data.py:1731`). The mode — `AUSTRALIA`, `NRM` or
 `IBRA_REG` — is a filter on the **targets CSV**: `get_NVIS_targets_df` queries
 `region_level == '{GBF3_NVIS_REGION_MODE}'` alongside `sheet_name == '{TARGET_CLASS}'` and
 `resfactor == {RESFACTOR}` (`data.py:1700-1706`), and `AUSTRALIA` additionally collapses every
 regional row to a single `'AUSTRALIA'` label so the solver bypasses NRM masking. There is no separate
 IBRA layer, attribute or constraint method — see §9.3.
-| `GBF4_SNES_pre_1750_area_sr` | 303 | `ag_biodiversity.get_GBF4_SNES_matrix_sr` | `GBF4_SNES_LAYERS_LDS` | `bio_GBF4_SNES_sparse.npz`, `bio_GBF4_SNES_sparse_species.npy` |
+| `GBF4_SNES_pre_1750_area_sr` | 303 | `ag_biodiversity.get_GBF4_SNES_matrix_sr` | `GBF4_SNES_LAYERS_LDS` | `bio_GBF4_SNES_sparse.nc` |
 | `GBF4_SNES_region_species` | 309 | — (direct) | `BIO_GBF4_SNES_SEL` | `BIODIVERSITY_GBF4_TARGET_SNES.csv` |
-| `GBF4_ECNES_pre_1750_area_sr` | 315 | `ag_biodiversity.get_GBF4_ECNES_matrix_sr` | `GBF4_ECNES_LAYERS_LDS` | `bio_GBF4_ECNES_sparse.npz`, `bio_GBF4_ECNES_sparse_species.npy` |
+| `GBF4_ECNES_pre_1750_area_sr` | 315 | `ag_biodiversity.get_GBF4_ECNES_matrix_sr` | `GBF4_ECNES_LAYERS_LDS` | `bio_GBF4_ECNES_sparse.nc` |
 | `GBF4_ECNES_region_species` | 321 | — (direct) | `BIO_GBF4_ECNES_SEL` | `BIODIVERSITY_GBF4_TARGET_ECNES.csv` |
 | `GBF8_pre_1750_area_sr` | 327 | `ag_biodiversity.get_GBF8_matrix_sr` | `BIO_GBF8_SEL_SPECIES`, `BIO_GBF8_GROUPS_LAYER` | `bio_GBF8_ssp{SSP}_EnviroSuit.nc`, `..._group.nc` |
 | `GBF8_region_species` | 333 | — (direct) | `BIO_GBF8_SEL`, `BIO_GBF8_BASELINE_SCORE_GROUPS`, `BIO_GBF8_OUTSDIE_LUTO_SCORE_GROUPS` | `BIODIVERSITY_GBF8_{SCORES,TARGET}{,_group}.csv` |
@@ -213,11 +224,11 @@ IBRA layer, attribute or constraint method — see §9.3.
 
 | Field | Builder (line) | L5 entry | Key `data.` attributes | L3 files |
 |-------|----------------|----------|------------------------|----------|
-| `ag_q_mrp` | `get_ag_q_mrp` 360 | `ag_quantity.get_quantity_matrices` | `AGEC_CROPS`, `AGEC_LVSTK`, `FEED_REQ`, `PASTURE_KG_DM_HA`, `SAFE_PUR_NATL`, `SAFE_PUR_MODL`, `CLIMATE_CHANGE_IMPACT`, `PRODUCTIVITY_MUL_*` | `agec_*.h5`, `feed_req.h5`, `pasture_kg_dm_ha.h5`, `safe_pur_{natl,modl}.h5`, `climate_change_impacts_{rcp}_{on,off}.h5`, `yieldincreases_bau2022.csv`, `yieldincreases_ag_2050.xlsx` |
+| `ag_q_mrp` | `get_ag_q_mrp` 360 | `ag_quantity.get_quantity_matrices` | `AGEC_CROPS`, `AGEC_LVSTK`, `FEED_REQ`, `PASTURE_KG_DM_HA`, `SAFE_PUR_NATL`, `SAFE_PUR_MODL`, `CLIMATE_CHANGE_IMPACT`, `PRODUCTIVITY_MUL_*` | `agec_*.nc`, `feed_req.nc`, `pasture_kg_dm_ha.nc`, `safe_pur_{natl,modl}.nc`, `climate_change_impacts_{rcp}_CO2_FERT_{ON,OFF}.nc`, `yieldincreases_bau2022.csv`, `yieldincreases_ag_2050.xlsx` |
 | `non_ag_q_crk` | `get_non_ag_q_crk` 366 | `non_ag_quantity.get_quantity_matrix` | `LU2PR`, `PR2CM` (structural — non-ag LUs produce no commodity) | — |
 | `ag_man_q_mrp` | `get_ag_man_q_mrj` 590 | `ag_quantity.get_agricultural_management_quantity_matrices` | AM bundles | AM bundle `.xlsx` |
 | `commodity_names` | inline 1307 | — | `COMMODITIES` | derived from `ag_landuses.csv` |
-| `limits['demand']` | `get_limits` 817 | — | `D_CY` ← `DEMAND_DATA` × AusTIMES multipliers | `demand_projections.h5`, `AusTIMES_demand_multiplier.xlsx`, `demand_elasticity.csv` |
+| `limits['demand']` | `get_limits` | — | `DEMAND_C.sel(year=...)` (xarray over `Commodity`) ← `DEMAND_DATA` × AusTIMES multipliers | `demand_projections.nc`, `AusTIMES_demand_multiplier.xlsx`, `demand_elasticity.csv` |
 
 ### 4.7 Transitions, bounds, feasibility
 
@@ -227,17 +238,17 @@ The transition system is **source-keyed**: costs and feasibility are sliced per 
 
 | Field | Builder (line) | L5 entry | Key `data.` attributes | L3 files |
 |-------|----------------|----------|------------------------|----------|
-| `feasible_ag_mrj` | `col_builder.get_cols` | — (`dvar_ub_ag > 0`: an ag entry exists where its upper bound is above zero) | `EXCLUDE` (← `x_mrj.npy`), `T_MAT`, `NO_GO_{LANDUSE,REGION}_AG` | `x_mrj.npy`, `ag_tmatrix.npy`, `no_go_areas/` |
-| `flow_cost_ag2ag` | `get_ag_t_mrj` 372 | `ag_transition.get_transition_matrices_ag2ag` | `T_MAT`, `TRANS_COST_MULTS`, `AG_TMATRIX`, `WATER_LICENCE_PRICE`, `IRRIG_COST_MULTS`, `REGIONAL_ADOPTION_ZONES` | `ag_tmatrix.npy`, `transition_cost_clearing_forest.npz`, `cost_multipliers.xlsx`, `water_licence_price.h5`, `regional_adoption_zones.h5` |
-| `flow_cost_ag2nonag` | inline 1080-1086 | `non_ag_transition.get_transition_matrix_ag2nonag` | `EP_EST_COST_HA`, `RP_EST_COST_HA`, `AF_EST_COST_HA`, `CP_EST_COST_HA`, `AG2EP_TRANSITION_COSTS_HA`, `AG_TO_DESTOCKED_NATURAL_COSTS_HA`, `RP_FENCING_LENGTH`, `EST/FENCE/IRRIG_COST_MULTS` | `ep_est_cost_ha.h5`, `cp_est_cost_ha.h5`, `ag_to_ep_tmatrix.npy`, `ag_to_destock_tmatrix.npy`, `stream_length_m_cell.h5`, `cost_multipliers.xlsx` |
+| `feasible_ag_mrj` | `col_builder.get_cols` | — (`dvar_ub_ag > 0`: an ag entry exists where its upper bound is above zero) | `EXCLUDE` (← `x_mrj.nc`), `T_MAT`, `NO_GO_{LANDUSE,REGION}_AG` | `x_mrj.nc`, `ag_tmatrix.npy`, `no_go_areas/` |
+| `flow_cost_ag2ag` | `get_ag_t_mrj` 372 | `ag_transition.get_transition_matrices_ag2ag` | `T_MAT`, `TRANS_COST_MULTS`, `AG_TMATRIX`, `WATER_LICENCE_PRICE`, `IRRIG_COST_MULTS`, `REGIONAL_ADOPTION_ZONES` | `ag_tmatrix.npy`, `transition_cost_clearing_forest.npz`, `cost_multipliers.xlsx`, `water_licence_price.nc`, `regional_adoption_zones.nc` |
+| `flow_cost_ag2nonag` | inline 1080-1086 | `non_ag_transition.get_transition_matrix_ag2nonag` | `EP_EST_COST_HA`, `RP_EST_COST_HA`, `AF_EST_COST_HA`, `CP_EST_COST_HA`, `AG2EP_TRANSITION_COSTS_HA`, `AG_TO_DESTOCKED_NATURAL_COSTS_HA`, `RP_FENCING_LENGTH`, `EST/FENCE/IRRIG_COST_MULTS` | `plantings_est_cost_ha.nc`, `ag_to_ep_tmatrix.npy`, `ag_to_destock_tmatrix.npy`, `stream_length_m_cell.nc`, `cost_multipliers.xlsx` |
 | `flow_cost_nonag2ag` | inline 1090-1096 | `non_ag_transition.get_transition_matrix_nonag2ag` | `EP2AG_TRANSITION_COSTS_HA`, `T_MAT` | `ep_to_ag_tmatrix.npy` |
-| `dvar_ub_ag` / `dvar_lb_ag` | 484 / 517 | `ag_transition.get_ag2ag_{ub,lb}` + `non_ag_transition.get_nonag2ag_ub` | `T_MAT`, `EXCLUDE`, base dvars | `ag_tmatrix.npy`, `x_mrj.npy` |
-| `dvar_ub_nonag` / `dvar_lb_nonag` | 504 / 524 | `non_ag_transition.get_non_ag_{ub,lb}_matrices` | `RP_PROPORTION`, `LU_LVSTK_NATURAL`, `NO_GO_*_NON_AG`, reversibility flags | `stream_length_m_cell.h5`, `no_go_areas/` |
-| `arc_*_src` (3 dicts) | `col_builder.get_arc_{ag2ag,nonag2ag,ag2nonag}_src` | `ag_transition.get_ag2ag_ub_src`, `non_ag_transition.get_nonag2ag_ub_src` | `T_MAT`, `EXCLUDE`, `NO_GO_*_AG`, base dvars | `ag_tmatrix.npy`, `x_mrj.npy`, `no_go_areas/` |
+| `dvar_ub_ag` / `dvar_lb_ag` | 484 / 517 | `ag_transition.get_ag2ag_{ub,lb}` + `non_ag_transition.get_nonag2ag_ub` | `T_MAT`, `EXCLUDE`, base dvars | `ag_tmatrix.npy`, `x_mrj.nc` |
+| `dvar_ub_nonag` / `dvar_lb_nonag` | 504 / 524 | `non_ag_transition.get_non_ag_{ub,lb}_matrices` | `RP_PROPORTION`, `LU_LVSTK_NATURAL`, `NO_GO_*_NON_AG`, reversibility flags | `stream_length_m_cell.nc`, `no_go_areas/` |
+| `arc_*_src` (3 dicts) | `col_builder.get_arc_{ag2ag,nonag2ag,ag2nonag}_src` | `ag_transition.get_ag2ag_ub_src`, `non_ag_transition.get_nonag2ag_ub_src` | `T_MAT`, `EXCLUDE`, `NO_GO_*_AG`, base dvars | `ag_tmatrix.npy`, `x_mrj.nc`, `no_go_areas/` |
 | `ag_source_cells` / `nonag_source_cells` | 416 / 421 | `ag_transition.get_base_dvar_mj_cell_map`, `non_ag_transition.get_base_nonag_dvar_k_cell_map` | base-year dvars | — (runtime state) |
 | `ag_man_limits` | `get_ag_man_limits` 620 | `ag_transition.get_agricultural_management_adoption_limits` | AM bundles | AM bundle `.xlsx` |
 | `ag_man_lb_mrj` | `get_ag_man_lb_mrj` 533 | `ag_transition.get_trans_lb_ag_man` | base-year AM dvars | — (runtime state) |
-| `dvar_base_ag_mrj` / `dvar_base_non_ag_rk` | `get_cols` §2 | `data.ag_dvars`, `data.non_ag_dvars` | `lumaps`, `lmmaps` | `lumap.h5`, `lmmap.h5` (base year only; later years are runtime state) |
+| `dvar_base_ag_mrj` / `dvar_base_non_ag_rk` | `get_cols` §2 | `data.ag_dvars`, `data.non_ag_dvars` | `lumaps`, `lmmaps` | `lumap.nc`, `lmmap.nc` (base year only; later years are runtime state) |
 
 ### 4.8 Renewable energy
 
@@ -257,12 +268,12 @@ never exceeds 1 in any period (`input_data.py:550-554`).
 
 | Field | Builder (line) | `data.` attribute | L3 file |
 |-------|----------------|-------------------|---------|
-| `region_state_r`, `region_state_name2idx` | 566, 570 | `REGION_STATE_CODE`, `REGION_STATE_NAME2CODE` | `REGION_STATE_r.h5` ← `cell_zones_df.h5` |
-| `region_NRM_names_r` | 574 | `REGION_NRM_NAME` | `REGION_NRM_r.h5` ← `cell_zones_df.h5` |
-| `savanna_eligible_r` | 765 | `SAVBURN_ELIGIBLE` | `cell_savanna_burning.h5` |
+| `region_state_r`, `region_state_name2idx` | 566, 570 | `REGION_STATE_CODE`, `REGION_STATE_NAME2CODE` | `region_state.nc` ← `cell_zones_df.h5` |
+| `region_NRM_names_r` | 574 | `REGION_NRM_NAME` | `region_nrm.nc` ← `cell_zones_df.h5` |
+| `savanna_eligible_r` | 765 | `SAVBURN_ELIGIBLE` | `cell_savanna_burning.nc` |
 | `GBF2_mask_idx` | 769 | `BIO_GBF2_MASK_LDS` | see §4.5 |
-| `real_area` | 1339 | `REAL_AREA` | `real_area.h5` ← `cell_zones_df['CELL_HA']` |
-| `ag_mask_proportion_r` | 1340 | `AG_MASK_PROPORTION_R` | derived from `lumap.h5` |
+| `real_area` | 1339 | `REAL_AREA` | `real_area.nc` ← `cell_zones_df['CELL_HA']` |
+| `ag_mask_proportion_r` | 1340 | `AG_MASK_PROPORTION_R` | derived from `lumap.nc` |
 | `lu2pr_pj`, `pr2cm_cp`, `desc2aglu` | 1336-1338 | `LU2PR`, `PR2CM`, `DESC2AGLU` | derived from `ag_landuses.csv` |
 | `base_yr_prod` | 1298-1305 | 6 base-year aggregates re-derived at `target_index=0` and cached on `data` | (recomputes the L5 matrices above) |
 | `scale_factors` | 1283-1296 | rescaling bands — see §8 | — |
@@ -274,7 +285,7 @@ never exceeds 1 in any period (`input_data.py:550-554`).
 
 | Key | Source attribute | L3 file | Gate |
 |-----|------------------|---------|------|
-| `demand` | `D_CY` | `demand_projections.h5`, `AusTIMES_demand_multiplier.xlsx` | always |
+| `demand` | `DEMAND_C` (xarray, `Commodity` × `year`) | `demand_projections.nc`, `AusTIMES_demand_multiplier.xlsx` | always |
 | `water` | `WATER_YIELD_TARGETS` | water yield baselines/outside-LUTO layers | `WATER_LIMITS == 'on'` |
 | `ghg` | `GHG_TARGETS[yr]` | `GHG_targets.xlsx` | `GHG_EMISSIONS_LIMITS != 'off'` |
 | `renewable_*` | `RENEWABLE_TARGETS` (TWh→MWh) | `renewable_targets.csv` | any `RENEWABLES_OPTIONS` |
@@ -282,7 +293,7 @@ never exceeds 1 in any period (`input_data.py:550-554`).
 | `GBF3_NVIS` | `get_GBF3_NVIS_limit_score_inside_LUTO_by_yr` | `BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS.csv` | `GBF3_NVIS_TARGET != 'off'` |
 | `GBF4_SNES` / `GBF4_ECNES` | `get_GBF4_{SNES,ECNES}_target_inside_LUTO_by_year` | `BIODIVERSITY_GBF4_TARGET_{SNES,ECNES}.csv` | respective setting `!= 'off'` |
 | `GBF8` | `get_GBF8_target_inside_LUTO_by_yr` | `BIODIVERSITY_GBF8_TARGET{,_group}.csv` | `GBF8_TARGET == 'on'` |
-| `ag_regional_adoption`, `non_ag_regional_adoption{,_sum}` | `ag_transition.get_regional_adoption_limits` | `regional_adoption_zones.h5/.xlsx` | `REGIONAL_ADOPTION_CONSTRAINTS != 'off'` |
+| `ag_regional_adoption`, `non_ag_regional_adoption{,_sum}` | `ag_transition.get_regional_adoption_limits` | `regional_adoption_zones.nc` / `.xlsx` | `REGIONAL_ADOPTION_CONSTRAINTS != 'off'` |
 
 ---
 
@@ -295,32 +306,32 @@ The L3 contract, with its L4 consumer and L2/L1/L0 origin. "copy" in the L2 colu
 
 | `input/` file | `data.py` | L2 (`dataprep.py`) | L1 / L0 origin |
 |---------------|-----------|--------------------|----------------|
-| `NLUM_2010-11_mask.tif` | 146 | copy 111 | `nlum_inpath` (National Landuse Map) |
-| `ag_landuses.csv` | 227 | copy 112 | `nlum_inpath` |
-| `lumap.h5` | 143 | built 340 | `raw_data/cell_LU_mapping.h5` ← script_2 |
-| `lmmap.h5` | 442 | built 355 | `raw_data/cell_LU_mapping.h5` ← script_2 |
-| `real_area.h5` | 435 | built 422 (`zones['CELL_HA']`) | `cell_zones_df.h5` ← script_1 |
-| `x_mrj.npy` | 898 | built 545-608 (SA2 concordance pivot × rainfall ≥175 mm × irrigation potential, then OR'd with the observed 2010 map) | `NLUM_SPREAD_LU_ID_Mapped_Concordance.h5` + `cell_biophysical_df.h5` + `cell_zones_df.h5` |
-| `state_id.npy` | **not read** | built 311 | `cell_zones_df.h5` (superseded by `REGION_STATE_r.h5`) |
-| `REGION_NRM_r.h5` / `REGION_STATE_r.h5` | 517 / 524 | built 360 / 363 | `cell_zones_df.h5` ← script_1 |
-| `regional_adoption_zones.h5` / `.xlsx` | 597 / 601 | built 379 / 411 | `cell_zones_df.h5` |
+| `NLUM_2010-11_mask.tif` | 156 | copy 117 | `nlum_inpath` (National Landuse Map) |
+| `ag_landuses.csv` | 260 | copy 118 | `nlum_inpath` |
+| `lumap.nc` (`LU_ID_LUTO`, full-res cells) | 152 | built 357 | `raw_data/cell_LU_mapping.h5` ← script_2 |
+| `lmmap.nc` (`IRRIGATION`) | 477 | built 374 | `raw_data/cell_LU_mapping.h5` ← script_2 |
+| `real_area.nc` (`CELL_HA`) | 468 | built 448 (`zones['CELL_HA']`) | `cell_zones_df.h5` ← script_1 |
+| `x_mrj.nc` (`X_MRJ` bool (lm, cell, lu) over the full-res cells, lm / lu labelled) | 916 | built 588-654 (SA2 concordance pivot × rainfall ≥175 mm × irrigation potential, then OR'd with the observed 2010 map) | `NLUM_SPREAD_LU_ID_Mapped_Concordance.h5` + `cell_biophysical_df.h5` + `cell_zones_df.h5` |
+| `state_id.npy` | **not read** | built 328 | `cell_zones_df.h5` (superseded by `region_state.nc`) |
+| `region_nrm.nc` / `region_state.nc` — the region code per cell (`NRM_CODE` / `STE_CODE11`) and each code's name once, over `code` | 531 / 537 | built 381-388 | `cell_zones_df.h5` ← script_1 |
+| `regional_adoption_zones.nc` / `.xlsx` | 611 / 617 | built 405 / 437 | `cell_zones_df.h5` |
 | `no_go_areas/` | 561 | copytree 163 | `no_go_areas` (toy dataset — flagged as such in `dataprep.py:56`) |
 
 ### Agricultural economics & production
 
 | `input/` file | `data.py` | L2 | L1 / L0 |
 |---------------|-----------|----|---------|
-| `agec_crops.h5` | 212 | built 1019 | `SA2_crop_data.h5` ← script_2 |
-| `agec_lvstk.h5` | 213 | built 1039 | `cell_livestock_data.h5` ← script_2 |
-| `agGHG_crops.h5` | 885 | built 1078 | `SA2_crop_GHG_data.h5` ← script_2 |
-| `agGHG_lvstk.h5` | 886 | built 1153 | `SA2_livestock_GHG_data.h5` ← script_2 |
-| `agGHG_irrpast.h5` | 887 | built 1159 | `SA2_irrigated_pasture_GHG_data.h5` ← script_2 |
-| `agGHG_lvstk_off_land.csv` | 1305 | built 1209 | `GHG_off_land_inpath` |
-| `feed_req.h5` | 646 | built 510 | `cell_livestock_data.h5` |
-| `pasture_kg_dm_ha.h5` | 648 | built 514 | `cell_livestock_data.h5` |
-| `safe_pur_natl.h5` / `safe_pur_modl.h5` | 651 / 654 | built 517 / 520 | `cell_livestock_data.h5` |
-| `soil_carbon_t_ha.h5` | 711 | built 540 (`SOC_T_HA_TOP_30CM`) | `cell_biophysical_df.h5` ← script_4 |
-| `climate_change_impacts_{rcp}_{on,off}.h5` | 486 | built 939-981 (parallel) | `SA2_climate_damage_mult.h5` ← script_3 |
+| `agec_crops.nc` — `AGEC_CROPS` over (column = (field, lm, lu), cell), the table's sparse columns kept | 245 (`read_column_table`, 3077) | built 1095 | `SA2_crop_data.h5` ← script_2 |
+| `agec_lvstk.nc` — `AGEC_LVSTK` over (column = (field, animal), cell) | 246 | built 1118 | `cell_livestock_data.h5` ← script_2 |
+| `agGHG_crops.nc` — `AGGHG_CROPS` over (column = (field, lm, lu), cell) | 902 | built 1160 | `SA2_crop_GHG_data.h5` ← script_2 |
+| `agGHG_lvstk.nc` — `AGGHG_LVSTK` over (column = (animal, field), cell) | 903 | built 1239 | `SA2_livestock_GHG_data.h5` ← script_2 |
+| `agGHG_irrpast.nc` — one variable per column | 904 | built 1246 | `SA2_irrigated_pasture_GHG_data.h5` ← script_2 |
+| `agGHG_lvstk_off_land.csv` | 1327 | built 1296 | `GHG_off_land_inpath` |
+| `feed_req.nc` | 662 | built 538 | `cell_livestock_data.h5` |
+| `pasture_kg_dm_ha.nc` | 664 | built 544 | `cell_livestock_data.h5` |
+| `safe_pur_natl.nc` / `safe_pur_modl.nc` | 666 / 668 | built 549 / 554 | `cell_livestock_data.h5` |
+| `soil_carbon_t_ha.nc` | 723 | built 581 (`SOC_T_HA_TOP_30CM`) | `cell_biophysical_df.h5` ← script_4 |
+| `climate_change_impacts_{rcp}_CO2_FERT_{ON,OFF}.nc` — `CLIMATE_CHANGE_IMPACT` over (column = (lm, lu, year), cell) | 523 | built 999-1056 (parallel) | `SA2_climate_damage_mult.h5` ← script_3 |
 | `yieldincreases_bau2022.csv` | 827 | copy 97 | `fdh_inpath` |
 | `yieldincreases_ag_2050.xlsx` | 839 | copy 98 | `ag_yield_trend` (ABARES) |
 | `ag_price_multipliers.xlsx` | 216-217 | copy 116 | `luto_1D_inpath` |
@@ -330,39 +341,35 @@ The L3 contract, with its L4 consumer and L2/L1/L0 origin. "copy" in the L2 colu
 
 | `input/` file | `data.py` | L2 | L1 / L0 |
 |---------------|-----------|----|---------|
-| `ag_tmatrix.npy` | 891 | built 486 | `transitions_costs_20251002.xlsx` + `tmatrix_cat2lus.csv` (`fdh_inpath`) |
-| `ag_to_ep_tmatrix.npy` | 972 | built 502 | same |
-| `ep_to_ag_tmatrix.npy` | 977 | built 494 | same |
-| `ag_to_destock_tmatrix.npy` | 892 | built 258 | `transitions_costs_20251002.xlsx` |
-| `transition_cost_clearing_forest.npz` | 1002 | built 271 | `transitions_costs_20251002.xlsx` |
-| `ep_est_cost_ha.h5` / `cp_est_cost_ha.h5` | 918 / 921 | built 919 / 922 — **CPI-adjusted 2021→2010 AUD (×99.2/118.8)**, `dataprep.py:913-916` | `cell_biophysical_df.h5` ← script_4 |
-| `stream_length_m_cell.h5` | 863 | built 886 | `cell_biophysical_df.h5` |
+| `ag_tmatrix.npy` | 909 | built 514 | `transitions_costs_20251002.xlsx` + `tmatrix_cat2lus.csv` (`fdh_inpath`) |
+| `ag_to_ep_tmatrix.npy` | 996 | built 530 | same |
+| `ep_to_ag_tmatrix.npy` | 1001 | built 522 | same |
+| `ag_to_destock_tmatrix.npy` | 910 | built 275 | `transitions_costs_20251002.xlsx` |
+| `transition_cost_clearing_forest.npz` | 1025 | built 287 | `transitions_costs_20251002.xlsx` |
+| `plantings_est_cost_ha.nc` (`EP_EST_COST_HA`, `CP_EST_COST_HA`; was two `.h5`) | 940 | built 988-993 — **CPI-adjusted 2021→2010 AUD (×99.2/118.8)**, `dataprep.py:983-986` | `cell_biophysical_df.h5` ← script_4 |
+| `stream_length_m_cell.nc` | 878 | built 949 | `cell_biophysical_df.h5` |
 
 ### Carbon
 
 | `input/` file | `data.py` | L2 | L1 / L0 |
 |---------------|-----------|----|---------|
-| `tCO2_ha_{ep_block,ep_rip,ep_belt,cp_block,cp_belt,hir_block,hir_rip}.nc` | 932-969 | subset 122-137 — ages `[50,60,70,80,90]` only, recompressed | script_9 ← FullCAM `carbonstock_RES_1_*` NetCDFs + `HIR_NFMR_AC_*.npy` |
-| `natural_land_t_co2_ha.h5` | 1155 | built 897-901 | `cell_biophysical_df.h5` L153-192 ← script_4 (ERF max-aboveground-biomass rasters) |
-| `fire_risk.h5` | 924 | built 908-910 | `cell_biophysical_df.h5` L633-651 ← `N:/Data-Master/Fire_drought_risk/ep_CO2_percentage.csv` |
-| `cell_BECCS_df.h5` | 1641 | built 1244-1291 | `df_info_best_grid_20211116.pkl` (CSIRO, Lei Gao) |
+| `tCO2_ha_{ep_block,ep_rip,ep_belt,cp_block,cp_belt,hir_block,hir_rip}.nc` | 955-993 | subset 130-144 — ages `[50,60,70,80,90]` only, recompressed | script_9 ← FullCAM `carbonstock_RES_1_*` NetCDFs + `HIR_NFMR_AC_*.npy` |
+| `natural_land_t_co2_ha.nc` | 1185 | built 962-967 | `cell_biophysical_df.h5` L153-192 ← script_4 (ERF max-aboveground-biomass rasters) |
+| `fire_risk.nc` — `FD_RISK` over (fire_risk = low / med / high, cell), the `settings.FIRE_RISK` options | 948 | built 975-980 | `cell_biophysical_df.h5` L633-651 ← `N:/Data-Master/Fire_drought_risk/ep_CO2_percentage.csv` |
+| `cell_BECCS.nc` | 1696 | built 1337-1385 | `df_info_best_grid_20211116.pkl` (CSIRO, Lei Gao) |
 | `carbon_prices.xlsx` | 1337 | copy 115 | `luto_1D_inpath` |
 | `GHG_targets.xlsx` | 1353 | copy 114 | `luto_1D_inpath/GHG_targets_20260223_2010-2060.xlsx` |
-| `cell_savanna_burning.h5` | 1366 | re-saved 119 | `luto_2D_inpath` — **no producing script in `Scripts/`** |
+| `cell_savanna_burning.nc` | 1385 | re-saved 125-126 (from the N: `.h5`) | `luto_2D_inpath` — **no producing script in `Scripts/`** |
 
 ### Water
 
 | `input/` file | `data.py` | L2 | L1 / L0 |
 |---------------|-----------|----|---------|
-| `water_yield_ssp{126,245,370,585}_2010-2100_{dr,sr}_ml_ha.h5` | 1117-1118 | built 141-156 (transposed out of the 4D HDF5) | script_6 |
-| `water_yield_baselines.h5` | 1105 | built 617 | script_6 outputs |
-| `water_yield_outside_LUTO_study_area_hist_1970_2000.h5` | 1122 | built 743 | script_6 |
-| `water_yield_outside_LUTO_study_area_2010_2100_{dd,rr}_ml.h5` | 2200 / 2220 | built 711-712 | script_6 |
-| `water_yield_natural_land_2010_2100_{dd,rr}_ml.h5` | 2204 / 2224 | built 719-720 | script_6 |
-| `rivreg_id.h5` / `rivreg_lut.h5` | 2194 / 2196 | built 635 / 632 | `cell_zones_df.h5` ← script_1 |
-| `draindiv_id.h5` / `draindiv_lut.h5` | 2214 / 2216 | built 647 / 644 | `cell_zones_df.h5` |
-| `water_licence_price.h5` | 1095 | built 532 (`WATER_PRICE_ML_ABARES`) | `cell_biophysical_df.h5` |
-| `water_delivery_price.h5` | 1100 | built 528 (`lvstk['WP']`) | `cell_livestock_data.h5` |
+| `water_yield_ssp{126,245,370,585}_2010_2100_ml_ha.nc` — `DR_ML_HA`, `SR_ML_HA` over (year, cell), a chunk = one year of every cell | 1144 (path only) → `get_water_yield` 3099 reads a year when first asked | built 147-158 (out of the 4D HDF5) | script_6 |
+| `water_yield_baselines.nc` — one variable per column | 1132 | built 661 | script_6 outputs |
+| `water_region_rivreg.nc` / `water_region_draindiv.nc` — one file per region type, replacing 9 `.h5`: `HR_<TYPE>_ID` (cell); `NAME`, `HIST_BASELINE_ML`, `OUTSIDE_LUTO_HIST_ML` (region_id); `OUTSIDE_LUTO_ML`, `NATURAL_LAND_ML` (year, region_id, ssp) | 1150, 2475-2477 | built 685 / 701, appended 766-776, 801 | script_6 + `cell_zones_df.h5` ← script_1 |
+| `water_licence_price.nc` | 1118 | built 570 (`WATER_PRICE_ML_ABARES`) | `cell_biophysical_df.h5` |
+| `water_delivery_price.nc` | 1126 | built 564 (`lvstk['WP']`) | `cell_livestock_data.h5` |
 | `Water_Use_Domestic.csv`, `Water_Use_Agriculture_ML.csv` | 1125 | copy 159-160 | `water_domestic_use` (Water Account) |
 
 ### Biodiversity
@@ -370,13 +377,13 @@ The L3 contract, with its L4 consumer and L2/L1/L0 origin. "copy" in the L2 colu
 | `input/` file | `data.py` | L2 | L1 / L0 |
 |---------------|-----------|----|---------|
 | `bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv` | 1394 | copy 174 (renamed from `HABITAT_CONDITION.csv`) | HCAS processed |
-| `bio_OVERALL_PRIORITY_RANK_AND_AREA_CONNECTIVITY.h5` | 1399, 2791 | built 765 | HCAS / Zonation |
+| `bio_OVERALL_PRIORITY_RANK_AND_AREA_CONNECTIVITY.nc` — `BIODIV_PRIORITY` (ssp, cell), `NATURAL_AREA_CONNECTIVITY`, `DCCEEW_NCI` (cell) | 1420, 3148 | built 805-830 | HCAS / Zonation |
 | `Biodiversity_conserve_performance.xlsx` | 1446 | copy 177 | script_5_4 |
 | `BIODIVERSITY_GBF2_TOP_RANK_CELL_BIO_SCORES_AND_TARGET.csv` | — (diagnostic) | built 873 | derived in `dataprep` |
-| `bio_GBF3_NVIS_{MVG,MVS}_sparse.npz`, `..._groups.npy` | 1665 | copy 180-183 | `bio_GBF3_NVIS_inpath` (NVIS 7.0 pre-1750) |
+| `bio_GBF3_NVIS_{MVG,MVS}_sparse.nc` — the `sparse.COO`'s parts (`COO_COORDS`, `COO_DATA`), the groups as a coordinate | 1731 (`read_sparse_layer`, 1734) | built 181-205 from the N: `.npz` + `_groups.npy` | `bio_GBF3_NVIS_inpath` (NVIS 7.0 pre-1750) |
 | `BIODIVERSITY_GBF3_NVIS_SCORES_AND_TARGETS.csv` | 1701 | copy 184 | script_5_2 |
-| `bio_GBF3_IBRA_{Regions,SubRegions}.nc` | **not read** | built 455-460 | IBRA layers — produced but never loaded (§9.3) |
-| `bio_GBF4_{SNES,ECNES}_sparse.npz`, `..._sparse_species.npy` | 1773 / 1800 | copy 187-190 | script_5_1 (DCCEEW SNES/ECNES) |
+| `bio_GBF3_IBRA_{Regions,SubRegions}.nc` | Regions 1554 (`GBF3_NVIS_REGION_MODE = 'IBRA_REG'` only); SubRegions **not read** | built 483-488 | IBRA layers |
+| `bio_GBF4_{SNES,ECNES}_sparse.nc` — COO parts, `species` / `presence` coordinates | 1850 / 1867 | built 181-205 from the N: `.npz` + `_species.npy` | script_5_1 (DCCEEW SNES/ECNES) |
 | `BIODIVERSITY_GBF4_TARGET_{SNES,ECNES}.csv` | 2306 / 2361 | copy 191-192 | script_5_2 |
 | `bio_GBF8_ssp{SSP}_EnviroSuit{,_group}.nc` | 1608 / 1631 | copy 195-202 | `bio_GBF8_inpath` (environmental suitability, 5 km) |
 | `BIODIVERSITY_GBF8_{SCORES,TARGET}{,_group}.csv` | 1609-1622 | copy 204-207 | `bio_GBF8_inpath` |
@@ -398,7 +405,7 @@ The L3 contract, with its L4 consumer and L2/L1/L0 origin. "copy" in the L2 colu
 
 | `input/` file | `data.py` | L2 | L1 / L0 |
 |---------------|-----------|----|---------|
-| `demand_projections.h5` | 1249 | built 1240 | `All_LUTO_demand_scenarios_with_convergences.csv` (`demand_scenarios_inpath`) |
+| `demand_projections.nc` — `DOMESTIC`, `EXPORTS`, `IMPORTS`, `FEED`, `PRODUCTION` over the 7 scenario dims × `Commodity` × `year`; `data.py` reads only the running scenario | 1274 | built 1300-1335 | `All_LUTO_demand_scenarios_with_convergences.csv` (`demand_scenarios_inpath`) — **outdated**: N: now holds only Michalis' `_2026-07-20` update, not adopted (negative demand under `IMPORT_TREND = 'Trend'`; TODO at `dataprep.py:103`) |
 | `demand_elasticity.csv` | 1289 | copy 103 | `demand_elasticity_inpath/20260311_values for runs.csv` |
 | `AusTIMES_demand_multiplier.xlsx` | 1214 | copy 104 | `luto_1D_inpath/20260220_CNS25 Pathways AusTIMES data.xlsx` |
 | `20260317_Bundle_MR.xlsx` | 672-675 | copy 167 | `luto_1D_inpath` (Asparagopsis) |
@@ -445,37 +452,40 @@ FullCAM REST API 2025 GeoTIFFs
 | Write | 161-184, 254-267, 303-315 | `tCO2_ha_*.nc`, dims `(age, cell)`, vars `{PREFIX}_{TREES,DEBRIS,SOIL}_T_CO2_HA` |
 | GeoTIFF export | 327-355 | Side artefact, **not** on the model's data path: `save_dataset_as_multiband_tiffs` writes 18 multiband tifs (91 bands, float32, LZW, nodata −99) to `N:/Data-Master/FullCAM/Output_TOT_CO2_HA_GeoTiffs/` — EP block/rip/belt, CP block/belt and HIR **block** only (HIR rip is not exported). For visualisation/QA; nothing in `luto/` reads them. Refreshed 2026-08-13 alongside the cap fix; they had been stale since 2025-10-09. |
 
-**L2 — `dataprep.py:122-137`**: `sel(age=[50,60,70,80,90])`, `assign_coords(cell=range(6956407))`,
-re-encode zlib level 5. No unit change.
+**L2 — `dataprep.py:128-144`**: `sel(age=[50,60,70,80,90])`, `assign_coords(cell=range(6956407))`,
+re-encode zlib level 5, a chunk = one age of every cell. No unit change.
 
-**L4 — `data.py:923-969`**:
+**L4 — `data.py:947-993`**:
 
 ```python
-fr_df     = pd.read_hdf(".../fire_risk.h5", where=self.MASK)          # 924
-fire_risk = fr_df[{"low":"FD_RISK_PERC_5TH","med":"FD_RISK_MEDIAN","high":"FD_RISK_PERC_95TH"}[settings.FIRE_RISK]]
+with xr.open_dataset(".../fire_risk.nc") as fire_risk_ds:                                  # 948
+    fire_risk = fire_risk_ds['FD_RISK'].sel(fire_risk=settings.FIRE_RISK, drop=True) \
+                  .load().isel(cell=self.MASK).assign_coords(cell=np.arange(self.NCELLS))
 
-ds = xr.open_dataset(".../tCO2_ha_ep_block.nc") \
-       .sel(age=settings.CARBON_EFFECTS_WINDOW).load().isel(cell=self.MASK)   # 932
+ds = xr.open_dataset(".../tCO2_ha_ep_block.nc").sel(age=settings.CARBON_EFFECTS_WINDOW) \
+       .load().isel(cell=self.MASK).assign_coords(cell=np.arange(self.NCELLS))             # 955
 self.EP_BLOCK_AVG_T_CO2_HA_PER_YR = (
     (ds['EP_BLOCK_TREES_T_CO2_HA'] + ds['EP_BLOCK_DEBRIS_T_CO2_HA'])
     * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)     # aboveground: risk-discounted
     + ds['EP_BLOCK_SOIL_T_CO2_HA']                            # belowground: undiscounted
-).values / settings.CARBON_EFFECTS_WINDOW                     # cumulative → annual rate
+) / settings.CARBON_EFFECTS_WINDOW                            # cumulative → annual rate (a DataArray over cell)
 ```
 
-Identical shape for `EP_BELT` (939-945), `EP_RIP` (947-953), `CP_BLOCK` (955-961), `CP_BELT`
-(963-969). `.sel(age=...).load().isel(cell=self.MASK)` is deliberate — label-based `.sel(cell=...)`
-on a 6.9 M cell axis is pathologically slow (`data.py:930-931`).
+Identical shape for `EP_BELT` (963), `EP_RIP` (971), `CP_BLOCK` (979), `CP_BELT` (987). Both sides carry
+the model-cell labels `0 … NCELLS−1`, so `fire_risk` multiplies the carbon BY LABEL (before S6 it was a
+pandas Series multiplied by position). `.sel(age=...).load().isel(cell=self.MASK)` is deliberate —
+label-based `.sel(cell=...)` on a 6.9 M cell axis is pathologically slow (`data.py:953-954`).
 
 Current settings: `CARBON_EFFECTS_WINDOW = 60`, `FIRE_RISK = 'med'`, `RISK_OF_REVERSAL = 0`
 (`settings.py:70, 84, 92`). `CARBON_EFFECTS_WINDOW` must be one of `[50,60,70,80,90]` — the ages the
 L2 subset kept.
 
-**Unallocated natural land** takes a different route (`data.py:1140-1160`):
+**Unallocated natural land** takes a different route (`data.py:1184-1192`):
 
 ```python
-nat_land_CO2 = pd.read_hdf(".../natural_land_t_co2_ha.h5", where=self.MASK)
-self.CO2E_STOCK_UNALL_NATURAL_TCO2_HA = np.array(
+with xr.open_dataset(".../natural_land_t_co2_ha.nc") as nat_land_CO2:
+    nat_land_CO2 = nat_land_CO2.load().isel(cell=self.MASK).assign_coords(cell=np.arange(self.NCELLS))
+self.CO2E_STOCK_UNALL_NATURAL_TCO2_HA = (
     nat_land_CO2['NATURAL_LAND_TREES_DEBRIS_SOIL_TCO2_HA']
     - nat_land_CO2['NATURAL_LAND_AGB_DEBRIS_TCO2_HA'] * (100 - fire_risk) / 100   # minus fire DAMAGE
 )
@@ -501,14 +511,14 @@ or annualisation, both of which already happened at L4.
 | `get_ghg_env_plantings` | 29-51 | `-EP_BLOCK_AVG_T_CO2_HA_PER_YR × REAL_AREA` | `tCO2_ha_ep_block.nc` |
 | `get_ghg_rip_plantings` | 54-75 | `-EP_RIP_AVG_T_CO2_HA_PER_YR × REAL_AREA` | `tCO2_ha_ep_rip.nc` |
 | `get_ghg_agroforestry_base` | 78-93 | `-EP_BELT_AVG_T_CO2_HA_PER_YR × REAL_AREA` | `tCO2_ha_ep_belt.nc` |
-| `get_ghg_sheep_agroforestry` | 96-130 | `base_af × x_r + ag_g_mrj[0,:,sheep_j] × (1 − x_r)` | + `agGHG_lvstk.h5` |
-| `get_ghg_beef_agroforestry` | 133-167 | same with `beef_j` | + `agGHG_lvstk.h5` |
+| `get_ghg_sheep_agroforestry` | 96-130 | `base_af × x_r + ag_g_mrj[0,:,sheep_j] × (1 − x_r)` | + `agGHG_lvstk.nc` |
+| `get_ghg_beef_agroforestry` | 133-167 | same with `beef_j` | + `agGHG_lvstk.nc` |
 | `get_ghg_carbon_plantings_block` | 170-192 | `-CP_BLOCK_AVG_T_CO2_HA_PER_YR × REAL_AREA` | `tCO2_ha_cp_block.nc` |
 | `get_ghg_carbon_plantings_belt_base` | 195-210 | `-CP_BELT_AVG_T_CO2_HA_PER_YR × REAL_AREA` | `tCO2_ha_cp_belt.nc` |
-| `get_ghg_sheep_carbon_plantings_belt` | 213-247 | `base_cp × x_r + sheep × (1 − x_r)` | + `agGHG_lvstk.h5` |
-| `get_ghg_beef_carbon_plantings_belt` | 250-284 | same with `beef_j` | + `agGHG_lvstk.h5` |
-| `get_ghg_beccs` | 287-308 | `-np.nan_to_num(BECCS_TCO2E_HA_YR) × REAL_AREA` | `cell_BECCS_df.h5` |
-| `get_ghg_destocked_land` | 311-348 | per base-year livestock-natural LU: `CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR × (habitat_contr[from_lu] − 1) × REAL_AREA` | `natural_land_t_co2_ha.h5`, `fire_risk.h5`, `bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv` |
+| `get_ghg_sheep_carbon_plantings_belt` | 213-247 | `base_cp × x_r + sheep × (1 − x_r)` | + `agGHG_lvstk.nc` |
+| `get_ghg_beef_carbon_plantings_belt` | 250-284 | same with `beef_j` | + `agGHG_lvstk.nc` |
+| `get_ghg_beccs` | 287-308 | `-np.nan_to_num(BECCS_TCO2E_HA_YR) × REAL_AREA` | `cell_BECCS.nc` |
+| `get_ghg_destocked_land` | 311-348 | per base-year livestock-natural LU: `CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR × (habitat_contr[from_lu] − 1) × REAL_AREA` | `natural_land_t_co2_ha.nc`, `fire_risk.nc`, `bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv` |
 | `get_ghg_matrix` | 352-398 | assembles all nine into `(r, k)` | — |
 
 **Exclusion (mixing) proportions** — written inline at the top of each non-ag matrix assembler (`get_*_matrix`
@@ -707,7 +717,7 @@ implies `IBRA_REG` mode loads different spatial layers — it does not (see §4.
 
 ### 9.4 OPEN — `cell_savanna_burning.h5` has no traceable origin
 
-Read straight out of `2D_Spatial_Snapshot/` at `dataprep.py:119`, but no script in
+Read straight out of `2D_Spatial_Snapshot/` at `dataprep.py:125` (and re-saved as `input/cell_savanna_burning.nc`), but no script in
 `N:/Data-Master/LUTO_2.0_input_data/Scripts/` produces it.
 
 **Impact**: it feeds `SAVBURN_ELIGIBLE` and `SAVBURN_TOTAL_TCO2E_HA` — live inputs to ag GHG, ag
@@ -732,7 +742,11 @@ layer or make the placeholder explicit at load time rather than in a `dataprep` 
 ### 9.6 OPEN — `input/` files nothing reads
 
 Written by `dataprep` but never loaded by `data.py`: `state_id.npy`,
-`bio_GBF3_IBRA_{Regions,SubRegions}.nc`, `tCO2_ha_hir_{block,rip}.nc`, `Water_Use_Agriculture_ML.csv`.
+`bio_GBF3_IBRA_SubRegions.nc` (the Regions file is read in `IBRA_REG` mode), `tCO2_ha_hir_{block,rip}.nc`,
+`Water_Use_Agriculture_ML.csv`. Moved to `input/deprecated_h5/` (2026-10-20), written and read by nothing: the
+dense `bio_GBF3_NVIS_{MVG,MVS}.nc` / `bio_GBF4_{SNES,ECNES}.nc` (254 MiB), the `.npz` + `.npy` sparse layers the
+`_sparse.nc` files replaced, `x_mrj.npy` and the old `.h5` inputs. Inside files that are read, written but never loaded: the savanna file's
+`SAV_AVEM_CH4_TCO2E_HA`, `SAV_AVEM_N2O_TCO2E_HA`, `SAV_SEQ_CO2_TCO2E_HA` and `cell_BECCS.nc`'s `CELL_ID`.
 
 **Impact**: minor — wasted `dataprep` time and disk on every refresh. Listed mainly so a future reader
 does not mistake them for live inputs.

@@ -26,7 +26,6 @@ import pandas as pd
 import rasterio
 import rasterio.features
 import geopandas as gpd
-import netCDF4 # necessary for running luto in Denethor
 
 from luto import tools
 import luto.settings as settings
@@ -144,64 +143,74 @@ class Data:
         self.MASK_LU_CODE = -1
 
         # Load LUMAP without resfactor
-        self.LUMAP_NO_RESFACTOR = pd.read_hdf(os.path.join(settings.INPUT_DIR, "lumap.h5")).to_numpy().astype(np.int8)   # 1D (ij flattend),  0-27 for land uses; -1 for non-agricultural land uses; All cells in Australia (land only)
+        self.LUMAP_NO_RESFACTOR = xr.load_dataarray(os.path.join(settings.INPUT_DIR, "lumap.nc")).astype(np.int8)                                         # 1D (ij flattend),  0-27 for land uses; -1 for non-agricultural land uses; All cells in Australia (land only)
 
         # NLUM mask.
         with rasterio.open(os.path.join(settings.INPUT_DIR, "NLUM_2010-11_mask.tif")) as rst:
             self.NLUM_MASK = rst.read(1).astype(np.int8)                                                                # 2D map,  0 for ocean, 1 for land
             self.LUMAP_2D_FULLRES = np.full_like(self.NLUM_MASK, self.NODATA, dtype=np.int16)                           # 2D map,  full of nodata (-9999)
-            np.place(self.LUMAP_2D_FULLRES, self.NLUM_MASK == 1, self.LUMAP_NO_RESFACTOR)                               # 2D map,  -9999 for ocean; -1 for desert, urban, water, etc; 0-27 for land uses
+            np.place(self.LUMAP_2D_FULLRES, self.NLUM_MASK == 1, self.LUMAP_NO_RESFACTOR.values)                               # 2D map,  -9999 for ocean; -1 for desert, urban, water, etc; 0-27 for land uses
             self.GEO_META_FULLRES = rst.meta                                                                            # dict,  key-value pairs of geospatial metadata for the full resolution land-use map
             self.GEO_META_FULLRES['dtype'] = 'float32'                                                                  # Set the data type to float32
             self.GEO_META_FULLRES['nodata'] = self.NODATA                                                               # Set the nodata value to -9999
 
 
         # Mask out non-agricultural, non-environmental plantings land (i.e., -1) from lumap 
-        self.LUMASK = self.LUMAP_NO_RESFACTOR != self.MASK_LU_CODE                                                      # 1D (ij flattend);  `True` for land uses; `False` for desert, urban, water, etc
-
-
-        # The spatial lookups. Every 1D array is over the full-res land cells (len = LUMASK.size) or over the model
-        # cells (len = NCELLS), and every spatial operation goes through these:
-        #   - FULLRES_1D_TO_2D (2, n land cells): (row, col) of each full-res land cell on the full-res grid
-        #   - RES_1D_TO_2D (2, NCELLS): (row, col) of each model cell on the resfactored grid (LUMAP_2D_RESFACTORED)
-        #   - FULL2RES_IDX_MAP (n land cells,): the model cell each full-res land cell falls in, -1 if none
-        #   - MASK (n land cells,): True at the full-res cell each model cell reads its inputs from
-        # 1D -> 2D is `grid[*one_d_to_2d] = arr` (tools.arr_to_2d); full-res -> model cells is a sum by
-        # FULL2RES_IDX_MAP (tools.block_sum).
+        self.LUMASK = self.LUMAP_NO_RESFACTOR.values != self.MASK_LU_CODE                                                      # 1D (ij flattend);  `True` for land uses; `False` for desert, urban, water, etc
         self.FULLRES_1D_TO_2D = np.vstack(np.nonzero(self.NLUM_MASK))
 
         if settings.RESFACTOR > 1:
-            rf = settings.RESFACTOR
             fullres_rows, fullres_cols = self.FULLRES_1D_TO_2D
 
             # The block of every full-res land cell, numbered row-major on a grid of whole RF x RF blocks
-            n_block_rows = -(-self.NLUM_MASK.shape[0] // rf)
-            n_block_cols = -(-self.NLUM_MASK.shape[1] // rf)
-            block_of_cell = (fullres_rows // rf) * n_block_cols + fullres_cols // rf
+            n_block_rows = ceil(self.NLUM_MASK.shape[0] / settings.RESFACTOR)
+            n_block_cols = ceil(self.NLUM_MASK.shape[1] / settings.RESFACTOR)
+            block_id_of_cell = (fullres_rows // settings.RESFACTOR) * n_block_cols + fullres_cols // settings.RESFACTOR
 
-            # A block is a model cell if it holds >= 1 land-use cell AND its centre cell is land (a block whose
-            # centre falls outside the grid or on ocean is not modelled; its land-use cells are dropped)
-            has_land_use = np.bincount(block_of_cell, weights=self.LUMASK, minlength=n_block_rows * n_block_cols) > 0
-            centre_rows = np.arange(n_block_rows) * rf + rf // 2
-            centre_cols = np.arange(n_block_cols) * rf + rf // 2
-            centre_is_land = np.zeros((n_block_rows, n_block_cols), dtype=bool)
-            inside_rows, inside_cols = centre_rows < self.NLUM_MASK.shape[0], centre_cols < self.NLUM_MASK.shape[1]
-            centre_is_land[np.ix_(inside_rows, inside_cols)] = self.NLUM_MASK[np.ix_(centre_rows[inside_rows], centre_cols[inside_cols])] == 1
-            model_blocks = np.flatnonzero(has_land_use & centre_is_land.ravel())                     # row-major, so in model-cell order
+            # A block is a model cell if it holds >= 1 land-use cell
+            has_land_use = np.bincount(block_id_of_cell, weights=self.LUMASK, minlength=n_block_rows * n_block_cols) > 0
+            model_blocks = np.flatnonzero(has_land_use)
+
+            # Each model cell's representative cell, where its inputs are read (MASK): the block's centre cell where the
+            # centre is land; for a coastal block whose centre is sea, the block's land-use cell nearest the centre
+            fullres_idx_2d = np.full(self.NLUM_MASK.shape, -1, dtype=np.int64)
+            fullres_idx_2d[fullres_rows, fullres_cols] = np.arange(fullres_rows.size)
+            block_rows, block_cols = np.divmod(model_blocks, n_block_cols)
+            centre_rows = block_rows * settings.RESFACTOR + settings.RESFACTOR // 2
+            centre_cols = block_cols * settings.RESFACTOR + settings.RESFACTOR // 2
+            inside_grid = (centre_rows < self.NLUM_MASK.shape[0]) & (centre_cols < self.NLUM_MASK.shape[1])
+            representative_cell = np.full(model_blocks.size, -1, dtype=np.int64)                  # -1: centre is sea (or off the grid)
+            representative_cell[inside_grid] = fullres_idx_2d[centre_rows[inside_grid], centre_cols[inside_grid]]
+
+            needs_substitute = np.zeros(n_block_rows * n_block_cols, dtype=bool)
+            needs_substitute[model_blocks[representative_cell < 0]] = True
+            candidate_cells = np.flatnonzero(self.LUMASK & needs_substitute[block_id_of_cell])       # land-use cells of those blocks
+            candidate_blocks = block_id_of_cell[candidate_cells]
+            distance_to_centre = ((fullres_rows[candidate_cells] - (candidate_blocks // n_block_cols * settings.RESFACTOR + settings.RESFACTOR // 2)) ** 2
+                                  + (fullres_cols[candidate_cells] - (candidate_blocks % n_block_cols * settings.RESFACTOR + settings.RESFACTOR // 2)) ** 2)
+            nearest_first = np.lexsort((candidate_cells, distance_to_centre, candidate_blocks))      # per block: nearest, ties by position
+            substitute_blocks, first = np.unique(candidate_blocks[nearest_first], return_index=True)
+            position_of_block = np.full(n_block_rows * n_block_cols, -1, dtype=np.int64)
+            position_of_block[model_blocks] = np.arange(model_blocks.size)
+            representative_cell[position_of_block[substitute_blocks]] = candidate_cells[nearest_first[first]]
+
+            # The model cells in the full-res order of their representative cells: inputs are read with
+            # `read_hdf(where=self.MASK)`, which returns rows in full-res order. Centre cells keep row-major block order;
+            # a substitute cell can sit off its block row's centre row, so a coastal cell may come before a neighbour.
+            in_read_order = np.argsort(representative_cell)
+            model_blocks, representative_cell = model_blocks[in_read_order], representative_cell[in_read_order]
             self.RES_1D_TO_2D = np.vstack(np.divmod(model_blocks, n_block_cols))
 
             # Each full-res land cell reads its block's model-cell index (-1: block not modelled)
-            model_cell_of_block = np.full(n_block_rows * n_block_cols, -1, dtype=np.int32)
-            model_cell_of_block[model_blocks] = np.arange(model_blocks.size)
-            self.FULL2RES_IDX_MAP = model_cell_of_block[block_of_cell]
+            model_cell_id_of_block = np.full(n_block_rows * n_block_cols, -1, dtype=np.int32)
+            model_cell_id_of_block[model_blocks] = np.arange(model_blocks.size)
+            self.FULL2RES_IDX_MAP = model_cell_id_of_block[block_id_of_cell]
 
-            # MASK: the centre cell of each model cell, among the full-res land cells
-            fullres_idx_2d = np.full(self.NLUM_MASK.shape, -1, dtype=np.int64)
-            fullres_idx_2d[fullres_rows, fullres_cols] = np.arange(fullres_rows.size)
+            # MASK: the representative cell of each model cell, among the full-res land cells
             self.MASK = np.zeros(fullres_rows.size, dtype=bool)
-            self.MASK[fullres_idx_2d[self.RES_1D_TO_2D[0] * rf + rf // 2, self.RES_1D_TO_2D[1] * rf + rf // 2]] = True
+            self.MASK[representative_cell] = True
 
-            self.LUMAP_2D_RESFACTORED = self.LUMAP_2D_FULLRES[rf//2::rf, rf//2::rf]
+            self.LUMAP_2D_RESFACTORED = self.LUMAP_2D_FULLRES[settings.RESFACTOR//2::settings.RESFACTOR, settings.RESFACTOR//2::settings.RESFACTOR]
             self.GEO_META = self.update_geo_meta()
 
         elif settings.RESFACTOR == 1:
@@ -225,8 +234,35 @@ class Data:
         # Load agricultural crop and livestock economic and yield data.
         ###############################################################
         print("├── Loading agricultural crop and livestock data", flush=True)
-        self.AGEC_CROPS = pd.read_hdf(os.path.join(settings.INPUT_DIR, "agec_crops.h5"), where=self.MASK)
-        self.AGEC_LVSTK = pd.read_hdf(os.path.join(settings.INPUT_DIR, "agec_lvstk.h5"), where=self.MASK)
+        #   (column, cell) at the model cells, the columns labelled (field, lm, lu) / (field, animal)
+        #   Each table is read one column at a time: a chunk holds one column of every full-res cell, so a column is
+        #   inflated whole and cut to the model cells (loading the whole table would hold every full-res column in
+        #   memory). The cells are labelled 0 … NCELLS−1 (NCELLS is not set yet: the count of MASK).
+        with xr.open_dataset(os.path.join(settings.INPUT_DIR, "agec_crops.nc")) as agec_crops_file:
+            agec_crops = agec_crops_file['AGEC_CROPS']
+            self.AGEC_CROPS = xr.DataArray(
+                np.stack([agec_crops.isel(column=i).values[self.MASK] for i in range(agec_crops.sizes['column'])]),
+                dims=['column', 'cell'],
+                name='AGEC_CROPS',
+                coords={
+                    'field': ('column', agec_crops['field'].values),
+                    'lm': ('column', agec_crops['lm'].values),
+                    'lu': ('column', agec_crops['lu'].values),
+                    'cell': np.arange(self.MASK.sum()),
+                },
+            ).set_xindex(['field', 'lm', 'lu'])
+        with xr.open_dataset(os.path.join(settings.INPUT_DIR, "agec_lvstk.nc")) as agec_lvstk_file:
+            agec_lvstk = agec_lvstk_file['AGEC_LVSTK']
+            self.AGEC_LVSTK = xr.DataArray(
+                np.stack([agec_lvstk.isel(column=i).values[self.MASK] for i in range(agec_lvstk.sizes['column'])]),
+                dims=['column', 'cell'],
+                name='AGEC_LVSTK',
+                coords={
+                    'field': ('column', agec_lvstk['field'].values),
+                    'animal': ('column', agec_lvstk['animal'].values),
+                    'cell': np.arange(self.MASK.sum()),
+                },
+            ).set_xindex(['field', 'animal'])
         
         # Price multipliers for livestock and crops over the years.
         self.CROP_PRICE_MULTIPLIERS = pd.read_excel(os.path.join(settings.INPUT_DIR, "ag_price_multipliers.xlsx"), sheet_name="AGEC_CROPS", index_col="Year")
@@ -311,7 +347,7 @@ class Data:
         ]
 
         # Derive land management types from AGEC.
-        self.LANDMANS = {t[1] for t in self.AGEC_CROPS.columns}  # Set comp., unique entries.
+        self.LANDMANS = set(self.AGEC_CROPS['lm'].values.tolist())  # Set comp., unique entries.
         self.LANDMANS = list(self.LANDMANS)  # Turn into list.
         self.LANDMANS.sort()  # Ensure lexicographic order.
 
@@ -459,14 +495,15 @@ class Data:
         print("├── Setting up spatial layers data", flush=True)
 
         # Actual hectares per cell, including projection corrections.
-        self.REAL_AREA_NO_RESFACTOR = pd.read_hdf(os.path.join(settings.INPUT_DIR, "real_area.h5")).to_numpy()
-        self.REAL_AREA = self.REAL_AREA_NO_RESFACTOR[self.MASK] * self.RESMULT  # TODO: adjusting using actual area
+        self.REAL_AREA_NO_RESFACTOR = xr.load_dataarray(os.path.join(settings.INPUT_DIR, "real_area.nc"))
+        real_area_r = self.REAL_AREA_NO_RESFACTOR.isel(cell=self.MASK)
+        self.REAL_AREA = (real_area_r * self.RESMULT).assign_coords(cell=np.arange(real_area_r.sizes['cell']))  # over the model cells; TODO: adjusting using actual area
 
         # Derive NCELLS (number of spatial cells) from the area array.
-        self.NCELLS = self.REAL_AREA.shape[0]
+        self.NCELLS = self.REAL_AREA.sizes['cell']
         
         # Initial (2010) ag decision variable (X_mrj).
-        self.LMMAP_NO_RESFACTOR = pd.read_hdf(os.path.join(settings.INPUT_DIR, "lmmap.h5")).to_numpy()
+        self.LMMAP_NO_RESFACTOR = xr.load_dataarray(os.path.join(settings.INPUT_DIR, "lmmap.nc"))
         self.AG_L_MRJ = self.get_exact_resfactored_lumap_mrj()
         self.add_ag_dvars(self.YR_CAL_BASE, self.AG_L_MRJ)
         
@@ -480,14 +517,14 @@ class Data:
         # Initial (2010) land-use map, mapped as lexicographic land-use class indices.
         self.LU_RESFACTOR_CELLS = pd.DataFrame({
             'lu_code': list(self.DESC2AGLU.values()),
-            'res_size': [ceil((self.LUMAP_NO_RESFACTOR == lu_code).sum() / self.RESMULT) for _,lu_code in self.DESC2AGLU.items()]
+            'res_size': [ceil((self.LUMAP_NO_RESFACTOR == lu_code).sum().item() / self.RESMULT) for _,lu_code in self.DESC2AGLU.items()]
         }).sort_values('res_size').reset_index(drop=True)
         
-        self.LUMAP = self.get_resfactored_lumap() if settings.RESFACTOR > 1 else self.LUMAP_NO_RESFACTOR[self.MASK]
+        self.LUMAP = self.get_resfactored_lumap() if settings.RESFACTOR > 1 else self.LUMAP_NO_RESFACTOR.isel(cell=self.MASK).values
         self.add_lumap(self.YR_CAL_BASE, self.LUMAP)
 
         # Initial (2010) land management map.
-        self.LMMAP = self.LMMAP_NO_RESFACTOR[self.MASK]
+        self.LMMAP = self.LMMAP_NO_RESFACTOR.isel(cell=self.MASK).values
         self.add_lmmap(self.YR_CAL_BASE, self.LMMAP)
 
         # Initial (2010) agricultural management maps - no cells are used for alternative agricultural management options.
@@ -510,9 +547,20 @@ class Data:
         ###############################################################
         print("├── Loading climate change data", flush=True)
 
-        self.CLIMATE_CHANGE_IMPACT = pd.read_hdf(
-            os.path.join(settings.INPUT_DIR, "climate_change_impacts_" + settings.RCP + "_CO2_FERT_" + settings.CO2_FERT.upper() + ".h5"), where=self.MASK
-        )
+        #   (column, cell) at the model cells, the columns labelled (lm, lu, year)
+        with xr.open_dataset(os.path.join(settings.INPUT_DIR, "climate_change_impacts_" + settings.RCP + "_CO2_FERT_" + settings.CO2_FERT.upper() + ".nc")) as cci_file:
+            cci = cci_file['CLIMATE_CHANGE_IMPACT']
+            self.CLIMATE_CHANGE_IMPACT = xr.DataArray(
+                np.stack([cci.isel(column=i).values[self.MASK] for i in range(cci.sizes['column'])]),
+                dims=['column', 'cell'],
+                name='CLIMATE_CHANGE_IMPACT',
+                coords={
+                    'lm': ('column', cci['lm'].values),
+                    'lu': ('column', cci['lu'].values),
+                    'year': ('column', cci['year'].values),
+                    'cell': np.arange(self.MASK.sum()),
+                },
+            ).set_xindex(['lm', 'lu', 'year'])
         
         # The impact files are multipliers relative to 2010: their years are {2020, 2050, 2080} and 2010 is 1 by
         # construction. The anchor is a property of the files, not of the model's base year.
@@ -521,25 +569,24 @@ class Data:
         ###############################################################
         # Regional coverage layers, mainly for regional reporting.
         ###############################################################
-        REGION_NRM_r = pd.read_hdf(
-            os.path.join(settings.INPUT_DIR, "REGION_NRM_r.h5"), where=self.MASK
-        )        
+        #   Each file holds the region code per cell and each code's name once (over `code`)
+        region_nrm = xr.load_dataset(os.path.join(settings.INPUT_DIR, "region_nrm.nc"))
         
-        self.REGION_NRM_CODE = REGION_NRM_r['NRM_CODE']
-        self.REGION_NRM_NAME = REGION_NRM_r['NRM_NAME'].to_numpy()
+        self.REGION_NRM_CODE = region_nrm['NRM_CODE'].isel(cell=self.MASK).assign_coords(cell=np.arange(self.NCELLS))
+        self.REGION_NRM_NAME = region_nrm['NRM_NAME'].sel(code=self.REGION_NRM_CODE.values).values.astype(object)     # str objects, as before
         
-        REGION_STATE_r = pd.read_hdf(
-            os.path.join(settings.INPUT_DIR, "REGION_STATE_r.h5"), where=self.MASK
-        )
+        region_state = xr.load_dataset(os.path.join(settings.INPUT_DIR, "region_state.nc"))
+        state_codes = region_state['STE_CODE11'].isel(cell=self.MASK).assign_coords(cell=np.arange(self.NCELLS))
+        state_names = region_state['STE_NAME11'].sel(code=np.unique(state_codes.values))     # the states with a model cell
         
-        self.REGION_STATE_NAME2CODE = REGION_STATE_r.groupby('STE_NAME11', observed=True)['STE_CODE11'].first().to_dict()
+        self.REGION_STATE_NAME2CODE = {str(name): int(code) for code, name in zip(state_names['code'].values, state_names.values)}
         self.REGION_STATE_NAME2CODE = dict(sorted(self.REGION_STATE_NAME2CODE.items()))     # Make sure the dict is sorted by state name, makes it consistent with renewable target.
         
         if 'Other Territories' in self.REGION_STATE_NAME2CODE:
             self.REGION_STATE_NAME2CODE.pop('Other Territories')                            # Remove 'Other Territories' from the dict.
         
-        self.REGION_STATE_CODE = REGION_STATE_r['STE_CODE11'].values
-        self.REGION_STATE_NAME = REGION_STATE_r['STE_NAME11'].values.to_numpy()
+        self.REGION_STATE_CODE = state_codes
+        self.REGION_STATE_NAME = region_state['STE_NAME11'].sel(code=state_codes.values).values.astype(object)
 
 
         ###############################################################
@@ -601,9 +648,10 @@ class Data:
 
         elif settings.REGIONAL_ADOPTION_CONSTRAINTS == "individual_cap":
             # Per-landuse caps (both ag and non-ag) read from the xlsx, scoped to REGIONAL_ADOPTION_ZONE.
-            self.REGIONAL_ADOPTION_ZONES = pd.read_hdf(
-                os.path.join(settings.INPUT_DIR, "regional_adoption_zones.h5"), where=self.MASK
-            )[settings.REGIONAL_ADOPTION_ZONE].to_numpy()
+            with xr.open_dataset(os.path.join(settings.INPUT_DIR, "regional_adoption_zones.nc")) as zones:
+                self.REGIONAL_ADOPTION_ZONES = (
+                    zones[settings.REGIONAL_ADOPTION_ZONE].load().isel(cell=self.MASK).assign_coords(cell=np.arange(self.NCELLS))
+                )
 
             regional_adoption_targets = pd.read_excel(
                 os.path.join(settings.INPUT_DIR, "regional_adoption_zones.xlsx"),
@@ -621,7 +669,7 @@ class Data:
             # Check missing zones due to high resfactor
             lost_zones = np.setdiff1d(
                 self.REGIONAL_ADOPTION_TARGETS[settings.REGIONAL_ADOPTION_ZONE].unique(),
-                np.unique(self.REGIONAL_ADOPTION_ZONES)
+                np.unique(self.REGIONAL_ADOPTION_ZONES.values)
             ) if len(self.REGIONAL_ADOPTION_TARGETS) > 0 else np.array([])
 
             if len(lost_zones) > 0:
@@ -650,15 +698,17 @@ class Data:
         ###############################################################
         print("├── Loading livestock related data", flush=True)
 
-        feed_req_raw = pd.read_hdf(os.path.join(settings.INPUT_DIR, "feed_req.h5"), where=self.MASK).to_numpy()
-        self.FEED_REQ = np.nan_to_num(feed_req_raw)
+        #   Each a layer over the model cells; FEED_REQ kept before its fill for the NaN guard (check_eligible_nan)
+        feed_req_raw = xr.load_dataarray(os.path.join(settings.INPUT_DIR, "feed_req.nc")).isel(cell=self.MASK).assign_coords(cell=np.arange(self.NCELLS))
+        self.FEED_REQ = feed_req_raw.fillna(0)
 
-        # The stocking calibration k per livestock type, in place of FEED_REQ: one value per (cell, type), each cell
-        # carrying its SA2's k for that type. Without a file every type takes FEED_REQ (the model as before).
+        # The stocking calibration k per livestock type, in place of FEED_REQ: one layer per type over the model cells,
+        # each cell carrying its SA2's k for that type. Without a file every type takes FEED_REQ (the model as before).
         if settings.LVSTK_K_FILE:
-            lvstk_k = pd.read_hdf(os.path.join(settings.INPUT_DIR, settings.LVSTK_K_FILE), where=self.MASK)
-            lvstk_k_raw = {lvstype: lvstk_k[lvstype].to_numpy() for lvstype in ('BEEF', 'SHEEP', 'DAIRY')}     # for the NaN guard
-            self.LVSTK_K = {lvstype: np.nan_to_num(k) for lvstype, k in lvstk_k_raw.items()}
+            with xr.open_dataset(os.path.join(settings.INPUT_DIR, settings.LVSTK_K_FILE)) as lvstk_k:
+                lvstk_k_raw = {lvstype: lvstk_k[lvstype].load().isel(cell=self.MASK).assign_coords(cell=np.arange(self.NCELLS))
+                               for lvstype in ('BEEF', 'SHEEP', 'DAIRY')}                    # for the NaN guard
+            self.LVSTK_K = {lvstype: k.fillna(0) for lvstype, k in lvstk_k_raw.items()}
         else:
             lvstk_k_raw = None
             self.LVSTK_K = {lvstype: self.FEED_REQ for lvstype in ('BEEF', 'SHEEP', 'DAIRY')}
@@ -666,21 +716,15 @@ class Data:
         # The stubble carrying rate <unit: DSE per ha, annualised>, read on every cell and applied on the cereal land uses
         # only (quantity.get_stubble_yield_pot); 0 where no file is given
         if settings.STUBBLE_DSE_FILE:
-            stubble_raw = pd.read_hdf(os.path.join(settings.INPUT_DIR, settings.STUBBLE_DSE_FILE), where=self.MASK).to_numpy()   # for the NaN guard
-            self.STUBBLE_DSE_HA = np.nan_to_num(stubble_raw)
+            stubble_raw = xr.load_dataarray(os.path.join(settings.INPUT_DIR, settings.STUBBLE_DSE_FILE)).isel(cell=self.MASK).assign_coords(cell=np.arange(self.NCELLS))   # for the NaN guard
+            self.STUBBLE_DSE_HA = stubble_raw.fillna(0)
         else:
             stubble_raw = None
-            self.STUBBLE_DSE_HA = np.zeros(self.NCELLS, dtype=np.float32)
+            self.STUBBLE_DSE_HA = xr.DataArray(np.zeros(self.NCELLS, dtype=np.float32), dims=['cell'], coords={'cell': np.arange(self.NCELLS)})
 
-        self.PASTURE_KG_DM_HA = pd.read_hdf(
-            os.path.join(settings.INPUT_DIR, "pasture_kg_dm_ha.h5"), where=self.MASK
-        ).to_numpy()
-        self.SAFE_PUR_NATL = pd.read_hdf(
-            os.path.join(settings.INPUT_DIR, "safe_pur_natl.h5"), where=self.MASK
-        ).to_numpy()
-        self.SAFE_PUR_MODL = pd.read_hdf(
-            os.path.join(settings.INPUT_DIR, "safe_pur_modl.h5"), where=self.MASK
-        ).to_numpy()
+        self.PASTURE_KG_DM_HA = xr.load_dataarray(os.path.join(settings.INPUT_DIR, "pasture_kg_dm_ha.nc")).isel(cell=self.MASK).assign_coords(cell=np.arange(self.NCELLS))
+        self.SAFE_PUR_NATL = xr.load_dataarray(os.path.join(settings.INPUT_DIR, "safe_pur_natl.nc")).isel(cell=self.MASK).assign_coords(cell=np.arange(self.NCELLS))
+        self.SAFE_PUR_MODL = xr.load_dataarray(os.path.join(settings.INPUT_DIR, "safe_pur_modl.nc")).isel(cell=self.MASK).assign_coords(cell=np.arange(self.NCELLS))
 
 
 
@@ -749,8 +793,9 @@ class Data:
             }
 
         # Load soil carbon data, convert C to CO2e (x 44/12), and average over years
+        soil_carbon_t_ha = xr.load_dataarray(os.path.join(settings.INPUT_DIR, "soil_carbon_t_ha.nc")).isel(cell=self.MASK).assign_coords(cell=np.arange(self.NCELLS))
         self.SOIL_CARBON_AVG_T_CO2_HA_PER_YR = (
-            pd.read_hdf(os.path.join(settings.INPUT_DIR, "soil_carbon_t_ha.h5"), where=self.MASK).to_numpy(dtype=np.float32) 
+            soil_carbon_t_ha.astype(np.float32)
             * (44 / 12)  # Convert C to CO2e
             / settings.CARBON_EFFECTS_WINDOW
         )
@@ -782,12 +827,13 @@ class Data:
             # Renewable energy related raster layers
             #   Compute before isel to avoid isel working on dask chunks
             #   which slows down the reading.
-            self.RENEWABLE_LAYERS = (
-                xr.open_dataset(f'{settings.INPUT_DIR}/renewable_energy_layers_1D.nc')
-                .sel(scenario=settings.RENEWABLE_TARGET_SCENARIO_INPUT_LAYERS)
-                .compute()
-                .isel(cell=self.MASK)
-            )
+            with xr.open_dataset(f'{settings.INPUT_DIR}/renewable_energy_layers_1D.nc') as renewable_layers:
+                self.RENEWABLE_LAYERS = (
+                    renewable_layers
+                    .sel(scenario=settings.RENEWABLE_TARGET_SCENARIO_INPUT_LAYERS)
+                    .compute()
+                    .isel(cell=self.MASK)
+                )
 
 
             # Existing capacity 
@@ -904,17 +950,14 @@ class Data:
         print("├── Loading auxiliary spatial layers data", flush=True)
 
         # Load stream length data in metres of stream per cell
-        self.STREAM_LENGTH = pd.read_hdf(
-            os.path.join(settings.INPUT_DIR, "stream_length_m_cell.h5"), where=self.MASK
-        ).to_numpy()
-        stream_area_ha = self.REAL_AREA_NO_RESFACTOR[self.MASK]
+        self.STREAM_LENGTH = xr.load_dataarray(os.path.join(settings.INPUT_DIR, "stream_length_m_cell.nc")).isel(cell=self.MASK).assign_coords(cell=np.arange(self.NCELLS))
+        stream_area_ha = self.REAL_AREA_NO_RESFACTOR.isel(cell=self.MASK).assign_coords(cell=np.arange(self.NCELLS))    # the representative cell's own area
 
         # RESFACTOR > 1: a coarse cell's stream length is its block's total, and its density is over the block's summed area.
         if settings.RESFACTOR > 1:
-            self.STREAM_LENGTH = self.get_resfactored_sum(
-                pd.read_hdf(os.path.join(settings.INPUT_DIR, "stream_length_m_cell.h5")).to_numpy()
-            )
-            stream_area_ha = self.get_resfactored_sum(self.REAL_AREA_NO_RESFACTOR)
+            stream_length_fullres = xr.load_dataarray(os.path.join(settings.INPUT_DIR, "stream_length_m_cell.nc")).values
+            self.STREAM_LENGTH = self.STREAM_LENGTH.copy(data=self.get_resfactored_sum(stream_length_fullres))
+            stream_area_ha = stream_area_ha.copy(data=self.get_resfactored_sum(self.REAL_AREA_NO_RESFACTOR.values))
 
         # Calculate the proportion of the area of each cell within stream buffer (convert REAL_AREA from ha to m2 and divide m2 by m2)
         self.RP_PROPORTION =  (
@@ -934,16 +977,41 @@ class Data:
 
 
         # Load greenhouse gas emissions from agriculture
-        self.AGGHG_CROPS = pd.read_hdf(os.path.join(settings.INPUT_DIR, "agGHG_crops.h5"), where=self.MASK)
-        self.AGGHG_LVSTK = pd.read_hdf(os.path.join(settings.INPUT_DIR, "agGHG_lvstk.h5"), where=self.MASK)
-        self.AGGHG_IRRPAST = pd.read_hdf(os.path.join(settings.INPUT_DIR, "agGHG_irrpast.h5"), where=self.MASK)
+        #   (column, cell) at the model cells, the columns labelled (field, lm, lu) / (animal, field); the irrigated
+        #   pasture emissions one variable per column over cell
+        with xr.open_dataset(os.path.join(settings.INPUT_DIR, "agGHG_crops.nc")) as agghg_crops_file:
+            agghg_crops = agghg_crops_file['AGGHG_CROPS']
+            self.AGGHG_CROPS = xr.DataArray(
+                np.stack([agghg_crops.isel(column=i).values[self.MASK] for i in range(agghg_crops.sizes['column'])]),
+                dims=['column', 'cell'],
+                name='AGGHG_CROPS',
+                coords={
+                    'field': ('column', agghg_crops['field'].values),
+                    'lm': ('column', agghg_crops['lm'].values),
+                    'lu': ('column', agghg_crops['lu'].values),
+                    'cell': np.arange(self.MASK.sum()),
+                },
+            ).set_xindex(['field', 'lm', 'lu'])
+        with xr.open_dataset(os.path.join(settings.INPUT_DIR, "agGHG_lvstk.nc")) as agghg_lvstk_file:
+            agghg_lvstk = agghg_lvstk_file['AGGHG_LVSTK']
+            self.AGGHG_LVSTK = xr.DataArray(
+                np.stack([agghg_lvstk.isel(column=i).values[self.MASK] for i in range(agghg_lvstk.sizes['column'])]),
+                dims=['column', 'cell'],
+                name='AGGHG_LVSTK',
+                coords={
+                    'animal': ('column', agghg_lvstk['animal'].values),
+                    'field': ('column', agghg_lvstk['field'].values),
+                    'cell': np.arange(self.MASK.sum()),
+                },
+            ).set_xindex(['animal', 'field'])
+        self.AGGHG_IRRPAST = xr.load_dataset(os.path.join(settings.INPUT_DIR, "agGHG_irrpast.nc")).isel(cell=self.MASK).assign_coords(cell=np.arange(self.NCELLS))
 
         # A cell without the sheep per-head data the stubble consumers read carries no stubble sheep: its stubble rate is 0
         # for quantity, revenue, cost, GHG and water alike (coarsen_guarded_arrays applies the same rule to a block's fine
         # cells). A NaN rate stays NaN for the guard.
         if stubble_raw is not None:
             stubble_raw = self.get_stubble_effective_rate(stubble_raw)
-            self.STUBBLE_DSE_HA = np.nan_to_num(stubble_raw)
+            self.STUBBLE_DSE_HA = stubble_raw.fillna(0)
 
 
         # Raw transition cost matrix. In AUD/ha and ordered lexicographically.
@@ -954,16 +1022,16 @@ class Data:
   
         # Boolean x_mrj matrix with allowed land uses j for each cell r under lm.
         # When RESFACTOR > 1, average the block's land-use cells (LUMASK, the cells RESFACTOR 1 models); > 0 means eligible.
-        x_mrj_full = np.load(os.path.join(settings.INPUT_DIR, "x_mrj.npy"))
+        x_mrj_full = xr.load_dataarray(os.path.join(settings.INPUT_DIR, "x_mrj.nc"))                                       # (lm, cell, lu) over the FULL-RES cells, no cell coordinate
         if settings.RESFACTOR == 1:
-            self.EXCLUDE = x_mrj_full[:, self.MASK, :]
+            self.EXCLUDE = x_mrj_full.sel(lm=self.LANDMANS, lu=self.AGRICULTURAL_LANDUSES).isel(cell=self.MASK).values
         else:
             self.EXCLUDE = np.stack([
                 np.stack([
-                    self.get_resfactored_average_fraction(x_mrj_full[m, :, j] & self.LUMASK, use_valid_cell_count=False)
-                    for j in range(self.N_AG_LUS)
+                    self.get_resfactored_average_fraction(x_mrj_full.sel(lm=lm, lu=lu).values & self.LUMASK, use_valid_cell_count=False)
+                    for lu in self.AGRICULTURAL_LANDUSES
                 ], axis=-1)
-                for m in range(self.NLMS)
+                for lm in self.LANDMANS
             ]) > 0
 
             # The agricultural economics, GHG, pasture and climate arrays above were read at each block's
@@ -978,58 +1046,63 @@ class Data:
         print("├── Loading non-agricultural data", flush=True)
 
         # Load plantings economic data
-        self.EP_EST_COST_HA = pd.read_hdf(os.path.join(settings.INPUT_DIR, "ep_est_cost_ha.h5"), where=self.MASK).to_numpy(dtype=np.float32)
+        est_cost = xr.load_dataset(os.path.join(settings.INPUT_DIR, "plantings_est_cost_ha.nc")).isel(cell=self.MASK).assign_coords(cell=np.arange(self.NCELLS)).astype(np.float32)
+        self.EP_EST_COST_HA = est_cost['EP_EST_COST_HA']
         self.RP_EST_COST_HA = self.EP_EST_COST_HA.copy()  # Riparian plantings have the same establishment cost as environmental plantings
         self.AF_EST_COST_HA = self.EP_EST_COST_HA.copy()  # Agroforestry plantings have the same establishment cost as environmental plantings
-        self.CP_EST_COST_HA = pd.read_hdf(os.path.join(settings.INPUT_DIR, "cp_est_cost_ha.h5"), where=self.MASK).to_numpy(dtype=np.float32)
+        self.CP_EST_COST_HA = est_cost['CP_EST_COST_HA']
 
-        # Load fire risk data (reduced carbon sequestration by this amount)
-        fr_df = pd.read_hdf(os.path.join(settings.INPUT_DIR, "fire_risk.h5"), where=self.MASK)
-        fr_dict = {"low": "FD_RISK_PERC_5TH", "med": "FD_RISK_MEDIAN", "high": "FD_RISK_PERC_95TH"}
-        fire_risk = fr_df[fr_dict[settings.FIRE_RISK]]
+        # Load fire risk data (reduced carbon sequestration by this amount); the levels are the settings.FIRE_RISK options
+        with xr.open_dataset(os.path.join(settings.INPUT_DIR, "fire_risk.nc")) as fire_risk_ds:
+            fire_risk = fire_risk_ds['FD_RISK'].sel(fire_risk=settings.FIRE_RISK, drop=True).load().isel(cell=self.MASK).assign_coords(cell=np.arange(self.NCELLS))
 
 
         # Load environmental plantings (block) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
         #   NOTE: Use .sel(age=...).load().isel(cell=self.MASK) instead of .sel(cell=self.MASK) 
         #   to avoid slow xarray label-based indexing on large cell dimensions
-        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_block.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW).load().isel(cell=self.MASK)
+        with xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_block.nc")) as ds:
+            ds = ds.sel(age=settings.CARBON_EFFECTS_WINDOW).load().isel(cell=self.MASK).assign_coords(cell=np.arange(self.NCELLS))
         self.EP_BLOCK_AVG_T_CO2_HA_PER_YR = (
             (ds['EP_BLOCK_TREES_T_CO2_HA'] + ds['EP_BLOCK_DEBRIS_T_CO2_HA'])
             * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
             + ds['EP_BLOCK_SOIL_T_CO2_HA']
-        ).values / settings.CARBON_EFFECTS_WINDOW
+        ) / settings.CARBON_EFFECTS_WINDOW
 
         # Load environmental plantings (belt) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
-        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_belt.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW).load().isel(cell=self.MASK)
+        with xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_belt.nc")) as ds:
+            ds = ds.sel(age=settings.CARBON_EFFECTS_WINDOW).load().isel(cell=self.MASK).assign_coords(cell=np.arange(self.NCELLS))
         self.EP_BELT_AVG_T_CO2_HA_PER_YR = (
             (ds['EP_BELT_TREES_T_CO2_HA'] + ds['EP_BELT_DEBRIS_T_CO2_HA'])
             * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
             + ds['EP_BELT_SOIL_T_CO2_HA']
-        ).values / settings.CARBON_EFFECTS_WINDOW
+        ) / settings.CARBON_EFFECTS_WINDOW
 
         # Load environmental plantings (riparian) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
-        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_rip.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW).load().isel(cell=self.MASK)
+        with xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_rip.nc")) as ds:
+            ds = ds.sel(age=settings.CARBON_EFFECTS_WINDOW).load().isel(cell=self.MASK).assign_coords(cell=np.arange(self.NCELLS))
         self.EP_RIP_AVG_T_CO2_HA_PER_YR = (
             (ds['EP_RIP_TREES_T_CO2_HA'] + ds['EP_RIP_DEBRIS_T_CO2_HA'])
             * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
             + ds['EP_RIP_SOIL_T_CO2_HA']
-        ).values / settings.CARBON_EFFECTS_WINDOW
+        ) / settings.CARBON_EFFECTS_WINDOW
 
         # Load carbon plantings (block) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
-        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_cp_block.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW).load().isel(cell=self.MASK)
+        with xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_cp_block.nc")) as ds:
+            ds = ds.sel(age=settings.CARBON_EFFECTS_WINDOW).load().isel(cell=self.MASK).assign_coords(cell=np.arange(self.NCELLS))
         self.CP_BLOCK_AVG_T_CO2_HA_PER_YR = (
             (ds['CP_BLOCK_TREES_T_CO2_HA'] + ds['CP_BLOCK_DEBRIS_T_CO2_HA'])
             * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
             + ds['CP_BLOCK_SOIL_T_CO2_HA']
-        ).values / settings.CARBON_EFFECTS_WINDOW
+        ) / settings.CARBON_EFFECTS_WINDOW
 
         # Load farm forestry [i.e. carbon plantings (belt)] GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
-        ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_cp_belt.nc")).sel(age=settings.CARBON_EFFECTS_WINDOW).load().isel(cell=self.MASK)
+        with xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_cp_belt.nc")) as ds:
+            ds = ds.sel(age=settings.CARBON_EFFECTS_WINDOW).load().isel(cell=self.MASK).assign_coords(cell=np.arange(self.NCELLS))
         self.CP_BELT_AVG_T_CO2_HA_PER_YR = (
             (ds['CP_BELT_TREES_T_CO2_HA'] + ds['CP_BELT_DEBRIS_T_CO2_HA'])
             * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
             + ds['CP_BELT_SOIL_T_CO2_HA']
-        ).values / settings.CARBON_EFFECTS_WINDOW
+        ) / settings.CARBON_EFFECTS_WINDOW
 
         # Agricultural land use to plantings raw transition costs:
         self.AG2EP_TRANSITION_COSTS_HA = np.load(
@@ -1129,9 +1202,10 @@ class Data:
                 # First find out which animal is involved.
                 animal, _ = ag_quantity.lvs_veg_types(lu)
                 # Water requirements per head are for drinking and irrigation.
-                wreq_lvstk_dry[lu] = self.agec_lvstk(lu, 'dry')["WR_DRN", animal] * settings.LIVESTOCK_DRINKING_WATER
+                wreq_lvstk_dry[lu] = self.agec_lvstk(lu, 'dry').sel(field="WR_DRN", animal=animal).to_series() * settings.LIVESTOCK_DRINKING_WATER
                 wreq_lvstk_irr[lu] = (
-                    self.agec_lvstk(lu, 'irr')["WR_IRR", animal] + self.agec_lvstk(lu, 'irr')["WR_DRN", animal] * settings.LIVESTOCK_DRINKING_WATER
+                    self.agec_lvstk(lu, 'irr').sel(field="WR_IRR", animal=animal).to_series()
+                    + self.agec_lvstk(lu, 'irr').sel(field="WR_DRN", animal=animal).to_series() * settings.LIVESTOCK_DRINKING_WATER
                 )
             else:
                 wreq_lvstk_dry[lu] = 0.0
@@ -1143,7 +1217,7 @@ class Data:
         # The rj-indexed arrays have zeroes where j is not a crop.
         for lu in self.AGRICULTURAL_LANDUSES:
             if lu in self.LU_CROPS:
-                wreq_crops_irr[lu] = self.AGEC_CROPS["WR", "irr", lu]
+                wreq_crops_irr[lu] = self.AGEC_CROPS.sel(field="WR", lm="irr", lu=lu).to_series()
             else:
                 wreq_crops_irr[lu] = 0.0
 
@@ -1154,43 +1228,42 @@ class Data:
         )
 
         # Spatially explicit costs of a water licence per ML.
-        self.WATER_LICENCE_PRICE = np.nan_to_num(
-                pd.read_hdf(os.path.join(settings.INPUT_DIR, "water_licence_price.h5"), where=self.MASK).to_numpy()
+        self.WATER_LICENCE_PRICE = (
+            xr.load_dataarray(os.path.join(settings.INPUT_DIR, "water_licence_price.nc")).isel(cell=self.MASK)
+            .fillna(0)                                                          # NaN filled with 0 as before (see the A1 NaN audit)
+            .assign_coords(cell=np.arange(self.NCELLS))
         )
 
         # Spatially explicit costs of water delivery per ML.
-        water_delivery_price_raw = pd.read_hdf(os.path.join(settings.INPUT_DIR, "water_delivery_price.h5"), where=self.MASK).to_numpy()
-        self.WATER_DELIVERY_PRICE = np.nan_to_num(water_delivery_price_raw)
+        water_delivery_price_raw = xr.load_dataarray(os.path.join(settings.INPUT_DIR, "water_delivery_price.nc")).isel(cell=self.MASK).assign_coords(cell=np.arange(self.NCELLS))
+        self.WATER_DELIVERY_PRICE = water_delivery_price_raw.fillna(0)
 
         # NaN guard: every eligible entry of the arrays the agricultural economics read must carry data.
         self.check_eligible_nan(feed_req_raw, water_delivery_price_raw, lvstk_k_raw, stubble_raw)
        
 
         # Water yields -- run off from a cell into catchment by deep-rooted, shallow-rooted, and natural land
-        water_yield_baselines = pd.read_hdf(os.path.join(settings.INPUT_DIR, "water_yield_baselines.h5"), where=self.MASK)
-        self.WATER_YIELD_HIST_DR = water_yield_baselines['WATER_YIELD_HIST_DR_ML_HA'].to_numpy(dtype = np.float32)
-        self.WATER_YIELD_HIST_SR = water_yield_baselines["WATER_YIELD_HIST_SR_ML_HA"].to_numpy(dtype = np.float32)
-        self.DEEP_ROOTED_PROPORTION = water_yield_baselines['DEEP_ROOTED_PROPORTION'].to_numpy(dtype = np.float32)
-        self.WATER_YIELD_HIST_NL = water_yield_baselines.eval(
-            'WATER_YIELD_HIST_DR_ML_HA * DEEP_ROOTED_PROPORTION + WATER_YIELD_HIST_SR_ML_HA * (1 - DEEP_ROOTED_PROPORTION)'
-        ).to_numpy(dtype = np.float32)
+        # The historical (1970-2000) yields and the deep-rooted proportion at the model cells, over cell
+        water_yield_baselines = xr.load_dataset(os.path.join(settings.INPUT_DIR, "water_yield_baselines.nc")).isel(cell=self.MASK).assign_coords(cell=np.arange(self.NCELLS))
+        self.WATER_YIELD_HIST_DR = water_yield_baselines['WATER_YIELD_HIST_DR_ML_HA'].astype(np.float32)
+        self.WATER_YIELD_HIST_SR = water_yield_baselines['WATER_YIELD_HIST_SR_ML_HA'].astype(np.float32)
+        self.DEEP_ROOTED_PROPORTION = water_yield_baselines['DEEP_ROOTED_PROPORTION'].astype(np.float32)
+        self.WATER_YIELD_HIST_NL = (
+            water_yield_baselines['WATER_YIELD_HIST_DR_ML_HA'] * water_yield_baselines['DEEP_ROOTED_PROPORTION']
+            + water_yield_baselines['WATER_YIELD_HIST_SR_ML_HA'] * (1 - water_yield_baselines['DEEP_ROOTED_PROPORTION'])
+        ).astype(np.float32)
 
-        wyield_fname_dr = os.path.join(settings.INPUT_DIR, 'water_yield_ssp' + str(settings.SSP) + '_2010-2100_dr_ml_ha.h5')
-        wyield_fname_sr = os.path.join(settings.INPUT_DIR, 'water_yield_ssp' + str(settings.SSP) + '_2010-2100_sr_ml_ha.h5')
-        
-        # Read water yield data
-        self.WATER_YIELD_DR_FILE = pd.read_hdf(wyield_fname_dr, where=self.MASK).T.values
-        self.WATER_YIELD_SR_FILE = pd.read_hdf(wyield_fname_sr, where=self.MASK).T.values
+        # The yields of this SSP, DR / SR over (year, cell): not loaded here — the simulation reads its inputs year by year,
+        # so get_water_yield reads a year when it is first asked for (a chunk holds one year of every cell)
+        self.WATER_YIELD_SSP_FILE = os.path.join(settings.INPUT_DIR, f'water_yield_ssp{settings.SSP}_2010_2100_ml_ha.nc')
+        self.WATER_YIELD_BY_YEAR = {}                                    # {year: Dataset of DR / SR}, filled by get_water_yield
 
-        # The files carry no year labels (columns 0..90): their rows are the years the file name gives, 2010-2100.
-        self.WATER_YIELD_FILE_YEARS = list(range(2010, 2101))
-        for f in (self.WATER_YIELD_DR_FILE, self.WATER_YIELD_SR_FILE):
-            if f.shape[0] != len(self.WATER_YIELD_FILE_YEARS):
-                raise ValueError(f"Water yield file has {f.shape[0]} years, expected {len(self.WATER_YIELD_FILE_YEARS)} (2010-2100).")
         
-        
-        # Water yield from outside LUTO study area.
-        self.WATER_YIELD_OUTSIDE_LUTO_HIST = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'water_yield_outside_LUTO_study_area_hist_1970_2000.h5'))
+        # Water yield from outside LUTO study area, historical (1970-2000), per region type: over region_id
+        self.WATER_YIELD_OUTSIDE_LUTO_HIST = {}
+        for region_type, region_file in [('River Region', 'water_region_rivreg.nc'), ('Drainage Division', 'water_region_draindiv.nc')]:
+            with xr.open_dataset(os.path.join(settings.INPUT_DIR, region_file)) as water_region:
+                self.WATER_YIELD_OUTSIDE_LUTO_HIST[region_type] = water_region['OUTSIDE_LUTO_HIST_ML'].load()
         
         # Water use for domestic and industrial sectors.
         water_use_domestic = pd.read_csv(os.path.join(settings.INPUT_DIR, "Water_Use_Domestic.csv")).query(f"REGION_TYPE == '{settings.WATER_REGION_DEF}'")
@@ -1223,11 +1296,11 @@ class Data:
         '''
     
         # Load the natural land carbon data.
-        nat_land_CO2 = pd.read_hdf(os.path.join(settings.INPUT_DIR, "natural_land_t_co2_ha.h5"), where=self.MASK)
+        nat_land_CO2 = xr.load_dataset(os.path.join(settings.INPUT_DIR, "natural_land_t_co2_ha.nc")).isel(cell=self.MASK).assign_coords(cell=np.arange(self.NCELLS))
         
         # Get the carbon stock of unallowcated natural land (t CO2e/ha): the one-off loss on clearing
-        self.CO2E_STOCK_UNALL_NATURAL_TCO2_HA = np.array(
-            nat_land_CO2['NATURAL_LAND_TREES_DEBRIS_SOIL_TCO2_HA'] - (nat_land_CO2['NATURAL_LAND_AGB_DEBRIS_TCO2_HA'] * (100 - fire_risk) / 100),  # everyting minus the fire DAMAGE
+        self.CO2E_STOCK_UNALL_NATURAL_TCO2_HA = (
+            nat_land_CO2['NATURAL_LAND_TREES_DEBRIS_SOIL_TCO2_HA'] - (nat_land_CO2['NATURAL_LAND_AGB_DEBRIS_TCO2_HA'] * (100 - fire_risk) / 100)  # everyting minus the fire DAMAGE
         )
         # Annualised over the regrowth window (t CO2e/ha/yr): HIR and Destocked regrowth only, not clearing
         self.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR = self.CO2E_STOCK_UNALL_NATURAL_TCO2_HA / settings.CARBON_EFFECTS_WINDOW
@@ -1300,84 +1373,74 @@ class Data:
         if ghg_pathway is None:                 # GHG off -- no carbon pathway, so no demand shift
             AusTIME_multipliers.loc[:, :] = 1.0
 
-        demand_multipliers = pd.DataFrame(
-            index=range(2010, AusTIME_multipliers.index.max() + 1),
-            columns=self.COMMODITIES,
-            data=1.0
+        # The AusTIMES multipliers on the demand of each (Commodity, year); 1 where AusTIMES gives none
+        demand_multipliers = xr.DataArray(
+            np.ones((len(self.COMMODITIES), AusTIME_multipliers.index.max() + 1 - 2010)),
+            dims=['Commodity', 'year'],
+            coords={'Commodity': self.COMMODITIES, 'year': np.arange(2010, AusTIME_multipliers.index.max() + 1)},
         )
-        
         demand_multipliers.loc[
-            AusTIME_multipliers.index,
-            AusTIME_multipliers.columns
-        ] = AusTIME_multipliers
-        
-        demand_multipliers = demand_multipliers.T
-        demand_multipliers.columns.name = 'YEAR'
-        demand_multipliers.index.name = 'COMMODITY'
+            {
+                'Commodity': list(AusTIME_multipliers.columns), 
+                'year': list(AusTIME_multipliers.index)
+            }] = AusTIME_multipliers.to_numpy().T
 
         # Cache for elasticity multipliers (keyed by yr_cal)
         self.DEMAND_ELASTICITY_MUL = {}
 
-        # Load demand data (actual production (tonnes, ML) by commodity) - from demand model
-        dd = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'demand_projections.h5'))
-        
-        # Select the demand data under the running scenariobbryan-January
-        self.DEMAND_DATA = dd.loc[(
-            settings.SCENARIO,
-            settings.DIET_DOM,
-            settings.DIET_GLOB,
-            settings.CONVERGENCE,
-            settings.IMPORT_TREND,
-            settings.WASTE,
-            settings.FEED_EFFICIENCY)
-        ].copy()
+        # Load demand data (actual production (tonnes, ML) by commodity) - from demand model:
+        # the running scenario's chunks only; one variable per quantity over (Commodity, year)
+        with xr.open_dataset(os.path.join(settings.INPUT_DIR, 'demand_projections.nc')) as demand_ds:
+            self.DEMAND_DATA = (
+                demand_ds
+                .sel(
+                    SCENARIO=settings.SCENARIO, 
+                    DIET_DOM=settings.DIET_DOM, 
+                    DIET_GLOB=settings.DIET_GLOB,
+                    CONVERGENCE=settings.CONVERGENCE, 
+                    IMPORT_TREND=settings.IMPORT_TREND, 
+                    WASTE=settings.WASTE,
+                    FEED_EFFICIENCY=settings.FEED_EFFICIENCY)
+                .reset_coords(drop=True)
+                .load()
+            )
 
         # Convert eggs from count to tonnes
-        self.DEMAND_DATA.loc['eggs'] = self.DEMAND_DATA.loc['eggs'] * settings.EGGS_AVG_WEIGHT / 1000 / 1000
+        self.DEMAND_DATA = xr.where(
+            self.DEMAND_DATA['Commodity'] == 'eggs', 
+            self.DEMAND_DATA * settings.EGGS_AVG_WEIGHT / 1000 / 1000, 
+            self.DEMAND_DATA
+        )
 
-        # Get the off-land commodities
-        self.DEMAND_OFFLAND = self.DEMAND_DATA.loc[self.DEMAND_DATA.query(f"COMMODITY in {settings.OFF_LAND_COMMODITIES}").index, 'PRODUCTION'].copy()
+        # The off-land commodities' production, and the on-land commodities' (the demand the solver meets)
+        commodities = self.DEMAND_DATA['Commodity'].values
+        self.DEMAND_OFFLAND = self.DEMAND_DATA['PRODUCTION'].sel(Commodity=[c for c in commodities if c in settings.OFF_LAND_COMMODITIES])
+        self.DEMAND_C = self.DEMAND_DATA['PRODUCTION'].sel(Commodity=[c for c in commodities if c not in settings.OFF_LAND_COMMODITIES])
 
-        # Remove off-land commodities
-        self.DEMAND_C = self.DEMAND_DATA.loc[self.DEMAND_DATA.query(f"COMMODITY not in {settings.OFF_LAND_COMMODITIES}").index, 'PRODUCTION'].copy()
-        
-        
         if settings.APPLY_DEMAND_MULTIPLIERS:
-            print(f"│   ├── Years before applying demand multipliers: {self.DEMAND_C.columns.min()} - {self.DEMAND_C.columns.max()}", flush=True)
-            self.DEMAND_C = (self.DEMAND_C *  demand_multipliers).dropna(axis=1)
-            print(f"│   └── Years after applying demand multipliers: {self.DEMAND_C.columns.min()} - {self.DEMAND_C.columns.max()}", flush=True)
-        
+            print(f"│   ├── Years before applying demand multipliers: {self.DEMAND_C['year'].min().item()} - {self.DEMAND_C['year'].max().item()}", flush=True)
+            self.DEMAND_C = self.DEMAND_C * demand_multipliers       # aligned by label; the inner join keeps the years both cover
+            print(f"│   └── Years after applying demand multipliers: {self.DEMAND_C['year'].min().item()} - {self.DEMAND_C['year'].max().item()}", flush=True)
+
         # Demand cannot be negative. Some projections are unclamped extrapolations that cross zero
         # (SSP5 'other non-cereal crops' does, from 2041), and a negative target becomes an equality
         # asking a sum of non-negative production terms to equal a negative number — infeasible by
         # construction, with no solver setting able to absorb it.
-        neg = self.DEMAND_C < 0
-        if neg.to_numpy().any():
-            for cm in self.DEMAND_C.index[neg.any(axis=1)]:
-                bad = self.DEMAND_C.loc[cm][neg.loc[cm]]
-                print(f"│   ⚠ WARNING: negative demand clamped to 0 for '{cm}' — "
-                      f"{len(bad)} year(s) from {bad.index.min()}, min {bad.min():,.0f}", flush=True)
-            self.DEMAND_C = self.DEMAND_C.clip(lower=0)
+        negative = self.DEMAND_C < 0
+        if negative.any():
+            for commodity in negative['Commodity'].values[negative.any('year').values]:
+                bad = self.DEMAND_C.sel(Commodity=commodity).where(negative.sel(Commodity=commodity), drop=True)
+                print(f"│   ⚠ WARNING: negative demand clamped to 0 for '{commodity}' — "
+                      f"{bad.sizes['year']} year(s) from {bad['year'].min().item()}, min {bad.min().item():,.0f}", flush=True)
+            self.DEMAND_C = self.DEMAND_C.clip(min=0)
 
-        # Convert to numpy array of shape (years, commodities); read it by year through D_CY_xr, which keeps
-        # the file's own year labels (DEMAND_C.columns)
-        self.D_CY = self.DEMAND_C.to_numpy(dtype = np.float32).T
-        self.D_CY_xr = xr.DataArray(
-            self.D_CY,
-            dims=['year','Commodity'],
-            coords={
-                'year':self.DEMAND_C.columns.astype(int).to_numpy(),
-                'Commodity':self.COMMODITIES
-            }
-        )
+        # The demand the solver reads (row_inputs, the demand rows' rhs), float32 as it has always been
+        self.DEMAND_C = self.DEMAND_C.astype(np.float32)
 
-        # Price elasticity data
-        demand_supply_elasticity = pd.read_csv(f'{settings.INPUT_DIR}/demand_elasticity.csv')
-        demand_supply_elasticity = demand_supply_elasticity.sort_values('Commodity')    # Sort by commodity to ensure the order is correct
-        demand_supply_elasticity['Demand Elasticity(ED)'] = demand_supply_elasticity['Demand Elasticity(ED)'] * -1 # ED is subtracted from supply becase demand curve are given as negative numbers
-        
-        self.elasticity_demand = demand_supply_elasticity['Demand Elasticity(ED)']
-        self.elasticity_supply = demand_supply_elasticity['Supply Elasticity (Es)']
+        # Price elasticity data, over Commodity
+        demand_supply_elasticity = pd.read_csv(f'{settings.INPUT_DIR}/demand_elasticity.csv').set_index('Commodity')
+        self.elasticity_demand = xr.DataArray(demand_supply_elasticity['Demand Elasticity(ED)'] * -1)  # ED is subtracted from supply becase demand curve are given as negative numbers
+        self.elasticity_supply = xr.DataArray(demand_supply_elasticity['Supply Elasticity (Es)'])
 
    
 
@@ -1387,28 +1450,25 @@ class Data:
         ###############################################################
         print("├── Loading off-land commodities' carbon emissions data", flush=True)
 
-        # Read the greenhouse gas intensity data
+        # Read the greenhouse gas intensity data, one row per (commodity, emission source)
         off_land_ghg_intensity = pd.read_csv(f'{settings.INPUT_DIR}/agGHG_lvstk_off_land.csv')
         # Split the Emission Source column into two columns
         off_land_ghg_intensity[['Emission Type', 'Emission Source']] = off_land_ghg_intensity['Emission Source'].str.extract(r'^(.*?)\s*\((.*?)\)')
+        intensity = xr.DataArray(
+            off_land_ghg_intensity['Emission Intensity [ kg CO2eq / kg ]'].to_numpy(),
+            dims=['emission'],
+            coords={
+                'Commodity': ('emission', off_land_ghg_intensity['COMMODITY'].to_numpy()),
+                'Emission Type': ('emission', off_land_ghg_intensity['Emission Type'].to_numpy()),
+                'Emission Source': ('emission', off_land_ghg_intensity['Emission Source'].to_numpy()),
+            },
+        )
 
-        # Get the emissions from the off-land commodities
-        demand_offland_long = self.DEMAND_OFFLAND.stack().reset_index()
-        demand_offland_long = demand_offland_long.rename(columns={ 0: 'DEMAND (tonnes)'})
+        # The emissions of every (emission, year): the off-land demand of its commodity x its intensity (tCO2e)
+        self.OFF_LAND_GHG_EMISSION = self.DEMAND_OFFLAND.sel(Commodity=intensity['Commodity']) * intensity
 
-        # Merge the demand and GHG intensity, and calculate the total GHG emissions
-        off_land_ghg_emissions = demand_offland_long.merge(off_land_ghg_intensity, on='COMMODITY')
-        off_land_ghg_emissions['Total GHG Emissions (tCO2e)'] = off_land_ghg_emissions.eval('`DEMAND (tonnes)` * `Emission Intensity [ kg CO2eq / kg ]`')
-
-        # Keep only the relevant columns
-        self.OFF_LAND_GHG_EMISSION = off_land_ghg_emissions[['YEAR',
-                                                             'COMMODITY',
-                                                             'Emission Type',
-                                                             'Emission Source',
-                                                             'Total GHG Emissions (tCO2e)']]
-
-        # Get the GHG constraints for luto: total tCO2e per year, indexed by year
-        self.OFF_LAND_GHG_EMISSION_C = self.OFF_LAND_GHG_EMISSION.groupby('YEAR')['Total GHG Emissions (tCO2e)'].sum()
+        # Their total per year: what the GHG cap must leave room for
+        self.OFF_LAND_GHG_EMISSION_C = self.OFF_LAND_GHG_EMISSION.sum('emission')
 
         # Read the carbon price per tonne over the years (indexed by the relevant year)
         if settings.CARBON_PRICES_FIELD == 'CONSTANT':
@@ -1455,16 +1515,17 @@ class Data:
         print("├── Loading savanna burning data", flush=True)
 
         # Read in the dataframe
-        savburn_df = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'cell_savanna_burning.h5'), where=self.MASK)
+        with xr.open_dataset(os.path.join(settings.INPUT_DIR, 'cell_savanna_burning.nc')) as savburn:
+            savburn = savburn[['ELIGIBLE_AREA', 'AEA_TOTAL_TCO2E_HA']].load().isel(cell=self.MASK).assign_coords(cell=np.arange(self.NCELLS))
 
-        # Load the columns as numpy arrays
-        self.SAVBURN_ELIGIBLE =  savburn_df.ELIGIBLE_AREA.to_numpy()                    # 1 = areas eligible for early dry season savanna burning under the ERF, 0 = ineligible          
-        self.SAVBURN_TOTAL_TCO2E_HA = savburn_df.AEA_TOTAL_TCO2E_HA.to_numpy()
+        # Load the layers as DataArrays over the model cells
+        self.SAVBURN_ELIGIBLE =  savburn['ELIGIBLE_AREA']                    # 1 = areas eligible for early dry season savanna burning under the ERF, 0 = ineligible          
+        self.SAVBURN_TOTAL_TCO2E_HA = savburn['AEA_TOTAL_TCO2E_HA']
         
         # # Avoided emissions from savanna burning
-        # self.SAVBURN_AVEM_CH4_TCO2E_HA = savburn_df.SAV_AVEM_CH4_TCO2E_HA.to_numpy()  # Avoided emissions - methane
-        # self.SAVBURN_AVEM_N2O_TCO2E_HA = savburn_df.SAV_AVEM_N2O_TCO2E_HA.to_numpy()  # Avoided emissions - nitrous oxide
-        # self.SAVBURN_SEQ_CO2_TCO2E_HA = savburn_df.SAV_SEQ_CO2_TCO2E_HA.to_numpy()    # Additional carbon sequestration - carbon dioxide
+        # self.SAVBURN_AVEM_CH4_TCO2E_HA = savburn['SAV_AVEM_CH4_TCO2E_HA']  # Avoided emissions - methane
+        # self.SAVBURN_AVEM_N2O_TCO2E_HA = savburn['SAV_AVEM_N2O_TCO2E_HA']  # Avoided emissions - nitrous oxide
+        # self.SAVBURN_SEQ_CO2_TCO2E_HA = savburn['SAV_SEQ_CO2_TCO2E_HA']    # Additional carbon sequestration - carbon dioxide
 
         # Cost per hectare in dollars from settings
         self.SAVBURN_COST_HA = settings.SAVBURN_COST_HA_YR
@@ -1488,19 +1549,21 @@ class Data:
 
         # ------------- Biodiversity priority scores for maximising overall biodiversity conservation in Australia ----------------------------
         
-        biodiv_raw = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'bio_OVERALL_PRIORITY_RANK_AND_AREA_CONNECTIVITY.h5'), where=self.MASK)
+        # The priority of this SSP (ssp, cell) and the two connectivity layers (cell) at the model cells
+        with xr.open_dataset(os.path.join(settings.INPUT_DIR, 'bio_OVERALL_PRIORITY_RANK_AND_AREA_CONNECTIVITY.nc')) as bio_priority:
+            biodiv_raw = bio_priority.sel(ssp=[settings.SSP]).load().isel(cell=self.MASK).assign_coords(cell=np.arange(self.NCELLS))
         
         # Get the biodiversity quality score (unweighted; connectivity is applied further below)
-        bio_quality_raw, performance_sheet = self.load_bio_quality_layer(settings.BIO_QUALITY_LAYER, biodiv_df=biodiv_raw)
+        bio_quality_raw, performance_sheet = self.load_bio_quality_layer(settings.BIO_QUALITY_LAYER, biodiv_ds=biodiv_raw)
 
         
         # Get connectivity score
         match settings.CONNECTIVITY_SOURCE:
             case 'NCI':
-                connectivity_score = biodiv_raw['DCCEEW_NCI'].to_numpy(dtype=np.float32)
+                connectivity_score = biodiv_raw['DCCEEW_NCI'].values.astype(np.float32)
                 connectivity_score = np.interp( biodiv_raw['DCCEEW_NCI'], (connectivity_score.min(), connectivity_score.max()), (settings.CONNECTIVITY_LB, 1)).astype('float32')
             case 'DWI':
-                connectivity_score = biodiv_raw['NATURAL_AREA_CONNECTIVITY'].to_numpy(dtype=np.float32)
+                connectivity_score = biodiv_raw['NATURAL_AREA_CONNECTIVITY'].values.astype(np.float32)
                 connectivity_score = np.interp(connectivity_score, (connectivity_score.min(), connectivity_score.max()), (1, settings.CONNECTIVITY_LB)).astype('float32')
             case 'NONE':
                 connectivity_score = np.ones(self.NCELLS, dtype=np.float32)
@@ -1531,7 +1594,7 @@ class Data:
         # Get the biodiversity quantity score for each land use in each cell
         self.BIO_QUALITY_RAW = bio_quality_raw * self.CONNECTIVITY_SCORE
         self.BIO_QUALITY_LDS = np.where(
-            self.SAVBURN_ELIGIBLE,
+            self.SAVBURN_ELIGIBLE.values,
             self.BIO_QUALITY_RAW  - (self.BIO_QUALITY_RAW * (1 - settings.BIO_CONTRIBUTION_LDS)),
             self.BIO_QUALITY_RAW
         )
@@ -1550,7 +1613,7 @@ class Data:
             # Get the mask of 'priority degraded areas' for habitat conservation
             self.BIO_GBF2_MASK = bio_quality_raw >= conservation_performance_curve[settings.GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT]
             self.BIO_GBF2_MASK_LDS = np.where(
-                self.SAVBURN_ELIGIBLE,
+                self.SAVBURN_ELIGIBLE.values,
                 self.BIO_GBF2_MASK  - (self.BIO_GBF2_MASK * (1 - settings.BIO_CONTRIBUTION_LDS)),
                 self.BIO_GBF2_MASK
             )
@@ -1561,12 +1624,12 @@ class Data:
                     np.array(list(self.BIO_HABITAT_CONTRIBUTION_LOOK_UP.values())),
                     self.AG_L_MRJ,      # lumap in proportion representation if resfactored
                     self.BIO_GBF2_MASK,
-                    self.REAL_AREA
+                    self.REAL_AREA.values
                 ) - (
-                    self.SAVBURN_ELIGIBLE
+                    self.SAVBURN_ELIGIBLE.values
                     * self.BIO_GBF2_MASK
                     * (1 - settings.BIO_CONTRIBUTION_LDS)
-                    * self.REAL_AREA
+                    * self.REAL_AREA.values
                     * self.AG_MASK_PROPORTION_R
                 )
             )
@@ -1579,7 +1642,7 @@ class Data:
 
         # Renewable energy exclusion masks using EPBC MNES prioritization layer
         if any(settings.RENEWABLES_OPTIONS.values()) and settings.EXCLUDE_RENEWABLES_IN_EPBC_MNES_MASK:
-            mnes_rank_raw = xr.open_dataset(os.path.join(settings.INPUT_DIR, 'renewable_QLD_EPBC_MNES_prioritization.nc'))['data'].values[self.MASK]
+            mnes_rank_raw = xr.load_dataarray(os.path.join(settings.INPUT_DIR, 'renewable_QLD_EPBC_MNES_prioritization.nc')).values[self.MASK]
             mnes_performance = pd.read_csv(os.path.join(settings.INPUT_DIR, 'renewable_QLD_EPBC_MNES_prioritization_performance.csv')).set_index('AREA_COVERAGE_PERCENT')['PRIORITY_RANK'].to_dict()
             self.RENEWABLE_MNES_MASK_SOLAR = mnes_rank_raw >= mnes_performance[settings.RENEWABLE_EPBC_MNES_CUT_SOLAR]
             self.RENEWABLE_MNES_MASK_WIND = mnes_rank_raw >= mnes_performance[settings.RENEWABLE_EPBC_MNES_CUT_WIND]
@@ -1613,7 +1676,7 @@ class Data:
                 coords={'group': sel_group, 'cell': np.arange(self.NCELLS)},
             )
             self.GBF3_NVIS_LAYERS_LDS = xr.where(
-                self.SAVBURN_ELIGIBLE[None, :],
+                self.SAVBURN_ELIGIBLE.values[None, :],
                 nvis_layers_arr * settings.BIO_CONTRIBUTION_LDS,
                 nvis_layers_arr,
             ).astype(np.float32)
@@ -1621,9 +1684,9 @@ class Data:
             # IBRA_REG mode: the bioregion of every cell, so a (bioregion, group) target is masked to its own cells
             # (sampled at the cell like the NRM / state labels). Code = position in REGION_IBRA_NAMES, -1 = no bioregion.
             if settings.GBF3_NVIS_REGION_MODE == 'IBRA_REG':
-                with xr.open_dataset(os.path.join(settings.INPUT_DIR, 'bio_GBF3_IBRA_Regions.nc')) as ibra_ds:
-                    self.REGION_IBRA_NAMES = ibra_ds['region'].values.tolist()
-                    in_region_vr = ibra_ds['data'].values[:, self.MASK]                      # bool (region, cell): read whole, then masked (a lazy boolean index on the compressed variable crawls)
+                ibra = xr.load_dataarray(os.path.join(settings.INPUT_DIR, 'bio_GBF3_IBRA_Regions.nc'))                # bool (region, cell): read whole, then masked (a lazy boolean index on the compressed variable crawls)
+                self.REGION_IBRA_NAMES = ibra['region'].values.tolist()
+                in_region_vr = ibra.values[:, self.MASK]
                 self.REGION_IBRA_CODE = np.where(in_region_vr.any(axis=0), in_region_vr.argmax(axis=0), -1).astype(np.int32)
 
 
@@ -1665,7 +1728,7 @@ class Data:
             )
             
             self.GBF4_SNES_LAYERS_LDS = xr.where(
-                self.SAVBURN_ELIGIBLE[None, :],
+                self.SAVBURN_ELIGIBLE.values[None, :],
                 snes_layer_arr * settings.BIO_CONTRIBUTION_LDS,
                 snes_layer_arr,
             ).astype(np.float32)
@@ -1692,7 +1755,7 @@ class Data:
                 },
             )
             self.GBF4_ECNES_LAYERS_LDS = xr.where(
-                self.SAVBURN_ELIGIBLE[None, :],
+                self.SAVBURN_ELIGIBLE.values[None, :],
                 ecnes_layer_arr * settings.BIO_CONTRIBUTION_LDS,
                 ecnes_layer_arr,
             ).astype(np.float32)
@@ -1763,13 +1826,14 @@ class Data:
         print("└── Loading BECCS data", flush=True)
 
         # Load dataframe
-        beccs_df = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'cell_BECCS_df.h5'), where=self.MASK)
+        with xr.open_dataset(os.path.join(settings.INPUT_DIR, 'cell_BECCS.nc')) as beccs:
+            beccs = beccs[['BECCS_COSTS_AUD_HA_YR', 'BECCS_REV_AUD_HA_YR', 'BECCS_TCO2E_HA_YR', 'BECCS_MWH_HA_YR']].load().isel(cell=self.MASK).assign_coords(cell=np.arange(self.NCELLS))
 
-        # Capture as numpy arrays
-        self.BECCS_COSTS_AUD_HA_YR = beccs_df['BECCS_COSTS_AUD_HA_YR'].to_numpy()
-        self.BECCS_REV_AUD_HA_YR = beccs_df['BECCS_REV_AUD_HA_YR'].to_numpy()
-        self.BECCS_TCO2E_HA_YR = beccs_df['BECCS_TCO2E_HA_YR'].to_numpy()
-        self.BECCS_MWH_HA_YR = beccs_df['BECCS_MWH_HA_YR'].to_numpy()
+        # Capture as DataArrays over the model cells
+        self.BECCS_COSTS_AUD_HA_YR = beccs['BECCS_COSTS_AUD_HA_YR']
+        self.BECCS_REV_AUD_HA_YR = beccs['BECCS_REV_AUD_HA_YR']
+        self.BECCS_TCO2E_HA_YR = beccs['BECCS_TCO2E_HA_YR']
+        self.BECCS_MWH_HA_YR = beccs['BECCS_MWH_HA_YR']
 
 
     @property
@@ -1784,6 +1848,19 @@ class Data:
         Switching an option off never moves another one, as a disabled non-ag land use keeps its k."""
         return {am: idx for idx, am in enumerate(settings.AG_MANAGEMENTS)}
 
+    def read_sparse_layer(self, file_name: str) -> xr.DataArray:
+        """A sparse biodiversity layer (GBF3 NVIS, GBF4 SNES / ECNES) as a sparse.COO-backed DataArray over the full-res
+        cells: the file holds the COO's parts (COO_COORDS, COO_DATA), its labels as coordinates and its shape / dims /
+        fill value as attributes; .sel / .isel select by label / position, .data.todense() materialises a slice."""
+        layer = xr.load_dataset(os.path.join(settings.INPUT_DIR, file_name))
+        coo = sparse.COO(
+            layer['COO_COORDS'].values, layer['COO_DATA'].values, shape=tuple(layer.attrs['shape']),
+            sorted=True, has_duplicates=False, fill_value=layer.attrs['fill_value'],
+        )
+        dims = list(layer.attrs['dims'])
+        labels = {dim: layer[dim].values.astype(str) for dim in dims[:-1]}
+        return xr.DataArray(coo, dims=dims, coords={**labels, 'cell': np.arange(coo.shape[-1])})
+
     def get_NVIS_sparse_array(self) -> xr.DataArray:
         """
         Load the full NVIS sparse array from disk and return as a sparse-backed xr.DataArray.
@@ -1797,13 +1874,9 @@ class Data:
         xr.DataArray
             shape (group, cell), sparse-backed, values in [0, 1].
         """
-        coo    = sparse.load_npz(settings.INPUT_DIR + f"/bio_GBF3_{settings.GBF3_NVIS_TARGET_CLASS}_sparse.npz") / np.float32(100)
-        groups = np.load(settings.INPUT_DIR + f"/bio_GBF3_{settings.GBF3_NVIS_TARGET_CLASS}_groups.npy", allow_pickle=True)
-        return xr.DataArray(
-            coo,
-            dims=['group', 'cell'],
-            coords={'group': groups, 'cell': np.arange(coo.shape[1])},
-        )
+        layer = self.read_sparse_layer(f"bio_GBF3_{settings.GBF3_NVIS_TARGET_CLASS}_sparse.nc")
+        return layer.copy(data=layer.data / np.float32(100))
+
 
     def get_NVIS_targets_df(self, verbose: bool = False) -> pd.DataFrame:
         """
@@ -1908,17 +1981,7 @@ class Data:
         xr.DataArray
             shape (species, presence, cell), sparse-backed.
         """
-        coo     = sparse.load_npz(settings.INPUT_DIR + '/bio_GBF4_SNES_sparse.npz')
-        species = np.load(settings.INPUT_DIR + '/bio_GBF4_SNES_sparse_species.npy', allow_pickle=True)
-        return xr.DataArray(
-            coo,
-            dims=['species', 'presence', 'cell'],
-            coords={
-                'species':  species,
-                'presence': np.array(['LIKELY', 'LIKELY_AND_MAYBE']),
-                'cell':     np.arange(coo.shape[2]),
-            },
-        )
+        return self.read_sparse_layer('bio_GBF4_SNES_sparse.nc')
 
 
     def get_ECNES_sparse_array(self) -> xr.DataArray:
@@ -1935,17 +1998,7 @@ class Data:
         xr.DataArray
             shape (species, presence, cell), sparse-backed.
         """
-        coo     = sparse.load_npz(settings.INPUT_DIR + '/bio_GBF4_ECNES_sparse.npz')
-        species = np.load(settings.INPUT_DIR + '/bio_GBF4_ECNES_sparse_species.npy', allow_pickle=True)
-        return xr.DataArray(
-            coo,
-            dims=['species', 'presence', 'cell'],
-            coords={
-                'species':  species,
-                'presence': np.array(['LIKELY', 'LIKELY_AND_MAYBE']),
-                'cell':     np.arange(coo.shape[2]),
-            },
-        )
+        return self.read_sparse_layer('bio_GBF4_ECNES_sparse.nc')
 
 
     def get_coord(self, index_ij: np.ndarray, trans):
@@ -2057,13 +2110,13 @@ class Data:
 
         """
         if settings.RESFACTOR == 1:
-            return tools.lumap2ag_l_mrj(self.LUMAP_NO_RESFACTOR, self.LMMAP_NO_RESFACTOR)[:, self.MASK, :]
+            return tools.lumap2ag_l_mrj(self.LUMAP_NO_RESFACTOR.values, self.LMMAP_NO_RESFACTOR.values)[:, self.MASK, :]
 
         lumap_mrj = np.zeros((self.NLMS, self.NCELLS, self.N_AG_LUS), dtype=np.float32)
         for idx_lu in self.DESC2AGLU.values():
             for idx_w, _ in enumerate(self.LANDMANS):
                 # Get the cells with the same ID and water supply
-                lu_arr = (self.LUMAP_NO_RESFACTOR == idx_lu) * (self.LMMAP_NO_RESFACTOR == idx_w)
+                lu_arr = (self.LUMAP_NO_RESFACTOR.values == idx_lu) * (self.LMMAP_NO_RESFACTOR.values == idx_w)
                 lumap_mrj[idx_w, :, idx_lu] = self.get_resfactored_average_fraction(lu_arr, use_valid_cell_count=False)
                     
         return lumap_mrj
@@ -2135,7 +2188,7 @@ class Data:
         return lumap_resfactored
 
 
-    def coarsen_guarded_arrays(self, x_mrj_full: np.ndarray) -> dict:
+    def coarsen_guarded_arrays(self, x_mrj_full: xr.DataArray) -> dict:
         """
         RESFACTOR > 1: the agricultural economics, GHG, pasture and climate arrays are read at each block's
         centre cell, while EXCLUDE and AG_L_MRJ are block aggregates. An eligible coarse entry whose centre
@@ -2196,32 +2249,34 @@ class Data:
 
         def path(fname):
             return os.path.join(settings.INPUT_DIR, fname)
-        cci_file = "climate_change_impacts_" + settings.RCP + "_CO2_FERT_" + settings.CO2_FERT.upper() + ".h5"
+        cci_file = "climate_change_impacts_" + settings.RCP + "_CO2_FERT_" + settings.CO2_FERT.upper() + ".nc"
 
-        # Coarse cell of each fine land cell (-1 if its block has none). Coarse cells are in row-major block order.
-        rf = settings.RESFACTOR
-        rows, cols = np.nonzero(self.NLUM_MASK)
-        n_block_cols = -(-self.NLUM_MASK.shape[1] // rf)
-        fine_key = (rows // rf) * n_block_cols + cols // rf
-        coarse_key = self.RES_1D_TO_2D[0] * n_block_cols + self.RES_1D_TO_2D[1]
-        pos = np.minimum(np.searchsorted(coarse_key, fine_key), self.NCELLS - 1)
-        f2c = np.where(coarse_key[pos] == fine_key, pos, -1)
-        area = self.REAL_AREA_NO_RESFACTOR.astype(np.float64)
-        lumap_fine, lmmap_fine = self.LUMAP_NO_RESFACTOR, self.LMMAP_NO_RESFACTOR       # base-year allocation, the cells AG_L_MRJ counts
+        # Coarse cell of each fine land cell (-1 if its block has none): the spatial lookup (S1).
+        f2c = self.FULL2RES_IDX_MAP
+        area = self.REAL_AREA_NO_RESFACTOR.values.astype(np.float64)
+        lumap_fine, lmmap_fine = self.LUMAP_NO_RESFACTOR.values, self.LMMAP_NO_RESFACTOR.values     # base-year allocation, the cells AG_L_MRJ counts
         n_alloc_outside = 0
 
-        # The fine inputs are read in bands of whole block rows (about `band_cells` fine cells each), so peak memory
-        # stays near one band (agec_crops alone is ~19 GB at full resolution). Fine cells are row-major, so a band is
-        # one row range of every input file and one range of coarse cells, and each block lies in a single band.
-        band_cells = 250_000
-        n_block_rows = -(-self.NLUM_MASK.shape[0] // rf)
-        fine_at = np.searchsorted(rows, np.arange(n_block_rows + 1) * rf)
-        coarse_at = np.searchsorted(self.RES_1D_TO_2D[0], np.arange(n_block_rows + 1))
-        bands, b0 = [], 0
-        for b in range(1, n_block_rows + 1):
-            if fine_at[b] - fine_at[b0] >= band_cells or b == n_block_rows:
-                bands.append((int(fine_at[b0]), int(fine_at[b]), int(coarse_at[b0]), int(coarse_at[b])))
-                b0 = b
+        # The fine inputs are read one full-res column at a time (a NetCDF chunk holds one column of every cell), so
+        # peak memory stays near the few columns of one (lm, lu) (agec_crops alone is ~19 GB at full resolution).
+        # Every block is reduced in one pass over all fine cells (bincount sums each block's cells in cell order).
+        files = {name: xr.open_dataset(path(name)) for name in [
+            "agec_crops.nc", "agGHG_crops.nc", cci_file, "agec_lvstk.nc", "agGHG_lvstk.nc", "agGHG_irrpast.nc",
+            "feed_req.nc", "pasture_kg_dm_ha.nc", "safe_pur_natl.nc", "safe_pur_modl.nc", "water_delivery_price.nc"]}
+        agec_crops, agghg_crops, cci = files["agec_crops.nc"]['AGEC_CROPS'], files["agGHG_crops.nc"]['AGGHG_CROPS'], files[cci_file]['CLIMATE_CHANGE_IMPACT']
+        agec_lvstk, agghg_lvstk, agghg_irrpast = files["agec_lvstk.nc"]['AGEC_LVSTK'], files["agGHG_lvstk.nc"]['AGGHG_LVSTK'], files["agGHG_irrpast.nc"]
+
+        def labels(table):
+            # The column labels of a (column, cell) table, in column order: tuples of its label coordinates (the
+            # levels of its index once loaded, the label coordinates as they sit in the file before)
+            levels = table.indexes['column'].names if 'column' in table.indexes else \
+                [name for name, coord in table.coords.items() if coord.dims == ('column',)]
+            return list(zip(*[table[level].values.tolist() for level in levels]))
+        position = {id(table): {label: i for i, label in enumerate(labels(table))} for table in [agec_crops, agghg_crops, cci, agec_lvstk, agghg_lvstk]}
+
+        def fine(table, label):
+            # One full-res column of a (column, cell) table, by its label
+            return table[position[id(table)][label]].values.astype(np.float64)
 
         def weight_class(table, field):
             if field not in table:
@@ -2231,210 +2286,215 @@ class Data:
         def as_float(centre):
             return np.array(centre, dtype=np.result_type(centre, np.float32), copy=True)     # PASTURE_KG_DM_HA and one AGGHG_IRRPAST column are integer
 
-        # Outputs start as the centre-cell values; each band replaces its eligible entries.
-        crop_pairs = sorted({c[1:] for c in self.AGEC_CROPS.columns})
-        agec_c = self.AGEC_CROPS.to_numpy(copy=True)
-        agghg_c = self.AGGHG_CROPS.to_numpy(copy=True)
-        cci_c = self.CLIMATE_CHANGE_IMPACT.to_numpy(copy=True)
-        water_price_centre = np.nan_to_num(pd.read_hdf(path("water_delivery_price.h5"), where=self.MASK).to_numpy(dtype=np.float64))   # WATER_DELIVERY_PRICE values (read later), float64
-        irrpast_cols = [c for c in self.AGGHG_IRRPAST.columns if 'CO2E' in c]
+        # Outputs start as the centre-cell values (cell, column); the block means replace their eligible entries.
+        agec_crops_labels, agghg_crops_labels, cci_labels = labels(self.AGEC_CROPS), labels(self.AGGHG_CROPS), labels(self.CLIMATE_CHANGE_IMPACT)
+        crop_pairs = sorted({c[1:] for c in agec_crops_labels})
+        agec_c = self.AGEC_CROPS.values.T.copy()
+        agghg_c = self.AGGHG_CROPS.values.T.copy()
+        cci_c = self.CLIMATE_CHANGE_IMPACT.values.T.copy()
+        water_price_centre = np.nan_to_num(files["water_delivery_price.nc"]['WP'].values[self.MASK].astype(np.float64))   # WATER_DELIVERY_PRICE values (read later), float64
+        irrpast_cols = [c for c in self.AGGHG_IRRPAST.data_vars if 'CO2E' in c]
+
+        def animal_columns(table, level, animal):
+            # The animal's columns of a livestock table (both label levels kept)
+            return table.isel(column=table[level].values == animal)
         lvstk = {}
         for lm in self.LANDMANS:
             for lu in self.LU_LVSTK:
                 animal, vegtype = ag_quantity.lvs_veg_types(lu)
                 lvstk[lm, lu] = {
-                    'AGEC_LVSTK': self.AGEC_LVSTK.loc[:, (slice(None), animal)].to_numpy(copy=True),
-                    'AGGHG_LVSTK': self.AGGHG_LVSTK.loc[:, (animal, slice(None))].to_numpy(copy=True),
-                    'AGGHG_IRRPAST': {c: as_float(self.AGGHG_IRRPAST[c].to_numpy()) for c in irrpast_cols} if lm == 'irr' else None,
-                    'FEED_REQ': as_float(self.FEED_REQ),
-                    'LVSTK_K': as_float(self.LVSTK_K[animal]),
-                    'PASTURE_KG_DM_HA': as_float(self.PASTURE_KG_DM_HA),
-                    'SAFE_PUR': as_float(self.SAFE_PUR_NATL if vegtype == 'natural land' else self.SAFE_PUR_MODL),
+                    'AGEC_LVSTK': animal_columns(self.AGEC_LVSTK, 'animal', animal).values.T.copy(),
+                    'AGGHG_LVSTK': animal_columns(self.AGGHG_LVSTK, 'animal', animal).values.T.copy(),
+                    'AGGHG_IRRPAST': {c: as_float(self.AGGHG_IRRPAST[c].values) for c in irrpast_cols} if lm == 'irr' else None,
+                    'FEED_REQ': as_float(self.FEED_REQ.values),
+                    'LVSTK_K': as_float(self.LVSTK_K[animal].values),
+                    'PASTURE_KG_DM_HA': as_float(self.PASTURE_KG_DM_HA.values),
+                    'SAFE_PUR': as_float((self.SAFE_PUR_NATL if vegtype == 'natural land' else self.SAFE_PUR_MODL).values),
                     'WATER_DELIVERY_PRICE': as_float(water_price_centre),
                 }
 
         # Stubble: one set per (lm, stubble land use), sheep values per stubble head.
         stubble_js = [self.DESC2AGLU[lu] for lu in self.LU_STUBBLE]
-        sheep_agec_cols = self.AGEC_LVSTK.loc[:, (slice(None), 'SHEEP')].columns
-        sheep_agghg_cols = self.AGGHG_LVSTK.loc[:, ('SHEEP', slice(None))].columns
+        sheep_agec = animal_columns(self.AGEC_LVSTK, 'animal', 'SHEEP')
+        sheep_agghg = animal_columns(self.AGGHG_LVSTK, 'animal', 'SHEEP')
         stubble = {(lm, lu): {
-            'STUBBLE_DSE_HA': as_float(self.STUBBLE_DSE_HA),
-            'K_SHEEP': as_float(self.LVSTK_K['SHEEP']),
-            'AGEC_LVSTK': self.AGEC_LVSTK.loc[:, sheep_agec_cols].to_numpy(dtype=np.float64, copy=True),
-            'AGGHG_LVSTK': self.AGGHG_LVSTK.loc[:, sheep_agghg_cols].to_numpy(dtype=np.float64, copy=True),
+            'STUBBLE_DSE_HA': as_float(self.STUBBLE_DSE_HA.values),
+            'K_SHEEP': as_float(self.LVSTK_K['SHEEP'].values),
+            'AGEC_LVSTK': sheep_agec.values.T.astype(np.float64),
+            'AGGHG_LVSTK': sheep_agghg.values.T.astype(np.float64),
             'WATER_DELIVERY_PRICE': as_float(water_price_centre),
         } for lm in self.LANDMANS for lu in self.LU_STUBBLE}
 
-        for s, e, c0, c1 in bands:
-            if c1 == c0:
+        ok = f2c >= 0
+        c_loc = f2c
+        n_coarse = self.NCELLS
+        a = area
+        land_use = self.LUMASK
+
+        def block_mean(v, w, cells):
+            # Weighted mean of fine v over each block's cells in `cells` with finite v and w; NaN if there are none.
+            k = cells & ok & np.isfinite(v) & np.isfinite(w)
+            c = c_loc[k]
+            num = np.bincount(c, weights=w[k] * v[k], minlength=n_coarse)
+            den = np.bincount(c, weights=w[k], minlength=n_coarse)
+            num_a = np.bincount(c, weights=a[k] * v[k], minlength=n_coarse)
+            den_a = np.bincount(c, weights=a[k], minlength=n_coarse)
+            out = np.full(n_coarse, np.nan)
+            np.divide(num_a, den_a, out=out, where=den_a > 0)
+            np.divide(num, den, out=out, where=den > 0)
+            return out
+
+        def cell_set(m, j):
+            # The fine cells (m, j) averages over: allocated in the base year where the block has any, else eligible.
+            nonlocal n_alloc_outside
+            elig = x_mrj_full.sel(lm=self.LANDMANS[m], lu=self.AGRICULTURAL_LANDUSES[j]).values & land_use
+            alloc = (lumap_fine == j) & (lmmap_fine == m)
+            n_alloc_outside += int((alloc & ok & ~elig).sum())
+            alloc &= elig
+            has_alloc = np.zeros(n_coarse, dtype=bool)
+            has_alloc[c_loc[alloc & ok]] = True
+            return np.where(has_alloc[np.where(ok, c_loc, 0)], alloc, elig)
+
+        # Crops: AGEC_CROPS and AGGHG_CROPS by (field, lm, lu).
+        for lm, lu in crop_pairs:
+            m, j = self.LANDMANS.index(lm), self.DESC2AGLU[lu]
+            cells, eligible = cell_set(m, j), self.EXCLUDE[m, :, j]
+            if not eligible.any():
                 continue
-            ok = f2c[s:e] >= 0
-            c_loc = f2c[s:e] - c0
-            a = area[s:e]
-            land_use = self.LUMASK[s:e]
+            weights = {'area': a, 'production': a * fine(agec_crops, ('Yield', lm, lu))}
+            if ('WR', lm, lu) in position[id(agec_crops)]:
+                weights['water'] = a * fine(agec_crops, ('WR', lm, lu))
+            for i, col in enumerate(agec_crops_labels):
+                if col[1:] == (lm, lu):
+                    w = weights[weight_class(crop_class, col[0])]
+                    agec_c[eligible, i] = block_mean(fine(agec_crops, col), w, cells)[eligible]
+            for i, col in enumerate(agghg_crops_labels):
+                if col[1:] == (lm, lu):
+                    agghg_c[eligible, i] = block_mean(fine(agghg_crops, col), a, cells)[eligible]
+            for i, col in enumerate(cci_labels):
+                if col[:2] == (lm, lu):
+                    cci_c[eligible, i] = block_mean(fine(cci, col), weights['production'], cells)[eligible]
 
-            def block_mean(v, w, cells):
-                # Weighted mean of fine v over each block's cells in `cells` with finite v and w; NaN if there are none.
-                k = cells & ok & np.isfinite(v) & np.isfinite(w)
-                c = c_loc[k]
-                num = np.bincount(c, weights=w[k] * v[k], minlength=c1 - c0)
-                den = np.bincount(c, weights=w[k], minlength=c1 - c0)
-                num_a = np.bincount(c, weights=a[k] * v[k], minlength=c1 - c0)
-                den_a = np.bincount(c, weights=a[k], minlength=c1 - c0)
-                out = np.full(c1 - c0, np.nan)
-                np.divide(num_a, den_a, out=out, where=den_a > 0)
-                np.divide(num, den, out=out, where=den > 0)
-                return out
-
-            def cell_set(m, j):
-                # The fine cells (m, j) averages over: allocated in the base year where the block has any, else eligible.
-                nonlocal n_alloc_outside
-                elig = x_mrj_full[m, s:e, j] & land_use
-                alloc = (lumap_fine[s:e] == j) & (lmmap_fine[s:e] == m)
-                n_alloc_outside += int((alloc & ok & ~elig).sum())
-                alloc &= elig
-                has_alloc = np.zeros(c1 - c0, dtype=bool)
-                has_alloc[c_loc[alloc & ok]] = True
-                return np.where(has_alloc[np.where(ok, c_loc, 0)], alloc, elig)
-
-            read = lambda fname: pd.read_hdf(path(fname), start=s, stop=e)
-            fine = lambda df, col: df[col].to_numpy(dtype=np.float64)
-
-            # Crops: AGEC_CROPS and AGGHG_CROPS by (field, lm, lu).
-            agec_crops = read("agec_crops.h5")
-            agghg_crops = read("agGHG_crops.h5")
-            cci = read(cci_file)
-            for lm, lu in crop_pairs:
-                m, j = self.LANDMANS.index(lm), self.DESC2AGLU[lu]
-                cells, eligible = cell_set(m, j), self.EXCLUDE[m, c0:c1, j]
+        # Livestock: per (lm, lu), since an animal's inputs serve both land managements and both vegetation types.
+        # The shared layers are read once; an animal's columns once for its four (lm, lu) entries.
+        feed_req = files["feed_req.nc"]['FEED_REQ'].values.astype(np.float64)
+        pasture = files["pasture_kg_dm_ha.nc"]['PASTURE_KG_DM_HA'].values.astype(np.float64)
+        safe_pur = {'natural land': files["safe_pur_natl.nc"]['SAFE_PUR_NATL'].values.astype(np.float64),
+                    'modified land': files["safe_pur_modl.nc"]['SAFE_PUR_MODL'].values.astype(np.float64)}
+        water_price = files["water_delivery_price.nc"]['WP'].values.astype(np.float64)
+        irrpast_fine = {col: agghg_irrpast[col].values.astype(np.float64) for col in irrpast_cols}
+        if settings.LVSTK_K_FILE:
+            with xr.open_dataset(path(settings.LVSTK_K_FILE)) as lvstk_k:
+                k_fine = {t: lvstk_k[t].values.astype(np.float64) for t in ('BEEF', 'SHEEP', 'DAIRY')}
+        else:
+            k_fine = {t: feed_req for t in ('BEEF', 'SHEEP', 'DAIRY')}          # LVSTK_K is FEED_REQ without a file
+        animal_cache = {}
+        for lu in self.LU_LVSTK:
+            animal, vegtype = ag_quantity.lvs_veg_types(lu)
+            if animal not in animal_cache:
+                animal_cache = {animal: {
+                    **{label: fine(agec_lvstk, label) for label in labels(agec_lvstk) if label[1] == animal},
+                    **{label: fine(agghg_lvstk, label) for label in labels(agghg_lvstk) if label[0] == animal}}}
+            column = animal_cache[animal]
+            for m, lm in enumerate(self.LANDMANS):
+                j = self.DESC2AGLU[lu]
+                cells, eligible = cell_set(m, j), self.EXCLUDE[m, :, j]
                 if not eligible.any():
                     continue
-                weights = {'area': a, 'production': a * fine(agec_crops, ('Yield', lm, lu))}
-                if ('WR', lm, lu) in agec_crops.columns:
-                    weights['water'] = a * fine(agec_crops, ('WR', lm, lu))
-                for i, col in enumerate(self.AGEC_CROPS.columns):
-                    if col[1:] == (lm, lu):
-                        w = weights[weight_class(crop_class, col[0])]
-                        agec_c[c0:c1][eligible, i] = block_mean(fine(agec_crops, col), w, cells)[eligible]
-                for i, col in enumerate(self.AGGHG_CROPS.columns):
-                    if col[1:] == (lm, lu):
-                        agghg_c[c0:c1][eligible, i] = block_mean(fine(agghg_crops, col), a, cells)[eligible]
-                for i, col in enumerate(self.CLIMATE_CHANGE_IMPACT.columns):
+                out = lvstk[lm, lu]
+                w = {'area': a, 'pasture': a * pasture}
+                w['capacity'] = w['pasture'] * safe_pur[vegtype]
+                w['head'] = w['capacity'] * k_fine[animal]
+                wr = column['WR_DRN', animal] * settings.LIVESTOCK_DRINKING_WATER
+                if lm == 'irr':
+                    wr = wr + column['WR_IRR', animal]
+                w['water'] = w['head'] * wr
+
+                for i, (field, _) in enumerate(label for label in labels(self.AGEC_LVSTK) if label[1] == animal):
+                    cls = weight_class(lvstk_class, field)
+                    if cls == 'head_F':
+                        wt = w['head'] * column[f'F{field[1]}', animal]
+                    elif cls == 'head_FQ':
+                        wt = w['head'] * column[f'F{field[1]}', animal] * column[f'Q{field[1]}', animal]
+                    else:
+                        wt = w[cls]
+                    out['AGEC_LVSTK'][eligible, i] = block_mean(column[field, animal], wt, cells)[eligible]
+
+                for i, col in enumerate(label for label in labels(self.AGGHG_LVSTK) if label[0] == animal):
+                    out['AGGHG_LVSTK'][eligible, i] = block_mean(column[col], w['head'], cells)[eligible]
+
+                if lm == 'irr':
+                    for col in irrpast_cols:
+                        out['AGGHG_IRRPAST'][col][eligible] = block_mean(irrpast_fine[col], a, cells)[eligible]
+
+                for i, col in enumerate(cci_labels):
                     if col[:2] == (lm, lu):
-                        cci_c[c0:c1][eligible, i] = block_mean(fine(cci, col), weights['production'], cells)[eligible]
-            del agec_crops, agghg_crops
+                        cci_c[eligible, i] = block_mean(fine(cci, col), w['head'], cells)[eligible]
 
-            # Livestock: per (lm, lu), since an animal's inputs serve both land managements and both vegetation types.
-            agec_lvstk = read("agec_lvstk.h5")
-            agghg_lvstk = read("agGHG_lvstk.h5")
-            agghg_irrpast = read("agGHG_irrpast.h5")
-            feed_req = read("feed_req.h5").to_numpy(dtype=np.float64)
-            pasture = read("pasture_kg_dm_ha.h5").to_numpy(dtype=np.float64)
-            safe_pur = {'natural land': read("safe_pur_natl.h5").to_numpy(dtype=np.float64),
-                        'modified land': read("safe_pur_modl.h5").to_numpy(dtype=np.float64)}
-            water_price = read("water_delivery_price.h5").to_numpy(dtype=np.float64)
-            if settings.LVSTK_K_FILE:
-                lvstk_k = read(settings.LVSTK_K_FILE)
-                k_fine = {t: lvstk_k[t].to_numpy(dtype=np.float64) for t in ('BEEF', 'SHEEP', 'DAIRY')}
-                del lvstk_k
-            else:
-                k_fine = {t: feed_req for t in ('BEEF', 'SHEEP', 'DAIRY')}          # LVSTK_K is FEED_REQ without a file
-            for m, lm in enumerate(self.LANDMANS):
-                for lu in self.LU_LVSTK:
-                    j = self.DESC2AGLU[lu]
-                    animal, vegtype = ag_quantity.lvs_veg_types(lu)
-                    cells, eligible = cell_set(m, j), self.EXCLUDE[m, c0:c1, j]
-                    if not eligible.any():
-                        continue
-                    out = lvstk[lm, lu]
-                    w = {'area': a, 'pasture': a * pasture}
-                    w['capacity'] = w['pasture'] * safe_pur[vegtype]
-                    w['head'] = w['capacity'] * k_fine[animal]
-                    wr = fine(agec_lvstk, ('WR_DRN', animal)) * settings.LIVESTOCK_DRINKING_WATER
-                    if lm == 'irr':
-                        wr = wr + fine(agec_lvstk, ('WR_IRR', animal))
-                    w['water'] = w['head'] * wr
+                out['FEED_REQ'][eligible] = block_mean(feed_req, w['capacity'], cells)[eligible]
+                out['LVSTK_K'][eligible] = block_mean(k_fine[animal], w['capacity'], cells)[eligible]
+                out['PASTURE_KG_DM_HA'][eligible] = block_mean(pasture, a, cells)[eligible]
+                out['SAFE_PUR'][eligible] = block_mean(safe_pur[vegtype], w['pasture'], cells)[eligible]
+                out['WATER_DELIVERY_PRICE'][eligible] = block_mean(water_price, w['water'], cells)[eligible]
 
-                    for i, (field, _) in enumerate(self.AGEC_LVSTK.loc[:, (slice(None), animal)].columns):
-                        cls = weight_class(lvstk_class, field)
-                        if cls == 'head_F':
-                            wt = w['head'] * fine(agec_lvstk, (f'F{field[1]}', animal))
-                        elif cls == 'head_FQ':
-                            wt = w['head'] * fine(agec_lvstk, (f'F{field[1]}', animal)) * fine(agec_lvstk, (f'Q{field[1]}', animal))
-                        else:
-                            wt = w[cls]
-                        out['AGEC_LVSTK'][c0:c1][eligible, i] = block_mean(fine(agec_lvstk, (field, animal)), wt, cells)[eligible]
-
-                    for i, col in enumerate(self.AGGHG_LVSTK.loc[:, (animal, slice(None))].columns):
-                        out['AGGHG_LVSTK'][c0:c1][eligible, i] = block_mean(fine(agghg_lvstk, col), w['head'], cells)[eligible]
-
-                    if lm == 'irr':
-                        for col in irrpast_cols:
-                            out['AGGHG_IRRPAST'][col][c0:c1][eligible] = block_mean(fine(agghg_irrpast, col), a, cells)[eligible]
-
-                    for i, col in enumerate(self.CLIMATE_CHANGE_IMPACT.columns):
-                        if col[:2] == (lm, lu):
-                            cci_c[c0:c1][eligible, i] = block_mean(fine(cci, col), w['head'], cells)[eligible]
-
-                    out['FEED_REQ'][c0:c1][eligible] = block_mean(feed_req, w['capacity'], cells)[eligible]
-                    out['LVSTK_K'][c0:c1][eligible] = block_mean(k_fine[animal], w['capacity'], cells)[eligible]
-                    out['PASTURE_KG_DM_HA'][c0:c1][eligible] = block_mean(pasture, a, cells)[eligible]
-                    out['SAFE_PUR'][c0:c1][eligible] = block_mean(safe_pur[vegtype], w['pasture'], cells)[eligible]
-                    out['WATER_DELIVERY_PRICE'][c0:c1][eligible] = block_mean(water_price, w['water'], cells)[eligible]
-
-            if stubble:
-                rate = read(settings.STUBBLE_DSE_FILE).to_numpy(dtype=np.float64)
-                # Effective rate: 0 on cells without the sheep per-head data (no stubble sheep there at RESFACTOR 1); a NaN
-                # rate stays NaN for the guard.
-                sources = [c for c in sheep_agghg_cols if not settings.USE_GHG_SCOPE_1 or c[1] in settings.LVSTK_GHG_SCOPE_1]
-                sheep_data = (np.isfinite(np.column_stack([fine(agec_lvstk, (f, 'SHEEP')) for f in STUBBLE_SHEEP_AGEC_FIELDS])).all(axis=1)
-                              & np.isfinite(np.column_stack([fine(agghg_lvstk, c) for c in sources])).all(axis=1)
-                              & np.isfinite(water_price))
-                rate = np.where(sheep_data | ~np.isfinite(rate), rate, 0.0)
-                for (lm, lu), out in stubble.items():
-                    m, j = self.LANDMANS.index(lm), self.DESC2AGLU[lu]
-                    cells, eligible = cell_set(m, j), self.EXCLUDE[m, c0:c1, j]
-                    if not eligible.any():
-                        continue
-                    w_rate = a * rate
-                    w_head = w_rate * k_fine['SHEEP']
-                    out['STUBBLE_DSE_HA'][c0:c1][eligible] = block_mean(rate, a, cells)[eligible]
-                    out['K_SHEEP'][c0:c1][eligible] = block_mean(k_fine['SHEEP'], w_rate, cells)[eligible]
-                    for i, (field, _) in enumerate(sheep_agec_cols):
-                        cls = weight_class(lvstk_class, field)
-                        if cls == 'head_F':
-                            wt = w_head * fine(agec_lvstk, (f'F{field[1]}', 'SHEEP'))
-                        elif cls == 'head_FQ':
-                            wt = w_head * fine(agec_lvstk, (f'F{field[1]}', 'SHEEP')) * fine(agec_lvstk, (f'Q{field[1]}', 'SHEEP'))
-                        else:
-                            wt = {'area': a, 'head': w_head}[cls]
-                        out['AGEC_LVSTK'][c0:c1][eligible, i] = block_mean(fine(agec_lvstk, (field, 'SHEEP')), wt, cells)[eligible]
-                    for i, col in enumerate(sheep_agghg_cols):
-                        out['AGGHG_LVSTK'][c0:c1][eligible, i] = block_mean(fine(agghg_lvstk, col), w_head, cells)[eligible]
-                    w_water = w_head * fine(agec_lvstk, ('WR_DRN', 'SHEEP')) * settings.LIVESTOCK_DRINKING_WATER
-                    out['WATER_DELIVERY_PRICE'][c0:c1][eligible] = block_mean(water_price, w_water, cells)[eligible]
+        if stubble:
+            rate = xr.load_dataarray(path(settings.STUBBLE_DSE_FILE)).values.astype(np.float64)
+            sheep_agec_fine = {label: fine(agec_lvstk, label) for label in labels(agec_lvstk) if label[1] == 'SHEEP'}
+            sheep_agghg_fine = {label: fine(agghg_lvstk, label) for label in labels(agghg_lvstk) if label[0] == 'SHEEP'}
+            # Effective rate: 0 on cells without the sheep per-head data (no stubble sheep there at RESFACTOR 1); a NaN
+            # rate stays NaN for the guard.
+            sources = [c for c in labels(sheep_agghg) if not settings.USE_GHG_SCOPE_1 or c[1] in settings.LVSTK_GHG_SCOPE_1]
+            sheep_data = (np.isfinite(np.column_stack([sheep_agec_fine[f, 'SHEEP'] for f in STUBBLE_SHEEP_AGEC_FIELDS])).all(axis=1)
+                          & np.isfinite(np.column_stack([sheep_agghg_fine[c] for c in sources])).all(axis=1)
+                          & np.isfinite(water_price))
+            rate = np.where(sheep_data | ~np.isfinite(rate), rate, 0.0)
+            for (lm, lu), out in stubble.items():
+                m, j = self.LANDMANS.index(lm), self.DESC2AGLU[lu]
+                cells, eligible = cell_set(m, j), self.EXCLUDE[m, :, j]
+                if not eligible.any():
+                    continue
+                w_rate = a * rate
+                w_head = w_rate * k_fine['SHEEP']
+                out['STUBBLE_DSE_HA'][eligible] = block_mean(rate, a, cells)[eligible]
+                out['K_SHEEP'][eligible] = block_mean(k_fine['SHEEP'], w_rate, cells)[eligible]
+                for i, (field, _) in enumerate(labels(sheep_agec)):
+                    cls = weight_class(lvstk_class, field)
+                    if cls == 'head_F':
+                        wt = w_head * sheep_agec_fine[f'F{field[1]}', 'SHEEP']
+                    elif cls == 'head_FQ':
+                        wt = w_head * sheep_agec_fine[f'F{field[1]}', 'SHEEP'] * sheep_agec_fine[f'Q{field[1]}', 'SHEEP']
+                    else:
+                        wt = {'area': a, 'head': w_head}[cls]
+                    out['AGEC_LVSTK'][eligible, i] = block_mean(sheep_agec_fine[field, 'SHEEP'], wt, cells)[eligible]
+                for i, col in enumerate(labels(sheep_agghg)):
+                    out['AGGHG_LVSTK'][eligible, i] = block_mean(sheep_agghg_fine[col], w_head, cells)[eligible]
+                w_water = w_head * sheep_agec_fine['WR_DRN', 'SHEEP'] * settings.LIVESTOCK_DRINKING_WATER
+                out['WATER_DELIVERY_PRICE'][eligible] = block_mean(water_price, w_water, cells)[eligible]
+        for opened in files.values():
+            opened.close()
 
         if n_alloc_outside:
             print(f"│   ⚠ WARNING: coarsen_guarded_arrays: {n_alloc_outside:,} allocated (lm, lu) fine-cell entries are not eligible; left out of their cell sets", flush=True)
-        self.AGEC_CROPS = pd.DataFrame(agec_c, index=self.AGEC_CROPS.index, columns=self.AGEC_CROPS.columns)
-        self.AGGHG_CROPS = pd.DataFrame(agghg_c, index=self.AGGHG_CROPS.index, columns=self.AGGHG_CROPS.columns)
+
+        # Back into the (column, cell) tables, labels unchanged
+        self.AGEC_CROPS = self.AGEC_CROPS.copy(data=agec_c.T)
+        self.AGGHG_CROPS = self.AGGHG_CROPS.copy(data=agghg_c.T)
         for (lm, lu), out in lvstk.items():
             animal, _ = ag_quantity.lvs_veg_types(lu)
-            agec, agghg = self.AGEC_LVSTK.loc[:, (slice(None), animal)], self.AGGHG_LVSTK.loc[:, (animal, slice(None))]
-            out['AGEC_LVSTK'] = pd.DataFrame(out['AGEC_LVSTK'], index=agec.index, columns=agec.columns)
-            out['AGGHG_LVSTK'] = pd.DataFrame(out['AGGHG_LVSTK'], index=agghg.index, columns=agghg.columns)
+            out['AGEC_LVSTK'] = animal_columns(self.AGEC_LVSTK, 'animal', animal).copy(data=out['AGEC_LVSTK'].T)
+            out['AGGHG_LVSTK'] = animal_columns(self.AGGHG_LVSTK, 'animal', animal).copy(data=out['AGGHG_LVSTK'].T)
             if out['AGGHG_IRRPAST'] is not None:
                 irrpast = self.AGGHG_IRRPAST.copy()
                 for col, v in out['AGGHG_IRRPAST'].items():
-                    irrpast[col] = v
+                    irrpast[col] = ('cell', v)
                 out['AGGHG_IRRPAST'] = irrpast
 
         for out in stubble.values():
-            out['AGEC_LVSTK'] = pd.DataFrame(out['AGEC_LVSTK'], index=self.AGEC_LVSTK.index, columns=sheep_agec_cols)
-            out['AGGHG_LVSTK'] = pd.DataFrame(out['AGGHG_LVSTK'], index=self.AGGHG_LVSTK.index, columns=sheep_agghg_cols)
+            out['AGEC_LVSTK'] = sheep_agec.copy(data=out['AGEC_LVSTK'].T)
+            out['AGGHG_LVSTK'] = sheep_agghg.copy(data=out['AGGHG_LVSTK'].T)
         self.STUBBLE_COARSE = stubble
 
-        self.CLIMATE_CHANGE_IMPACT = pd.DataFrame(cci_c, index=self.CLIMATE_CHANGE_IMPACT.index, columns=self.CLIMATE_CHANGE_IMPACT.columns)
+        self.CLIMATE_CHANGE_IMPACT = self.CLIMATE_CHANGE_IMPACT.copy(data=cci_c.T)
         return lvstk
 
 
@@ -2457,7 +2517,7 @@ class Data:
         (k_sheep x rate > 0).
         """
         coarse = getattr(self, 'LVSTK_COARSE', None)
-        climate_pairs = {c[:2] for c in self.CLIMATE_CHANGE_IMPACT.columns}
+        climate_pairs = set(zip(self.CLIMATE_CHANGE_IMPACT['lm'].values.tolist(), self.CLIMATE_CHANGE_IMPACT['lu'].values.tolist()))
         found = []
 
         def check(name, lm, lu, values, where):
@@ -2470,26 +2530,26 @@ class Data:
                 j = self.DESC2AGLU[lu]
                 eligible = self.EXCLUDE[m, :, j]
                 if lu in self.LU_CROPS:
-                    if ('Yield', lm, lu) not in self.AGEC_CROPS.columns:
+                    if ('Yield', lm, lu) not in self.AGEC_CROPS.indexes['column']:
                         continue                    # (lm, lu) does not occur; its matrices are zeros
                     for f in ['Yield', 'AC', 'QC', 'FLC', 'FOC', 'FDC', 'P1'] + (['WR', 'WP'] if lm == 'irr' else []):
-                        check(f'AGEC_CROPS {f}', lm, lu, self.AGEC_CROPS[f, lm, lu], eligible)
-                    for t in [c[0] for c in self.AGGHG_CROPS.columns if c[1:] == (lm, lu)]:
-                        check(f'AGGHG_CROPS {t}', lm, lu, self.AGGHG_CROPS[t, lm, lu], eligible)
+                        check(f'AGEC_CROPS {f}', lm, lu, self.AGEC_CROPS.sel(field=f, lm=lm, lu=lu).values, eligible)
+                    for t in [c[0] for c in self.AGGHG_CROPS.indexes['column'] if c[1:] == (lm, lu)]:
+                        check(f'AGGHG_CROPS {t}', lm, lu, self.AGGHG_CROPS.sel(field=t, lm=lm, lu=lu).values, eligible)
                 else:
                     animal, vegtype = ag_quantity.lvs_veg_types(lu)
                     agec = self.agec_lvstk(lu, lm)
                     fields = ['AC', 'QC', 'FLC', 'FOC', 'FDC', 'WR_DRN'] + (['WR_IRR'] if lm == 'irr' else [])
-                    fields += [f'{p}{k}' for k in '123' if (f'F{k}', animal) in agec.columns for p in 'FQP']
+                    fields += [f'{p}{k}' for k in '123' if (f'F{k}', animal) in agec.indexes['column'] for p in 'FQP']
                     for f in fields:
-                        check(f'AGEC_LVSTK {f}', lm, lu, agec[f, animal], eligible)
+                        check(f'AGEC_LVSTK {f}', lm, lu, agec.sel(field=f, animal=animal).values, eligible)
                     agghg = self.agghg_lvstk(lu, lm)
-                    for t in [c[1] for c in agghg.columns if c[0] == animal]:
-                        check(f'AGGHG_LVSTK {t}', lm, lu, agghg[animal, t], eligible)
+                    for t in [c[1] for c in agghg.indexes['column'] if c[0] == animal]:
+                        check(f'AGGHG_LVSTK {t}', lm, lu, agghg.sel(animal=animal, field=t).values, eligible)
                     if lm == 'irr':
                         irrpast = self.agghg_irrpast(lu, lm)
-                        for t in [c for c in irrpast.columns if 'CO2E' in c]:
-                            check(f'AGGHG_IRRPAST {t}', lm, lu, irrpast[t], eligible)
+                        for t in [c for c in irrpast.data_vars if 'CO2E' in c]:
+                            check(f'AGGHG_IRRPAST {t}', lm, lu, irrpast[t].values, eligible)
                     feed_req, pasture, safe_pur = self.lvstk_pasture(lu, lm)
                     water_price = self.water_delivery_price(lu, lm)
                     if coarse is None:
@@ -2502,7 +2562,7 @@ class Data:
                     if lvstk_k_raw is not None:
                         check('LVSTK_K', lm, lu, lvstk_k_raw[animal] if coarse is None else self.lvstk_k(lu, lm), eligible)
                 if (lm, lu) in climate_pairs:
-                    climate_nan = np.where(self.CLIMATE_CHANGE_IMPACT[lm, lu].isna().any(axis=1).to_numpy(), np.nan, 0.0)
+                    climate_nan = np.where(self.CLIMATE_CHANGE_IMPACT.sel(lm=lm, lu=lu).isnull().any('year').values, np.nan, 0.0)   # the (lm, lu) columns, over (year, cell)
                     check('CLIMATE_CHANGE_IMPACT (allocated)', lm, lu, climate_nan, self.AG_L_MRJ[m, :, j] > 0)
 
         if stubble_raw is not None:
@@ -2522,11 +2582,11 @@ class Data:
                     head = np.nan_to_num(np.asarray(st['K_SHEEP'] * st['STUBBLE_DSE_HA'], dtype=np.float64))
                     positive = eligible & (head > 0)
                     for f in STUBBLE_SHEEP_AGEC_FIELDS:
-                        check(f'AGEC_LVSTK {f} (stubble head > 0)', lm, stubble_lu, st['AGEC_LVSTK'][f, 'SHEEP'], positive)
+                        check(f'AGEC_LVSTK {f} (stubble head > 0)', lm, stubble_lu, st['AGEC_LVSTK'].sel(field=f, animal='SHEEP').values, positive)
                     agghg = st['AGGHG_LVSTK']
-                    sources = [c for c in agghg.columns if c[0] == 'SHEEP' and (not settings.USE_GHG_SCOPE_1 or c[1] in settings.LVSTK_GHG_SCOPE_1)]
+                    sources = [c for c in agghg.indexes['column'] if c[0] == 'SHEEP' and (not settings.USE_GHG_SCOPE_1 or c[1] in settings.LVSTK_GHG_SCOPE_1)]
                     for col in sources:
-                        check(f'AGGHG_LVSTK {col[1]} (stubble head > 0)', lm, stubble_lu, agghg[col], positive)
+                        check(f'AGGHG_LVSTK {col[1]} (stubble head > 0)', lm, stubble_lu, agghg.sel(animal=col[0], field=col[1]).values, positive)
                     check('WATER_DELIVERY_PRICE (stubble head > 0)', lm, stubble_lu, st['WATER_DELIVERY_PRICE'], positive)
 
         self.raise_nan_report(found, 'guarded arrays, eligible (allocated for the climate multiplier)')
@@ -2573,22 +2633,23 @@ class Data:
 
 
     # The livestock inputs as read for one (lu, lm): the shared attributes at RESFACTOR 1, the per-(lm, lu)
-    # block means at RESFACTOR > 1 (see coarsen_guarded_arrays).
-    def agec_lvstk(self, lu: str, lm: str) -> pd.DataFrame:
+    # block means at RESFACTOR > 1 (see coarsen_guarded_arrays). The tables stay xarray (selected by label by the
+    # economics modules); the pasture layers and the delivery price enter the numpy yield arithmetic as arrays.
+    def agec_lvstk(self, lu: str, lm: str) -> xr.DataArray:
         coarse = getattr(self, 'LVSTK_COARSE', None)
         return self.AGEC_LVSTK if coarse is None else coarse[lm, lu]['AGEC_LVSTK']
 
-    def agghg_lvstk(self, lu: str, lm: str) -> pd.DataFrame:
+    def agghg_lvstk(self, lu: str, lm: str) -> xr.DataArray:
         coarse = getattr(self, 'LVSTK_COARSE', None)
         return self.AGGHG_LVSTK if coarse is None else coarse[lm, lu]['AGGHG_LVSTK']
 
-    def agghg_irrpast(self, lu: str, lm: str) -> pd.DataFrame:
+    def agghg_irrpast(self, lu: str, lm: str) -> xr.Dataset:
         coarse = getattr(self, 'LVSTK_COARSE', None)
         return self.AGGHG_IRRPAST if coarse is None else coarse[lm, lu]['AGGHG_IRRPAST']
 
     def water_delivery_price(self, lu: str, lm: str) -> np.ndarray:
         coarse = getattr(self, 'LVSTK_COARSE', None)
-        return self.WATER_DELIVERY_PRICE if coarse is None else coarse[lm, lu]['WATER_DELIVERY_PRICE']
+        return self.WATER_DELIVERY_PRICE.values if coarse is None else coarse[lm, lu]['WATER_DELIVERY_PRICE']
 
     def lvstk_pasture(self, lu: str, lm: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """(FEED_REQ, PASTURE_KG_DM_HA, SAFE_PUR) for (lu, lm); SAFE_PUR is NATL or MODL by vegetation type."""
@@ -2598,24 +2659,24 @@ class Data:
             c = coarse[lm, lu]
             return c['FEED_REQ'], c['PASTURE_KG_DM_HA'], c['SAFE_PUR']
         safe_pur = self.SAFE_PUR_NATL if vegtype == 'natural land' else self.SAFE_PUR_MODL
-        return self.FEED_REQ, self.PASTURE_KG_DM_HA, safe_pur
+        return self.FEED_REQ.values, self.PASTURE_KG_DM_HA.values, safe_pur.values
 
     def get_stubble_effective_rate(self, rate: np.ndarray) -> np.ndarray:
         """The stubble rate at the model's cells, 0 where the sheep per-head data the stubble consumers read is missing
         (AGEC_LVSTK STUBBLE_SHEEP_AGEC_FIELDS, the AGGHG_LVSTK sources, WATER_DELIVERY_PRICE); NaN stays NaN."""
-        agghg = self.AGGHG_LVSTK.loc[:, ('SHEEP', slice(None))]
-        sources = [c for c in agghg.columns if not settings.USE_GHG_SCOPE_1 or c[1] in settings.LVSTK_GHG_SCOPE_1]
-        water_price = pd.read_hdf(os.path.join(settings.INPUT_DIR, "water_delivery_price.h5"), where=self.MASK).to_numpy(dtype=np.float64)
-        sheep_data = (np.isfinite(self.AGEC_LVSTK.loc[:, [(f, 'SHEEP') for f in STUBBLE_SHEEP_AGEC_FIELDS]].to_numpy(dtype=np.float64)).all(axis=1)
-                      & np.isfinite(agghg[sources].to_numpy(dtype=np.float64)).all(axis=1)
+        sources = [field for animal, field in self.AGGHG_LVSTK.indexes['column']
+                   if animal == 'SHEEP' and (not settings.USE_GHG_SCOPE_1 or field in settings.LVSTK_GHG_SCOPE_1)]
+        water_price = xr.load_dataarray(os.path.join(settings.INPUT_DIR, "water_delivery_price.nc")).values[self.MASK]     # before its fill: NaN where no price
+        sheep_data = (np.isfinite(np.stack([self.AGEC_LVSTK.sel(field=f, animal='SHEEP').values for f in STUBBLE_SHEEP_AGEC_FIELDS])).all(axis=0)
+                      & np.isfinite(np.stack([self.AGGHG_LVSTK.sel(animal='SHEEP', field=f).values for f in sources])).all(axis=0)
                       & np.isfinite(water_price))
-        return np.where(sheep_data | ~np.isfinite(rate), rate, 0.0)
+        return rate.where(sheep_data | ~np.isfinite(rate), 0.0)
 
     def lvstk_k(self, lu: str, lm: str) -> np.ndarray:
         """The stocking calibration k of the livestock type of `lu`, for (lu, lm); FEED_REQ without LVSTK_K_FILE."""
         animal, _ = ag_quantity.lvs_veg_types(lu)
         coarse = getattr(self, 'LVSTK_COARSE', None)
-        return self.LVSTK_K[animal] if coarse is None else coarse[lm, lu]['LVSTK_K']
+        return self.LVSTK_K[animal].values if coarse is None else coarse[lm, lu]['LVSTK_K']
 
     def stubble(self, lu: str, lm: str) -> dict:
         """The arrays the stubble sheep of stubble land use `lu` read for `lm`: K_SHEEP, STUBBLE_DSE_HA, AGEC_LVSTK and
@@ -2624,8 +2685,8 @@ class Data:
         coarse = getattr(self, 'STUBBLE_COARSE', None)
         if coarse:
             return coarse[lm, lu]
-        return {'K_SHEEP': self.LVSTK_K['SHEEP'], 'STUBBLE_DSE_HA': self.STUBBLE_DSE_HA, 'AGEC_LVSTK': self.AGEC_LVSTK,
-                'AGGHG_LVSTK': self.AGGHG_LVSTK, 'WATER_DELIVERY_PRICE': self.WATER_DELIVERY_PRICE}
+        return {'K_SHEEP': self.LVSTK_K['SHEEP'].values, 'STUBBLE_DSE_HA': self.STUBBLE_DSE_HA.values, 'AGEC_LVSTK': self.AGEC_LVSTK,
+                'AGGHG_LVSTK': self.AGGHG_LVSTK, 'WATER_DELIVERY_PRICE': self.WATER_DELIVERY_PRICE.values}
 
 
 
@@ -2765,7 +2826,7 @@ class Data:
         yr_cal: year (int).
 
         Returns:
-            dict: A dictionary with land use as keys and elasticity multipliers as values.
+            xr.DataArray: the price multiplier of every commodity, over Commodity (1 everywhere when DYNAMIC_PRICE is off).
         '''
 
         # Return cached result if available for this year
@@ -2778,18 +2839,18 @@ class Data:
         delta_supply = (supply_base_dvar_target_production - supply_base_dvar_base_production) / supply_base_dvar_base_production
 
         # Get demand delta (0-based ratio)
-        demand_base_year = self.D_CY_xr.sel(year=self.YR_CAL_BASE)
-        demand_target_year = self.D_CY_xr.sel(year=yr_cal)
+        demand_base_year = self.DEMAND_C.sel(year=self.YR_CAL_BASE)
+        demand_target_year = self.DEMAND_C.sel(year=yr_cal)
         delta_demand = (demand_target_year - demand_base_year) / demand_base_year
 
-        # Calculate price_multiplier (1-based ratio)
+        # Calculate price_multiplier (1-based ratio); every term over Commodity, aligned by label
         price_delta = (delta_demand - delta_supply) / (self.elasticity_demand + self.elasticity_supply)
-        elasticity_multiplier = (price_delta + 1).to_dataframe('multiplier')['multiplier'].to_dict()
+        elasticity_multiplier = price_delta + 1
 
         if settings.DYNAMIC_PRICE:
             self.DEMAND_ELASTICITY_MUL[yr_cal] = elasticity_multiplier
         else:
-            self.DEMAND_ELASTICITY_MUL[yr_cal] = {k: 1 for k in elasticity_multiplier.keys()}
+            self.DEMAND_ELASTICITY_MUL[yr_cal] = xr.ones_like(elasticity_multiplier)
 
         return self.DEMAND_ELASTICITY_MUL[yr_cal]
     
@@ -2800,50 +2861,24 @@ class Data:
         Get the water yield components for the specified watersheds.
         """
         if settings.WATER_REGION_DEF == 'River Region':
-
-            self.WATER_REGION_ID = pd.read_hdf(os.path.join(settings.INPUT_DIR, "rivreg_id.h5"), where=self.MASK).to_numpy()
-
-            rr = pd.read_hdf(os.path.join(settings.INPUT_DIR, "rivreg_lut.h5"))
-            self.WATER_REGION_NAMES = dict(zip(rr['HR_RIVREG_ID'], rr['HR_RIVREG_NAME']))  
-            self.WATER_REGION_HIST_LEVEL = dict(zip(rr['HR_RIVREG_ID'], rr['WATER_YIELD_HIST_BASELINE_ML']))  
-            
-            rr_outside_luto = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'water_yield_outside_LUTO_study_area_2010_2100_rr_ml.h5'))
-            rr_outside_luto = rr_outside_luto.loc[:, pd.IndexSlice[:, settings.SSP]]
-            rr_outside_luto.columns = rr_outside_luto.columns.droplevel('ssp')
-
-            rr_natural_land = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'water_yield_natural_land_2010_2100_rr_ml.h5'))
-            rr_natural_land = rr_natural_land.loc[:, pd.IndexSlice[:, settings.SSP]]
-            rr_natural_land.columns = rr_natural_land.columns.droplevel('ssp')
-            rr_outside_luto = rr_outside_luto.reindex(columns=sorted(rr_outside_luto.columns))
-
-            self.WATER_OUTSIDE_LUTO_BY_CCI = rr_outside_luto
-            self.WATER_OUTSIDE_LUTO_HIST = self.WATER_YIELD_OUTSIDE_LUTO_HIST.query('Region_Type == "River Region"').set_index('Region_ID')['Water Yield (ML)'].to_dict()
-
+            region_file, id_name = 'water_region_rivreg.nc', 'HR_RIVREG_ID'
         elif settings.WATER_REGION_DEF == 'Drainage Division':
-            
-            self.WATER_REGION_ID = pd.read_hdf(os.path.join(settings.INPUT_DIR, "draindiv_id.h5"), where=self.MASK).to_numpy()  # Drainage div ID mapped.
-
-            dd = pd.read_hdf(os.path.join(settings.INPUT_DIR, "draindiv_lut.h5"))
-            self.WATER_REGION_NAMES = dict(zip(dd['HR_DRAINDIV_ID'], dd['HR_DRAINDIV_NAME']))
-            self.WATER_REGION_HIST_LEVEL = dict(zip(dd['HR_DRAINDIV_ID'], dd['WATER_YIELD_HIST_BASELINE_ML']))
-
-            dd_outside_luto = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'water_yield_outside_LUTO_study_area_2010_2100_dd_ml.h5'))
-            dd_outside_luto = dd_outside_luto.loc[:, pd.IndexSlice[:, settings.SSP]]
-            dd_outside_luto.columns = dd_outside_luto.columns.droplevel('ssp')
-
-            dd_natural_land = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'water_yield_natural_land_2010_2100_dd_ml.h5'))
-            dd_natural_land = dd_natural_land.loc[:, pd.IndexSlice[:, settings.SSP]]
-            dd_natural_land.columns = dd_natural_land.columns.droplevel('ssp')
-            dd_natural_land = dd_natural_land.reindex(columns=sorted(dd_natural_land.columns))
-
-            self.WATER_OUTSIDE_LUTO_BY_CCI = dd_outside_luto
-            self.WATER_OUTSIDE_LUTO_HIST = self.WATER_YIELD_OUTSIDE_LUTO_HIST.query('Region_Type == "Drainage Division"').set_index('Region_ID')['Water Yield (ML)'].to_dict()
-            
+            region_file, id_name = 'water_region_draindiv.nc', 'HR_DRAINDIV_ID'
         else:
             raise ValueError(f"Unknown water region definition: {settings.WATER_REGION_DEF}. "
                         f"Must be either 'River Region' or 'Drainage Division'.")
-            
-            
+
+        water_region = xr.load_dataset(os.path.join(settings.INPUT_DIR, region_file))
+
+        self.WATER_REGION_ID = water_region[id_name].isel(cell=self.MASK).assign_coords(cell=np.arange(self.NCELLS))   # the region of every model cell
+        self.WATER_REGION_NAMES = dict(zip(water_region['region_id'].values, water_region['NAME'].values))
+        self.WATER_REGION_HIST_LEVEL = water_region['HIST_BASELINE_ML']                                      # over region_id
+
+        self.WATER_OUTSIDE_LUTO_BY_CCI = water_region['OUTSIDE_LUTO_ML'].sel(ssp=str(settings.SSP), drop=True)    # over (year, region_id)
+        water_natural_land = water_region['NATURAL_LAND_ML'].sel(ssp=str(settings.SSP), drop=True)            # read as before; not used (reported as dead code)
+        self.WATER_OUTSIDE_LUTO_HIST = self.WATER_YIELD_OUTSIDE_LUTO_HIST[settings.WATER_REGION_DEF]          # over region_id
+
+
         # Using high res factor will make some small river regions disappear; hence we update the data with validated river region ids
         if valid_watershed_id is None:
             valid_watershed_id = np.unique(self.WATER_REGION_ID)
@@ -2853,9 +2888,9 @@ class Data:
             print(f"│   ⚠ WARNING: {len(self.WATERSHED_DISAPPEARING)} river regions are disappearing due to using high resolution factors.", flush=True)
             [print(f"       - {list(i)}") for i in np.array_split(self.WATERSHED_DISAPPEARING, len(self.WATERSHED_DISAPPEARING)//3)]
             self.WATER_REGION_NAMES = {k: v for k, v in self.WATER_REGION_NAMES.items() if k in valid_watershed_id}
-            self.WATER_REGION_HIST_LEVEL = {k: v for k, v in self.WATER_REGION_HIST_LEVEL.items() if k in valid_watershed_id}
-            self.WATER_OUTSIDE_LUTO_BY_CCI = self.WATER_OUTSIDE_LUTO_BY_CCI.loc[:, self.WATER_OUTSIDE_LUTO_BY_CCI.columns.isin(valid_watershed_id)]
-            self.WATER_OUTSIDE_LUTO_HIST = {k: v for k, v in self.WATER_OUTSIDE_LUTO_HIST.items() if k in valid_watershed_id}
+            self.WATER_REGION_HIST_LEVEL = self.WATER_REGION_HIST_LEVEL.sel(region_id=[k for k in self.WATER_REGION_HIST_LEVEL['region_id'].values if k in valid_watershed_id])
+            self.WATER_OUTSIDE_LUTO_BY_CCI = self.WATER_OUTSIDE_LUTO_BY_CCI.sel(region_id=[k for k in self.WATER_OUTSIDE_LUTO_BY_CCI['region_id'].values if k in valid_watershed_id])
+            self.WATER_OUTSIDE_LUTO_HIST = self.WATER_OUTSIDE_LUTO_HIST.sel(region_id=[k for k in self.WATER_OUTSIDE_LUTO_HIST['region_id'].values if k in valid_watershed_id])
             self.WATER_USE_DOMESTIC = {k: v for k, v in self.WATER_USE_DOMESTIC.items() if k in valid_watershed_id}
 
         return valid_watershed_id
@@ -2876,7 +2911,7 @@ class Data:
             The priority degrade areas conservation target for the given year.
         """
         
-        bio_habitat_score_baseline_sum = (self.BIO_GBF2_MASK * self.REAL_AREA * self.AG_MASK_PROPORTION_R).sum()
+        bio_habitat_score_baseline_sum = (self.BIO_GBF2_MASK * self.REAL_AREA.values * self.AG_MASK_PROPORTION_R).sum()
         bio_habitat_score_base_yr_sum = self.BIO_GBF2_BASE_YR.sum()
         bio_habitat_score_base_yr_proportion = bio_habitat_score_base_yr_sum / bio_habitat_score_baseline_sum
 
@@ -3185,7 +3220,7 @@ class Data:
         out = lo * (np.float32(1) - w) + hi * w
 
         # Apply Savanna Burning penalties (in place: one per-cell factor, broadcast over species)
-        out *= np.where(self.SAVBURN_ELIGIBLE, np.float32(settings.BIO_CONTRIBUTION_LDS), np.float32(1))
+        out *= np.where(self.SAVBURN_ELIGIBLE.values, np.float32(settings.BIO_CONTRIBUTION_LDS), np.float32(1))
 
         return out
 
@@ -3211,16 +3246,17 @@ class Data:
         lon, lat = self.COORD_LON_LAT
 
         with dask.config.set(scheduler='synchronous'):                  # one chunk at a time: the raw stack is ~42 GB
-            matched = xr.open_dataset(raw_path, chunks={'year': 1, level: 128})['data'].interp(
-                x=xr.DataArray(lon, dims='cell'),
-                y=xr.DataArray(lat, dims='cell'),
-                method='linear'                                         # Use LINEAR interpolation
-            ).astype(np.float32)
-            tmp_path = f'{cache_path}.tmp{os.getpid()}'
-            matched.to_netcdf(tmp_path, encoding={'data': {
-                'zlib': True, 'complevel': 4, 'dtype': 'float32',
-                'chunksizes': (1, 1, self.NCELLS),                      # one species (group) per chunk: a subset reads only its own
-            }})
+            with xr.open_dataset(raw_path, chunks={'year': 1, level: 128}) as raw:
+                matched = raw['data'].interp(
+                    x=xr.DataArray(lon, dims='cell'),
+                    y=xr.DataArray(lat, dims='cell'),
+                    method='linear'                                     # Use LINEAR interpolation
+                ).astype(np.float32)
+                tmp_path = f'{cache_path}.tmp{os.getpid()}'
+                matched.to_netcdf(tmp_path, encoding={'data': {
+                    'zlib': True, 'complevel': 4, 'dtype': 'float32',
+                    'chunksizes': (1, 1, self.NCELLS),                  # one species (group) per chunk: a subset reads only its own
+                }})
         os.replace(tmp_path, cache_path)                                # atomic: a reader never sees a partial cache
         print(f"│   │   └── saved {os.path.basename(cache_path)}", flush=True)
         return cache_path
@@ -3334,7 +3370,7 @@ class Data:
         reg_adop_limits = self.get_regional_adoption_percent_by_year(yr)
         reg_adop_limits_ha = []
         for reg, landuse, pct in reg_adop_limits:
-            reg_total_area_ha = ((self.REGIONAL_ADOPTION_ZONES == reg) * self.REAL_AREA).sum()
+            reg_total_area_ha = ((self.REGIONAL_ADOPTION_ZONES.values == reg) * self.REAL_AREA.values).sum()
             reg_adop_limits_ha.append((reg, landuse, reg_total_area_ha * pct / 100))
             
         return reg_adop_limits_ha
@@ -3377,7 +3413,7 @@ class Data:
             if pct is None:
                 continue
             reg_ind = np.where(region_arr == reg)[0]
-            reg_total_area_ha = self.REAL_AREA[reg_ind].sum()
+            reg_total_area_ha = self.REAL_AREA.values[reg_ind].sum()
             limits.append((reg, reg_ind, reg_total_area_ha * pct / 100))
         return limits
 
@@ -3451,13 +3487,13 @@ class Data:
             sel = cells['fy_registered'] <= fy
             frac = cells.loc[sel].groupby('cell')['fraction'].sum().clip(upper=1)
             px = frac.index.to_numpy()
-            px_ha = frac.to_numpy() * self.REAL_AREA_NO_RESFACTOR[px] * float(scaling['scale_factor'])
+            px_ha = frac.to_numpy() * self.REAL_AREA_NO_RESFACTOR.values[px] * float(scaling['scale_factor'])
             cell = block[rows[px] // rf, cols[px] // rf]
             ha[fy] = np.bincount(cell[cell >= 0], weights=px_ha[cell >= 0], minlength=self.NCELLS)
             ha_mj[fy] = {}
             for m in range(self.NLMS):
                 for j in hir_js:
-                    on = (cell >= 0) & (self.LUMAP_NO_RESFACTOR[px] == j) & (self.LMMAP_NO_RESFACTOR[px] == m)
+                    on = (cell >= 0) & (self.LUMAP_NO_RESFACTOR.values[px] == j) & (self.LMMAP_NO_RESFACTOR.values[px] == m)
                     ha_mj[fy][m, j] = np.bincount(cell[on], weights=px_ha[on], minlength=self.NCELLS)
             dropped[fy] = float(px_ha[cell < 0].sum())
         return {'ha': ha, 'ha_mj': ha_mj, 'dropped_ha': dropped, 'baseline_fy': baseline_fy, 'first_fy': min(ha),
@@ -3533,38 +3569,43 @@ class Data:
         self.GHG_LULUCF_BUDGET = pd.read_csv(os.path.join(target_dir, 'budget.csv')).iloc[0].to_dict()   # reported; the cumulative budget is not imposed yet
         return targets
 
-    def get_water_yield_file_row(self, yr_cal: int) -> int:
-        """The row of the SSP water yield files (WATER_YIELD_DR_FILE / _SR_FILE) that holds calendar year `yr_cal`."""
-        if yr_cal not in self.WATER_YIELD_FILE_YEARS:
-            raise ValueError(f"Water yield data not given for year {yr_cal}; the files cover 2010-2100.")
-        return self.WATER_YIELD_FILE_YEARS.index(yr_cal)
+    def get_water_yield(self, root: str, yr_cal: int) -> xr.DataArray:
+        """The water yield of this SSP in one year at the model cells, ML/ha over cell (float32); root 'DR' = deep-rooted,
+        'SR' = shallow-rooted. Read from the file the first time a year is asked for — one chunk per variable (the year's
+        every cell), then the model cells — and kept: the water targets (in __init__) and every solve step ask for the
+        simulated years again, so each is read once; memory is the simulated years only, not all 91."""
+        if yr_cal not in self.WATER_YIELD_BY_YEAR:
+            with xr.open_dataset(self.WATER_YIELD_SSP_FILE) as water_yield:
+                year = water_yield[['DR_ML_HA', 'SR_ML_HA']].sel(year=yr_cal).load()
+            self.WATER_YIELD_BY_YEAR[yr_cal] = year.isel(cell=self.MASK).assign_coords(cell=np.arange(self.NCELLS))
+        return self.WATER_YIELD_BY_YEAR[yr_cal][f'{root}_ML_HA']
 
     def get_water_nl_yield_for_yr_idx(
         self,
         yr_idx: int,
-        water_dr_yield: Optional[np.ndarray] = None,
-        water_sr_yield: Optional[np.ndarray] = None,
-    ) -> np.ndarray:
+        water_dr_yield: Optional[xr.DataArray] = None,
+        water_sr_yield: Optional[xr.DataArray] = None,
+    ) -> xr.DataArray:
         """
         Get the net land water yield array, ? inclusive of all cells that LUTO does not look at.?
 
         Returns
         -------
-        np.ndarray: shape (NCELLS,)
+        xr.DataArray: over cell (NCELLS)
         """
         water_dr_yield = (
             water_dr_yield if water_dr_yield is not None
-            else self.WATER_YIELD_DR_FILE[self.get_water_yield_file_row(self.YR_CAL_BASE + yr_idx)]
+            else self.get_water_yield('DR', self.YR_CAL_BASE + yr_idx)
         )
         water_sr_yield = (
             water_sr_yield if water_sr_yield is not None
-            else self.WATER_YIELD_SR_FILE[self.get_water_yield_file_row(self.YR_CAL_BASE + yr_idx)]
+            else self.get_water_yield('SR', self.YR_CAL_BASE + yr_idx)
         )
         dr_prop = self.DEEP_ROOTED_PROPORTION
 
         return (dr_prop * water_dr_yield + (1 - dr_prop) * water_sr_yield)
 
-    def load_bio_quality_layer(self, backend_layer: str, biodiv_df=None) -> tuple[np.ndarray, str]:
+    def load_bio_quality_layer(self, backend_layer: str, biodiv_ds=None) -> tuple[np.ndarray, str]:
         """Return (raw priority values on MASK, performance-curve sheet name) for a backend layer.
 
         The values are *unweighted* — connectivity is applied by the callers that want it.
@@ -3572,32 +3613,22 @@ class Data:
         because the thresholds in Biodiversity_conserve_performance.xlsx are derived from the
         unweighted layers too.
 
-        `biodiv_df` lets __init__ pass the priority/connectivity table it has already read,
-        avoiding a second pass over the HDF for the 'Suitability' backend.
+        `biodiv_ds` lets __init__ pass the priority/connectivity Dataset it has already read (at the model cells),
+        avoiding a second read of the file for the 'Suitability' backend.
         """
         if backend_layer == 'Suitability':
-            col = f'BIODIV_PRIORITY_SSP{settings.SSP}'
-            if biodiv_df is None:
-                biodiv_df = pd.read_hdf(
-                    os.path.join(settings.INPUT_DIR, 'bio_OVERALL_PRIORITY_RANK_AND_AREA_CONNECTIVITY.h5'),
-                    where=self.MASK,
-                    columns=[col]
-                )
-            return biodiv_df[col].values.astype(np.float32), f'ssp{settings.SSP}'
+            if biodiv_ds is None:
+                with xr.open_dataset(os.path.join(settings.INPUT_DIR, 'bio_OVERALL_PRIORITY_RANK_AND_AREA_CONNECTIVITY.nc')) as bio_priority:
+                    biodiv_ds = bio_priority[['BIODIV_PRIORITY']].sel(ssp=[settings.SSP]).load().isel(cell=self.MASK)
+            return biodiv_ds['BIODIV_PRIORITY'].sel(ssp=settings.SSP).values.astype(np.float32), f'ssp{settings.SSP}'
 
         if 'NES' in backend_layer:
-            return (
-                xr.open_dataarray(os.path.join(settings.INPUT_DIR, 'bio_NES_Zonation.nc'))
-                .sel(layer=backend_layer)
-                .compute()
-                .values[self.MASK]
-                .astype(np.float32)
-            ), backend_layer
+            with xr.open_dataarray(os.path.join(settings.INPUT_DIR, 'bio_NES_Zonation.nc')) as nes_zonation:
+                return nes_zonation.sel(layer=backend_layer).values[self.MASK].astype(np.float32), backend_layer
 
         if backend_layer == 'RHI':
             return (
-                xr.open_dataarray(os.path.join(settings.INPUT_DIR, 'bio_RHI_Zonation.nc'))
-                .compute()
+                xr.load_dataarray(os.path.join(settings.INPUT_DIR, 'bio_RHI_Zonation.nc'))
                 .values[self.MASK]
                 .astype(np.float32)
             ), 'RHI'

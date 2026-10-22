@@ -25,7 +25,7 @@ import numpy as np
 from luto import settings
 from joblib import Parallel, delayed
 
-from luto.economics.off_land_commodity import get_demand_df
+from luto.economics.off_land_commodity import get_demand_xr
 from luto.tools.report.data_tools import get_all_files
 from luto.tools.report.data_tools.parameters import (
     AG_LANDUSE,
@@ -1490,7 +1490,16 @@ def process_production_data(files, SAVE_DIR, years):
 
     # -------------------- Demand --------------------
 
-    DEMAND_DATA = get_demand_df()\
+    # The demand as the long table the charts read: one row per (quantity, year, commodity)
+    DEMAND_DATA = get_demand_xr()\
+        .to_array('Type')\
+        .transpose('Type', 'year', 'Commodity')\
+        .to_dataframe('Quantity (tonnes, KL)')\
+        .reset_index()\
+        .rename(columns={'year': 'Year'})\
+        [['Commodity', 'Type', 'Year', 'Quantity (tonnes, KL)']]\
+        .assign(Type = lambda x: x['Type'].str.title(),
+                Commodity = lambda x: x['Commodity'].apply(lambda name: name[0].upper() + name[1:].lower()))\
         .query(f'Year.isin({years}) and abs(`Quantity (tonnes, KL)`) > 1')\
         .replace({'Beef lexp': 'Beef live export', 'Sheep lexp': 'Sheep live export'})\
         .infer_objects(copy=False)\

@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License along with
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
-import pandas as pd
+import xarray as xr
 
 # import luto settings
 from luto.settings import (
@@ -33,38 +33,25 @@ from luto.settings import (
 )
 
 
-def get_demand_df(egg_weight=EGGS_AVG_WEIGHT) -> pd.DataFrame:
+def get_demand_xr(egg_weight=EGGS_AVG_WEIGHT) -> xr.Dataset:
     """
-    Get the demand dataframe for off-land commodities.
+    The demand under the running scenario: one variable per quantity (DOMESTIC, EXPORTS, IMPORTS, FEED, PRODUCTION)
+    over (Commodity, year), eggs converted from count to tonnes.
 
     Args:
         egg_weight (int, optional): The weight of each egg in grams. Defaults to settings.EGGS_AVG_WEIGHT.
 
     Returns
-        pd.DataFrame: The demand dataframe for off-land commodities.
+        xr.Dataset: The demand of every commodity and year.
     """
-
-    # Read the demand data
-    dd = pd.read_hdf(f'{INPUT_DIR}/demand_projections.h5')
-
-    # Select the demand data under the running scenario
-    DEMAND_DATA = dd.loc[(
-        SCENARIO, DIET_DOM, DIET_GLOB, CONVERGENCE, IMPORT_TREND, WASTE, FEED_EFFICIENCY)].copy()
+    with xr.open_dataset(f'{INPUT_DIR}/demand_projections.nc') as demand_ds:
+        demand = (
+            demand_ds
+            .sel(SCENARIO=SCENARIO, DIET_DOM=DIET_DOM, DIET_GLOB=DIET_GLOB, CONVERGENCE=CONVERGENCE,
+                 IMPORT_TREND=IMPORT_TREND, WASTE=WASTE, FEED_EFFICIENCY=FEED_EFFICIENCY)
+            .reset_coords(drop=True)
+            .load()
+        )
 
     # Convert eggs from count to tonnes
-    DEMAND_DATA.loc['eggs'] = DEMAND_DATA.loc['eggs'] * egg_weight / 1000 / 1000
-
-    # Filter the demand data to only include years up to the target year
-    DEMAND_DATA_long = DEMAND_DATA.melt(
-        ignore_index=False,
-        value_name='Quantity (tonnes, KL)'
-    ).reset_index()
-
-    DEMAND_DATA_long.columns = ['Commodity', 'Type', 'Year', 'Quantity (tonnes, KL)']
-
-    # Rename the columns, so that they are the same with LUTO naming convention
-    DEMAND_DATA_long['Type'] = DEMAND_DATA_long['Type'].str.title()
-    DEMAND_DATA_long['Commodity'] = DEMAND_DATA_long['Commodity'] \
-        .apply(lambda x: x[0].upper() + x[1:].lower())
-
-    return DEMAND_DATA_long
+    return xr.where(demand['Commodity'] == 'eggs', demand * egg_weight / 1000 / 1000, demand)

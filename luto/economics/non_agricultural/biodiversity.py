@@ -36,17 +36,17 @@ from luto.settings import (
 
 def get_biodiv_environmental_plantings(data: Data, bio_quality_raw: np.ndarray = None) -> np.ndarray:
     bq_raw = bio_quality_raw if bio_quality_raw is not None else data.BIO_QUALITY_RAW
-    return bq_raw * data.REAL_AREA * BIO_CONTRIBUTION_ENV_PLANTING
+    return bq_raw * data.REAL_AREA.values * BIO_CONTRIBUTION_ENV_PLANTING
 
 
 def get_biodiv_riparian_plantings(data: Data, bio_quality_raw: np.ndarray = None) -> np.ndarray:
     bq_raw = bio_quality_raw if bio_quality_raw is not None else data.BIO_QUALITY_RAW
-    return bq_raw * data.REAL_AREA * BIO_CONTRIBUTION_RIPARIAN_PLANTING
+    return bq_raw * data.REAL_AREA.values * BIO_CONTRIBUTION_RIPARIAN_PLANTING
 
 
 def get_biodiv_agroforestry_base(data: Data, bio_quality_raw: np.ndarray = None) -> np.ndarray:
     bq_raw = bio_quality_raw if bio_quality_raw is not None else data.BIO_QUALITY_RAW
-    return bq_raw * data.REAL_AREA * BIO_CONTRIBUTION_AGROFORESTRY
+    return bq_raw * data.REAL_AREA.values * BIO_CONTRIBUTION_AGROFORESTRY
 
 
 def get_biodiv_sheep_agroforestry(
@@ -111,12 +111,12 @@ def get_biodiv_beef_agroforestry(
 
 def get_biodiv_carbon_plantings_block(data: Data, bio_quality_raw: np.ndarray = None) -> np.ndarray:
     bq_raw = bio_quality_raw if bio_quality_raw is not None else data.BIO_QUALITY_RAW
-    return bq_raw * data.REAL_AREA * BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK
+    return bq_raw * data.REAL_AREA.values * BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK
 
 
 def get_biodiv_carbon_plantings_belt_base(data: Data, bio_quality_raw: np.ndarray = None) -> np.ndarray:
     bq_raw = bio_quality_raw if bio_quality_raw is not None else data.BIO_QUALITY_RAW
-    return bq_raw * data.REAL_AREA * BIO_CONTRIBUTION_CARBON_PLANTING_BELT
+    return bq_raw * data.REAL_AREA.values * BIO_CONTRIBUTION_CARBON_PLANTING_BELT
 
 
 def get_biodiv_sheep_carbon_plantings_belt(
@@ -191,7 +191,7 @@ def get_biodiv_beccs(data: Data, bio_quality_raw: np.ndarray = None):
     Numpy array indexed by r
     """
     bq_raw = bio_quality_raw if bio_quality_raw is not None else data.BIO_QUALITY_RAW
-    return bq_raw * data.REAL_AREA * BIO_CONTRIBUTION_BECCS
+    return bq_raw * data.REAL_AREA.values * BIO_CONTRIBUTION_BECCS
 
 
 def get_biodiv_destocked_land(data: Data, lumap: np.ndarray, bio_quality_raw: np.ndarray = None):
@@ -219,7 +219,7 @@ def get_biodiv_destocked_land(data: Data, lumap: np.ndarray, bio_quality_raw: np
         destock_b_contr[lumap == from_lu] = (
             bq_raw[lumap == from_lu]
             * contribution
-            * data.REAL_AREA[lumap == from_lu]
+            * data.REAL_AREA.values[lumap == from_lu]
         )
 
     return destock_b_contr
