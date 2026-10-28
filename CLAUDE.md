@@ -85,6 +85,7 @@ The LUTO2 documentation is split into themed files for better memory efficiency.
 - [patch_existing_renewable_capacity.md](docs/CLAUDE_SKILL/patch_existing_renewable_capacity.md): Inject real-world existing renewable capacity as `lu='Existing Capacity'` into output xarrays before `add_all` — covers write_dvar_and_mosaic_map, write_dvar_area, write_economics, and write_renewable_production
 - [submit_task_runs_windows.md](docs/CLAUDE_SKILL/submit_task_runs_windows.md): Launch LUTO2 task runs locally on Windows via `run_all.py` — concurrency control, log monitoring, result verification, and failure recovery
 - [retry_task_runs.md](docs/CLAUDE_SKILL/retry_task_runs.md): Retry runs with non-optimal solver status (false-INFEASIBLE, NUMERIC) — unzip archives, patch RETRY_PARAMS, resubmit via run_all.py; covers when checkpoint-based retry fixes the infeasible year vs when a full re-run is needed
+- [editable_pptx_slides.md](docs/CLAUDE_SKILL/editable_pptx_slides.md): Build a slide deck once as 1280×720 HTML artboards and get an editable pptx that matches it 1:1 (headless Edge measures every box, python-pptx places native shapes) — project-local pinned plotting env (never the luto env, never edit `environment.yml`), standalone variant slides outside the deck, and proving a rebuild reproduces the old slide
 
 ## Diagnostic Tools
 
