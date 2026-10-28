@@ -913,6 +913,14 @@ When True, the solver excludes:
               fodder production (CO2E_KG_HEAD_FODDER), and seed (CO2E_KG_HEAD_SEED).
               Only LVSTK_GHG_SCOPE_1 sources (enteric, dung/urine, manure, leach/runoff)
               enter the constraint.
+  Irrigated pasture — the crop filter (agGHG_irrpast.nc): only CROP_GHG_SCOPE_1 sources.
+  Off-land  — only OFFLAND_GHG_SCOPE_1 emission types (enteric, manure); not the direct and
+              embedded on-farm energy CO2.
+  Ag management — the reductions Precision Agriculture, AgTech EI and Biochar make to the
+              crop fields outside CROP_GHG_SCOPE_1.
+  The irrigated pasture, off-land and ag management items left out are reported in
+  GHG_emissions_split_<yr>.csv as 'Energy and lifecycle (not NIR 3)', on no constraint row.
+  When False, every field counts on the agriculture row.
 
 Note: BECCS should also be disabled when using AusTIMES pathway targets to maintain
 inter-model consistency (energy-related CO2 displacement is handled by AusTIMES).
@@ -920,6 +928,7 @@ inter-model consistency (energy-related CO2 displacement is handled by AusTIMES)
 
 CROP_GHG_SCOPE_1 = ['CO2E_KG_HA_SOIL']
 LVSTK_GHG_SCOPE_1 = ['CO2E_KG_HEAD_DUNG_URINE', 'CO2E_KG_HEAD_ENTERIC', 'CO2E_KG_HEAD_IND_LEACH_RUNOFF', 'CO2E_KG_HEAD_MANURE_MGT']
+OFFLAND_GHG_SCOPE_1 = ['Enteric fermentation', 'Manure']     # 'Emission Type' in agGHG_lvstk_off_land.csv (the text before the gas)
 
 
 

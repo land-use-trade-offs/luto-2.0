@@ -34,12 +34,25 @@ from functools import lru_cache
 
 
 # The GHG constraint has two rows: agriculture-sector emissions ('AG') and net LULUCF ('LULUCF'). Every emission
-# term is a sum of named sub-terms, and every sub-term sits on exactly one row. The energy and lifecycle sub-terms
-# are off-inventory (scope-1 leaks); they stay on the AG row, where the single net row counted them, until the
-# scope-1 fix moves them out.
+# term is a sum of named sub-terms, and every sub-term sits on one side. ENERGY marks the fields outside the scope-1
+# lists (energy and lifecycle, not NIR category 3): under settings.USE_GHG_SCOPE_1 they sit on no constraint row and
+# are reported only ('REPORTED'); without it they count on the AG row, as every crop and livestock field does.
+ENERGY = 'ENERGY'
+REPORTED = 'REPORTED'
+REPORTED_NAME = 'Energy and lifecycle (not NIR 3)'
+
+
+def subterm_row(side: str) -> str:
+    """The row a sub-term's side resolves to: 'AG', 'LULUCF', or 'REPORTED' (an ENERGY sub-term under the scope-1
+    filter, on no constraint row)."""
+    if side == ENERGY:
+        return REPORTED if settings.USE_GHG_SCOPE_1 else 'AG'
+    return side
+
+
 AG_GHG_SUBTERMS = {
     'Crop and livestock emissions': 'AG',
-    'Irrigated pasture energy and lifecycle fields': 'AG',
+    'Irrigated pasture energy and lifecycle fields': ENERGY,
     'Stubble-grazing sheep': 'AG',
 }
 AG_MAN_GHG_SUBTERMS = {
@@ -48,7 +61,7 @@ AG_MAN_GHG_SUBTERMS = {
     },
     'Precision Agriculture': {
         'Soil N2O': 'AG',
-        'Energy and lifecycle (CHEM_APPL, CROP_MGT, PEST_PROD)': 'AG',
+        'Energy and lifecycle (CHEM_APPL, CROP_MGT, PEST_PROD)': ENERGY,
     },
     'Ecological Grazing': {
         'Leaching and runoff N2O': 'AG',
@@ -59,11 +72,11 @@ AG_MAN_GHG_SUBTERMS = {
     },
     'AgTech EI': {
         'Soil N2O': 'AG',
-        'Energy and lifecycle (CHEM_APPL, CROP_MGT, PEST_PROD, IRRIG)': 'AG',
+        'Energy and lifecycle (CHEM_APPL, CROP_MGT, PEST_PROD, IRRIG)': ENERGY,
     },
     'Biochar': {
         'Soil N2O': 'AG',
-        'Energy (CROP_MGT)': 'AG',
+        'Energy (CROP_MGT)': ENERGY,
         'Soil carbon': 'LULUCF',
     },
     'HIR - Beef': {
@@ -97,7 +110,7 @@ def side_of_parts(parts: dict, subterms: dict, side: str) -> np.ndarray:
     """The sum of the sub-terms of a {sub-term: array} dict that sit on `side` (zeros if none do)."""
     total = np.zeros_like(next(iter(parts.values())))
     for name, arr in parts.items():
-        if subterms[name] == side:
+        if subterm_row(subterms[name]) == side:
             total += arr
     return total
 
@@ -220,11 +233,11 @@ def get_ghg_lvstk( data:Data    # Data object.
     ghg_rs = ghg_raw * yield_pot[:,np.newaxis]
 
 
-    # Add pasture irrigation emissions.
+    # Add pasture irrigation emissions (per ha; the scope-1 filter of the crop fields, settings.CROP_GHG_SCOPE_1).
     if lm == 'irr':
         ghg_lvstk_irr = data.agghg_irrpast(lu, lm)
-        ghg_lvstk_irr_cols = [i for i in ghg_lvstk_irr.data_vars if 'CO2E' in i]
-        
+        ghg_lvstk_irr_cols = [i for i in ghg_lvstk_irr.data_vars if 'CO2E' in i and (not settings.USE_GHG_SCOPE_1 or i in settings.CROP_GHG_SCOPE_1)]
+
         ghg_rs = pd.concat([ghg_rs, ghg_lvstk_irr[ghg_lvstk_irr_cols].to_dataframe()], axis = 1)
         ghg_name_s += ghg_lvstk_irr_cols
         
@@ -342,8 +355,9 @@ def get_ghg_matrices(data:Data, yr_idx, aggregate=True):
 
 
 def get_irrpast_energy_ghg_matrices(data: Data) -> np.ndarray:
-    """The irrigated pasture energy and lifecycle fields inside g_mrj <unit: t/cell>, (m, r, j): every agGHG_irrpast.h5
-    field except the soil field, on the irrigated livestock land uses. `get_ghg_lvstk` adds them with no scope-1 filter."""
+    """The irrigated pasture energy and lifecycle fields <unit: t/cell>, (m, r, j): every agGHG_irrpast.nc field
+    outside settings.CROP_GHG_SCOPE_1, on the irrigated livestock land uses. Inside g_mrj only without the scope-1
+    filter (`get_ghg_lvstk`); with it they are reported, on no constraint row (subterm_row(ENERGY))."""
     g_mrj = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
     energy_cols = [c for c in data.AGGHG_IRRPAST.data_vars if 'CO2E' in c and c not in settings.CROP_GHG_SCOPE_1]
     m = data.LANDMANS.index('irr')
@@ -364,12 +378,14 @@ def get_stubble_ghg_matrices(data: Data) -> np.ndarray:
 
 
 def get_ghg_matrices_parts(data: Data, yr_idx) -> dict[str, np.ndarray]:
-    """g_mrj <unit: t/cell> as its named sub-terms (AG_GHG_SUBTERMS); they sum to `get_ghg_matrices`."""
+    """g_mrj <unit: t/cell> as its named sub-terms (AG_GHG_SUBTERMS); those on the AG row sum to `get_ghg_matrices`
+    (the irrigated pasture energy fields are outside it under the scope-1 filter, reported only)."""
     total = get_ghg_matrices(data, yr_idx)
     energy = get_irrpast_energy_ghg_matrices(data)
     stubble = get_stubble_ghg_matrices(data)
+    energy_in_total = energy if subterm_row(ENERGY) == 'AG' else np.zeros_like(energy)
     return {
-        'Crop and livestock emissions': total - energy - stubble,
+        'Crop and livestock emissions': total - energy_in_total - stubble,
         'Irrigated pasture energy and lifecycle fields': energy,
         'Stubble-grazing sheep': stubble,
     }
@@ -915,3 +931,13 @@ def get_agricultural_management_ghg_matrices(data:Data, yr_idx, separate=False) 
         'Utility Solar PV': utility_solar_ghg_impact,
         'Onshore Wind': onshore_wind_ghg_impact
     }
+
+
+def get_agricultural_management_ghg_matrices_on_rows(data: Data, yr_idx) -> dict[str, np.ndarray]:
+    """{option: GHG matrix <unit: t/cell>} of the sub-terms on a constraint row (AG or LULUCF): the reported-only
+    sub-terms (energy and lifecycle under the scope-1 filter) left out. Without the filter, every sub-term."""
+    out = {}
+    for am, parts in get_agricultural_management_ghg_matrices(data, yr_idx, separate=True).items():
+        on_rows = {name: arr for name, arr in parts.items() if subterm_row(AG_MAN_GHG_SUBTERMS[am][name]) != REPORTED}
+        out[am] = sum_parts(on_rows)
+    return out
