@@ -66,7 +66,8 @@ class RowInputs:
     mask_mnes_wind: np.ndarray                                          # the same for wind
 
     # The GHG streams by the row they sit on: agriculture ('ag') or net LULUCF ('lulucf'). Every sub-term is on one
-    # row (ag_ghg.AG_MAN_GHG_SUBTERMS, non_ag_ghg.NON_AG_GHG_SUBTERMS); the two rows' streams sum to the single net row's.
+    # side (ag_ghg.AG_MAN_GHG_SUBTERMS, non_ag_ghg.NON_AG_GHG_SUBTERMS); the energy and lifecycle sub-terms the
+    # scope-1 filter reports on no row (ag_ghg.subterm_row) are in neither stream.
     ag_g_mrj: np.ndarray                                                # agricultural GHG emissions [m, r, j]: all on the ag row
     ag_w_mrj: np.ndarray                                                # agricultural water net yield [m, r, j]
     ag_q_mrp: np.ndarray                                                # agricultural production quantity [m, r, p] (p = product, not land use)
@@ -104,8 +105,8 @@ class RowInputs:
     GBF8_region_species: list                                           # GBF8 constraint pairs - list[(region, species)]
 
     commodity_names: list[str]                                          # commodity names (data.COMMODITIES order)
-    offland_ghg: float                                                  # target-year GHG emissions from off-land commodities (tCO2e), on the ag row; 0.0 when GHG limits are off
-    offland_ghg_energy: float                                           # ... the part of it that is on-farm energy CO2 (direct and embedded; off-inventory, kept on the ag row)
+    offland_ghg: float                                                  # target-year GHG emissions from off-land commodities (tCO2e), all types; 0.0 when GHG limits are off
+    offland_ghg_energy: float                                           # ... the part of it outside OFFLAND_GHG_SCOPE_1: on-farm energy CO2 (direct and embedded; not NIR 3)
     lu2pr_pj: np.ndarray                                                # conversion matrix: product (p) × land use (j)
     pr2cm_cp: np.ndarray                                                # conversion matrix: commodity (c) × product (p)
     limits: dict                                                        # raw constraint targets for the target year (see get_limits)
@@ -118,10 +119,18 @@ class RowInputs:
     def ncms(self):
         return len(self.commodity_names)
 
+    @property
+    def offland_ghg_on_ag(self):
+        """The off-land emissions on the ag row: all of them, less the energy CO2 when the scope-1 filter reports it on
+        no row (ag_ghg.subterm_row)."""
+        if ag_ghg.subterm_row(ag_ghg.ENERGY) == ag_ghg.REPORTED:
+            return self.offland_ghg - self.offland_ghg_energy
+        return self.offland_ghg
+
 
 def get_ghg_side(parts: dict, subterms: dict, side: str) -> np.ndarray:
-    """The float32 sum of the sub-terms of `parts` on `side` ('AG' or 'LULUCF'); a zero view when none are."""
-    on_side = [name for name in parts if subterms[name] == side]
+    """The float32 sum of the sub-terms of `parts` on `side` ('AG', 'LULUCF' or 'REPORTED'); a zero view when none are."""
+    on_side = [name for name in parts if ag_ghg.subterm_row(subterms[name]) == side]
     if not on_side:
         shape = next(iter(parts.values())).shape
         return np.broadcast_to(np.float32(0.0), shape)
@@ -331,7 +340,7 @@ def get_row_inputs(data: Data, base_year: int, target_year: int) -> RowInputs:
     )
     offland_emission = data.OFF_LAND_GHG_EMISSION.sel(year=target_year)
     offland_ghg_energy = (
-        float(offland_emission.isel(emission=offland_emission['Emission Type'].str.contains('energy').values).sum())
+        float(offland_emission.isel(emission=~np.isin(offland_emission['Emission Type'].values, settings.OFFLAND_GHG_SCOPE_1)).sum())
         if settings.GHG_EMISSIONS_LIMITS != 'off'
         else 0.0
     )
