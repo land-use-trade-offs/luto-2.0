@@ -120,8 +120,8 @@ def create_new_dataset(refresh=False):
     # The GHG constraint series are built from public sources (NIR 2024, DCCEEW 2025) by
     # luto/tools/ghg_targets.py, replacing the retired GHG_targets.xlsx.
     subprocess.run([sys.executable, os.path.dirname(__file__) + '/tools/ghg_targets.py',
-                    '--out', outpath + 'ghg_targets',
-                    '--scope-matrix', outpath + 'ghg_targets/scope_matrix.csv',
+                    '--out', outpath + 'Nick_build/ghg_targets',
+                    '--scope-matrix', outpath + 'Nick_build/ghg_targets/scope_matrix.csv',
                     '--cache', raw_data + 'ghg_targets_cache'], check=True)
     shutil.copyfile(luto_1D_inpath + 'carbon_prices_20240612.xlsx', outpath + 'carbon_prices.xlsx')
     shutil.copyfile(luto_1D_inpath + 'ag_price_multipliers_20240612.xlsx', outpath + 'ag_price_multipliers.xlsx')
