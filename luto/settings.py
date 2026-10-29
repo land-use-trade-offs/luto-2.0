@@ -1128,7 +1128,7 @@ BIO_CONTRIBUTION_CARBON_PLANTING_BELT = 0.12
 BIO_CONTRIBUTION_RIPARIAN_PLANTING = 1.0
 BIO_CONTRIBUTION_AGROFORESTRY = 0.6         # 0.7->0.6 20260831; we think agroforestry should not be as high as EP.
 BIO_CONTRIBUTION_BECCS = 0
-BIO_CONTRIBUTION_DESTOCKING = 1.0           # If 'GAP' <Should never be used!!, since its produces neg bio-contr scores>, uses BIO_HABITAT_CONTRIBUTION_LOOK_UP difference; if set to a number (e.g. 0.75), overrides with a fixed scalar
+BIO_CONTRIBUTION_DESTOCKING = 1.0           # Habitat contribution of destocked natural land (0-1); destocking's removal cost scales with this minus the grazing land's HCAS score
 '''
 The benefit of each non-agricultural land use to biodiversity is set as a proportion to the raw biodiversity priority value.
 For example, if the raw biodiversity priority value is 0.6 and the benefit is 0.8, then the biodiversity value

@@ -273,10 +273,14 @@ def get_destocked_from_ag(
     data: Data, target_year: int, mj_cell_map: dict, separate=False
 ) -> dict:
     """{(from_m, from_j): $/cell/yr} to Destocked - natural land: T_MAT transition + HCAS-weighted removal cost (livestock-natural
-    sources only, else 0) + irrigation removal."""
+    sources only, else 0) + irrigation removal. The removal cost is EP establishment × the habitat gain destocking buys, the
+    same gap its biodiversity contribution is credited with: BIO_CONTRIBUTION_DESTOCKING − HCAS(from), floored at 0."""
     t_j_raw      = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Destocked - natural land').values
     irr_scalar   = settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[target_year]
-    HCAS_benefit_mult = {lu: 1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[lu] for lu in data.LU_LVSTK_NATURAL}
+    HCAS_benefit_mult = {
+        lu: max(0.0, float(settings.BIO_CONTRIBUTION_DESTOCKING) - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[lu])
+        for lu in data.LU_LVSTK_NATURAL
+    }
 
     result = {}
     for (from_m, from_j), cell_idx in mj_cell_map.items():
