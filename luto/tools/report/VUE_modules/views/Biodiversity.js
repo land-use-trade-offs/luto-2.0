@@ -15,9 +15,15 @@ window.BiodiversityView = {
     const selectRegionLevel = ref('region_state');
 
     // ── Paged species (SNES / ECNES / GBF3_NVIS) ────────────────────────────
+    // The index and chart files land on `window`, which Vue does not track: a computed read
+    // before its script arrives would cache null for good. Each load bumps a tick the
+    // computeds read, so they re-evaluate once the data is there.
+    const indexTick = ref(0);
+    const chartTick = ref(0);
     const selectPage = ref(0);
     const isPaged = computed(() => !!mapRegister[selectMetric.value]?.[selectCategory.value]?.paged);
     const pagedIndex = computed(() => {
+      indexTick.value;
       if (!isPaged.value) return null;
       const idxName = mapRegister[selectMetric.value]?.[selectCategory.value]?.indexName;
       return idxName ? (window[idxName] ?? null) : null;
@@ -152,6 +158,7 @@ window.BiodiversityView = {
     }
 
     const selectMultiInput = computed(() => {
+      chartTick.value;
       if (!dataLoaded.value) return null;
       const metric = selectMetric.value;
       const cat = selectCategory.value;
@@ -215,6 +222,7 @@ window.BiodiversityView = {
       const region = selectRegion.value;
       const species = selectSpecies.value;
       const withSpecies = hasSpecies.value;
+      chartTick.value;
       if (!dataLoaded.value) return {};
       const cr = chartRegister[metric];
       const dataRoot = qualityRoot(cr?.[cat]?.["name"]);
@@ -263,8 +271,12 @@ window.BiodiversityView = {
       const entry = mapRegister[metric]?.[cat];
       if (entry && !window[entry.indexName]) {
         isLoadingData.value = true;
-        await loadScript(entry.indexPath, entry.indexName, VIEW_NAME);
-        isLoadingData.value = false;
+        try {
+          await loadScript(entry.indexPath, entry.indexName, VIEW_NAME);
+        } finally {
+          isLoadingData.value = false;
+          indexTick.value++;
+        }
       }
     }
 
@@ -303,7 +315,9 @@ window.BiodiversityView = {
       const entry  = mapRegister[metric]?.[cat];
       if (!entry?.layerPrefix) return;
       const combo = buildCombo(cat, tree, withSpecies);
-      if (isPaged.value && currentPageInfo.value) {
+      if (isPaged.value) {
+        // Paged layers exist only as <prefix>__<combo>_<start>_<end>.js.
+        if (!currentPageInfo.value) return;
         const { start, end } = currentPageInfo.value;
         await ensureComboLayer(entry.layerPrefix, combo, [start, end]);
       } else {
@@ -432,11 +446,18 @@ window.BiodiversityView = {
         selectLanduse.value = (prevLU && availableLanduse.value.includes(prevLU)) ? prevLU : (availableLanduse.value[0] || '');
       }
 
-      await _ensureLayer(cat, tree, withSpecies);
-      if (isPaged.value && currentPageInfo.value) {
-        const { start, end } = currentPageInfo.value;
-        isLoadingData.value = true;
-        await _loadChartPage(start, end);
+      await _ensureLayerAndChartPage(cat, tree, withSpecies);
+    }
+
+    // The map layer and (paged metrics) the chart page, fetched together.
+    async function _ensureLayerAndChartPage(cat, tree, withSpecies) {
+      const layer = _ensureLayer(cat, tree, withSpecies);
+      if (!(isPaged.value && currentPageInfo.value)) return layer;
+      const { start, end } = currentPageInfo.value;
+      isLoadingData.value = true;
+      try {
+        await Promise.all([layer, _loadChartPage(start, end)]);
+      } finally {
         isLoadingData.value = false;
       }
     }
@@ -458,6 +479,7 @@ window.BiodiversityView = {
         }
       }
       if (pending.length > 0) await Promise.allSettled(pending);
+      chartTick.value++;
     }
 
     // Load chart page files for paged metrics and alias to base window names.
@@ -482,10 +504,16 @@ window.BiodiversityView = {
         }
       }
       if (pending.length > 0) await Promise.allSettled(pending);
-      // Alias paged data to base names so existing chart lookup code is unchanged
+      // A page the user has already left must not overwrite the current one.
+      const page = currentPageInfo.value;
+      if (selectMetric.value !== metric || !page || page.start !== start || page.end !== end) return;
+      // Alias paged data to base names so existing chart lookup code is unchanged.
+      // The aliases hold the page too, so they are released with the view.
       for (const { base, paged } of entries) {
         window[base] = window[paged];
       }
+      window.MemoryService.registerViewData(VIEW_NAME, entries.map(e => e.base));
+      chartTick.value++;
     }
 
     onMounted(async () => {
@@ -676,13 +704,7 @@ window.BiodiversityView = {
       const prevSp = previousSelections.value[cat]?.species;
       selectSpecies.value = (prevSp && availableSpecies.value.includes(prevSp))
           ? prevSp : (availableSpecies.value[0] || '');
-      await _ensureLayer(cat, tree, hasSpecies.value);
-      if (currentPageInfo.value) {
-        const { start, end } = currentPageInfo.value;
-        isLoadingData.value = true;
-        await _loadChartPage(start, end);
-        isLoadingData.value = false;
-      }
+      await _ensureLayerAndChartPage(cat, tree, hasSpecies.value);
     });
 
     watch(selectBackend, async () => {

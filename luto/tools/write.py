@@ -4010,7 +4010,7 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
         )
     )
     sum_df['ALL_HA'] = sum_df.merge(all_ha_lookup, on=['region', 'region_level'], how='left')['ALL_HA'].values
-    sum_df['Relative_Contribution_Percentage'] = sum_df['Area Weighted Score (ha)'] / sum_df['ALL_HA'] * 100
+    sum_df['Relative_Contribution_Percentage'] = sum_df['Area Weighted Score (ha)'] / sum_df['BASE_TOTAL_SCORE'] * 100
 
     # Outside rows for sum CSV — from baseline_df (no separate loop needed).
     outside_sum = baseline_df.assign(
@@ -4018,7 +4018,7 @@ def write_biodiversity_GBF3_NVIS_scores(data: Data, yr_cal: int, path) -> None:
         Year=yr_cal, Type='Outside LUTO study area',
     )
     outside_sum['ALL_HA'] = outside_sum.merge(all_ha_lookup, on=['region', 'region_level'], how='left')['ALL_HA'].values
-    outside_sum['Relative_Contribution_Percentage'] = outside_sum['Area Weighted Score (ha)'] / outside_sum['ALL_HA'] * 100
+    outside_sum['Relative_Contribution_Percentage'] = outside_sum['Area Weighted Score (ha)'] / outside_sum['BASE_TOTAL_SCORE'] * 100
 
     pd.concat([sum_df, outside_sum], axis=0, ignore_index=True
         ).rename(columns={'group': 'Vegetation Group'}
@@ -4482,14 +4482,14 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
         on=['region', 'species', 'region_level'], how='inner'
     )
     sum_df['ALL_HA'] = sum_df.merge(all_ha_lookup, on=['region', 'region_level'], how='left')['ALL_HA'].values
-    sum_df['Relative_Contribution_Percentage'] = sum_df['Area Weighted Score (ha)'] / sum_df['ALL_HA'] * 100
+    sum_df['Relative_Contribution_Percentage'] = sum_df['Area Weighted Score (ha)'] / sum_df['BASE_TOTAL_SCORE'] * 100
 
     outside_sum = baseline_df.assign(
         **{'Area Weighted Score (ha)': baseline_df['BASE_OUTSIDE_SCORE']},
         Year=yr_cal, Type='Outside LUTO study area',
     )
     outside_sum['ALL_HA'] = outside_sum.merge(all_ha_lookup, on=['region', 'region_level'], how='left')['ALL_HA'].values
-    outside_sum['Relative_Contribution_Percentage'] = outside_sum['Area Weighted Score (ha)'] / outside_sum['ALL_HA'] * 100
+    outside_sum['Relative_Contribution_Percentage'] = outside_sum['Area Weighted Score (ha)'] / outside_sum['BASE_TOTAL_SCORE'] * 100
 
     sum_out = pd.concat([sum_df, outside_sum], axis=0, ignore_index=True).reset_index(drop=True)
     sum_out = sum_out[sum_out['Area Weighted Score (ha)'].abs() > 0]
@@ -4846,14 +4846,14 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
         )
     )
     sum_df['ALL_HA'] = sum_df.merge(all_ha_lookup, on=['region', 'region_level'], how='left')['ALL_HA'].values
-    sum_df['Relative_Contribution_Percentage'] = sum_df['Area Weighted Score (ha)'] / sum_df['ALL_HA'] * 100
+    sum_df['Relative_Contribution_Percentage'] = sum_df['Area Weighted Score (ha)'] / sum_df['BASE_TOTAL_SCORE'] * 100
 
     outside_sum = baseline_df.assign(
         **{'Area Weighted Score (ha)': baseline_df['BASE_OUTSIDE_SCORE']},
         Year=yr_cal, Type='Outside LUTO study area',
     )
     outside_sum['ALL_HA'] = outside_sum.merge(all_ha_lookup, on=['region', 'region_level'], how='left')['ALL_HA'].values
-    outside_sum['Relative_Contribution_Percentage'] = outside_sum['Area Weighted Score (ha)'] / outside_sum['ALL_HA'] * 100
+    outside_sum['Relative_Contribution_Percentage'] = outside_sum['Area Weighted Score (ha)'] / outside_sum['BASE_TOTAL_SCORE'] * 100
 
     pd.concat([sum_df, outside_sum], axis=0, ignore_index=True
         ).reset_index(drop=True

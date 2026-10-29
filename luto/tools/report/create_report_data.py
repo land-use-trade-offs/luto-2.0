@@ -221,6 +221,33 @@ def build_out_dict_bulk(df_wide_pct, df_wide_area, key_cols):
     return out_dict
 
 
+def add_bio_target_lines(out_dict: dict, bio_df: pd.DataFrame) -> dict:
+    """Append the 'Target (%)' / 'Target (ha)' lines to a {region_level: {region: {species: {Percent, Area}}}} dict.
+
+    The target is read per YEAR: Target_by_Percent is NaN in a year with no active constraint
+    (write.py), so the line has a point only in the years a target binds, at that year's level.
+    Both lines share the units of the columns they sit on: % of the item's own pre-1750 total
+    (BASE_TOTAL_SCORE), and habitat-hectares.
+    """
+    color = COLORS.get('Target (%)', '#040404')
+    targets = (
+        bio_df[bio_df['Target_by_Percent'].notna()]
+        [['region_level', 'region', 'species', 'Year', 'Target_by_Percent', 'BASE_TOTAL_SCORE']]
+        .drop_duplicates(['region_level', 'region', 'species', 'Year'])
+        .sort_values('Year')
+    )
+    for (region_level, region, species), df in targets.groupby(['region_level', 'region', 'species']):
+        leaf = out_dict.get(region_level, {}).get(region, {}).get(species)
+        if leaf is None:
+            continue
+        years = df['Year'].astype(int).tolist()
+        pct = df['Target_by_Percent'].astype(float).tolist()
+        area = (df['Target_by_Percent'] / 100 * df['BASE_TOTAL_SCORE']).astype(float).tolist()
+        leaf['Percent'] = leaf['Percent'] + [{'name': 'Target (%)', 'type': 'line', 'color': color, 'data': [list(p) for p in zip(years, pct)]}]
+        leaf['Area'] = leaf['Area'] + [{'name': 'Target (ha)', 'type': 'line', 'color': color, 'data': [list(p) for p in zip(years, area)]}]
+    return out_dict
+
+
 def _paged_species_order(bio_paths: pd.DataFrame, chunks_base: str) -> list | None:
     """Species order for a paged metric, read from the manifest that cuts the map pages.
 
@@ -3500,18 +3527,9 @@ def process_biodiversity_data(files, SAVE_DIR):
 
         # ---------------- (GBF3-NVIS) Overview  ----------------
 
-        # Build target lookup once (species × region → Target_by_Percent, BASE_TOTAL_SCORE).
-        # Target_by_Percent is NaN when no constraint is active (write.py sets it to NaN
-        # when TARGET_INSIDE_SCORE = 0), so .notna() correctly selects only real targets.
-        _gbf3_target_lk = (
-            bio_df[bio_df['Target_by_Percent'].notna()]
-            [['species', 'region', 'region_level', 'Target_by_Percent', 'BASE_TOTAL_SCORE']]
-            .drop_duplicates(['species', 'region', 'region_level'])
-        )
-
-
-        # Sum-tab: normalise by ALL_HA (total pre-1750 baseline across all veg groups) so
-        # the stacked bar shows sum(area)/ALL_HA*100, not a meaningless sum of per-group %.
+        # Every chart is per vegetation group, so a Type's % is its area over THAT group's
+        # pre-1750 total (BASE_TOTAL_SCORE) — the denominator of the target line and of the
+        # Ag / Ag Mgt / Non-Ag tabs. (ALL_HA is the total over every group in the region.)
         # Inside rows: exclude 'ALL' aggregates (keep leaf lm × lu combinations only).
         # Outside rows: use only the am='ALL', lm='ALL' aggregate row to avoid cross-join
         # inflation (each group's outside area is replicated across every am×lm combo).
@@ -3525,9 +3543,9 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_region = (
             pd.concat([_inside, _outside])
             .groupby(['Year', 'region_level', 'region', 'species', 'Type'])
-            .agg({'Area Weighted Score (ha)': 'sum', 'ALL_HA': 'first'})
+            .agg({'Area Weighted Score (ha)': 'sum', 'BASE_TOTAL_SCORE': 'first'})
             .reset_index()
-            .assign(**{'Sum_Pct (%)': lambda d: d['Area Weighted Score (ha)'] / d['ALL_HA'] * 100})
+            .assign(**{'Sum_Pct (%)': lambda d: d['Area Weighted Score (ha)'] / d['BASE_TOTAL_SCORE'] * 100})
         )
         df_wide_pct = groupby_to_records(df_region, ['region_level', 'Type', 'region', 'species'], ['region_level', 'name', 'region', 'species', 'data'], value_cols=('Year', 'Sum_Pct (%)'))
         df_wide_pct['type'] = 'column'
@@ -3552,8 +3570,11 @@ def process_biodiversity_data(files, SAVE_DIR):
             ).rename(columns={'Vegetation Group': 'species'})
             sum_bio_df = sum_bio_df[sum_bio_df['Type'] != 'ALL'].copy()
             sum_bio_df['name'] = sum_bio_df['Type'].map(_SUM_TYPE_DISPLAY).fillna(sum_bio_df['Type'])
+            # Each Type's % of the item's own pre-1750 total, computed here rather than read from
+            # Relative_Contribution_Percentage so a report rebuilt from older CSVs is right too.
+            sum_bio_df['Value (%)'] = sum_bio_df['Area Weighted Score (ha)'] / sum_bio_df['BASE_TOTAL_SCORE'] * 100
             df_wide_sum_pct = groupby_to_records(sum_bio_df, ['region_level', 'name', 'region', 'species'], ['region_level', 'name', 'region', 'species', 'data'],
-                value_cols=('Year', 'Relative_Contribution_Percentage'),
+                value_cols=('Year', 'Value (%)'),
             )
             df_wide_sum_pct['type'] = 'column'
             df_wide_sum_pct['color'] = df_wide_sum_pct['name'].apply(lambda x: COLORS[x])
@@ -3564,30 +3585,8 @@ def process_biodiversity_data(files, SAVE_DIR):
             df_wide_sum_area['type'] = 'column'
             df_wide_sum_area['color'] = df_wide_sum_area['name'].apply(lambda x: COLORS[x])
 
-            _sum_years = sorted(sum_bio_df['Year'].unique().tolist())
-            _target_color = COLORS.get('Target (%)', '#040404')
-
-            out_dict_sum = {}
-            for (region_level, region, species), df_pct in df_wide_sum_pct.groupby(['region_level', 'region', 'species']):
-                df_pct = df_pct.drop(['region_level', 'region', 'species'], axis=1)
-                df_area = df_wide_sum_area[(df_wide_sum_area['region_level'] == region_level) & (df_wide_sum_area['region'] == region) & (df_wide_sum_area['species'] == species)].drop(['region_level', 'region', 'species'], axis=1)
-                pct_records = df_pct.to_dict(orient='records')
-                area_records = df_area.to_dict(orient='records')
-                # Add target line if this species×region has a constraint target
-                _trow = _gbf3_target_lk[(_gbf3_target_lk['species'] == species) & (_gbf3_target_lk['region'] == region) & (_gbf3_target_lk['region_level'] == region_level)]
-                if not _trow.empty:
-                    t_pct = float(_trow['Target_by_Percent'].iloc[0])
-                    t_area = t_pct / 100 * float(_trow['BASE_TOTAL_SCORE'].iloc[0])
-                    pct_records = pct_records + [{'name': 'Target (%)', 'type': 'line', 'color': _target_color, 'data': [[yr, t_pct] for yr in _sum_years]}]
-                    area_records = area_records + [{'name': 'Target (ha)', 'type': 'line', 'color': _target_color, 'data': [[yr, t_area] for yr in _sum_years]}]
-                if region_level not in out_dict_sum:
-                    out_dict_sum[region_level] = {}
-                if region not in out_dict_sum[region_level]:
-                    out_dict_sum[region_level][region] = {}
-                out_dict_sum[region_level][region][species] = {
-                    'Percent': pct_records,
-                    'Area':    area_records,
-                }
+            out_dict_sum = build_out_dict_bulk(df_wide_sum_pct, df_wide_sum_area, ['region_level', 'region', 'species'])
+            out_dict_sum = add_bio_target_lines(out_dict_sum, bio_df)
             _write_paged_chart_js(out_dict_sum, 'BIO_GBF3_NVIS_Sum', SAVE_DIR, species_order=_nvis_species_order)
 
 
@@ -3670,7 +3669,10 @@ def process_biodiversity_data(files, SAVE_DIR):
         bio_df = _read_concat(bio_paths['path'], ignore_index=False)
         bio_df = bio_df.replace(RENAME_AM_NON_AG)\
             .infer_objects(copy=False)\
-            .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)'})\
+            .rename(columns={
+                'Contribution Relative to Pre-1750 Level (%)': 'Value (%)',
+                'Target by Percent (%)': 'Target_by_Percent',
+            })\
             .round(6)
         # Drop the per-species 'ALL' aggregate so it is not surfaced as a selectable
         # species in the report dropdowns; sum charts re-aggregate explicitly.
@@ -3705,7 +3707,7 @@ def process_biodiversity_data(files, SAVE_DIR):
 
         # ---------------- (GBF4 SNES) Overview  ----------------
 
-        # sum: normalise by ALL_HA so the chart shows sum(area)/ALL_HA*100 not sum of per-species %.
+        # Per-item %: a Type's area over the item's own pre-1750 total (BASE_TOTAL_SCORE), as the target line.
         _inside = bio_df.query(
             'Type != "Outside LUTO study area" and species != "ALL" '
             'and Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"'
@@ -3716,9 +3718,9 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_region = (
             pd.concat([_inside, _outside])
             .groupby(['Year', 'region_level', 'region', 'species', 'Type'])
-            .agg({'Area Weighted Score (ha)': 'sum', 'ALL_HA': 'first'})
+            .agg({'Area Weighted Score (ha)': 'sum', 'BASE_TOTAL_SCORE': 'first'})
             .reset_index()
-            .assign(**{'Sum_Pct (%)': lambda d: d['Area Weighted Score (ha)'] / d['ALL_HA'] * 100})
+            .assign(**{'Sum_Pct (%)': lambda d: d['Area Weighted Score (ha)'] / d['BASE_TOTAL_SCORE'] * 100})
         )
         df_wide_pct = groupby_to_records(df_region, ['region_level', 'Type', 'region', 'species'], ['region_level', 'name', 'region', 'species', 'data'], value_cols=('Year', 'Sum_Pct (%)'))
         df_wide_pct['type'] = 'column'
@@ -3743,17 +3745,23 @@ def process_biodiversity_data(files, SAVE_DIR):
             )
             sum_bio_df = sum_bio_df[sum_bio_df['Type'] != 'ALL'].copy()
             sum_bio_df['name'] = sum_bio_df['Type'].map(_SUM_TYPE_DISPLAY).fillna(sum_bio_df['Type'])
+            # Each Type's % of the item's own pre-1750 total, computed here rather than read from
+            # Relative_Contribution_Percentage so a report rebuilt from older CSVs is right too.
+            sum_bio_df['Value (%)'] = sum_bio_df['Area Weighted Score (ha)'] / sum_bio_df['BASE_TOTAL_SCORE'] * 100
             df_wide_sum_pct = groupby_to_records(sum_bio_df, ['region_level', 'name', 'region', 'species'], ['region_level', 'name', 'region', 'species', 'data'],
-                value_cols=('Year', 'Relative_Contribution_Percentage'),
+                value_cols=('Year', 'Value (%)'),
             )
             df_wide_sum_pct['type'] = 'column'
             df_wide_sum_pct['color'] = df_wide_sum_pct['name'].apply(lambda x: COLORS[x])
+
             df_wide_sum_area = groupby_to_records(sum_bio_df, ['region_level', 'name', 'region', 'species'], ['region_level', 'name', 'region', 'species', 'data'],
                 value_cols=('Year', 'Area Weighted Score (ha)'),
             )
             df_wide_sum_area['type'] = 'column'
             df_wide_sum_area['color'] = df_wide_sum_area['name'].apply(lambda x: COLORS[x])
+
             out_dict_sum = build_out_dict_bulk(df_wide_sum_pct, df_wide_sum_area, ['region_level', 'region', 'species'])
+            out_dict_sum = add_bio_target_lines(out_dict_sum, bio_df)
             _write_paged_chart_js(out_dict_sum, 'BIO_GBF4_SNES_Sum', SAVE_DIR, species_order=_snes_species_order)
 
         # ---------------- (GBF4 SNES) Ag  ----------------
@@ -3839,15 +3847,6 @@ def process_biodiversity_data(files, SAVE_DIR):
         _ecnes_species_order = (_paged_species_order(bio_paths, 'xr_biodiversity_GBF4_ECNES_ag')
                                 or sorted(bio_df['species'].unique().tolist()))
 
-        # Build target lookup once (species × region → Target_by_Percent, BASE_TOTAL_SCORE).
-        # Target_by_Percent is NaN when no constraint is active (write.py sets it to NaN
-        # when TARGET_INSIDE_SCORE = 0), so .notna() correctly selects only real targets.
-        _ecnes_target_lk = (
-            bio_df[bio_df['Target_by_Percent'].notna()]
-            [['species', 'region', 'region_level', 'Target_by_Percent', 'BASE_TOTAL_SCORE']]
-            .drop_duplicates(['species', 'region', 'region_level'])
-        )
-
         # ---------------- (GBF4 ECNES) Ranking  ----------------
         bio_rank_total = bio_df.query('Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL" and region != "AUSTRALIA"')\
             .groupby(['Year', 'region_level', 'region'])\
@@ -3873,7 +3872,7 @@ def process_biodiversity_data(files, SAVE_DIR):
 
         # ---------------- (GBF4 ECNES) Overview  ----------------
 
-        # sum: normalise by ALL_HA so the chart shows sum(area)/ALL_HA*100 not sum of per-community %.
+        # Per-item %: a Type's area over the item's own pre-1750 total (BASE_TOTAL_SCORE), as the target line.
         _inside = bio_df.query(
             'Type != "Outside LUTO study area" and species != "ALL" '
             'and Water_supply != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"'
@@ -3884,9 +3883,9 @@ def process_biodiversity_data(files, SAVE_DIR):
         df_region = (
             pd.concat([_inside, _outside])
             .groupby(['Year', 'region_level', 'region', 'species', 'Type'])
-            .agg({'Area Weighted Score (ha)': 'sum', 'ALL_HA': 'first'})
+            .agg({'Area Weighted Score (ha)': 'sum', 'BASE_TOTAL_SCORE': 'first'})
             .reset_index()
-            .assign(**{'Sum_Pct (%)': lambda d: d['Area Weighted Score (ha)'] / d['ALL_HA'] * 100})
+            .assign(**{'Sum_Pct (%)': lambda d: d['Area Weighted Score (ha)'] / d['BASE_TOTAL_SCORE'] * 100})
         )
         df_wide_pct = groupby_to_records(df_region, ['region_level', 'Type', 'region', 'species'], ['region_level', 'name', 'region', 'species', 'data'], value_cols=('Year', 'Sum_Pct (%)'))
         df_wide_pct['type'] = 'column'
@@ -3911,9 +3910,11 @@ def process_biodiversity_data(files, SAVE_DIR):
             )
             sum_bio_df = sum_bio_df[sum_bio_df['Type'] != 'ALL'].copy()
             sum_bio_df['name'] = sum_bio_df['Type'].map(_SUM_TYPE_DISPLAY).fillna(sum_bio_df['Type'])
-            sum_bio_df['_Pct_AllHA'] = sum_bio_df['Area Weighted Score (ha)'] / sum_bio_df['ALL_HA'] * 100
+            # Each Type's % of the item's own pre-1750 total, computed here rather than read from
+            # Relative_Contribution_Percentage so a report rebuilt from older CSVs is right too.
+            sum_bio_df['Value (%)'] = sum_bio_df['Area Weighted Score (ha)'] / sum_bio_df['BASE_TOTAL_SCORE'] * 100
             df_wide_sum_pct = groupby_to_records(sum_bio_df, ['region_level', 'name', 'region', 'species'], ['region_level', 'name', 'region', 'species', 'data'],
-                value_cols=('Year', '_Pct_AllHA'),
+                value_cols=('Year', 'Value (%)'),
             )
             df_wide_sum_pct['type'] = 'column'
             df_wide_sum_pct['color'] = df_wide_sum_pct['name'].apply(lambda x: COLORS[x])
@@ -3924,29 +3925,8 @@ def process_biodiversity_data(files, SAVE_DIR):
             df_wide_sum_area['type'] = 'column'
             df_wide_sum_area['color'] = df_wide_sum_area['name'].apply(lambda x: COLORS[x])
 
-            _ecnes_sum_years = sorted(sum_bio_df['Year'].unique().tolist())
-            _ecnes_target_color = COLORS.get('Target (%)', '#040404')
-
-            out_dict_sum = {}
-            for (region_level, region, species), df_pct in df_wide_sum_pct.groupby(['region_level', 'region', 'species']):
-                df_pct = df_pct.drop(['region_level', 'region', 'species'], axis=1)
-                df_area = df_wide_sum_area[(df_wide_sum_area['region_level'] == region_level) & (df_wide_sum_area['region'] == region) & (df_wide_sum_area['species'] == species)].drop(['region_level', 'region', 'species'], axis=1)
-                pct_records = df_pct.to_dict(orient='records')
-                area_records = df_area.to_dict(orient='records')
-                _trow = _ecnes_target_lk[(_ecnes_target_lk['species'] == species) & (_ecnes_target_lk['region'] == region) & (_ecnes_target_lk['region_level'] == region_level)]
-                if not _trow.empty:
-                    t_pct = float(_trow['Target_by_Percent'].iloc[0])
-                    t_area = t_pct / 100 * float(_trow['BASE_TOTAL_SCORE'].iloc[0])
-                    pct_records = pct_records + [{'name': 'Target (%)', 'type': 'line', 'color': _ecnes_target_color, 'data': [[yr, t_pct] for yr in _ecnes_sum_years]}]
-                    area_records = area_records + [{'name': 'Target (ha)', 'type': 'line', 'color': _ecnes_target_color, 'data': [[yr, t_area] for yr in _ecnes_sum_years]}]
-                if region_level not in out_dict_sum:
-                    out_dict_sum[region_level] = {}
-                if region not in out_dict_sum[region_level]:
-                    out_dict_sum[region_level][region] = {}
-                out_dict_sum[region_level][region][species] = {
-                    'Percent': pct_records,
-                    'Area':    area_records,
-                }
+            out_dict_sum = build_out_dict_bulk(df_wide_sum_pct, df_wide_sum_area, ['region_level', 'region', 'species'])
+            out_dict_sum = add_bio_target_lines(out_dict_sum, bio_df)
             _write_paged_chart_js(out_dict_sum, 'BIO_GBF4_ECNES_Sum', SAVE_DIR, species_order=_ecnes_species_order)
 
         # ---------------- (GBF4 ECNES) Ag  ----------------

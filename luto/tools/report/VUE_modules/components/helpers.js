@@ -86,12 +86,19 @@ window.createMapLayerLoader = function(viewName) {
     const currentLayerData = ref(null);
     const loadedComboKey   = ref(null);
 
+    // A view's cascade watchers often ask for the same combo several times in one tick, and a
+    // slow file can land after the user has moved on. One load per key is shared (`inflight`),
+    // and only the most recently requested key (`latestKey`) may set the layer.
+    const inflight = new Map();
+    let latestKey  = null;
+
     async function ensureComboLayer(layerPrefix, comboValues, pageRange = null) {
         // pageRange: [start, end] for paged SNES/ECNES/NVIS layers; null for standard layers.
         // The var name never includes the page so each new page overwrites the window variable,
         // keeping only the current page in memory.
         const pageKey = pageRange ? `||page_${pageRange[0]}_${pageRange[1]}` : '';
         const key     = `${layerPrefix}||${comboValues.join('||')}${pageKey}`;
+        latestKey = key;
         if (loadedComboKey.value === key && currentLayerData.value) return;
 
         const varName  = `${layerPrefix}__${comboValues.map(_safeKey).join('__')}`;
@@ -101,9 +108,24 @@ window.createMapLayerLoader = function(viewName) {
 
         const filePath = `data/map_layers/${filename}`;
         currentLayerData.value = null;
-        await window.loadScriptWithTracking(filePath, varName, viewName);
-        currentLayerData.value = window[varName] ?? null;
-        delete window[varName];
+        if (!inflight.has(key)) {
+            inflight.set(key, (async () => {
+                try {
+                    await window.loadScriptWithTracking(filePath, varName, viewName);
+                    return window[varName] ?? {};
+                } catch (err) {
+                    // A combo listed in the index with no file: show an empty map, not a stuck one.
+                    console.warn(`Map layer not loaded: ${filePath}`, err);
+                    return {};
+                } finally {
+                    delete window[varName];
+                    inflight.delete(key);
+                }
+            })());
+        }
+        const layer = await inflight.get(key);
+        if (latestKey !== key) return;
+        currentLayerData.value = layer;
         loadedComboKey.value = key;
     }
 
