@@ -20,13 +20,7 @@ window.AreaView = {
 
     // Available variables
     const availableYears = ref([]);
-    const availableUnit = {
-      Area: "Hectares",
-      Economics: "AUD",
-      GHG: "Mt CO2e",
-      Water: "ML",
-      Biodiversity: "Relative Percentage (Pre-1750 = 100%)",
-    };
+    const availableUnit = window.ReportLabels.units;
 
     // Available selections
     const availableCategories = ["Ag", "Ag Mgt", "Non-Ag"];
@@ -85,7 +79,7 @@ window.AreaView = {
       return {
         ...window["Chart_default_options"],
         chart: { height: 440 },
-        yAxis: { title: { text: availableUnit[cat] } },
+        yAxis: { title: { text: availableUnit.Area } },
         series: seriesData || [],
       };
     });
@@ -345,7 +339,7 @@ window.AreaView = {
 
         <!-- Water options -->
         <div v-if="selectCategory !== 'Non-Ag' && dataLoaded && availableWater.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
-          <span class="text-[0.8rem] mr-1 font-medium">Water:</span>
+          <span class="text-[0.8rem] mr-1 font-medium">Irrigation:</span>
           <button v-for="(val, key) in availableWater" :key="key"
             @click="selectWater = val"
             class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
@@ -356,7 +350,7 @@ window.AreaView = {
 
         <!-- Landuse options -->
         <div v-if="dataLoaded" class="flex flex-wrap gap-1 max-w-[300px]">
-          <span class="text-[0.8rem] mr-1 font-medium">Landuse:</span>
+          <span class="text-[0.8rem] mr-1 font-medium">Land use:</span>
           <button v-for="(val, key) in availableLanduse" :key="key"
             @click="selectLanduse = val"
             class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
@@ -389,6 +383,7 @@ window.AreaView = {
         <!-- Map component takes full space -->
         <regions-map
           :mapData="selectMapData"
+          unit="proportion of cell (0–1)"
           :file-name="mapFileName"
           :region-type="selectRegionLevel === 'region_state' ? 'STATE' : 'NRM'"
           :show-legend="!isDrawerOpen"

@@ -15,7 +15,7 @@ window.EconomicsView = {
     const selectRegionLevel = ref('region_state');
 
     const availableYears = ref([]);
-    const availableUnit = { Economics: "AUD" };
+    const availableUnit = window.ReportLabels.units;
     const availableCategories = ["Sum", "Ag", "Ag Mgt", "Non-Ag"];
     const availableMapTypes = ref([]);
     const availableAgMgt = ref([]);
@@ -254,8 +254,7 @@ window.EconomicsView = {
 
       availableMapTypes.value = Object.keys(mapRegister[initCat] || {});
       selectMapType.value = initMapType;
-      await cascadeAll(initCat, initMapType);
-
+      // The [selectCategory, selectMapType] watcher runs the first cascade (once).
       selectCategory.value = initCat;
       dataLoaded.value = true;
     });
@@ -278,7 +277,7 @@ window.EconomicsView = {
       }
       await ensureIndexLoaded(newCat, newMapType);
       await cascadeAll(newCat, newMapType);
-    }, { immediate: true });
+    });
 
     watch(selectAgMgt, async (newAgMgt) => {
       if (selectCategory.value !== "Ag Mgt") return;
@@ -501,7 +500,7 @@ window.EconomicsView = {
 
         <!-- 4. Water (Ag and Ag Mgt, not Transition or Non-Ag or Sum) -->
         <div v-if="!isTransition && selectCategory !== 'Non-Ag' && selectCategory !== 'Sum' && dataLoaded && availableWater.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
-          <span class="text-[0.8rem] mr-1 font-medium">Water:</span>
+          <span class="text-[0.8rem] mr-1 font-medium">Irrigation:</span>
           <button v-for="(val, key) in availableWater" :key="key"
             @click="selectWater = val"
             class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
@@ -534,7 +533,7 @@ window.EconomicsView = {
 
         <!-- 6. Landuse -->
         <div v-if="dataLoaded && availableLanduse.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
-          <span class="text-[0.8rem] mr-1 font-medium">{{ selectCategory === 'Sum' ? 'Type:' : 'Landuse:' }}</span>
+          <span class="text-[0.8rem] mr-1 font-medium">{{ selectCategory === 'Sum' ? 'Type:' : 'Land use:' }}</span>
           <button v-for="(val, key) in availableLanduse" :key="key"
             @click="selectLanduse = val"
             class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
@@ -562,6 +561,7 @@ window.EconomicsView = {
         <!-- Map component takes full space -->
         <regions-map
           :mapData="selectMapData"
+          unit="AUD/ha"
           :file-name="mapFileName"
           :region-type="selectRegionLevel === 'region_state' ? 'STATE' : 'NRM'"
           :show-legend="!isDrawerOpen"

@@ -43,6 +43,7 @@ from luto.tools.report.data_tools.parameters import (
     COLOR_AM,
     COLOR_NON_AG,
     COLOR_LUMAP,
+    RENAME_AM_NON_AG,
 )
 
 
@@ -606,9 +607,9 @@ def save_report_layer(raw_data_dir: str):
 
     legend_registry = {
         'ag':     build_map_legend(COLOR_AG),
-        'am':     build_map_legend(COLOR_AM),
-        'non_ag': build_map_legend(COLOR_NON_AG),
-        'lumap':  build_map_legend(COLOR_LUMAP),
+        'am':     build_map_legend(COLOR_AM, RENAME_AM_NON_AG),
+        'non_ag': build_map_legend(COLOR_NON_AG, RENAME_AM_NON_AG),
+        'lumap':  build_map_legend(COLOR_LUMAP, RENAME_AM_NON_AG),
     }
     
     with open(f'{SAVE_DIR}/map_layers/legend_registry.js', 'w') as _f:
@@ -970,9 +971,12 @@ def save_report_layer(raw_data_dir: str):
     
     prod_magnitudes = cell_magnitudes['production']
     prod_min_max = {k: (min(v), max(v)) for k, v in prod_magnitudes.items()}
+    # The range is shared per commodity across Ag / Ag Mgt / Non-Ag; only Ag Mgt (a change in
+    # production) can go below 0, so the other layers start their colour bar at 0.
+    prod_min_max_nonneg = {k: (max(0, lo), hi) for k, (lo, hi) in prod_min_max.items()}
 
     quantities_ag = files_quantities.query('base_name == "xr_quantities_agricultural"')
-    get_map2json(quantities_ag, {'Commodity':'ALL'}, prod_min_max, f'{SAVE_DIR}/map_layers/map_quantities_Ag.js', legend_key_int='ag')
+    get_map2json(quantities_ag, {'Commodity':'ALL'}, prod_min_max_nonneg, f'{SAVE_DIR}/map_layers/map_quantities_Ag.js', legend_key_int='ag')
     print('│   ├── Quantities Ag layer saved.')
 
     quantities_am = files_quantities.query('base_name == "xr_quantities_agricultural_management"')
@@ -980,11 +984,11 @@ def save_report_layer(raw_data_dir: str):
     print('│   ├── Quantities Am layer saved.')
 
     quantities_nonag = files_quantities.query('base_name == "xr_quantities_non_agricultural"')
-    get_map2json(quantities_nonag, {'Commodity':'ALL'}, prod_min_max, f'{SAVE_DIR}/map_layers/map_quantities_NonAg.js', legend_key_int='non_ag')
+    get_map2json(quantities_nonag, {'Commodity':'ALL'}, prod_min_max_nonneg, f'{SAVE_DIR}/map_layers/map_quantities_NonAg.js', legend_key_int='non_ag')
     print('│   ├── Quantities Non-Ag layer saved.')
 
     quantities_sum = files_quantities.query('base_name == "xr_quantities_sum"')
-    get_map2json(quantities_sum, {'Commodity':'ALL'}, prod_min_max, f'{SAVE_DIR}/map_layers/map_quantities_Sum.js', legend_key_int='ag')
+    get_map2json(quantities_sum, {'Commodity':'ALL'}, prod_min_max_nonneg, f'{SAVE_DIR}/map_layers/map_quantities_Sum.js', legend_key_int='ag')
     print('│   ├── Quantities Sum layer saved.')
 
 

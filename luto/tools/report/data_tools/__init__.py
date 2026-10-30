@@ -228,12 +228,14 @@ def rename_reorder_hierarchy(sel: dict) -> dict:
     return sel_rename
 
 
-def build_map_legend(code_dict) -> dict:
+def build_map_legend(code_dict, rename_map=None) -> dict:
     """Build map legend dicts from the Python color sub-dicts in parameters.py.
 
-    Input: code_dict is a dict of the form {code: (description, hex_color)}, e.g. COLOR_AG.
-    Output: dict with two sub-dicts:
-     - 'legend': {description: hex_color} for legend rendering
+    Input: code_dict is a dict of the form {code: (description, hex_color)}, e.g. COLOR_AG;
+    rename_map (e.g. RENAME_AM_NON_AG) gives the display name the charts use.
+    Output: dict with three sub-dicts:
+     - 'legend': {display name: hex_color} for legend rendering
+     - 'labels': {code: display name} for the value popup
      - 'code_colors': {code: (R, G, B, A)} for pixel rendering, with nodata (-1) as transparent (0, 0, 0, 0).
     """
     # Items disabled in settings are excluded from legend and pixel rendering
@@ -243,14 +245,17 @@ def build_map_legend(code_dict) -> dict:
     )
 
     legend = {}
+    labels = {}
     code_colors = {}
     for code, (desc, hex_c) in code_dict.items():
         if desc in rm_items:
             continue
-        legend[desc] = hex_c
+        name = (rename_map or {}).get(desc, desc)
+        legend[name] = hex_c
+        labels[code] = name
         code_colors[code] = hex_color_to_numeric(hex_c)
     code_colors[-1] = (0, 0, 0, 0)  # nodata / outside study area → transparent
-    return {'legend': legend, 'code_colors': code_colors}
+    return {'legend': legend, 'labels': labels, 'code_colors': code_colors}
 
 
     

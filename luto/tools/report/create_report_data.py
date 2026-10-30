@@ -68,21 +68,17 @@ def get_rank_color(x):
 
 
 def format_with_suffix(x):
-    """Format number with suffix (K, M, B, T)."""
+    """Format number with suffix (K, M, B, T), three significant figures (31.3 B, 491 M, 4.56 K)."""
     if pd.isna(x) or x == 0:
         return "0"
     suffixes = ['', 'K', 'M', 'B', 'T']
-    # Determine the appropriate suffix
+    x = float(f"{x:.3g}")               # round first, so 999.6 K becomes 1.00 M, not 1e+03 K
     magnitude = 0
     while abs(x) >= 1000 and magnitude < len(suffixes)-1:
         magnitude += 1
         x /= 1000.0
-    # Format with 2 significant digits
-    if abs(x) < 100:
-        formatted = f"{x:.2f}"
-    else:
-        formatted = f"{int(round(x))}"
-    return f"{formatted} {suffixes[magnitude]}"
+    formatted = f"{x:#.3g}".rstrip('.')
+    return f"{formatted} {suffixes[magnitude]}".rstrip()
 
 
 def annualise_points(years, values, sim_years=None) -> list:
@@ -236,6 +232,13 @@ def add_bio_target_lines(out_dict: dict, bio_df: pd.DataFrame) -> dict:
         .drop_duplicates(['region_level', 'region', 'species', 'Year'])
         .sort_values('Year')
     )
+    # Where an item's targets are set per NRM region, the state and AUSTRALIA rows are sums of
+    # them (plus the outside-LUTO credit of the whole state / country) that no constraint enforces:
+    # draw the line only at the level the targets were set. National targets have no NRM rows.
+    regional = (targets['region_level'] == 'region_NRM') & (targets['region'] != 'AUSTRALIA')
+    has_regional = targets[regional][['species', 'Year']].drop_duplicates().assign(_regional=True)
+    targets = targets.merge(has_regional, on=['species', 'Year'], how='left')
+    targets = targets[~targets['_regional'].fillna(False).astype(bool) | regional.values]
     for (region_level, region, species), df in targets.groupby(['region_level', 'region', 'species']):
         leaf = out_dict.get(region_level, {}).get(region, {}).get(species)
         if leaf is None:
@@ -318,12 +321,15 @@ def _write_paged_chart_js(
         fname = f'{filename_prefix}_{page_start}_{page_end}'
         with open(f'{save_dir}/{fname}.js', 'w') as f:
             f.write(f'window["{fname}"] = ')
-            json.dump(page_dict, f, separators=(',', ':'), indent=2)
+            json.dump(page_dict, f, separators=(',', ':'))
             f.write(';\n')
-    # Also write a flat combined file so Home.js can load all species in one request.
+    # Home.js loads the *_overview_sum flat file in one request; the Biodiversity view reads only
+    # the pages, so no other prefix gets a flat file (it was GBs of unread data).
+    if not filename_prefix.endswith('_overview_sum'):
+        return
     with open(f'{save_dir}/{filename_prefix}.js', 'w') as f:
         f.write(f'window["{filename_prefix}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        json.dump(out_dict, f, separators=(',', ':'))
         f.write(';\n')
 
 
@@ -414,7 +420,9 @@ def process_area_data(files, SAVE_DIR, lu_group_map):
         .assign(Rank=lambda x: x.groupby(['Year', 'region_level', 'Source']).cumcount())\
         .round({'Area (ha)': 2})
 
+    # Ag Mgt options sit on Ag land (and can overlap one another), so the total is Ag + Non-Ag only
     area_ranking_total = area_ranking_raw\
+        .query('Source != "Agricultural Management"')\
         .groupby(['Year', 'region_level', 'region'])[["Area (ha)"]]\
         .sum(numeric_only=True)\
         .reset_index()\
@@ -444,7 +452,7 @@ def process_area_data(files, SAVE_DIR, lu_group_map):
     filename = 'Area_ranking'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        json.dump(out_dict, f, separators=(',', ':'))
         f.write(';\n')
 
 
@@ -488,7 +496,7 @@ def process_area_data(files, SAVE_DIR, lu_group_map):
         filename = f'Area_overview_{idx+1}_{col.replace(" ", "_")}'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            json.dump(out_dict, f, separators=(',', ':'))
             f.write(';\n')
 
 
@@ -512,7 +520,7 @@ def process_area_data(files, SAVE_DIR, lu_group_map):
     filename = 'Area_Ag'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        json.dump(out_dict, f, separators=(',', ':'))
         f.write(';\n')
 
 
@@ -537,7 +545,7 @@ def process_area_data(files, SAVE_DIR, lu_group_map):
     filename = f'Area_Am'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        json.dump(out_dict, f, separators=(',', ':'))
         f.write(';\n')
 
 
@@ -559,7 +567,7 @@ def process_area_data(files, SAVE_DIR, lu_group_map):
     filename = 'Area_NonAg'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        json.dump(out_dict, f, separators=(',', ':'))
         f.write(';\n')
 
     return "Area data processing completed"
@@ -679,7 +687,7 @@ def process_economics_data(files, SAVE_DIR):
     filename = 'Economics_ranking'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        json.dump(out_dict, f, separators=(',', ':'))
         f.write(';\n')
 
 
@@ -735,7 +743,7 @@ def process_economics_data(files, SAVE_DIR):
     filename = 'Economics_overview_sum'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        json.dump(out_dict, f, separators=(',', ':'))
         f.write(';\n')
 
 
@@ -765,7 +773,7 @@ def process_economics_data(files, SAVE_DIR):
     filename = f'Economics_overview_Ag'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        json.dump(out_dict, f, separators=(',', ':'))
         f.write(';\n')
 
 
@@ -795,7 +803,7 @@ def process_economics_data(files, SAVE_DIR):
     filename = f'Economics_overview_Am'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        json.dump(out_dict, f, separators=(',', ':'))
         f.write(';\n')
 
 
@@ -846,7 +854,7 @@ def process_economics_data(files, SAVE_DIR):
     filename = f'Economics_overview_Non_Ag'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        json.dump(out_dict, f, separators=(',', ':'))
         f.write(';\n')
 
 
@@ -857,7 +865,7 @@ def process_economics_data(files, SAVE_DIR):
     def write_chart_js(out_dict, filename):
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            json.dump(out_dict, f, separators=(',', ':'))
             f.write(';\n')
 
     # Ag Revenue: region → Type(source) → Water → [series by LU]
@@ -1187,7 +1195,7 @@ def process_economics_data(files, SAVE_DIR):
     filename = 'Economics_Sum'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        json.dump(out_dict, f, separators=(',', ':'))
         f.write(';\n')
 
 
@@ -1232,7 +1240,7 @@ def process_economics_data(files, SAVE_DIR):
     #     filename = f'Economics_transition_split_ag2ag_{idx+1}_{col.replace(" ", "_")}'
     #     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
     #         f.write(f'window["{filename}"] = ')
-    #         json.dump(out_dict, f, separators=(',', ':'), indent=2)
+    #         json.dump(out_dict, f, separators=(',', ':'))
     #         f.write(';\n')
 
 
@@ -1285,7 +1293,7 @@ def process_economics_data(files, SAVE_DIR):
     # filename = 'Economics_transition_mat_ag2ag'
     # with open(f'{SAVE_DIR}/{filename}.js', 'w', encoding='utf-8') as f:
     #     f.write(f'window["{filename}"] = ')
-    #     json.dump(out_dict_area, f, separators=(',', ':'), indent=2)
+    #     json.dump(out_dict_area, f, separators=(',', ':'))
     #     f.write(';\n')
 
 
@@ -1332,7 +1340,7 @@ def process_economics_data(files, SAVE_DIR):
     #     filename = f'Economics_transition_split_Ag2NonAg_{idx+1}_{col.replace(" ", "_")}'
     #     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
     #         f.write(f'window["{filename}"] = ')
-    #         json.dump(out_dict, f, separators=(',', ':'), indent=2)
+    #         json.dump(out_dict, f, separators=(',', ':'))
     #         f.write(';\n')
 
 
@@ -1384,7 +1392,7 @@ def process_economics_data(files, SAVE_DIR):
     # filename = 'Economics_transition_mat_ag2nonag'
     # with open(f'{SAVE_DIR}/{filename}.js', 'w', encoding='utf-8') as f:
     #     f.write(f'window["{filename}"] = ')
-    #     json.dump(out_dict_area, f, separators=(',', ':'), indent=2)
+    #     json.dump(out_dict_area, f, separators=(',', ':'))
     #     f.write(';\n')
 
 
@@ -1430,7 +1438,7 @@ def process_economics_data(files, SAVE_DIR):
     #     filename = f'Economics_transition_split_NonAg2Ag_{idx+1}_{col.replace(" ", "_")}'
     #     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
     #         f.write(f'window["{filename}"] = ')
-    #         json.dump(out_dict, f, separators=(',', ':'), indent=2)
+    #         json.dump(out_dict, f, separators=(',', ':'))
     #         f.write(';\n')
 
 
@@ -1483,7 +1491,7 @@ def process_economics_data(files, SAVE_DIR):
     # filename = 'Economics_transition_mat_nonag2ag'
     # with open(f'{SAVE_DIR}/{filename}.js', 'w', encoding='utf-8') as f:
     #     f.write(f'window["{filename}"] = ')
-    #     json.dump(out_dict_area, f, separators=(',', ':'), indent=2)
+    #     json.dump(out_dict_area, f, separators=(',', ':'))
     #     f.write(';\n')
 
     return "Economics data processing completed"
@@ -1576,7 +1584,7 @@ def process_production_data(files, SAVE_DIR, years):
     filename = 'Production_ranking'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        json.dump(out_dict, f, separators=(',', ':'))
         f.write(';\n')
 
 
@@ -1592,7 +1600,7 @@ def process_production_data(files, SAVE_DIR, years):
     filename = 'Production_overview_demand_type'
     with open(fr'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        json.dump(out_dict, f, separators=(',', ':'))
         f.write(';\n')
 
     # seperate plot data
@@ -1618,7 +1626,7 @@ def process_production_data(files, SAVE_DIR, years):
         filename = f'Production_overview_{_type}'
         with open(fr'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            json.dump(out_dict, f, separators=(',', ':'))
             f.write(';\n')
 
 
@@ -1647,7 +1655,7 @@ def process_production_data(files, SAVE_DIR, years):
     filename = 'Production_overview_AUS_achive_percent'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(quantity_diff_wide_AUS_data, f, separators=(',', ':'), indent=2)
+        json.dump(quantity_diff_wide_AUS_data, f, separators=(',', ':'))
         f.write(';\n')
 
 
@@ -1674,7 +1682,7 @@ def process_production_data(files, SAVE_DIR, years):
     filename = f'Production_Ag'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        json.dump(out_dict, f, separators=(',', ':'))
         f.write(';\n')
 
 
@@ -1717,7 +1725,7 @@ def process_production_data(files, SAVE_DIR, years):
     filename = f'Production_Am'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        json.dump(out_dict, f, separators=(',', ':'))
         f.write(';\n')
 
 
@@ -1736,7 +1744,7 @@ def process_production_data(files, SAVE_DIR, years):
     filename = f'Production_NonAg'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        json.dump(out_dict, f, separators=(',', ':'))
         f.write(';\n')
 
 
@@ -1778,7 +1786,7 @@ def process_production_data(files, SAVE_DIR, years):
     filename = f'Production_Sum'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        json.dump(out_dict, f, separators=(',', ':'))
         f.write(';\n')
 
 
@@ -1837,7 +1845,7 @@ def process_renewable_data(files, SAVE_DIR, years):
     filename = 'Renewable_energy_Am'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        json.dump(out_dict, f, separators=(',', ':'))
         f.write(';\n')
 
     return "Renewable energy data processing completed"
@@ -1953,7 +1961,7 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
     filename = 'GHG_overview_sum'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(GHG_region, f, separators=(',', ':'), indent=2)
+        json.dump(GHG_region, f, separators=(',', ':'))
         f.write(';\n')
         
         
@@ -1974,7 +1982,7 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
     filename = 'GHG_overview_Ag'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        json.dump(out_dict, f, separators=(',', ':'))
         f.write(';\n')
         
         
@@ -1994,7 +2002,7 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
     filename = 'GHG_overview_Am'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        json.dump(out_dict, f, separators=(',', ':'))
         f.write(';\n')
         
         
@@ -2014,7 +2022,7 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
     filename = 'GHG_overview_NonAg'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        json.dump(out_dict, f, separators=(',', ':'))
         f.write(';\n')
     
 
@@ -2066,7 +2074,7 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
     filename = 'GHG_Sum'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        json.dump(out_dict, f, separators=(',', ':'))
         f.write(';\n')
 
 
@@ -2097,7 +2105,7 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
         .assign(Type='GHG sequestrations')
     GHG_rank_region_net = GHG_rank_emission_region\
         .merge(GHG_rank_sequestration_region, on=['Year', 'region_level', 'region'], how='outer', suffixes=('_emission', '_sequestration'))\
-        .assign(**{'Value (t CO2e)': lambda x: x['Value (t CO2e)_emission'] - x['Value (t CO2e)_sequestration']})\
+        .assign(**{'Value (t CO2e)': lambda x: x['Value (t CO2e)_emission'].fillna(0) - x['Value (t CO2e)_sequestration'].fillna(0)})\
         .assign(Type='Total')
 
 
@@ -2127,7 +2135,7 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
     filename = 'GHG_ranking'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        json.dump(out_dict, f, separators=(',', ':'))
         f.write(';\n')
         
         
@@ -2181,14 +2189,14 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
     filename = 'GHG_Ag'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        json.dump(out_dict, f, separators=(',', ':'))
         f.write(';\n')
 
 
 
     # -------------------- GHG by Non-Agricultural --------------------
     Non_ag_reduction_long = GHG_land.query('Type == "Non-Agricultural Land-use" and `Land-use` != "ALL"').reset_index(drop=True)
-    Non_ag_reduction_long['Value (t CO2e)'] *= -1  # Convert from negative to positive
+    # Sequestration stays negative, as on Home and the Sum tab (net emissions everywhere)
     
     df_region = Non_ag_reduction_long\
         .groupby(['Year', 'region_level', 'region', 'Land-use'])[['Value (t CO2e)']]\
@@ -2212,7 +2220,7 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
     filename = f'GHG_NonAg'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        json.dump(out_dict, f, separators=(',', ':'))
         f.write(';\n')
 
 
@@ -2221,7 +2229,7 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
     Ag_man_sequestration_long = GHG_land\
         .query('Type == "Agricultural Management" and `Agricultural Management Type` != "ALL"')\
         .reset_index(drop=True)
-    Ag_man_sequestration_long['Value (t CO2e)'] = Ag_man_sequestration_long['Value (t CO2e)'] * -1  # Convert from negative to positive
+    # Sequestration stays negative, as on Home and the Sum tab (net emissions everywhere)
 
     df_wide = groupby_to_records(Ag_man_sequestration_long, ['region_level', 'region', 'Water_supply', 'Land-use', 'Agricultural Management Type'], ['region_level', 'region', 'water', 'landuse', 'name', 'data'], value_cols=('Year', 'Value (t CO2e)'))
     df_wide['type'] = 'column'
@@ -2241,7 +2249,7 @@ def process_ghg_data(files, SAVE_DIR, lu_group_map, years):
     filename = 'GHG_Am'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        json.dump(out_dict, f, separators=(',', ':'))
         f.write(';\n')
 
         
@@ -2384,7 +2392,7 @@ def process_water_data(files, SAVE_DIR):
     filename = 'Water_overview_watershed'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as outfile:
         outfile.write(f'window["{filename}"] = ')
-        json.dump(water_yield_region, outfile, separators=(',', ':'), indent=2)
+        json.dump(water_yield_region, outfile, separators=(',', ':'))
         outfile.write(';\n')
         
         
@@ -2443,7 +2451,7 @@ def process_water_data(files, SAVE_DIR):
     filename = 'Water_ranking_NRM'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        json.dump(out_dict, f, separators=(',', ':'))
         f.write(';\n')
 
 
@@ -2466,7 +2474,7 @@ def process_water_data(files, SAVE_DIR):
     filename = f'Water_overview_NRM_sum'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        json.dump(out_dict, f, separators=(',', ':'))
         f.write(';\n')
         
         
@@ -2491,7 +2499,7 @@ def process_water_data(files, SAVE_DIR):
     filename = f'Water_overview_NRM_Ag'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        json.dump(out_dict, f, separators=(',', ':'))
         f.write(';\n')
         
     # Am
@@ -2515,7 +2523,7 @@ def process_water_data(files, SAVE_DIR):
     filename = f'Water_overview_NRM_Am'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        json.dump(out_dict, f, separators=(',', ':'))
         f.write(';\n')
         
         
@@ -2540,7 +2548,7 @@ def process_water_data(files, SAVE_DIR):
     filename = f'Water_overview_NRM_NonAg'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        json.dump(out_dict, f, separators=(',', ':'))
         f.write(';\n')
 
 
@@ -2592,7 +2600,7 @@ def process_water_data(files, SAVE_DIR):
     filename = f'Water_Ag_NRM'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        json.dump(out_dict, f, separators=(',', ':'))
         f.write(';\n')
         
 
@@ -2644,7 +2652,7 @@ def process_water_data(files, SAVE_DIR):
     filename = f'Water_Am_NRM'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        json.dump(out_dict, f, separators=(',', ':'))
         f.write(';\n')
             
             
@@ -2688,7 +2696,7 @@ def process_water_data(files, SAVE_DIR):
     filename = f'Water_NonAg_NRM'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        json.dump(out_dict, f, separators=(',', ':'))
         f.write(';\n')
 
 
@@ -2742,7 +2750,7 @@ def process_water_data(files, SAVE_DIR):
     filename = 'Water_Sum_NRM'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        json.dump(out_dict, f, separators=(',', ':'))
         f.write(';\n')
 
     return "Water data processing completed"
@@ -2818,7 +2826,7 @@ def process_transition_data(files, SAVE_DIR):
     filename = 'Transition_start_end_area'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(se_out_dict, f, separators=(',', ':'), indent=2)
+        json.dump(se_out_dict, f, separators=(',', ':'))
         f.write(';\n')
 
     # --------------------- Transition Area year-by-years (ag2ag) --------------------
@@ -2904,7 +2912,7 @@ def process_transition_data(files, SAVE_DIR):
     filename = 'Transition_ag2ag_area'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        json.dump(out_dict, f, separators=(',', ':'))
         f.write(';\n')
 
     # --------------------- Transition Area year-by-years (ag2nonag) --------------------
@@ -2985,7 +2993,7 @@ def process_transition_data(files, SAVE_DIR):
     filename = 'Transition_ag2nonag_area'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_ag2nonag_dict, f, separators=(',', ':'), indent=2)
+        json.dump(out_ag2nonag_dict, f, separators=(',', ':'))
         f.write(';\n')
 
 
@@ -3050,7 +3058,7 @@ def process_transition_data(files, SAVE_DIR):
         filename = 'Transition_ag2ag_cost'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_cost_ag2ag_dict, f, separators=(',', ':'), indent=2)
+            json.dump(out_cost_ag2ag_dict, f, separators=(',', ':'))
             f.write(';\n')
 
 
@@ -3122,7 +3130,7 @@ def process_transition_data(files, SAVE_DIR):
         filename = 'Transition_ag2nonag_cost'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_cost_ag2nonag_dict, f, separators=(',', ':'), indent=2)
+            json.dump(out_cost_ag2nonag_dict, f, separators=(',', ':'))
             f.write(';\n')
 
 
@@ -3198,7 +3206,7 @@ def process_biodiversity_data(files, SAVE_DIR):
     filename = 'BIO_quality_ranking'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(ranking_out, f, separators=(',', ':'), indent=2)
+        json.dump(ranking_out, f, separators=(',', ':'))
         f.write(';\n')
 
 
@@ -3221,7 +3229,7 @@ def process_biodiversity_data(files, SAVE_DIR):
     filename = f'BIO_quality_overview_sum'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(overview_out, f, separators=(',', ':'), indent=2)
+        json.dump(overview_out, f, separators=(',', ':'))
         f.write(';\n')
 
 
@@ -3243,7 +3251,7 @@ def process_biodiversity_data(files, SAVE_DIR):
     filename = f'BIO_quality_Ag'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(ag_out, f, separators=(',', ':'), indent=2)
+        json.dump(ag_out, f, separators=(',', ':'))
         f.write(';\n')
 
     # ---------------- Overall quality - Am (backend → region_level → region → am → water → {Percent, Area}) ----------------
@@ -3267,7 +3275,7 @@ def process_biodiversity_data(files, SAVE_DIR):
     filename = f'BIO_quality_Am'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(am_out, f, separators=(',', ':'), indent=2)
+        json.dump(am_out, f, separators=(',', ':'))
         f.write(';\n')
 
     # ---------------- Overall quality - Non-Ag (backend → region_level → region → {Percent, Area}) ----------------
@@ -3289,7 +3297,7 @@ def process_biodiversity_data(files, SAVE_DIR):
     filename = f'BIO_quality_NonAg'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(nonag_out, f, separators=(',', ':'), indent=2)
+        json.dump(nonag_out, f, separators=(',', ':'))
         f.write(';\n')
     
     
@@ -3361,7 +3369,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         filename = f'BIO_GBF2_overview_sum'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            json.dump(out_dict, f, separators=(',', ':'))
             f.write(';\n')
 
 
@@ -3394,7 +3402,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         filename = f'BIO_GBF2_Ag'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            json.dump(out_dict, f, separators=(',', ':'))
             f.write(';\n')
 
         # ---------------- (GBF2) Ag-Mgt  ----------------
@@ -3432,7 +3440,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         filename = f'BIO_GBF2_Am'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            json.dump(out_dict, f, separators=(',', ':'))
             f.write(';\n')
 
         # ---------------- (GBF2) Non-Ag  ----------------
@@ -3463,7 +3471,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         filename = f'BIO_GBF2_NonAg'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            json.dump(out_dict, f, separators=(',', ':'))
             f.write(';\n')
             
             
@@ -4048,7 +4056,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         filename = f'BIO_GBF8_SPECIES_overview_sum'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            json.dump(out_dict, f, separators=(',', ':'))
             f.write(';\n')
 
         # ---------------- (GBF8 SPECIES) Ag  ----------------
@@ -4072,7 +4080,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         filename = f'BIO_GBF8_SPECIES_Ag'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            json.dump(out_dict, f, separators=(',', ':'))
             f.write(';\n')
 
         # ---------------- (GBF8 SPECIES) Agricultural Management  ----------------
@@ -4099,7 +4107,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         filename = f'BIO_GBF8_SPECIES_Am'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            json.dump(out_dict, f, separators=(',', ':'))
             f.write(';\n')
 
         # ---------------- (GBF8 SPECIES) Non-ag  ----------------
@@ -4121,7 +4129,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         filename = f'BIO_GBF8_SPECIES_NonAg'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            json.dump(out_dict, f, separators=(',', ':'))
             f.write(';\n')
         
         
@@ -4177,7 +4185,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         filename = f'BIO_GBF8_GROUP_overview_sum'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            json.dump(out_dict, f, separators=(',', ':'))
             f.write(';\n')
 
         # ---------------- (GBF8 GROUP) Ag  ----------------
@@ -4201,7 +4209,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         filename = f'BIO_GBF8_GROUP_Ag'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            json.dump(out_dict, f, separators=(',', ':'))
             f.write(';\n')
 
         # ---------------- (GBF8 GROUP) Agricultural Management  ----------------
@@ -4228,7 +4236,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         filename = f'BIO_GBF8_GROUP_Am'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            json.dump(out_dict, f, separators=(',', ':'))
             f.write(';\n')
 
         # ---------------- (GBF8 GROUP) Non-ag  ----------------
@@ -4250,7 +4258,7 @@ def process_biodiversity_data(files, SAVE_DIR):
         filename = f'BIO_GBF8_GROUP_NonAg'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            json.dump(out_dict, f, separators=(',', ':'))
             f.write(';\n')
 
 
@@ -4258,7 +4266,7 @@ def process_biodiversity_data(files, SAVE_DIR):
     filename = 'BIO_ranking'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(bio_rank_dict, f, separators=(',', ':'), indent=2)
+        json.dump(bio_rank_dict, f, separators=(',', ':'))
         f.write(';\n')
 
 
@@ -4332,7 +4340,7 @@ def process_supporting_info_data(SAVE_DIR, years, raw_data_dir):
         'model_run_settings': settings_dict,
         'years': years,
         'colors': COLORS,
-        'COLORSing': COLORS,
+        'colors_ranking': {k: COLORS[k] for k in ['1-10', '11-20', '>=21', 'N.A.']},
         'mem_logs': mem_logs_obj,
         'renewables_enabled': any(settings.RENEWABLES_OPTIONS.values()),
         'GBF3_NVIS_REGION_MODE': settings.GBF3_NVIS_REGION_MODE,
@@ -4344,7 +4352,7 @@ def process_supporting_info_data(SAVE_DIR, years, raw_data_dir):
     filename = 'Supporting_info'
     with open(f"{SAVE_DIR}/{filename}.js", 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(supporting, f, separators=(',', ':'), indent=2)
+        json.dump(supporting, f, separators=(',', ':'))
         f.write(';\n')
     
 

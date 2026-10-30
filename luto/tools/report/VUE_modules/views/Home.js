@@ -28,7 +28,8 @@ window.HomeView = {
         return dataObj?.['NRM']?.[region];
       }
       if (cat === 'Production') {
-        return dataObj?.[region];
+        // Production is reported nationally only (the demand rows are national)
+        return dataObj?.['AUSTRALIA'];
       }
       return dataObj?.['region_NRM']?.[region];
     }
@@ -56,19 +57,14 @@ window.HomeView = {
     const rankingColors = ref({});
     const runScenario = ref({});
     const dataLoaded = ref(false);
+    const lazyBioEntries = {};               // GBF tab -> ChartService entry, fetched on first pick
+    const isLoadingChart = ref(false);
 
     // Available selections
     const availableYears = ref([]);
     const availableChartCategories = ref([]);
     const availableChartSubCategories = ref([]);
-    const availableUnit = {
-      'Area': 'Hectares',
-      'Economics': 'AUD',
-      'GHG': 'Mt CO2e',
-      'Water': 'ML',
-      'Biodiversity': 'Relative Percentage (Pre-1750 = 100%)',
-      'Production': 'Tonnes or KL',
-    };
+    const availableUnit = window.ReportLabels.units;
     const RankSubcategoriesRename = {
       'Agricultural Land-use': 'Ag',
       'Agricultural Management': 'Ag Mgt',
@@ -102,6 +98,23 @@ window.HomeView = {
       return v >= 1e6 ? (v / 1e6).toFixed(1) + 'M'
         : v >= 1e3 ? (v / 1e3).toFixed(0) + 'k'
           : String(Math.round(v));
+    });
+
+    // 'SSP245' -> 'SSP2-4.5'
+    const scenarioLabel = computed(() => {
+      const ssp = String(runScenario.value.SSP || '');
+      return ssp.length === 3 ? `SSP${ssp[0]}-${ssp[1]}.${ssp[2]}` : `SSP${ssp}`;
+    });
+
+    // "<quantity> — <view>, <region>"; Production is national only
+    const chartHeading = computed(() => {
+      const cat = selectChartCategory.value;
+      const unit = availableUnit[cat] || cat;
+      const quantity = cat === 'Biodiversity' ? 'Biodiversity' : unit.replace(/\s*\(.*\)\s*$/, '');
+      const region = cat === 'Production' && selectRegion.value !== 'AUSTRALIA'
+        ? 'AUSTRALIA (reported nationally only)'
+        : selectRegion.value;
+      return `${quantity} — ${selectChartSubCategory.value}, ${region}`;
     });
 
     //  Reactive data
@@ -228,55 +241,20 @@ window.HomeView = {
       const rankingBiodiversityQuality = chartRegister['Biodiversity']['quality']['ranking'];
       const rankingBiodiversityAll = chartRegister['Biodiversity']['ranking'];
 
-      await loadScript(chartOverview_area_source['path'], chartOverview_area_source['name'], VIEW_NAME);
-      await loadScript(chartOverview_area_category['path'], chartOverview_area_category['name'], VIEW_NAME);
-      await loadScript(chartOverview_area_landuse['path'], chartOverview_area_landuse['name'], VIEW_NAME);
-      await loadScript(chartOverview_bio_quality['path'], chartOverview_bio_quality['name'], VIEW_NAME);
-      // Conditional biodiversity script loading based on runScenario
-      if (runScenario.value['GBF2_TARGET'] !== 'off') {
-        await loadScript(chartOverview_bio_GBF2['path'], chartOverview_bio_GBF2['name'], VIEW_NAME);
-      }
-      if (runScenario.value['WRITE_GBF3_NVIS'] !== 'off') {
-        await loadScript(chartOverview_bio_GBF3_NVIS['path'], chartOverview_bio_GBF3_NVIS['name'], VIEW_NAME);
-      }
-      if (runScenario.value['WRITE_GBF4_SNES'] !== 'off') {
-        await loadScript(chartOverview_bio_GBF4_SNES['path'], chartOverview_bio_GBF4_SNES['name'], VIEW_NAME);
-      }
-      if (runScenario.value['WRITE_GBF4_ECNES'] !== 'off') {
-        await loadScript(chartOverview_bio_GBF4_ECNES['path'], chartOverview_bio_GBF4_ECNES['name'], VIEW_NAME);
-      }
-      if (runScenario.value['GBF8_TARGET'] !== 'off') {
-        await loadScript(chartOverview_bio_GBF8_SPECIES['path'], chartOverview_bio_GBF8_SPECIES['name'], VIEW_NAME);
-        await loadScript(chartOverview_bio_GBF8_GROUP['path'], chartOverview_bio_GBF8_GROUP['name'], VIEW_NAME);
-      }
-      await loadScript(chartOverview_economics_sum['path'], chartOverview_economics_sum['name'], VIEW_NAME);
-      await loadScript(chartOverview_economics_ag['path'], chartOverview_economics_ag['name'], VIEW_NAME);
-      await loadScript(chartOverview_economics_agMgt['path'], chartOverview_economics_agMgt['name'], VIEW_NAME);
-      await loadScript(chartOverview_economics_Nonag['path'], chartOverview_economics_Nonag['name'], VIEW_NAME);
-      await loadScript(chartOverview_ghg_sum['path'], chartOverview_ghg_sum['name'], VIEW_NAME);
-      await loadScript(chartOverview_ghg_ag['path'], chartOverview_ghg_ag['name'], VIEW_NAME);
-      await loadScript(chartOverview_ghg_agMgt['path'], chartOverview_ghg_agMgt['name'], VIEW_NAME);
-      await loadScript(chartOverview_ghg_Nonag['path'], chartOverview_ghg_Nonag['name'], VIEW_NAME);
-      await loadScript(chartOverview_prod_achieve['path'], chartOverview_prod_achieve['name'], VIEW_NAME);
-      await loadScript(chartOverview_prod_overview['path'], chartOverview_prod_overview['name'], VIEW_NAME);
-      await loadScript(chartOverview_prod_domestic['path'], chartOverview_prod_domestic['name'], VIEW_NAME);
-      await loadScript(chartOverview_prod_export['path'], chartOverview_prod_export['name'], VIEW_NAME);
-      await loadScript(chartOverview_prod_import['path'], chartOverview_prod_import['name'], VIEW_NAME);
-      await loadScript(chartOverview_prod_feed['path'], chartOverview_prod_feed['name'], VIEW_NAME);
-      await loadScript(chartOverview_water_sum['path'], chartOverview_water_sum['name'], VIEW_NAME);
-      await loadScript(chartOverview_water_ag['path'], chartOverview_water_ag['name'], VIEW_NAME);
-      await loadScript(chartOverview_water_agMgt['path'], chartOverview_water_agMgt['name'], VIEW_NAME);
-      await loadScript(chartOverview_water_Nonag['path'], chartOverview_water_Nonag['name'], VIEW_NAME);
-
-      await loadScript(rankingArea['path'], rankingArea['name'], VIEW_NAME);
-      await loadScript(rankingEconomics['path'], rankingEconomics['name'], VIEW_NAME);
-      await loadScript(rankingGHG['path'], rankingGHG['name'], VIEW_NAME);
-      await loadScript(rankingProduction['path'], rankingProduction['name'], VIEW_NAME);
-      await loadScript(rankingWater['path'], rankingWater['name'], VIEW_NAME);
-      await loadScript(rankingBiodiversityQuality['path'], rankingBiodiversityQuality['name'], VIEW_NAME);
-      await loadScript(rankingBiodiversityAll['path'], rankingBiodiversityAll['name'], VIEW_NAME);
-
-
+      // Every overview and ranking file is independent: fetch them in parallel. The GBF overviews
+      // (the SNES one alone can be > 100 MB) are fetched only when their tab is picked.
+      const eagerEntries = [
+        chartOverview_area_source, chartOverview_area_category, chartOverview_area_landuse,
+        chartOverview_bio_quality,
+        chartOverview_economics_sum, chartOverview_economics_ag, chartOverview_economics_agMgt, chartOverview_economics_Nonag,
+        chartOverview_ghg_sum, chartOverview_ghg_ag, chartOverview_ghg_agMgt, chartOverview_ghg_Nonag,
+        chartOverview_prod_achieve, chartOverview_prod_overview, chartOverview_prod_domestic,
+        chartOverview_prod_export, chartOverview_prod_import, chartOverview_prod_feed,
+        chartOverview_water_sum, chartOverview_water_ag, chartOverview_water_agMgt, chartOverview_water_Nonag,
+        rankingArea, rankingEconomics, rankingGHG, rankingProduction, rankingWater,
+        rankingBiodiversityQuality, rankingBiodiversityAll,
+      ];
+      await Promise.all(eagerEntries.map(entry => loadScript(entry['path'], entry['name'], VIEW_NAME)));
 
       rankingData.value = {
         'Area': window[rankingArea['name']],
@@ -328,22 +306,19 @@ window.HomeView = {
         },
       };
 
-      // Dynamically add GBF data based on what was loaded
-      if (runScenario.value['GBF2_TARGET'] !== 'off') {
-        ChartData.value['Biodiversity']['GBF2'] = window[chartOverview_bio_GBF2['name']];
-      }
-      if (runScenario.value['WRITE_GBF3_NVIS'] !== 'off') {
-        ChartData.value['Biodiversity']['GBF3 (NVIS)'] = window[chartOverview_bio_GBF3_NVIS['name']];
-      }
-      if (runScenario.value['WRITE_GBF4_SNES'] !== 'off') {
-        ChartData.value['Biodiversity']['GBF4 (SNES)'] = window[chartOverview_bio_GBF4_SNES['name']];
-      }
-      if (runScenario.value['WRITE_GBF4_ECNES'] !== 'off') {
-        ChartData.value['Biodiversity']['GBF4 (ECNES)'] = window[chartOverview_bio_GBF4_ECNES['name']];
-      }
-      if (runScenario.value['GBF8_TARGET'] !== 'off') {
-        ChartData.value['Biodiversity']['GBF8 (SPECIES)'] = window[chartOverview_bio_GBF8_SPECIES['name']];
-        ChartData.value['Biodiversity']['GBF8 (GROUP)'] = window[chartOverview_bio_GBF8_GROUP['name']];
+      // GBF tabs: listed now, their data fetched on first pick (lazyBioEntries, see the watcher)
+      const gbfTabs = [
+        ['GBF2', 'GBF2_TARGET', chartOverview_bio_GBF2],
+        ['GBF3 (NVIS)', 'WRITE_GBF3_NVIS', chartOverview_bio_GBF3_NVIS],
+        ['GBF4 (SNES)', 'WRITE_GBF4_SNES', chartOverview_bio_GBF4_SNES],
+        ['GBF4 (ECNES)', 'WRITE_GBF4_ECNES', chartOverview_bio_GBF4_ECNES],
+        ['GBF8 (SPECIES)', 'GBF8_TARGET', chartOverview_bio_GBF8_SPECIES],
+        ['GBF8 (GROUP)', 'GBF8_TARGET', chartOverview_bio_GBF8_GROUP],
+      ];
+      for (const [tab, settingKey, entry] of gbfTabs) {
+        if (runScenario.value[settingKey] === 'off') continue;
+        ChartData.value['Biodiversity'][tab] = null;
+        lazyBioEntries[tab] = entry;
       }
 
       //  Set initial values
@@ -381,6 +356,20 @@ window.HomeView = {
       selectRankingSubCategory.value = availableRankSubcategories.value[0] || 'N/A';
     });
 
+    // Fetch a GBF overview the first time its tab is picked
+    watch(selectChartSubCategory, async (sub) => {
+      if (selectChartCategory.value !== 'Biodiversity') return;
+      const entry = lazyBioEntries[sub];
+      if (!entry || ChartData.value['Biodiversity'][sub]) return;
+      isLoadingChart.value = true;
+      try {
+        await loadScript(entry['path'], entry['name'], VIEW_NAME);
+        ChartData.value['Biodiversity'][sub] = window[entry['name']];
+      } finally {
+        isLoadingChart.value = false;
+      }
+    });
+
     // Reset species selection when subcategory or category changes
     watch(availableSpecies, (newSpecies) => {
       if (!newSpecies.includes(selectSpecies.value)) {
@@ -394,6 +383,9 @@ window.HomeView = {
     const _state = {
       yearIndex,
       runScenario,
+      scenarioLabel,
+      chartHeading,
+      isLoadingChart,
       dataLoaded,
 
       ChartData,
@@ -437,9 +429,9 @@ window.HomeView = {
 
         <!-- Scenario Information Header -->
         <p class="text-[#505051] font-bold p-1 pt-8">
-          SSP - {{ runScenario.SSP }} |
-          GHG - {{ runScenario.GHG_EMISSIONS_LIMITS }} |
-          Biodiversity - {{ runScenario.GBF2_TARGET }}
+          Scenario: {{ scenarioLabel }} ·
+          GHG target: {{ runScenario.GHG_EMISSIONS_LIMITS }} ·
+          GBF2 target: {{ runScenario.GBF2_TARGET }}
         </p>
 
         <!-- Ranking Cards Section -->
@@ -453,7 +445,8 @@ window.HomeView = {
             Map and Statistics
           </p>
           <p class="flex-1 text-[#505051] font-bold ml-4 p-1 pt-8">
-            {{ selectChartCategory }} overview for {{ selectRegion }}
+            {{ chartHeading }}
+            <span v-if="isLoadingChart" class="ml-2 text-[0.75rem] font-normal text-gray-500">loading…</span>
           </p>
         </div>
 
@@ -493,7 +486,7 @@ window.HomeView = {
                 v-for="(data, key) in availableRankSubcategories"
                 :key="key"
                 @click="selectRankingSubCategory = data"
-                class="bg-[#e8eaed] text-[#1f1f1f] text-[0.57rem] px-1 py-1 rounded"
+                class="bg-[#e8eaed] text-[#1f1f1f] text-[0.7rem] px-2 py-1 rounded"
                 :class="{'bg-sky-500 text-white': selectRankingSubCategory === data}"
               >
                 {{ RankSubcategoriesRename[data] || data }}
@@ -533,7 +526,7 @@ window.HomeView = {
               class="absolute bottom-[20px] left-[35px] z-[100]"
             >
               <div class="font-bold text-sm mb-2 text-gray-600">
-                Ranking
+                NRM rank by {{ RankSubcategoriesRename[selectRankingSubCategory] || selectRankingSubCategory }}, {{ selectYear }}
               </div>
               <div class="flex flex-row items-center">
                 <div
@@ -601,7 +594,7 @@ window.HomeView = {
             <div class="absolute top-2 left-3 z-10 flex items-center gap-4 bg-white/80 rounded px-2 py-1">
               <!-- From-Water buttons -->
               <div class="flex items-center gap-1">
-                <span class="text-[0.75rem] text-[#505051] mr-1">From Water:</span>
+                <span class="text-[0.75rem] text-[#505051] mr-1">From:</span>
                 <button
                   v-for="opt in WATER_OPTIONS" :key="'fw-' + opt"
                   @click="transitionFromWater = opt"
@@ -611,7 +604,7 @@ window.HomeView = {
               </div>
               <!-- To-Water buttons -->
               <div class="flex items-center gap-1">
-                <span class="text-[0.75rem] text-[#505051] mr-1">To Water:</span>
+                <span class="text-[0.75rem] text-[#505051] mr-1">To:</span>
                 <button
                   v-for="opt in WATER_OPTIONS" :key="'tw-' + opt"
                   @click="transitionToWater = opt"

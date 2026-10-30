@@ -18,7 +18,10 @@ window.MemoryService = {
     if (!this.viewScriptRegistry.has(viewName)) {
       this.viewScriptRegistry.set(viewName, new Map());
     }
-    this.viewScriptRegistry.get(viewName).set(src, scriptElement);
+    // A list per src: a re-request must not orphan the element of an earlier one.
+    const scripts = this.viewScriptRegistry.get(viewName);
+    if (!scripts.has(src)) scripts.set(src, []);
+    scripts.get(src).push(scriptElement);
   },
 
   // AGGRESSIVE CLEANUP - Remove ALL data and scripts when leaving a view
@@ -35,10 +38,12 @@ window.MemoryService = {
     // Clean up script elements
     const scriptMap = this.viewScriptRegistry.get(viewName);
     if (scriptMap) {
-      scriptMap.forEach((scriptElement, src) => {
-        if (scriptElement && scriptElement.parentNode) {
-          scriptElement.parentNode.removeChild(scriptElement);
-        }
+      scriptMap.forEach((scriptElements) => {
+        scriptElements.forEach((scriptElement) => {
+          if (scriptElement && scriptElement.parentNode) {
+            scriptElement.parentNode.removeChild(scriptElement);
+          }
+        });
       });
       this.viewScriptRegistry.delete(viewName);
     }
@@ -54,7 +59,7 @@ window.MemoryService = {
     const totalDataObjects = Array.from(this.viewDataRegistry.values())
       .reduce((sum, set) => sum + set.size, 0);
     const totalScriptElements = Array.from(this.viewScriptRegistry.values())
-      .reduce((sum, map) => sum + map.size, 0);
+      .reduce((sum, map) => sum + [...map.values()].reduce((n, list) => n + list.length, 0), 0);
 
     return {
       activeViews: this.viewDataRegistry.size,

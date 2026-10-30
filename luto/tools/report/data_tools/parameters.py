@@ -94,8 +94,8 @@ RENAME_AM = {
     "Savanna Burning": "Early dry-season savanna burning",
     "AgTech EI": "Agricultural technology (energy)",
     'Biochar': "Biochar (soil amendment)",
-    'HIR - Beef': "Human-induced regeneration (Beef)",
-    'HIR - Sheep': "Human-induced regeneration (Sheep)",
+    'HIR - Beef': "Managed regeneration (Beef)",
+    'HIR - Sheep': "Managed regeneration (Sheep)",
     'Utility Solar PV': "Utility Solar PV",
     'Onshore Wind': "Onshore Wind"
 }
@@ -197,7 +197,7 @@ GROUP_LU = {
     'Unallocated - natural land': [
         'Unallocated - natural land',
     ],
-    'Human-induced regeneration': [
+    'Managed regeneration': [
         'Destocked - natural land',
     ],
 }
@@ -335,7 +335,7 @@ COLORS_PLOT = {
     'Other crops':                              '#d9abe1',
     'Carbon-focussed sequestration':            '#73ff73',
     'Nature positive sequestration':            '#006f53',
-    'Human-induced regeneration':               '#7ece7e',
+    'Managed regeneration':                     '#7ece7e',
 
     # --- Production aggregates ---
     'Meat':                                     '#8085e9',
@@ -514,8 +514,8 @@ LUMAP_GROUP = {
     'Sheep Agroforestry':            'Sheep Agroforestry',
     'Beef Agroforestry':             'Beef Agroforestry',
     'Carbon Plantings (Block)':      'Carbon Plantings (Block)',
-    'Sheep Carbon Plantings (Belt)': 'Carbon Plantings (Block)',
-    'Beef Carbon Plantings (Belt)':  'Carbon Plantings (Block)',
+    'Sheep Carbon Plantings (Belt)': 'Farm forestry (hardwood timber + sheep/beef)',
+    'Beef Carbon Plantings (Belt)':  'Farm forestry (hardwood timber + sheep/beef)',
     'BECCS':                         'BECCS',
     'Destocked - natural land':      'Destocked - natural land',
 }
@@ -529,6 +529,7 @@ LUMAP_GROUP_HEX = {
     'Sheep Agroforestry':          '#c500ff',
     'Beef Agroforestry':           '#ff0000',
     'Carbon Plantings (Block)':    '#267300',
+    'Farm forestry (hardwood timber + sheep/beef)': '#4fb06a',
     'BECCS':                       '#686868',
     'Destocked - natural land':    '#e0e048',
 }

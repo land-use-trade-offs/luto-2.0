@@ -283,7 +283,7 @@ window.TransitionView = {
 
           <!-- Area mode: From-water buttons -->
           <div v-if="isAreaMode && dataLoaded && availableFromWater.length > 0" class="flex flex-wrap gap-1">
-            <span class="text-[0.8rem] mr-1 font-medium">From Water:</span>
+            <span class="text-[0.8rem] mr-1 font-medium">From:</span>
             <button v-for="val in availableFromWater" :key="val"
               @click="selectFromWater = val"
               class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
@@ -294,7 +294,7 @@ window.TransitionView = {
 
           <!-- Area mode: To-water buttons -->
           <div v-if="isAreaMode && dataLoaded && availableToWater.length > 0" class="flex flex-wrap gap-1">
-            <span class="text-[0.8rem] mr-1 font-medium">To Water:</span>
+            <span class="text-[0.8rem] mr-1 font-medium">To:</span>
             <button v-for="val in availableToWater" :key="val"
               @click="selectToWater = val"
               class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"

@@ -244,6 +244,11 @@ window.RegionsMap = {
     fileName: {
       type: String,
       default: ''
+    },
+    // Unit of a continuous layer's values, shown on the colour bar and in the value popup
+    unit: {
+      type: String,
+      default: 'per ha'
     }
   },
 
@@ -310,7 +315,7 @@ window.RegionsMap = {
         if (raw === null || raw === NODATA) {
           content = '<span style="color:#888">No data</span>';
         } else if (data.intOrFloat === 'int') {
-          const label = window.legend_registry?.[data.legendKey]?.legend?.[Math.round(raw)];
+          const label = window.legend_registry?.[data.legendKey]?.labels?.[Math.round(raw)];
           content = label
             ? `<b>${label}</b><br><span style="color:#888">code ${Math.round(raw)}</span>`
             : `<b>${Math.round(raw)}</b>`;
@@ -318,7 +323,7 @@ window.RegionsMap = {
           const fmt = v => Math.abs(v) >= 1e4 ? v.toExponential(3)
                          : Math.abs(v) >= 1    ? v.toPrecision(5)
                          :                       v.toPrecision(4);
-          content = `<b>${fmt(raw)}</b>`;
+          content = `<b>${fmt(raw)}</b> <span style="color:#888">${props.unit}</span>`;
         }
 
         L.popup({ closeButton: true, className: 'luto-value-popup' })
@@ -619,6 +624,8 @@ window.RegionsMap = {
     };
 
     Vue.watch(() => props.mapData, async (newVal) => {
+      // A pinned value belongs to the layer it was read from
+      map.value?.closePopup();
       await loadMapData();
     });
 
@@ -921,7 +928,7 @@ window.RegionsMap = {
              class="absolute bottom-[28px] left-1/2 z-[1001] bg-white/80 px-3 py-2 rounded-lg shadow"
              style="transform: translateX(-50%); min-width: 260px; max-width: 380px;">
           <!-- Header row: unit label -->
-          <div class="text-[0.6rem] text-gray-400 text-right mb-0.5 italic">per ha</div>
+          <div class="text-[0.7rem] text-gray-600 text-right mb-0.5 font-medium">{{ unit }}</div>
           <!-- Gradient bar -->
           <div class="h-3 w-full rounded" :style="{ background: colorbarInfo.gradient }"></div>
           <!-- Tick labels -->

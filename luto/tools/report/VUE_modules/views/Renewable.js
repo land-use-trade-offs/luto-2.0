@@ -42,7 +42,7 @@ window.RenewableView = {
       return {
         ...window["Chart_default_options"],
         chart: { height: 440 },
-        yAxis: { title: { text: "MWh" } },
+        yAxis: { title: { text: window.ReportLabels.units.Renewable } },
         series: seriesData || [],
       };
     });
@@ -191,7 +191,7 @@ window.RenewableView = {
 
         <!-- Water options -->
         <div v-if="dataLoaded && availableWater.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
-          <span class="text-[0.8rem] mr-1 font-medium">Water:</span>
+          <span class="text-[0.8rem] mr-1 font-medium">Irrigation:</span>
           <button v-for="(val, key) in availableWater" :key="key"
             @click="selectWater = val"
             class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
@@ -202,7 +202,7 @@ window.RenewableView = {
 
         <!-- Landuse options -->
         <div v-if="dataLoaded && availableLanduse.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
-          <span class="text-[0.8rem] mr-1 font-medium">Landuse:</span>
+          <span class="text-[0.8rem] mr-1 font-medium">Land use:</span>
           <button v-for="(val, key) in availableLanduse" :key="key"
             @click="selectLanduse = val"
             class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
@@ -230,6 +230,7 @@ window.RenewableView = {
         <!-- Map component takes full space -->
         <regions-map
           :mapData="selectMapData"
+          unit="MWh/ha"
           :file-name="mapFileName"
           :region-type="selectRegionLevel === 'region_state' ? 'STATE' : 'NRM'"
           :overlays="mapOverlays"

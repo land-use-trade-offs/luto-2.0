@@ -15,11 +15,7 @@ window.ProductionView = {
     const selectRegionLevel = ref('region_state');
 
     const availableYears = ref([]);
-    const availableUnit = {
-      Area: "Hectares", Economics: "AUD", GHG: "Mt CO2e",
-      Water: "ML", Production: "Tonnes",
-      Biodiversity: "Relative Percentage (Pre-1750 = 100%)",
-    };
+    const availableUnit = window.ReportLabels.units;
 
     const availableCategories = ["Sum", "Ag", "Ag Mgt", "Non-Ag"];
     const availableAgMgt = ref([]);
@@ -302,7 +298,7 @@ window.ProductionView = {
 
         <!-- Water options (for Sum, Ag and Ag Mgt) -->
         <div v-if="dataLoaded && (selectCategory === 'Sum' || selectCategory === 'Ag' || selectCategory === 'Ag Mgt') && availableWater.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
-          <span class="text-[0.8rem] mr-1 font-medium">Water:</span>
+          <span class="text-[0.8rem] mr-1 font-medium">Irrigation:</span>
           <button v-for="(val, key) in availableWater" :key="key"
             @click="selectWater = val"
             class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
@@ -313,7 +309,7 @@ window.ProductionView = {
 
         <!-- Landuse options -->
         <div v-if="dataLoaded" class="flex flex-wrap gap-1 max-w-[300px]">
-          <span class="text-[0.8rem] mr-1 font-medium">Landuse:</span>
+          <span class="text-[0.8rem] mr-1 font-medium">Land use:</span>
           <button v-for="(val, key) in availableLanduse" :key="key"
             @click="selectCommodity = val"
             class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
@@ -341,6 +337,7 @@ window.ProductionView = {
         <!-- Map component takes full space -->
         <regions-map
           :mapData="selectMapData"
+          unit="t/ha (milk kL/ha)"
           :file-name="mapFileName"
           :region-type="selectRegionLevel === 'region_state' ? 'STATE' : 'NRM'"
           :show-legend="!isDrawerOpen"

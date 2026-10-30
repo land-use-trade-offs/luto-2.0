@@ -25,9 +25,11 @@ window.OverlayShp = {
       style: () => ({ color: '#555', weight: 1.5, fillColor: '#666', fillOpacity: 0.35, opacity: 0.7 }),
     },
 
-    // AEMO Renewable Energy Zones — a few dozen large polygons.
+    // AEMO Renewable Energy Zones — a few dozen large polygons. Off until the user turns it
+    // on: it covers the land-use colours the page opens on.
     rez: {
       label: 'Renewable Energy Zones',
+      defaultVisible: false,
       color: '#f59e0b',
       icon: '<path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>',
       style: () => ({ color: '#f59e0b', weight: 1.5, fillColor: '#f59e0b', fillOpacity: 0.12, opacity: 0.85 }),
@@ -94,7 +96,12 @@ window.OverlayShp = {
       return out;
     });
 
-    const isVisible = (id) => !hidden.value[id];
+    // An overlay the user has not toggled shows unless its registry entry says defaultVisible: false
+    const isVisible = (id) => {
+      const userHidden = hidden.value[id];
+      if (userHidden !== undefined) return !userHidden;
+      return this.registry[id]?.defaultVisible !== false;
+    };
 
     const items = computed(() => resolved.value.map((o) => ({
       id: o.id,
@@ -106,7 +113,7 @@ window.OverlayShp = {
       visible: isVisible(o.id),
     })));
 
-    const toggle = (id) => { hidden.value = { ...hidden.value, [id]: !hidden.value[id] }; };
+    const toggle = (id) => { hidden.value = { ...hidden.value, [id]: isVisible(id) }; };
 
     const sync = () => {
       const map = getMap();

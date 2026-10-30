@@ -35,7 +35,7 @@ window.BiodiversityView = {
     });
 
     const availableYears = ref([]);
-    const availableUnit = { Biodiversity: "Relative Percentage (Pre-1750 = 100%)" };
+    const availableUnit = window.ReportLabels.units;
 
     const METRIC_LABELS = {
       'quality': 'Quality', 'GBF2': 'GBF2', 'GBF3_NVIS': 'GBF3 NVIS',
@@ -456,7 +456,7 @@ window.BiodiversityView = {
       const { start, end } = currentPageInfo.value;
       isLoadingData.value = true;
       try {
-        await Promise.all([layer, _loadChartPage(start, end)]);
+        await Promise.all([layer, _loadChartPage(start, end, cat)]);
       } finally {
         isLoadingData.value = false;
       }
@@ -482,8 +482,10 @@ window.BiodiversityView = {
       chartTick.value++;
     }
 
-    // Load chart page files for paged metrics and alias to base window names.
-    async function _loadChartPage(start, end) {
+    // Load the chart page of the shown category (and the overview) for paged metrics and alias it
+    // to the base window name. Another category's page is loaded when that category is picked
+    // (doCascade), so a Sum view never fetches the large Ag Mgt page.
+    async function _loadChartPage(start, end, cat) {
       const metric = selectMetric.value;
       const metricCr = chartRegister[metric];
       if (!metricCr) return;
@@ -497,7 +499,7 @@ window.BiodiversityView = {
             if (!window[pagedName]) pending.push(loadScript(`data/${pagedName}.js`, pagedName, VIEW_NAME));
             entries.push({ base: entry.name, paged: pagedName });
           }
-        } else if (val?.paged && val.name) {
+        } else if (key === cat && val?.paged && val.name) {
           const pagedName = `${val.name}_${start}_${end}`;
           if (!window[pagedName]) pending.push(loadScript(`data/${pagedName}.js`, pagedName, VIEW_NAME));
           entries.push({ base: val.name, paged: pagedName });
@@ -506,7 +508,8 @@ window.BiodiversityView = {
       if (pending.length > 0) await Promise.allSettled(pending);
       // A page the user has already left must not overwrite the current one.
       const page = currentPageInfo.value;
-      if (selectMetric.value !== metric || !page || page.start !== start || page.end !== end) return;
+      if (selectMetric.value !== metric || selectCategory.value !== cat
+          || !page || page.start !== start || page.end !== end) return;
       // Alias paged data to base names so existing chart lookup code is unchanged.
       // The aliases hold the page too, so they are released with the view.
       for (const { base, paged } of entries) {
@@ -827,7 +830,7 @@ window.BiodiversityView = {
 
         <!-- Water options (Ag and Ag Mgt only) -->
         <div v-if="selectCategory !== 'Non-Ag' && selectCategory !== 'Sum' && dataLoaded && availableWater.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
-          <span class="text-[0.8rem] mr-1 font-medium">Water:</span>
+          <span class="text-[0.8rem] mr-1 font-medium">Irrigation:</span>
           <button v-for="(val, key) in availableWater" :key="key"
             @click="selectWater = val"
             class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
@@ -838,7 +841,7 @@ window.BiodiversityView = {
 
         <!-- Landuse options (for Sum: shows Type dimension values) -->
         <div v-if="dataLoaded" class="flex flex-wrap gap-1 max-w-[300px]">
-          <span class="text-[0.8rem] mr-1 font-medium">{{ selectCategory === 'Sum' ? 'Type:' : 'Landuse:' }}</span>
+          <span class="text-[0.8rem] mr-1 font-medium">{{ selectCategory === 'Sum' ? 'Type:' : 'Land use:' }}</span>
           <button v-for="(val, key) in availableLanduse" :key="key"
             @click="selectLanduse = val"
             class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
@@ -925,6 +928,7 @@ window.BiodiversityView = {
         <!-- Map component takes full space -->
         <regions-map
           :mapData="selectMapData"
+          unit="score/ha"
           :file-name="mapFileName"
           :region-type="selectRegionLevel === 'region_state' ? 'STATE' : 'NRM'"
           :overlays="mapOverlays"

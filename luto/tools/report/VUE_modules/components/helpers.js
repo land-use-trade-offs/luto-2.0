@@ -33,18 +33,22 @@ window.loadScript = (src, name) => {
     });
 };
 
+// One load per src while it is in flight: the watchers of one click often ask for the same file.
+const _scriptInflight = new Map();
+
 window.loadScriptWithTracking = (src, name, viewName) => {
-    return new Promise((resolve, reject) => {
-        // Always create new script element for aggressive cleanup approach
+    // The view owns the data either way, so leaving it releases the data.
+    if (viewName) window.MemoryService.registerViewData(viewName, [name]);
+
+    // Already loaded (by the sidebar, Home, or an earlier call): no second fetch and parse.
+    if (window[name]) return Promise.resolve();
+    if (_scriptInflight.has(src)) return _scriptInflight.get(src);
+
+    const promise = new Promise((resolve, reject) => {
         const script = document.createElement("script");
         script.src = src;
         document.head.appendChild(script);
-
-        // Register both data and script with the view for aggressive cleanup
-        if (viewName) {
-            window.MemoryService.registerViewData(viewName, [name]);
-            window.MemoryService.registerViewScript(viewName, src, script);
-        }
+        if (viewName) window.MemoryService.registerViewScript(viewName, src, script);
 
         script.onload = async () => {
             const timeout = 60000;
@@ -60,7 +64,10 @@ window.loadScriptWithTracking = (src, name, viewName) => {
         };
 
         script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
-    });
+    }).finally(() => _scriptInflight.delete(src));
+
+    _scriptInflight.set(src, promise);
+    return promise;
 };
 
 
