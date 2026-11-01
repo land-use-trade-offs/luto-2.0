@@ -63,7 +63,7 @@ window.Sidebar = {
     };
   },
 
-  template: `
+  template: /*html*/`
     <div>
 
       <div class="flex items-center h-[80px]">

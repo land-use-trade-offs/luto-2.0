@@ -27,7 +27,7 @@ const app = createApp({
             globalMapViewpoint,
         };
     },
-    template: `
+    template: /*html*/`
     <div class="flex">
         <!-- Sidebar -->
         <div  class="bg-white pl-2 w-min-[50px] sticky top-0 h-screen self-start overflow-y-auto transition-all duration-300 ease-in-out"

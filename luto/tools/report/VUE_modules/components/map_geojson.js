@@ -199,7 +199,7 @@ window.map_geojson = {
             props,
         };
     },
-    template: `
+    template: /*html*/`
       <div>
         <div ref="mapElement" :style="{ background: 'transparent', height: props.height + ' !important', width: '100%' }"></div>
       </div>

@@ -11,7 +11,7 @@ window.RankingCards = {
   },
 
 
-  template: `
+  template: /*html*/`
     <div class="flex flex-wrap gap-4 justify-between h-[230px]">
       <!-- Economics Card -->
       <div class="flex-1 rounded-lg p-3 shadow-md flex flex-col bg-gradient-to-r from-[#d9a521] to-[#ebc867]" >

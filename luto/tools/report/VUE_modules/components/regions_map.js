@@ -838,7 +838,7 @@ window.RegionsMap = {
       toggleOverlay: overlayCtl.toggle,
     };
   },
-  template: `
+  template: /*html*/`
     <div class="bg-white h-screen flex flex-col">
     
       <!-- Map Container with Controls Overlay - Base map selector and map element -->

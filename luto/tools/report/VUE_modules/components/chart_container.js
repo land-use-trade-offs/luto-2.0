@@ -230,7 +230,7 @@ window.Highchart = {
       setInput,
     };
   },
-  template: `
+  template: /*html*/`
     <div class="m-2 relative"
       :style="{ transform: 'translate(' + position.x + 'px, ' + position.y + 'px) scale(' + scale + ')', cursor: draggable ? 'move' : 'default' }"
       @mousedown="startDrag"

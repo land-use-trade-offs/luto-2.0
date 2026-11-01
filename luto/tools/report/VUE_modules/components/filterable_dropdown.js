@@ -122,7 +122,7 @@ window.FilterableDropdown = {
       this.searchTerm = '';
     }
   },
-  template: `
+  template: /*html*/`
     <div class="relative py-2 px-2" ref="dropdownRef">
       <!-- Main dropdown trigger button - displays selected region or placeholder -->
       <button
