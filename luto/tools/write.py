@@ -3205,20 +3205,24 @@ def write_biodiversity_quality_scores(data: Data, yr_cal, path):
         # Fill empty DataFrames
         if ag_df.empty:
             ag_df = pd.DataFrame({
-                'region': ['AUSTRALIA'], 'Year': [yr_cal], 'lm': ['dry'],
-                'lu': ['Unallocated - natural land'],
-                'Area Weighted Score (ha)': [0.0], 'Relative_Contribution_Percentage': [0.0],
+                'region_level': ['region_state', 'region_NRM'],
+                'region': ['AUSTRALIA', 'AUSTRALIA'], 'Year': [yr_cal, yr_cal], 'lm': ['dry', 'dry'],
+                'lu': ['Unallocated - natural land', 'Unallocated - natural land'],
+                'Area Weighted Score (ha)': [0.0, 0.0], 'Relative_Contribution_Percentage': [0.0, 0.0],
             })
         if non_ag_df.empty:
             non_ag_df = pd.DataFrame({
-                'region': ['AUSTRALIA'], 'Year': [yr_cal], 'lu': ['Environmental Plantings'],
-                'lm': ['dry'], 'Area Weighted Score (ha)': [0.0], 'Relative_Contribution_Percentage': [0.0],
+                'region_level': ['region_state', 'region_NRM'],
+                'region': ['AUSTRALIA', 'AUSTRALIA'], 'Year': [yr_cal, yr_cal],
+                'lu': ['Environmental Plantings', 'Environmental Plantings'], 'lm': ['dry', 'dry'],
+                'Area Weighted Score (ha)': [0.0, 0.0], 'Relative_Contribution_Percentage': [0.0, 0.0],
             })
         if am_df.empty:
             am_df = pd.DataFrame({
-                'region': ['AUSTRALIA', 'AUSTRALIA'], 'Year': [yr_cal, yr_cal],
-                'am': ['ALL', 'Savanna Burning'], 'lm': ['dry', 'dry'], 'lu': ['Apples', 'Apples'],
-                'Area Weighted Score (ha)': [0.0, 0.0], 'Relative_Contribution_Percentage': [0.0, 0.0],
+                'region_level': ['region_state', 'region_state', 'region_NRM', 'region_NRM'],
+                'region': ['AUSTRALIA'] * 4, 'Year': [yr_cal] * 4,
+                'am': ['ALL', 'Savanna Burning'] * 2, 'lm': ['dry'] * 4, 'lu': ['Apples'] * 4,
+                'Area Weighted Score (ha)': [0.0] * 4, 'Relative_Contribution_Percentage': [0.0] * 4,
             })
 
         # Tag backend
