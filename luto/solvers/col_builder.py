@@ -203,10 +203,12 @@ def get_trans_ub_nonag_rk(data: Data, base_year: int) -> np.ndarray:
     """Non-ag target upper bound, raised to the base so a cell can always keep its base land use."""
     print('Getting non-agricultural target upper bounds...', flush=True)
     base_nonag_rk = get_base_nonag_rk(data, base_year)
+    # the reach is read off the base as held (as the ag ub's is): a share at or below the noise floor is no source,
+    # so it must not open a non-ag column (and a node-balance row) of its own
     ub = non_ag_transition.get_non_ag_ub_matrices(
         data,
-        base_dvar_nonag_rk=base_nonag_rk,
-        base_dvar_ag_mrj=data.ag_dvars[base_year],
+        base_dvar_nonag_rk=tools.get_base_held(base_nonag_rk),
+        base_dvar_ag_mrj=tools.get_base_held(data.ag_dvars[base_year]),
     )
     return tools.clamp_dvar_bound(ub, tools.get_base_held(base_nonag_rk), np.inf, 'NonAg ub raised to base')
 
@@ -215,9 +217,10 @@ def get_trans_lb_nonag_rk(data: Data, base_year: int) -> np.ndarray:
     print('Getting non-agricultural lower bound matrices...', flush=True)
     base_nonag_rk = get_base_nonag_rk(data, base_year)
     lb = non_ag_transition.get_non_ag_lb_matrices(data, base_year)
-    # capped by the base as held (not the noise-floor deadband the ub is raised to): a lock-in can never ask for
-    # more than the cell holds, and the cap only ever lowers a lb
-    return tools.clamp_dvar_bound(lb, 0.0, np.maximum(base_nonag_rk.astype(np.float32), 0.0), 'NonAg lb clamped to [0,base]')
+    # capped by the base as held (get_base_held, the deadband the ub is read off and raised to): a lock-in can never
+    # ask for more than the cell holds, a share at or below the noise floor locks nothing in (its ub is 0), and the
+    # cap only ever lowers a lb
+    return tools.clamp_dvar_bound(lb, 0.0, tools.get_base_held(base_nonag_rk), 'NonAg lb clamped to [0,base]')
 
 # ── the arcs: each source's own upper bound, above zero, on its own cells ──
 
