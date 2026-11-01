@@ -5,6 +5,161 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20261030 — barrier specks bloat the next year's model; store-time cleaning (`SOLUTION_SHARE_FLOOR`) and the non-ag leak fix
+
+### TL;DR
+
+Barrier without crossover (`RETRY_PARAMS = [(0, 2, 0, -1, -1)]`) stops at an interior point. That point leaves millions of tiny shares ("specks") spread over a cell's feasible options. The transition model is exact, so the next year turns every share above `ROUND_DECIMALS` (1e-6) into a source with its own arcs. The θ fold that used to absorb them is gone.
+
+- **RES1 T300 (SNES = ECNES 30 % in NE + GB):** 2025 grew from 2020's 94.5 M columns to 163.6 M; after presolve 116.9 M against 57 M. Each barrier iteration took 103 s against 36 s.
+  - The specks hold almost no land. 3.25 M of 2020's 7.48 M ag sources, and 98 k of its 103 k non-ag sources, hold less than 1e-4 of their cell, about 700 ha in all.
+- **Store-time cleaning** (`settings.SOLUTION_SHARE_FLOOR`, default `None` = off; `post_solve.clear_specks`). Every ag / non-ag / ag-mgt share at or below the floor is cleared before the solution is stored.
+  - The cleared amount moves to the cell's largest share of the same kind, so each cell's total is kept.
+  - Every reader of the next year's base reads that one array, so bounds, sources and node-balance constants stay exactly consistent and presolve accepts them.
+  - RES1 at 1e-4: 2025 goes back to 94.6 M columns, about 42 s per iteration (2020: 36 s).
+  - RES5: 2025 objective +0.0007 %, every row feasible, every cell conserving.
+- **The non-ag leak** (`col_builder.get_trans_ub_nonag_rk`, fixed). The non-ag reach was read off the RAW base, so a share at or below 1e-6, which is no source, still opened a non-ag column and a redundant node-balance row.
+  - RES5: 655,551 such rows. RES1 T300: 16.4 M of 24.2 M non-ag columns in 2025.
+  - It now reads `tools.get_base_held`, as the ag reach does, and the non-ag lb is capped by the held base so a sub-floor lock-in cannot invert its bound.
+  - RES5, from an uncleaned 2020: 2025 non-ag columns 1,208,832 → 553,281, other blocks identical, 0 impossible rows, all 187,755 cells conserving. The barrier is Optimal in 174 iterations against 132; the objective is +0.0127 %, more than BarConvTol, with only 10 ha leaving the base. The likely cause is a different interior end point, not verified.
+
+The full measurements are in `jinzhu_inspect_code/Explore_CMA_RES1_runs/doc/findings.md` §4c.
+
+---
+
+## 20261030 — why Gurobi's presolve now removes 36 % of a RES1 model's nonzeros (June: 3 %)
+
+### TL;DR
+
+Two runs were compared on the same Gadi hugemem node (Xeon 8268, 28 threads, barrier, `Presolve = -1`):
+- **the June REM RES1 runs** (old formulation): presolve removed 12 % of rows and **3 % of nonzeros**;
+- **today's code** (`b33f38e5`, `Run_RES1_T150_ag0_noHIR` 2020): presolve removes **64 % of rows, 48 % of columns
+  and 36 % of nonzeros**.
+
+The presolved model is 2.3× smaller and its Cholesky factor needs 4.2× fewer operations. So one barrier iteration
+costs **30 s instead of 89 s** (iterations 0–19).
+
+A RES5 experiment separates the causes. **It is mainly the formulation:**
+1. the node-balance equalities (X = base + Σ in − Σ out), short enough for presolve to substitute away;
+2. the ag-management options whose adoption limit is exactly 0 in the year, which presolve fixes at 0, link rows and all.
+
+Neither the scenario (GHG off: about 2 points of the am block) nor float32 inputs (about 0.6 % of the presolved
+nonzeros) explains much.
+
+### RES1: today against June
+
+| | Now (T150 2020) | June G0005 2050 | June G0002 2050 (Windows EPYC 9654) |
+|---|---|---|---|
+| Into presolve | 70.26 M rows, 94.49 M cols, 358.6 M nz | 78.56 M, 98.18 M, 543.6 M nz | 78.56 M, 86.47 M, 490.9 M nz |
+| After presolve | **25.36 M rows, 49.08 M cols, 228.9 M nz** | 68.77 M, 95.93 M, 527.6 M nz | 57.18 M, 84.33 M, 464.5 M nz |
+| Removed | **64 % rows / 48 % cols / 36 % nz** | 12 % / 2 % / 3 % | 27 % / 2 % / 5 % |
+| Presolve time | 388 s | 485 s | 237 s |
+| AA' nz / factor nz | 2.17e8 / 2.82e8 (~30 GB) | 7.49e8 / 9.91e8 (~70 GB) | 6.13e8 / 8.17e8 |
+| Factor operations | 4.4e9 | 1.86e10 | 1.59e10 |
+| s/iteration, iterations 0–19 | **30** | 89 (whole-solve average 123) | 36 (average 50) |
+
+**How the speed-up adds up.**
+- An iteration costs matrix–vector products, which grow with the presolved nonzeros (2.3× fewer), plus a factorisation,
+  which grows with the factor operations (4.2× fewer).
+- The measured 2.8× sits between the two. So the gain is **size after presolve**, not better conditioning, which would
+  show up as fewer iterations instead.
+
+**The June scenario differed.** The June runs had GHG low (hard), GBF2 high, solar + wind on and HIR on. This run has
+SNES = ECNES 15 % in two CMAs, everything else off and HIR off. The RES5 experiment below controls for that.
+
+### The RES5 experiment
+
+`jinzhu_inspect_code/Explore_CMA_RES1_runs/scripts/presolve_experiment.py`:
+- builds the model exactly as `simulation.solve_timeseries` does (`get_cols` → `get_row_inputs` → `get_rows` →
+  `get_obj` → `build_solver`), one step from 2010;
+- runs `model.presolve()` alone;
+- counts which ORIGINAL columns (by block) and rows (by family) survive, matched by name, since Gurobi keeps the names
+  of what survives.
+
+| Arm | Model |
+|---|---|
+| A | this scenario |
+| B | A with `GHG_EMISSIONS_LIMITS = 'low'` |
+| C | A with every matrix coefficient, nonzero bound and objective coefficient × (1 + u), u ~ U(±1e-7): breaks every exact tie float32 rounding could create |
+
+**Watch the year.** In 2020 the GHG series is a benchmark only (role `REFERENCE` in
+`input/Nick_build/ghg_targets/series_*.csv`): no GHG row is built, so B at 2020 is identical to A. The series binds from 2025.
+
+| Removed by presolve | A 2020 | C 2020 (jitter) | A 2025 | B 2025 (GHG low) |
+|---|---|---|---|---|
+| nonzeros (in → out) | 25.43 M → 20.20 M (**21 %**) | → 20.33 M | 25.80 M → 22.09 M (**14 %**) | 30.30 M → 27.11 M (**11 %**) |
+| am columns, and their `ag_mgt_link` rows one for one | **45.4 %** | 45.4 % | **22.6 %** | **20.5 %** |
+| `node_balance_nonag` rows | **49.3 %** | 49.3 % | **49.3 %** | **49.3 %** |
+| `node_balance_ag` rows | **32.7 %** | 32.7 % | **32.7 %** | **33.6 %** |
+| nonag columns | 16.0 % | 12.3 % | 16.0 % | 11.9 % |
+| ag2nonag arcs | 28.3 % | 28.3 % | 28.3 % | 28.5 % |
+| ag2ag arcs | 15.1 % | 15.1 % | 15.1 % | 15.2 % |
+| ag columns | 3.0 % | 2.0 % | 3.0 % | 2.7 % |
+| `ag_mgt_adoption` rows | 23 of 63 | 23 of 63 | 8 of 63 | 4 of 63 |
+| GBF4, demand, GHG rows | 0 | 0 | 0 | 0 (both GHG rows kept) |
+
+The 2025 arms carry 2 more GHG rows in B (3,818,421 rows against A's 3,818,419). Totals: 7,235,634 columns and
+3,818,419 rows, with 1,628,588 am, 1,258,471 ag, 553,387 nonag, 2,544,335 ag2ag and 1,250,853 ag2nonag.
+
+### The causes
+
+1. **The node-balance equalities are substituted away: the main, structural cause.**
+   - Every non-ag column has one incoming arc. At RES1 the ag2nonag and nonag blocks both have 7,805,908 columns, so a
+     non-ag node row is a short equality, X_k = base + arc. Presolve writes X_k in terms of the arc and drops the row.
+     Ag nodes with a single arc in or out go the same way.
+   - The share is the same with GHG off or on, and in 2020 or 2025: about half the non-ag and a third of the ag node rows.
+   - The June formulation had no arcs and no node rows. Its main equality was the per-cell land-use row over every
+     land use and management (Σ = 1), which is too wide to substitute.
+2. **Options with a zero adoption limit are fixed at 0.** Their whole column block and link rows go. The year matters:
+   - am removal is **45 % in 2020 and 23 % in 2025**, with the same settings;
+   - in 2020 Biochar is 0 on every crop (opens at 1.6 % / 3.2 % in 2025), and Asparagopsis is 0 on sheep and dairy
+     until 2030 (`*_Bundle_*.xlsx` `Technical_Adoption`, `TECH_ADOPT_MULT = 1`).
+3. **A GHG target barely protects the am block:** 22.6 % → 20.5 % removed. The idea that GHG off makes the emission
+   options "dominated" (they cost money, no constraint needs them) accounts for about 2 points, not the bulk.
+4. **Float32 inputs** account for about 0.6 % of the presolved nonzeros (C against A), almost all of it non-ag. Exact
+   ties from rounding are not the reason. The small-value tails reaching Gurobi are cut by explicit floors either way:
+   - `SOLVER_COEFF_MIN` gives a matrix range [1e-04, …] now and in June;
+   - the near-zero bound snap gives a bounds range [5e-05, 1] now and in June.
+
+### What the removed cell-usage row does and does not explain
+
+- There is no cell-usage row (Σ X = Σ base per cell). A cell's node-balance rows already sum to it, and the bound pass
+  checks this every year: *"the node-balance rows of 4,218,733 of 4,218,733 cells sum to Σ X = Σ base"*.
+- **What dropping it saves at RES1:** 4.2 M rows and about 32.7 M nonzeros (every ag and non-ag column of the cell).
+  That is about 18 % of the 184 M-nonzero gap to June.
+- **What it doesn't explain:** the change from 3 % to 36 % presolve reduction. A redundant row does not stop the
+  substitution in cause 1.
+- **It is good for the barrier.** A second statement of the cell total is a linearly dependent equality whose rhs
+  differs from the sum of the node rows by float noise. That is a classic floor under primal infeasibility, which leads
+  to a stall and then a restart.
+- **It cannot cause today's restart:** the T150 2020 barrier stalled at primal infeasibility ~1.1e2 and restarted at
+  iteration 128 without that row.
+- Not tested yet: arm D, A plus the cell-usage rows put back.
+
+### Consequences
+
+- **Runs with GHG on keep most of the reduction** (causes 1 and 2 are untouched).
+  - The two GHG rows are wide: +17 % nonzeros at RES5 (25.8 → 30.3 M), about +23 % after presolve (22.1 → 27.1 M).
+  - Their iterations should be slower than this run by about that much, still far faster than June.
+- **RES5 understates RES1:** 21 % of nonzeros removed at 2020, against 36 % at RES1. At RES1 more cells have a single
+  source or arc, so more node rows can be substituted. Read RES5 for the mechanisms, not the RES1 proportions.
+- **The early years presolve more than the later ones**, as options open up (cause 2).
+
+### Reproduce
+
+```bash
+cd <repo>; PYTHONPATH=$PWD conda run -n luto python \
+  jinzhu_inspect_code/Explore_CMA_RES1_runs/scripts/presolve_experiment.py A 2025   # arms A / B / C, year optional (2020)
+```
+
+Each arm takes about 7.5 min at RES5 locally (data 336 s, presolve 25 s) and writes
+`Explore_CMA_RES1_runs/outputs/presolve_<arm>_<year>.json`. Run the arms one at a time: `load_data` writes a shared
+timestamp file. The RES1 figures are from `Run_RES1_T150_ag0_noHIR`'s `LUTO_RUN__stdout.log` (Gadi, PBS 182598021)
+and the June logs copied into `Explore_CMA_RES1_runs/data/june_res1_logs/`. The project write-up is in
+`Explore_CMA_RES1_runs/doc/findings.md` §4c.
+
+---
+
 ## 20261016 — the livestock-economics gap: consistent at RES1, a block-aggregation artefact at RES > 1
 
 ### TL;DR
