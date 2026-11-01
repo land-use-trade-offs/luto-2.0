@@ -1365,6 +1365,13 @@ NON_AGRICULTURAL_LU_BASE_CODE = 100
 # Number of decimals to round any value; designed to remove insignificant decimals
 ROUND_DECIMALS = 6
 
+# Shares of a cell at or below this are cleared from every solution before it is stored (post_solve.clear_specks),
+# their amount moved to the largest share of the same kind (ag / non-ag) in the cell, so the cell's total is kept.
+# A barrier solution without crossover leaves millions of shares just above zero (RES1 2020: 3.2 M ag shares in
+# (1e-6, 1e-5], ~570 ha in all), and every share above the ROUND_DECIMALS floor is a source of the next year with
+# arcs of its own (RES1 2025: 1.7x the columns of 2020). None = off: the solution is stored as solved.
+SOLUTION_SHARE_FLOOR = None
+
 
 """ NON-AGRICULTURAL LAND USES (indexed by k)
 0: 'Environmental Plantings'

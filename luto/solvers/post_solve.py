@@ -94,6 +94,8 @@ def post_solve(x: np.ndarray, cols: xr.Dataset, col_support: ColSupport, inputs:
 
     ag_X_mrj = np.stack((X_dry_sol_rj, X_irr_sol_rj))                    # fractional values preserved as-is
     ag_man_X_mrj = {am: np.stack((am_X_dry_sol_rj[am], am_X_irr_sol_rj[am])) for am in agman2lu}
+    if settings.SOLUTION_SHARE_FLOOR is not None:
+        clear_specks(ag_X_mrj, non_ag_X_sol_rk, ag_man_X_mrj, settings.SOLUTION_SHARE_FLOOR)
 
     # ── 2. the transition deltas: the gross flows the objective charged, SOURCE-KEYED so reporting can
     #       attribute the true from → to flows. Leaf axes mirror the flow_obj dicts ([to_m, local_r, to_j]
@@ -160,3 +162,47 @@ def post_solve(x: np.ndarray, cols: xr.Dataset, col_support: ColSupport, inputs:
         dvar_D_ag2nonag_rk=dvar_D_ag2nonag_rk,
         dvar_D_nonag2ag_mrj=dvar_D_nonag2ag_mrj,
     )
+
+
+def clear_specks(ag_X_mrj: np.ndarray, non_ag_X_rk: np.ndarray, ag_man_X_mrj: dict, floor: float) -> None:
+    """Clear, in place, every ag (m, j) and non-ag k share of a cell at or below `floor` (settings.SOLUTION_SHARE_FLOOR),
+    and add the cleared amount to the largest share of the same kind in the cell — ag to ag, non-ag to non-ag; to the
+    largest share of the other kind where the cell holds none above the floor — so every cell's total is kept (summed in
+    float64). An ag-mgt share is cleared where its host ag share was, and where it is itself at or below the floor.
+
+    Run before the solution is stored, so the next year reads ONE array for everything it builds from the base: the
+    sources and their arcs, the node constant `base`, the source caps, the upper bounds raised to the base, the
+    non-ag and ag-mgt lower bounds — they agree as they did before. The source-keyed transition deltas are left as solved
+    (the flows the objective charged): a cleared share's arcs no longer match its stored share, by at most `floor`."""
+    nlms, ncells, n_ag_lus = ag_X_mrj.shape
+    ag_rx = ag_X_mrj.transpose(1, 0, 2).reshape(ncells, nlms * n_ag_lus)          # (cell, m·j), a copy
+    speck_ag = (ag_rx != 0) & (ag_rx <= floor)
+    speck_nonag = (non_ag_X_rk != 0) & (non_ag_X_rk <= floor)
+    cleared_ag_r = np.where(speck_ag, ag_rx, 0).sum(axis=1, dtype=np.float64)
+    cleared_nonag_r = np.where(speck_nonag, non_ag_X_rk, 0).sum(axis=1, dtype=np.float64)
+    ag_rx[speck_ag] = 0
+    non_ag_X_rk[speck_nonag] = 0
+
+    # the receiving share of every cell: its largest ag / non-ag share after the clearing
+    top_ag_r = ag_rx.argmax(axis=1)
+    top_nonag_r = non_ag_X_rk.argmax(axis=1)
+    cells = np.arange(ncells)
+    has_ag_r = ag_rx[cells, top_ag_r] > floor
+    has_nonag_r = non_ag_X_rk[cells, top_nonag_r] > floor
+    to_ag_r = np.where(has_ag_r, cleared_ag_r, 0) + np.where(has_nonag_r, 0, cleared_nonag_r)
+    to_nonag_r = np.where(has_nonag_r, cleared_nonag_r, 0) + np.where(has_ag_r, 0, cleared_ag_r)
+    if (~has_ag_r & ~has_nonag_r & ((cleared_ag_r != 0) | (cleared_nonag_r != 0))).any():
+        raise ValueError("clear_specks: a cell holds nothing above SOLUTION_SHARE_FLOOR — the floor is too high")
+    ag_rx[cells, top_ag_r] = (ag_rx[cells, top_ag_r].astype(np.float64) + to_ag_r).astype(np.float32)
+    non_ag_X_rk[cells, top_nonag_r] = (non_ag_X_rk[cells, top_nonag_r].astype(np.float64) + to_nonag_r).astype(np.float32)
+    ag_X_mrj[:] = ag_rx.reshape(ncells, nlms, n_ag_lus).transpose(1, 0, 2)
+
+    am_cleared = 0
+    for am_X_mrj in ag_man_X_mrj.values():
+        clear = (am_X_mrj != 0) & ((ag_X_mrj == 0) | (am_X_mrj <= floor))
+        am_cleared += int(clear.sum())
+        am_X_mrj[clear] = 0
+
+    print(f"Cleared shares at or below {floor:g}: {int(speck_ag.sum()):,} ag ({cleared_ag_r.sum():.4g} cell-fractions), "
+          f"{int(speck_nonag.sum()):,} non-ag ({cleared_nonag_r.sum():.4g}), {am_cleared:,} ag-mgt; "
+          f"{int(((cleared_ag_r != 0) | (cleared_nonag_r != 0)).sum()):,} cells changed\n", flush=True)
