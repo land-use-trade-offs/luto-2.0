@@ -40,7 +40,9 @@ window['MapView'] = {
 
         // ── Per-combo map layer loader ───────────────────────────────────────
         const { currentLayerData, ensureComboLayer } = window.createMapLayerLoader(VIEW_NAME);
-        const selectMapData = computed(() => currentLayerData.value?.[selectYear.value] ?? {});
+        // Layer toggle: a second click on the selected land use hides its map layer
+        const { layerOn, clickLayer, layerButtonClass, layerButtonTitle } = window.createLayerToggle(selectLanduse, [currentLayerData]);
+        const selectMapData = computed(() => layerOn.value ? (currentLayerData.value?.[selectYear.value] ?? {}) : {});
 
         // ── Helpers ──────────────────────────────────────────────────────────
         const CAT_TO_KEY = { "Land-use": "Lumap", "Ag": "Ag", "Ag Mgt": "Ag Mgt", "Non-Ag": "Non-Ag" };
@@ -184,6 +186,7 @@ window['MapView'] = {
         });
 
         const _state = {
+            layerOn, clickLayer, layerButtonClass, layerButtonTitle,
             yearIndex, selectYear, selectRegion,
             availableYears, availableCategories,
             availableAgMgt, availableWater, availableLanduse,
@@ -263,9 +266,10 @@ window['MapView'] = {
             <div v-if="dataLoaded && selectCategory !== 'Land-use' && availableLanduse.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
                 <span class="text-[0.8rem] mr-1 font-medium">Land use:</span>
                 <button v-for="(val, key) in availableLanduse" :key="key"
-                    @click="selectLanduse = val"
-                    class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
-                    :class="{'bg-sky-500 text-white': selectLanduse === val}">
+                    @click="clickLayer(val)"
+                    :title="layerButtonTitle(val)"
+                    class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1 border"
+                    :class="layerButtonClass(val)">
                     {{ val }}
                 </button>
             </div>

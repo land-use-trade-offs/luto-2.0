@@ -138,3 +138,38 @@ window.createMapLayerLoader = function(viewName) {
 
     return { currentLayerData, loadedComboKey, ensureComboLayer };
 };
+
+
+/**
+ * Layer toggle for the last row of selector buttons (land use / commodity).
+ *
+ * A click on another button selects it and shows its map layer; a click on the selected
+ * button switches its layer off, and the next one switches it back on. A hidden layer's
+ * button loses its fill and gets a faint dashed border. The chart is not affected.
+ *
+ * Usage (in a view's setup()):
+ *   const { layerOn, clickLayer, layerButtonClass, layerButtonTitle } =
+ *     window.createLayerToggle(selectLanduse, [currentLayerData]);
+ *   // selectMapData: computed(() => layerOn.value ? (currentLayerData.value?.[year] ?? {}) : {})
+ *   // button: @click="clickLayer(val)" :title="layerButtonTitle(val)" :class="layerButtonClass(val)"
+ *
+ * @param {Ref<string>} selected  The view's selection ref for that row.
+ * @param {Ref[]} showAgainOn     Refs whose change shows the layer again (the loaded layer data:
+ *                                any other choice loads a new layer).
+ */
+window.createLayerToggle = function(selected, showAgainOn = []) {
+    const layerOn = Vue.ref(true);
+
+    const clickLayer = (val) => {
+        if (selected.value === val) { layerOn.value = !layerOn.value; }
+        else { selected.value = val; layerOn.value = true; }
+    };
+    if (showAgainOn.length > 0) Vue.watch(showAgainOn, () => { layerOn.value = true; });
+
+    const layerButtonClass = (val) => selected.value !== val ? 'border-transparent'
+        : (layerOn.value ? 'bg-sky-500 text-white border-transparent' : 'border-dashed border-sky-400');
+    const layerButtonTitle = (val) => selected.value !== val ? ''
+        : (layerOn.value ? 'Click to hide this layer' : 'Layer hidden: click to show it');
+
+    return { layerOn, clickLayer, layerButtonClass, layerButtonTitle };
+};

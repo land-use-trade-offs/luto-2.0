@@ -130,9 +130,11 @@ window.BiodiversityView = {
     // ── Per-combo map layer loader ──────────────────────────────────────────
     const { currentLayerData, ensureComboLayer } = window.createMapLayerLoader(VIEW_NAME);
 
+    // Layer toggle: a second click on the selected land use hides its map layer
+    const { layerOn, clickLayer, layerButtonClass, layerButtonTitle } = window.createLayerToggle(selectLanduse, [currentLayerData, selectSpecies]);
     const selectMapData = computed(() => {
       const data = currentLayerData.value;
-      if (!data) return {};
+      if (!data || !layerOn.value) return {};
       // Paged layers: outer key = species name, inner key = year.
       if (isPaged.value && hasSpecies.value && selectSpecies.value) {
         return data?.[selectSpecies.value]?.[selectYear.value] ?? {};
@@ -148,7 +150,7 @@ window.BiodiversityView = {
     const hasMapData = computed(() => !!selectMapData.value?.tif_b64);
     const showNoMapData = computed(() =>
       dataLoaded.value && !isLoadingData.value
-      && currentLayerData.value !== null && !hasMapData.value
+      && currentLayerData.value !== null && layerOn.value && !hasMapData.value
     );
 
     // For the quality metric, chart data has an extra 'backend' outermost key.
@@ -716,6 +718,7 @@ window.BiodiversityView = {
     });
 
     const _state = {
+      layerOn, clickLayer, layerButtonClass, layerButtonTitle,
       yearIndex, selectYear, selectRegion,
       availableRegionLevels, selectRegionLevel,
       METRIC_LABELS, availableYears, availableMetrics, availableCategories,
@@ -843,9 +846,10 @@ window.BiodiversityView = {
         <div v-if="dataLoaded" class="flex flex-wrap gap-1 max-w-[300px]">
           <span class="text-[0.8rem] mr-1 font-medium">{{ selectCategory === 'Sum' ? 'Type:' : 'Land use:' }}</span>
           <button v-for="(val, key) in availableLanduse" :key="key"
-            @click="selectLanduse = val"
-            class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
-            :class="{'bg-sky-500 text-white': selectLanduse === val}">
+            @click="clickLayer(val)"
+            :title="layerButtonTitle(val)"
+            class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1 border"
+            :class="layerButtonClass(val)">
             {{ formatLanduse(val) }}
           </button>
         </div>
