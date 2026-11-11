@@ -338,7 +338,8 @@ def store_solution(data: Data, target_year: int, solution, obj_val: float, input
 
     # GHG from the stored dvars and the step's own GHG inputs: Σ ghg · share over the ag, ag-mgt and non-ag land, the
     # transition emissions on the ag → ag flows, plus the off-land constant — what the GHG row summed (the row's contract
-    # dropped its sub-floor coefficients; float32 dot products, 1e-7 relative of the float64 sum at RES50)
+    # dropped its sub-floor coefficients; float32 dot products, 1e-7 relative of the float64 sum at RES50). The
+    # energy and lifecycle sub-terms reported on no row (ag_ghg.subterm_row) are not in it.
     ghg = float(np.dot(inputs.ag_g_mrj.ravel(), solution.ag_X_mrj.ravel()))
     for non_ag_g_rk in (inputs.non_ag_g_rk_ag, inputs.non_ag_g_rk_lulucf):                # both rows' streams: the net total
         ghg += float(np.dot(non_ag_g_rk.ravel(), solution.non_ag_X_rk.ravel()))
@@ -350,7 +351,7 @@ def store_solution(data: Data, target_year: int, solution, obj_val: float, input
     for src, g in inputs.trans_ghg_ag2ag.items():                                           # [to_m, local_r, to_j], as the flows are keyed
         ghg_transition += float(np.dot(g.ravel(), solution.dvar_D_ag2ag_mrj[src].ravel()))
     ghg += ghg_transition
-    ghg += inputs.offland_ghg
+    ghg += inputs.offland_ghg_on_ag
     data.add_production_data(target_year, 'GHG', ghg)
     data.add_production_data(target_year, 'GHG_TRANSITION', ghg_transition)                 # the row's transition term; write_ghg checks its output against it
     if settings.GHG_EMISSIONS_LIMITS != 'off':
@@ -367,6 +368,8 @@ def store_solution(data: Data, target_year: int, solution, obj_val: float, input
 def get_ghg_split(data: Data, target_year: int, solution, inputs: RowInputs) -> pd.DataFrame:
     """The two GHG rows of the step, agriculture ('AG') and net LULUCF ('LULUCF'), from the stored dvars: one line per
     named sub-term (tCO2e), the exogenous constants on each row's left-hand side, the row's total and its series.
+    Under the scope-1 filter the energy and lifecycle sub-terms are lines on 'REPORTED', with their own total and
+    no series: on no constraint row (ag_ghg.subterm_row).
 
     ``value_t`` of the 'total' lines is the row's left-hand side; ``rhs_t`` is what it is compared with. In a year
     whose role is not 'BINDING' the row was not imposed, and ``deviation_t`` is the benchmark deviation (for AG also
@@ -374,13 +377,15 @@ def get_ghg_split(data: Data, target_year: int, solution, inputs: RowInputs) -> 
     target_index = target_year - data.YR_CAL_BASE
     t = inputs.limits['ghg']
     lines = []                                                              # (row, term, component, sub_term, value_t)
+    energy_row = ag_ghg.subterm_row(ag_ghg.ENERGY)
 
-    # term 1: the ag land uses (all on AG)
+    # term 1: the ag land uses (on AG; the irrigated pasture energy fields are outside g_mrj under the scope-1 filter)
     energy = float(np.dot(ag_ghg.get_irrpast_energy_ghg_matrices(data).ravel(), solution.ag_X_mrj.ravel()))
     stubble = float(np.dot(ag_ghg.get_stubble_ghg_matrices(data).ravel(), solution.ag_X_mrj.ravel()))
     total_1 = float(np.dot(inputs.ag_g_mrj.ravel(), solution.ag_X_mrj.ravel()))
-    lines += [('AG', 1, 'Agricultural land uses', 'Crop and livestock emissions', total_1 - energy - stubble),
-              ('AG', 1, 'Agricultural land uses', 'Irrigated pasture energy and lifecycle fields', energy),
+    energy_in_total_1 = energy if energy_row == 'AG' else 0.0
+    lines += [('AG', 1, 'Agricultural land uses', 'Crop and livestock emissions', total_1 - energy_in_total_1 - stubble),
+              (energy_row, 1, 'Agricultural land uses', 'Irrigated pasture energy and lifecycle fields', energy),
               ('AG', 1, 'Agricultural land uses', 'Stubble-grazing sheep', stubble)]
 
     # term 2: the ag-management options, sub-term by sub-term
@@ -388,13 +393,13 @@ def get_ghg_split(data: Data, target_year: int, solution, inputs: RowInputs) -> 
     for am, lus in inputs.agman2lu.items():
         for name, arr in am_parts[am].items():
             value = sum(float(np.dot(arr[:, :, j_idx].ravel(), solution.ag_man_X_mrj[am][:, :, j].ravel())) for j_idx, j in enumerate(lus))
-            lines.append((ag_ghg.AG_MAN_GHG_SUBTERMS[am][name], 2, am, name, value))
+            lines.append((ag_ghg.subterm_row(ag_ghg.AG_MAN_GHG_SUBTERMS[am][name]), 2, am, name, value))
 
     # term 3: the non-ag land uses, sub-term by sub-term
     nonag_parts = non_ag_ghg.get_ghg_matrix(data, inputs.ag_g_mrj, separate=True)
     for k, lu in enumerate(data.NON_AGRICULTURAL_LANDUSES):
         for name, arr in nonag_parts[lu].items():
-            lines.append((non_ag_ghg.NON_AG_GHG_SUBTERMS[lu][name], 3, lu, name, float(np.dot(arr, solution.non_ag_X_rk[:, k]))))
+            lines.append((ag_ghg.subterm_row(non_ag_ghg.NON_AG_GHG_SUBTERMS[lu][name]), 3, lu, name, float(np.dot(arr, solution.non_ag_X_rk[:, k]))))
 
     # term 4: the ag -> ag transitions (all on LULUCF)
     trans = sum(float(np.dot(g.ravel(), solution.dvar_D_ag2ag_mrj[src].ravel())) for src, g in inputs.trans_ghg_ag2ag.items())
@@ -402,7 +407,7 @@ def get_ghg_split(data: Data, target_year: int, solution, inputs: RowInputs) -> 
 
     # term 5 and the exogenous constants
     lines += [('AG', 5, 'Off-land commodities', 'Livestock emissions (enteric, manure)', inputs.offland_ghg - inputs.offland_ghg_energy),
-              ('AG', 5, 'Off-land commodities', 'On-farm energy CO2 (direct, embedded)', inputs.offland_ghg_energy),
+              (energy_row, 5, 'Off-land commodities', 'On-farm energy CO2 (direct, embedded)', inputs.offland_ghg_energy),
               ('AG', 'exogenous', 'Exogenous agriculture', 'series_agriculture_exogenous.csv (none built: 0)' if t['AG_EXO_t'] == 0 else 'series_agriculture_exogenous.csv', t['AG_EXO_t']),
               ('LULUCF', 'exogenous', 'Exogenous LULUCF', 'LULUCF_EXO (series_lulucf_exogenous.csv)', t['LULUCF_EXO_t']),
               ('LULUCF', 'baseline', 'Plantings baseline', 'Baseline new-plantings removals, subtracted (plantings_baseline.csv)', -t['PLANTINGS_BASELINE_t']),
@@ -424,10 +429,18 @@ def get_ghg_split(data: Data, target_year: int, solution, inputs: RowInputs) -> 
                            rhs_t=target[row], role=t['role'], imposed=imposed, deviation_t=lhs - target[row],
                            slack_t=target[row] - lhs if imposed else np.nan, tolerance_t=tol,
                            within_tolerance=(abs(lhs - target[row]) <= tol) if (not imposed and not np.isnan(tol)) else None))
+    reported = df.loc[df['row'] == ag_ghg.REPORTED, 'value_t']
+    if len(reported):
+        totals.append(dict(row=ag_ghg.REPORTED, term='total', component=ag_ghg.REPORTED_NAME, sub_term='on no constraint row',
+                           value_t=float(reported.sum()), rhs_t=np.nan, role=t['role'], imposed=False, deviation_t=np.nan,
+                           slack_t=np.nan, tolerance_t=np.nan, within_tolerance=None))
     df = pd.concat([df, pd.DataFrame(totals)], ignore_index=True)
     df.insert(0, 'Year', target_year)
 
     for r in totals:
+        if r['row'] == ag_ghg.REPORTED:
+            print(f"Year {target_year}: GHG {r['component']} {r['value_t']:,.0f} tCO2e, on no constraint row", flush=True)
+            continue
         what = (f"slack {r['slack_t']:,.0f}" if r['imposed']
                 else f"benchmark deviation {r['deviation_t']:,.0f}" + ('' if np.isnan(r['tolerance_t']) else
                      f" (tolerance ±{r['tolerance_t']:,.0f}: {'within' if r['within_tolerance'] else 'OUTSIDE'})"))

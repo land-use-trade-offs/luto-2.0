@@ -2699,7 +2699,7 @@ def write_ghg(data: Data, yr_cal: int, path: str):
 
     ag_man_dvar_mrj = chunk_unify_size(tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
         ).assign_coords(region_state=('cell', data.REGION_STATE_NAME), region_NRM=('cell', data.REGION_NRM_NAME))
-    ag_man_g_mrj = tools.am_mrj_to_xr(data, ag_ghg.get_agricultural_management_ghg_matrices(data, yr_idx))
+    ag_man_g_mrj = tools.am_mrj_to_xr(data, ag_ghg.get_agricultural_management_ghg_matrices_on_rows(data, yr_idx))   # the reported-only sub-terms are in GHG_emissions_split_<yr>.csv
 
     xr_ghg_ag_man = ag_man_dvar_mrj * ag_man_g_mrj
     xr_ghg_ag_man = add_all(xr_ghg_ag_man, ['lm', 'lu', 'am'])
