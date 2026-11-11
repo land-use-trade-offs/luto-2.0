@@ -31,7 +31,7 @@ luto/tools/report/VUE_modules/data/map_layers/
 docs/manual/
 
 # Project-specific scratch
-jinzhu_inspect_code/
+jinzhu_inspect_code
 pyproject.toml
 anthropic.yml
 
