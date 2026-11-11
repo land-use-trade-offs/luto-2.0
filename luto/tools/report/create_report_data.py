@@ -52,7 +52,12 @@ def _read_concat(paths, ignore_index=True):
     if frames:
         return pd.concat(frames, ignore_index=ignore_index)
     paths = list(paths)
-    return pd.read_csv(paths[0], engine='pyarrow') if paths else pd.DataFrame()
+    if not paths:
+        return pd.DataFrame()
+    # A header-only CSV reads `Year` as float64; concatenated with a category that has rows it
+    # would turn every year into 2020.0, a key no view looks up
+    schema = pd.read_csv(paths[0], engine='pyarrow')
+    return schema.astype({'Year': 'int64'}) if 'Year' in schema.columns else schema
 
 
 def get_rank_color(x):

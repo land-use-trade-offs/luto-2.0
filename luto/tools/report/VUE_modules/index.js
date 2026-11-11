@@ -30,12 +30,12 @@ const app = createApp({
     template: /*html*/`
     <div class="flex">
         <!-- Sidebar -->
-        <div  class="bg-white pl-2 w-min-[50px] sticky top-0 h-screen self-start overflow-y-auto transition-all duration-300 ease-in-out"
+        <div  class="bg-white pl-2 shrink-0 sticky top-0 h-screen self-start overflow-y-auto transition-all duration-300 ease-in-out"
             :class="{'w-[50px]': isCollapsed, 'w-[200px]': !isCollapsed}">
           <side-bar @update:isCollapsed="updateSidebarCollapsed"></side-bar>
         </div>
         <!-- Main content -->
-        <div class="flex-1 bg-[#f8f9fe] mr-4 pl-4">
+        <div class="flex-1 min-w-0 bg-[#f8f9fe] mr-4 pl-4">
           <router-view></router-view>
         </div>
     </div>

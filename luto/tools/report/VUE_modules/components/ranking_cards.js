@@ -41,7 +41,7 @@ window.RankingCards = {
             <span>{{ selectRankingData.areaAgLand }}</span>
           </div>
           <div class="flex justify-between text-white text-[14px] py-1 border-t border-white/20">
-            <span title="Ag-management options sit on Ag land and can overlap, so this area is not added to the total">Under Ag Mgt (overlapping)</span>
+            <span title="Ag-management options sit on Ag land and can overlap, so this area is not added to the total">Ag Mgt (overlaps Ag land)</span>
             <span>{{ selectRankingData.areaAgMgt }}</span>
           </div>
           <div class="flex justify-between text-white text-[14px] py-1 border-t border-white/20">
