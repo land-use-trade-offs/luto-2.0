@@ -928,7 +928,7 @@ class Data:
             fpath = os.path.join(settings.INPUT_DIR, "yieldincreases_ag_2050.xlsx")
             productivity_trend = pd.read_excel(
                 fpath, 
-                sheet_name=f'{settings.PRODUCTIVITY_TREND.lower()}', 
+                sheet_name=f'{settings.PRODUCTIVITY_TREND.lower()}_actual', 
                 header=[0, 1],
                 index_col=0
             ).astype(np.float32)

@@ -96,7 +96,7 @@ def create_new_dataset(refresh=False):
     
     # Yiled trend data
     shutil.copyfile(fdh_inpath + 'yieldincreases-bau2022.csv', outpath + 'yieldincreases_bau2022.csv')
-    shutil.copyfile(ag_yield_trend + 'yieldncreases_ABARES.xlsx', outpath + 'yieldincreases_ag_2050.xlsx')
+    shutil.copyfile(ag_yield_trend + '20201111_yieldincreases_ag_2050_ETS.xlsx', outpath + 'yieldincreases_ag_2050.xlsx')
 
     
     # Demand and elasticity data
