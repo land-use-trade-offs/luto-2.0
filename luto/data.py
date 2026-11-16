@@ -43,6 +43,27 @@ from math import ceil
 from dataclasses import dataclass
 
 
+# The climate change impact files are multipliers relative to this year (1 there, no column for it); Data re-anchors
+# them to YR_CAL_BASE. The productivity trend csv starts in this year too (row 0, multiplier 1).
+CLIMATE_FILE_ANCHOR_YEAR = 2010
+PRODUCTIVITY_FILE_FIRST_YEAR = 2010
+
+
+def climate_base_multiplier(column, years: list, base_year: int) -> np.ndarray:
+    """The climate change impact multiplier at `base_year` per cell, for one (lm, lu): linear between the knots around
+    it, the knots being CLIMATE_FILE_ANCHOR_YEAR (multiplier 1) and the files' `years`, with a missing value counted as
+    1 (as quantity.get_ccimpact counts it). `column(year)` returns that year's column, float64."""
+    knots = [CLIMATE_FILE_ANCHOR_YEAR] + sorted(years)
+    if not knots[0] < base_year < knots[-1]:
+        raise ValueError(f"YR_CAL_BASE {base_year} is outside the climate change impact years {knots}.")
+    hi = next(k for k in knots if k >= base_year)
+    lo = knots[knots.index(hi) - 1]
+    w = (base_year - lo) / (hi - lo)
+    m_lo = 1.0 if lo == CLIMATE_FILE_ANCHOR_YEAR else np.nan_to_num(column(lo), nan=1.0)
+    m_hi = np.nan_to_num(column(hi), nan=1.0)
+    return m_lo + (m_hi - m_lo) * w
+
+
 
 @dataclass
 class Data:
@@ -82,7 +103,13 @@ class Data:
         print('')
         print(f'Data Initialization at RES{settings.RESFACTOR}')
 
-        self.YR_CAL_BASE = 2010  # The base year, i.e. where year index yr_idx == 0.
+        self.YR_CAL_BASE = settings.YR_CAL_BASE  # The base year, i.e. where year index yr_idx == 0.
+        early = [yr for yr in settings.SIM_YEARS if yr <= self.YR_CAL_BASE]
+        if early:
+            raise ValueError(f"SIM_YEARS {early} are not after the base year YR_CAL_BASE = {self.YR_CAL_BASE}.")
+        if getattr(settings, 'INPUT_SET', '2010') == '2021' and settings.ECONOMICS_DOLLAR_YEAR != 2021:   # INPUT_SET: the input set, where the code has it
+            print(f"│   ⚠ WARNING: INPUT_SET '2021' reads FY2021-dollar economics, but ECONOMICS_DOLLAR_YEAR is "
+                  f"{settings.ECONOMICS_DOLLAR_YEAR}: the 2010-dollar constants are not rescaled to them.", flush=True)
 
         ###############################################################
         # Masking and spatial coarse graining.
@@ -501,9 +528,10 @@ class Data:
         with xr.open_dataset(Path(settings.INPUT_DIR) / cci_name) as table:
             self.CLIMATE_CHANGE_IMPACT = self.get_resfactored_average(table['CLIMATE_CHANGE_IMPACT'], cci_name).set_xindex(['lm', 'lu', 'year'])
         
-        # The impact files are multipliers relative to 2010: their years are {2020, 2050, 2080} and 2010 is 1 by
-        # construction. The anchor is a property of the files, not of the model's base year.
-        self.CLIMATE_CHANGE_IMPACT_ANCHOR_YEAR = 2010
+        # The impact files are multipliers relative to 2010 (CLIMATE_FILE_ANCHOR_YEAR): their years are {2020, 2050, 2080}
+        # and 2010 is 1 by construction. They are re-anchored to the base year, so the multiplier is 1 at YR_CAL_BASE.
+        self.CLIMATE_CHANGE_IMPACT = self.reanchor_climate_change_impact(self.CLIMATE_CHANGE_IMPACT)
+        self.CLIMATE_CHANGE_IMPACT_ANCHOR_YEAR = self.YR_CAL_BASE
 
         ###############################################################
         # Regional coverage layers, mainly for regional reporting.
@@ -860,9 +888,10 @@ class Data:
             fpath = Path(settings.INPUT_DIR) / "yieldincreases_bau2022.csv"
             productivity_trend = pd.read_csv(fpath, header=[0, 1]).astype(np.float32)
             # The csv has no year column: row 0 is 2010 (multiplier 1.0, cumulative growth since then). The
-            # first year is a property of the file, not of the model's base year.
-            productivity_trend.index = productivity_trend.index + 2010  # Adjust year to absolute year
+            # first year is a property of the file; the trend is re-anchored to the base year below.
+            productivity_trend.index = productivity_trend.index + PRODUCTIVITY_FILE_FIRST_YEAR  # Adjust year to absolute year
             productivity_trend.index.name = 'Year'
+            productivity_trend = self.reanchor_productivity_trend(productivity_trend)
             
             # Convert to xarray for easier accessing.
             self.PRODUCTIVITY_MUL_xr = (
@@ -878,7 +907,8 @@ class Data:
                 header=[0, 1],
                 index_col=0
             ).astype(np.float32)
-            
+            productivity_trend = self.reanchor_productivity_trend(productivity_trend)
+
             # Convert to xarray for easier accessing.
             self.PRODUCTIVITY_MUL_xr = (
                 xr.DataArray(productivity_trend)
@@ -937,8 +967,11 @@ class Data:
 
 
         # Raw transition cost matrix. In AUD/ha and ordered lexicographically.
-        self.AG_TMATRIX = np.load(Path(settings.INPUT_DIR) / "ag_tmatrix.npy")
-        self.AG_TO_DESTOCKED_NATURAL_COSTS_HA = np.load(Path(settings.INPUT_DIR) / "ag_to_destock_tmatrix.npy")
+        # The transition cost files state no price year: taken as 2010 dollars (an ASSUMPTION) and rescaled by
+        # settings.TRANSITION_COST_2010_TO_ECONOMICS, here and for ag_to_ep, ep_to_ag and the clearing costs below.
+        self.AG_TMATRIX = np.load(Path(settings.INPUT_DIR) / "ag_tmatrix.npy") * settings.TRANSITION_COST_2010_TO_ECONOMICS
+        self.AG_TO_DESTOCKED_NATURAL_COSTS_HA = (np.load(Path(settings.INPUT_DIR) / "ag_to_destock_tmatrix.npy")
+                                                 * settings.TRANSITION_COST_2010_TO_ECONOMICS)
 
         
   
@@ -966,6 +999,7 @@ class Data:
         # Load plantings economic data
         est_cost = xr.load_dataset(Path(settings.INPUT_DIR) / "plantings_est_cost_ha.nc")
         est_cost = xr.Dataset({name: self.get_resfactored_average(est_cost[name], f'plantings_est_cost_ha_{name}') for name in est_cost.data_vars}).astype(np.float32)
+        est_cost = est_cost * np.float32(settings.EST_COST_2010_TO_ECONOMICS)   # converted from 2021 to 2010 dollars when built; undone for 2021-dollar economics
         self.EP_EST_COST_HA = est_cost['EP_EST_COST_HA']
         self.RP_EST_COST_HA = self.EP_EST_COST_HA.copy()  # Riparian plantings have the same establishment cost as environmental plantings
         self.AF_EST_COST_HA = self.EP_EST_COST_HA.copy()  # Agroforestry plantings have the same establishment cost as environmental plantings
@@ -1032,12 +1066,12 @@ class Data:
         # Agricultural land use to plantings raw transition costs:
         self.AG2EP_TRANSITION_COSTS_HA = np.load(
             Path(settings.INPUT_DIR) / "ag_to_ep_tmatrix.npy"
-        )  # shape: (28,)
+        ) * settings.TRANSITION_COST_2010_TO_ECONOMICS  # shape: (28,); 2010 dollars assumed (see AG_TMATRIX)
 
         # EP to agricultural land use transition costs:
         self.EP2AG_TRANSITION_COSTS_HA = np.load(
             Path(settings.INPUT_DIR) / "ep_to_ag_tmatrix.npy"
-        )  # shape: (28,)
+        ) * settings.TRANSITION_COST_2010_TO_ECONOMICS  # shape: (28,); 2010 dollars assumed (see AG_TMATRIX)
         
         
         ##############################################################
@@ -1060,7 +1094,8 @@ class Data:
         
         
         # Transition matrix of non-ag to unallocated-modified land (land clearing)
-        tmat_wood_clear = np.load(Path(settings.INPUT_DIR) / 'transition_cost_clearing_forest.npz')
+        with np.load(Path(settings.INPUT_DIR) / 'transition_cost_clearing_forest.npz') as z:   # 2010 dollars assumed (see AG_TMATRIX)
+            tmat_wood_clear = {k: z[k] * settings.TRANSITION_COST_2010_TO_ECONOMICS for k in z.files}
         
         tmat_clear_EP = tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']
         tmat_clear_RP = tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']
@@ -1772,8 +1807,8 @@ class Data:
         })
 
         # Capture as DataArrays over the model cells
-        self.BECCS_COSTS_AUD_HA_YR = beccs['BECCS_COSTS_AUD_HA_YR']
-        self.BECCS_REV_AUD_HA_YR = beccs['BECCS_REV_AUD_HA_YR']
+        self.BECCS_COSTS_AUD_HA_YR = beccs['BECCS_COSTS_AUD_HA_YR'] * settings.CPI_2010_TO_ECONOMICS    # 2010 dollars
+        self.BECCS_REV_AUD_HA_YR = beccs['BECCS_REV_AUD_HA_YR'] * settings.CPI_2010_TO_ECONOMICS        # 2010 dollars
         self.BECCS_TCO2E_HA_YR = beccs['BECCS_TCO2E_HA_YR']
         self.BECCS_MWH_HA_YR = beccs['BECCS_MWH_HA_YR']
 
@@ -2115,6 +2150,39 @@ class Data:
             except PermissionError:                           # Windows drives: another process has the finished cache open, and it stands
                 tmp_path.unlink(missing_ok=True)
         return result
+
+
+    def reanchor_productivity_trend(self, trend: pd.DataFrame) -> pd.DataFrame:
+        """
+        The productivity trend (yield multipliers by year) divided by its row at YR_CAL_BASE, so the multiplier is 1
+        at the base year, where the input yields are calibrated. At a 2010 base (PRODUCTIVITY_FILE_FIRST_YEAR) it is
+        returned unchanged.
+        """
+        if self.YR_CAL_BASE == PRODUCTIVITY_FILE_FIRST_YEAR:
+            return trend
+        if self.YR_CAL_BASE not in trend.index:
+            raise ValueError(f"The productivity trend has no row for YR_CAL_BASE {self.YR_CAL_BASE}.")
+        return (trend / trend.loc[self.YR_CAL_BASE]).astype(np.float32)
+
+
+    def reanchor_climate_change_impact(self, cci: xr.DataArray) -> xr.DataArray:
+        """
+        The climate change impact multipliers (column, cell), columns labelled (lm, lu, year), re-anchored to the base
+        year: every year column of an (lm, lu) divided by its multiplier at YR_CAL_BASE (climate_base_multiplier), so
+        the multiplier is 1 at the base year. Missing values stay missing (the NaN guard reads them). At a 2010 base
+        (CLIMATE_FILE_ANCHOR_YEAR) it is returned unchanged. Applied to the model cells' block means.
+        """
+        if self.YR_CAL_BASE == CLIMATE_FILE_ANCHOR_YEAR:
+            return cci
+        position = {label: i for i, label in enumerate(cci.indexes['column'])}
+        years = sorted({label[2] for label in position})
+        vals = cci.values.astype(np.float64)
+        out = vals.copy()
+        for lm, lu in sorted({label[:2] for label in position}):
+            base = climate_base_multiplier(lambda yr: vals[position[lm, lu, yr]], years, self.YR_CAL_BASE)
+            for yr in years:
+                out[position[lm, lu, yr]] = vals[position[lm, lu, yr]] / base
+        return cci.copy(data=out.astype(cci.dtype))
 
 
     def block_mean(self, arr: np.ndarray) -> np.ndarray:
@@ -2571,7 +2639,7 @@ class Data:
 
             for _, row in targets_df.iterrows():
                 f = interp1d(
-                    [2010, 2030, 2050, 2100],
+                    [self.YR_CAL_BASE, 2030, 2050, 2100],
                     [min(row['BASEYEAR_LEVEL'], row['TARGET_LEVEL_2030']),
                     row['TARGET_LEVEL_2030'],
                     row['TARGET_LEVEL_2050'],
@@ -2603,7 +2671,7 @@ class Data:
             species  = row['SCIENTIFIC_NAME']
             presence = row['presence']
             f = interp1d(
-                [2010, 2030, 2050, 2100],
+                [self.YR_CAL_BASE, 2030, 2050, 2100],
                 [min(row['BASEYEAR_LEVEL'], row['TARGET_LEVEL_2030']),
                  row['TARGET_LEVEL_2030'], row['TARGET_LEVEL_2050'], row['TARGET_LEVEL_2100']],
                 kind='linear', fill_value='extrapolate',
@@ -2634,7 +2702,7 @@ class Data:
             species  = row['COMMUNITY']
             presence = row['presence']
             f = interp1d(
-                [2010, 2030, 2050, 2100],
+                [self.YR_CAL_BASE, 2030, 2050, 2100],
                 [min(row['BASEYEAR_LEVEL'], row['TARGET_LEVEL_2030']),
                  row['TARGET_LEVEL_2030'], row['TARGET_LEVEL_2050'], row['TARGET_LEVEL_2100']],
                 kind='linear', fill_value='extrapolate',
@@ -2759,7 +2827,7 @@ class Data:
         target_pct = []
         for _,row in self.BIO_GBF8_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES.iterrows():
             f = interp1d(
-                [2010, 2030, 2050, 2100],
+                [self.YR_CAL_BASE, 2030, 2050, 2100],
                 [min(row['HABITAT_SUITABILITY_BASELINE_PERCENT'], row['TARGET_LEVEL_2030']), row[f'TARGET_LEVEL_2030'], row[f'TARGET_LEVEL_2050'], row[f'TARGET_LEVEL_2100']],
                 kind="linear",
                 fill_value="extrapolate",
@@ -2820,7 +2888,7 @@ class Data:
         reg_adop_limits = []
         for _,row in self.REGIONAL_ADOPTION_TARGETS.iterrows():
             f = interp1d(
-                [2010, 2030, 2050, 2100],
+                [self.YR_CAL_BASE, 2030, 2050, 2100],
                 [row['BASE_LANDUSE_AREA_PERCENT'], row['ADOPTION_PERCENTAGE_2030'], row['ADOPTION_PERCENTAGE_2050'], row['ADOPTION_PERCENTAGE_2100']],
                 kind="linear",
                 fill_value="extrapolate",
