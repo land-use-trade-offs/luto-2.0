@@ -50,7 +50,7 @@ from luto.solvers.reports import record_shadow_prices, report_shortfall, save_mo
 from luto.solvers.tables import Tables, elastic_absorbs
 import luto.economics.agricultural.ghg as ag_ghg
 import luto.economics.non_agricultural.ghg as non_ag_ghg
-from luto.tools.write import write_outputs
+from luto.tools.write_output import write_outputs
 from luto.tools import (
     LogToFile,
     log_memory_usage,
