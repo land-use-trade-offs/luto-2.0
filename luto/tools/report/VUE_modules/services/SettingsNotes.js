@@ -1,8 +1,9 @@
 // The notes of the settings, shown in the pop-up behind the i of each setting on the Settings page.
 //
 // Hand-written for a reader of the report, from the comments of luto/settings.py and the code that reads each
-// setting. They do NOT follow settings.py by themselves: when a setting, its options or its meaning change there,
-// update its entry here. A setting with no entry here shows its comment from settings.py as a fallback.
+// setting. This file is the only source of the notes: nothing reads settings.py for them. When a setting, its
+// options or its meaning change there, or a setting is added, update its entry here by hand; a setting with no
+// entry shows "No note for this setting yet".
 //
 //   SettingsNotes[<setting>] = {
 //     what:    one sentence on what the setting does,

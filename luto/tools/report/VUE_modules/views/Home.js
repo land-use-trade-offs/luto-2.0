@@ -354,32 +354,51 @@ const HomeAssumptions = {
   props: { groups: { type: Array, required: true } },
   template: /*html*/`
     <div class="h-full flex flex-col bg-white/95 rounded-[10px] shadow-md px-4 py-3 overflow-hidden">
-      <div class="flex items-baseline justify-between gap-3 mb-1">
+      <div class="flex items-baseline justify-between gap-3 mb-2">
         <span class="font-bold text-[0.9rem] text-gray-700">Assumptions of the model</span>
         <span class="flex items-center gap-1 text-gray-500 text-[0.65rem]">
           <span class="inline-block px-1 py-0.5 rounded border border-dashed border-sky-700 leading-none">abc</span>
           <span>= user-selected option of this run</span>
         </span>
       </div>
-      <!-- the columns grow downwards inside the scrolling box (columns on the box itself would run off to the right) -->
-      <div class="flex-1 min-h-0 overflow-y-auto pr-2"><div class="columns-2 gap-8">
-        <template v-for="group in groups" :key="group.name">
-          <div class="text-[0.65rem] font-semibold uppercase tracking-wide text-gray-500 mt-2 mb-1 border-b border-gray-200 break-after-avoid">{{ group.name }}</div>
-          <div v-for="item in group.items" :key="item.setting" class="mb-2 break-inside-avoid">
-            <div class="text-[0.78rem] font-semibold text-[#1f1f1f] leading-snug">{{ item.what }}</div>
-            <div class="font-mono text-[0.62rem] text-gray-400">{{ item.setting }}</div>
-            <div class="flex flex-wrap gap-1 mt-1">
-              <template v-if="item.options.length">
-                <span v-for="option in item.options" :key="option.value" :title="option.meaning"
-                  class="text-[0.72rem] px-1.5 py-0.5 rounded border bg-[#f1f3f5] text-[#1f1f1f]"
-                  :class="option.ofRun ? 'border-dashed border-sky-700' : 'border-transparent'">{{ option.value }}</span>
-              </template>
-              <span v-else class="text-[0.72rem] px-1.5 py-0.5 rounded border border-dashed border-sky-700 bg-[#f1f3f5] text-[#1f1f1f] break-all">{{ item.value }}</span>
-            </div>
-            <div v-if="item.meaning" class="text-[0.72rem] text-[#505051] leading-snug mt-0.5">{{ item.meaning }}</div>
-          </div>
-        </template>
-      </div></div>
+      <!-- One table: a row per setting (what it decides, its options with the run's marked, what the run's option
+           means), under a heading row per group; the column heads stay in view while the rows scroll -->
+      <div class="flex-1 min-h-0 overflow-y-auto pr-1">
+        <table class="w-full border-collapse text-[0.75rem]">
+          <colgroup><col class="w-[34%]"><col class="w-[30%]"><col class="w-[36%]"></colgroup>
+          <thead class="sticky top-0 bg-white z-10">
+            <tr class="text-left text-[0.65rem] uppercase tracking-wide text-gray-500">
+              <th class="font-semibold py-1 pr-3 border-b border-gray-300">Assumption</th>
+              <th class="font-semibold py-1 pr-3 border-b border-gray-300">Options</th>
+              <th class="font-semibold py-1 border-b border-gray-300">In this run</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template v-for="group in groups" :key="group.name">
+              <tr><td colspan="3" class="pt-3 pb-1 text-[0.68rem] font-bold uppercase tracking-wide text-sky-700 bg-sky-50/60 px-2">{{ group.name }}</td></tr>
+              <!-- the rows alternate white and a faint grey, to follow a row across the three columns -->
+              <tr v-for="(item, position) in group.items" :key="item.setting" class="align-top border-b border-gray-100 hover:bg-sky-50/50"
+                :class="position % 2 ? 'bg-[#f6f7f9]' : 'bg-white'">
+                <td class="py-1.5 pr-3 pl-2">
+                  <div class="font-semibold text-[#1f1f1f] leading-snug">{{ item.what }}</div>
+                  <div class="font-mono text-[0.62rem] text-gray-400">{{ item.setting }}</div>
+                </td>
+                <td class="py-1.5 pr-3">
+                  <div class="flex flex-wrap gap-1">
+                    <template v-if="item.options.length">
+                      <span v-for="option in item.options" :key="option.value" :title="option.meaning"
+                        class="px-1.5 py-0.5 rounded border bg-[#e9ecef] text-[#1f1f1f]"
+                        :class="option.ofRun ? 'border-dashed border-sky-700' : 'border-transparent text-gray-500'">{{ option.value }}</span>
+                    </template>
+                    <span v-else class="px-1.5 py-0.5 rounded border border-dashed border-sky-700 bg-[#e9ecef] text-[#1f1f1f] break-all max-h-[4.6rem] overflow-y-auto">{{ item.value }}</span>
+                  </div>
+                </td>
+                <td class="py-1.5 text-[#505051] leading-snug">{{ item.meaning }}</td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
     </div>
   `,
 };
@@ -505,13 +524,15 @@ window.HomeView = {
     // The assumptions: the settings that are not input data. Their names, options and meanings are the notes of the
     // Settings page (services/SettingsNotes.js); the groups and their order are chosen here.
     const ASSUMPTION_THEME = 'Assumptions';
+    // Settings an input theme already shows as option buttons (SSP, CO2 fertilisation, scope 1, carbon window, fire
+    // risk, quality layer, HCAS source) or marks on its chart (the productivity trend) are left out: the run's choice
+    // is highlighted there.
     const ASSUMPTIONS = [
       ['Prices and costs', ['DYNAMIC_PRICE', 'CARBON_PRICES_FIELD', 'CARBON_PRICE_COSTANT', 'AMORTISE_UPFRONT_COSTS', 'DISCOUNT_RATE', 'AMORTISATION_PERIOD', 'TRANSITION_COST_MULT', 'INCLUDE_WATER_LICENSE_COSTS']],
       ['Objective and demand', ['OBJECTIVE', 'DEMAND_BOUNDS', 'APPLY_DEMAND_MULTIPLIERS']],
-      ['Climate and yield', ['SSP', 'CO2_FERT', 'PRODUCTIVITY_TREND', 'WATER_CLIMATE_CHANGE_IMPACT']],
-      ['Carbon accounting', ['USE_GHG_SCOPE_1', 'CARBON_EFFECTS_WINDOW', 'FIRE_RISK', 'RISK_OF_REVERSAL']],
-      ['Water', ['WATER_REGION_DEF', 'WATER_STRESS', 'LIVESTOCK_DRINKING_WATER']],
-      ['Biodiversity', ['BIO_QUALITY_LAYER', 'CONNECTIVITY_SOURCE', 'CONNECTIVITY_LB', 'HCAS_CONTRIBUTION_PERCENTILE']],
+      ['Carbon accounting', ['RISK_OF_REVERSAL']],
+      ['Water', ['WATER_CLIMATE_CHANGE_IMPACT', 'WATER_REGION_DEF', 'WATER_STRESS', 'LIVESTOCK_DRINKING_WATER']],
+      ['Biodiversity', ['CONNECTIVITY_SOURCE', 'CONNECTIVITY_LB']],
       ['Land-use change', ['NON_AG_LAND_USES_REVERSIBLE', 'AG_MANAGEMENTS_REVERSIBLE', 'TECH_ADOPT_MULT', 'EXCLUDE_NO_GO_LU']],
       ['Resolution and years', ['RESFACTOR', 'SIM_YEARS']],
     ];
@@ -581,7 +602,20 @@ window.HomeView = {
       'W': { setting: 'CARBON_EFFECTS_WINDOW', name: 'Carbon window (years)', order: ['50', '60', '70', '80', '90'] },
       'F': { setting: 'FIRE_RISK', name: 'Fire risk', order: ['low', 'med', 'high'] },
       'Q': { setting: 'BIO_QUALITY_LAYER', name: 'Quality layer', order: [] },
+      // 'CONSTANT' is built as no carbon price: it is the run's option only where the run's constant is 0
+      'P': { setting: 'CARBON_PRICES_FIELD', name: 'Carbon price', order: ['CONSTANT', 'Default', '100', '1.8C 67%', '1.5C 50%', '1.5C 67%'],
+             labels: { 'CONSTANT': 'none (0)', 'Default': 'default path', '100': '100 AUD/t' } },
     };
+    const optionValueLabel = (option, value) => OPTIONS[option]?.labels?.[value] ?? value;
+    // The value of the run for an option, as the buttons name it (null: the run has a value no button stands for)
+    const runValueOf = (option, known) => {
+      const value = String(settingOf(known.setting));
+      if (option === 'P' && value === 'CONSTANT' && Number(settingOf('CARBON_PRICE_COSTANT')) !== 0) return null;
+      return value;
+    };
+    // What to say where no button stands for the run's value
+    const runValueNote = (option) => option === 'P' && String(settingOf('CARBON_PRICES_FIELD')) === 'CONSTANT' && Number(settingOf('CARBON_PRICE_COSTANT')) !== 0
+      ? `this run: a constant ${settingOf('CARBON_PRICE_COSTANT')} AUD per t, not among the maps` : '';
     // A table can have options too (Inputs_tables.js: `options`): the sources of the habitat contribution
     const TABLE_OPTIONS = {
       'Habitat contribution of a land use (HCAS)': { key: 'H', setting: 'HCAS_CONTRIBUTION_PERCENTILE', name: 'Habitat condition source', reference: '50', referenceName: '50th percentile' },
@@ -604,8 +638,8 @@ window.HomeView = {
       return Object.entries(rows).map(([option, found]) => {
         const known = OPTIONS[option] || { setting: option, name: option, order: [] };
         const values = [...known.order.filter(value => found.includes(value)), ...found.filter(value => !known.order.includes(value))];
-        const ofRun = values.find(value => String(settingOf(known.setting)) === value) ?? null;
-        return { setting: option, name: known.name, values, ofRun, picked: values.includes(optionChoice[option]) ? optionChoice[option] : (ofRun ?? values[0]) };
+        const ofRun = values.find(value => runValueOf(option, known) === value) ?? null;
+        return { setting: option, name: known.name, values, ofRun, note: runValueNote(option), picked: values.includes(optionChoice[option]) ? optionChoice[option] : (ofRun ?? values[0]) };
       });
     });
     const selectInputOption = computed(() => {
@@ -1513,7 +1547,7 @@ window.HomeView = {
         return [{ key: 'assumptions', accent: METRIC_COLORS[selectTheme.value] || '#64748b', title: 'Assumptions', setting: 'settings', sections: [
           { label: 'What they are', text: 'Settings that are not input data, but decide how the model reads the data and what it optimises: how prices respond, how costs are counted, which climate and carbon rules apply.' },
           { label: 'How to read them', text: 'Every setting is shown with all its options; the option of this run has the dashed border. A setting that is a number or a table shows its value in this run. Hover an option to see what it means.' },
-          { label: 'Where the rest are', text: 'These are the settings that shape the results most. Every setting of the run, with a note on each, is on the Settings and Log page.' },
+          { label: 'Where the rest are', text: 'A setting that picks between versions of an input (climate pathway, CO2 fertilisation, carbon window, quality layer) is not repeated here: it is the highlighted button on that input. Every setting of the run, with a note on each, is on the Settings and Log page.' },
         ] }];
       }
       if (isBundleTheme.value) {
@@ -1690,6 +1724,7 @@ window.HomeView = {
       inputEntry,
       inputLmOptions,
       inputOptionRows,
+      optionValueLabel,
       optionChoice,
       selectInputOption,
       inputYearNote,
@@ -1984,8 +2019,9 @@ window.HomeView = {
                         class="text-[0.75rem] px-2 py-0.5 rounded text-left border"
                         :class="[row.picked === value ? 'bg-sky-500 text-white' : 'bg-[#f1f3f5] text-[#1f1f1f] hover:bg-sky-100',
                                  value === row.ofRun ? 'border-dashed border-sky-700' : 'border-transparent']"
-                      >{{ value }}</button>
+                      >{{ optionValueLabel(row.setting, value) }}</button>
                     </div>
+                    <p v-if="row.note" class="text-[0.65rem] text-gray-500 leading-tight mt-0.5">{{ row.note }}</p>
                   </div>
                   <!-- What the dashed border means, as on the Biodiversity page -->
                   <div v-if="inputOptionRows.length" class="flex items-center gap-1 text-gray-500 text-[0.65rem] leading-tight">

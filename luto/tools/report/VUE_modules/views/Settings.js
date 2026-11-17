@@ -74,12 +74,8 @@ window.SettingsView = {
     onMounted(() => document.addEventListener('click', closeInfo));
     Vue.onUnmounted(() => document.removeEventListener('click', closeInfo));
 
-    // The note of a setting: the hand-written one of services/SettingsNotes.js; a setting that has none yet shows
-    // its comment in settings.py, which arrives one line per block, a list item starting with a bullet
-    // (create_report_data.tidy_settings_note).
+    // The note of a setting: hand-written, in services/SettingsNotes.js (null for a setting that has none yet)
     const noteOf = (param) => (window.SettingsNotes || {})[param.parameter] || null;
-    const BULLET = '\u2022 ';
-    const noteBlocks = (note) => String(note).split('\n').map(line => line.startsWith(BULLET) ? { item: true, text: line.slice(BULLET.length) } : { item: false, text: line });
 
     const getValueClass = (value) => {
       const length = typeof value === 'string' ? value.length : 0;
@@ -120,7 +116,6 @@ window.SettingsView = {
       filteredCategories,
       openInfo,
       toggleInfo,
-      noteBlocks,
       noteOf,
       getValueClass,
       chartMemLogData,
@@ -234,12 +229,7 @@ window.SettingsView = {
                         </div>
                       </template>
                     </template>
-                    <!-- A setting with no hand-written note yet: its comment in settings.py, a line per block -->
-                    <template v-else-if="param.doc">
-                      <div v-for="(block, position) in noteBlocks(param.doc)" :key="position" class="mt-1.5 text-gray-700 leading-relaxed break-words"
-                        :class="block.item ? 'pl-3 border-l-2 border-sky-200' : ''">{{ block.text }}</div>
-                    </template>
-                    <p v-else class="mt-1.5 text-gray-400 italic">No note for this setting yet.</p>
+                    <p v-else class="mt-1.5 text-gray-400 italic">No note for this setting yet: add it to services/SettingsNotes.js.</p>
                     <div class="mt-3 pt-2 border-t border-gray-100 flex flex-wrap gap-1">
                       <span v-for="group in param.groups" :key="group" class="px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 text-[0.65rem]">{{ group }}</span>
                     </div>
