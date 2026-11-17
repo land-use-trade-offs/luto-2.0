@@ -2885,6 +2885,8 @@ def write_water(data: Data, yr_cal, path):
             data,
             ag_water.get_agricultural_management_water_matrices(data, yr_idx)
         )
+        ag_runoff_mrj = ag_water.get_wyield_matrices(data, yr_idx)
+        non_ag_runoff_rk = non_ag_water.get_w_net_yield_matrix(data, ag_runoff_mrj, yr_idx)
     elif settings.WATER_CLIMATE_CHANGE_IMPACT == 'off':
         ag_w_mrj = tools.ag_mrj_to_xr(
             data,
@@ -2898,6 +2900,8 @@ def write_water(data: Data, yr_cal, path):
             data,
             ag_water.get_agricultural_management_water_matrices(data, yr_idx)
         )
+        ag_runoff_mrj = ag_water.get_wyield_matrices(data, yr_idx, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)
+        non_ag_runoff_rk = non_ag_water.get_w_net_yield_matrix(data, ag_runoff_mrj, yr_idx, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)
     else:
         raise ValueError("Invalid setting for WATER_CLIMATE_CHANGE_IMPACT, only 'on' or 'off' allowed.")
 
@@ -2910,23 +2914,47 @@ def write_water(data: Data, yr_cal, path):
     xr_non_ag_wny = add_all(xr_non_ag_wny, ['lu'])
     xr_am_wny     = add_all(xr_am_wny,     ['lm', 'lu', 'am'])
 
-    ag_wny = xr_ag_wny.groupby('region_water'
+    # Net yield = runoff - use. Runoff is what the land cover yields (the non-ag matrix built on the ag
+    # runoff: a non-ag land use that keeps livestock carries their drinking water as use); use is the
+    # rest, irrigation and livestock drinking water. An ag-management option changes the water its land
+    # use requires and no runoff, so its net yield is all (negative) use.
+    xr_ag_runoff     = add_all(ag_dvar_mrj * tools.ag_mrj_to_xr(data, ag_runoff_mrj), ['lm', 'lu'])
+    xr_non_ag_runoff = add_all(non_ag_dvar_rj * tools.non_ag_rk_to_xr(data, non_ag_runoff_rk), ['lu'])
+    xr_am_runoff     = xr.zeros_like(xr_am_wny)
+
+    ag_parts = xr.Dataset({
+        'Water Net Yield (ML)': xr_ag_wny,
+        'Water Runoff (ML)': xr_ag_runoff,
+        'Water Use (ML)': xr_ag_runoff - xr_ag_wny,
+    })
+    non_ag_parts = xr.Dataset({
+        'Water Net Yield (ML)': xr_non_ag_wny,
+        'Water Runoff (ML)': xr_non_ag_runoff,
+        'Water Use (ML)': xr_non_ag_runoff - xr_non_ag_wny,
+    })
+    am_parts = xr.Dataset({
+        'Water Net Yield (ML)': xr_am_wny,
+        'Water Runoff (ML)': xr_am_runoff,
+        'Water Use (ML)': xr_am_runoff - xr_am_wny,
+    })
+
+    ag_wny = ag_parts.groupby('region_water'
         ).sum(['cell']
-        ).to_dataframe('Water Net Yield (ML)'
+        ).to_dataframe(
         ).reset_index(
         ).assign(Type='Agricultural Land-use'
         ).infer_objects(copy=False
         ).replace({'region_water': data.WATER_REGION_NAMES})
-    non_ag_wny = xr_non_ag_wny.groupby('region_water'
+    non_ag_wny = non_ag_parts.groupby('region_water'
         ).sum(['cell']
-        ).to_dataframe('Water Net Yield (ML)'
+        ).to_dataframe(
         ).reset_index(
         ).assign(Type='Non-Agricultural Land-use', lm='dry'
         ).infer_objects(copy=False
         ).replace({'region_water': data.WATER_REGION_NAMES})
-    am_wny = xr_am_wny.groupby('region_water'
+    am_wny = am_parts.groupby('region_water'
         ).sum(['cell']
-        ).to_dataframe('Water Net Yield (ML)'
+        ).to_dataframe(
         ).reset_index(
         ).assign(Type='Agricultural Management'
         ).infer_objects(copy=False
@@ -2989,8 +3017,9 @@ def write_water(data: Data, yr_cal, path):
     # ==================== Organise Water Yield Components ====================
 
     # Water net yield for watershed regions
+    # Leaf rows only: every dimension that carries an "ALL" row must be filtered, or the sum counts twice
     wny_inside_luto_sum = wny_inside_luto\
-        .query('`Water Supply` != "ALL" and `Agricultural Management` != "ALL"')\
+        .query('`Water Supply` != "ALL" and Landuse != "ALL" and `Agricultural Management` != "ALL"')\
         .groupby('Region')[['Water Net Yield (ML)']]\
         .sum()
     wny_inside_luto_sum = xr.DataArray(
@@ -3021,23 +3050,23 @@ def write_water(data: Data, yr_cal, path):
     water_other_records.to_csv(os.path.join(path, f'water_yield_limits_and_public_land_{yr_cal}.csv'), index=False)
 
     # Water yield for NRM region (use add_all'd arrays so Water Supply="ALL" is included)
-    ag_wny = xr_ag_wny.groupby('region_NRM'
+    ag_wny = ag_parts.groupby('region_NRM'
         ).sum(['cell']
-        ).to_dataframe('Water Net Yield (ML)'
+        ).to_dataframe(
         ).reset_index(
         ).assign(Type='Agricultural Land-use'
         ).infer_objects(copy=False
         ).replace({'region_NRM': data.WATER_REGION_NAMES})
-    non_ag_wny = xr_non_ag_wny.groupby('region_NRM'
+    non_ag_wny = non_ag_parts.groupby('region_NRM'
         ).sum(['cell']
-        ).to_dataframe('Water Net Yield (ML)'
+        ).to_dataframe(
         ).reset_index(
         ).assign(Type='Non-Agricultural Land-use', lm='dry'
         ).infer_objects(copy=False
         ).replace({'region_NRM': data.WATER_REGION_NAMES})
-    am_wny = xr_am_wny.groupby('region_NRM'
+    am_wny = am_parts.groupby('region_NRM'
         ).sum(['cell']
-        ).to_dataframe('Water Net Yield (ML)'
+        ).to_dataframe(
         ).reset_index(
         ).assign(Type='Agricultural Management'
         ).infer_objects(copy=False

@@ -52,6 +52,7 @@ def extract_dtype_from_path(path):
             'biodiversity':['biodiversity'],
             'renewable':['renewable_energy_'],
             'shadow_price':['shadow_prices'],
+            'inputs':['inputs_'],
             # Metrics xarrays
             'xarray_layer':['xr_'],
     }
@@ -168,6 +169,10 @@ def rename_reorder_hierarchy(sel: dict) -> dict:
     4. 'lu' (Land-use) has to be the lowest level in the hierarchy.
     '''
     sel_rename = {}
+
+    # 0: 'input' (outermost dim of the input layers: input -> lm -> lu)
+    if 'input' in sel:
+        sel_rename['input'] = sel['input']
 
     # 0: 'backend' (outermost dim for quality-metric layers)
     if 'backend' in sel:

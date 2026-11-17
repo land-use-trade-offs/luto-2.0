@@ -262,12 +262,6 @@ COLORS_PLOT = {
     'ALL':                                      "#E8E8E8",
     'Outside LUTO study area':                  "#E8E8E8",
 
-    # --- Rank ---
-    '1-10':                                     "#ff8f5e",
-    '11-20':                                    "#d5e5a3",
-    '>=21':                                     "#91e8e1",
-    'N.A.':                                     "#E8E8E8",
-
     # --- Water (chart colors — distinct from map COLOR_LM) ---
     'Dryland':                                  "#f7a35c",
     'Irrigated':                                "#7cb5ec",
@@ -451,7 +445,7 @@ AM_HEX = {
     'Onshore Wind':            '#7EB8D4',
 }
 COLOR_AM = {
-    -1: ('Non-Agricultural Land', '#e1e1e1'),
+    -1: ('Public land',           '#e1e1e1'),
      0: ('No management',         '#cccccc'),
     **{idx + 1: (am, AM_HEX[am]) for idx, am in enumerate(settings.AG_MANAGEMENTS)},
 }
@@ -471,7 +465,7 @@ NON_AG_HEX = {
     'Destocked - natural land':      '#c9b45a',
 }
 COLOR_NON_AG = {
-    -1: ('Non-Agricultural Land',   '#e1e1e1'),
+    -1: ('Public land',             '#e1e1e1'),
      0: ('Other Agricultural Land', '#ffebbe'),
     **{settings.NON_AGRICULTURAL_LU_BASE_CODE + k: (lu, NON_AG_HEX[lu]) for k, lu in enumerate(settings.NON_AG_LAND_USES)},
 }
@@ -480,35 +474,13 @@ COLOR_NON_AG = {
 # Grouped land-use overview map — lumap_colors_grouped.csv
 # The map code is FIXED: an ag land use's position in ag_landuses.csv (AG_LANDUSE), a non-ag land use
 # NON_AGRICULTURAL_LU_BASE_CODE + its position in settings.NON_AG_LAND_USES; each is drawn in its group's colour
+# The agricultural land uses are grouped as settings groups them (LU2TYPE, the land-use types of the AgTech
+# bundles: cropping, intensive cropping, horticulture); the livestock land uses are one group and the two
+# unallocated land uses stand for themselves. The names are the ones write_input.py gives the same groups.
+LUMAP_TYPE_NAMES = {'cropping': 'Cropping', 'int_cropping': 'Intensive cropping', 'horticulture': 'Horticulture'}
 LUMAP_GROUP = {
-    'Apples':                        'Crops',
-    'Beef - modified land':          'Livestock',
-    'Beef - natural land':           'Livestock',
-    'Citrus':                        'Crops',
-    'Cotton':                        'Crops',
-    'Dairy - modified land':         'Livestock',
-    'Dairy - natural land':          'Livestock',
-    'Grapes':                        'Crops',
-    'Hay':                           'Crops',
-    'Nuts':                          'Crops',
-    'Other non-cereal crops':        'Crops',
-    'Pears':                         'Crops',
-    'Plantation fruit':              'Crops',
-    'Rice':                          'Crops',
-    'Sheep - modified land':         'Livestock',
-    'Sheep - natural land':          'Livestock',
-    'Stone fruit':                   'Crops',
-    'Sugar':                         'Crops',
-    'Summer cereals':                'Crops',
-    'Summer legumes':                'Crops',
-    'Summer oilseeds':               'Crops',
-    'Tropical stone fruit':          'Crops',
-    'Unallocated - modified land':   'Unallocated - modified land',
-    'Unallocated - natural land':    'Unallocated - natural land',
-    'Vegetables':                    'Crops',
-    'Winter cereals':                'Crops',
-    'Winter legumes':                'Crops',
-    'Winter oilseeds':               'Crops',
+    **{lu: LUMAP_TYPE_NAMES[settings.LU2TYPE[lu]] if lu in settings.LU2TYPE else lu if lu.startswith('Unallocated') else 'Livestock'
+       for lu in AG_LANDUSE},
     'Environmental Plantings':       'Environmental plantings',
     'Riparian Plantings':            'Riparian Plantings',
     'Sheep Agroforestry':            'Sheep Agroforestry',
@@ -519,8 +491,11 @@ LUMAP_GROUP = {
     'BECCS':                         'BECCS',
     'Destocked - natural land':      'Destocked - natural land',
 }
+# The order of the agricultural groups here is their order in the legend
 LUMAP_GROUP_HEX = {
-    'Crops':                       '#7a8ef5',
+    'Cropping':                    '#7a8ef5',
+    'Intensive cropping':          '#16a3c7',
+    'Horticulture':                '#a0522d',
     'Livestock':                   '#ffa77f',
     'Unallocated - modified land': '#00e6a9',
     'Unallocated - natural land':  '#ffebbe',
@@ -533,17 +508,18 @@ LUMAP_GROUP_HEX = {
     'BECCS':                       '#686868',
     'Destocked - natural land':    '#e0e048',
 }
+# The order here is the order of the legend: the land outside the model's area ('Public land') comes last
 COLOR_LUMAP = {
-    -1: ('Non-Agricultural Land', '#e1e1e1'),
-    -2: ('Non-Agricultural Land', '#e1e1e1'),
     **{j: (LUMAP_GROUP[lu], LUMAP_GROUP_HEX[LUMAP_GROUP[lu]]) for j, lu in enumerate(AG_LANDUSE)},
     **{settings.NON_AGRICULTURAL_LU_BASE_CODE + k: (LUMAP_GROUP[lu], LUMAP_GROUP_HEX[LUMAP_GROUP[lu]]) for k, lu in enumerate(settings.NON_AG_LAND_USES)},
+    -1: ('Public land', '#e1e1e1'),
+    -2: ('Public land', '#e1e1e1'),
 }
 
 
 # Land management — lm_colors.csv
 COLOR_LM = {
-    -1: ('Non-Agricultural Land', '#cccccc'),
+    -1: ('Public land',           '#cccccc'),
      0: ('Dryland',               '#ffebbe'),
      1: ('Irrigated Land',        '#ff73df'),
 }

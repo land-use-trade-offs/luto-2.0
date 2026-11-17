@@ -23,12 +23,12 @@ import re
 import glob
 import json
 import base64
+import zlib
 import numpy as np
 import pandas as pd
 import xarray as xr
 import cf_xarray as cfxr
 import rioxarray  # .rio accessor on xarray objects
-from rasterio.io import MemoryFile
 
 from joblib import delayed, Parallel
 from luto import settings
@@ -43,6 +43,8 @@ from luto.tools.report.data_tools.parameters import (
     COLOR_AM,
     COLOR_NON_AG,
     COLOR_LUMAP,
+    LUMAP_GROUP,
+    LUMAP_GROUP_HEX,
     RENAME_AM_NON_AG,
 )
 
@@ -73,8 +75,8 @@ def write_geotiff_index(flat_data: dict, dim_names: list, prefix: str) -> None:
     """Write ``<prefix>__index.js`` with the dimension tree and per-combo display attrs.
 
     flat_data : { (dim1, …, dimN, year): data_dict }
-    data_dict : {'tif_b64': str, 'intOrFloat': ..., 'min_max'|'legendKey': ...}
-    tif_b64 is excluded from the index — it lives in the per-combo JS files.
+    data_dict : {'cells_b64': str, 'intOrFloat': ..., 'min_max'|'legendKey': ...}
+    cells_b64 is excluded from the index — it lives in the per-combo JS files.
     """
     base_name = os.path.basename(prefix)
     os.makedirs(os.path.dirname(prefix) or '.', exist_ok=True)
@@ -82,7 +84,7 @@ def write_geotiff_index(flat_data: dict, dim_names: list, prefix: str) -> None:
     combo_map: dict = {}
     for tp, data in flat_data.items():
         combo = tp[:-1]
-        combo_map[combo] = {k: v for k, v in data.items() if k != 'tif_b64'}
+        combo_map[combo] = {k: v for k, v in data.items() if k != 'cells_b64'}
 
     tree = build_tree(list(combo_map.keys()))
     combo_attrs = {
@@ -98,14 +100,14 @@ def write_geotiff_index(flat_data: dict, dim_names: list, prefix: str) -> None:
         f.write(';\n')
 
 
-def write_split_by_combo_geotiff(flat_data: dict, dim_names: list, prefix: str) -> None:
+def write_split_by_combo_geotiff(flat_data: dict, dim_names: list, prefix: str, collapse_years: bool = False) -> None:
     """Write one JS file per unique combo (all years) and an index JS file.
 
-    Each per-combo JS file contains the base64-encoded GeoTIFF and display attrs
+    Each per-combo JS file contains the base64-encoded cell vector (map2cells) and display attrs
     for every year, following the same split-file pattern the Vue already uses:
       window["map_area_Ag__Dryland__Wheat"] = {
-          2010: {tif_b64: "...", intOrFloat: "float", min_max: [0, 500]},
-          2025: {tif_b64: "...", ...},
+          2010: {cells_b64: "...", intOrFloat: "float", min_max: [0, 500]},
+          2025: {cells_b64: "...", ...},
       };
     """
     base_name = os.path.basename(prefix)
@@ -118,6 +120,9 @@ def write_split_by_combo_geotiff(flat_data: dict, dim_names: list, prefix: str) 
         combos.setdefault(combo, {})[year] = data
 
     for combo, year_data in combos.items():
+        # `collapse_years`: a layer whose cells are the same in every year is stored once, under 'ALL'
+        if collapse_years and len(year_data) > 1 and len({leaf['cells_b64'] for leaf in year_data.values()}) == 1:
+            year_data = {'ALL': next(iter(year_data.values()))}
         var_suffix = '__'.join(safe_key(v) for v in combo)
         js_filename = f'{base_name}__{var_suffix}.js'
         var_name = js_filename.removesuffix('.js')
@@ -130,66 +135,93 @@ def write_split_by_combo_geotiff(flat_data: dict, dim_names: list, prefix: str) 
 
 
 
-def map2geotiff(
-    index_merc: np.ndarray,    # (H, W) int32; ≥0 = 1D cell index, -1 = nodata
-    geo_meta_merc: dict,       # rasterio write kwargs for the EPSG:3857 grid
+#: A cell of a float layer is stored as one signed byte: 0 = no value, ±1 … ±CELL_LEVELS = the value as a share of
+#: the layer's own range (the positive side of `raw_min_max[1]`, the negative side of `raw_min_max[0]`), a value
+#: beyond the range clipped to it; CELL_NODATA = not a number (drawn transparent).
+CELL_LEVELS = 127
+CELL_NODATA = -128
+
+
+def map2cells(
     arr_sel: xr.DataArray,     # 1D DataArray[cell] — raw data values
     isInt: bool,
     hierarchy_tp: tuple,
     layer_magnitude,           # (global_min, global_max) for float layers; None for int
     legend_key: str | None,
     real_area_1d: np.ndarray,               # 1D float32[cell] — actual ha per cell
+    per_ha: bool = True,                    # False: the values are intensive already (%, ML/ha), stored as they are
 ) -> tuple:
-    """Convert a 1D cell array to GeoTIFF bytes in EPSG:3857.
+    """Pack a 1D cell array for the report: the land cells only, in the model's cell order, deflated.
 
-    For float layers, each cell value is divided by the cell's real area (ha) so
-    the GeoTIFF stores actual per-ha values.  ``index_merc`` is memmapped by
-    joblib across workers; ``real_area_1d`` is small enough to be pickled.
+    The 2D picture is not stored per layer: the report holds ONE raster of cell numbers (`map_cell_index.js`,
+    `write_cell_index`) and the browser paints every layer through it. A layer is therefore the same 1D vector
+    the model works with, in the smallest type a map needs:
+
+      int layers (land-use codes)   int16, the codes as they are (-9999 = no data)
+      float layers                  int8, each side of zero scaled to the layer's range (CELL_LEVELS); the browser
+                                    restores value = byte / CELL_LEVELS x raw_min_max[side], to within one level
+                                    (0.8 % of the range). Float layers are divided by the cell's real area (ha)
+                                    first unless `per_ha` is False.
+    Returns (hierarchy_tp, the deflated bytes, the layer's display attrs).
     """
-    H, W = int(index_merc.shape[-2]), int(index_merc.shape[-1])
-    nodata_val = geo_meta_merc['nodata']
-    dtype = 'int16' if isInt else 'float32'
-
-    arr_2d = np.full((H, W), nodata_val, dtype=dtype)
-    valid = index_merc >= 0
-    src_vals = arr_sel.values[index_merc[valid]]
+    src_vals = np.asarray(arr_sel.values, dtype=np.float32)
 
     if isInt:
-        # Source is float32; NaN/inf can't cast to int16 — map them to nodata first.
-        src_f = np.asarray(src_vals, dtype=np.float32)
-        src_f[~np.isfinite(src_f)] = nodata_val
-        arr_2d[valid] = src_f.astype(np.int16)
-    else:
-        cell_area = real_area_1d[index_merc[valid]]
-        src_vals = src_vals / np.where(cell_area > 0, cell_area, np.nan)
-        arr_2d[valid] = src_vals
-
-    meta = {**geo_meta_merc, 'dtype': dtype}
-    with MemoryFile() as memfile:
-        with memfile.open(**meta) as dst:
-            dst.write(arr_2d[np.newaxis])   # rasterio expects (bands, H, W)
-        tif_bytes = memfile.read()
-
-    if isInt:
+        cells = np.where(np.isfinite(src_vals), src_vals, -9999).astype('<i2')
         attrs: dict = {'intOrFloat': 'int', 'legendKey': legend_key}
     else:
         global_min, global_max = layer_magnitude
-        # min_max: colorbar labels — use RF²×121 (≈ max cell area) so bounded
-        # layers display ≤1 and the legend matches prior behaviour.
-        min_max = (
-            round(global_min / settings.RESFACTOR ** 2 / 121, 2),
-            round(global_max / settings.RESFACTOR ** 2 / 121, 2),
-        )
-        # raw_min_max: pixel normalisation — use mean real area to match the
-        # per-ha values actually stored in the GeoTIFF (raw / cell_real_area).
-        mean_area = float(np.nanmean(real_area_1d))
-        per_ha_min = round(global_min / mean_area, 4)
-        per_ha_max = round(global_max / mean_area, 4)
+        if per_ha:
+            src_vals = src_vals / np.where(real_area_1d > 0, real_area_1d, np.nan)
+            # min_max: colorbar labels — use RF²×121 (≈ max cell area) so bounded
+            # layers display ≤1 and the legend matches prior behaviour.
+            min_max = (
+                round(global_min / settings.RESFACTOR ** 2 / 121, 2),
+                round(global_max / settings.RESFACTOR ** 2 / 121, 2),
+            )
+            # raw_min_max: the range the cells are scaled to — use mean real area to match the
+            # per-ha values (raw / cell_real_area).
+            mean_area = float(np.nanmean(real_area_1d))
+            raw_min_max = (float(global_min / mean_area), float(global_max / mean_area))
+        else:
+            # Intensive values: the labels and the cells share the layer's own range
+            min_max = raw_min_max = (float(global_min), float(global_max))
+            min_max = tuple(round(value, 4) for value in min_max)
+
+        low, high = min(raw_min_max[0], 0.0), max(raw_min_max[1], 0.0)
+        finite = np.isfinite(src_vals)
+        values = np.where(finite, src_vals, 0)
+        # ceil: a value that is not zero never lands on 0, the byte of "no value"
+        positive = np.ceil(np.clip(values / high, 0, 1) * CELL_LEVELS) if high > 0 else np.zeros_like(values)
+        negative = np.ceil(np.clip(values / low, 0, 1) * CELL_LEVELS) if low < 0 else np.zeros_like(values)
+        cells = np.where(values > 0, positive, np.where(values < 0, -negative, 0))
+        cells = np.where(finite, cells, CELL_NODATA).astype('i1')
         attrs = {'intOrFloat': 'float',
                  'min_max':     list(min_max),
-                 'raw_min_max': [per_ha_min, per_ha_max]}
+                 'raw_min_max': [float(f'{low:.6g}'), float(f'{high:.6g}')]}
 
-    return hierarchy_tp, tif_bytes, attrs
+    return hierarchy_tp, zlib.compress(cells.tobytes(), 6), attrs
+
+
+
+def write_cell_index(index_merc: np.ndarray, geo_meta_merc: dict, save_dir: str, name: str = 'map_cell_index') -> None:
+    """Write `map_cell_index.js`, the raster of the report every layer of the run is painted through: for each pixel
+    of the EPSG:3857 grid the number of the cell it shows (-1 = outside the study area), with the grid's extent.
+    The input layers are on a grid of their own (the input cache has its own resolution): `name` says which."""
+    transform = geo_meta_merc['transform']
+    height, width = int(index_merc.shape[-2]), int(index_merc.shape[-1])
+    content = {
+        'width': width, 'height': height,
+        'xmin': transform.c, 'xmax': transform.c + transform.a * width,
+        'ymax': transform.f, 'ymin': transform.f + transform.e * height,
+        'ncells': int(index_merc.max()) + 1,
+        'levels': CELL_LEVELS, 'nodata': CELL_NODATA,
+        'index_b64': base64.b64encode(zlib.compress(np.ascontiguousarray(index_merc.reshape(height, width), dtype='<i4').tobytes(), 6)).decode(),
+    }
+    with open(f'{save_dir}/{name}.js', 'w') as f:
+        f.write(f'window["{name}"] = ')
+        json.dump(content, f, separators=(',', ':'))
+        f.write(';\n')
 
 
 
@@ -240,8 +272,11 @@ def get_map2json(
     float_magnitude: tuple | dict,
     save_path: str,
     legend_key_int: str | None = None,
+    per_ha: bool = True,
+    collapse_years: bool = False,
 ) -> None:
-    """Convert all layers in *files_df* to GeoTIFF files (EPSG:3857).
+    """Pack all layers in *files_df* as 1D cell vectors (map2cells), painted by the browser through the
+    report's cell-number raster (write_cell_index).
 
     For each unique (combo × year) one JS file is written per combo (all years)
     plus a companion ``<prefix>__index.js`` with the dimension tree and per-combo
@@ -267,7 +302,8 @@ def get_map2json(
         if isinstance(float_magnitude, dict):
             # Keyed by any dim VALUE of the combo (Commodity for production, backend for the
             # bio-quality maps, ...): the first sel value that is a key wins.
-            key = next((v for v in sel.values() if v in float_magnitude), None)
+            # A dict keyed by the whole combo (the input layers: (input, lm, lu)) gives every layer its own range.
+            key = tuple(sel.values()) if tuple(sel.values()) in float_magnitude else next((v for v in sel.values() if v in float_magnitude), None)
             magnitude = float_magnitude[key]
         else:
             magnitude = float_magnitude
@@ -306,16 +342,15 @@ def get_map2json(
             isInt, layer_magnitude, legend_key = get_legend_params(sel)
             renamed = rename_reorder_hierarchy(sel)
             hierarchy_tp = tuple(list(renamed.values()) + [int(row['Year'])])
-            vals = xr_arr.sel(**sel).values.copy()
-            # Transition layers (From-lu × To-lu MultiIndex) sometimes leave a residual
-            # size-1 non-cell dimension after .sel(); squeeze then reshape to guarantee 1-D.
-            vals = np.asarray(vals).squeeze()
-            if vals.ndim != 1:
-                vals = vals.reshape(-1)
+            # A layer is one value per cell. A file whose layer index leaves another dimension over (the NonAg2Ag
+            # transition cost keeps its 29 to-land-uses beside `layer`) is summed over it: the layer is then the
+            # total its labels name. (Flattening such an array, as before 2026-11-12, scrambled the map.)
+            layer_arr = xr_arr.sel(**sel)
+            layer_arr = layer_arr.sum([dim for dim in layer_arr.dims if dim != 'cell'])
+            vals = np.asarray(layer_arr.values).reshape(-1).copy()
             arr_sel = xr.DataArray(vals, dims=('cell',), coords=is_selected_coords)
-            tasks.append(delayed(map2geotiff)(
-                index_merc, geo_meta_merc, arr_sel, isInt, hierarchy_tp, layer_magnitude, legend_key,
-                real_area_1d,
+            tasks.append(delayed(map2cells)(
+                arr_sel, isInt, hierarchy_tp, layer_magnitude, legend_key, real_area_1d, per_ha,
             ))
 
         xr_arr.close()
@@ -323,16 +358,77 @@ def get_map2json(
     if not tasks:
         return
 
-    # threads: map2geotiff is NumPy + Rasterio (both release the GIL), so threads get true
+    # threads: map2cells is NumPy + Rasterio (both release the GIL), so threads get true
     # parallelism with zero pickling cost. Standard layers have few tasks (2–30 per file),
     # so heap-allocator contention between threads is negligible.
-    for hierarchy_tp, tif_bytes, attrs in Parallel(
+    for hierarchy_tp, cell_bytes, attrs in Parallel(
         n_jobs=workers, prefer='threads'
     )(tasks):
-        flat_data[hierarchy_tp] = {'tif_b64': base64.b64encode(tif_bytes).decode(), **attrs}
+        flat_data[hierarchy_tp] = {'cells_b64': base64.b64encode(cell_bytes).decode(), **attrs}
 
-    write_split_by_combo_geotiff(flat_data, dim_names, prefix)
+    write_split_by_combo_geotiff(flat_data, dim_names, prefix, collapse_years)
         
+
+
+def get_lumap_legend_columns() -> dict:
+    """The entries of the land-use map's legend, in its two columns: the agricultural groups and the land outside
+    the model's area ('land'), and EVERY non-agricultural land use ('non_ag'), enabled or not — `enabled` is False
+    where settings.NON_AG_LAND_USES turns every land use of the entry off (the report greys its name)."""
+    def display(group):
+        return RENAME_AM_NON_AG.get(group, group)
+
+    ag_groups = {LUMAP_GROUP[lu] for lu in LUMAP_GROUP if lu not in settings.NON_AG_LAND_USES}
+    land = [group for group in LUMAP_GROUP_HEX if group in ag_groups]           # in the order of LUMAP_GROUP_HEX
+    non_ag: dict = {}
+    for lu, enabled in settings.NON_AG_LAND_USES.items():
+        entry = non_ag.setdefault(LUMAP_GROUP[lu], {'name': display(LUMAP_GROUP[lu]), 'color': LUMAP_GROUP_HEX[LUMAP_GROUP[lu]], 'enabled': False})
+        entry['enabled'] = entry['enabled'] or bool(enabled)
+    return {
+        'land': [{'name': display(group), 'color': LUMAP_GROUP_HEX[group], 'enabled': True} for group in land]
+                + [{'name': COLOR_LUMAP[-1][0], 'color': COLOR_LUMAP[-1][1], 'enabled': True}],
+        'non_ag': list(non_ag.values()),
+    }
+
+
+
+def get_lumap_group_layers(dvar_ag: pd.DataFrame, dvar_nonag: pd.DataFrame, save_path: str) -> None:
+    """Write one float layer per entry of the land-use map's legend: the share of each cell (0-1) under the land
+    uses of the entry (LUMAP_GROUP: 'Cropping' is the sum of every cropping land use, both irrigation statuses), so a click on a
+    legend entry of the Home map can show where that entry is, and how much of each cell it takes.
+
+    The layers are named as the legend names them; an entry the run turned off has none."""
+    shares: dict = {}                                           # year -> legend name -> 1D share of the cell
+    for files_df, sel_all in [(dvar_ag, {'lm': 'ALL'}), (dvar_nonag, {})]:
+        for _, row in files_df.iterrows():
+            xr_arr = cfxr.decode_compress_to_multi_index(xr.open_dataset(row['path'], chunks={}), 'layer')['data']
+            year_shares = shares.setdefault(int(row['Year']), {})
+            for sel in xr_arr['layer'].to_index().to_frame().to_dict(orient='records'):
+                if sel['lu'] == 'ALL' or any(sel[dim] != value for dim, value in sel_all.items()):
+                    continue
+                group = LUMAP_GROUP[sel['lu']]
+                name = RENAME_AM_NON_AG.get(group, group)
+                values = np.nan_to_num(np.asarray(xr_arr.sel(**sel).values, dtype=np.float32).reshape(-1))
+                year_shares[name] = year_shares.get(name, 0) + values
+            xr_arr.close()
+
+    # Every entry the run has turned on gets a layer in every year, all zero where the run never used it
+    # (`empty`): a click on the legend then shows that there is none, instead of doing nothing.
+    columns = get_lumap_legend_columns()
+    enabled = [entry['name'] for column in columns.values() for entry in column if entry['enabled'] and entry['name'] != COLOR_LUMAP[-1][0]]
+    flat_data: dict = {}
+    for year, year_shares in shares.items():
+        if not year_shares:
+            continue
+        zeros = np.zeros_like(next(iter(year_shares.values())))
+        for name in enabled:
+            values = year_shares.get(name, zeros)
+            hierarchy_tp, cell_bytes, attrs = map2cells(
+                xr.DataArray(values, dims=('cell',)), False, (name, year), (0, 1), None, None, per_ha=False)
+            flat_data[hierarchy_tp] = {'cells_b64': base64.b64encode(cell_bytes).decode(), **attrs, 'empty': not bool(np.any(values > 0))}
+
+    if flat_data:
+        write_split_by_combo_geotiff(flat_data, ['lu'], save_path.removesuffix('.js'))
+
 
 
 def find_chunks_dirs(raw_data_dir: str, base_pattern: str, years: list) -> dict:
@@ -346,7 +442,7 @@ def find_chunks_dirs(raw_data_dir: str, base_pattern: str, years: list) -> dict:
 
 
 def write_split_by_combo_paged(
-    combo_sp_data: dict,    # {combo_tp: {sp: {year: {tif_b64, ...}}}}
+    combo_sp_data: dict,    # {combo_tp: {sp: {year: {cells_b64, ...}}}}
     page_start: int,
     page_end: int,
     prefix: str,
@@ -358,7 +454,7 @@ def write_split_by_combo_paged(
     JS filename:  {prefix}__{combo}_{page_start}_{page_end}.js
     JS var name:  {prefix}__{combo}               (no page suffix — Vue overwrites per page)
     JS content:   window["prefix__combo"] = {
-                    "Species A": {2020: {tif_b64, ...}, 2025: {...}},
+                    "Species A": {2020: {cells_b64, ...}, 2025: {...}},
                     "Species B": {...},
                   }
     """
@@ -399,7 +495,7 @@ def write_paged_index(combo_attrs: dict, dim_names: list, manifest: dict,
 
     tree = build_tree(list(combo_attrs.keys()))
     combos_out = {
-        '__'.join(safe_key(v) for v in combo): {k: v for k, v in attrs.items() if k != 'tif_b64'}
+        '__'.join(safe_key(v) for v in combo): {k: v for k, v in attrs.items() if k != 'cells_b64'}
         for combo, attrs in combo_attrs.items()
     }
 
@@ -455,7 +551,7 @@ def get_map2json_paged(
     JS filename:  {prefix}__{combo}_{page_start}_{page_end}.js
     JS var name:  {prefix}__{combo}               (no page suffix — Vue overwrites per page)
     JS content:   window["prefix__combo"] = {
-                    "Species A": {2020: {tif_b64, intOrFloat, min_max, raw_min_max}, ...},
+                    "Species A": {2020: {cells_b64, intOrFloat, min_max, raw_min_max}, ...},
                     "Species B": {...},
                   }
     """
@@ -511,7 +607,7 @@ def get_map2json_paged(
         page_end   = page_starts[last_idx] + len(manifest[str(last_idx)])
 
         # Accumulate all (chunk × year) tasks for this page before launching workers.
-        chunk_data: dict = {}   # {(combo_tp, sp): {year: {tif_b64, ...}}}
+        chunk_data: dict = {}   # {(combo_tp, sp): {year: {cells_b64, ...}}}
         tasks: list = []
 
         for chunk_idx in group:
@@ -547,9 +643,8 @@ def get_map2json_paged(
                     if vals.ndim != 1:
                         vals = vals.reshape(-1)
                     arr_sel = xr.DataArray(vals, dims=('cell',), coords=is_selected_coords)
-                    tasks.append(delayed(map2geotiff)(
-                        index_merc, geo_meta_merc, arr_sel, False,
-                        hierarchy_tp, float_magnitude, None, real_area_1d,
+                    tasks.append(delayed(map2cells)(
+                        arr_sel, False, hierarchy_tp, float_magnitude, None, real_area_1d,
                     ))
 
                 xr_arr.close()
@@ -559,7 +654,7 @@ def get_map2json_paged(
         # concurrent malloc/free calls, causing heavy lock contention that outweighs pickling
         # savings. Loky workers have isolated heaps so allocations never contend.
         # max_nbytes memmaps index_merc (≥200 MB) to avoid pickling it per task.
-        for hierarchy_tp, tif_bytes, attrs in Parallel(
+        for hierarchy_tp, cell_bytes, attrs in Parallel(
             n_jobs=workers, max_nbytes=1_000_000
         )(tasks):
             combo_tp = hierarchy_tp[:-2]
@@ -567,7 +662,7 @@ def get_map2json_paged(
             year_val = hierarchy_tp[-1]
             key = (combo_tp, sp_val)
             chunk_data.setdefault(key, {})[year_val] = {
-                'tif_b64': base64.b64encode(tif_bytes).decode(),
+                'cells_b64': base64.b64encode(cell_bytes).decode(),
                 **attrs,
             }
             all_combo_attrs[combo_tp] = attrs   # last-write wins — all years share attrs
@@ -579,6 +674,75 @@ def get_map2json_paged(
         write_split_by_combo_paged(combo_sp_data, page_start, page_end, prefix)
 
     write_paged_index(all_combo_attrs, dim_names, manifest, prefix, chunk_num=chunk_num)
+
+
+# The inputs whose layers share one colour range over every land use and both irrigation states: runoff (ML/ha) and
+# its change with the climate, and the climate multiplier on yield (a ratio). The others keep a range per land use:
+# their values differ by orders of magnitude between land uses (cost, revenue, emissions, water requirement).
+INPUTS_ONE_RANGE = ['Runoff', 'Climate change impact on runoff', 'Climate change']
+
+
+def get_input_layer_ranges(files_input: pd.DataFrame) -> dict:
+    """The colour range of every input layer (xr_input_layers_<year>.nc), shared by its years so they compare: the
+    0.5 % and 99.5 % quantiles of its non-zero cells, opened to include zero. A range per (input, lm, lu): one
+    range for a whole input would be set by its dearest land use (horticulture) and leave the others pale. The parts
+    of an input share the range of the whole, and the inputs of INPUTS_ONE_RANGE have one range for all their layers.
+    {(input, lm, lu): (low, high)}"""
+    samples, layer_keys, names = {}, set(), ['input', 'lm', 'option', 'lu']
+    for path in files_input['path']:
+        with xr.open_dataset(path) as dataset:
+            layers = cfxr.decode_compress_to_multi_index(dataset, 'layer')['data'].load()
+        names = list(layers['layer'].to_index().names)
+        for position, key in enumerate(layers['layer'].to_index()):
+            values = layers.values[position]
+            label = dict(zip(names, key))
+            layer_keys.add(tuple(key))
+            samples.setdefault((label['input'], label['lm'], label['lu']), []).append(values[np.isfinite(values) & (values != 0)])
+    def quantile_range(parts):
+        values = np.concatenate(parts)
+        low, high = (np.quantile(values, [0.005, 0.995]) if values.size else (0.0, 0.0))
+        return (min(float(low), 0.0), max(float(high), 0.0))
+
+    ranges = {key: quantile_range(parts) for key, parts in samples.items()}
+
+    # An input whose land uses are the same quantity on the same scale (INPUTS_ONE_RANGE) takes ONE range, from all
+    # its layers together, so its land uses and its dryland / irrigated maps compare.
+    for name in INPUTS_ONE_RANGE:
+        keys = [key for key in samples if key[0] == name]
+        if keys:
+            shared = quantile_range([part for key in keys for part in samples[key]])
+            ranges.update({key: shared for key in keys})
+
+    # A part of an input ('Agricultural cost: quantity' of 'Agricultural cost') takes the range of the whole for the
+    # same (lm, lu), so the maps of the parts and of their total read on one colour bar and compare.
+    inputs = {key[0] for key in ranges}
+    for (name, lm, lu) in list(ranges):
+        whole = name.split(': ')[0]
+        if whole != name and whole in inputs and (whole, lm, lu) in ranges:
+            ranges[(name, lm, lu)] = ranges[(whole, lm, lu)]
+
+    # Every layer by its own labels, in the order of its index: the options of a layer share its range, so they compare
+    return {key: ranges[(label['input'], label['lm'], label['lu'])]
+            for key in layer_keys for label in [dict(zip(names, key))]}
+
+
+def save_input_layers(raw_dir: str, save_dir: str):
+    """The input layers of the input cache (write_input.build_input_cache), from the files of `raw_dir`
+    (out_<year>/xr_input_layers_<theme>_<year>.nc) into `save_dir`/map_layers: input -> lm -> option -> lu, on the
+    grid of the cache (map_input_cell_index.js). The values are intensive (per ha, %, 0 / 1), so they are stored as
+    they are; a layer that is the same in every year is stored once."""
+    files = get_all_files(raw_dir).query('category == "xarray_layer"')
+    files['Year'] = files['Year'].astype(int)
+
+    first_template = files.query('base_name == "xr_map_template"').sort_values('Year').iloc[0]
+    index_merc, geo_meta_merc, _ = build_year_meta(int(first_template['Year']), os.path.dirname(first_template['path']))
+    write_cell_index(index_merc, geo_meta_merc, f'{save_dir}/map_layers', name='map_input_cell_index')
+
+    # One theme at a time: with every option a theme holds thousands of layers
+    files_input = files.query('base_name.str.startswith("xr_input_layers")')
+    input_min_max = get_input_layer_ranges(files_input)
+    get_map2json(files_input, None, input_min_max, f'{save_dir}/map_layers/map_in.js', per_ha=False, collapse_years=True)   # a short name: it starts every layer's file name
+    print('Input layers saved.', flush=True)
 
 
 def save_report_layer(raw_data_dir: str):
@@ -609,8 +773,12 @@ def save_report_layer(raw_data_dir: str):
         'ag':     build_map_legend(COLOR_AG),
         'am':     build_map_legend(COLOR_AM, RENAME_AM_NON_AG),
         'non_ag': build_map_legend(COLOR_NON_AG, RENAME_AM_NON_AG),
-        'lumap':  build_map_legend(COLOR_LUMAP, RENAME_AM_NON_AG),
+        'lumap':  {**build_map_legend(COLOR_LUMAP, RENAME_AM_NON_AG), 'columns': get_lumap_legend_columns()},
     }
+    # The land-use legend in the order of its columns (build_map_legend lists the entries by map code)
+    lumap_order = [entry['name'] for column in legend_registry['lumap']['columns'].values() for entry in column]
+    lumap_legend = legend_registry['lumap']['legend']
+    legend_registry['lumap']['legend'] = {name: lumap_legend[name] for name in lumap_order if name in lumap_legend}
     
     with open(f'{SAVE_DIR}/map_layers/legend_registry.js', 'w') as _f:
         _f.write('window["legend_registry"] = ')
@@ -618,6 +786,16 @@ def save_report_layer(raw_data_dir: str):
         _f.write(';\n')
         
     print('│   ├── Legend registry saved.')
+
+
+    ####################################################
+    #     0b) The cell-number raster of the report     #
+    ####################################################
+    # Every layer is a 1D vector of cells (map2cells); the browser paints it through this one raster.
+    first_template = files.query('base_name == "xr_map_template"').sort_values('Year').iloc[0]
+    index_merc, geo_meta_merc, _ = build_year_meta(int(first_template['Year']), os.path.dirname(first_template['path']))
+    write_cell_index(index_merc, geo_meta_merc, f'{SAVE_DIR}/map_layers')
+    print('│   ├── Cell index raster saved.')
     
 
     ####################################################
@@ -633,19 +811,24 @@ def save_report_layer(raw_data_dir: str):
     #                   2) Dvar Layer                  #
     ####################################################
     
+    # A dvar layer is the share of the cell under a land use (0-1): an intensive value, stored as it is
+    # (per_ha=False). Divided by the cell's area, as an extensive layer is, its colour-bar labels rounded to 0 - 0.
     dvar_min_max = (0, 1)
 
     dvar_ag = files.query('base_name == "xr_dvar_ag"')
-    get_map2json(dvar_ag, {'lu':'ALL'}, dvar_min_max, f'{SAVE_DIR}/map_layers/map_dvar_Ag.js', legend_key_int='ag')
+    get_map2json(dvar_ag, {'lu':'ALL'}, dvar_min_max, f'{SAVE_DIR}/map_layers/map_dvar_Ag.js', legend_key_int='ag', per_ha=False)
     print('│   ├── Dvar Ag layer saved.')
 
     dvar_am = files.query('base_name == "xr_dvar_am"')
-    get_map2json(dvar_am, {'am':'ALL'}, dvar_min_max, f'{SAVE_DIR}/map_layers/map_dvar_Am.js', legend_key_int='am')
+    get_map2json(dvar_am, {'am':'ALL'}, dvar_min_max, f'{SAVE_DIR}/map_layers/map_dvar_Am.js', legend_key_int='am', per_ha=False)
     print('│   ├── Dvar Am layer saved.')
 
     dvar_nonag = files.query('base_name == "xr_dvar_non_ag"')
-    get_map2json(dvar_nonag, {'lu':'ALL'}, dvar_min_max, f'{SAVE_DIR}/map_layers/map_dvar_NonAg.js', legend_key_int='non_ag')
+    get_map2json(dvar_nonag, {'lu':'ALL'}, dvar_min_max, f'{SAVE_DIR}/map_layers/map_dvar_NonAg.js', legend_key_int='non_ag', per_ha=False)
     print('│   ├── Dvar Non-Ag layer saved.')
+
+    get_lumap_group_layers(dvar_ag, dvar_nonag, f'{SAVE_DIR}/map_layers/map_dvar_lumap_share.js')
+    print('│   ├── Land-use share layers (one per legend entry of the land-use map) saved.')
     
     
     
@@ -1084,10 +1267,11 @@ def save_report_layer(raw_data_dir: str):
 
         get_map2json(files_renewable_exist, None, exist_min_max, f'{SAVE_DIR}/map_layers/map_renewable_existing_dvar_Am.js')
         print('│   ├── Renewable Existing Dvar Am layer saved.')
-        
-        
-        
-        
 
 
 
+    ####################################################
+    #        11) Input layers (the Home page)          #
+    ####################################################
+    # Not built here: the inputs are no product of the run. They come from the input cache, which
+    # create_report_data.copy_input_cache copies into the report (write_input.ensure_input_cache).
