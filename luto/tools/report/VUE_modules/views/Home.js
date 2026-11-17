@@ -377,10 +377,12 @@ const HomeAssumptions = {
             <template v-for="group in groups" :key="group.name">
               <tr><td colspan="3" class="pt-3 pb-1 text-[0.68rem] font-bold uppercase tracking-wide text-sky-700 bg-sky-50/60 px-2">{{ group.name }}</td></tr>
               <!-- the rows alternate white and a faint grey, to follow a row across the three columns -->
-              <tr v-for="(item, position) in group.items" :key="item.setting" class="align-top border-b border-gray-100 hover:bg-sky-50/50"
+              <tr v-for="(item, position) in group.items" :key="item.setting"
+                class="group align-top border-b border-gray-100 transition-colors duration-150 hover:!bg-sky-100"
                 :class="position % 2 ? 'bg-[#f6f7f9]' : 'bg-white'">
-                <td class="py-1.5 pr-3 pl-2">
-                  <div class="font-semibold text-[#1f1f1f] leading-snug">{{ item.what }}</div>
+                <!-- on hover the row turns light blue, with a bar at its left edge -->
+                <td class="py-1.5 pr-3 pl-2 border-l-[3px] border-transparent group-hover:border-sky-500">
+                  <div class="font-semibold text-[#1f1f1f] leading-snug group-hover:text-sky-800">{{ item.what }}</div>
                   <div class="font-mono text-[0.62rem] text-gray-400">{{ item.setting }}</div>
                 </td>
                 <td class="py-1.5 pr-3">

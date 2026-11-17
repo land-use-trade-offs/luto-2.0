@@ -52,6 +52,7 @@ def extract_dtype_from_path(path):
             'biodiversity':['biodiversity'],
             'renewable':['renewable_energy_'],
             'shadow_price':['shadow_prices'],
+            'solver_diagnostic':['bound_preflight', 'bound_report', 'shortfall', 'rowgen_'],   # the solve step's own tables; no report page reads them
             'inputs':['inputs_'],
             # Metrics xarrays
             'xarray_layer':['xr_'],

@@ -821,8 +821,12 @@ class Data:
                 .assign(Renewable_Target_MWh=lambda df: df['Renewable_Target_TWh'] * 1e6)
             )
 
-            self.SOLAR_PRICES = pd.read_csv(f'{settings.INPUT_DIR}/renewable_price_AUD_MWh_solar.csv')
-            self.WIND_PRICES = pd.read_csv(f'{settings.INPUT_DIR}/renewable_price_AUD_MWh_wind.csv')
+            # 'Other Territories' (the Jervis Bay cells, enclosed by NSW) has no row in the price tables: it sells at
+            # the NSW price. Model cells land there at RES1, and at RES 2-15 since coastal blocks are modelled (ce25e72e).
+            solar_prices = pd.read_csv(f'{settings.INPUT_DIR}/renewable_price_AUD_MWh_solar.csv')
+            wind_prices = pd.read_csv(f'{settings.INPUT_DIR}/renewable_price_AUD_MWh_wind.csv')
+            self.SOLAR_PRICES = pd.concat([solar_prices, solar_prices.query("State == 'New South Wales'").assign(State='Other Territories')], ignore_index=True)
+            self.WIND_PRICES = pd.concat([wind_prices, wind_prices.query("State == 'New South Wales'").assign(State='Other Territories')], ignore_index=True)
 
             # Renewable energy related raster layers
             #   Compute before isel to avoid isel working on dask chunks
@@ -2587,6 +2591,14 @@ class Data:
                     check('WATER_DELIVERY_PRICE (stubble head > 0)', lm, stubble_lu, st['WATER_DELIVERY_PRICE'], positive)
 
         self.raise_nan_report(found, 'guarded arrays, eligible (allocated for the climate multiplier)')
+
+
+    def get_renewable_price_r(self, prices: pd.DataFrame, yr_cal: int) -> np.ndarray:
+        """The electricity price (AUD/MWh) of every cell in `yr_cal`: its state's price from `prices`
+        (SOLAR_PRICES / WIND_PRICES). Raises KeyError if a cell's state has no price that year."""
+        price_of_state = prices.query('Year == @yr_cal').set_index('State')['Price_AUD_per_MWh']
+        states, state_idx_of_cell = np.unique(self.REGION_STATE_NAME.astype(str), return_inverse=True)
+        return price_of_state.loc[states].to_numpy(np.float32)[state_idx_of_cell]
 
 
     def check_ag_man_nan(self, effects: dict[str, dict[str, np.ndarray]], yr_cal: int) -> None:

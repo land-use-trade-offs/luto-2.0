@@ -1318,9 +1318,10 @@ def merge_input_themes(built_dir: str, cache_data_dir: str, themes: list):
         head, old = read_js(os.path.join(cache_data_dir, filename))
         new_head, new = read_js(os.path.join(built_dir, filename))
         for theme in themes:
-            old.pop(theme, None)
             if theme in new:
-                old[theme] = new[theme]
+                old[theme] = new[theme]                # in its place: the themes keep their order on the page
+            else:
+                old.pop(theme, None)
         write_js(os.path.join(cache_data_dir, filename), head or new_head, old)
 
     # The layers: every layer of the inputs of these themes out (files and index entries), the rebuilt ones in

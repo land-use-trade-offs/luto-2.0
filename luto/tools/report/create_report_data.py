@@ -244,6 +244,8 @@ def write_bio_target_summary(df_region: pd.DataFrame, bio_df: pd.DataFrame, file
     of an item is their sum. bio_df: the table the targets are read from (select_bio_targets).
     """
     targets = select_bio_targets(bio_df)
+    # AUSTRALIA is written once per region level (the charts of each level carry it); Home counts the items, so it is kept once
+    targets = targets[(targets['region'] != 'AUSTRALIA') | (targets['region_level'] == 'region_NRM')]
     keys = ['region_level', 'region', 'species']
     years = sorted(int(year) for year in df_region['Year'].unique())
     scores = df_region.groupby(keys + ['Year'])['Sum_Pct (%)'].sum().unstack('Year').reindex(columns=years)
