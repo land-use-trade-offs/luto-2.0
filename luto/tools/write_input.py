@@ -19,8 +19,10 @@
 
 
 import os
+import re
 import sys
 import json
+import base64
 import shutil
 import subprocess
 
@@ -28,8 +30,15 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
+import openpyxl
+import rioxarray  # noqa: F401  (the .rio accessor on xarray objects)
+
 from luto import settings
+from luto import tools
 from luto.data import Data
+from luto.tools.report.create_report_layers import map2cells, safe_key, save_input_layers as save_input_report_layers, write_cell_index
+from luto.tools.report.data_tools import get_all_files
+from luto.tools.report.data_tools.parameters import RENAME_AM_NON_AG
 
 import luto.economics.agricultural.quantity as ag_quantity
 import luto.economics.agricultural.revenue as ag_revenue
@@ -91,7 +100,9 @@ def save_input_layers(data: Data, yr_cal, path, tag, catalogue, layers):
                 is left out, and so is an input of the catalogue that ends with no layer.
     An input of kind 'chart' has no layer: it is listed in the catalogue so the report offers it.
     """
-    from luto.tools.write_output import save2nc          # write_output imports this module
+    # Imported here, not at the top: write_output imports create_report_data, which imports this module, so an
+    # import at the top would be circular.
+    from luto.tools.write_output import save2nc
 
     catalogue = pd.DataFrame(catalogue, columns=['theme', 'input', 'unit', 'kind']).drop_duplicates('input')
     kept = []
@@ -325,29 +336,96 @@ def ag_cost_part_layers(data: Data, yr_idx) -> tuple[list, list]:
     return layers, names
 
 
-def input_economics(data: Data, yr_cal, path):
+def input_economics(data: Data, yr_cal, path, climate=None, carbon_price_fields=None):
     """Cost and revenue per hectare of every agricultural and non-agricultural land use; the agricultural cost
-    also part by part."""
+    also part by part.
+
+    `climate` ({'SSP': ..., 'CO2_FERT': ...}): the climate `data` is under, for the option the layers are filed under
+    (revenue and the costs of what is produced follow yield). The four parts of the cost that are per hectare whatever
+    is produced (area, fixed labour, fixed operating, fixed depreciation) do not depend on it and are filed once.
+    `carbon_price_fields`: the carbon prices the non-agricultural revenue (carbon stored x the price) is written
+    under, each set in turn (set_carbon_price_option); the caller puts the price of the run back afterwards."""
     yr_idx = yr_cal - data.YR_CAL_BASE
+    climate_option = option_label(**climate) if climate else 'ALL'
+    CLIMATE_FREE_PARTS = ('Agricultural cost: area', 'Agricultural cost: fixed labour', 'Agricultural cost: fixed operating', 'Agricultural cost: fixed depreciation')
 
     ag_c_mrj = ag_cost.get_cost_matrices(data, yr_idx)                               # AUD/cell
     ag_r_mrj = ag_revenue.get_rev_matrices(data, yr_idx)
     non_ag_c_rk = non_ag_cost.get_cost_matrix(data, ag_c_mrj, yr_cal)
-    non_ag_r_rk = non_ag_revenue.get_rev_matrix(data, yr_cal, ag_r_mrj)
     part_layers, part_names = ag_cost_part_layers(data, yr_idx)
 
-    layers = (
-        ag_layers(data, 'Agricultural cost', ag_c_mrj)
-        + part_layers
-        + ag_layers(data, 'Agricultural revenue', ag_r_mrj)
-        + non_ag_layers(data, 'Non-agricultural cost', non_ag_c_rk)
-        + non_ag_layers(data, 'Non-agricultural revenue', non_ag_r_rk)
-    )
+    layers = [
+        (name, lm, lu, values_r, 'ALL' if name in CLIMATE_FREE_PARTS else climate_option)
+        for name, lm, lu, values_r in (
+            ag_layers(data, 'Agricultural cost', ag_c_mrj)
+            + part_layers
+            + ag_layers(data, 'Agricultural revenue', ag_r_mrj)
+            + non_ag_layers(data, 'Non-agricultural cost', non_ag_c_rk)
+        )
+    ]
+    if carbon_price_fields:
+        for field in carbon_price_fields:
+            set_carbon_price_option(data, field)
+            non_ag_r_rk = non_ag_revenue.get_rev_matrix(data, yr_cal, ag_r_mrj)
+            price_option = option_label(**(climate or {}), CARBON_PRICES_FIELD=field)
+            layers += [(name, lm, lu, values_r, price_option) for name, lm, lu, values_r in non_ag_layers(data, 'Non-agricultural revenue', non_ag_r_rk)]
+    else:
+        non_ag_r_rk = non_ag_revenue.get_rev_matrix(data, yr_cal, ag_r_mrj)
+        layers += [(name, lm, lu, values_r, climate_option) for name, lm, lu, values_r in non_ag_layers(data, 'Non-agricultural revenue', non_ag_r_rk)]
     catalogue = [
         {'theme': 'Economics', 'input': name, 'unit': 'AUD/ha', 'kind': 'layer'}
         for name in ['Agricultural cost', *part_names, 'Agricultural revenue', 'Non-agricultural cost', 'Non-agricultural revenue']
     ]
     return input_theme('economics', catalogue, layers)
+
+
+# The cells of sheet 'Current' of the transition cost workbook that the from-to table is summed from, and the part
+# of the cost each one is. The table's own cells are formulas over these (e.g. "=$F$22+$F$23+$F$31+$F$38").
+TRANSITION_COST_PARTS = {
+    'F21': 'Clearing lightly wooded land',
+    'F22': 'Clearing heavily wooded land',
+    'F23': 'Clearing: barrier effect',
+    'F25': 'Establishing the land use',            # vineyard / orchard
+    'F27': 'Income lost while establishing',       # the first years of a vineyard / orchard
+    'F29': 'Establishing the land use',            # intensive cropping
+    'F31': 'Establishing the land use',            # cropping
+    'F33': 'Establishing the land use',            # dairy
+    'F36': 'Establishing the land use',            # beef and sheep
+    'F38': 'Removing crops or livestock',
+}
+
+
+def get_transition_cost_parts(workbook_path: str, cat2lus_path: str) -> pd.DataFrame:
+    """The agricultural transition cost table (ag_tmatrix.npy) part by part: [from_lu, to_lu, part, cost (AUD/ha)],
+    from the transition cost workbook and its category table as dataprep.py copies them into the inputs
+    (transitions_costs.xlsx, tmatrix_cat2lus.csv).
+
+    The workbook gives the cost of moving between two land-use CATEGORIES as a formula over a few cost items
+    (TRANSITION_COST_PARTS); this reads the formulas, so every from-to cost is split into the items it sums, and
+    lays the categories out over their land uses as ag_tmatrix does (a land use to itself costs nothing, so has no
+    part). The parts of a pair add up to its entry of ag_tmatrix; a pair the table leaves blank has none."""
+    sheet = openpyxl.load_workbook(workbook_path)['Current']                       # formulas, not their values
+    item_cost = {ref: float(sheet[ref].value) for ref in TRANSITION_COST_PARTS}
+    to_categories = [cell.value for cell in sheet[6][2:13]]                        # C6:M6
+    parts_of = {}                                                                  # (from category, to category) -> {part: cost}
+    for row in sheet.iter_rows(min_row=7, max_row=17, min_col=2, max_col=13):
+        from_category = row[0].value
+        for to_category, cell in zip(to_categories, row[1:]):
+            if not isinstance(cell.value, str):                                    # blank (not allowed) or a plain 0
+                continue
+            parts = {}
+            for ref in re.findall(r'\$?([A-Z]+)\$?(\d+)', cell.value):
+                ref = ''.join(ref)
+                parts[TRANSITION_COST_PARTS[ref]] = parts.get(TRANSITION_COST_PARTS[ref], 0.0) + item_cost[ref]
+            parts_of[(from_category, to_category)] = parts
+
+    category_of = {lu: category for category, lu in pd.read_csv(cat2lus_path).to_numpy()}
+    rows = [
+        (from_lu, to_lu, part, cost)
+        for from_lu in category_of for to_lu in category_of if from_lu != to_lu
+        for part, cost in parts_of.get((category_of[from_lu], category_of[to_lu]), {}).items()
+    ]
+    return pd.DataFrame(rows, columns=['from_lu', 'to_lu', 'part', 'cost'])
 
 
 def get_transition_matrix(data: Data) -> pd.DataFrame:
@@ -356,21 +434,24 @@ def get_transition_matrix(data: Data) -> pd.DataFrame:
     `allowed` is False where T_MAT has no value (the model can not make that change).
 
     The parts follow how data.py builds T_MAT:
-      ag -> ag                       the items of the transition cost workbook (input/transition_cost_parts.csv)
+      ag -> ag                       the items of the transition cost workbook (get_transition_cost_parts)
       non-ag -> ag                   as leaving unallocated natural land for that land use
       non-ag -> unallocated modified clearing the planting (the tree share only, for the mixed land uses)
       ag -> non-ag                   one item: the workbook gives it as a single cost per land use
-    A report whose inputs have no parts file gets the totals only."""
+    The workbook (transitions_costs.xlsx) and its category table (tmatrix_cat2lus.csv) have to be in the inputs."""
     lus = list(data.T_MAT['from_lu'].values)
     total = data.T_MAT.to_pandas().reindex(index=lus, columns=lus)
     rows = [(from_lu, to_lu, 'Total', 0.0 if pd.isna(total.loc[from_lu, to_lu]) else float(total.loc[from_lu, to_lu]), bool(pd.notna(total.loc[from_lu, to_lu])))
             for from_lu in lus for to_lu in lus]
 
-    parts_file = os.path.join(settings.INPUT_DIR, 'transition_cost_parts.csv')
-    if not os.path.exists(parts_file):
-        return pd.DataFrame(rows, columns=['from_lu', 'to_lu', 'part', 'cost', 'allowed'])
+    workbook = os.path.join(settings.INPUT_DIR, 'transitions_costs.xlsx')
+    categories = os.path.join(settings.INPUT_DIR, 'tmatrix_cat2lus.csv')
+    if not (os.path.exists(workbook) and os.path.exists(categories)):
+        raise FileNotFoundError(
+            f'The transition cost matrix needs {workbook} and {categories}: the transition cost workbook and its '
+            'category table, copied into the inputs by dataprep.py.')
 
-    ag_parts = pd.read_csv(parts_file)
+    ag_parts = get_transition_cost_parts(workbook, categories)
     non_ag = data.NON_AGRICULTURAL_LANDUSES
     parts = [tuple(row) for row in ag_parts.itertuples(index=False)]
 
@@ -404,7 +485,7 @@ def get_transition_matrix(data: Data) -> pd.DataFrame:
     off = int(((summed - total.fillna(0)).abs() > 1).values.sum())
     if off:
         print(f'Transition cost matrix: the parts of {off} from-to pairs do not add up to data.T_MAT '
-              f'(input/transition_cost_parts.csv from another version of the workbook than ag_tmatrix.npy?)', flush=True)
+              f'(input/transitions_costs.xlsx is another version of the workbook than ag_tmatrix.npy was built from?)', flush=True)
     return pd.concat([pd.DataFrame(rows, columns=['from_lu', 'to_lu', 'part', 'cost', 'allowed']), parts.assign(allowed=True)], ignore_index=True)
 
 
@@ -729,6 +810,8 @@ INPUT_OPTIONS = {
     'CARBON_EFFECTS_WINDOW': [50, 60, 70, 80, 90],
     'FIRE_RISK': ['low', 'med', 'high'],
     'BIO_QUALITY_LAYER': list(settings.BIO_QUALITY_LAYERS),
+    # 'CONSTANT' is built as no carbon price (0 AUD per t); the others are the sheets of carbon_prices.xlsx
+    'CARBON_PRICES_FIELD': ['CONSTANT', 'Default', '100', '1.8C 67%', '1.5C 50%', '1.5C 67%'],
 }
 
 # The short name of an option in the label of a layer. The label goes into the name of the layer's file, and a
@@ -736,7 +819,7 @@ INPUT_OPTIONS = {
 # allows, and the browser could not open the layer.
 OPTION_SHORT_NAMES = {
     'SSP': 'S', 'CO2_FERT': 'C', 'USE_GHG_SCOPE_1': 'G', 'CARBON_EFFECTS_WINDOW': 'W',
-    'FIRE_RISK': 'F', 'BIO_QUALITY_LAYER': 'Q',
+    'FIRE_RISK': 'F', 'BIO_QUALITY_LAYER': 'Q', 'CARBON_PRICES_FIELD': 'P',
 }
 
 
@@ -759,7 +842,7 @@ def clear_economics_caches():
     for module in (ag_quantity, ag_revenue, ag_cost, ag_transitions, ag_ghg, ag_water,
                    non_ag_revenue, non_ag_cost, non_ag_transitions, non_ag_ghg, non_ag_water):
         for function in vars(module).values():
-            if callable(getattr(function, 'cache_clear', None)):
+            if hasattr(function, 'cache_clear'):                 # a function wrapped by functools.lru_cache
                 function.cache_clear()
 
 
@@ -956,6 +1039,25 @@ def set_carbon_option(data: Data, window: int, fire_risk: str):
     clear_economics_caches()
 
 
+def set_carbon_price_option(data: Data, field: str):
+    """Put `data` under another carbon price: 'CONSTANT' as no price at all (0 AUD per t CO2e in every year), any
+    other name as that sheet of carbon_prices.xlsx, read as Data.__init__ reads it."""
+    settings.CARBON_PRICES_FIELD = field
+    if field == 'CONSTANT':
+        settings.CARBON_PRICE_COSTANT = 0.0
+        data.CARBON_PRICES = {yr: 0.0 for yr in range(2010, 2101)}
+    else:
+        data.CARBON_PRICES = pd.read_excel(
+            os.path.join(settings.INPUT_DIR, 'carbon_prices.xlsx'),
+            sheet_name=field,
+            usecols="A,B",
+            names=["Year", "Carbon_price_$_tCO2e"],
+            header=0,
+            index_col="Year",
+        )["Carbon_price_$_tCO2e"].to_dict()
+    clear_economics_caches()
+
+
 def get_climate_options() -> list:
     """The (SSP, CO2 fertilisation) pairs the inputs hold a climate change impact file for. An SSP without one can not
     be loaded by the model either (Data.__init__ reads the file), so none of its inputs are built."""
@@ -979,7 +1081,9 @@ def write_input_cache_layers(data: Data, raw_dir: str, years: list, writers=None
     None for all of them: an option no wanted writer depends on is not set, so its data is not loaded. An option is set once and every year written under it: setting one loads data.
     At RESFACTOR > 1 the values are those of the land a coarse cell stands for: block means over its land-use cells.
 
-    Climate (SSP, CO2 fertilisation)   the climate change impact on yield
+    Climate (SSP, CO2 fertilisation)   the climate change impact on yield; the cost and revenue of every land use
+                                       (input_economics: revenue and the costs of what is produced follow yield)
+    Carbon price                       the non-agricultural revenue (under every climate too) and the transition costs
     SSP                                the water inputs (runoff, its change, and the water requirement: livestock
                                        drinking water follows the stocking rate, so the climate), at the CO2
                                        fertilisation the settings hold
@@ -987,7 +1091,14 @@ def write_input_cache_layers(data: Data, raw_dir: str, years: list, writers=None
     Carbon window, fire risk           the sequestration of the non-agricultural land uses
     Quality layer                      the biodiversity quality and the GBF2 mask it gives (input_biodiversity)
     Everything else is built at the values the settings hold when the cache is built."""
-    held = {name: getattr(settings, name) for name in INPUT_OPTIONS}
+    # The values the settings hold, put back after each option
+    held = {
+        'SSP': settings.SSP,
+        'CO2_FERT': settings.CO2_FERT,
+        'USE_GHG_SCOPE_1': settings.USE_GHG_SCOPE_1,
+        'CARBON_EFFECTS_WINDOW': settings.CARBON_EFFECTS_WINDOW,
+        'FIRE_RISK': settings.FIRE_RISK,
+    }
     path_of = {yr_cal: os.path.join(raw_dir, f'out_{yr_cal}') for yr_cal in years}
     themes = {yr_cal: {} for yr_cal in years}                                  # year -> tag -> (catalogue, layers)
     wanted = lambda name: writers is None or name in writers
@@ -1002,17 +1113,31 @@ def write_input_cache_layers(data: Data, raw_dir: str, years: list, writers=None
             if keep(lm):
                 collected[1].append((name, lm, own_option[0] if own_option else option, lu, values_r))
 
-    for ssp, co2_fert in get_climate_options() if wanted('yield') or wanted('water') else []:
-        if not (wanted('yield') or co2_fert == held['CO2_FERT']):                # water alone: one CO2 setting
+    held_carbon_price = settings.CARBON_PRICES_FIELD, dict(data.CARBON_PRICES)
+    for ssp, co2_fert in get_climate_options() if wanted('yield') or wanted('water') or wanted('economics') else []:
+        if not (wanted('yield') or wanted('economics') or co2_fert == held['CO2_FERT']):   # water alone: one CO2 setting
             continue
         set_climate_option(data, ssp, co2_fert)
         for yr_cal in years:
             if wanted('yield'):
                 add(yr_cal, input_yield(data, yr_cal, path_of[yr_cal]), option_label(SSP=ssp, CO2_FERT=co2_fert))
+            if wanted('economics'):
+                # cost and revenue follow yield, so the climate; the non-ag revenue also the carbon price
+                add(yr_cal, input_economics(data, yr_cal, path_of[yr_cal], {'SSP': ssp, 'CO2_FERT': co2_fert}, INPUT_OPTIONS['CARBON_PRICES_FIELD']))
             if wanted('water') and co2_fert == held['CO2_FERT']:
                 add(yr_cal, input_water(data, yr_cal, path_of[yr_cal]), option_label(SSP=ssp))
         print(f'Inputs: climate SSP {ssp}, CO2 fertilisation {co2_fert} done', flush=True)
     set_climate_option(data, held['SSP'], held['CO2_FERT'])
+
+    # The transition costs under every carbon price (the carbon released by clearing natural land is charged at it),
+    # at the climate the settings hold; then the carbon price of the settings back
+    if wanted('transition_cost'):
+        for field in INPUT_OPTIONS['CARBON_PRICES_FIELD']:
+            set_carbon_price_option(data, field)
+            for yr_cal in years:
+                add(yr_cal, input_transition_cost(data, yr_cal, path_of[yr_cal]), option_label(CARBON_PRICES_FIELD=field))
+    settings.CARBON_PRICES_FIELD, data.CARBON_PRICES = held_carbon_price
+    clear_economics_caches()
 
     if wanted('ghg'):
         for scope_1 in INPUT_OPTIONS['USE_GHG_SCOPE_1']:
@@ -1033,7 +1158,7 @@ def write_input_cache_layers(data: Data, raw_dir: str, years: list, writers=None
     for yr_cal in years:
         if wanted('ghg'):
             add(yr_cal, input_ghg(data, yr_cal, path_of[yr_cal]), keep=lambda lm: lm == 'ALL')    # savanna burning: no option
-        for name, writer in (('economics', input_economics), ('transition_cost', input_transition_cost), ('exclusion', input_exclusion),
+        for name, writer in (('exclusion', input_exclusion),
                              ('biodiversity', input_biodiversity), ('renewable', input_renewable),
                              ('ag_management', input_ag_management), ('social_licence', input_social_licence)):
             if wanted(name):
@@ -1059,9 +1184,6 @@ SPECIES_PER_FILE = 100                      # the items of a set that share a fi
 def species_leaf(values, high) -> dict:
     """One species layer as the report reads a map layer (create_report_layers.map2cells: one byte per cell, the
     value as a share of `high`)."""
-    from luto.tools.report.create_report_layers import map2cells
-    import base64
-
     _, cell_bytes, attrs = map2cells(xr.DataArray(np.asarray(values, dtype=np.float32), dims=('cell',)), False, (), (0.0, float(high)), None, None, per_ha=False)
     return {'cells_b64': base64.b64encode(cell_bytes).decode(), **attrs}
 
@@ -1113,9 +1235,6 @@ def write_species_gbf8_layers(save_dir: str, limit: int | None = None) -> dict:
     """The climate suitability of every GBF8 species, as it is in the input: the rasters are read as they are, on
     their own grid (map_gbf8_cell_index.js: one cell per land pixel of the raster), for the SSP the settings hold and
     the years INPUT_GBF8_YEARS. `limit` keeps the first species only (to try it)."""
-    from luto.tools.report.create_report_layers import write_cell_index
-    import rioxarray  # noqa: F401  (the .rio accessor)
-
     raster_file = os.path.join(settings.INPUT_DIR, f'bio_GBF8_ssp{settings.SSP}_EnviroSuit.nc')
     group_file = os.path.join(settings.INPUT_DIR, f'bio_GBF8_ssp{settings.SSP}_EnviroSuit_group.nc')
     with xr.open_dataset(group_file) as groups:
@@ -1169,8 +1288,6 @@ INPUT_THEMES = {
 def merge_input_themes(built_dir: str, cache_data_dir: str, themes: list):
     """The files of a rebuild of `themes` (in `built_dir`, laid out as the cache's `data`) into the cache: what the
     cache held for those themes is taken out first, the rest of the cache is left as it is."""
-    from luto.tools.report.create_report_layers import safe_key
-
     def read_js(path):
         """(the text before the content, the content) of a window[...] = <json>; file, (None, {}) if it is not there"""
         if not os.path.exists(path):
@@ -1234,6 +1351,136 @@ def merge_input_themes(built_dir: str, cache_data_dir: str, themes: list):
                 shutil.copy2(os.path.join(built_dir, filename), os.path.join(cache_data_dir, filename))
 
 
+def copy_input_cache(SAVE_DIR):
+    """The inputs of the report (the Inputs view of the Home page): copied from the input cache, built first if it is
+    not there (write_input.ensure_input_cache). The cache holds the report's own files -- the tables of
+    process_inputs_data and the layers of create_report_layers.save_input_layers -- for every option of the model, at
+    the cache's own resolution: the inputs are the same whatever a run then does with them."""
+    cache_dir = ensure_input_cache()
+    shutil.copytree(os.path.join(cache_dir, 'data'), SAVE_DIR, dirs_exist_ok=True)
+    write_input_years(cache_dir, SAVE_DIR)
+    return f"Inputs copied from the input cache ({os.path.basename(cache_dir)})"
+
+
+def write_input_years(cache_dir, SAVE_DIR):
+    """Inputs_years.js: the years the input cache holds (its DONE.json), which are not those of the run. The year
+    slider of the Inputs view steps through them."""
+    with open(os.path.join(cache_dir, 'DONE.json'), 'r', encoding='utf-8') as file:
+        years = json.load(file)['years']
+    with open(os.path.join(SAVE_DIR, 'Inputs_years.js'), 'w', encoding='utf-8') as file:
+        file.write(f'window["Inputs_years"] = {json.dumps(years)};\n')
+
+
+def process_inputs_data(files, SAVE_DIR):
+    """The inputs of the run (write_input.py), for the Inputs view of the Home page.
+
+    Inputs_catalogue.js   {theme: [{input, unit, kind}]}: the map inputs, in the order written
+    Inputs_tables.js      {theme: {table: {unit, rows: [[row, value, group]]}}}: the inputs that are a table, in groups
+                          (a table with options also has `options` {option: rows} and `reference` {row: value})
+    Inputs_bundles.js     {ag-management: {variable: [{name: land-use group, data: [[year, value]]}]}}
+    Inputs_adoption_caps.js {years, rows: [[region, target, [cap % per year], [cap ha per year]]]}: the social-licence caps
+    Inputs_yield_trend.js {source: {scenario: [{group, lm, kind, data: [[year, multiplier on 2010]]}]}}: both yield-trend inputs
+    A run written before 2026-11-12 has none of the tables and gets four empty files.
+    """
+    def read(base_name, first_only=False, newest_first=False):
+        """Every file whose name starts with `base_name` (a theme writes its own: inputs_catalogue_<tag>_<year>.csv)"""
+        paths = files[files['base_name'].str.startswith(base_name)].sort_values('Year', ascending=not newest_first, kind='stable')['path'].tolist()
+        if not paths:
+            return pd.DataFrame()
+        return pd.read_csv(paths[0]) if first_only else pd.concat([pd.read_csv(path) for path in paths], ignore_index=True)
+
+    # The order the themes are listed in (a theme not named here follows them)
+    THEME_ORDER = ['Yield', 'Water', 'GHG', 'Economics', 'Exclusion', 'Biodiversity', 'Renewable energy']
+
+    def save(filename, content):
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(content, f, separators=(',', ':'))
+            f.write(';\n')
+
+    catalogue = {}
+    # (the newest year first: an input with nothing to show in the base year -- the climate change impact on yield is
+    # zero then -- is missing from that year's list, and would be listed after the others)
+    catalogue_df = read('inputs_catalogue', newest_first=True)
+    if not catalogue_df.empty:
+        catalogue_df = catalogue_df.drop_duplicates('input').fillna('')
+        themes = [theme for theme in THEME_ORDER if theme in set(catalogue_df['theme'])] + sorted(set(catalogue_df['theme']) - set(THEME_ORDER))
+        for theme in themes:
+            catalogue[theme] = catalogue_df.query('theme == @theme')[['input', 'unit', 'kind']].to_dict(orient='records')
+    save('Inputs_catalogue', catalogue)
+
+    tables = {}
+    tables_df = read('inputs_tables', first_only=True)
+    for (theme, table), df in (tables_df.groupby(['theme', 'table']) if not tables_df.empty else []):
+        df = df.replace({'row': RENAME_AM_NON_AG})
+        content = {'unit': df['unit'].iloc[0]}
+        if 'option' in df.columns and df['option'].notna().any():
+            # A table built under several options (the sources of the habitat contribution): its rows per option, and
+            # the reference value of a row where it has one (marked on the bars of the other options)
+            content['options'] = {str(option): rows[['row', 'value', 'group']].round(4).values.tolist() for option, rows in df.groupby('option', sort=False)}
+            content['reference'] = df.dropna(subset=['reference']).drop_duplicates('row').set_index('row')['reference'].round(4).to_dict()
+            content['rows'] = next(iter(content['options'].values()))
+        else:
+            content['rows'] = df[['row', 'value', 'group']].round(4).values.tolist()
+        tables.setdefault(theme, {})[table] = content
+    save('Inputs_tables', tables)
+
+    # The bundles are the same table in every year's folder (they hold every year themselves)
+    # The yield trend the model can run on, from both of its input files: {source: {scenario: [{group, lm, kind, data}]}}
+    yield_trend = {}
+    yield_trend_df = read('inputs_yield_trend', first_only=True)
+    if not yield_trend_df.empty:
+        yield_trend_df['value'] = yield_trend_df['value'].round(4)
+        for (source, scenario, kind, lm, group), df in yield_trend_df.groupby(['source', 'scenario', 'kind', 'lm', 'group'], sort=False):
+            yield_trend.setdefault(source, {}).setdefault(scenario, []).append(
+                {'group': group, 'lm': lm, 'kind': kind, 'data': df.sort_values('Year')[['Year', 'value']].values.tolist()})
+    save('Inputs_yield_trend', yield_trend)
+
+    # The regional adoption caps (social licence): {years, rows: [[region, target, [cap % per year], [cap ha per year]]]}
+    adoption_caps = {'years': [], 'rows': []}
+    adoption_df = read('inputs_adoption_caps')
+    if not adoption_df.empty:
+        cap_years = sorted(int(year) for year in adoption_df['Year'].unique())
+        percent_wide = adoption_df.pivot_table(index=['region', 'target'], columns='Year', values='cap_percent', aggfunc='first').reindex(columns=cap_years)
+        hectare_wide = adoption_df.pivot_table(index=['region', 'target'], columns='Year', values='cap_ha', aggfunc='first').reindex(columns=cap_years)
+        clean = lambda values, digits: [None if pd.isna(value) else round(float(value), digits) for value in values]
+        adoption_caps = {
+            'years': cap_years,
+            'rows': [[region, RENAME_AM_NON_AG.get(target, target), clean(percent_wide.loc[(region, target)], 3), clean(hectare_wide.loc[(region, target)], 1)]
+                     for region, target in percent_wide.index],
+        }
+    save('Inputs_adoption_caps', adoption_caps)
+
+    # The from-to cost table of the model (the same in every year): the land uses in the model's order, each part
+    # as its cells [from, to, cost], and the pairs the model does not allow
+    transition_matrix = {}
+    matrix_df = read('inputs_transition_matrix', first_only=True)
+    if not matrix_df.empty:
+        lus = list(dict.fromkeys(matrix_df['from_lu']))
+        position = {lu: at for at, lu in enumerate(lus)}
+        matrix_df['from_at'], matrix_df['to_at'] = matrix_df['from_lu'].map(position), matrix_df['to_lu'].map(position)
+        allowed_df = matrix_df[matrix_df['allowed'].astype(str) == 'True']
+        transition_matrix = {
+            'lus': [RENAME_AM_NON_AG.get(lu, lu) for lu in lus],
+            'n_ag': int(sum(lu in AG_LANDUSE for lu in lus)),
+            'parts': list(dict.fromkeys(allowed_df['part'])),
+            'cost': {part: df[['from_at', 'to_at', 'cost']].round(0).astype(int).values.tolist() for part, df in allowed_df[allowed_df['cost'] != 0].groupby('part', sort=False)},
+            'disallowed': matrix_df[(matrix_df['part'] == 'Total') & (matrix_df['allowed'].astype(str) != 'True')][['from_at', 'to_at']].values.tolist(),
+        }
+    save('Inputs_transition_matrix', transition_matrix)
+
+    bundles = {}
+    bundles_df = read('inputs_bundles', first_only=True)
+    if not bundles_df.empty:
+        bundles_df = bundles_df.sort_values('Year')
+        bundles_df['value'] = bundles_df['value'].apply(lambda value: float(f'{value:.5g}'))
+        for (option, variable, group), df in bundles_df.groupby(['am', 'variable', 'group']):
+            bundles.setdefault(option, {}).setdefault(variable, []).append({'name': group, 'data': df[['Year', 'value']].values.tolist()})
+    save('Inputs_bundles', bundles)
+
+    return "Inputs data processing completed"
+
+
 def build_input_cache(themes=None):
     """Build what the input cache lacks, and print where it is. Two parts, each marked done by a file of its own, so
     one can be built without the other: the inputs of every option (DONE.json) and the species layers
@@ -1246,10 +1493,6 @@ def build_input_cache(themes=None):
 
     `themes` (names of INPUT_THEMES): rebuild these themes only, in a cache that is already built, and merge them
     in (merge_input_themes); the rest of the cache, the species layers included, is left as it is."""
-    from luto import tools
-    from luto.tools.report import create_report_data, create_report_layers
-    from luto.tools.report.data_tools import get_all_files
-
     cache_dir = get_input_cache_dir()
     need_inputs = not os.path.exists(os.path.join(cache_dir, 'DONE.json'))
     need_species = not os.path.exists(os.path.join(cache_dir, 'DONE_species.json'))
@@ -1290,8 +1533,8 @@ def build_input_cache(themes=None):
 
         # The report's own files, made once: the layers (create_report_layers) and the tables (create_report_data)
         os.makedirs(os.path.join(save_dir, 'map_layers'), exist_ok=True)
-        create_report_layers.save_input_layers(raw_dir, save_dir)
-        print(create_report_data.process_inputs_data(get_all_files(raw_dir), save_dir), flush=True)
+        save_input_report_layers(raw_dir, save_dir)
+        print(process_inputs_data(get_all_files(raw_dir), save_dir), flush=True)
         shutil.rmtree(raw_dir)
         if themes:
             # These themes only: merged into the cache, whose marker notes when each theme was last rebuilt
@@ -1342,10 +1585,9 @@ def ensure_input_cache(themes=None) -> str:
 
     code = (f'import luto.settings as settings; settings.RESFACTOR = {INPUT_CACHE_RESFACTOR}; '
             f'import luto.tools.write_input as write_input; write_input.build_input_cache({themes!r})')
-    package_parent = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     os.makedirs(os.path.dirname(cache_dir), exist_ok=True)
     with open(cache_dir + '.log', 'a') as log:
-        built = subprocess.run([sys.executable, '-u', '-c', code], cwd=package_parent, stdout=log, stderr=subprocess.STDOUT)
+        built = subprocess.run([sys.executable, '-u', '-c', code], stdout=log, stderr=subprocess.STDOUT)     # in the repository root, as this process
     if built.returncode != 0 or not all(os.path.exists(marker) for marker in markers):
         raise RuntimeError(f'The input cache could not be built: see {cache_dir}.log')
     return cache_dir

@@ -18,15 +18,18 @@
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
 import os
-import shutil
+import re
 import json
+import shutil
 import pandas as pd
 import numpy as np
+from collections import defaultdict
 from luto import settings
 from joblib import Parallel, delayed
 
 from luto.economics.off_land_commodity import get_demand_xr
 from luto.tools.report.data_tools import get_all_files
+from luto.tools.write_input import copy_input_cache
 from luto.tools.report.data_tools.parameters import (
     AG_LANDUSE,
     COLORS,
@@ -187,7 +190,6 @@ def build_out_dict_bulk(df_wide_pct, df_wide_area, key_cols):
     The returned dict is nested in the order of key_cols, with leaf dicts:
         {'Percent': [...records...], 'Area': [...records...]}
     """
-    from collections import defaultdict
 
     def _df_to_keyed(df):
         keys = list(zip(*[df[c].tolist() for c in key_cols]))
@@ -1652,137 +1654,6 @@ def process_production_data(files, SAVE_DIR, years):
 
 
     return "Production data processing completed"
-
-
-def copy_input_cache(SAVE_DIR):
-    """The inputs of the report (the Inputs view of the Home page): copied from the input cache, built first if it is
-    not there (write_input.ensure_input_cache). The cache holds the report's own files -- the tables of
-    process_inputs_data and the layers of create_report_layers.save_input_layers -- for every option of the model, at
-    the cache's own resolution: the inputs are the same whatever a run then does with them."""
-    from luto.tools.write_input import ensure_input_cache
-    cache_dir = ensure_input_cache()
-    shutil.copytree(os.path.join(cache_dir, 'data'), SAVE_DIR, dirs_exist_ok=True)
-    write_input_years(cache_dir, SAVE_DIR)
-    return f"Inputs copied from the input cache ({os.path.basename(cache_dir)})"
-
-
-def write_input_years(cache_dir, SAVE_DIR):
-    """Inputs_years.js: the years the input cache holds (its DONE.json), which are not those of the run. The year
-    slider of the Inputs view steps through them."""
-    with open(os.path.join(cache_dir, 'DONE.json'), 'r', encoding='utf-8') as file:
-        years = json.load(file)['years']
-    with open(os.path.join(SAVE_DIR, 'Inputs_years.js'), 'w', encoding='utf-8') as file:
-        file.write(f'window["Inputs_years"] = {json.dumps(years)};\n')
-
-
-def process_inputs_data(files, SAVE_DIR):
-    """The inputs of the run (write_input.py), for the Inputs view of the Home page.
-
-    Inputs_catalogue.js   {theme: [{input, unit, kind}]}: the map inputs, in the order written
-    Inputs_tables.js      {theme: {table: {unit, rows: [[row, value, group]]}}}: the inputs that are a table, in groups
-                          (a table with options also has `options` {option: rows} and `reference` {row: value})
-    Inputs_bundles.js     {ag-management: {variable: [{name: land-use group, data: [[year, value]]}]}}
-    Inputs_adoption_caps.js {years, rows: [[region, target, [cap % per year], [cap ha per year]]]}: the social-licence caps
-    Inputs_yield_trend.js {source: {scenario: [{group, lm, kind, data: [[year, multiplier on 2010]]}]}}: both yield-trend inputs
-    A run written before 2026-11-12 has none of the tables and gets four empty files.
-    """
-    def read(base_name, first_only=False, newest_first=False):
-        """Every file whose name starts with `base_name` (a theme writes its own: inputs_catalogue_<tag>_<year>.csv)"""
-        paths = files[files['base_name'].str.startswith(base_name)].sort_values('Year', ascending=not newest_first, kind='stable')['path'].tolist()
-        if not paths:
-            return pd.DataFrame()
-        return pd.read_csv(paths[0]) if first_only else pd.concat([pd.read_csv(path) for path in paths], ignore_index=True)
-
-    # The order the themes are listed in (a theme not named here follows them)
-    THEME_ORDER = ['Yield', 'Water', 'GHG', 'Economics', 'Exclusion', 'Biodiversity', 'Renewable energy']
-
-    def save(filename, content):
-        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-            f.write(f'window["{filename}"] = ')
-            json.dump(content, f, separators=(',', ':'))
-            f.write(';\n')
-
-    catalogue = {}
-    # (the newest year first: an input with nothing to show in the base year -- the climate change impact on yield is
-    # zero then -- is missing from that year's list, and would be listed after the others)
-    catalogue_df = read('inputs_catalogue', newest_first=True)
-    if not catalogue_df.empty:
-        catalogue_df = catalogue_df.drop_duplicates('input').fillna('')
-        themes = [theme for theme in THEME_ORDER if theme in set(catalogue_df['theme'])] + sorted(set(catalogue_df['theme']) - set(THEME_ORDER))
-        for theme in themes:
-            catalogue[theme] = catalogue_df.query('theme == @theme')[['input', 'unit', 'kind']].to_dict(orient='records')
-    save('Inputs_catalogue', catalogue)
-
-    tables = {}
-    tables_df = read('inputs_tables', first_only=True)
-    for (theme, table), df in (tables_df.groupby(['theme', 'table']) if not tables_df.empty else []):
-        df = df.replace({'row': RENAME_AM_NON_AG})
-        content = {'unit': df['unit'].iloc[0]}
-        if 'option' in df.columns and df['option'].notna().any():
-            # A table built under several options (the sources of the habitat contribution): its rows per option, and
-            # the reference value of a row where it has one (marked on the bars of the other options)
-            content['options'] = {str(option): rows[['row', 'value', 'group']].round(4).values.tolist() for option, rows in df.groupby('option', sort=False)}
-            content['reference'] = df.dropna(subset=['reference']).drop_duplicates('row').set_index('row')['reference'].round(4).to_dict()
-            content['rows'] = next(iter(content['options'].values()))
-        else:
-            content['rows'] = df[['row', 'value', 'group']].round(4).values.tolist()
-        tables.setdefault(theme, {})[table] = content
-    save('Inputs_tables', tables)
-
-    # The bundles are the same table in every year's folder (they hold every year themselves)
-    # The yield trend the model can run on, from both of its input files: {source: {scenario: [{group, lm, kind, data}]}}
-    yield_trend = {}
-    yield_trend_df = read('inputs_yield_trend', first_only=True)
-    if not yield_trend_df.empty:
-        yield_trend_df['value'] = yield_trend_df['value'].round(4)
-        for (source, scenario, kind, lm, group), df in yield_trend_df.groupby(['source', 'scenario', 'kind', 'lm', 'group'], sort=False):
-            yield_trend.setdefault(source, {}).setdefault(scenario, []).append(
-                {'group': group, 'lm': lm, 'kind': kind, 'data': df.sort_values('Year')[['Year', 'value']].values.tolist()})
-    save('Inputs_yield_trend', yield_trend)
-
-    # The regional adoption caps (social licence): {years, rows: [[region, target, [cap % per year], [cap ha per year]]]}
-    adoption_caps = {'years': [], 'rows': []}
-    adoption_df = read('inputs_adoption_caps')
-    if not adoption_df.empty:
-        cap_years = sorted(int(year) for year in adoption_df['Year'].unique())
-        percent_wide = adoption_df.pivot_table(index=['region', 'target'], columns='Year', values='cap_percent', aggfunc='first').reindex(columns=cap_years)
-        hectare_wide = adoption_df.pivot_table(index=['region', 'target'], columns='Year', values='cap_ha', aggfunc='first').reindex(columns=cap_years)
-        clean = lambda values, digits: [None if pd.isna(value) else round(float(value), digits) for value in values]
-        adoption_caps = {
-            'years': cap_years,
-            'rows': [[region, RENAME_AM_NON_AG.get(target, target), clean(percent_wide.loc[(region, target)], 3), clean(hectare_wide.loc[(region, target)], 1)]
-                     for region, target in percent_wide.index],
-        }
-    save('Inputs_adoption_caps', adoption_caps)
-
-    # The from-to cost table of the model (the same in every year): the land uses in the model's order, each part
-    # as its cells [from, to, cost], and the pairs the model does not allow
-    transition_matrix = {}
-    matrix_df = read('inputs_transition_matrix', first_only=True)
-    if not matrix_df.empty:
-        lus = list(dict.fromkeys(matrix_df['from_lu']))
-        position = {lu: at for at, lu in enumerate(lus)}
-        matrix_df['from_at'], matrix_df['to_at'] = matrix_df['from_lu'].map(position), matrix_df['to_lu'].map(position)
-        allowed_df = matrix_df[matrix_df['allowed'].astype(str) == 'True']
-        transition_matrix = {
-            'lus': [RENAME_AM_NON_AG.get(lu, lu) for lu in lus],
-            'n_ag': int(sum(lu in AG_LANDUSE for lu in lus)),
-            'parts': list(dict.fromkeys(allowed_df['part'])),
-            'cost': {part: df[['from_at', 'to_at', 'cost']].round(0).astype(int).values.tolist() for part, df in allowed_df[allowed_df['cost'] != 0].groupby('part', sort=False)},
-            'disallowed': matrix_df[(matrix_df['part'] == 'Total') & (matrix_df['allowed'].astype(str) != 'True')][['from_at', 'to_at']].values.tolist(),
-        }
-    save('Inputs_transition_matrix', transition_matrix)
-
-    bundles = {}
-    bundles_df = read('inputs_bundles', first_only=True)
-    if not bundles_df.empty:
-        bundles_df = bundles_df.sort_values('Year')
-        bundles_df['value'] = bundles_df['value'].apply(lambda value: float(f'{value:.5g}'))
-        for (option, variable, group), df in bundles_df.groupby(['am', 'variable', 'group']):
-            bundles.setdefault(option, {}).setdefault(variable, []).append({'name': group, 'data': df[['Year', 'value']].values.tolist()})
-    save('Inputs_bundles', bundles)
-
-    return "Inputs data processing completed"
 
 
 def process_renewable_data(files, SAVE_DIR, years):
@@ -4074,107 +3945,11 @@ def process_biodiversity_data(files, SAVE_DIR):
     return "Biodiversity data processing completed"
 
 
-def tidy_settings_note(note):
-    """A note of settings.py as the Settings page shows it: one line per block. The source wraps its lines at the
-    width of the editor; here the wrapped lines of a block are joined again, and a list item becomes a line starting
-    with a bullet. A list item is a line that starts with a marker ('- ', '* ', '1. '), a definition ("'off' -- ..."),
-    or an indented line under a paragraph that ends with ':'; a line indented deeper than its block continues it."""
-    import re
-
-    MARKER = re.compile(r'^\s*(?:[-*\u2022]|\d+[.)])\s+')
-    DEFINITION = re.compile(r"^\s*'[^']+'(?:\s*/\s*'[^']+')*\s+(?:[\u2014\u2013-]+|:)\s")
-    blocks = []                    # {'item': a list item or a paragraph, 'indent': of its first line, 'text'}
-    current = None                 # the block the next line may continue; None after a blank line
-    siblings = None                # the indent of the unmarked items under a paragraph ending with ':'
-    for raw in note.split('\n'):
-        body = raw.strip()
-        indent = len(raw) - len(raw.lstrip())
-        if not body:
-            current, siblings = None, None
-            continue
-        marked = bool(MARKER.match(raw))
-        defined = bool(DEFINITION.match(raw))
-        under_colon = current is not None and not current['item'] and current['text'].endswith(':') and indent > current['indent']
-        if marked or defined or under_colon or (siblings is not None and indent == siblings):
-            if under_colon and not (marked or defined):
-                siblings = indent
-            current = {'item': True, 'indent': indent, 'text': MARKER.sub('', raw).strip() if marked else body}
-            blocks.append(current)
-        elif current is not None and (indent > current['indent'] or (not current['item'] and indent == current['indent'])):
-            current['text'] += ' ' + body                          # a wrapped line of the block above
-        else:
-            current, siblings = {'item': False, 'indent': indent, 'text': body}, None
-            blocks.append(current)
-    squeeze = lambda value: re.sub(r'\s{2,}', ' ', value)          # the columns the source aligns with spaces
-    return '\n'.join(('\u2022 ' if block['item'] else '') + squeeze(block['text']) for block in blocks)
-
-
-def get_settings_docs():
-    """{setting: its description}, read off the source of luto/settings.py: the comment lines right above the
-    assignment, the comment on its line, and the string that follows it as a docstring, in that order (settings on
-    consecutive lines share the comment above the first and the docstring after the last). They are the
-    notes of the current code, shown as pop-ups on the Settings page of the report (tidy_settings_note: one line
-    per paragraph or list item)."""
-    import ast, io, re, textwrap, tokenize
-
-    with open(settings.__file__, 'r', encoding='utf-8') as file:
-        source = file.read()
-    source_lines = source.split('\n')
-    comments = {token.start[0]: token.string for token in tokenize.generate_tokens(io.StringIO(source).readline)
-                if token.type == tokenize.COMMENT}
-    standalone = {number for number in comments if source_lines[number - 1].lstrip().startswith('#')}
-
-    def clean(comment):
-        """A comment without its '#' and without the rules a heading is drawn with ('# ---- Title ----'); its
-        indentation is kept (a wrapped line of a list is indented under its item). Nothing for a line of rules only."""
-        body = comment.lstrip('#').rstrip().rstrip('*-=#').rstrip()
-        body = re.sub(r'^(\s*)[*\-=#]{2,}\s*', r'\1', body)
-        return body if any(char.isalnum() for char in body) else ''
-
-    def is_setting(statement):
-        return (isinstance(statement, ast.Assign) and len(statement.targets) == 1
-                and isinstance(statement.targets[0], ast.Name) and statement.targets[0].id.isupper())
-
-    docs = {}
-    def walk(body):
-        position = 0
-        while position < len(body):
-            statement = body[position]
-            for field in ('body', 'orelse', 'finalbody'):                      # settings set inside an if / try
-                if isinstance(getattr(statement, field, None), list):
-                    walk(getattr(statement, field))
-            if not is_setting(statement):
-                position += 1
-                continue
-            # Settings on consecutive lines are one block: the comment above the first and the docstring after the
-            # last describe them all (RENEWABLE_GBF2_CUT_WIND / _SOLAR, the BIO_CONTRIBUTION_* list)
-            block = [statement]
-            while (position + len(block) < len(body) and is_setting(body[position + len(block)])
-                   and body[position + len(block)].lineno == block[-1].end_lineno + 1):
-                block.append(body[position + len(block)])
-            above, number = [], block[0].lineno - 1
-            while number in standalone:
-                above.insert(0, clean(comments[number]))
-                number -= 1
-            following = body[position + len(block)] if position + len(block) < len(body) else None
-            docstring = (textwrap.dedent(following.value.value).strip()
-                         if isinstance(following, ast.Expr) and isinstance(getattr(following, 'value', None), ast.Constant)
-                         and isinstance(following.value.value, str) else '')
-            for member in block:
-                inline = clean(comments[member.lineno]) if member.lineno in comments and member.lineno not in standalone else ''
-                parts = [textwrap.dedent('\n'.join(line for line in above if line)), inline.strip(), docstring]
-                docs[member.targets[0].id] = tidy_settings_note('\n\n'.join(part for part in parts if part))
-            position += len(block)
-    walk(ast.parse(source).body)
-    return docs
-
-
 def process_supporting_info_data(SAVE_DIR, years, raw_data_dir):
     """Process and save supporting information data (Section 7)."""
-    settings_docs = get_settings_docs()
     with open(f'{raw_data_dir}/model_run_settings.txt', 'r', encoding='utf-8') as f:
         settings_dict = [
-            {'parameter': k.strip(), 'val': v.strip(), 'doc': settings_docs.get(k.strip(), '')}
+            {'parameter': k.strip(), 'val': v.strip()}
             for line in f if ':' in line
             for k, v in [line.split(':', 1)]
         ]

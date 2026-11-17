@@ -37,6 +37,8 @@ from shapely.geometry import shape
 from joblib import Parallel, delayed
 from collections import defaultdict
 
+from itertools import combinations
+
 from luto import settings
 from luto import tools
 from luto.data import Data
@@ -1717,7 +1719,6 @@ def write_transition_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     At the base year there are no transitions: CSVs are header-only and each NetCDF carries a single
     all-'ALL' zero layer to keep the schema alive.
     """
-    from itertools import combinations
 
     yr_idx = yr_cal - data.YR_CAL_BASE
     gap = get_year_gap(data, yr_cal)  # annualise: divide period value matrices by this
@@ -1941,7 +1942,6 @@ def write_transition_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
       - Water : non-ag net-yield matrix × D            ML yield change on the newly converted area
     All annualised by `gap`. At the base year: header-only CSVs + one all-'ALL' zero layer per NetCDF.
     """
-    from itertools import combinations
 
     yr_idx = yr_cal - data.YR_CAL_BASE
     gap = get_year_gap(data, yr_cal)  # annualise: divide period value matrices by this
@@ -2318,7 +2318,6 @@ def write_area_transition_start_end(data: Data, path, yr_cal_end):
     Exact up to within-pool fungibility (land units inside one (cell, lm, lu) pool are
     indistinguishable — inherent to the model).
     """
-    from itertools import combinations
 
     yr_cal_start = data.YR_CAL_BASE
     years = [y for y in sorted(data.lumaps.keys()) if y <= yr_cal_end]
