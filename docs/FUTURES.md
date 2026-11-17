@@ -638,7 +638,7 @@ a cell's value = values[blob_of_cell[cell]]
 - Store both ends, `[min, max]`. An initial 0 would change the colour bar: all-positive layers would start from 0 instead of their real minimum, and all-negative layers would end at 0. Start from empty, not 0.
 - `get_mag` takes quantiles, while water and the start-to-end transition take true min / max. The merge's min-of-mins and max-of-maxes matches what `create_report_layers.py` does now.
 - Keep the NaN → 0 cleaning, which `write_data` applies at line 507.
-- Update `docs/CLAUDE_OUTPUT.md` § "Colorbar Range: MAX_CELL_MAGNITUDE Design" and `docs/CLAUDE_SKILL/redo_failed_write.md`.
+- Update `docs/CLAUDE_OUTPUT.md` § "Colorbar Range: MAX_CELL_MAGNITUDE Design".
 
 ### 3. Remove the temp-dir remnants
 

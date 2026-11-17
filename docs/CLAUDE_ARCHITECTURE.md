@@ -63,7 +63,7 @@ This document describes the core architecture, modules, and data flow of LUTO2.
 - Uses compressed NetCDF encoding with chunking for efficient storage
 - Format: `tCO2_ha_{type}.nc` where type is ep_block, ep_belt, ep_rip, cp_block, cp_belt, hir_block, hir_rip
 
-### Output Writing (`luto/tools/write.py`)
+### Output Writing (`luto/tools/write_output.py`)
 - Outputs model results as xarray datasets in NetCDF format
 - Uses hierarchical dimension structure for progressive selection in reporting UI
 - See [CLAUDE_OUTPUT.md](CLAUDE_OUTPUT.md) for detailed NetCDF format documentation
@@ -117,7 +117,7 @@ This document describes the core architecture, modules, and data flow of LUTO2.
    - Objective: the economy alone, `obj · x` in million AUD (`row_builder.get_obj`); `SOLVE_WEIGHT_BETA` is gone
    - The sub-`SOLVER_COEFF_MIN` floor on scaled coefficients is the last step of `row_builder.contract` on every family's stacked block and of the objective vector; no post-build sweep exists. The flow rows (source cap, node balance) and the ag-mgt link rows are structural ±1 rows: they pass through `contract` without the rescale, and the drop is a no-op on them or rescaled.
 
-6. **Output Generation**: `tools/write.py` writes results to `/output/`
+6. **Output Generation**: `tools/write_output.py` writes results to `/output/`
    - **Two-stage writing process**: Decision variables and mosaic maps written first (stage 1), then all other outputs (stage 2)
    - Stage 1 uses `write_dvar_and_mosaic_map()` which combines dvar and mosaic generation in a single function
    - Mosaic maps are concatenated directly to dvar arrays before saving (optimizes file I/O)
@@ -210,7 +210,7 @@ Transitions are explicit per-source delta flows. The base-year ag dvar `data.ag_
 
 There is no fold. The former θ dial (`EXACT_REACHABILITY_MIN_FRACTION`), which merged sub-θ fractions into the cell's dominant land use and undid the merge with an accounting layer (`X_acct_*` columns, `acct_link_*` rows), was removed on 2026-09-08: a census of the RES5 2020→2050 trajectory showed the fold catching 12–69 of ~350k nonzero entries per year (≤ 0.02 %), so the exact model was already the model being solved (see `docs/FINDINGS.md`, 20260908). Model size scales with the number of nonzero base-year entries, not with the number of cells.
 
-Transition **reporting** (`write.py`) is rebuilt on the solved per-source delta flows (`data.delta_dvars_ag2ag[yr_cal]` etc.), giving exact from→to attribution.
+Transition **reporting** (`write_output.py`) is rebuilt on the solved per-source delta flows (`data.delta_dvars_ag2ag[yr_cal]` etc.), giving exact from→to attribution.
 
 ## Simulation Flow
 

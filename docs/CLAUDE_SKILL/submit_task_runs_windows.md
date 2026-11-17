@@ -149,7 +149,7 @@ Get-ChildItem Run_G0001\Run_Archive.zip, Report_Data\Run_G0001.zip | Select-Obje
 2. Common issues:
    - **`INPUT_DIR` wrong** — patch with `--input_dir` flag or edit `Run_G000X/luto/settings.py` directly.
    - **Out of memory** — reduce `--max` concurrency so fewer runs overlap.
-   - **Settings mismatch** — if source files changed after the run dir was created, copy the fixed files into `Run_G000X/luto/` before relaunching (same pattern as `redo_failed_write` skill).
+   - **Settings mismatch** — if source files changed after the run dir was created, copy the fixed files into `Run_G000X/luto/` before relaunching.
 
 To relaunch only failed runs after fixing the issue:
 

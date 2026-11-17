@@ -57,7 +57,7 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 - `VERSION`: Model version identifier (current: '2.3')
 - `SSP`: Shared Socioeconomic Pathway code (e.g., '245' for SSP2-RCP4.5)
 - `SCENARIO`: Auto-derived from SSP (e.g., 'SSP2')
-- `RCP`: Auto-derived from SSP (e.g., 'rcp4p5')
+- `YIELD_RCP`: Auto-derived from SSP (e.g., 'rcp4p5'); picks the yield climate-impact file only. SSP '370' gives 'rcp6p0' (GAEZ v4 has no RCP 7.0)
 - `SIM_YEARS`: Simulation time periods (default: `list(range(2020, 2051, 5))` = 2020-2050 in 5-year steps)
 - `RESFACTOR`: Spatial resolution factor (1 = full resolution, >1 = coarser)
 - `OBJECTIVE`: Optimization objective ('maxprofit' or 'mincost')
@@ -292,7 +292,7 @@ profit = xr.dot(profit_combo, decision_vars, dims=['am', 'lm', 'lu'])
 
 #### Where this applies
 
-This is a **standing convention** for any large-array `(a * b).sum(dim=...)` reduction in `write.py` and the report data tools — apply it whenever you add or refactor such a reduction. (Do not rely on hard-coded line numbers here: `write.py` has been substantially rewritten — notably the transition reporting, which now aggregates solved per-source delta flows rather than a `base × target × cost` Cartesian product — so exact call sites move.)
+This is a **standing convention** for any large-array `(a * b).sum(dim=...)` reduction in `write_output.py` and the report data tools — apply it whenever you add or refactor such a reduction. (Do not rely on hard-coded line numbers here: `write_output.py` has been substantially rewritten — notably the transition reporting, which now aggregates solved per-source delta flows rather than a `base × target × cost` Cartesian product — so exact call sites move.)
 
 **Special case - Dimension elimination.** When a product would create a full Cartesian intermediate over two water-supply dimensions, sum each dimension separately instead:
 ```python

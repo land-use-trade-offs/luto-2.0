@@ -17,12 +17,12 @@ Vue.js 3 dashboard (`DATA_REPORT/REPORT_HTML/index.html`) that renders LUTO simu
 
 ## xarray → Base64 Map Pipeline
 
-How simulation outputs (`write.py` NetCDF) become the base64 PNG tiles rendered in Leaflet.
+How simulation outputs (`write_output.py` NetCDF) become the base64 PNG tiles rendered in Leaflet.
 
 ### Pipeline overview
 
 ```
-write.py: xarray (1D cells) → stack dims → valid-layer filter → NetCDF
+write_output.py: xarray (1D cells) → stack dims → valid-layer filter → NetCDF
     ↓
 create_report_layers.py: decode MultiIndex → iterate layers → rename/reorder
     ↓ per layer
@@ -33,7 +33,7 @@ tuple_dict_to_nested(): flat tuple keys → nested dict
 window["map_name"] = { Water: { Source: { LU: { Year: {img_str, bounds, ...} } } } };
 ```
 
-### Step 1 — Stack dims and save NetCDF (`write.py`)
+### Step 1 — Stack dims and save NetCDF (`write_output.py`)
 
 ```python
 xr_stacked = xr_data.stack(layer=['lm', 'source', 'lu']).sel(layer=valid_layers)
@@ -528,3 +528,39 @@ await ensureComboLayer(layerPrefix, [selectLanduse.value]);
 
 The loaded file name is derived as: `<layerPrefix>__<safe(dim1)>__…__<safe(dimN)>.js`
 where `safe(s) = s.replace(/[^a-zA-Z0-9]+/g, '_').trim('_')`.
+
+## The input cache (Home page, Inputs view)
+
+The inputs shown on the Home page are **not written by a run**. They are built once into
+`input/_cache/report_inputs_RES5_v<version>/` and every report copies them from there
+(`create_report_data.copy_input_cache` -> `write_input.ensure_input_cache`).
+
+- **Built by** `luto/tools/write_input.py` (`build_input_cache`), in a process of its own that loads `Data` at
+  `INPUT_CACHE_RESFACTOR` (5), whatever the resolution of the run. About 6 minutes to load, then the options.
+  Progress goes to `<cache folder>.log`. Delete the folder, or raise `INPUT_CACHE_VERSION`, to build it again.
+  **Nothing checks that the cache is current**: after a change to the files in `input/` or to the input writers,
+  do one of the two, or reports keep showing the old inputs.
+- **One theme at a time.** A change to one theme (an input file, or its writer) does not need the whole cache:
+  `rebuild_input_cache_themes(['Biodiversity'])` (`write_input.py`; themes are the keys of `INPUT_THEMES`: Yield,
+  Water, GHG, Economics, Exclusion, Biodiversity, Renewable energy, Ag management, Social licence) rebuilds those
+  themes and merges them into the cache (`merge_input_themes`), leaving the other themes and the species layers
+  as they are. The model data is loaded either way (~6 min); a theme without options adds about a minute.
+  `python -c "from luto.tools.write_input import rebuild_input_cache_themes; rebuild_input_cache_themes(['Biodiversity'])"`
+- **One cache for every run.** Inputs with option buttons hold every option; the others (economics, transition
+  costs, exclusion) are those of the settings in force when the cache was built (listed in its `DONE.json`).
+- **Raw values.** At RESFACTOR > 1 `Data` replaces the economics / emissions / climate values of a cell by block
+  means (`coarsen_guarded_arrays`); the cache puts the centre-cell values back (`use_centre_cell_values`).
+- **Years** `INPUT_CACHE_YEARS` (2010-2050 every ten). A layer that is the same in every year is stored once
+  (year key `ALL`); the view shows the kept year nearest to the selected one.
+- **Options** (`INPUT_OPTIONS`): SSP x CO2 fertilisation (yield climate), SSP (water), scope 1 (ag emissions), carbon
+  window x fire risk (non-ag sequestration), quality layer (biodiversity). A layer is filed as
+  `input -> lm -> option -> lu`, the option a short label (`S=245|C=on`, `write_input.OPTION_SHORT_NAMES`): the
+  label goes into the file name, and long names broke the 260-character path limit of Windows.
+- **Its own grid.** The layers are painted through `map_input_cell_index.js` (a leaf's `cellIndex`), not the run's
+  `map_cell_index.js`.
+- **Species layers** (GBF3 vegetation groups, GBF4 SNES / ECNES, GBF8 species): packed `SPECIES_PER_FILE` (100) to a file,
+  `data/map_layers/input_species/<set>/<variant>/<n>.js` (`{position: leaf}`), listed in `data/Inputs_species.js`. GBF3 / GBF4 are block
+  means on the cache cells (a small range still shows); GBF8 is the raw raster on its own grid
+  (`map_gbf8_cell_index.js`), for the SSP of the settings and `INPUT_GBF8_YEARS`.
+- **In the view** (`views/Home.js`): option rows under the input buttons, the value of the run with a dashed
+  border; a species set shows a searchable list.

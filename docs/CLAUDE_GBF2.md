@@ -133,7 +133,7 @@ Cells are pre-filtered to `GBF2_mask_idx = where(BIO_GBF2_MASK_LDS)` — only ce
 
 ## 4. Reporting: `Relative_Contribution_Percentage`
 
-**File:** `luto/tools/write.py` — `write_biodiversity_GBF2_scores()`
+**File:** `luto/tools/write_output.py` — `write_biodiversity_GBF2_scores()`
 
 The function decomposes the solver's aggregate target into per–(land-use, land-management, NRM region) contributions and expresses each as a percentage of the **total degradation**. The sum of non-ALL rows for Australia equals the fraction of degradation that has been restored at `yr_cal`.
 
@@ -244,7 +244,7 @@ solver.py  _add_GBF2_constraints()
   score ≥ limits["GBF2"] / scale_factor              (hard constraint)
           │
           ▼
-write.py  write_biodiversity_GBF2_scores()
+write_output.py  write_biodiversity_GBF2_scores()
   denom  = baseline − BIO_GBF2_BASE_YR.sum()
   ag     = MASK×AREA × (bio_contr×(dvar_yr − base_dvar) + savburn×(1−LDS)×base_dvar)
   non_ag = MASK×AREA × non_ag_bio_contr × non_ag_dvar

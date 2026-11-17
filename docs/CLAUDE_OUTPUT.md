@@ -283,7 +283,7 @@ through all downstream xarray arithmetic. Never attached manually at individual 
 Always computed — all-`True` in `Australia` mode, NRM-union mask in `NRM` mode.
 
 ```python
-# In write.py: applied to GBF3 NVIS, GBF4 SNES, GBF4 ECNES write functions
+# In write_output.py: applied to GBF3 NVIS, GBF4 SNES, GBF4 ECNES write functions
 if getattr(settings, '<MODE_SETTING>', 'Australia') == 'NRM':
     sel_regions = sorted({r for r, _ in getattr(data, '<SEL_ATTR>', []) if r != 'Australia'})
     sel_mask = (
@@ -325,9 +325,9 @@ NRMs) so non-selected cells have non-zero values to grey out. `data.py` always b
 
 Both are available in **Australia mode and NRM mode**. In Australia mode they mirror
 `GBF4_SNES_LAYERS_SEL` (reshaped to drop the MultiIndex). In NRM mode they are built
-without the per-region mask so every cell retains its habitat value. `write.py` reads
+without the per-region mask so every cell retains its habitat value. `write_output.py` reads
 these attrs directly — `get_GBF4_SNES_matrix_sr(data)` (the solver-facing function)
-is no longer called from write.py.
+is no longer called from write_output.py.
 
 | Metric | `<MODE_SETTING>` | `<SEL_ATTR>` | Region name attr |
 |---|---|---|---|
@@ -633,13 +633,13 @@ This maintains consistency between spatial maps and statistical charts, ensuring
 
 ## Colorbar Range: MAX_CELL_MAGNITUDE Design
 
-Each map layer in the report needs a consistent `min_max` colorbar range that spans **all simulated years**, not just a single year. This is achieved via `MAX_CELL_MAGNITUDE` in `write.py`.
+Each map layer in the report needs a consistent `min_max` colorbar range that spans **all simulated years**, not just a single year. This is achieved via `MAX_CELL_MAGNITUDE` in `write_output.py`.
 
 ### Pipeline
 
 1. **`get_mag(arr)`** — called once per output xarray per year. Returns `[MIN_P-quantile, MAX_P-quantile]` (currently `[0.5%, 99.5%]`) of non-zero cell values. Using quantiles avoids extreme outliers distorting the colorbar.
 
-2. **`MAX_CELL_MAGNITUDE`** — a plain pre-initialized 2-level dict (defined near the top of `write.py`). Each leaf is a list that accumulates `[min_q, max_q]` pairs from every year's parallel job:
+2. **`MAX_CELL_MAGNITUDE`** — a plain pre-initialized 2-level dict (defined near the top of `write_output.py`). Each leaf is a list that accumulates `[min_q, max_q]` pairs from every year's parallel job:
 
    ```python
    MAX_CELL_MAGNITUDE = {
