@@ -37,13 +37,7 @@ input/*.nc  ->  Data attributes  ->  economics modules  ->  solvers/row_inputs.p
 
 A new input is therefore one new attribute on `Data`, read by the economics function that uses it.
 
-## 4. Building a new attribute: use a fake `Data` if the real one is too heavy
-
-If building the real `Data` just to develop one new attribute is too slow, use the lightweight stand-in in
-`docs/CLAUDE_SKILL/fakedata_inspection.md`. It loads only the masks and geo-metadata, so you can add your attribute to
-it, check the array and plot it, then move the code into `data.py`.
-
-## 5. Save a `Data` object once, then step through the code with it
+## 4. Save a `Data` object once, then step through the code with it
 
 Build `Data` once, save it, and load it back whenever you need it:
 
@@ -65,7 +59,7 @@ self = data
 # paste the lines of the method here and inspect each result
 ```
 
-## 6. Keep things together, so errors can't be silent
+## 5. Keep things together, so errors can't be silent
 
 The most important rule. When one piece of logic is spread over several places, a change in one place can quietly
 disagree with another. Nothing crashes, and the results are just wrong. So:
@@ -80,7 +74,7 @@ disagree with another. Nothing crashes, and the results are just wrong. So:
 - **One change, one PR.** A PR does one thing and starts from the latest `jinzhu`. Once it's merged it's frozen: a
   fix is a new PR, and a merged branch is never rebased or force-pushed.
 
-## 7. Write down what you find in `docs/FINDINGS.md`
+## 6. Write down what you find in `docs/FINDINGS.md`
 
 When debugging turns up something interesting (why a target is infeasible, where an input disagrees with another,
 a result that surprised you), add an entry to `docs/FINDINGS.md`. Feel free to have an AI assistant write it up from

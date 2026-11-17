@@ -2897,7 +2897,7 @@ Run: `Custom_runs/NECMA_follow_runs/Run_G0001` (RF5, 2020–2050).
 
 ### Diagnostic method: single-species PBS workers
 
-A new debugging workflow was established (see `docs/CLAUDE_SKILL/debug_species_infeasibility.md`):
+A new debugging workflow was established (its guide, `docs/CLAUDE_SKILL/debug_species_infeasibility.md`, was removed on 2026-11-17):
 
 1. **Launcher** loads the year checkpoint, enumerates all GBF4 SNES/ECNES `(region, species, presence)` triplets, and submits one PBS worker per target.
 2. **Worker** builds the full base model (all constraints except GBF4), adds the single species constraint, and solves with barrier.

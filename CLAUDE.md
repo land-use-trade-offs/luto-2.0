@@ -73,21 +73,14 @@ The LUTO2 documentation is split into themed files for better memory efficiency.
 
 **Step-by-step skill guides for common tasks:**
 
-- [debug_species_infeasibility.md](docs/CLAUDE_SKILL/debug_species_infeasibility.md): Debug SNES/ECNES species infeasibility — build MPS from checkpoint, submit per-species maximisation jobs, identify which species targets are physically unachievable
-- [debug_iis_from_zip.md](docs/CLAUDE_SKILL/debug_iis_from_zip.md): Debug IIS from Run_Archive.zip — extract MPS + lz4, compute IIS with Gurobi, analyze via PBS jobs
-- [fakedata_inspection.md](docs/CLAUDE_SKILL/fakedata_inspection.md): Use `fakedata` as a lightweight `data.py` substitute for inspecting arrays and prototyping spatial helpers without loading full simulation inputs
 - [make_run_index_html.md](docs/CLAUDE_SKILL/make_run_index_html.md): Generate a self-contained interactive `index.html` for any task run directory — reads GEP params from `merged_grid_search_parameters_unique.csv`, full settings from `merged_grid_search_template.csv`, and model status from PBS stdout logs
-- [iis_to_story.md](docs/CLAUDE_SKILL/iis_to_story.md): Translate IIS analysis summaries, ILP files, and PBS stdout logs into plain-language story tables grouped by scenario — diagnoses numerical stagnation vs rounding artefacts vs structural infeasibility
 - [create_task_runs.md](docs/CLAUDE_SKILL/create_task_runs.md): Create and submit multi-scenario task runs — write create_tasks.py with lean BASE_GRID (intentional overrides only), RUN_OVERRIDES, generate CSVs, and submit to cluster
-- [patch_existing_renewable_capacity.md](docs/CLAUDE_SKILL/patch_existing_renewable_capacity.md): Inject real-world existing renewable capacity as `lu='Existing Capacity'` into output xarrays before `add_all` — covers write_dvar_and_mosaic_map, write_dvar_area, write_economics, and write_renewable_production
-- [submit_task_runs_windows.md](docs/CLAUDE_SKILL/submit_task_runs_windows.md): Launch LUTO2 task runs locally on Windows via `run_all.py` — concurrency control, log monitoring, result verification, and failure recovery
-- [retry_task_runs.md](docs/CLAUDE_SKILL/retry_task_runs.md): Retry runs with non-optimal solver status (false-INFEASIBLE, NUMERIC) — unzip archives, patch RETRY_PARAMS, resubmit via run_all.py; covers when checkpoint-based retry fixes the infeasible year vs when a full re-run is needed
 - [editable_pptx_slides.md](docs/CLAUDE_SKILL/editable_pptx_slides.md): Build a slide deck once as 1280×720 HTML artboards and get an editable pptx that matches it 1:1 (headless Edge measures every box, python-pptx places native shapes) — project-local pinned plotting env (never the luto env, never edit `environment.yml`), standalone variant slides outside the deck, and proving a rebuild reproduces the old slide
 
 ## Diagnostic Tools
 
 - **Bound propagation** (`luto/solvers/row_bounds.py`, every solve step, before the model is built): every row's activity interval against its rhs, over the column box and under the bounds the rows themselves imply (caps bound their columns, all-ones rows bound them together — among them the sum of each cell's node-balance rows, Σ X = Σ base, which `row_bounds` forms itself: the model carries no cell-usage row). `out_<year>/bound_report_<year>.csv` names each IMPOSSIBLE row with its shortfall in raw units (ha, ML, tCO2e, t, MWh; `best_raw` from the implied interval), each REDUNDANT row and the TIGHT rows of the unit-carrying families; `bound_preflight_<year>.csv` counts columns no row touches and NaN / inverted bounds. Engine-independent — arithmetic on the row and column tables — so the report can be shared without a solver. It proves single-row facts only: rows competing for the same cells stay invisible to it.
-- The former `luto/tests/find_infeasible_ecnes.py` (per-community LHS maximisation on a saved MPS) is no longer in the tree; the per-species maximisation workflow is in `docs/CLAUDE_SKILL/debug_species_infeasibility.md`.
+- The former `luto/tests/find_infeasible_ecnes.py` (per-community LHS maximisation on a saved MPS) is no longer in the tree.
 
 ## Quick Reference
 
@@ -409,7 +402,7 @@ Renewable energy types (Utility Solar PV, Onshore Wind) are implemented as agric
 - **Per-row rescaling**: each (type, state) target row carries its own factor (`renewable_scales`); the yield arrays themselves are raw
 - **ACT excluded**: Australian Capital Territory skipped in state-level constraints
 - **`write_renewable_economics` deleted**: Superseded by xarray injection in `write_economics` (cost/revenue/profit) and `write_renewable_production` (MWh). Old function had a broken parallel task-list call and patched DataFrames post-hoc, causing `KeyError` in `xr.stack(...).sel(layer=valid_layers)`.
-- **Existing capacity injection pattern**: Patch the result xarray of `dvar × mat` (after multiplication) with `lu='Existing Capacity'` **before** `add_all` — never patch the dvar arrays or the DataFrame. `lm='dry'` carries real values; `lm='irr'` is zeros to avoid double-counting. See skill: [patch_existing_renewable_capacity.md](docs/CLAUDE_SKILL/patch_existing_renewable_capacity.md).
+- **Existing capacity injection pattern**: Patch the result xarray of `dvar × mat` (after multiplication) with `lu='Existing Capacity'` **before** `add_all` — never patch the dvar arrays or the DataFrame. `lm='dry'` carries real values; `lm='irr'` is zeros to avoid double-counting.
 - **`return_cells=True`**: `get_utility_solar_pv_existing_cost_by_region` and `get_onshore_wind_existing_cost_by_region` in `cost.py` accept `return_cells=True` to return per-cell `{'opex_r': DataArray[cell], 'capex_r': DataArray[cell]}` before any regional groupby — used by `write_economics` for xarray injection.
 
 ## Vue.js Reporting System Architecture

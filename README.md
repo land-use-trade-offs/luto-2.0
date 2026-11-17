@@ -168,7 +168,7 @@ result = my_expensive_function(my_data)
 
 **Non-optimal Solves (INFEASIBLE / NUMERIC):**
 - A year is only accepted when Gurobi returns `GRB.OPTIMAL`; the attempts in `settings.RETRY_PARAMS` are tried in order first
-- Barrier can report false infeasibility on numerically hard scenarios. The dual-simplex fallback in `RETRY_PARAMS` usually resolves it; if not, re-run that year from its checkpoint with different parameters (`docs/CLAUDE_SKILL/retry_task_runs.md`)
+- Barrier can report false infeasibility on numerically hard scenarios. The dual-simplex fallback in `RETRY_PARAMS` usually resolves it; if not, re-run that year from its checkpoint with different parameters
 - A genuinely infeasible year is usually a handful of targets that cannot be met on the available land. Start with the bound report every year writes before its model is built — see [Diagnosing Infeasible Years](#diagnosing-infeasible-years)
 
 ### Diagnosing Infeasible Years
@@ -191,7 +191,6 @@ The check needs no solver — it is arithmetic on the constraint matrix and the 
 
 **What it cannot see.** It proves facts about one row at a time. Targets that are each achievable on their own but compete for the same cells (several species sharing habitat, a water limit against a planting target) are not detected, so "nothing proven" does not mean feasible. When the solver still reports INFEASIBLE:
 - Load `debug_model_<base_year>_<target_year>.mps`, saved in the run directory before every solve, compute an IIS, and decode the `.ilp` with `luto/tools/inspect_iis.py`
-- Follow `docs/CLAUDE_SKILL/debug_species_infeasibility.md` (per-species maximisation) or `docs/CLAUDE_SKILL/debug_iis_from_zip.md` (IIS from a run archive)
 
 The settings (`BOUND_PROP_REL_TOL`, `BOUND_PROP_DROP_FAMILIES`, `BOUND_PROP_ON_IMPOSSIBLE`) are under [Solver Configuration](#solver-configuration).
 
@@ -330,7 +329,7 @@ python luto/tools/create_task_runs/create_grid_search_tasks.py
 python luto/tools/create_task_runs/bash_scripts/run_all.py
 ```
 
-Each run directory carries its own `luto/settings.py`, so scenarios are fully reproducible. `run_all.py` handles both fresh runs and checkpoint resumes; see `docs/CLAUDE_SKILL/create_task_runs.md`, `submit_task_runs_windows.md`, and `retry_task_runs.md`.
+Each run directory carries its own `luto/settings.py`, so scenarios are fully reproducible. `run_all.py` handles both fresh runs and checkpoint resumes; see `docs/CLAUDE_SKILL/create_task_runs.md`.
 
 ### Viewing Results
 Results are saved in a run directory named `output/<timestamp>_RF<resfactor>_<first_year>-<last_year>/`:

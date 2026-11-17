@@ -220,7 +220,7 @@ python run_all.py --max 4   # 4 concurrent
 python run_all.py Run_G0001 Run_G0003   # specific runs only
 ```
 
-`run_all.py` globs `Run_G*`, launches `python_script.py` in each up to `--max` concurrently, and writes stdout/stderr to `Run_G*/run.log`. See [submit_task_runs_windows.md](submit_task_runs_windows.md) for monitoring and failure recovery.
+`run_all.py` globs `Run_G*`, launches `python_script.py` in each up to `--max` concurrently, and writes stdout/stderr to `Run_G*/run.log`.
 
 ---
 
