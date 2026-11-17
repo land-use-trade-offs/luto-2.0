@@ -34,6 +34,56 @@ from luto.settings import INPUT_DIR, RAW_DATA
 
 
 
+# The cells of sheet 'Current' of the transition cost workbook that the from-to table is summed from, and the part
+# of the cost each one is. The table's own cells are formulas over these (e.g. "=$F$22+$F$23+$F$31+$F$38").
+TRANSITION_COST_PARTS = {
+    'F21': 'Clearing lightly wooded land',
+    'F22': 'Clearing heavily wooded land',
+    'F23': 'Clearing: barrier effect',
+    'F25': 'Establishing the land use',            # vineyard / orchard
+    'F27': 'Income lost while establishing',       # the first years of a vineyard / orchard
+    'F29': 'Establishing the land use',            # intensive cropping
+    'F31': 'Establishing the land use',            # cropping
+    'F33': 'Establishing the land use',            # dairy
+    'F36': 'Establishing the land use',            # beef and sheep
+    'F38': 'Removing crops or livestock',
+}
+
+
+def get_transition_cost_parts(workbook_path: str, cat2lus_path: str) -> pd.DataFrame:
+    """The agricultural transition cost table (ag_tmatrix.npy) part by part: [from_lu, to_lu, part, cost (AUD/ha)].
+
+    The workbook gives the cost of moving between two land-use CATEGORIES as a formula over a few cost items
+    (TRANSITION_COST_PARTS); this reads the formulas, so every from-to cost is split into the items it sums, and
+    lays the categories out over their land uses as ag_tmatrix does (a land use to itself costs nothing, so has no
+    part). The parts of a pair add up to its entry of ag_tmatrix; a pair the table leaves blank has none."""
+    import re
+    import openpyxl
+
+    sheet = openpyxl.load_workbook(workbook_path)['Current']                       # formulas, not their values
+    item_cost = {ref: float(sheet[ref].value) for ref in TRANSITION_COST_PARTS}
+    to_categories = [cell.value for cell in sheet[6][2:13]]                        # C6:M6
+    parts_of = {}                                                                  # (from category, to category) -> {part: cost}
+    for row in sheet.iter_rows(min_row=7, max_row=17, min_col=2, max_col=13):
+        from_category = row[0].value
+        for to_category, cell in zip(to_categories, row[1:]):
+            if not isinstance(cell.value, str):                                    # blank (not allowed) or a plain 0
+                continue
+            parts = {}
+            for ref in re.findall(r'\$?([A-Z]+)\$?(\d+)', cell.value):
+                ref = ''.join(ref)
+                parts[TRANSITION_COST_PARTS[ref]] = parts.get(TRANSITION_COST_PARTS[ref], 0.0) + item_cost[ref]
+            parts_of[(from_category, to_category)] = parts
+
+    category_of = {lu: category for category, lu in pd.read_csv(cat2lus_path).to_numpy()}
+    rows = [
+        (from_lu, to_lu, part, cost)
+        for from_lu in category_of for to_lu in category_of if from_lu != to_lu
+        for part, cost in parts_of.get((category_of[from_lu], category_of[to_lu]), {}).items()
+    ]
+    return pd.DataFrame(rows, columns=['from_lu', 'to_lu', 'part', 'cost'])
+
+
 def create_new_dataset(refresh=False):
     """Creates a new LUTO input dataset from source data"""
 
@@ -342,9 +392,10 @@ def create_new_dataset(refresh=False):
     # Copy biodiversity NES Zonation files
     shutil.copyfile(bio_NES_Zonation_inpath + 'bio_NES_Zonation.nc', outpath + 'bio_NES_Zonation.nc')
 
-    # Copy biodiversity RHI Zonation file (DCCEEW's native 0-100 ranks, no rescaling). data.py thresholds
-    # it against the 'RHI' sheet of Biodiversity_conserve_performance.xlsx, which script 5_4 builds from
-    # these same values over in-LUTO cells and writes alongside this layer, so the two share a scale.
+    # Copy biodiversity RHI Zonation file: DCCEEW's ranks on 0-1, the scale of the other quality layers (script 5_3
+    # divides the native 0-100 by 100). data.py thresholds it against the 'RHI' sheet of
+    # Biodiversity_conserve_performance.xlsx, which script 5_4 builds from these same values over in-LUTO cells
+    # and writes alongside this layer, so the two share a scale.
     shutil.copyfile(f'{bio_RHI_Zonation_inpath}/bio_RHI_Zonation.nc', outpath + 'bio_RHI_Zonation.nc')
 
     # Copy renewable energy data files
@@ -376,6 +427,10 @@ def create_new_dataset(refresh=False):
                           , skiprows = 5
                           , nrows = 11
                           , index_col = 0)
+
+    # The same table part by part (what each from-to cost is the sum of), for the report's transition cost matrix
+    get_transition_cost_parts(raw_data + 'transitions_costs_20251002.xlsx', raw_data + 'tmatrix_cat2lus.csv')\
+        .to_csv(outpath + 'transition_cost_parts.csv', index=False)
 
     # Read transition costs from agricultural land to environmental plantings
     ag_to_new_land_uses = pd.read_excel( raw_data + 'transitions_costs_20251002.xlsx'

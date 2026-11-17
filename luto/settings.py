@@ -27,16 +27,16 @@
 # LUTO model version.                                                          #
 # ---------------------------------------------------------------------------- #
 
-VERSION = '2.4'
+VERSION = '2.4'  # The version of the LUTO model that made this run.
 
 
 # ---------------------------------------------------------------------------- #
 # Directories.                                                                 #
 # ---------------------------------------------------------------------------- #
 
-INPUT_DIR = 'input'
-OUTPUT_DIR = 'output'
-RAW_DATA = '../raw_data'
+INPUT_DIR = 'input'  # Folder of the model-ready input data, relative to the repository (written by dataprep.py, read by data.py).
+OUTPUT_DIR = 'output'  # Folder the runs are written to, one timestamped sub-folder per run.
+RAW_DATA = '../raw_data'  # Folder of the raw source data that dataprep.py turns into INPUT_DIR; not read during a run.
 
 
 # ---------------------------------------------------------------------------- #
@@ -45,7 +45,14 @@ RAW_DATA = '../raw_data'
 
 # Climate change assumptions. Options include '126', '245', '370', '585'
 SSP = '245'
-RCP = 'rcp' + SSP[1] + 'p' + SSP[2] # Representative Concentration Pathway string identifier e.g., 'rcp4p5'.
+# The Representative Concentration Pathway of the climate change impact on yield, e.g. 'rcp4p5': it picks the yield
+# impact file (FAO GAEZ v4) and nothing else. The water yield and GBF8 inputs are read by SSP
+# (water_yield_ssp370_..., bio_GBF8_ssp370_...). GAEZ v4 has RCP 2.6, 4.5, 6.0 and 8.5 and no RCP 7.0, so SSP '370'
+# reads the RCP 6.0 yield impacts, the nearest pathway GAEZ offers (somewhat cooler than 7.0: its yield impacts are a
+# little understated). (Named RCP until 2026-11-17.)
+YIELD_RCP = 'rcp' + SSP[1] + 'p' + SSP[2]
+if YIELD_RCP == 'rcp7p0':
+    YIELD_RCP = 'rcp6p0'
 
 # Set demand parameters which define requirements for Australian production of agricultural commodities
 SCENARIO        = 'SSP' + SSP[0]     # SSP1, SSP2, SSP3, SSP4, SSP5
@@ -556,37 +563,37 @@ This is expected behaviour and the user must choose how to deal with it.
 FENCING_COST_PER_M = 2
 
 # Environmental Plantings Parameters
-EP_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
-EP_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR = 0
+EP_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR = 100  # AUD per ha and year to maintain environmental plantings: their yearly cost in the objective.
+EP_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR = 0  # AUD per ha and year of ecosystem services credited to environmental plantings, subtracted from their yearly cost. 0 = none counted.
 
 # Carbon Plantings Block Parameters
-CP_BLOCK_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
-CP_BLOCK_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR = 0
+CP_BLOCK_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR = 100  # AUD per ha and year to maintain carbon plantings (block): their yearly cost in the objective.
+CP_BLOCK_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR = 0  # AUD per ha and year of ecosystem services credited to carbon plantings (block), subtracted from their yearly cost. 0 = none counted.
 
 # Carbon Plantings Belt Parameters
-CP_BELT_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
-CP_BELT_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR = 0
+CP_BELT_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR = 100  # AUD per ha and year to maintain the tree belts of farm forestry (carbon plantings, belt), on the tree share of the hectare.
+CP_BELT_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR = 0  # AUD per ha and year of ecosystem services credited to the tree belts of farm forestry, subtracted from their yearly cost. 0 = none counted.
 
-CP_BELT_ROW_WIDTH = 20
-CP_BELT_ROW_SPACING = 40
-CP_BELT_PROPORTION = CP_BELT_ROW_WIDTH / (CP_BELT_ROW_WIDTH + CP_BELT_ROW_SPACING)
+CP_BELT_ROW_WIDTH = 20  # Width in metres of a tree belt of farm forestry (carbon plantings, belt).
+CP_BELT_ROW_SPACING = 40  # Width in metres of the alley of pasture between two tree belts of farm forestry.
+CP_BELT_PROPORTION = CP_BELT_ROW_WIDTH / (CP_BELT_ROW_WIDTH + CP_BELT_ROW_SPACING)  # Share of a farm forestry hectare under trees: belt width / (belt width + alley). The rest stays sheep or beef; cost, revenue, carbon, water and biodiversity are mixed by this share.
 cp_no_alleys_per_ha = 100 / (CP_BELT_ROW_WIDTH + CP_BELT_ROW_SPACING)
 CP_BELT_FENCING_LENGTH = 100 * cp_no_alleys_per_ha * 2     # Length (average) of fencing required per ha in metres
 
 # Riparian Planting Parameters
-RP_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
-RP_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR = 0
+RP_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR = 100  # AUD per ha and year to maintain riparian plantings: their yearly cost in the objective.
+RP_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR = 0  # AUD per ha and year of ecosystem services credited to riparian plantings, subtracted from their yearly cost. 0 = none counted.
 
-RIPARIAN_PLANTING_BUFFER_WIDTH = 30
-RIPARIAN_PLANTING_TORTUOSITY_FACTOR = 0.5
+RIPARIAN_PLANTING_BUFFER_WIDTH = 30  # Width in metres of the strip planted on each side of a stream. With the stream length of a cell it gives the share of the cell riparian plantings may take.
+RIPARIAN_PLANTING_TORTUOSITY_FACTOR = 0.5  # Scales the stream length of a cell into the length of fence riparian plantings need (2 sides x factor x stream length), which sets their fencing cost.
 
 # Agroforestry Parameters
-AF_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
-AF_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR = 0
+AF_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR = 100  # AUD per ha and year to maintain the tree belts of agroforestry, on the tree share of the hectare.
+AF_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR = 0  # AUD per ha and year of ecosystem services credited to the tree belts of agroforestry, subtracted from their yearly cost. 0 = none counted.
 
-AGROFORESTRY_ROW_WIDTH = 20
-AGROFORESTRY_ROW_SPACING = 40
-AF_PROPORTION = AGROFORESTRY_ROW_WIDTH / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_ROW_SPACING)
+AGROFORESTRY_ROW_WIDTH = 20  # Width in metres of a tree belt of agroforestry (environmental plantings, belt).
+AGROFORESTRY_ROW_SPACING = 40  # Width in metres of the alley of pasture between two tree belts of agroforestry.
+AF_PROPORTION = AGROFORESTRY_ROW_WIDTH / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_ROW_SPACING)  # Share of an agroforestry hectare under trees: belt width / (belt width + alley). The rest stays sheep or beef; cost, revenue, carbon, water and biodiversity are mixed by this share.
 no_belts_per_ha = 100 / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_ROW_SPACING)
 AF_FENCING_LENGTH_HA = 100 * no_belts_per_ha * 2 # Length of fencing required per ha in metres
 
@@ -687,10 +694,12 @@ the land can be used for Utility Solar PV.
 # Land use type groupings (used by AgTech bundles)
 # ---------------------------------------------------------------------------- #
 
-LUS_CROPPING     = ['Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds']
-LUS_INT_CROPPING = ['Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables']
-LUS_HORTICULTURE = ['Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 'Plantation fruit', 'Stone fruit', 'Tropical stone fruit']
+LUS_CROPPING     = ['Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds']  # The land uses of the 'cropping' type (broadacre crops and hay).
+LUS_INT_CROPPING = ['Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables']  # The land uses of the 'int_cropping' type (intensive crops).
+LUS_HORTICULTURE = ['Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 'Plantation fruit', 'Stone fruit', 'Tropical stone fruit']  # The land uses of the 'horticulture' type (orchards, vines and nuts).
 
+# {land use: type}, built from the three lists above. An AgTech bundle (precision agriculture, AgTech EI, biochar)
+# reads its effect on a land use from the table of that type.
 LU2TYPE = (
     {lu: "cropping"     for lu in LUS_CROPPING}
   | {lu: "int_cropping" for lu in LUS_INT_CROPPING}
@@ -702,6 +711,8 @@ LU2TYPE = (
 # Agricultural Management parameters
 # ---------------------------------------------------------------------------- #
 
+# {agricultural management: the land uses it may be applied to}. It decides which (management, land use) pairs get a
+# variable in the model; the order of the keys fixes the index of each management.
 AG_MANAGEMENTS_TO_LAND_USES = {
     'Asparagopsis taxiformis':  ['Beef - modified land', 'Sheep - modified land', 'Dairy - natural land', 'Dairy - modified land'],
     'Precision Agriculture':    LUS_CROPPING + LUS_INT_CROPPING + LUS_HORTICULTURE,
@@ -765,7 +776,7 @@ the rest of the simulation. This may be an unintended side effect.
 
 # The cost for removing and establishing irrigation infrastructure ($ per hectare)
 REMOVE_IRRIG_COST = 5000
-NEW_IRRIG_COST = 10000
+NEW_IRRIG_COST = 10000  # AUD per ha to set up irrigation when dryland becomes irrigated: part of the transition cost.
 
 # Savanna burning cost per hectare per year ($/ha/yr)
 SAVBURN_COST_HA_YR = 10
@@ -786,8 +797,8 @@ HIR_CEILING_PERCENTAGE = 0.8
 HIR_BASELINE = None
 
 # Maintainace cost for HIR
-BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
-SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
+BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100  # AUD per ha and year to maintain human-induced regeneration on beef land.
+SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100  # AUD per ha and year to maintain human-induced regeneration on sheep land.
 
 
 
@@ -799,7 +810,7 @@ SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
 # Off-land commodity parameters
 # ---------------------------------------------------------------------------- #
 
-OFF_LAND_COMMODITIES = ['pork', 'chicken', 'eggs', 'aquaculture']
+OFF_LAND_COMMODITIES = ['pork', 'chicken', 'eggs', 'aquaculture']  # Commodities produced off the land of the model (sheds and ponds): they get no land use and no demand row; their emissions are added to the agriculture GHG row.
 EGGS_AVG_WEIGHT = 60  # Average weight of an egg in grams
 
 
@@ -826,7 +837,7 @@ Sheep grazing cereal stubble, a co-product of the cereal land uses (STUBBLE_LAND
   rows and whose emissions sit on the agriculture row. Per-head economics and emission factors are the cell's sheep
   values (provisional).
 '''
-STUBBLE_LAND_USES = ['Winter cereals', 'Summer cereals']
+STUBBLE_LAND_USES = ['Winter cereals', 'Summer cereals']  # The cereal land uses whose stubble sheep may graze when STUBBLE_DSE_FILE is set; unused when it is None.
 
 
 # ---------------------------------------------------------------------------- #
@@ -918,8 +929,8 @@ Note: BECCS should also be disabled when using AusTIMES pathway targets to maint
 inter-model consistency (energy-related CO2 displacement is handled by AusTIMES).
 '''
 
-CROP_GHG_SCOPE_1 = ['CO2E_KG_HA_SOIL']
-LVSTK_GHG_SCOPE_1 = ['CO2E_KG_HEAD_DUNG_URINE', 'CO2E_KG_HEAD_ENTERIC', 'CO2E_KG_HEAD_IND_LEACH_RUNOFF', 'CO2E_KG_HEAD_MANURE_MGT']
+CROP_GHG_SCOPE_1 = ['CO2E_KG_HA_SOIL']  # The emission sources of crops kept when USE_GHG_SCOPE_1 is True (columns of the crop emissions table): soil N2O only.
+LVSTK_GHG_SCOPE_1 = ['CO2E_KG_HEAD_DUNG_URINE', 'CO2E_KG_HEAD_ENTERIC', 'CO2E_KG_HEAD_IND_LEACH_RUNOFF', 'CO2E_KG_HEAD_MANURE_MGT']  # The emission sources of livestock kept when USE_GHG_SCOPE_1 is True (columns of the livestock emissions table): dung and urine, enteric methane, indirect leaching and runoff, manure management.
 
 
 
@@ -1063,11 +1074,10 @@ Essentially, the biodiversity quality layer determines how important (0-100) a c
       community and species equally important.
     - If choosing 'RHI', you assume the overal biodiversity is determined by EPBC-listed threatened and migratory species,
       as ranked by DCCEEW themselves. Unlike the layers above this one is not produced in-house: DCCEEW ran Zonation 5
-      (CAZMAX) over the SNES 'likely to occur' distributions and published the finished 0-100 raster, which LUTO uses as
-      is. Note it carries those native 0-100 units while the layers above run 0-1, so RHI's absolute bio-quality scores
-      read ~100x theirs in the outputs. Nothing in the model is affected: the GBF2 mask comes from the 'RHI' sheet of
-      Biodiversity_conserve_performance.xlsx, which is on the same 0-100 scale, and the solver rescales the bio-quality
-      matrices by their own maximum before use.
+      (CAZMAX) over the SNES 'likely to occur' distributions and published the finished raster on a 0-100 scale. The
+      input file holds it on 0-1, like the layers above (Data-Master script 5_3 divides by 100, since 20261117), and
+      the 'RHI' sheet of Biodiversity_conserve_performance.xlsx is built from that file, so RHI's scores compare
+      with theirs. Before that date the file was 0-100 and RHI scores read 100x larger; the GBF2 mask is the same.
 
 To understand the 'Suitability' layer, refer to
     https://academic.oup.com/gigascience/article/doi/10.1093/gigascience/giae002/7619364
@@ -1123,11 +1133,11 @@ BIO_CONTRIBUTION_LDS = 0.75
 
 # Non-agricultural biodiversity parameters 
 BIO_CONTRIBUTION_ENV_PLANTING = 0.8         # 0.8->0.6 20260831; we think environmental planting should be higher than 0.7.
-BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK = 0.12
-BIO_CONTRIBUTION_CARBON_PLANTING_BELT = 0.12
-BIO_CONTRIBUTION_RIPARIAN_PLANTING = 1.0
+BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK = 0.12  # Habitat contribution of carbon plantings (block), 0-1: the share of the cell's biodiversity value a monoculture planting provides.
+BIO_CONTRIBUTION_CARBON_PLANTING_BELT = 0.12  # Habitat contribution of the tree belts of farm forestry (carbon plantings, belt), 0-1.
+BIO_CONTRIBUTION_RIPARIAN_PLANTING = 1.0  # Habitat contribution of riparian plantings, 0-1: 1 = the full biodiversity value of the cell.
 BIO_CONTRIBUTION_AGROFORESTRY = 0.6         # 0.7->0.6 20260831; we think agroforestry should not be as high as EP.
-BIO_CONTRIBUTION_BECCS = 0
+BIO_CONTRIBUTION_BECCS = 0  # Habitat contribution of BECCS, 0-1: 0 = bioenergy crops provide no biodiversity value.
 BIO_CONTRIBUTION_DESTOCKING = 1.0           # Habitat contribution of destocked natural land (0-1); destocking's removal cost scales with this minus the grazing land's HCAS score
 '''
 The benefit of each non-agricultural land use to biodiversity is set as a proportion to the raw biodiversity priority value.
@@ -1156,6 +1166,8 @@ Level presets apply to ALL vegetation groups at the configured region mode (no C
 '''
 
 
+# Uniform target presets (percent of the pre-1750 extent of each vegetation group to reach by 2030, 2050 and 2100),
+# keyed by GBF3_NVIS_TARGET. Only read when that setting is 'medium' or 'high'.
 GBF3_TARGETS_DICT = {
     'off':     None,
     'medium':  {2030: 30, 2050: 30},
