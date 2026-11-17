@@ -44,6 +44,11 @@ from dataclasses import dataclass
 
 
 
+# The NIR sector 3 codes whose crop leaves the crop inventory fields (settings.CROP_GHG_INVENTORY_FIELD_NAMES) model:
+# rice cultivation, crop residues (direct; leaves under the pasture node excluded), crop residue leaching and field burning.
+CROP_GHG_INVENTORY_NIR_CODES = ('3.C', '3.D.a.4', '3.D.b.2.v', '3.F')
+
+
 @dataclass
 class Data:
     """
@@ -926,6 +931,13 @@ class Data:
         #   pasture emissions one variable per column over cell
         with xr.open_dataset(Path(settings.INPUT_DIR) / "agGHG_crops.nc") as table:
             self.AGGHG_CROPS = self.get_resfactored_average(table['AGGHG_CROPS'], "agGHG_crops.nc").set_xindex(['field', 'lm', 'lu'])
+        if settings.CROP_GHG_INVENTORY_FIELDS:
+            columns = set(zip(self.AGGHG_CROPS['field'].values, self.AGGHG_CROPS['lm'].values, self.AGGHG_CROPS['lu'].values))
+            missing = sorted((f, lm, lu) for f in settings.CROP_GHG_INVENTORY_FIELD_NAMES
+                             for lm, lu in {c[1:] for c in columns} if (f, lm, lu) not in columns)
+            if missing:
+                raise ValueError(f"CROP_GHG_INVENTORY_FIELDS is True but agGHG_crops.nc lacks {len(missing)} columns of "
+                                 f"CROP_GHG_INVENTORY_FIELD_NAMES (the 2020-21 table has them), e.g. {missing[:3]}.")
         with xr.open_dataset(Path(settings.INPUT_DIR) / "agGHG_lvstk.nc") as table:
             self.AGGHG_LVSTK = self.get_resfactored_average(table['AGGHG_LVSTK'], "agGHG_lvstk.nc").set_xindex(['animal', 'field'])
         
@@ -2974,6 +2986,51 @@ class Data:
         return {'ha': ha, 'ha_mj': ha_mj, 'dropped_ha': dropped, 'baseline_fy': baseline_fy, 'first_fy': min(ha),
                 'scale_factor': float(scaling['scale_factor'])}
 
+    @staticmethod
+    def get_ag_exo_crop_fields(target_dir: str) -> pd.Series:
+        """The part of the exogenous agriculture series (t CO2e, by LUTO year) from the NIR leaves the crop inventory fields
+        (settings.CROP_GHG_INVENTORY_FIELD_NAMES) model: the leaves of CROP_GHG_INVENTORY_NIR_CODES (a code or its
+        sub-codes) not under a pasture node, flagged not modelled in scope_matrix.csv. History years: the sum of those
+        leaves in series_components_long.csv. Projection years, as luto/tools/ghg_targets.py builds the exogenous series:
+        each DCCEEW commodity's projection component times the share of the commodity's NIR leaves those leaves make up in
+        the last history year. Stops if either file, a code's leaves, a leaf's history or a commodity's projection is
+        missing."""
+        paths = {f: os.path.join(target_dir, f) for f in ('scope_matrix.csv', 'series_components_long.csv')}
+        absent = [f for f, p in paths.items() if not os.path.exists(p)]
+        if absent:
+            raise ValueError(f"CROP_GHG_INVENTORY_FIELDS is True but the GHG target folder lacks {absent}.")
+        scope = pd.read_csv(paths['scope_matrix.csv'], dtype={'node_id': str, 'category_code': str})
+        comp = pd.read_csv(paths['series_components_long.csv'])
+        ag = scope[scope['assignment'] == 'AG'].copy()
+        ag['component_id'] = 'NIR:' + ag['node_id']
+        code = ag['category_code'].fillna('')
+        under_pasture = ag['nir_path'].map(lambda p: any(n.split(' ', 1)[-1].strip() in ('Pasture', 'Pastures') for n in p.split(' > ')))
+        crop = pd.Series(False, index=ag.index)
+        for c in CROP_GHG_INVENTORY_NIR_CODES:
+            of_c = (code == c) | code.str.startswith(c + '.')
+            if not (of_c & ~under_pasture).any():
+                raise ValueError(f"CROP_GHG_INVENTORY_FIELDS is True but scope_matrix.csv has no crop leaf of NIR {c}.")
+            crop |= of_c
+        moved = ag[crop & ~under_pasture & (ag['modelled_by_luto'] != 'yes')]
+
+        comp_ag = comp[comp['series'] == 'AG']
+        hist = comp_ag[comp_ag['component_id'].str.startswith('NIR:')].pivot_table(
+            index='year_end', columns='component_id', values='value_kt_co2e_ar5', aggfunc='sum')
+        proj = comp_ag[comp_ag['component_id'].str.startswith('DCCEEW:Figure25:')].pivot_table(
+            index='year_end', columns='component_id', values='value_kt_co2e_ar5', aggfunc='sum')
+        lack = sorted(set(ag['component_id']) - set(hist.columns))
+        if lack or hist[ag['component_id']].isna().any().any():
+            raise ValueError(f"CROP_GHG_INVENTORY_FIELDS is True but series_components_long.csv lacks history of NIR leaves {lack[:5]}.")
+        anchor = int(hist.index.max())
+        out_proj = pd.Series(0.0, index=proj.index)
+        for commodity, leaves in moved.groupby('dcceew_row')['component_id']:
+            column = f'DCCEEW:Figure25:{commodity}'
+            if column not in proj.columns or proj[column].isna().any():
+                raise ValueError(f"CROP_GHG_INVENTORY_FIELDS is True but series_components_long.csv lacks the projection of {column}.")
+            total = hist.loc[anchor, ag.loc[ag['dcceew_row'] == commodity, 'component_id']].sum()
+            out_proj += (hist.loc[anchor, leaves].sum() / total if total else 0.0) * proj[column]
+        return pd.concat([hist[moved['component_id']].sum(axis=1), out_proj]).sort_index() * 1000       # kt -> t
+
     def load_ghg_targets(self, target_dir: str) -> pd.DataFrame:
         """The two GHG constraints' series, one row per LUTO year (luto_year = financial year ending that year), in t CO2e.
 
@@ -2983,7 +3040,9 @@ class Data:
           - LULUCF_MOD_t, LULUCF_EXO_t: modelled and exogenous LULUCF; net LULUCF is their sum. MOD is 0: direct
             clearing is exogenous, and LUTO's clearing (term 4) and plantings count as additional to EXO.
           - AG_EXO_t: exogenous agriculture on the AG row (the sector 3 categories LUTO does not model), from
-            series_agriculture_exogenous.csv; 0 if that file is absent (target folders built before it existed).
+            series_agriculture_exogenous.csv; 0 if that file is absent (target folders built before it existed). With
+            settings.CROP_GHG_INVENTORY_FIELDS on, less AG_EXO_CROP_FIELDS_t (get_ag_exo_crop_fields), the NIR leaves the
+            crop inventory fields model on term 1; that column exists only then.
           - PLANTINGS_BASELINE_t: the baseline new-plantings removals in the year (negative), from the LEAN row of
             plantings_baseline.csv: rate x (year - anchor year), 0 up to the anchor year. LUTO's plantings count on
             the LULUCF row only above it.
@@ -3018,6 +3077,18 @@ class Data:
         targets['AG_EXO_t'] = series('series_agriculture_exogenous.csv')['value_t_co2e'].reindex(targets.index) if Path(ag_exo_file).exists() else 0.0
         if targets['AG_EXO_t'].isna().any():
             raise ValueError("series_agriculture_exogenous.csv does not cover every year of the target series.")
+        if settings.CROP_GHG_INVENTORY_FIELDS:
+            # The crop inventory fields model these NIR leaves on term 1: they leave the exogenous part (no double count).
+            if not os.path.exists(ag_exo_file):
+                raise ValueError("CROP_GHG_INVENTORY_FIELDS is True but the GHG target folder has no series_agriculture_exogenous.csv.")
+            moved = self.get_ag_exo_crop_fields(target_dir).reindex(targets.index)
+            if moved.isna().any():
+                raise ValueError(f"CROP_GHG_INVENTORY_FIELDS is True but the crop-field NIR leaves have no value for years "
+                                 f"{moved.index[moved.isna()].tolist()} of the target series.")
+            if (moved > targets['AG_EXO_t'] + 1).any():
+                raise ValueError("CROP_GHG_INVENTORY_FIELDS: the crop-field NIR leaves exceed the exogenous agriculture series.")
+            targets['AG_EXO_CROP_FIELDS_t'] = moved
+            targets['AG_EXO_t'] = targets['AG_EXO_t'] - moved
 
         baseline = pd.read_csv(Path(target_dir) / 'plantings_baseline.csv')
         lean = baseline[baseline['definition'].str.startswith('annual change') & baseline['status'].str.contains('(LEAN)', regex=False)]
