@@ -7,7 +7,7 @@ const app = createApp({
         const isCollapsed = ref(false);
         const globalSelectedRegion = ref('AUSTRALIA');
         const globalMapViewpoint = ref({
-            center: [-26, 126.5],
+            center: window.AUSTRALIA_VIEW.center,          // helpers.js: the centre every map shares
             zoom: 5,
             lastSelectedRegion: 'AUSTRALIA'
         });
@@ -31,7 +31,7 @@ const app = createApp({
     <div class="flex">
         <!-- Sidebar -->
         <div  class="bg-white pl-2 shrink-0 sticky top-0 h-screen self-start overflow-y-auto transition-all duration-300 ease-in-out"
-            :class="{'w-[50px]': isCollapsed, 'w-[200px]': !isCollapsed}">
+            :class="{'w-[50px]': isCollapsed, 'w-[240px]': !isCollapsed}">
           <side-bar @update:isCollapsed="updateSidebarCollapsed"></side-bar>
         </div>
         <!-- Main content -->
@@ -47,7 +47,8 @@ app.component("chart-container", window.Highchart);
 app.component("heatmap-container", window.HeatmapContainer);
 app.component("side-bar", window.Sidebar);
 app.component('map-geojson', window.map_geojson);
-app.component('ranking-cards', window.RankingCards);
+app.component('headline-cards', window.HeadlineCards);
+app.component('chart-cards', window.ChartCards);
 app.component('filterable-dropdown', window.FilterableDropdown);
 app.component('regions-map', window.RegionsMap);
 

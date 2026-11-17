@@ -133,7 +133,8 @@ window.OverlayShp = {
       for (const o of resolved.value) {
         if (drawn.has(o.id) || !isVisible(o.id)) continue;
         const opts = { style: o.style };
-        if (o.canvas) opts.renderer = L.canvas({ padding: 0.5 });
+        // `canvas: true` gives the overlay a canvas of its own (the map's shapes share one, regions_map.js)
+        if (o.canvas) opts.renderer = L.canvas({ padding: 1 });
         if (o.popup) opts.onEachFeature = (feature, layer) => layer.bindPopup(o.popup(feature));
         drawn.set(o.id, { layer: L.geoJSON(o.data, opts).addTo(map), data: o.data });
       }

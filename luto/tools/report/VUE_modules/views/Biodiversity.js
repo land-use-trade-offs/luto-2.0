@@ -147,7 +147,7 @@ window.BiodiversityView = {
     // never get one at all. Say so rather than showing a blank map that reads as a bug.
     // `currentLayerData` is nulled while ensureComboLayer fetches, without flipping
     // isLoadingData — so check it too, or this flashes on every combo switch.
-    const hasMapData = computed(() => !!selectMapData.value?.tif_b64);
+    const hasMapData = computed(() => window.MapCells.hasData(selectMapData.value));
     const showNoMapData = computed(() =>
       dataLoaded.value && !isLoadingData.value
       && currentLayerData.value !== null && layerOn.value && !hasMapData.value

@@ -95,6 +95,92 @@ with open('luto/tools/report/VUE_modules/data/geo/REZ_centroid_bbox.js', 'w', en
 
 
 
+# ── Water regions (BoM GeoFabric V3.2, HR Regions): river regions and drainage divisions ──────────────────────
+#
+# The model sets its water limits per water region (settings.WATER_REGION_DEF: 'River Region' or 'Drainage
+# Division'), so the report draws them as a region level of their own. Two steps, as for the NRM regions:
+#   1. the GeoFabric layers -> a simplified shapefile each, in assets/Water_river_region and
+#      assets/Water_drainage_region (run once; delete the folder to rebuild it from the GeoFabric);
+#   2. the asset shapefiles -> data/geo/WATER_RIVREG.js and WATER_DRAINDIV.js, with their centroid / bounding box.
+#
+# The regions are named as the MODEL names them (the NAME of input/water_region_rivreg.nc and
+# water_region_draindiv.nc), joined on the region id the zones script gave them, because the GeoFabric spells
+# two drainage divisions differently ('Tanami -Timor Sea Coast', 'South East Coast (VICTORIA)'): the report
+# looks a region's chart up by its name.
+import os
+import shapely
+import xarray as xr
+
+ASSETS = 'luto/tools/report/VUE_modules/assets'
+GEO_DIR = 'luto/tools/report/VUE_modules/data/geo'
+DATA_MASTER = 'N:/Data-Master' if os.name == 'nt' else '/mnt/n/Planet-A/Data-Master'      # read only
+GEOFABRIC = f'{DATA_MASTER}/Water/GeoFabric_V3.2/HR_Regions_GDB_V3_2/HR_Regions_GDB/HR_Regions.gdb'
+
+# asset folder, GeoFabric layer, model input file, JS variable; and how script_1_assemble_zones_data.py numbered
+# the regions: river regions by the rank of their name (1-based), drainage divisions by their row in the layer
+WATER_REGIONS = [
+    ('Water_river_region', 'RiverRegion', 'input/water_region_rivreg.nc', 'WATER_RIVREG',
+     lambda layer: layer['RivRegName'].map({name: rank + 1 for rank, name in enumerate(sorted(layer['RivRegName'].unique()))})),
+    ('Water_drainage_region', 'AWRADrainageDivision', 'input/water_region_draindiv.nc', 'WATER_DRAINDIV',
+     lambda layer: pd.Series(layer.index + 1, index=layer.index)),
+]
+SIMPLIFY_TOLERANCE_M = 5000          # Web Mercator metres; the shared borders of neighbours stay shared
+
+
+def round_coordinates(coordinates, ndigits=4):
+    if isinstance(coordinates, list):
+        return [round_coordinates(item, ndigits) for item in coordinates]
+    return round(coordinates, ndigits)
+
+MIN_PART_KM2 = 100                   # islands and slivers under this are dropped (never a region's largest part)
+
+for folder, layer_name, model_file, js_name, region_id_of in WATER_REGIONS:
+    asset_path = f'{ASSETS}/{folder}/{folder}.shp'
+
+    # 1. The simplified asset, built once from the GeoFabric
+    if not os.path.exists(asset_path):
+        layer = gpd.read_file(GEOFABRIC, layer=layer_name)
+        with xr.open_dataset(model_file) as model_regions:
+            model_names = dict(zip(model_regions['region_id'].values.tolist(), model_regions['NAME'].values.tolist()))
+        layer['REGION_ID'] = region_id_of(layer).astype(int)
+        layer = layer[layer['REGION_ID'].isin(model_names)]                 # a region with no cell in the model has no data
+        layer['NAME'] = layer['REGION_ID'].map(model_names)
+        regions = layer.dissolve(by='REGION_ID', aggfunc='first')[['NAME', 'geometry']].reset_index().to_crs('EPSG:3857')
+
+        # Drop the small parts, then simplify the regions as ONE coverage so neighbours keep a common border
+        parts = regions.explode(index_parts=False).reset_index(drop=True)
+        parts['area_km2'] = parts.geometry.area / 1e6
+        largest = parts.groupby('REGION_ID')['area_km2'].transform('max')
+        parts = parts[(parts['area_km2'] >= MIN_PART_KM2) | (parts['area_km2'] == largest)]
+        regions = parts.dissolve(by='REGION_ID', aggfunc='first')[['NAME', 'geometry']].reset_index()
+        simplified = gpd.GeoSeries(shapely.coverage_simplify(regions.geometry.values, SIMPLIFY_TOLERANCE_M), index=regions.index, crs=regions.crs)
+        regions = regions.set_geometry(simplified)
+        regions = regions[~regions.geometry.is_empty]
+
+        os.makedirs(os.path.dirname(asset_path), exist_ok=True)
+        regions.to_file(asset_path)
+
+    # 2. The asset -> JS (EPSG:4326 for Leaflet), and the centroid / bounding box of every region and of the country
+    regions = gpd.read_file(asset_path)
+    regions_crs = regions.crs
+    regions_wgs = regions.to_crs('EPSG:4326')[['NAME', 'geometry']]
+    geojson = json.loads(regions_wgs.to_json(drop_id=True))
+    for feature in geojson['features']:                      # 4 decimal places is ~10 m: far under the simplification
+        feature['geometry']['coordinates'] = round_coordinates(feature['geometry']['coordinates'])
+    with open(f'{GEO_DIR}/{js_name}.js', 'w', encoding='utf-8') as f:
+        f.write(f'window.{js_name} = {json.dumps(geojson, separators=(",", ":"))};\n')
+
+    country = gpd.GeoDataFrame({'NAME': ['AUSTRALIA']}, geometry=[unary_union(regions.geometry.values)], crs=regions_crs)
+    with_country = pd.concat([regions[['NAME', 'geometry']], country], ignore_index=True)
+    with_country['centroid'] = with_country.geometry.centroid.to_crs('EPSG:4326').apply(lambda p: [p.y, p.x])
+    with_country['bounding_box'] = with_country.geometry.to_crs('EPSG:4326').bounds.values.tolist()
+    centroid_bbox = with_country.set_index('NAME')[['centroid', 'bounding_box']].to_dict(orient='index')
+    with open(f'{GEO_DIR}/{js_name}_centroid_bbox.js', 'w', encoding='utf-8') as f:
+        f.write(f'window.{js_name}_centroid_bbox = {json.dumps(centroid_bbox, indent=2)};\n')
+# ── end of the water regions ────────────────────────────────────────────────────────────────────────────────
+
+
+
 # Save merged NECMA + GBCMA past vegetation works to JS object.
 #
 # The merge and cleaning live with the source data, not here — see

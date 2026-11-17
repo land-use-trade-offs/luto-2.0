@@ -21,14 +21,6 @@ window.ChartService = {
           path: "data/Area_overview_1_Land-use.js",
           name: "Area_overview_1_Land-use",
         },
-        Category: {
-          path: "data/Area_overview_2_Category.js",
-          name: "Area_overview_2_Category",
-        },
-        Source: {
-          path: "data/Area_overview_3_Source.js",
-          name: "Area_overview_3_Source",
-        },
       },
       ranking: {
         path: "data/Area_ranking.js",
@@ -84,6 +76,11 @@ window.ChartService = {
             paged: true,
           },
         },
+        // every (region, item) with a target: its score and target per year (Home's target cards)
+        targets: {
+          path: "data/BIO_GBF3_NVIS_target_summary.js",
+          name: "BIO_GBF3_NVIS_target_summary",
+        },
       },
       GBF4_SNES: {
         Sum: {
@@ -113,6 +110,11 @@ window.ChartService = {
             paged: true,
           },
         },
+        // every (region, item) with a target: its score and target per year (Home's target cards)
+        targets: {
+          path: "data/BIO_GBF4_SNES_target_summary.js",
+          name: "BIO_GBF4_SNES_target_summary",
+        },
       },
       GBF4_ECNES: {
         Sum: {
@@ -141,6 +143,11 @@ window.ChartService = {
             name: "BIO_GBF4_ECNES_overview_sum",
             paged: true,
           },
+        },
+        // every (region, item) with a target: its score and target per year (Home's target cards)
+        targets: {
+          path: "data/BIO_GBF4_ECNES_target_summary.js",
+          name: "BIO_GBF4_ECNES_target_summary",
         },
       },
       GBF8_GROUP: {
@@ -181,6 +188,11 @@ window.ChartService = {
             path: "data/BIO_GBF8_SPECIES_overview_sum.js",
             name: "BIO_GBF8_SPECIES_overview_sum",
           },
+        },
+        // every species with a target: its score and target per year (Home's target cards)
+        targets: {
+          path: "data/BIO_GBF8_SPECIES_target_summary.js",
+          name: "BIO_GBF8_SPECIES_target_summary",
         },
       },
       quality: {
@@ -269,18 +281,6 @@ window.ChartService = {
         },
       },
       overview: {
-        Ag: {
-          path: "data/Economics_overview_Ag.js",
-          name: "Economics_overview_Ag",
-        },
-        "Ag Mgt": {
-          path: "data/Economics_overview_Am.js",
-          name: "Economics_overview_Am",
-        },
-        "Non-Ag": {
-          path: "data/Economics_overview_Non_Ag.js",
-          name: "Economics_overview_Non_Ag",
-        },
         sum: {
           path: "data/Economics_overview_sum.js",
           name: "Economics_overview_sum",
@@ -309,18 +309,6 @@ window.ChartService = {
         name: "GHG_NonAg",
       },
       overview: {
-        Ag: {
-          path: "data/GHG_overview_Ag.js",
-          name: "GHG_overview_Ag",
-        },
-        "Ag Mgt": {
-          path: "data/GHG_overview_Am.js",
-          name: "GHG_overview_Am",
-        },
-        "Non-Ag": {
-          path: "data/GHG_overview_NonAg.js",
-          name: "GHG_overview_NonAg",
-        },
         sum: {
           path: "data/GHG_overview_sum.js",
           name: "GHG_overview_sum",
@@ -353,25 +341,10 @@ window.ChartService = {
           path: "data/Production_overview_AUS_achive_percent.js",
           name: "Production_overview_AUS_achive_percent",
         },
-        Domestic: {
-          path: "data/Production_overview_Domestic.js",
-          name: "Production_overview_Domestic",
-        },
-        Exports: {
-          path: "data/Production_overview_Exports.js",
-          name: "Production_overview_Exports",
-        },
-        Feed: {
-          path: "data/Production_overview_Feed.js",
-          name: "Production_overview_Feed",
-        },
-        Imports: {
-          path: "data/Production_overview_Imports.js",
-          name: "Production_overview_Imports",
-        },
-        sum: {
-          path: "data/Production_overview_demand_type.js",
-          name: "Production_overview_demand_type",
+        // commodity -> [series]: the demand types and what the run has to produce, one commodity at a time
+        commodity: {
+          path: "data/Production_overview_demand_commodity.js",
+          name: "Production_overview_demand_commodity",
         },
       },
       ranking: {
@@ -397,24 +370,6 @@ window.ChartService = {
           path: "data/Water_NonAg_NRM.js",
           name: "Water_NonAg_NRM",
         },
-        overview: {
-          Ag: {
-            path: "data/Water_overview_NRM_Ag.js",
-            name: "Water_overview_NRM_Ag",
-          },
-          "Ag Mgt": {
-            path: "data/Water_overview_NRM_Am.js",
-            name: "Water_overview_NRM_Am",
-          },
-          "Non-Ag": {
-            path: "data/Water_overview_NRM_NonAg.js",
-            name: "Water_overview_NRM_NonAg",
-          },
-          sum: {
-            path: "data/Water_overview_NRM_sum.js",
-            name: "Water_overview_NRM_sum",
-          },
-        },
         ranking: {
           path: "data/Water_ranking_NRM.js",
           name: "Water_ranking_NRM",
@@ -432,6 +387,16 @@ window.ChartService = {
         path: "data/Renewable_energy_Am.js",
         name: "Renewable_energy_Am",
       },
+    },
+    Inputs: {
+      catalogue: { path: "data/Inputs_catalogue.js", name: "Inputs_catalogue" },
+      tables: { path: "data/Inputs_tables.js", name: "Inputs_tables" },
+      bundles: { path: "data/Inputs_bundles.js", name: "Inputs_bundles" },
+      yield_trend: { path: "data/Inputs_yield_trend.js", name: "Inputs_yield_trend" },
+      adoption_caps: { path: "data/Inputs_adoption_caps.js", name: "Inputs_adoption_caps" },
+      transition_matrix: { path: "data/Inputs_transition_matrix.js", name: "Inputs_transition_matrix" },
+      species: { path: "data/Inputs_species.js", name: "Inputs_species" },
+      years: { path: "data/Inputs_years.js", name: "Inputs_years" },
     },
     Transition: {
       Area: {

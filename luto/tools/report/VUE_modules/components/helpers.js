@@ -3,6 +3,13 @@
 // Usage: window._debug.Home.ChartData.value
 window._debug = {};
 
+// The view of the whole country every map of the report opens on: the box the Home map fits, and its
+// centre (the Mercator centre of the box, so the country sits in the middle of the map element)
+window.AUSTRALIA_VIEW = {
+    bounds: [[-43.8, 112.8], [-10.5, 153.8]],
+    center: [-28.4, 133.3],
+};
+
 window.loadScript = (src, name) => {
     return new Promise((resolve, reject) => {
         const existingScript = document.querySelector(`script[src="${src}"]`);
@@ -173,3 +180,68 @@ window.createLayerToggle = function(selected, showAgainOn = []) {
 
     return { layerOn, clickLayer, layerButtonClass, layerButtonTitle };
 };
+
+
+/**
+ * Decode a map layer leaf into a raster the map components draw, read and export.
+ *
+ * A layer is stored as a 1D vector of the model's cells (`cells_b64`: deflated, base64), not as a picture:
+ * the report holds ONE raster of cell numbers (data/map_layers/map_cell_index.js; the input layers, which have
+ * a resolution of their own, a second one named by the leaf's `cellIndex`), and a layer is painted by
+ * looking every pixel's cell up in the vector. Int layers hold int16 codes; float layers hold one signed byte
+ * per cell: 0 = no value, ±1 … ±levels = the value as a share of the layer's range (raw_min_max), restored here
+ * to within one level, so a value read off the map or exported is good for LOOKING AT, not for analysis.
+ *
+ * Returns { width, height, values: [band], xmin, xmax, ymin, ymax, noDataValue }, `band` a flat typed array
+ * in row order (the shape parseGeoraster returns, which a report written before 2026-11-12 still goes through:
+ * its leaves hold `tif_b64`).
+ */
+window.MapCells = (() => {
+    const NODATA = -9999;
+    const indexPromises = {};          // name of the cell-number raster -> its promise
+
+    const inflate = async (b64) => {
+        const bytes = Uint8Array.from(atob(b64), char => char.charCodeAt(0));
+        const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate'));
+        return new Response(stream).arrayBuffer();
+    };
+
+    // The cell-number raster, read once and kept for the life of the page
+    const loadIndex = (name = 'map_cell_index') => {
+        if (!indexPromises[name]) {
+            indexPromises[name] = (async () => {
+                await window.loadScriptWithTracking(`data/map_layers/${name}.js`, name);
+                const meta = window[name];
+                return { ...meta, index: new Int32Array(await inflate(meta.index_b64)) };
+            })();
+            indexPromises[name].catch(() => { delete indexPromises[name]; });
+        }
+        return indexPromises[name];
+    };
+
+    const hasData = (leaf) => !!(leaf?.cells_b64 || leaf?.tif_b64);
+
+    const decode = async (leaf) => {
+        if (leaf.tif_b64) {
+            const bytes = Uint8Array.from(atob(leaf.tif_b64), char => char.charCodeAt(0));
+            return parseGeoraster(bytes.buffer);
+        }
+        const [grid, buffer] = await Promise.all([loadIndex(leaf.cellIndex), inflate(leaf.cells_b64)]);
+        const { width, height, index, levels, nodata } = grid;
+        const isInt = leaf.intOrFloat === 'int';
+        const cells = isInt ? new Int16Array(buffer) : new Int8Array(buffer);
+        const band = isInt ? new Int16Array(width * height) : new Float32Array(width * height);
+        const [low, high] = leaf.raw_min_max ?? [0, 1];
+        for (let pixel = 0; pixel < band.length; pixel++) {
+            const cell = index[pixel];
+            if (cell < 0) { band[pixel] = NODATA; continue; }
+            const stored = cells[cell];
+            if (isInt) band[pixel] = stored;
+            else if (stored === nodata) band[pixel] = NODATA;
+            else band[pixel] = stored > 0 ? stored / levels * high : stored < 0 ? -stored / levels * low : 0;
+        }
+        return { width, height, values: [band], xmin: grid.xmin, xmax: grid.xmax, ymin: grid.ymin, ymax: grid.ymax, noDataValue: NODATA };
+    };
+
+    return { decode, hasData, NODATA };
+})();

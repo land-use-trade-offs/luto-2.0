@@ -47,7 +47,8 @@ VUE_modules/
 │   ├── regions_map.js                  # <regions-map>       — NRM region selector with base64 overlay
 │   ├── map_geojson.js                  # <map-geojson>       — Leaflet NRM choropleth
 │   ├── sidebar.js                      # <side-bar>          — Navigation sidebar
-│   ├── ranking_cards.js                # <ranking-cards>     — Top-N land-use ranking cards
+│   ├── headline_cards.js               # <headline-cards>    — Headline numbers of a region and year, one card per metric (no view uses it now)
+│   ├── chart_cards.js                  # <chart-cards>       — Home panel cards: a title, a small chart over the years, rows of text; greyed when switched off
 │   ├── filterable_dropdown.js          # <filterable-dropdown> — Searchable dropdown
 │   └── helpers.js                      # loadScriptWithTracking() + createMapLayerLoader() — on-demand JS loaders
 │
@@ -113,7 +114,7 @@ VUE_modules/
 │   ├── Production_Sum/Ag/Am/NonAg.js
 │   ├── Production_overview_*.js / Production_ranking.js
 │   ├── Water_Sum/Ag/Am/NonAg_NRM.js
-│   ├── Water_overview_NRM_*.js / Water_ranking_NRM.js
+│   ├── Water_ranking_NRM.js
 │   ├── Water_overview_watershed.js
 │   ├── BIO_GBF2/GBF3_NVIS/GBF4_SNES/GBF4_ECNES/GBF8_GROUP/GBF8_SPECIES_Ag/Am/NonAg.js
 │   ├── BIO_*_overview_*.js / BIO_ranking.js
@@ -264,8 +265,11 @@ Used inside `<regions-map>` and directly in views that need a standalone spatial
 ### `<side-bar>` (`sidebar.js`)
 Collapsible navigation sidebar with LUTO branding. Provides `isCollapsed` toggle.
 
-### `<ranking-cards>` (`ranking_cards.js`)
-Displays top-N land use items as sorted card list. Used on Home view.
+### `<headline-cards>` (`headline_cards.js`)
+The headline numbers of the selected region and year, one card per metric (economics, area, GHG, water, biodiversity). No view uses it since the Home page was rebuilt around the targets and inputs (2026-11-12).
+
+### `<chart-cards>` (`chart_cards.js`)
+The cards of a Home panel (the targets of the run, or its inputs): a title, the setting behind it, a small chart over the years with the selected year marked, optional rows of text and a note. A card switched off in the run is drawn grey with its message; a card that names a map `layer` can be clicked to show it.
 
 ### `<filterable-dropdown>` (`filterable_dropdown.js`)
 Searchable dropdown for long option lists (e.g. land use names). Wraps Element Plus select with filter.

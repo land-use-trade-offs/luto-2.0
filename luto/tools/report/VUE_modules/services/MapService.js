@@ -106,6 +106,13 @@ window.MapService = {
       'Ag Mgt': { 'indexPath': 'data/map_layers/map_water_yield_Am__index.js', 'indexName': 'map_water_yield_Am__index', 'layerPrefix': 'map_water_yield_Am' },
       'Non-Ag': { 'indexPath': 'data/map_layers/map_water_yield_NonAg__index.js', 'indexName': 'map_water_yield_NonAg__index', 'layerPrefix': 'map_water_yield_NonAg' },
     },
+    // The share of each cell under one entry of the land-use map's legend (Home: a click on the legend)
+    'LanduseShare': {
+      'Layers': { 'indexPath': 'data/map_layers/map_dvar_lumap_share__index.js', 'indexName': 'map_dvar_lumap_share__index', 'layerPrefix': 'map_dvar_lumap_share' },
+    },
+    'Input': {
+      'Layers': { 'indexPath': 'data/map_layers/map_in__index.js', 'indexName': 'map_in__index', 'layerPrefix': 'map_in' },
+    },
     'Renewable': {
       'Ag Mgt': { 'indexPath': 'data/map_layers/map_renewable_energy_Am__index.js', 'indexName': 'map_renewable_energy_Am__index', 'layerPrefix': 'map_renewable_energy_Am' },
     },

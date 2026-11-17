@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="#1d3a2f" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+  <title>LUTO2</title>
+  <!-- Trade-off: a beam on a pivot, grain on one end and a tree on the other -->
+  <circle cx="32" cy="32" r="28.5" fill="#f6f3ea"/>
+  <path d="M10 41 L54 32"/>
+  <path d="M32 38 L25 51 H39 Z" fill="#3b8fc4"/>
+  <path d="M17 39.5 V17" stroke-width="2.8"/>
+  <path d="M17 33.5 L11.5 29.5 M17 33.5 L22.5 29.5 M17 27.5 L11.5 23.5 M17 27.5 L22.5 23.5 M17 21.5 L12.5 18 M17 21.5 L21.5 18" stroke="#e9b949" stroke-width="3.2"/>
+  <path d="M47 33.5 V25"/>
+  <circle cx="47" cy="18" r="7.5" fill="#3f9b6b"/>
+</svg>

@@ -21,6 +21,13 @@ window.Highchart = {
       type: Object,
       default: null,
     },
+    // The legend as a drawer: hidden behind a handle at the chart's right edge, pulled out on a click
+    // as a half-transparent panel OVER the plot (the plot keeps its size). The plot takes the width a
+    // fixed legend would hold; an exported image keeps the normal legend.
+    legendDrawer: {
+      type: Boolean,
+      default: false,
+    },
   },
   setup(props) {
     const { ref, onMounted, onUnmounted, watch, inject, computed } = Vue
@@ -35,6 +42,12 @@ window.Highchart = {
     const dragStartPos = ref({ x: 0, y: 0 });
     const scale = ref(1);
     const zoomStep = 0.1;
+
+    // Legend drawer state: open or not, and one entry per series of the chart
+    const legendOpen = ref(false);
+    const legendItems = ref([]);
+    const LEGEND_DRAWER_WIDTH = 250;      // px, the drawer pulled out
+    const LEGEND_HANDLE_WIDTH = 26;       // px, the handle alone
 
     // Multi-input selector state
     const selectedInput = ref(null);
@@ -63,6 +76,52 @@ window.Highchart = {
       };
     });
 
+    // With the drawer, Highcharts draws no legend and leaves the margin the handle needs
+    const renderedChartData = computed(() => {
+      const data = effectiveChartData.value;
+      if (!props.legendDrawer) return data;
+      return {
+        ...data,
+        chart: { ...(data.chart || {}), marginRight: LEGEND_HANDLE_WIDTH + 14 },
+        legend: { ...(data.legend || {}), enabled: false },
+        exporting: {
+          ...(data.exporting || {}),
+          chartOptions: { chart: { marginRight: 300 }, legend: { ...(data.legend || {}), enabled: true } },
+        },
+      };
+    });
+
+    const refreshLegendItems = () => {
+      const chart = ChartInstance.value;
+      legendItems.value = !chart ? [] : chart.series
+        .filter(series => series.options.showInLegend !== false)
+        .map(series => ({ index: series.index, name: series.name, color: series.color, visible: series.visible, isLine: series.type !== 'column' }));
+    };
+
+    const toggleSeries = (item) => {
+      const series = ChartInstance.value?.series[item.index];
+      if (!series) return;
+      series.setVisible(!series.visible);
+      refreshLegendItems();
+    };
+
+    // Show every series, or hide them all (to then pick a few)
+    const setAllSeries = (visible) => {
+      const chart = ChartInstance.value;
+      if (!chart) return;
+      chart.series.forEach(series => series.setVisible(visible, false));
+      chart.redraw();
+      refreshLegendItems();
+    };
+
+    const highlightSeries = (item, on) => {
+      const chart = ChartInstance.value;
+      if (!chart) return;
+      chart.series.forEach(series => {
+        if (series.visible) series.setState(on && series.index !== item.index ? 'inactive' : 'normal');
+      });
+    };
+
     // Function to handle dataset loading and chart creation
     const createChart = () => {
       isLoading.value = true;
@@ -74,7 +133,7 @@ window.Highchart = {
       }
 
       // Create new chart with chart data
-      const data = effectiveChartData.value;
+      const data = renderedChartData.value;
       ChartInstance.value = Highcharts.chart(
         chartElement.value,
         {
@@ -82,6 +141,7 @@ window.Highchart = {
           chart: (data.chart || {}),
         }
       );
+      refreshLegendItems();
       isLoading.value = false;
     };
 
@@ -179,6 +239,7 @@ window.Highchart = {
 
       // Final redraw to apply all changes with animation
       chart.redraw();
+      refreshLegendItems();
 
     };
     onMounted(() => {
@@ -204,7 +265,7 @@ window.Highchart = {
     // Watch for changes in chart data and update Highcharts.
     // No loop-guard needed: updateChart only calls Highcharts APIs and never
     // writes back to Vue reactive state, so the watcher cannot re-trigger itself.
-    watch(effectiveChartData, (newValue) => {
+    watch(renderedChartData, (newValue) => {
       updateChart(ChartInstance.value, newValue);
     }, { deep: true });
 
@@ -228,6 +289,13 @@ window.Highchart = {
       handleWheel,
       selectedInput,
       setInput,
+      legendOpen,
+      legendItems,
+      toggleSeries,
+      setAllSeries,
+      highlightSeries,
+      LEGEND_DRAWER_WIDTH,
+      LEGEND_HANDLE_WIDTH,
     };
   },
   template: /*html*/`
@@ -244,7 +312,53 @@ window.Highchart = {
           {{ key }}
         </button>
       </div>
+      <div class="relative">
       <div ref="chartElement" id="chart-container"></div>
+
+      <!-- Legend drawer: a handle at the right edge; a click pulls the legend out over the plot -->
+      <div v-if="legendDrawer" class="absolute top-0 right-0 bottom-0 flex items-center z-10 pointer-events-none" @mousedown.stop @wheel.stop>
+        <button
+          @click="legendOpen = !legendOpen"
+          class="flex flex-col items-center justify-center gap-2 rounded-l-md border border-r-0 border-gray-300 bg-[#f1f3f5] hover:bg-sky-100 text-[#505051] py-3 pointer-events-auto"
+          :style="{ width: LEGEND_HANDLE_WIDTH + 'px' }"
+          :title="legendOpen ? 'Hide the legend' : 'Show the legend'"
+        >
+          <span class="text-[0.9rem] leading-none">{{ legendOpen ? '›' : '‹' }}</span>
+          <span class="text-[0.75rem] font-medium tracking-wide" style="writing-mode: vertical-rl;">Legend</span>
+          <span class="text-[0.9rem] leading-none">{{ legendOpen ? '›' : '‹' }}</span>
+        </button>
+        <div
+          v-if="legendOpen"
+          class="flex flex-col max-h-full border border-gray-300 bg-white/60 rounded-md pointer-events-auto"
+          :style="{ width: (LEGEND_DRAWER_WIDTH - LEGEND_HANDLE_WIDTH) + 'px' }"
+        >
+          <div class="flex items-center justify-between px-2 py-1 border-b border-gray-200 text-[0.72rem] text-gray-500">
+            <span>Click to hide / show</span>
+            <span class="whitespace-nowrap ml-2">
+              <button class="text-sky-600 hover:underline" @click="setAllSeries(true)">all</button> ·
+              <button class="text-sky-600 hover:underline" @click="setAllSeries(false)">none</button>
+            </span>
+          </div>
+          <div class="overflow-y-auto py-1">
+            <button
+              v-for="item in legendItems" :key="item.index"
+              @click="toggleSeries(item)"
+              @mouseenter="highlightSeries(item, true)"
+              @mouseleave="highlightSeries(item, false)"
+              class="flex items-center w-full text-left px-2 py-[2px] bg-white hover:bg-sky-50"
+              :class="{ 'opacity-40': !item.visible }"
+            >
+              <span
+                class="inline-block shrink-0 mr-2"
+                :class="item.isLine ? 'w-[14px] h-[3px]' : 'w-[11px] h-[11px] rounded-sm'"
+                :style="{ backgroundColor: item.color }"
+              ></span>
+              <span class="text-[0.75rem] text-[#1f1f1f] leading-snug" :class="{ 'line-through': !item.visible }">{{ item.name }}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+      </div>
       <div v-if="zoomable" class="absolute top-[40px] right-2 flex flex-col space-y-1">
         <button @click="zoomIn" class="bg-white/80 hover:bg-white text-gray-800 w-8 h-8 rounded-full shadow flex items-center justify-center">+</button>
         <button @click="zoomOut" class="bg-white/80 hover:bg-white text-gray-800 w-8 h-8 rounded-full shadow flex items-center justify-center">-</button>

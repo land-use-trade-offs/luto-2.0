@@ -28,7 +28,8 @@ function getColorFn(meta) {
         // min_max:     display-scale range (colorbar labels only — divided by RESFACTOR²×121)
         const [minVal, maxVal] = meta.raw_min_max ?? meta.min_max ?? [0, 1];
         // Anchor colours matching the colorbar gradient in regions_map colorbarInfo
-        const POS = [[255,246,176], [253,147,62], [128,0,38]];   // yellow→orange→maroon
+        // (a layer may bring its own three stops, meta.ramp: a mask is drawn in a quieter colour than the ramp)
+        const POS = meta.ramp ?? [[255,246,176], [253,147,62], [128,0,38]];   // yellow→orange→maroon
         const NEG = [[93,148,220],  [16,73,145],  [0,14,43]];    // light→mid→dark blue
 
         return (value) => {
@@ -262,6 +263,12 @@ window.RegionsMap = {
     const overlayCtl = window.OverlayShp.createController(() => props.overlays, () => map.value);
     const loadScript = window.loadScript;
     const selectedBaseMap = ref('CartoDB');
+    const showLabels = ref(true);            // the place names over the map layer
+    const toggleLabels = () => {
+      showLabels.value = !showLabels.value;
+      const pane = map.value?.getPane('labels');
+      if (pane) pane.style.display = showLabels.value ? '' : 'none';
+    };
     const tileLayers = ref({});
     const baseMapOptions = ref(['CartoDB', 'Satellite', 'None']);
 
@@ -269,8 +276,12 @@ window.RegionsMap = {
 
     const initMap = () => {
       // Initialize the map with saved viewpoint
+      // Every vector shape of this map (the selected region's outline, the overlays of overlay_shp.js) is drawn
+      // on a canvas: one bitmap, scaled with the basemap tiles while a zoom animates. As SVG paths (Leaflet's
+      // default) the browser redrew the shapes every frame of the animation and they lagged behind the basemap.
       map.value = L.map('map', {
-        zoomControl: false
+        zoomControl: false,
+        renderer: L.canvas({ padding: 1 }),
       }).setView(globalMapViewpoint.value.center, globalMapViewpoint.value.zoom);
 
       // Save current view on map events
@@ -332,18 +343,35 @@ window.RegionsMap = {
           .openOn(map.value);
       });
 
-      // Create tile layers but don't add them yet. The CARTO key is a free public basemap key, embedded on purpose
+      // Create the base maps but don't add them yet. The CARTO key is a free public basemap key, embedded on purpose
       // so every generated report can load the basemap for whoever opens it.
+      // Each base map is two layers: the ground without labels at the bottom, and the place names in their own
+      // pane ABOVE the map layer (overlay pane, z 400), so a layer never covers them. The pane takes no pointer
+      // events: a click still reads the cell under a label.
+      map.value.createPane('labels');
+      map.value.getPane('labels').style.zIndex = 450;
+      map.value.getPane('labels').style.pointerEvents = 'none';
+      const placeNames = () => L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png?key=cb1_2lje_1_eb930ec7809f7b2ebec6a65f', {
+        subdomains: 'abcd',
+        maxZoom: 20,
+        pane: 'labels',
+      });
       tileLayers.value = {
-        OSM: L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=cb1_2lje_1_eb930ec7809f7b2ebec6a65f', {
-          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-          subdomains: 'abcd',
-          maxZoom: 20
-        }),
-        Satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-          attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
-          maxZoom: 18
-        })
+        OSM: L.layerGroup([
+          L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png?key=cb1_2lje_1_eb930ec7809f7b2ebec6a65f', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 20
+          }),
+          placeNames(),
+        ]),
+        Satellite: L.layerGroup([
+          L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+            maxZoom: 18
+          }),
+          placeNames(),
+        ]),
       };
 
       // Add initial base map
@@ -538,7 +566,7 @@ window.RegionsMap = {
       const mySeq = ++_loadSeq;
 
       const data = props.mapData;
-      if (!data?.tif_b64 || !data?.intOrFloat) {
+      if (!window.MapCells.hasData(data) || !data?.intOrFloat) {
         if (_currentRasterOverlay) {
           map.value.removeLayer(_currentRasterOverlay);
           _currentRasterOverlay = null;
@@ -548,10 +576,9 @@ window.RegionsMap = {
       }
 
       // Decode base64 → parse GeoTIFF (already EPSG:3857, no reprojection needed)
-      const bytes     = Uint8Array.from(atob(data.tif_b64), c => c.charCodeAt(0));
-      const georaster = await parseGeoraster(bytes.buffer);
+      const georaster = await window.MapCells.decode(data);          // helpers.js
 
-      // Discard if a newer load was triggered while we were awaiting parseGeoraster
+      // Discard if a newer load was triggered while we were awaiting the decode
       if (mySeq !== _loadSeq) return;
 
       const { width, height, values, xmin, xmax, ymin, ymax } = georaster;
@@ -736,14 +763,26 @@ window.RegionsMap = {
     const isExporting = ref(false);
 
     async function exportLayer() {
-      if (!props.mapData?.tif_b64) return;
+      if (!window.MapCells.hasData(props.mapData)) return;
+
+      // The layers of the report are stored for display: say so before a file leaves it
+      try {
+        await ElementPlus.ElMessageBox.confirm(
+          'This GeoTIFF is for visualisation only. Each cell is stored at 127 steps of the layer\'s colour range, '
+          + 'so a value is accurate to about 1 % of that range, and a value beyond the range is capped at it. '
+          + 'For analysis, use the NetCDF outputs of the run (the xr_*.nc files in its out_<year> folders).',
+          'Export for visualisation only',
+          { confirmButtonText: 'Export', cancelButtonText: 'Cancel', type: 'warning' },
+        );
+      } catch (cancelled) {
+        return;
+      }
       isExporting.value = true;
       await new Promise(resolve => setTimeout(resolve, 50)); // let UI update before heavy work
 
       try {
         const data      = props.mapData;
-        const bytes     = Uint8Array.from(atob(data.tif_b64), c => c.charCodeAt(0));
-        const georaster = await parseGeoraster(bytes.buffer);
+        const georaster = await window.MapCells.decode(data);        // helpers.js
         const { width, height, values, xmin, xmax, ymin, ymax, noDataValue } = georaster;
 
         const rawBand = values[0];
@@ -826,6 +865,8 @@ window.RegionsMap = {
       selectedRegion,
       updateMap,
       selectedBaseMap,
+      showLabels,
+      toggleLabels,
       changeBaseMap,
       baseMapOptions,
       handleBaseMapChange,
@@ -833,7 +874,7 @@ window.RegionsMap = {
       intLegend,
       isExporting,
       exportLayer,
-      canExport: computed(() => !!props.mapData?.tif_b64),
+      canExport: computed(() => window.MapCells.hasData(props.mapData)),
       overlayItems: overlayCtl.items,
       toggleOverlay: overlayCtl.toggle,
     };
@@ -855,6 +896,14 @@ window.RegionsMap = {
               @change="handleBaseMapChange"
             />
           </div>
+
+          <!-- Place names on / off -->
+          <button
+            @click="toggleLabels"
+            :title="showLabels ? 'Hide the place names' : 'Show the place names'"
+            class="text-[0.8rem] px-3 py-[7px] rounded-lg shadow-lg border"
+            :class="showLabels ? 'bg-sky-500 text-white border-sky-500' : 'bg-white/70 text-[#505051] border-gray-300'"
+          >Labels</button>
 
           <!-- Export GeoTIFF button -->
           <button
