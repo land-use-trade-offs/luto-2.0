@@ -54,7 +54,7 @@ def relax(tables: Tables, idx) -> Tables:
     target missed in full (million AUD in the objective, as every objective coefficient). The column carries s in the
     row's own units, s' = unit · s (``slack_unit``: |rhs|) — coefficient ±1, ub and penalty rescaled to match
     — so the scaled rhs never enters the matrix; a reader divides by the unit (``shortfall``). ``rows['slack_col']``
-    names the column. An EQUALITY row (a demand row: production = demand) gets two, a·x + s⁺ − s⁻ = rhs, each at the
+    names the column. An EQUALITY row (a demand row: production = demand) gets two, a·x + s⁺ - s⁻ = rhs, each at the
     penalty — ``slack_col`` the one that lowers it, ``slack_col_up`` the one that raises it — so a demand that cannot be
     met in either direction shows up in the diagnosis. The structural rows (node balance, source cap, ag-mgt link) are
     never relaxed: a cell cannot hold more than its area. The ONE mechanism for every row that may fall short, built up

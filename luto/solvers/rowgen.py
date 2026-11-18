@@ -401,7 +401,7 @@ def cell_floor_ceiling(cols: xr.Dataset, support: ColSupport, bio_coeff: np.ndar
     min_c[~np.isfinite(min_c)] = 0.0
     max_c[~np.isfinite(max_c)] = 0.0
 
-    # ── the free share laid on the open columns in order of contribution, each up to its room (ub − lb) ──
+    # ── the free share laid on the open columns in order of contribution, each up to its room (ub - lb) ──
     room = np.maximum(ub - lb, 0.0)
 
     def fill(value: np.ndarray, best_first: bool, rest: np.ndarray) -> np.ndarray:

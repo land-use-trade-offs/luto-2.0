@@ -237,7 +237,7 @@ class Data:
         #   (column, cell) at the model cells, the columns labelled (field, lm, lu) / (field, animal)
         #   Each table is read one column at a time: a chunk holds one column of every full-res cell, so a column is
         #   inflated whole and cut to the model cells (loading the whole table would hold every full-res column in
-        #   memory). The cells are labelled 0 … NCELLS−1 (NCELLS is not set yet: the count of MASK).
+        #   memory). The cells are labelled 0 … NCELLS-1 (NCELLS is not set yet: the count of MASK).
         with xr.open_dataset(os.path.join(settings.INPUT_DIR, "agec_crops.nc")) as agec_crops_file:
             agec_crops = agec_crops_file['AGEC_CROPS']
             self.AGEC_CROPS = xr.DataArray(
@@ -2888,14 +2888,16 @@ class Data:
         self.WATER_OUTSIDE_LUTO_HIST = self.WATER_YIELD_OUTSIDE_LUTO_HIST[settings.WATER_REGION_DEF]          # over region_id
 
 
-        # Using high res factor will make some small river regions disappear; hence we update the data with validated river region ids
+        # A region with no model cell is left out of the water rows: at RESFACTOR 1 it holds no land-use cell (islands,
+        # conservation and Indigenous land), at RESFACTOR > 1 also a small region no block represents
         if valid_watershed_id is None:
             valid_watershed_id = np.unique(self.WATER_REGION_ID)
-        self.WATERSHED_DISAPPEARING = [self.WATER_REGION_NAMES[i] for i in set(self.WATER_REGION_NAMES.keys()) - set(valid_watershed_id)]
-        
+        self.WATERSHED_DISAPPEARING = sorted(str(self.WATER_REGION_NAMES[i]) for i in set(self.WATER_REGION_NAMES.keys()) - set(valid_watershed_id))
+
         if self.WATERSHED_DISAPPEARING:
-            print(f"│   ⚠ WARNING: {len(self.WATERSHED_DISAPPEARING)} river regions are disappearing due to using high resolution factors.", flush=True)
-            [print(f"       - {list(i)}") for i in np.array_split(self.WATERSHED_DISAPPEARING, len(self.WATERSHED_DISAPPEARING)//3)]
+            print(f"│   ⚠ WARNING: {len(self.WATERSHED_DISAPPEARING)} water regions have no model cell at RES{settings.RESFACTOR} and are left out of the water constraints:", flush=True)
+            for start in range(0, len(self.WATERSHED_DISAPPEARING), 4):
+                print(f"│       - {', '.join(self.WATERSHED_DISAPPEARING[start:start + 4])}", flush=True)
             self.WATER_REGION_NAMES = {k: v for k, v in self.WATER_REGION_NAMES.items() if k in valid_watershed_id}
             self.WATER_REGION_HIST_LEVEL = self.WATER_REGION_HIST_LEVEL.sel(region_id=[k for k in self.WATER_REGION_HIST_LEVEL['region_id'].values if k in valid_watershed_id])
             self.WATER_OUTSIDE_LUTO_BY_CCI = self.WATER_OUTSIDE_LUTO_BY_CCI.sel(region_id=[k for k in self.WATER_OUTSIDE_LUTO_BY_CCI['region_id'].values if k in valid_watershed_id])

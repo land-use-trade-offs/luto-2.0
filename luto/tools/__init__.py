@@ -119,7 +119,7 @@ def lumap2ag_l_mrj(lumap, lmmap):
 
 def get_ag_to_ag_water_delta_matrix(data, from_m, from_j, cells, w_mrj, yr_idx) -> np.ndarray:
     """Source-parameterised water-licence delta ($/cell): transitioning FROM (from_m, from_j) TO every
-    target (to_m, to_j) on `cells` — (target req − source req) × licence price, plus the dry↔irr
+    target (to_m, to_j) on `cells` — (target req - source req) × licence price, plus the dry↔irr
     irrigation setup/teardown. Returns (NLMS, len(cells), N_AG_LUS), RAW (un-amortised) upfront cost —
     the caller amortises explicitly (see transitions.py).
     """

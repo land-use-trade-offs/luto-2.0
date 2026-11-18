@@ -1715,7 +1715,7 @@ def write_transition_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
       - Area  : D × REAL_AREA                          ha moved from → to
       - Cost  : per-source transition-cost leaves × D  $ paid, per Cost-type
       - GHG   : per-source transition emissions × D    t CO2e, per GHG-type
-      - Water : (target wreq − source wreq) × D        ML requirement change (TRUE ML; previously
+      - Water : (target wreq - source wreq) × D        ML requirement change (TRUE ML; previously
                 the $-valued licence-cost delta was reported under the ML label)
     All annualised by `gap` (one-off change over the period since the previous simulated year).
     At the base year there are no transitions: CSVs are header-only and each NetCDF carries a single
@@ -1898,7 +1898,7 @@ def write_transition_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     dims_water = ['From-land-use', 'To-land-use', 'From-water-supply', 'To-water-supply']
 
     def leaf_water(fm, fj, cells):
-        # TRUE ML requirement change: target requirement − the source's own requirement.
+        # TRUE ML requirement change: target requirement - the source's own requirement.
         return {None: w_mrj_full[:, cells, :] - w_mrj_full[fm, cells, fj][None, :, None]}
 
     water_region, water_layers = _flow_report(leaf_water, None, dims_water, 'Water Requirement Change (ML)')

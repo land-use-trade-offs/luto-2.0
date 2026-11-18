@@ -102,7 +102,7 @@ def create_new_dataset(refresh=False):
     # TODO (2026-10-20): OUTDATED demand file — this name no longer exists on N:; LUTO runs on the copy already in
     # input/ (demand_projections.h5 / .nc). N: now holds only Michalis' update, ..._2026-07-20.csv, which is NOT adopted:
     # under IMPORT_TREND = 'Trend' its imports exceed domestic use + exports for several commodities, so demand goes
-    # negative (default scenario 2050: sheep meat −9.3 Mt; also citrus, pears, hay, tropical stone fruit, other non-cereal
+    # negative (default scenario 2050: sheep meat -9.3 Mt; also citrus, pears, hay, tropical stone fruit, other non-cereal
     # crops, cotton) and data.py clamps it to 0. Talk with Michalis before switching to it.
     shutil.copyfile(f'{demand_scenarios_inpath}/All_LUTO_demand_scenarios_with_convergences.csv',  raw_data + 'All_LUTO_demand_scenarios_with_convergences.csv')
     shutil.copyfile(f'{demand_elasticity_inpath}/20260311_values for runs.csv', outpath + 'demand_elasticity.csv')

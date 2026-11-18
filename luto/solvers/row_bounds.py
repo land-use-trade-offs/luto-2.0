@@ -101,7 +101,7 @@ def get_row_bounds(row_matrix: sparse.csr_matrix, rows: xr.Dataset, cols: xr.Dat
 
 def row_intervals(row_matrix, lb: np.ndarray, ub: np.ndarray, chunk_nnz: int = 50_000_000) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """lo, hi and S of every row over the box, float64 — Gurobi reads the float32 coefficients as doubles, so this is
-    the model the engine sees — and 0 on an empty row. Every lb is finite, so lo meets −inf only through a negative
+    the model the engine sees — and 0 on an empty row. Every lb is finite, so lo meets -inf only through a negative
     entry on an infinite ub and hi +inf only through a positive one: the two never meet in one sum. row_matrix is walked in slabs
     of whole rows of about ``chunk_nnz`` entries, so the per-entry arrays stay bounded."""
     n_rows = row_matrix.shape[0]
@@ -138,9 +138,9 @@ def row_verdict(sense: np.ndarray, rhs: np.ndarray, lo: np.ndarray, hi: np.ndarr
     """The verdict of every row as a code into ``STATUS`` (m = the row's margin; NaN compares False, so a NaN row straddles):
 
         sense   redundant                    impossible                     tight                          near_redundant
-          <     hi ≤ rhs − m                 lo > rhs + m                   lo ≥ rhs − m                   hi ≤ rhs + m
-          >     lo ≥ rhs + m                 hi < rhs − m                   hi ≤ rhs + m                   lo ≥ rhs − m
-          =     rhs − m ≤ lo and hi ≤ rhs + m   lo > rhs + m or hi < rhs − m   lo ≥ rhs − m or hi ≤ rhs + m   —
+          <     hi ≤ rhs - m                 lo > rhs + m                   lo ≥ rhs - m                   hi ≤ rhs + m
+          >     lo ≥ rhs + m                 hi < rhs - m                   hi ≤ rhs + m                   lo ≥ rhs - m
+          =     rhs - m ≤ lo and hi ≤ rhs + m   lo > rhs + m or hi < rhs - m   lo ≥ rhs - m or hi ≤ rhs + m   —
 
     Where two hold, the earlier column wins (an impossible row is also tight; a redundant one also near-redundant)."""
     le, ge, eq = sense == '<', sense == '>', sense == '='
@@ -175,7 +175,7 @@ def implying_rows(row_matrix, sense: np.ndarray) -> tuple[np.ndarray, np.ndarray
 
 def conservation_rows(row_matrix: sparse.csr_matrix, rows: xr.Dataset, margin: np.ndarray) -> tuple[sparse.csr_matrix, np.ndarray, np.ndarray, dict]:
     """(2c) What a cell's node-balance rows say TOGETHER, one row per cell: the sum of its restored rows (row × scale).
-    Every arc leaves one node of the cell (+1 on that row) and lands on another (−1 on that one), so the arcs cancel
+    Every arc leaves one node of the cell (+1 on that row) and lands on another (-1 on that one), so the arcs cancel
     and the sum is Σ X = Σ base over the cell's ag and non-ag columns — the cell's total is what it held, an all-ones
     = row no single row of the table states. Rows the solver meets within their margins sum to a row met within the
     sum of those margins. Returned: only the cells whose rows DO cancel to a unit row (an arc whose other end has no
@@ -188,7 +188,7 @@ def conservation_rows(row_matrix: sparse.csr_matrix, rows: xr.Dataset, margin: n
     G = sparse.csr_matrix((rows['scale'].values[node_rows], (cell, np.arange(node_rows.size))),
                           shape=(int(cell.max()) + 1, node_rows.size))                      # (cell x node row) the row's scale where the row sits in the cell: G @ · sums a cell's restored rows
     C = (G @ row_matrix[node_rows].astype(np.float64)).tocsr()
-    C.eliminate_zeros()                                                                     # the arcs: +1 and −1 on one column
+    C.eliminate_zeros()                                                                     # the arcs: +1 and -1 on one column
     _, unit = implying_rows(C, np.full(C.shape[0], '=', dtype=object))
     whole = np.bincount(cell, weights=~rows['active'].values[node_rows], minlength=C.shape[0]) == 0   # no node row of the cell flagged off
     keep = np.flatnonzero(unit & whole)
@@ -198,7 +198,7 @@ def conservation_rows(row_matrix: sparse.csr_matrix, rows: xr.Dataset, margin: n
 
 def implied_ub(S, rhs: np.ndarray, margin: np.ndarray, lb: np.ndarray, ub: np.ndarray) -> np.ndarray:
     """(2a) Every column's ub tightened by the source rows ``S`` that hold it (``rhs`` / ``margin`` theirs): Σ a·x ≤
-    rhs + m with every other column at least at its lb leaves x_j ≤ lb_j + (rhs + m − Σ a·lb) / a_j — the smallest
+    rhs + m with every other column at least at its lb leaves x_j ≤ lb_j + (rhs + m - Σ a·lb) / a_j — the smallest
     over the rows, one round."""
     local = np.repeat(np.arange(S.shape[0]), np.diff(S.indptr))
     a = S.data.astype(np.float64)
@@ -211,8 +211,8 @@ def implied_ub(S, rhs: np.ndarray, margin: np.ndarray, lb: np.ndarray, ub: np.nd
 
 def unit_groups(U, rhs: np.ndarray, margin: np.ndarray, lb: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """(2b) The groups, one per unit row of ``U`` (``rhs`` / ``margin`` theirs; a group's id is its row in U): a group
-    row's room is rhs + m − Σ lb over the whole row — what its columns can rise above their lb together — and every
-    column belongs to the unit row holding it with the least room (−1 where none): any assignment bounds validly, the
+    row's room is rhs + m - Σ lb over the whole row — what its columns can rise above their lb together — and every
+    column belongs to the unit row holding it with the least room (-1 where none): any assignment bounds validly, the
     least room bounds tightest."""
     local = np.repeat(np.arange(U.shape[0]), np.diff(U.indptr))
     room = rhs + margin - np.bincount(local, weights=lb[U.indices], minlength=U.shape[0])
@@ -229,7 +229,7 @@ def unit_groups(U, rhs: np.ndarray, margin: np.ndarray, lb: np.ndarray) -> tuple
 def grouped_intervals(row_matrix, lb: np.ndarray, ub: np.ndarray, group_of_col: np.ndarray, room_of_group: np.ndarray,
                       chunk_nnz: int = 50_000_000) -> tuple[np.ndarray, np.ndarray]:
     """(2b) lo and hi of every row with each group's columns bounded together: over one group a row's entries reach at
-    most Σ a·lb + min(Σ a⁺·(ub − lb), room · max a⁺) and at least Σ a·lb + max(Σ a⁻·(ub − lb), room · min a⁻) — a
+    most Σ a·lb + min(Σ a⁺·(ub - lb), room · max a⁺) and at least Σ a·lb + max(Σ a⁻·(ub - lb), room · min a⁻) — a
     fractional-knapsack bound; an ungrouped column counts at its own bound. The columns are permuted so each group is
     contiguous, which makes one group's entries one run inside every sorted CSR row."""
     none = np.iinfo(np.int64).max
@@ -258,8 +258,8 @@ def grouped_intervals(row_matrix, lb: np.ndarray, ub: np.ndarray, group_of_col: 
             run_row, run_g = row_e[starts], g[starts]
             width = ub_p[p] - lb_p[p]
             with np.errstate(invalid='ignore'):
-                pos_width = np.where(a > 0, a * width, 0.0)                         # a⁺·(ub − lb): +inf on an infinite ub
-                neg_width = np.where(a < 0, a * width, 0.0)                         # a⁻·(ub − lb): −inf on an infinite ub
+                pos_width = np.where(a > 0, a * width, 0.0)                         # a⁺·(ub - lb): +inf on an infinite ub
+                neg_width = np.where(a < 0, a * width, 0.0)                         # a⁻·(ub - lb): -inf on an infinite ub
             sum_lb = np.add.reduceat(a * lb_p[p], starts)
             sum_pos = np.add.reduceat(pos_width, starts)
             sum_neg = np.add.reduceat(neg_width, starts)
@@ -332,7 +332,7 @@ def report_row_bounds(rows: xr.Dataset, bounds: xr.Dataset, target_year: int, ou
     for line in table.to_markdown(tablefmt='psql', intfmt=',').split('\n'):
         print(f"│   │   {line}")
     conservation = bounds.attrs['conservation']
-    print(f"│   │   conservation: the node-balance rows of {conservation['unit']:,} of {conservation['cells']:,} cells sum to Σ X = Σ base (the row that bounds a cell's columns together)")
+    print(f"│   │   conservation: the node-balance rows of {conservation['unit']:,} of {conservation['cells']:,} cells sum to sum X = sum base (the row that bounds a cell's columns together)")
     for block, counts in bounds.attrs['preflight'].items():
         hits = {what: count for what, count in counts.items() if what != 'columns' and count}
         if hits:

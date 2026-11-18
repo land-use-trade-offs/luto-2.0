@@ -424,7 +424,7 @@ def get_economic_mrj(
     ag_man_r_mrj: dict[str, np.ndarray],
     ag_man_t_mrj: dict[str, np.ndarray],
     ) -> tuple[np.ndarray, np.ndarray, dict[str, np.ndarray]]:
-    """Operating economics per ag (m, r, j), non-ag (r, k) and ag-management option: revenue − production cost
+    """Operating economics per ag (m, r, j), non-ag (r, k) and ag-management option: revenue - production cost
     under maxprofit, production cost under mincost. The land-use transition cost is not here — it is charged per
     arc (``flow_obj_*``, signed for the objective); the two non-flow terms that are, are ``non_ag_t_rk`` and the ag-management adoption cost."""
     print('Getting base year economic matrix...', flush=True)
@@ -496,7 +496,7 @@ def get_economics(data: Data, base_year: int, target_year: int) -> EconomicInput
     # NaN guard on the effects (get_economic_mrj turns NaN into zero); their inputs are checked in Data.check_eligible_nan
     data.check_ag_man_nan({'cost': ag_man_c_mrj, 'revenue': ag_man_r_mrj, 'adoption cost': ag_man_t_mrj}, target_year)
 
-    # operating economics only — revenue − production cost; the land-use transition cost is charged per arc
+    # operating economics only — revenue - production cost; the land-use transition cost is charged per arc
     ag_obj_mrj, non_ag_obj_rk, ag_man_objs = get_economic_mrj(
         ag_c_mrj, ag_r_mrj, non_ag_c_rk, non_ag_r_rk, non_ag_t_rk, ag_man_c_mrj, ag_man_r_mrj, ag_man_t_mrj)
     ag_obj_mrj = ag_obj_mrj.astype(np.float32)
@@ -538,7 +538,7 @@ def get_economics(data: Data, base_year: int, target_year: int) -> EconomicInput
             flow_cost_nonag2ag[k] = per_k[k].astype(np.float32)
 
     # ── the transition cost signed for the objective, as get_economic_mrj signs the operating terms ──
-    # maxprofit: a cost lowers the profit (−cost); mincost: a cost is added to the cost minimised (+cost)
+    # maxprofit: a cost lowers the profit (-cost); mincost: a cost is added to the cost minimised (+cost)
     sign = np.float32(-1.0 if settings.OBJECTIVE == "maxprofit" else 1.0)
     return EconomicInputs(
         ag_obj_mrj=ag_obj_mrj,

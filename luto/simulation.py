@@ -233,7 +233,6 @@ def solve_timeseries(
         base_ckpt = checkpoint_path / f"data_{years_to_run[0]}.lz4"
         if not base_ckpt.exists():
             save_data_to_disk(data, str(base_ckpt))
-            print(f"Saved base checkpoint for year {years_to_run[0]}: {base_ckpt}", flush=True)
 
     check_grouping_settings()                                                               # settings.CELL_GROUPING: what it cannot run with
     carry = set()                                                                            # row generation: the targets whose rows the next step starts with
@@ -435,7 +434,7 @@ def get_ghg_split(data: Data, target_year: int, solution, inputs: RowInputs) -> 
         what = (f"slack {r['slack_t']:,.0f}" if r['imposed']
                 else f"benchmark deviation {r['deviation_t']:,.0f}" + ('' if np.isnan(r['tolerance_t']) else
                      f" (tolerance ±{r['tolerance_t']:,.0f}: {'within' if r['within_tolerance'] else 'OUTSIDE'})"))
-        print(f"Year {target_year}: GHG {r['row']} row {r['value_t']:,.0f} tCO2e vs series {r['rhs_t']:,.0f} ({r['role']}); {what}", flush=True)
+        print(f"Year {target_year}: GHG {r['row']} row {r['value_t']:,.0f} tCO2e vs series {r['rhs_t']:,.0f} ({'ENFORCED' if r['role'] == 'BINDING' else r['role']}); {what}", flush=True)   # the series' role 'BINDING' = the limit is enforced this year; whether it is tight is the slack
     return df
 
 
@@ -487,15 +486,15 @@ def save_checkpoint(data: Data, checkpoint_path: Path, target_year: int) -> None
     for old in checkpoint_path.iterdir():
         if CHECKPOINT_RE.match(old.name) and old != final_path:
             old.unlink()
-    print(f"Saved checkpoint for year {target_year}: {final_path}", flush=True)
 
 
 def save_data_to_disk(data: Data, path: str, compress_level=3) -> None:
     """Save using joblib with atomic tmp→rename to prevent partial writes."""
-    print(f'Saving data to {path}...', flush=True)
+    start_time = time.time()
     tmp = Path(f"{path}.tmp")
     joblib.dump(data, str(tmp), compress=('lz4', compress_level))
     # Write to .tmp first, then rename atomically (os.replace → POSIX rename()).
     # If the job is killed mid-write, only the .tmp is left partial; the final
     # .lz4 is never created until the write completes successfully.
     os.replace(tmp, path)
+    print(f'Saved data to {path} in {round(time.time() - start_time)} seconds', flush=True)

@@ -333,8 +333,8 @@ def get_ghg_coeffs(inputs: RowInputs, cols: xr.Dataset) -> dict[str, np.ndarray]
 
 def get_ghg_rhs(inputs: RowInputs) -> dict[str, float]:
     """The two GHG rows' right-hand sides (raw tCO2e), with the constants each row's left-hand side carries moved over:
-      AG:      Σ coeff · X + off-land + exogenous ag − HIR baseline (destocking)                 ≤ AG series
-      LULUCF:  Σ coeff · X − plantings baseline − HIR baseline (regrowth) + LULUCF_EXO          ≤ LULUCF_MOD + LULUCF_EXO (net LULUCF)
+      AG:      Σ coeff · X + off-land + exogenous ag - HIR baseline (destocking)                 ≤ AG series
+      LULUCF:  Σ coeff · X - plantings baseline - HIR baseline (regrowth) + LULUCF_EXO          ≤ LULUCF_MOD + LULUCF_EXO (net LULUCF)
     LUTO's plantings count on the LULUCF row only above the baseline new-plantings removals (negative), and its HIR
     on each row only above the existing HIR projects' regrowth and destocking (negative; 0 when HIR_BASELINE is off)."""
     t = inputs.limits['ghg']
@@ -533,7 +533,7 @@ def get_GBF8_targets(inputs: RowInputs, support: ColSupport):
 
 
 def get_ag_mgt_adoption(inputs: RowInputs, cols: xr.Dataset):
-    """One row per (option, land use): Σ X_am − limit · Σ X_ag ≤ 0."""
+    """One row per (option, land use): Σ X_am - limit · Σ X_ag ≤ 0."""
     print("│   ├── Adding ag-management adoption-limit constraints...")
     am      = np.flatnonzero(cols['block'].values == 'am')
     ag      = np.flatnonzero(cols['block'].values == 'ag')
@@ -711,7 +711,7 @@ def get_water(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
 
 
 def get_renewable(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
-    """One row per (state, type): Σ yield · X_am over the type's columns in the state, outside the excluded cells ≥ target − existing."""
+    """One row per (state, type): Σ yield · X_am over the type's columns in the state, outside the excluded cells ≥ target - existing."""
     if not any(settings.RENEWABLES_OPTIONS.values()):
         print("│   ├── TURNING OFF renewable energy constraints ...")
         return None, None
@@ -779,8 +779,8 @@ def get_renewable(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
 
 
 def get_ag_mgt_link(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
-    """One row per am column: X_am − X_ag ≤ 0 (an ag-mgt column cannot exceed the ag column it sits on)."""
-    print("│   ├── Adding ag-management link (X_am ≤ X_ag) constraints...")
+    """One row per am column: X_am - X_ag ≤ 0 (an ag-mgt column cannot exceed the ag column it sits on)."""
+    print("│   ├── Adding ag-management link (X_am <= X_ag) constraints...")
     options  = inputs.am_options                                                        # the names of the am_idx codes
     am_cols  = np.flatnonzero(cols['block'].values == 'am')                            # one row per am column, in table order ...
     am_idx   = cols['am_idx'].values[am_cols]
@@ -794,7 +794,7 @@ def get_ag_mgt_link(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
     row_matrix = sparse.csr_matrix(
         (np.concatenate([np.ones(n_rows), -np.ones(n_rows)]), (np.concatenate([rows, rows]), np.concatenate([am_cols, ag_cols]))),
         shape=(n_rows, cols.sizes['col'])
-    )                                         # +1 on X_am, −1 on X_ag
+    )                                         # +1 on X_am, -1 on X_ag
     row_matrix, _, _ = contract(row_matrix)
     return make_part(
         'ag_mgt_link',
@@ -807,8 +807,8 @@ def get_ag_mgt_link(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
 
 
 def get_renewable_ceiling(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
-    """One row per (renewable option, cell with existing capacity): Σ X_am ≤ max(ag_mask − existing, 0)."""
-    print("│   ├── Adding renewable ceiling (Σ X_am ≤ ag mask − existing) constraints...")
+    """One row per (renewable option, cell with existing capacity): Σ X_am ≤ max(ag_mask - existing, 0)."""
+    print("│   ├── Adding renewable ceiling (sum X_am <= ag mask - existing) constraints...")
     blocks = []
     rhs = []
     names = []
@@ -839,7 +839,7 @@ def get_renewable_ceiling(inputs: RowInputs, cols: xr.Dataset, support: ColSuppo
 # ═══════════════════════════ the flow rows ═══════════════════════════
 #
 #   group the arcs by their source's place in the base grid   →  source cap:   Σ out ≤ base              (a ≤ row per source node)
-#   look every column and arc up on the grid of its node       →  node balance: X = base + Σ in − Σ out   (an = row per node)
+#   look every column and arc up on the grid of its node       →  node balance: X = base + Σ in - Σ out   (an = row per node)
 #   the inflow cap is not a row: X's own ub (the transition upper bound) bounds it.
 #   a cell's total is not a row either: every arc leaves one node of the cell and lands on another, so the cell's
 #   node-balance rows sum to Σ X = Σ base (row_bounds forms that sum to bound a cell's columns together).
@@ -848,7 +848,7 @@ def get_renewable_ceiling(inputs: RowInputs, cols: xr.Dataset, support: ColSuppo
 def get_source_cap_ag(cols: xr.Dataset, support: ColSupport):
     """One row per ag source (lm, lu, cell): Σ of the arcs leaving it (ag2ag ∪ ag2nonag) ≤ its base share."""
     # bounds the arc columns (some flow costs are negative) and rules out pass-through
-    print("│   ├── Adding source-cap (Σ out ≤ base) constraints at the ag sources...")
+    print("│   ├── Adding source-cap (sum out <= base) constraints at the ag sources...")
     arcs        = np.flatnonzero(np.isin(cols['block'].values, ('ag2ag', 'ag2nonag')))   # the arcs leaving an ag node
     if not arcs.size:
         return None, None
@@ -873,7 +873,7 @@ def get_source_cap_ag(cols: xr.Dataset, support: ColSupport):
 
 def get_source_cap_nonag(cols: xr.Dataset, support: ColSupport):
     """One row per non-ag source (nonag_lu, cell): Σ of the arcs leaving it (nonag2ag) ≤ its base share."""
-    print("│   ├── Adding source-cap (Σ out ≤ base) constraints at the non-ag sources...")
+    print("│   ├── Adding source-cap (sum out <= base) constraints at the non-ag sources...")
     arcs    = np.flatnonzero(cols['block'].values == 'nonag2ag')                               # the arcs leaving a non-ag node
     if not arcs.size:
         return None, None
@@ -895,8 +895,8 @@ def get_source_cap_nonag(cols: xr.Dataset, support: ColSupport):
 
 
 def get_node_balance_ag(cols: xr.Dataset, support: ColSupport):
-    """One row per ag column: X_ag = base + Σ in (ag2ag ∪ nonag2ag) − Σ out (ag2ag ∪ ag2nonag)."""
-    print("│   ├── Adding node-balance (X = base + Σin − Σout) constraints at the ag nodes...")
+    """One row per ag column: X_ag = base + Σ in (ag2ag ∪ nonag2ag) - Σ out (ag2ag ∪ ag2nonag)."""
+    print("│   ├── Adding node-balance (X = base + sum in - sum out) constraints at the ag nodes...")
     ag          = np.flatnonzero(cols['block'].values == 'ag')
 
     # ── the rows: one per ag column ──
@@ -910,7 +910,7 @@ def get_node_balance_ag(cols: xr.Dataset, support: ColSupport):
         col = support.ag_mrj2col[m_, r_, j_]
         return np.where(col >= 0, row_of_col[col], -1)
 
-    # ── the entries: X on its own row, inflows −1 on the target's row, outflows +1 on the source's row ──
+    # ── the entries: X on its own row, inflows -1 on the target's row, outflows +1 on the source's row ──
     row_idx = []
     col_idx = []
     vals = []
@@ -938,8 +938,8 @@ def get_node_balance_ag(cols: xr.Dataset, support: ColSupport):
 
 
 def get_node_balance_nonag(cols: xr.Dataset, support: ColSupport):
-    """One row per non-ag column: X_nonag = base + Σ in (ag2nonag) − Σ out (nonag2ag)."""
-    print("│   ├── Adding node-balance (X = base + Σin − Σout) constraints at the non-ag nodes...")
+    """One row per non-ag column: X_nonag = base + Σ in (ag2nonag) - Σ out (nonag2ag)."""
+    print("│   ├── Adding node-balance (X = base + sum in - sum out) constraints at the non-ag nodes...")
     nonag       = np.flatnonzero(cols['block'].values == 'nonag')
 
     # ── the rows: one per non-ag column ──
@@ -955,7 +955,7 @@ def get_node_balance_nonag(cols: xr.Dataset, support: ColSupport):
         col = support.nonag_rk2col[r_, k_]
         return np.where(col >= 0, row_of_col[col], -1)
 
-    # ── the entries: X on its own row, inflows −1 on the target's row, outflows +1 on the source's row ──
+    # ── the entries: X on its own row, inflows -1 on the target's row, outflows +1 on the source's row ──
     row_idx = []
     col_idx = []
     vals = []

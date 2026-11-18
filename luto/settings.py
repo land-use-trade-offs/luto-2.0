@@ -1398,6 +1398,8 @@ ROUND_DECIMALS = 6
 # A barrier solution without crossover leaves millions of shares just above zero (RES1 2020: 3.2 M ag shares in
 # (1e-6, 1e-5], ~570 ha in all), and every share above the ROUND_DECIMALS floor is a source of the next year with
 # arcs of its own (RES1 2025: 1.7x the columns of 2020). None = off: the solution is stored as solved.
+# Needed only for a solve WITHOUT crossover: with crossover (the default RETRY_PARAMS) the solution is a vertex and leaves
+# almost none (RES5, 2050: 144 of 331,410 ag shares at or below 1e-4), so leave it at None. Set 1e-4 for a barrier-only run.
 SOLUTION_SHARE_FLOOR = None
 
 
