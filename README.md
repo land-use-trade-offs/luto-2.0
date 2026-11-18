@@ -113,7 +113,6 @@ luto/                                    # Main package directory
     │   ├── data_tools/                  # Data processing for reports
     │   ├── create_report_data.py        # Generate chart data files
     │   └── create_report_layers.py      # Generate map layer files
-    ├── inspect_iis.py                   # Decode IIS / .ilp files from infeasible solves
     ├── mem_monitor.py                   # Memory profiling decorator and live plot
     └── write.py                         # Output writing functions
 
@@ -168,7 +167,7 @@ result = my_expensive_function(my_data)
 
 **Non-optimal Solves (INFEASIBLE / NUMERIC):**
 - A year is only accepted when Gurobi returns `GRB.OPTIMAL`; the attempts in `settings.RETRY_PARAMS` are tried in order first
-- Barrier can report false infeasibility on numerically hard scenarios. The dual-simplex fallback in `RETRY_PARAMS` usually resolves it; if not, re-run that year from its checkpoint with different parameters
+- The default is ONE attempt, the homogeneous barrier. It solves the grouped RES1 models on which the plain barrier ends in "Numerical trouble", but on a highly degenerate model it can report a false INFEASIBLE; such a year stops. Re-run it from its checkpoint with another attempt in `RETRY_PARAMS` (e.g. the plain barrier, `(0, 2, -1, -1, -1)`)
 - A genuinely infeasible year is usually a handful of targets that cannot be met on the available land. Start with the bound report every year writes before its model is built — see [Diagnosing Infeasible Years](#diagnosing-infeasible-years)
 
 ### Diagnosing Infeasible Years
@@ -190,7 +189,8 @@ Every constraint row is a linear expression over decision variables whose bounds
 The check needs no solver — it is arithmetic on the constraint matrix and the variable bounds — so the report can be reproduced and shared without a Gurobi licence.
 
 **What it cannot see.** It proves facts about one row at a time. Targets that are each achievable on their own but compete for the same cells (several species sharing habitat, a water limit against a planting target) are not detected, so "nothing proven" does not mean feasible. When the solver still reports INFEASIBLE:
-- Load `debug_model_<base_year>_<target_year>.mps`, saved in the run directory before every solve, compute an IIS, and decode the `.ilp` with `luto/tools/inspect_iis.py`
+- Let the suspect families fall short instead of failing: list them in `ELASTIC_FAMILIES` and re-run the year from its checkpoint. Every row that cannot be met together with the rest of the year is then named in `out_<year>/shortfall_<year>.csv` with the amount it misses (with `ELASTIC_DROP_SHORT`, pass 1 minimises only the shortfall: a row still short there cannot be met together with the hard rows)
+- Work on the model space itself: a year's model is the column table `cols`, the row table `rows` and one scipy matrix `row_matrix` (plus `obj`), plain numpy / scipy / xarray. A family or a region is a mask on the row table (`rows['family'].values == name`, `rows['region']`), a cell's columns a mask on `cols['cell']`, so any subset of rows can be switched off (`active`) or examined (activity, ranges, coefficients) without a solver and without parsing names. There is no IIS tooling: an IIS is a statement about the model handed to it and was found to mislead (docs/FINDINGS.md, 20260810)
 
 The settings (`BOUND_PROP_REL_TOL`, `BOUND_PROP_DROP_FAMILIES`, `BOUND_PROP_ON_IMPOSSIBLE`) are under [Solver Configuration](#solver-configuration).
 
@@ -206,7 +206,7 @@ The settings (`BOUND_PROP_REL_TOL`, `BOUND_PROP_DROP_FAMILIES`, `BOUND_PROP_ON_I
 
 **Minimum Requirements:**
 - Python 3.14 (pinned in `requirements.yml`)
-- 16 GB RAM at `RESFACTOR >= 10`; 32 GB or more for `RESFACTOR = 5`. Full resolution (`RESFACTOR = 1`) is an HPC workload — budget several hundred GB and expect the write/report phase to dominate peak memory.
+- 16 GB RAM at `RESFACTOR >= 10`; 32 GB or more for `RESFACTOR = 5`. Full resolution (`RESFACTOR = 1`) is an HPC workload: with `CELL_GROUPING = True` a year takes about 1 h and the run peaks at about 290 GB (2020–2050, default targets, no report, 2026-11-18); the write/report phase at RES1 is not yet tested with grouping.
 - 50 GB available disk space for input data and outputs
 - GUROBI optimization solver license (academic licenses available); `gurobipy` is pinned to 13.0.3
 - We are working on support for other solving engines, such as IBM CPLEX and NVIDIA cuOpt (see [Other solving engines](#other-solving-engines-in-progress)). GUROBI is the only engine the model solves with today
@@ -246,8 +246,11 @@ We are working on letting a run solve with engines other than GUROBI:
 - **IBM CPLEX**, a commercial LP solver on the CPU and the engine the original LUTO used. The `cplex` and `docplex`
   packages are already in `requirements.yml`; the native runtime needs a licensed IBM ILOG CPLEX Optimization
   Studio 22.2 installation.
-- **NVIDIA cuOpt**, an open-source, GPU-accelerated solver. Its first-order LP method (PDLP) can make very large
-  models, such as full-resolution LUTO years, much faster on a GPU, with a looser default precision than barrier.
+- **NVIDIA cuOpt**, an open-source, GPU-accelerated solver. Tested (cuOpt 26.08): its GPU barrier is 2.5 – 7× faster
+  than Gurobi on models with few wide rows, but it fails on models with GBF8 species rows and on the default grouped
+  RES1 model, under every linear system it offers, and its own crossover would take about a day. Not reliable for
+  LUTO today; every test is listed in `docs/FINDINGS.md` (20261119). Gurobi's own GPU method (PDHG) has not converged
+  on any LUTO model.
 
 The model build is what makes this practical. Each year's LP is handed to the solver as plain arrays: the column
 table (bounds), one scipy CSR matrix `A`, the row table (rhs, sense) and the objective vector. So a new engine only
@@ -315,7 +318,7 @@ Long runs (typically full-resolution jobs on HPC) can checkpoint after each solv
 sim.run(data=data, checkpoint_dir='output/my_run/checkpoint')
 ```
 
-A year is only accepted (and checkpointed) when the solver returns `GRB.OPTIMAL`. If the first solve attempt fails, the attempts listed in `settings.RETRY_PARAMS` are tried in order before the run stops.
+A year is only accepted (and checkpointed) when the solver returns `GRB.OPTIMAL`. If a solve attempt fails, the next attempt listed in `settings.RETRY_PARAMS` is tried; the default lists one, so a failed year stops the run and can be resumed from its checkpoint.
 
 ### Batch and Grid-Search Runs
 
@@ -420,7 +423,9 @@ Transitions are modelled as explicit per-source delta flows: each cell's land is
 
 ### Solver Configuration
 - `THREADS`: Number of parallel threads for optimization (default: 32)
-- `RETRY_PARAMS`: Ordered list of solve attempts, each a `(NumericFocus, Method, Crossover, Presolve, BarHomogeneous)` tuple. The algorithm is chosen here — there is no standalone `SOLVE_METHOD` setting. The default first attempt is barrier with presolve, crossover and the homogeneous algorithm left automatic (`-1`); the fallback is dual simplex
+- `RETRY_PARAMS`: Ordered list of solve attempts, each a `(NumericFocus, Method, Crossover, Presolve, BarHomogeneous)` tuple. The algorithm is chosen here — there is no standalone `SOLVE_METHOD` setting. The default is one attempt, `(0, 2, -1, -1, 1)`: barrier with crossover and presolve automatic and the homogeneous algorithm ON (2026-11-18; the plain barrier failed on the grouped RES1 2025 model). There is no simplex fallback: on a model this size it runs for hours
+- `SCALE_FLAG`: Gurobi's own scaling of rows and columns (default 2, geometric). It works on top of the row rescale (`RESCALE_FACTOR`); with cell grouping a column sums its blob's cells, so the columns differ by the blob's size, and geometric scaling cut the barrier iterations by 35 % on the grouped RES1 model
+- `CELL_GROUPING`: Cells that are alike share one decision, so the solver sees a much smaller model (default `False`). At RES1 about 4.2 M cells become about 250 k blobs and the solved model has about 9× fewer nonzeros, about the size of an ungrouped RES5 model. A blob is cells with the same starting land use and options, the same regions and GBF target footprints, and close coefficients (an SVD of the objective and the wide rows: `CELL_GROUPING_SVD_DIMS`, `CELL_GROUPING_TOLERANCE`; `CELL_GROUPING_RIPARIAN_BINS`). The solution is mapped back to every cell and checked against the full model each year (`out_<year>/grouping_<year>.csv`, `grouping_rows_<year>.csv`): it is always feasible there, and the cost is optimality (within 0.12 % of the ungrouped run at RES5, 2020–2050). It shortens the solve only — the full tables are still built — needs crossover, and cannot be combined with `BIO_ROW_GENERATION` or `ELASTIC_FAMILIES`; with GBF8 targets most of the speed-up is lost. Design: `luto/solvers/README.md`
 - `FEASIBILITY_TOLERANCE` / `OPTIMALITY_TOLERANCE` / `BARRIER_CONVERGENCE_TOLERANCE`: Solver tolerances. `ROUND_DECIMALS` and the near-zero bound snapping threshold are derived from `FEASIBILITY_TOLERANCE`
 - `RESCALE_FACTOR`: Target magnitude (1e3) that solver input arrays are rescaled to for numerical stability
 - `SOLVER_COEFF_MIN`: Universal floor (1e-4) below which a term's coefficient is dropped before entering Gurobi, keeping the constraint matrix range within Gurobi's safe zone

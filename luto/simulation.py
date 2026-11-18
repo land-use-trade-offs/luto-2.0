@@ -132,7 +132,7 @@ def run(
         to resume from, in which case the checkpointed Data replaces it.
     do_report : bool, default True
         If True, write outputs at the end of the run. Set to False to skip output
-        writing (e.g. when doing a quick test run or debugging IIS infeasibility).
+        writing (e.g. when doing a quick test run or debugging an infeasible year).
     checkpoint_dir : str or None, default None
         Where to LOOK for a ``data_<year>.lz4`` checkpoint to resume from; the run
         continues at the first unsolved year. Checkpoints themselves are always
