@@ -200,10 +200,19 @@ def aggregate(tables: Tables, blob_of_cell: np.ndarray) -> tuple[Tables, sparse.
     ub_grouped = np.full(n_new_cols, np.inf)
     np.maximum.at(lb_grouped, new_col, cols['lb'].values.astype(np.float64))
     np.minimum.at(ub_grouped, new_col, cols['ub'].values.astype(np.float64))
-    n_inverted = int((lb_grouped > ub_grouped).sum())
-    if n_inverted:
-        raise ValueError(f'Cell grouping: {n_inverted:,} grouped column(s) have a lower bound above their upper bound — '
-                         f'cells whose bounds exclude each other share a blob.')
+    # The cells of a blob hold the same base to ROUND_DECIMALS (the key), so a bound that follows the base (a locked-in
+    # share: lb = ub = base) can differ between them in the next decimal, and the largest lb then passes the smallest ub by
+    # that much. Within the margin the two meet at their midpoint — every cell's own bound holds to the margin, which
+    # report_grouping measures; beyond it the blob mixes cells that cannot share a share, and the year stops.
+    inverted = np.flatnonzero(lb_grouped > ub_grouped)
+    if inverted.size:
+        gap = lb_grouped[inverted] - ub_grouped[inverted]
+        margin = 10 * settings.FEASIBILITY_TOLERANCE
+        if gap.max() > margin:
+            raise ValueError(f'Cell grouping: {int((gap > margin).sum()):,} grouped column(s) have a lower bound above their upper bound by more than '
+                             f'{margin:g} (largest {gap.max():.3g}) — cells whose bounds exclude each other share a blob.')
+        lb_grouped[inverted] = ub_grouped[inverted] = (lb_grouped[inverted] + ub_grouped[inverted]) / 2
+        print(f"│   ├── {inverted.size:,} grouped column(s) whose cells' bounds cross by at most {gap.max():.3g}: set to the midpoint", flush=True)
     cols_grouped = cols.isel(col=first_col).assign(lb=(('col',), lb_grouped), ub=(('col',), ub_grouped))
 
     # ── the rows: a wide row stays; a per-cell row joins the rows of its blob that read the same over the grouped columns ──
