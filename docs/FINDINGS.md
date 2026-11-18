@@ -5,6 +5,39 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20261119 — cuOpt's GPU barrier does not solve the default grouped RES1 model; Gurobi stays the engine
+
+### TL;DR
+
+On 2026-11-06 a grouped RES1 model (2045 → 2050, GHG and GBF2 off, HIR off, 28.5 M nonzeros) was solved to a vertex in
+about 230 s by cuOpt's barrier on the GPU followed by Gurobi's crossover from cuOpt's point (x and row duals as `PStart` /
+`DStart`, `LPWarmStart 2`), against 758 s for Gurobi alone. The same hand-over was tried on the model LUTO's defaults
+give, as the RES1 run of 2026-11-18 solved it for 2020 → 2025 (GHG 'low', GBF2 'high', HIR on; 251,337 blobs, 8.22 M
+rows × 11.35 M columns, 55.2 M nonzeros). cuOpt solved it in none of three settings. Conclusion: cuOpt is not reliable
+on LUTO's models: whether it solves depends on which targets are on. Gurobi's homogeneous barrier + crossover stays
+(on this model 261 iterations, 1,337 s, vertex 4,928.760657).
+
+### Results (cuOpt 26.08, NVIDIA L40S 45 GB, local)
+
+| cuOpt setting | Result |
+|---|---|
+| PSLP presolve, ADAT system | presolve ~430 s (the 11-06 model: 24 s), symbolic factorisation 237 s (14 s), factor 3.41e7 nonzeros, GPU 22.3 GB; iteration 0: `||ADAT*dy - h|| = 1.77e7` against `||h|| = 7.9e11`, "Search direction computation failed", NumericalError, no solution |
+| PaPILO presolve | still in presolve after 40 min (past its 1,800 s time limit), one thread, 220 GB of RAM; stopped |
+| PSLP presolve, augmented system | iterates (~7 s each, GPU full), primal residual 1.15e4 → 147 by iteration 37, but the primal (−4.3e8) and dual (+5.7e15) objectives move apart (optimum ~4,929) and complementarity rises 12 → 2.1e4; no output for 3 min after that; stopped |
+
+- **Not the coefficient range:** the two models' ranges are about the same (matrix 1e-6 .. 4e5 against 3e-6 .. 8e5).
+- **Not isolated:** the two models differ in year, GHG (two rows over nearly every column), GBF2, HIR and GBF4 at once. The
+  full model is 34 % larger (498 M against 373 M nonzeros); there are 60 % more blobs with fewer distinct keys (47,048
+  against 51,444), so the extra blobs come from the SVD bins. The failure matches every earlier model with GBF8 species
+  rows (ADAT fails at iteration 0, the augmented system does not converge: 20260930 and the 11-04 tests), which points at
+  wide dense rows; untested: the same model without the GHG or the GBF2 rows.
+- Even had it solved, cuOpt's presolve and symbolic factorisation alone took ~11 min, half of Gurobi's whole barrier.
+
+Scripts and logs: `jinzhu_inspect_code/LUTO_cluster_cols/` (`script/merge_hybrid_res1.py`, `log/merge_hybrid_res1*.log`,
+`data/bench_res1/`, `doc/progress.md`).
+
+---
+
 ## 20261118 — cell grouping in the solver (`CELL_GROUPING`): a GBF row's footprint must be in the blob key; the RES1 size cut survives it
 
 ### TL;DR
