@@ -802,17 +802,19 @@ HIR_PRODUCTIVITY_CONTRIBUTION = 0.5
 # HIR celling factor, assuming HIR achienves x% of bio/GHG benefits of the Destocked - natural land land use
 HIR_CEILING_PERCENTAGE = 0.8
 
-# Existing-HIR-project baseline on the two GHG rows. None = off. Otherwise a folder under INPUT_DIR built outside LUTO
-# (e.g. 'Nick_build/ag_mgt_caps'). LUTO's HIR then counts only above the regrowth (LULUCF row) and
-# destocking (AG row) of the existing ACCU HIR projects on their mapped cells, as its plantings count above the
-# plantings baseline: the NIR series already carry those projects.
+# Retired: the existing-HIR-project baseline subtraction on the two GHG rows. Existing projects now start as base-year
+# adoption (HIR_BASE_YEAR_PROJECTS), and HIR counts on each row only above each cell's base-year adoption. Data stops
+# with an error if this is set.
 HIR_BASELINE = None
 
 # Existing HIR projects as base-year management. None = off (no ag-management adoption in the base year). Otherwise a
 # folder under INPUT_DIR written by input/Nick_build/scripts/ag_mgt_caps.py (e.g. 'Nick_build/ag_mgt_caps_2021', the 2021-map run): the ACCU HIR projects registered up
 # to its baseline FY start as base-year adoption of HIR - Beef and HIR - Sheep on the cells of their Carbon Estimation
 # Areas whose base-year land use is the option's own (Beef or Sheep natural land), as the share of the cell inside the
-# projects (capped at the land use's share). Project area on other land uses is not adopted.
+# projects (capped at the land use's share). Project area on other land uses is not adopted. HIR regrowth counts on the
+# LULUCF row only above each cell's base-year adoption: the existing projects' removals are in the national inventory, so
+# in the exogenous series. Their destocking counts on the AG row as part of the base state (NIR's livestock figures reflect
+# it and the stocking calibration k is calibrated with it in place); its constant is 0 (ghg.get_hir_base_year_t).
 HIR_BASE_YEAR_PROJECTS = None
 
 # Maintainace cost for HIR

@@ -387,13 +387,6 @@ window.SettingsNotes = {
       "False: each option stays at most at its base-year adoption on every cell (existing regeneration projects; every other option at 0).",
     ],
   },
-  HIR_BASELINE: {
-    what: "Whether regeneration projects that already exist are left out of what the model can claim.",
-    detail: [
-      "None: not applied.",
-      "A folder name: the regrowth and destocking of existing registered projects is taken as given, since the national inventory already counts them. The model is credited only for regeneration beyond them.",
-    ],
-  },
   BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR: {
     what: "The cost of maintaining human-induced regeneration on beef land.",
     detail: [
