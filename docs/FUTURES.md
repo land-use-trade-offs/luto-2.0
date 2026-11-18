@@ -5,6 +5,89 @@ Entries are in **descending date order** (newest first). Each entry stands on it
 
 ---
 
+## 20261118 — model build: stop computing the same input several times a year (caches, one hoisted call)
+
+### TL;DR
+
+At RES1 the model build takes about 12.5 minutes per year before the solver starts, and with cell grouping on it is the larger part of a year. The "Getting ..." functions are vectorised over cells; the time lost is in repeated work. Cache the per-(land use, land management) results that several modules ask for, and move one call out of a loop. Estimated saving: 1–2 minutes of the 12.5 per RES1 year (about 10–15 %), scaled from the RES5 profile and the RES1 step times, not yet measured at RES1.
+
+### What is repeated
+
+Profiled on one step's build at RES5 (39 s in all; `cProfile` over `get_cols`, `get_row_inputs`, `get_rows`, `get_row_bounds`, `get_economics`, `get_obj`).
+
+| What | Evidence | Fix |
+|---|---|---|
+| Ag-management GHG matrices built twice | `row_inputs.py:259`: `get_agricultural_management_ghg_matrices(..., separate=True)` is called inside the loop over the two GHG sides (AG, LULUCF). RES1: the step takes 40 s | call it once before the loop |
+| Crop quantity computed three times | `quantity.get_quantity`: 140 calls a year, 64 from the quantity matrices, 38 from `revenue.get_rev_crop`, 38 from `cost.get_cost_crop` | cache |
+| Livestock stocking rate computed about eight times per type | `quantity.get_yield_pot`: 96 calls, from quantity, GHG, cost, revenue, water and the ag-management effects | cache |
+| Climate-impact lookup | `quantity.get_ccimpact`: 210 calls, from the two functions above | cache |
+| Dynamic pricing rebuilds every quantity matrix | `Data.get_elasticity_multiplier`, first call of a year: `get_potential_production_lyr` recomputes the ag, non-ag and ag-management quantities that `get_row_inputs` built minutes before, then sums them in chunks. Likely why agricultural revenue is the slowest matrix at RES1 (2 min 10 s against 49 s for cost); inferred from the code and the timings, not profiled | the ag part becomes a lookup once `get_quantity` is cached; pass the built matrices in for the rest |
+
+### RES1 timings the entry starts from (2010 → 2020, default settings, one run)
+
+| Step | Time |
+|---|---|
+| Columns | about 1 min |
+| Row inputs | 1 min 49 s |
+| Rows | 2 min 55 s (ag-management link 57 s, node balance 55 s) |
+| Bound propagation | 2 min 49 s (75.7 M rows) |
+| Objective | 3 min 53 s (agricultural revenue 2 min 10 s) |
+| Model build | 12 min 33 s |
+
+### Estimated saving at RES1 (per year; scaled from the RES5 profile, to be measured)
+
+| Fix | Saving | From |
+|---|---|---|
+| Ag-management GHG built once | about 20 s | half of the 40 s step |
+| `get_quantity` cached: revenue and cost reuse the crop quantities | about 18 s | the ag quantity matrices take 15 s; crops are 38 of 64 calls, recomputed twice |
+| `get_quantity` cached: dynamic pricing's ag quantities | about 15 s | one more build of the ag quantity matrices |
+| `get_yield_pot` / `get_ccimpact` cached | about 20 s | 96 calls for about 14 distinct results |
+| **Caches and the hoisted call** | **about 75 s** | |
+| Dynamic pricing takes the built non-ag and ag-management quantities | up to 35 s more | needs a changed call, not a cache |
+
+The larger costs are not repeated work and a cache does not touch them: bound propagation (2 min 49 s), the row families (2 min 55 s), the chunked sum inside dynamic pricing.
+
+### How
+
+- `functools.lru_cache` on `get_quantity`, `get_yield_pot` and `get_ccimpact`, as the matrix functions already have (`get_cost_matrices`, `get_rev_matrices`, `get_ghg_matrices`, `get_wreq_matrices`).
+- **A size limit**, so one year's results are kept and older years are dropped. One result is one value per cell: 17–34 MB at RES1, about 2–4 GB for a year's set.
+- **Cached arrays are read-only** (`setflags(write=False)`). A cached array is shared by every caller; one that changes it in place would hand wrong numbers to the next. Read-only makes that an error at once. Check the callers first; a few may need a copy.
+- **Check:** build the RES5 tables with and without the caches; the matrix, the bounds and the objective vector must be identical. Then profile again and confirm the call counts fell.
+
+### Two more ideas, noted with the suggestion NOT to implement (2026-11-18)
+
+Both are real gains on paper. Neither is worth its restructuring now; they are recorded so the reasoning is not repeated.
+
+**1. Build next year's inputs while this year solves.**
+
+| Build step | RES1 time | Needs the solved year? |
+|---|---|---|
+| Columns (bounds, sources, arcs) | about 1 min | yes: built from where the land is now |
+| Row inputs (GHG, water, quantity, biodiversity matrices) | 1 min 49 s | mostly no: target year only |
+| Rows | 2 min 55 s | yes: built on the columns |
+| Bound propagation | 2 min 49 s | yes |
+| Cost and revenue matrices | about 3 min 15 s | no: target year only |
+| Transition costs, objective | about 40 s | yes: priced per arc from the current state |
+| Cell grouping | 5 min 15 s | yes |
+
+- About 5 minutes of a 30–35 minute year could overlap with the solve (about 15 %), and nothing in the last year. A background thread would do it: numpy and Gurobi both release Python's lock during heavy work.
+- Why not: `get_row_inputs` returns one object that mixes target-year matrices with pieces read from the current state, so it would have to be split in two; the matrix functions cache ONE year (`lru_cache(maxsize=1)`), so computing the next year would evict the current year's results while they may still be read; and the next year's matrices (about 7 GB of economics plus the row inputs at RES1) would sit on top of the build's memory peak.
+
+**2. Use the processor's chiplets (one L3 cache per 8 cores on the local EPYC 9654P) for the build.**
+
+- Why not: the data load and the build are single-threaded numpy over arrays of 17–34 MB each at RES1, far larger than a chiplet's cache. One thread already sits on one chiplet, and the limit is memory speed, which every chiplet shares on a single-socket machine. Pinning would gain a few percent at most.
+- What would use the cores is running the independent matrix functions (cost, revenue, GHG, water, quantity) at the same time. That is the restructuring of idea 1 again, with several matrices in flight at once.
+- The one place chiplets may matter is the Gurobi barrier, which runs 28–32 threads across chiplets on a memory-heavy factorisation. A cheap test, if solve time becomes the limit: the same saved model with the threads pinned to 2 and to 4 chiplets against unpinned, compared on time per iteration.
+
+**Where to look first instead:** the cell grouping step itself (5 min 15 s at RES1, single-threaded sorting and hashing, never tuned), and bound propagation (below).
+
+### Also worth a look, same goal
+
+- Bound propagation on the wide rows only, or on the grouped tables: most of its 75.7 M rows are per-cell rows.
+- The checkpoint: about 3 minutes per save of the data object at RES1, once before the first year and once after every year.
+
+---
+
 ## 20261110 — Vue report: a Hypothesis tab (inputs and assumptions) and a terminology wiki
 
 ### TL;DR

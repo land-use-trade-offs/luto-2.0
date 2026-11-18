@@ -5,6 +5,85 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20261118 — cell grouping in the solver (`CELL_GROUPING`): a GBF row's footprint must be in the blob key; the RES1 size cut survives it
+
+### TL;DR
+
+Cell grouping (`luto/solvers/aggregate.py`, `settings.CELL_GROUPING`, default off) merges cells that are alike into blobs and solves the smaller model. Its first solve in the repo, at RES5, lost 9.3 % of the objective. The cause was the GBF2 row: a blob mixed cells inside and outside the priority area. With the footprint of every GBF row in the exact key, the loss is 0.02 %, and at RES1 the model stays 12× smaller. A RES5 run to 2050 with grouping on stays within ±0.12 % of the run without it, with nearly identical land use, but is 1.2× slower: RES5 cannot show the speed.
+
+- **The transform is exact.** With every cell its own blob, the grouped model gives the plain objective and the same `x`.
+- **A grouped solution is feasible for the full model.** Mapped back, no row of the full model is over tolerance (worst excess 2.2e-8) and no bound is breached.
+- **A GBF target over a mask needs its footprint in the key.** GBF2 counts only cells inside the priority degraded area. A blob that mixes inside and outside cells must convert both to serve the target, and pays for land that does not count.
+- **The rule:** the set of GBF rows a cell has a coefficient in is part of the exact key, for every GBF family.
+- **At RES1 the footprints cost little** with 34 GBF4 rows: 4.4 % more blobs, 12.4× fewer nonzeros against 13.1× without.
+
+### RES5, one step (2010 → 2020, default settings: GBF2 'high', one GBF2 row)
+
+The same tables for every model; barrier with crossover.
+
+| Model | Blobs | Rows | Columns | Nonzeros | Objective (M AUD) | Against plain |
+|---|---|---|---|---|---|---|
+| Plain | 187,755 cells | 4,091,369 | 7,508,805 | 27,829,256 | 9,194.76 | — |
+| Identity (every cell its own blob) | 187,755 | 4,091,369 | 7,508,805 | 27,829,256 | 9,194.76 | 0; `x` identical |
+| Grouped, no GBF footprint in the key | 83,293 | 2,942,311 | 6,017,521 | 21,673,960 | 8,343.58 | **−9.26 %** |
+| Grouped, GBF2 footprint in the key | 84,950 | 2,966,194 | 6,050,200 | 21,801,126 | 9,193.00 | **−0.019 %** |
+
+- The GBF2 footprint covers 44,738 of the 187,755 cells and splits 1,657 blobs (2 % more).
+- RES5 groups poorly whatever the key: coarse cells start with fractional land-use shares, so most cells have their own starting state. Only 1.3× fewer nonzeros.
+- The grouped RES5 solve is slower than the plain one: 190–202 barrier iterations against 88, for a model only 1.3× smaller (year 2020 of the full run: 640 s against 431 s). The doubled iteration count is not explained.
+
+### RES1, blob count with the merged code (2045 → 2050, `Run_RES1_T150_ag0_noHIR`, 27 GBF4 SNES + 7 GBF4 ECNES rows, no GBF2, no solve)
+
+| Rule | Blobs | Rows | Columns | Nonzeros | Fewer than full (372.7 M) |
+|---|---|---|---|---|---|
+| Full model | 4,218,733 cells | 70,279,193 | 94,771,055 | 372,749,665 | — |
+| GBF footprints in the key (the merged rule) | 157,377 | 5,338,046 | 7,622,862 | 30,096,421 | 12.4× |
+| GBF rows hidden from the footprint step | 150,740 | 5,083,376 | 7,271,092 | 28,452,879 | 13.1× |
+
+- The last row reproduces the prototype's solved run exactly (150,740 blobs, 28,452,879 nonzeros; 0.016 % objective loss, 12.3× fewer presolved nonzeros, solved 2026-11-02). So the merged blob maker is the tested one.
+- The footprint model has not been solved at RES1. Its loss can only be smaller (finer blobs); its solve time is not measured.
+- Many footprints do hurt: with 73 GBF8 species rows the prototype went from 150,740 to 949,177 blobs (2.5× fewer nonzeros, no faster than the full model). The settings guard warns when GBF8 is on.
+
+### RES5, the multi-year chain: grouping on against off (2020–2050 by 5 years, default settings: GHG 'low', GBF2 'high')
+
+Two runs from the same code, differing only in `CELL_GROUPING`. Each year starts from the run's own previous solution, so only 2020 is a like-for-like loss; later years compare two paths.
+
+| Year | Objective off (M AUD) | Objective on | On against off | Presolved nonzeros off | on | Barrier iterations off | on | Year total off | on |
+|---|---|---|---|---|---|---|---|---|---|
+| 2020 | 9,194.76 | 9,193.00 | −0.019 % | 23.1 M | 18.6 M | 88 | 190 | 431 s | 640 s |
+| 2025 | 5,613.61 | 5,607.27 | −0.113 % | 29.7 M | 24.0 M | 132 | 209 | 679 s | 893 s |
+| 2030 | 2,873.51 | 2,877.03 | +0.123 % | 30.5 M | 24.5 M | 158 | 223 | 930 s | 881 s |
+| 2035 | −18,055.07 | −18,063.73 | −0.048 % | 30.2 M | 24.2 M | 152 | 257 | 747 s | 1,057 s |
+| 2040 | 23,352.60 | 23,361.34 | +0.037 % | 30.4 M | 24.1 M | 140 | 225 | 796 s | 937 s |
+| 2045 | 18,689.36 | 18,696.03 | +0.036 % | 30.3 M | 23.9 M | 144 | 265 | 829 s | 953 s |
+| 2050 | 9,406.16 | 9,402.71 | −0.037 % | 29.8 M | 23.5 M | 154 | 290 | 808 s | 978 s |
+| All years | | | | | | | | 5,220 s | 6,339 s (1.21× slower) |
+
+Land use of the two runs (`script/merge_test_compare.py`, from the stored solutions; share of the 465 M ha on a different use):
+
+| Year | National totals | Cell by cell | Ag-management area, national (share of all ag-management ha) |
+|---|---|---|---|
+| 2020 | 0.0003 % | 0.003 % | 0.005 % |
+| 2030 | 0.003 % | 0.010 % | 0.019 % |
+| 2040 | 0.003 % | 0.012 % | 0.023 % |
+| 2050 | 0.004 % | 0.048 % | 0.053 % |
+
+- **The chain is stable.** The objectives stay within ±0.12 % and do not drift; blobs stay at 85,000–89,300 of 187,755 cells and the grouped model at 23.5–24.5 M presolved nonzeros from 2025 on.
+- **Every year is feasible for the full model:** no row over tolerance at the mapped-back solution (worst 6e-8), bounds to 1e-6.
+- **Land use is nearly identical.** The largest 2050 differences: HIR - Beef +48,663 ha of 9.90 M ha (0.5 %), dry Winter cereals +8,850 ha of 25.8 M ha, dry Beef - modified land −8,359 ha, Environmental Plantings +4,770 ha of 19.1 M ha.
+- **Grouping adds no fractional cells:** 71,409 cells hold one whole land use in 2050 in both runs (70,831 against 70,835 in 2020).
+- **At RES5 grouping is slower**, in six of seven years: the model is 1.25× smaller, the barrier needs 1.4–2.2× the iterations.
+
+### Not yet known
+
+- The solve time of the merged rule at RES1, and under the default targets (GHG 'low', GBF2 'high'): a RES1 run with grouping on and default settings was started 2026-11-18 15:04.
+- GBF2 at RES1, and the GHG rows, under grouping.
+- Why the grouped RES5 model needs twice the barrier iterations, and whether RES1 shows it (the prototype's RES1 solve took fewer iterations than the full model: 240 against 379).
+
+Scripts, logs and the merge plan: `jinzhu_inspect_code/LUTO_cluster_cols/` (`script/merge_test_one_year.py`, `merge_test_footprint.py`, `merge_blob_count_res1.py`; `doc/merge.md`, `doc/progress.md`).
+
+---
+
 ## 20261030 — barrier specks bloat the next year's model; store-time cleaning (`SOLUTION_SHARE_FLOOR`) and the non-ag leak fix
 
 ### TL;DR
