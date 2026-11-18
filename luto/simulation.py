@@ -37,8 +37,12 @@ from contextlib import contextmanager
 from pathlib import Path
 from gurobipy import GRB
 
+import luto.economics.agricultural.ghg as ag_ghg
+import luto.economics.non_agricultural.ghg as non_ag_ghg
+
 from luto import settings
 from luto.data import Data
+from luto.solvers.aggregate import check_grouping_settings, group_tables, report_grouping
 from luto.solvers.col_builder import get_cols
 from luto.solvers.rowgen import RowGen
 from luto.solvers.step import solve_step
@@ -48,16 +52,8 @@ from luto.solvers.row_bounds import STATUS, drop_redundant_rows, get_row_bounds,
 from luto.solvers.post_solve import post_solve
 from luto.solvers.reports import record_shadow_prices, report_shortfall, save_model_to_disk
 from luto.solvers.tables import Tables, elastic_absorbs
-import luto.economics.agricultural.ghg as ag_ghg
-import luto.economics.non_agricultural.ghg as non_ag_ghg
 from luto.tools.write_output import write_outputs
-from luto.tools import (
-    LogToFile,
-    log_memory_usage,
-    set_path,
-    write_timestamp,
-    read_timestamp,
-)
+from luto.tools import  LogToFile, log_memory_usage, set_path, write_timestamp, read_timestamp
 
 
 # Checkpoint files are named data_<year>.lz4. The same pattern drives both resume
@@ -239,6 +235,7 @@ def solve_timeseries(
             save_data_to_disk(data, str(base_ckpt))
             print(f"Saved base checkpoint for year {years_to_run[0]}: {base_ckpt}", flush=True)
 
+    check_grouping_settings()                                                               # settings.CELL_GROUPING: what it cannot run with
     carry = set()                                                                            # row generation: the targets whose rows the next step starts with
 
     for base_year, target_year in zip(years_to_run[:-1], years_to_run[1:]):
@@ -288,8 +285,12 @@ def solve_timeseries(
 
         # ─────────────── 6. the solve: the tables are the state, a solver is built from them for every solve ───────────────
         on_first_model = (lambda model: save_model_to_disk(model, data.path, base_year, target_year)) if settings.WRITE_DEBUG_MPS else None   # the debug MPS, BEFORE the first solve (off by default: ~5 GB a year)
-        accepted, x, status, luto_solver = solve_step(Tables(row_matrix, rows, cols, obj), inputs, rowgen, target_year, out_dir, on_first_model=on_first_model)
-        cols, obj = luto_solver.cols, luto_solver.obj                                        # the final tables: with the shortfall columns, the dropped rows off
+        #     settings.CELL_GROUPING: the solver takes the tables over blobs of alike cells; its x is mapped back to every cell below
+        tables = Tables(row_matrix, rows, cols, obj)
+        grouping = group_tables(tables, data.REAL_AREA.values, col_support.region2cell) if settings.CELL_GROUPING else None
+        accepted, x_solved, status, luto_solver = solve_step(tables if grouping is None else grouping.tables, inputs, rowgen, target_year, out_dir, on_first_model=on_first_model)
+        if grouping is None:
+            cols, obj = luto_solver.cols, luto_solver.obj                                    # the final tables: with the shortfall columns, the dropped rows off
 
         if not accepted:
             print(f'Processing for {target_year} completed in {round(time.time() - start_time)} seconds\n\n' , flush=True)
@@ -300,6 +301,9 @@ def solve_timeseries(
             break
 
         # ─────────────── 7. the solution: stored, reported, checkpointed ───────────────
+        x = x_solved if grouping is None else grouping.col_map @ x_solved                    # over the full column table: every cell of a blob takes the blob's share
+        if grouping is not None:
+            report_grouping(grouping, tables, x, target_year, out_dir)                       # every row of the full model at the mapped x; grouping_<year>.csv
         solution = post_solve(x, cols, col_support, inputs)                                    # the LUTO 1-D format
         slack = cols['block'].values == 'slack'                                               # the elastic rows' shortfall columns (settings.ELASTIC_FAMILIES)
         penalty = float(obj[slack] @ x[slack]) if slack.any() else 0.0                      # million AUD: the penalty in the objective, bookkeeping not money
@@ -311,7 +315,7 @@ def solve_timeseries(
 
         record_shadow_prices(luto_solver, target_year, out_dir)
         if not settings.ELASTIC_DROP_SHORT:                                                   # under the two-pass step, pass 1's shortfall was written before the drop
-            report_shortfall(x, luto_solver.rows, target_year, out_dir)
+            report_shortfall(x_solved, luto_solver.rows, target_year, out_dir)
         if rowgen is not None:
             rowgen.report(luto_solver.rows, out_dir)
             carry = rowgen.carry_next(luto_solver.rows)

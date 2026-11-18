@@ -1364,6 +1364,22 @@ ROWGEN_MAX_ROUNDS = 30              # per pass: a pass that reaches it stops NOT
 ROWGEN_SHORT_TOL = 1e-4             # relative: a target is short when its score is under its target by more than this
 ROWGEN_SCREEN_TOL = 1e-6            # relative: the screen must clear a target by more than this to call it safe / unattainable
 
+CELL_GROUPING = False
+'''
+True: cells that are alike share one decision, so the model the solver sees is smaller (luto/solvers/aggregate.py).
+A blob is the cells with the same key (the column types they hold with their base, their regions, Riparian Plantings'
+upper bound in CELL_GROUPING_RIPARIAN_BINS natural-break bins, the footprints of the GBF rows: exact) and the same SVD bin (their coefficients per
+hectare on CELL_GROUPING_SVD_DIMS directions, binned at CELL_GROUPING_TOLERANCE: close). The grouped solution is
+mapped back to every cell before it is stored, and is feasible for the full model; the cost is optimality (RES1,
+2045 -> 2050, no GBF8: 0.016 % of the objective for 12x fewer nonzeros, solved before the GBF footprints joined the
+key; with them the model is 4 % larger, not yet solved). It saves the solve only: the full tables are
+still built. Not with BIO_ROW_GENERATION or ELASTIC_FAMILIES; needs crossover (RETRY_PARAMS); with GBF8 targets the
+species footprints leave little of the grouping. Per year: out_<year>/grouping_<year>.csv and grouping_rows_<year>.csv.
+'''
+CELL_GROUPING_SVD_DIMS = 16         # the SVD directions a cell's coefficients are compared on
+CELL_GROUPING_TOLERANCE = 1.0       # the bin width on each direction, in the scaled signature's own units: ONE value for every run
+CELL_GROUPING_RIPARIAN_BINS = 5     # Riparian Plantings' ub joins the key in this many natural-break bins (a blob takes its smallest ub)
+
 
 
 

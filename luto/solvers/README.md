@@ -86,6 +86,47 @@ operation on them (`relax`, `append_rows`, `fix_slack`) takes a `Tables` and ret
 flagged off, the table never shrinks. The solver is stateless: it is built from the tables for every solve and never
 changes them.
 
+## Cell grouping: fewer unknowns for the same model (`settings.CELL_GROUPING`, default off)
+
+Cells that are alike can share one decision. `aggregate.py` turns the step's tables into smaller ones, between
+`get_obj` and `solve_step`, and maps the solution back before `post_solve`:
+
+```
+row_matrix_grouped = row_map @ row_matrix @ col_map      obj_grouped = col_map.T @ obj      x = col_map @ x_grouped
+```
+
+**A blob** is the cells with the same key and the same SVD bin. The key must match exactly; the SVD only has to be close.
+
+| part | what it holds | why |
+|---|---|---|
+| key | the column types a cell holds (`block` and every field but `cell`, `local_r`), each with its `base` | required: cells that start differently or have different options cannot take equal shares |
+| key | the cell's region in every layer of `col_support.region2cell` | for quality only: mixing regions stays exact |
+| key | Riparian Plantings' ub, in `CELL_GROUPING_RIPARIAN_BINS` natural-break bins | the one bound that does not follow from the base |
+| key | the set of GBF rows the cell has a coefficient in (their footprints) | a GBF target counts only the cells inside its mask or range: a blob that mixes inside and outside must convert both to serve it (RES5, 2010 → 2020, GBF2: 9.3 % objective loss without the footprint, 0.02 % with it, for 2 % more blobs) |
+| SVD | the cell's coefficients per hectare in the objective and the wide rows, on `CELL_GROUPING_SVD_DIMS` directions, binned at `CELL_GROUPING_TOLERANCE` | affects accuracy, not validity |
+
+**The grouped model.** A grouped column is one (blob, column type): its coefficient in a wide row and in the objective
+is the sum over the blob's cells, its lb the largest and its ub the smallest of them. A per-cell row (node balance,
+source cap, ag-mgt link, renewable ceiling) joins the rows of its blob that read the same over the grouped columns
+(same column types, coefficients and rhs), as their average; rows that differ stay separate.
+
+**The guarantee.** Grouping adds one statement to the model: the cells of a blob take equal shares. So a grouped
+solution, mapped back, is feasible for the full model, and under maxprofit its objective is a lower bound of the full
+optimum. `report_grouping` checks it after every solve: every row and bound of the full model at the mapped `x`
+(`grouping_rows_<year>.csv`), and the step's sizes (`grouping_<year>.csv`).
+
+**Limits.**
+
+- It saves the solve only. The full tables are still built, and data loading, writing and the report run at full size.
+- It needs crossover: a blob is whole only at a vertex.
+- Not with `BIO_ROW_GENERATION` or `ELASTIC_FAMILIES` (raises). With GBF8 targets it warns: every species row splits
+  the blobs by its footprint, so little is left of the grouping (RES1, 73 species rows: 2.5× fewer nonzeros, no faster
+  than the full model, 2.8 % loss).
+- The shadow prices of the wide rows are the grouped model's; the per-cell rows' are those of the averaged rows.
+- Measured at RES1 on one step and one scenario (2045 → 2050, 34 GBF4 rows, no GBF8). Solved without the GBF
+  footprints in the key: 150,740 blobs, 0.016 % objective loss, 12.3× fewer presolved nonzeros. Counted with them,
+  as the code is now (no solve): 157,377 blobs, 12.4× fewer built nonzeros (13.1× without).
+
 ## Module map
 
 | point | module | what it holds |
@@ -97,11 +138,12 @@ changes them.
 | 5 | `row_bounds.py` | bound propagation over every row: the interval, the verdict, the implied bounds, the report |
 | 6, 7 | `tables.py` | `Tables` and the operations on it: `relax`, `append_rows`, `fix_slack`, `scale_cost`, `elastic_absorbs`; the readers of a relaxed row, `shortfall`, `slack_unit` |
 | 5, 6 | `rowgen.py` | `RowGen`: the targets, the screen, eager / lazy, the bookkeeping; `solve_rounds`: one pass by row generation |
+| grouping | `aggregate.py` | `get_blobs`: the blob of every cell; `aggregate`: the tables over blobs, `col_map`, `row_map`; `group_tables`; `report_grouping` |
 | 7 | `step.py` | `solve_step`: one pass, or pass 1 → the drop → pass 2; `solve_pass`: one solve or the rounds |
 | engine | `solver.py` | `LutoSolver`: the Gurobi model of the tables, `solve`; `build_solver` |
 | after | `post_solve.py` | `x` scattered back into the LUTO land-use arrays |
 | after | `reports.py` | the shadow prices, the shortfall report, the debug MPS |
 
 The flow (`simulation.solve_timeseries`): `get_cols` → `get_row_inputs` → `get_rows` → `RowGen` (if row
-generation) → `get_row_bounds` → `get_obj` → `solve_step(Tables(...))` → `post_solve` → `record_shadow_prices`,
+generation) → `get_row_bounds` → `get_obj` → `group_tables` (if cell grouping) → `solve_step(Tables(...))` → `post_solve` → `record_shadow_prices`,
 `report_shortfall`, `RowGen.report`.
