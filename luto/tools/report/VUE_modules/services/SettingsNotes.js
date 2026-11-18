@@ -373,6 +373,20 @@ window.SettingsNotes = {
       "0.8 means regeneration reaches 80 % of the carbon and biodiversity gain of fully destocked natural land.",
     ],
   },
+  HIR_BASE_YEAR_PROJECTS: {
+    what: "Whether regeneration projects that already exist start the run as adopted.",
+    detail: [
+      "None: nothing is adopted in the base year.",
+      "A folder name: the registered projects (up to the folder's baseline year) are adopted in the base year on the beef and sheep natural land they cover, and stay adopted in every year.",
+    ],
+  },
+  AG_MANAGEMENT_ADOPTION_ABOVE_BASE: {
+    what: "Whether management options may be adopted beyond what is already adopted in the base year.",
+    detail: [
+      "True: the usual limits apply.",
+      "False: each option stays at most at its base-year adoption on every cell (existing regeneration projects; every other option at 0).",
+    ],
+  },
   HIR_BASELINE: {
     what: "Whether regeneration projects that already exist are left out of what the model can claim.",
     detail: [

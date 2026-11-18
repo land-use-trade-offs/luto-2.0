@@ -471,7 +471,7 @@ class Data:
         self.LMMAP = self.LMMAP_NO_RESFACTOR.isel(cell=self.MASK).values
         self.add_lmmap(self.YR_CAL_BASE, self.LMMAP)
 
-        # Initial (2010) agricultural management maps - no cells are used for alternative agricultural management options.
+        # Base-year agricultural management maps: none adopted here; the existing HIR projects are set with the base-year dvars below.
         # Includes a separate AM map for each agricultural management option, because they can be stacked.
         self.AG_MAN_DESC = [am for am in settings.AG_MANAGEMENTS if settings.AG_MANAGEMENTS[am]]
         self.AG_MAN_LU_DESC = {am:settings.AG_MANAGEMENTS_TO_LAND_USES[am] for am in self.AG_MAN_DESC}
@@ -1232,11 +1232,21 @@ class Data:
         # Calculate base year production 
         ###############################################################
 
-        # base-year ag-mgt dvars: no option was adopted in the base year, so every option is zeros over (m, r, j)
+        # base-year ag-mgt dvars: no option was adopted in the base year, so every option is zeros over (m, r, j), except the
+        # existing HIR projects, which settings.HIR_BASE_YEAR_PROJECTS sets (load_hir_base_year_adoption)
         self.AG_MAN_L_MRJ_DICT = {
             am: np.zeros((self.NLMS, self.NCELLS, self.N_AG_LUS)) 
             for am in settings.AG_MANAGEMENTS_TO_LAND_USES
         }
+        self.HIR_BASE_YEAR_ADOPTION = None
+        if settings.HIR_BASE_YEAR_PROJECTS is not None:
+            self.HIR_BASE_YEAR_ADOPTION = self.load_hir_base_year_adoption(os.path.join(settings.INPUT_DIR, settings.HIR_BASE_YEAR_PROJECTS))
+            for am, x_mrj in self.HIR_BASE_YEAR_ADOPTION['x_mrj'].items():
+                if am not in self.AG_MAN_DESC:                     # option switched off: no adoption
+                    continue
+                self.AG_MAN_L_MRJ_DICT[am] = x_mrj
+                self.AG_MAN_MAP[am] = (x_mrj.sum(axis=(0, 2)) > 0).astype("int8")
+            self.add_ammaps(self.YR_CAL_BASE, self.AG_MAN_MAP)
         self.add_ag_man_dvars(self.YR_CAL_BASE, self.AG_MAN_L_MRJ_DICT)
         
         print("├── Calculating base year productivity", flush=True)
@@ -2973,6 +2983,48 @@ class Data:
             dropped[fy] = float(px_ha[cell < 0].sum())
         return {'ha': ha, 'ha_mj': ha_mj, 'dropped_ha': dropped, 'baseline_fy': baseline_fy, 'first_fy': min(ha),
                 'scale_factor': float(scaling['scale_factor'])}
+
+    def load_hir_base_year_adoption(self, hir_dir: str) -> dict:
+        """Base-year adoption of HIR - Beef and HIR - Sheep from the existing ACCU HIR projects (registered up to the
+        baseline FY of hir_scaling.csv), from the files `input/Nick_build/scripts/ag_mgt_caps.py` writes (hir_project_cells.csv: the
+        share of each full-resolution cell inside each mapped project; overlapping projects clipped at the whole cell).
+
+        Only project area on full-resolution cells whose base-year land use is the option's own (Beef natural land,
+        Sheep natural land) is adopted, under that cell's land management; project area on any other land use is not.
+        At RESFACTOR > 1 the area is summed into the block of the cell that represents it and divided by the cell's
+        REAL_AREA; adoption is capped at the land use's share of the cell (AG_L_MRJ). A block with no cell in the model
+        drops its area. Unmapped projects have no cells and are not adopted (hir_scaling.csv's scale factor is not
+        applied). Returns {'x_mrj': {am: (NLMS, NCELLS, N_AG_LUS) adoption}, 'report': DataFrame (ha by option and lm:
+        project area on the land use, adopted, capped, dropped), 'baseline_fy'}."""
+        cells = pd.read_csv(os.path.join(hir_dir, 'hir_project_cells.csv'))
+        baseline_fy = int(pd.read_csv(os.path.join(hir_dir, 'hir_scaling.csv')).iloc[0]['baseline_fy'])
+        frac = cells.loc[cells['fy_registered'] <= baseline_fy].groupby('cell')['fraction'].sum().clip(upper=1)
+        px = frac.index.to_numpy()
+        px_ha = frac.to_numpy() * self.REAL_AREA_NO_RESFACTOR.values[px]
+        rf = settings.RESFACTOR
+        rows, cols = np.nonzero(self.NLUM_MASK)                                   # the file's cell index order
+        block = np.full((rows.max() // rf + 1, cols.max() // rf + 1), -1, dtype=np.int64)
+        block[rows[self.MASK] // rf, cols[self.MASK] // rf] = np.arange(self.NCELLS)
+        cell = block[rows[px] // rf, cols[px] // rf]
+        lu_px, lm_px = self.LUMAP_NO_RESFACTOR.values[px], self.LMMAP_NO_RESFACTOR.values[px]
+
+        x_mrj, report = {}, []
+        for am in ('HIR - Beef', 'HIR - Sheep'):
+            lu = settings.AG_MANAGEMENTS_TO_LAND_USES[am][0]
+            j = self.DESC2AGLU[lu]
+            x = np.zeros((self.NLMS, self.NCELLS, self.N_AG_LUS), dtype=np.float32)
+            for m, lm in enumerate(self.LANDMANS):
+                on_lu = (lu_px == j) & (lm_px == m)
+                kept = on_lu & (cell >= 0)
+                ha = np.bincount(cell[kept], weights=px_ha[kept], minlength=self.NCELLS)
+                share = np.divide(ha, self.REAL_AREA.values, out=np.zeros(self.NCELLS), where=self.REAL_AREA.values > 0)
+                x[m, :, j] = np.minimum(share, self.AG_L_MRJ[m, :, j]).astype(np.float32)
+                adopted = float((x[m, :, j] * self.REAL_AREA.values).sum())
+                report.append({'am': am, 'lm': lm, 'project_ha_on_lu': float(px_ha[on_lu].sum()), 'adopted_ha': adopted,
+                               'dropped_ha': float(px_ha[on_lu & (cell < 0)].sum()),
+                               'capped_ha': float(px_ha[kept].sum()) - adopted})
+            x_mrj[am] = x
+        return {'x_mrj': x_mrj, 'report': pd.DataFrame(report), 'baseline_fy': baseline_fy}
 
     def load_ghg_targets(self, target_dir: str) -> pd.DataFrame:
         """The two GHG constraints' series, one row per LUTO year (luto_year = financial year ending that year), in t CO2e.
