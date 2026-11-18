@@ -74,6 +74,46 @@ Land use of the two runs (`script/merge_test_compare.py`, from the stored soluti
 - **Grouping adds no fractional cells:** 71,409 cells hold one whole land use in 2050 in both runs (70,831 against 70,835 in 2020).
 - **At RES5 grouping is slower**, in six of seven years: the model is 1.25× smaller, the barrier needs 1.4–2.2× the iterations.
 
+### RES1: grouping widens the coefficient range; Gurobi's geometric scaling takes the iterations back (2045 → 2050, 34 GBF4 rows, 157,377 blobs)
+
+A grouped column's coefficient is the sum over its blob's cells, so a blob of thousands of cells carries numbers thousands of times larger than a blob of one. The ranges Gurobi reports (year 2020 of each run):
+
+| Model | Matrix coefficients | Objective coefficients | Barrier iterations |
+|---|---|---|---|
+| RES5, plain | 1e-4 to 2e3 | 1e-4 to 5e2 | 88 |
+| RES5, grouped | 1e-5 to 6e4 | 8e-5 to 4e5 | 190 |
+| RES1, grouped | 8e-7 to 3e5 | 2e-7 to 3e5 | 280 |
+
+Three solves of the same grouped RES1 model (`merge_rescale_test.py`; 28 threads, barrier with crossover; the machine shared with another run, so the times are indicative):
+
+| Solve | Barrier iterations | Barrier time | Whole solve | Objective (M AUD) | Full-model rows over 1e-5 |
+|---|---|---|---|---|---|
+| Baseline: the grouped model as built, `ScaleFlag = 0` (LUTO's setting) | 246 | 806 s | 837 s | 35,766.55 | 0 |
+| **Gurobi's geometric scaling, `ScaleFlag = 2`** | **159** | **501 s** | **536 s** | **35,766.59** | 0 |
+| Rescaled by hand: every grouped column divided by its cell count, per-cell rows to a largest coefficient of 1, wide rows as `contract` | 144 | 527 s | 2,015 s | 35,619.16 | 0 |
+
+- **`ScaleFlag = 2` is the fix:** 35 % fewer iterations, the solve 36 % shorter, the same objective. One parameter, no change to the tables.
+- **The hand rescale is rejected.** It narrows the matrix range (to 2e-6 .. 3e3) and the barrier is as quick, but the objective is 0.41 % lower and crossover takes 1,480 s (4.9 M simplex iterations). Likely reason: dividing a column by its blob's cell count (up to 83,463) shrinks its objective coefficient by the same factor (range 3e-8 .. 11), while `OPTIMALITY_TOLERANCE` (1e-2) is an absolute tolerance on reduced costs, so the solver accepts a point that is far from optimal in real terms. Not tested further.
+- The baseline's objective is 0.016 % below the full model's 35,772.26: with the GBF footprints in the key the loss is the prototype's.
+- Not yet done: `ScaleFlag = 2` on the multi-year chain, and on the plain (ungrouped) model, where `settings.SCALE_FLAG` notes that 1 tripled the solve time and 3 gave numerical problems. It is not switched on in the code.
+
+### RES1, default targets: the grouped 2025 model needs the homogeneous barrier (2020 → 2025, GHG rows enforced, 251,337 blobs, 43.5 M presolved nonzeros)
+
+The first RES1 run with grouping and the default settings solved 2010 → 2020 with the plain barrier (205,369 blobs, 10.7× fewer nonzeros, 280 iterations, 854 s). The next year, the first with the two GHG rows, did not:
+
+| Attempt on the same grouped 2025 model | Iterations | Time | Per iteration | Result |
+|---|---|---|---|---|
+| Barrier, `ScaleFlag = 0` | 545 | 1,810 s | 3.3 s | "Numerical trouble encountered"; Gurobi then went on in simplex (dual infeasibility 1e9 – 1e16), stopped by hand after 10 min |
+| Barrier, `ScaleFlag = 2` | 507 | 1,701 s | 3.4 s | "Numerical trouble encountered" |
+| **Homogeneous barrier (`BarHomogeneous = 1`), `ScaleFlag = 2`** | **261** | **1,292 s** | **5.0 s** | **Optimal; crossover 20 s** |
+
+- **Both plain-barrier attempts diverged at the same place:** converging normally to about iteration 300 (primal residual about 0.5, complementarity 3e-3), then a jump back by several orders of magnitude, and no recovery. Scaling made the path cleaner (dual residual at 1e-11 from iteration 30, against 1e-2 – 1e-5 without) but did not remove the jump.
+- **The homogeneous barrier passed that point without a jump.** A step costs about half as much again, but it needs half the steps.
+- **The solution is valid for the full model:** no row over tolerance (worst 3e-7), bounds to 1e-6; agriculture 72.5 Mt against the 75.2 Mt limit, LULUCF −109.4 Mt against −51.4 Mt.
+- **A failed barrier falls into simplex.** With crossover on (grouping needs it), Gurobi carries on in simplex from the failed point. During the run a message callback terminated such an attempt so the next entry of `RETRY_PARAMS` could start (status 11, the homogeneous attempt 6 s later); it was removed on 2026-11-19 together with the plain-barrier attempt, so `RETRY_PARAMS` holds the homogeneous barrier alone and a failed barrier would again go on in simplex.
+- **Also found:** in the second year a few grouped columns have a lower bound above their upper bound by under 1e-6 (3 of about 10 million; cells of a blob share their base only to `ROUND_DECIMALS`, and a locked-in share has lb = ub = base). `aggregate` stopped the year on it; it now sets the two to their midpoint within 10 × `FEASIBILITY_TOLERANCE` and logs it (local, uncommitted).
+- **Now the defaults in `settings.py` (local, 2026-11-19):** `SCALE_FLAG = 2`, `RETRY_PARAMS = [(0, 2, -1, -1, 1)]`: the homogeneous barrier, one attempt. A failed plain attempt cost about 28 minutes a year. Not yet measured on a model without cell grouping.
+
 ### Not yet known
 
 - The solve time of the merged rule at RES1, and under the default targets (GHG 'low', GBF2 'high'): a RES1 run with grouping on and default settings was started 2026-11-18 15:04.

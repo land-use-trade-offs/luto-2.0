@@ -374,17 +374,22 @@ Range from 1e-2 (fast, loose) to 1e-8 (slow, tight; Gurobi default).
    prevents the barrier from closing the gap to 1e-5; crossover polishes the result.
 '''
 
-SCALE_FLAG = 0
+SCALE_FLAG = 2
 ''' 
 Scales the rows and columns of the model to improve the numerical properties of 
 the constraint matrix. -1: Auto, 0: No scaling, 1: equilibrium scaling (First scale each 
 row to make its largest nonzero entry to be magnitude one, then scale each column to 
 max-norm 1), 2: geometric scaling, 3: multi-pass equilibrium scaling. Testing revealed 
 that 1 tripled solve time, 3 led to numerical problems.
+ - 20261118: 0 -> 2. It works on top of the row rescale of row_builder.contract, which evens out the ROWS; cell
+   grouping then sums a column over its blob's cells, so the COLUMNS differ by the blob's size (1 to tens of thousands
+   of cells) and the matrix range grows from 7 to 11-12 orders of magnitude. On the grouped RES1 model (2045 -> 2050):
+   159 barrier iterations against 246, the solve 536 s against 837 s, the same objective. Not yet measured on a model
+   without cell grouping. See docs/FINDINGS.md, 20261118.
 '''
 
 RETRY_PARAMS = [
-    (0, 2, -1, -1, -1),   # NF, Method, Crossover, Presolve, BarHomogeneous
+    (0, 2, -1, -1,  1),   # NF, Method, Crossover, Presolve, BarHomogeneous: the homogeneous barrier (2026-11-18)
     # (0, 1,  0, -1, 0 ), # Fallback to dual simplex, which is VERY SLOW !!
 ]
 '''
@@ -415,18 +420,19 @@ Presolve:
 
 BarHomogeneous:
     -1 = automatic, 0 = off, 1 = on.
-    The default barrier attempt leaves it automatic (-1). 0 (off) avoids a known
-    failure: the homogeneous algorithm's tau parameter drifts toward zero in
-    highly degenerate problems, triggering false INFEASIBLE (status 3) even with
-    NumericFocus=3, whereas with 0 the barrier reports NUMERIC (12) or SUBOPTIMAL
-    (13) instead — both handled by the retry loop. Set to 1 only when debugging
-    to avoid ambiguous INF_OR_UNBD status.
+    ON since 2026-11-18. At RES1 with cell grouping and the GHG rows the plain barrier diverged twice on the 2025
+    model (converging to about iteration 300, then a jump back and "Numerical trouble" at 507 - 545 iterations, 28 min
+    each); the homogeneous barrier solved the same model in 261 iterations (5.0 s an iteration against 3.4 s), and
+    every year of the RES1 run 2020-2050 at the first attempt. See docs/FINDINGS.md, 20261118.
+    Its known failure, recorded here earlier: in a highly degenerate problem its tau parameter can drift toward zero
+    and give a false INFEASIBLE (status 3), even with NumericFocus=3. With one attempt there is no fallback: such a
+    year stops (only OPTIMAL is accepted).
 
-Default sequence:
-  (0, 2, -1, -1, -1) barrier, auto crossover, auto presolve, auto homogeneous  — fast first pass
-  (0, 1,  0, -1, 0)  dual simplex, auto presolve, homogeneous off              — fallback; simplex
-                     walks the boundary so it cannot misdiagnose feasibility
-                     from an interior-point argument; presolve safe with simplex
+Default sequence: ONE attempt.
+  (0, 2, -1, -1,  1) barrier, auto crossover, auto presolve, homogeneous ON
+  No simplex attempt: (0, 1, 0, -1, 0), dual simplex, is left commented out — VERY SLOW on a model this size. Note that
+  with crossover on, a barrier that ends in "Numerical trouble" is carried on by Gurobi in simplex from the failed
+  point, which can run for hours.
 '''
 
 
