@@ -118,7 +118,7 @@ def create_new_dataset(refresh=False):
     shutil.copyfile(nlum_inpath + 'ag_landuses.csv', outpath + 'ag_landuses.csv')
 
     # The GHG constraint series (NIR 2024, DCCEEW 2025; they replace the retired GHG_targets.xlsx) are built outside
-    # LUTO (ghg_targets.py) into input/Nick_build/ghg_targets, where Data reads them; nothing to build here.
+    # LUTO (input/Nick_build/scripts/ghg_targets.py) into input/Nick_build/ghg_targets, where Data reads them; nothing to build here.
     shutil.copyfile(luto_1D_inpath + 'carbon_prices_20240612.xlsx', outpath + 'carbon_prices.xlsx')
     shutil.copyfile(luto_1D_inpath + 'ag_price_multipliers_20240612.xlsx', outpath + 'ag_price_multipliers.xlsx')
     shutil.copyfile(luto_1D_inpath + 'cost_multipliers_20240612.xlsx', outpath + 'cost_multipliers.xlsx')
@@ -1695,7 +1695,7 @@ def create_new_dataset(refresh=False):
 
 
     # Observed ag-management adoption caps and the existing-HIR-project cells (CER register, CEA files, ABS 4627.0):
-    # built outside LUTO (ag_mgt_caps.py) into input/Nick_build/ag_mgt_caps, where settings.AG_MANAGEMENT_OBSERVED_CAPS
+    # built outside LUTO (input/Nick_build/scripts/ag_mgt_caps.py) into input/Nick_build/ag_mgt_caps, where settings.AG_MANAGEMENT_OBSERVED_CAPS
     # and settings.HIR_BASELINE point; nothing to build here.
 
 

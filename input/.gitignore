@@ -3,3 +3,9 @@
 
 # Except this very file:
 !.gitignore
+
+# ... and Nick_build/scripts/: the code that builds the inputs in Nick_build/ (data processing kept out of luto/, but
+# version-controlled). Everything else in Nick_build/ (the built data folders, download caches) stays ignored.
+!Nick_build/
+!Nick_build/scripts/
+!Nick_build/scripts/**
