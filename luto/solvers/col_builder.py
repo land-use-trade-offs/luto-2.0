@@ -320,6 +320,11 @@ def am_space(data: Data, feasible_ag_mrj: np.ndarray, mask_gbf2_solar: np.ndarra
         if base_am is not None:
             ub_smr[slot] = base_am[am][:, :, j]
             lb_smr[slot] = np.minimum(lb_smr[slot], ub_smr[slot])                     # never above the ub
+        # new HIR only where the gross rate is above 0 (settings.HIR_NEW_ONLY_WHERE_RATE_POSITIVE): elsewhere the option is held at its
+        # existing adoption, the lock-in floor, so base-year projects stay
+        if settings.HIR_NEW_ONLY_WHERE_RATE_POSITIVE and am.startswith('HIR'):
+            zero_rate = ~(np.asarray(data.HIR_REGROWTH_T_CO2E_HA_PER_YR) > 0)           # (cell,) the layer at the model's resolution
+            ub_smr[slot][:, zero_rate] = lb_smr[slot][:, zero_rate]
         # assign the slot's column existence
         valid[slot] = slot_valid
 

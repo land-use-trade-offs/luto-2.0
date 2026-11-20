@@ -1230,6 +1230,8 @@ class Data:
         # HIR regrowth per cell (settings.HIR_RATE_FILE, t CO2e/ha/yr, gross removals): the regrowth carbon of HIR - Beef, HIR - Sheep
         # and Destocked natural land. None with the setting off. Non-negative, and 0 outside the NRM regions with HIR projects.
         self.HIR_REGROWTH_T_CO2E_HA_PER_YR = None
+        if settings.HIR_NEW_ONLY_WHERE_RATE_POSITIVE and settings.HIR_RATE_FILE is None:
+            raise ValueError("settings.HIR_NEW_ONLY_WHERE_RATE_POSITIVE needs settings.HIR_RATE_FILE (the gross rate is what the rule gates on)")
         if settings.HIR_RATE_FILE is not None:
             hir_rates = xr.load_dataset(os.path.join(settings.INPUT_DIR, settings.HIR_RATE_FILE)).isel(cell=self.MASK)
             self.HIR_REGROWTH_T_CO2E_HA_PER_YR = hir_rates['HIR_RATE'].values.astype(np.float32)

@@ -817,6 +817,14 @@ issuance / CEA hectares by NRM region; regions with fewer than 3 mapped projects
 Land clearing and the unallocated to livestock-natural conversion still read the natural-land stock.
 '''
 
+HIR_NEW_ONLY_WHERE_RATE_POSITIVE = False
+'''
+False (default): HIR - Beef and HIR - Sheep may be adopted on every cell where the land use exists, as before.
+True: new HIR is allowed only on cells whose gross rate (HIR_RATE_FILE, at the model's resolution) is above 0; on the other
+cells each HIR option is held at its existing adoption (the lock-in floor, so base-year HIR projects stay, including any on a
+zero-rate cell). Needs HIR_RATE_FILE; with no layer the setting raises an error instead of doing nothing.
+'''
+
 # Retired: the existing-HIR-project baseline subtraction on the two GHG rows. Existing projects now start as base-year
 # adoption (HIR_BASE_YEAR_PROJECTS), and HIR counts on each row only above each cell's base-year adoption. Data stops
 # with an error if this is set.
