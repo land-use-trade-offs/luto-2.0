@@ -50,6 +50,7 @@ import xarray as xr
 from scipy import sparse
 
 from luto import settings
+from luto.solvers.row_builder import contract
 from luto.solvers.tables import Tables
 
 
@@ -75,6 +76,8 @@ def check_grouping_settings() -> None:
         raise ValueError('CELL_GROUPING cannot run with BIO_ROW_GENERATION: row generation has not been run on grouped tables.')
     if settings.ELASTIC_FAMILIES:
         raise ValueError('CELL_GROUPING cannot run with ELASTIC_FAMILIES: relaxed rows have not been run on grouped tables.')
+    if not 0 <= settings.CELL_GROUPING_DROP_REL < 1:
+        raise ValueError(f'CELL_GROUPING_DROP_REL must be in [0, 1) (0 = off), not {settings.CELL_GROUPING_DROP_REL!r}.')
     if settings.GBF8_TARGET != 'off':
         print('⚠ WARNING: CELL_GROUPING with GBF8 targets: every species row splits the blobs by its footprint, so little is '
               'left of the grouping (RES1, 73 species rows: 2.5x fewer nonzeros, no faster than the full model, 2.8 % loss).', flush=True)
@@ -251,12 +254,61 @@ def aggregate(tables: Tables, blob_of_cell: np.ndarray) -> tuple[Tables, sparse.
     return Tables(row_matrix_grouped, rows_grouped, cols_grouped, obj_grouped), col_map, row_map
 
 
+def condition_grouped(tables: Tables) -> Tables:
+    """The grouped tables with their wide rows' coefficient range narrowed (settings.CELL_GROUPING_DROP_REL,
+    settings.CELL_GROUPING_RESCALE; both off by default, and then the tables come back as they are). A grouped column
+    sums its blob's cells, so ``aggregate`` leaves the wide rows unscaled: [3e-7, 4e5] at RES1. The per-cell rows are
+    never touched. ``report_grouping`` checks every row of the FULL model at the mapped-back solution, so what the drops
+    cost shows in grouping_rows_<year>.csv."""
+    if settings.CELL_GROUPING_DROP_REL <= 0 and not settings.CELL_GROUPING_RESCALE:
+        return tables
+    row_matrix, rows, cols, obj = tables
+    row_matrix = row_matrix.tocsr()
+    wide = ~np.isin(rows['family'].values.astype(str), PER_CELL_FAMILIES)
+    magnitude = np.abs(row_matrix.data)
+    print(f"│   ├── grouped matrix |a| [{magnitude.min():.1e}, {magnitude.max():.1e}], {row_matrix.nnz:,} entries", flush=True)
+
+    # ── 1. drop, in every wide row, the entries below CELL_GROUPING_DROP_REL x the row's largest |entry| ──
+    if settings.CELL_GROUPING_DROP_REL > 0:
+        n_entries = np.diff(row_matrix.indptr)
+        entry_row = np.repeat(np.arange(row_matrix.shape[0]), n_entries)
+        row_max = np.zeros(row_matrix.shape[0])
+        row_max[n_entries > 0] = np.maximum.reduceat(magnitude, row_matrix.indptr[:-1][n_entries > 0])
+        drop = wide[entry_row] & (magnitude < settings.CELL_GROUPING_DROP_REL * row_max[entry_row])
+        row_matrix.data[drop] = 0.0
+        row_matrix.eliminate_zeros()
+        print(f"│   ├── dropped {int(drop.sum()):,} entries under {settings.CELL_GROUPING_DROP_REL:g} x their row's largest, "
+              f"in {np.unique(entry_row[drop]).size:,} wide rows", flush=True)
+
+    # ── 2. contract the wide rows again (drop, rescale around RESCALE_FACTOR, floor), and floor the objective ──
+    if settings.CELL_GROUPING_RESCALE:
+        wide_rows, other_rows = np.flatnonzero(wide), np.flatnonzero(~wide)
+        block, rhs_wide, factor = contract(row_matrix[wide_rows].tocsr(), rows['rhs'].values[wide_rows], rescale=True)
+        stacked = sparse.vstack([row_matrix[other_rows], block]).tocsr()
+        row_matrix = stacked[np.argsort(np.concatenate([other_rows, wide_rows]), kind='stable')].tocsr()   # back to the table's row order
+        rhs = rows['rhs'].values.astype(np.float64).copy()
+        rhs[wide_rows] = rhs_wide
+        scale = rows['scale'].values.astype(np.float64).copy()
+        scale[wide_rows] *= factor                                       # the readers restore raw units through it
+        rows = rows.assign(rhs=(('row',), rhs), scale=(('row',), scale))
+        obj = np.where(np.abs(obj) < settings.SOLVER_COEFF_MIN, 0.0, obj)
+        print(f"│   ├── wide rows contracted (rescaled around {settings.RESCALE_FACTOR:g}, floored at {settings.SOLVER_COEFF_MIN:g}); "
+              f"objective floored: {int((obj != 0).sum()):,} nonzeros", flush=True)
+
+    row_matrix.sort_indices()
+    magnitude = np.abs(row_matrix.data)
+    print(f"│   ├── now |a| [{magnitude.min():.1e}, {magnitude.max():.1e}], {row_matrix.nnz:,} entries", flush=True)
+    return Tables(row_matrix, rows, cols, obj)
+
+
 def group_tables(tables: Tables, area_r: np.ndarray, region2cell: xr.Dataset) -> Grouping:
-    """The step's tables grouped: the blobs (``get_blobs``), then the transform (``aggregate``)."""
+    """The step's tables grouped: the blobs (``get_blobs``), the transform (``aggregate``), then the grouped wide rows'
+    range narrowed when asked (``condition_grouped``)."""
     print('Grouping the cells...', flush=True)
     start = time.time()
     blob_of_cell = get_blobs(tables, np.asarray(area_r, dtype=np.float64), region2cell)
     grouped, col_map, row_map = aggregate(tables, blob_of_cell)
+    grouped = condition_grouped(grouped)
     seconds = time.time() - start
     sizes = pd.DataFrame({'': ['full', 'grouped'],
                           'rows': [tables.row_matrix.shape[0], grouped.row_matrix.shape[0]],

@@ -1386,6 +1386,24 @@ CELL_GROUPING_SVD_DIMS = 16         # the SVD directions a cell's coefficients a
 CELL_GROUPING_TOLERANCE = 1.0       # the bin width on each direction, in the scaled signature's own units: ONE value for every run
 CELL_GROUPING_RIPARIAN_BINS = 5     # Riparian Plantings' ub joins the key in this many natural-break bins (a blob takes its smallest ub)
 
+CELL_GROUPING_DROP_REL = 0
+'''
+0: off. > 0 (e.g. 1e-6): after grouping, in every WIDE row (not PER_CELL_FAMILIES) drop the entries below this x the
+row's largest |entry|. A grouped column sums its blob's cells, so a grouped row spans [3e-7, 4e5] at RES1; the drop
+lifts its smallest entry. Test (LUTO_cluster_cols, 2026-11-20, RES1 grouped 2010 -> 2050, Gadi): 1e-6 cut barrier
+iterations 212 -> 114, Gurobi 1,711 s -> 815 s, objective -0.004 %, but 4 demand rows of the full model miss (worst
+other non-cereal crops 508 t, 0.59 %): the speed-up comes from the small entries of the demand rows.
+'''
+CELL_GROUPING_RESCALE = False
+'''
+True: after grouping (and CELL_GROUPING_DROP_REL), row_builder.contract the grouped WIDE rows again (drop |a| <
+SOLVER_COEFF_MIN, rescale every row around RESCALE_FACTOR, floor again; the row's `scale` takes the new factor) and
+floor the grouped objective at SOLVER_COEFF_MIN, as get_obj floors the full one. The per-cell rows are left as they
+are: rescaling a node-balance equality and flooring it made a RES10 model infeasible. Test (same run): barrier
+212 -> 143 iterations, but crossover 412 s, Gurobi 1,711 s -> 1,410 s; objective unchanged; 32 full-model rows over
+1e-5 (worst a demand row, 1.7 t of sheep live exports).
+'''
+
 
 
 
