@@ -131,7 +131,7 @@ TRANSITION_COST_MULT = 1
 TECH_ADOPT_MULT = 1
 
 # Observed ag-management adoption caps (DCCEEW baseline calibration run). None = off (no caps).
-# Otherwise a path under INPUT_DIR to the caps file written by luto/tools/ag_mgt_caps.py (e.g. 'ag_mgt_caps/caps.csv').
+# Otherwise a path under INPUT_DIR to the caps file built outside LUTO (e.g. 'Nick_build/ag_mgt_caps/caps.csv').
 # Each (option, land use) with rows is limited to min(current limit, observed cap); the cap is held flat after the
 # file's last year, and an (option, land use) with no rows keeps its current limit.
 AG_MANAGEMENT_OBSERVED_CAPS = None
@@ -796,8 +796,8 @@ HIR_PRODUCTIVITY_CONTRIBUTION = 0.5
 # HIR celling factor, assuming HIR achienves x% of bio/GHG benefits of the Destocked - natural land land use
 HIR_CEILING_PERCENTAGE = 0.8
 
-# Existing-HIR-project baseline on the two GHG rows. None = off. Otherwise a folder under INPUT_DIR written by
-# luto/tools/ag_mgt_caps.py (e.g. 'ag_mgt_caps'). LUTO's HIR then counts only above the regrowth (LULUCF row) and
+# Existing-HIR-project baseline on the two GHG rows. None = off. Otherwise a folder under INPUT_DIR built outside LUTO
+# (e.g. 'Nick_build/ag_mgt_caps'). LUTO's HIR then counts only above the regrowth (LULUCF row) and
 # destocking (AG row) of the existing ACCU HIR projects on their mapped cells, as its plantings count above the
 # plantings baseline: the NIR series already carry those projects.
 HIR_BASELINE = None
@@ -863,7 +863,7 @@ GHG_EMISSIONS_LIMITS = 'low'         # 'off', 'low', or 'high'
 '''
 Any level but 'off' adds two GHG rows in the years the target series bind: agriculture-sector emissions and net
 LULUCF, each against its own series in input/Nick_build/ghg_targets/ (NIR 2024 history, DCCEEW 2025 baseline projections,
-built by luto/tools/ghg_targets.py). In the other years the series are benchmarks, reported in
+built outside LUTO). In the other years the series are benchmarks, reported in
 GHG_emissions_split_<yr>.csv but not imposed. 'off' adds no GHG row.
 
 Historical `GHG_EMISSIONS_LIMITS` options (targets from the retired GHG_targets.xlsx):

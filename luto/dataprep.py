@@ -19,11 +19,12 @@
 
 
 
+from pathlib import Path
 import h5py
 import numpy as np
 import xarray as xr
 import pandas as pd
-import shutil, os, time, h5py, subprocess, sys
+import shutil, time, h5py
 import sparse
 
 from luto import settings
@@ -74,7 +75,7 @@ def create_new_dataset(refresh=False):
 
 
     # Remove existing files in the output folder, except for .gitignore, if refresh is True
-    if refresh: [os.remove(f.path) for f in os.scandir(outpath) if f.name != '.gitignore']
+    if refresh: [f.unlink() for f in Path(outpath).iterdir() if f.name != '.gitignore']
 
 
     # Copy raw data files from their source into raw_data folder for further processing
@@ -116,12 +117,8 @@ def create_new_dataset(refresh=False):
     shutil.copyfile(nlum_inpath + 'NLUM_2010-11_mask.tif', outpath + 'NLUM_2010-11_mask.tif')
     shutil.copyfile(nlum_inpath + 'ag_landuses.csv', outpath + 'ag_landuses.csv')
 
-    # The GHG constraint series are built from public sources (NIR 2024, DCCEEW 2025) by
-    # luto/tools/ghg_targets.py, replacing the retired GHG_targets.xlsx.
-    subprocess.run([sys.executable, os.path.dirname(__file__) + '/tools/ghg_targets.py',
-                    '--out', outpath + 'ghg_targets',
-                    '--scope-matrix', outpath + 'ghg_targets/scope_matrix.csv',
-                    '--cache', raw_data + 'ghg_targets_cache'], check=True)
+    # The GHG constraint series (NIR 2024, DCCEEW 2025; they replace the retired GHG_targets.xlsx) are built outside
+    # LUTO (ghg_targets.py) into input/Nick_build/ghg_targets, where Data reads them; nothing to build here.
     shutil.copyfile(luto_1D_inpath + 'carbon_prices_20240612.xlsx', outpath + 'carbon_prices.xlsx')
     shutil.copyfile(luto_1D_inpath + 'ag_price_multipliers_20240612.xlsx', outpath + 'ag_price_multipliers.xlsx')
     shutil.copyfile(luto_1D_inpath + 'cost_multipliers_20240612.xlsx', outpath + 'cost_multipliers.xlsx')
@@ -1084,14 +1081,14 @@ def create_new_dataset(refresh=False):
     
     ############### Get biodiversity contribution scale for each land-use
 
-    biodiv_contribution_lookup = pd.read_csv(os.path.join(settings.INPUT_DIR, 'bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv'))
+    biodiv_contribution_lookup = pd.read_csv(Path(settings.INPUT_DIR) / 'bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv')
     biodiv_contribution_cols = [i for i in biodiv_contribution_lookup.columns if 'PERCENTILE' in i]
     
     for col in biodiv_contribution_cols:
         # Rescale the biodiversity contribution values by Unallocated - natural land (code 23)
         biodiv_contribution_lookup[col] = biodiv_contribution_lookup[col] / biodiv_contribution_lookup[col][23]
     
-    biodiv_contribution_lookup.to_csv(os.path.join(settings.INPUT_DIR, 'bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv'), index=False)
+    biodiv_contribution_lookup.to_csv(Path(settings.INPUT_DIR) / 'bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv', index=False)
     
     
     ############## Get the biodiversity (GBF2) achievement percentages for BASE YEAR (2010)
@@ -1181,7 +1178,7 @@ def create_new_dataset(refresh=False):
     
     GBF2_biodiv_achieve = GBF2_biodiv_achieve.query('TOP_RANK_CELL_AREA_COVERAGE_PERCENT < 100 and TOP_RANK_CELL_AREA_COVERAGE_PERCENT >0')
     GBF2_biodiv_achieve.to_csv(
-        os.path.join(outpath, 'BIODIVERSITY_GBF2_TOP_RANK_CELL_BIO_SCORES_AND_TARGET.csv'),
+        Path(outpath) / 'BIODIVERSITY_GBF2_TOP_RANK_CELL_BIO_SCORES_AND_TARGET.csv',
         index=False,
         float_format='%.2f'
     )
@@ -1697,12 +1694,9 @@ def create_new_dataset(refresh=False):
     )
 
 
-    # Observed ag-management adoption caps and the existing-HIR-project cells (CER register, CEA files, ABS 4627.0),
-    # built by luto/tools/ag_mgt_caps.py on the NLUM grid, lumap.h5 and real_area.h5 written above.
-    subprocess.run([sys.executable, os.path.dirname(__file__) + '/tools/ag_mgt_caps.py',
-                    '--out', outpath + 'ag_mgt_caps',
-                    '--input', outpath,
-                    '--cache', raw_data + 'ag_mgt_caps_cache'], check=True)
+    # Observed ag-management adoption caps and the existing-HIR-project cells (CER register, CEA files, ABS 4627.0):
+    # built outside LUTO (ag_mgt_caps.py) into input/Nick_build/ag_mgt_caps, where settings.AG_MANAGEMENT_OBSERVED_CAPS
+    # and settings.HIR_BASELINE point; nothing to build here.
 
 
     # Complete processing and report back
