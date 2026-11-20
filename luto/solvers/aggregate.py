@@ -256,7 +256,7 @@ def aggregate(tables: Tables, blob_of_cell: np.ndarray) -> tuple[Tables, sparse.
 
 def condition_grouped(tables: Tables) -> Tables:
     """The grouped tables with their wide rows' coefficient range narrowed (settings.CELL_GROUPING_DROP_REL,
-    settings.CELL_GROUPING_RESCALE; both off by default, and then the tables come back as they are). A grouped column
+    settings.CELL_GROUPING_RESCALE; both on by default; with both off the tables come back as they are). A grouped column
     sums its blob's cells, so ``aggregate`` leaves the wide rows unscaled: [3e-7, 4e5] at RES1. The per-cell rows are
     never touched. ``report_grouping`` checks every row of the FULL model at the mapped-back solution, so what the drops
     cost shows in grouping_rows_<year>.csv."""

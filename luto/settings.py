@@ -1386,22 +1386,30 @@ CELL_GROUPING_SVD_DIMS = 16         # the SVD directions a cell's coefficients a
 CELL_GROUPING_TOLERANCE = 1.0       # the bin width on each direction, in the scaled signature's own units: ONE value for every run
 CELL_GROUPING_RIPARIAN_BINS = 5     # Riparian Plantings' ub joins the key in this many natural-break bins (a blob takes its smallest ub)
 
-CELL_GROUPING_DROP_REL = 0
+CELL_GROUPING_DROP_REL = 1e-6
 '''
-0: off. > 0 (e.g. 1e-6): after grouping, in every WIDE row (not PER_CELL_FAMILIES) drop the entries below this x the
-row's largest |entry|. A grouped column sums its blob's cells, so a grouped row spans [3e-7, 4e5] at RES1; the drop
-lifts its smallest entry. Test (LUTO_cluster_cols, 2026-11-20, RES1 grouped 2010 -> 2050, Gadi): 1e-6 cut barrier
-iterations 212 -> 114, Gurobi 1,711 s -> 815 s, objective -0.004 %, but 4 demand rows of the full model miss (worst
-other non-cereal crops 508 t, 0.59 %): the speed-up comes from the small entries of the demand rows.
+Drop the tiny coefficients of the grouped model (only with CELL_GROUPING).
+- 0: off, nothing is dropped.
+- Any value above 0 (default 1e-6): on, and the value is the cut-off, relative to each row. In every wide row (demand,
+  GHG, water, renewables, regional adoption, the GBF targets), a coefficient smaller than this fraction of the row's
+  largest coefficient is removed. Example: a demand row whose largest coefficient is 400,000 loses every coefficient
+  below 0.4 (1e-6 x 400,000). The per-cell rows (PER_CELL_FAMILIES: node balance, source cap, ag-mgt link, renewable
+  ceiling) are never touched.
+Why: a grouped column sums its blob's cells, so one grouped row can hold coefficients from 3e-7 to 4e5 (RES1), which
+the solver handles badly. Test (RES1 grouped 2010 -> 2050, Gadi, 2026-11-20): Gurobi 1,711 s -> 815 s, objective
+-0.004 %; the cost: 4 demand rows of the full model miss their target (worst: other non-cereal crops, 508 t, 0.59 %).
 '''
-CELL_GROUPING_RESCALE = False
+CELL_GROUPING_RESCALE = True
 '''
-True: after grouping (and CELL_GROUPING_DROP_REL), row_builder.contract the grouped WIDE rows again (drop |a| <
-SOLVER_COEFF_MIN, rescale every row around RESCALE_FACTOR, floor again; the row's `scale` takes the new factor) and
-floor the grouped objective at SOLVER_COEFF_MIN, as get_obj floors the full one. The per-cell rows are left as they
-are: rescaling a node-balance equality and flooring it made a RES10 model infeasible. Test (same run): barrier
-212 -> 143 iterations, but crossover 412 s, Gurobi 1,711 s -> 1,410 s; objective unchanged; 32 full-model rows over
-1e-5 (worst a demand row, 1.7 t of sheep live exports).
+Rescale the grouped model's wide rows again (only with CELL_GROUPING). True (default) or False.
+True: after grouping (and after CELL_GROUPING_DROP_REL), every wide row goes through row_builder.contract once more,
+as the full model's rows did before grouping: coefficients below SOLVER_COEFF_MIN are dropped, the row and its rhs
+are divided by one factor so its numbers sit around RESCALE_FACTOR, and the tiny coefficients left after that are
+dropped too. The row's `scale` takes the new factor, so shadow prices still come out in real units. The grouped
+objective is floored at SOLVER_COEFF_MIN, as get_obj floors the full one. The per-cell rows are left as they are:
+rescaling a node-balance equality and flooring it made a RES10 model infeasible.
+Test (same run): barrier 212 -> 143 iterations, but a longer crossover (412 s); Gurobi 1,711 s -> 1,410 s; objective
+unchanged; 32 rows of the full model over tolerance (worst: a demand row, 1.7 t of sheep live exports).
 '''
 
 
