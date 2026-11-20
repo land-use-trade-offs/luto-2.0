@@ -21,7 +21,7 @@
 #   python python_script.py                          # use INPUT_DIR already in luto/settings.py
 #   python python_script.py --input_dir /path/to/input  # override INPUT_DIR before running
 
-import argparse, re, pathlib, os, sys
+import argparse, re, pathlib, sys
 import shutil
 import zipfile
 
@@ -99,11 +99,11 @@ archive_path = simulation_root / 'Run_Archive.zip'
 # Walk the run dir once, splitting files into the main archive and the
 # DATA_REPORT subtree (which only exists if the simulation succeeded).
 files_run, files_report = [], []
-for root, dirs, files in os.walk(simulation_root):
+for root, dirs, files in simulation_root.walk():
     for file in files:
         if file == 'Run_Archive.zip':
             continue
-        abs_path = pathlib.Path(root) / file
+        abs_path = root / file
         if 'DATA_REPORT' in abs_path.as_posix():
             files_report.append(abs_path)
         else:
@@ -123,9 +123,8 @@ if files_report:
 
 
 # Remove all files after archiving
-for item in os.listdir(simulation_root):
-    if item != 'Run_Archive.zip':
-        item_path = simulation_root / item
+for item_path in simulation_root.iterdir():
+    if item_path.name != 'Run_Archive.zip':
         try:
             if item_path.is_file() or item_path.is_symlink():
                 item_path.unlink()

@@ -25,11 +25,11 @@ functions as a singleton class. It is intended to be the _only_ part of the
 model that has 'global' varying state.
 """
 
-import os
 import re
 import time
 import threading
 import joblib
+import lz4.frame
 import numpy as np
 import pandas as pd
 
@@ -200,7 +200,11 @@ def load_data_from_disk(path: str) -> Data:
     def _load_data():
         print(f"Loading data from {path}...\n", flush=True)
 
-        data = joblib.load(path)
+        # The lz4 stream opened and closed here: joblib.load(path) leaves its own decompressor wrapper to the garbage
+        # collector after closing the file under it, and Python then prints "Exception ignored ... I/O operation on
+        # closed file" (harmless, same data either way)
+        with lz4.frame.open(path, 'rb') as stream:
+            data = joblib.load(stream)
         data.timestamp = read_timestamp()
         data.path = save_dir
 
@@ -466,7 +470,8 @@ def load_latest_checkpoint(
 
     checkpoint_file = files[-1]
     resume_year = int(checkpoint_file.stem.split("_")[1])
-    data = joblib.load(str(checkpoint_file))
+    with lz4.frame.open(checkpoint_file, 'rb') as stream:                 # opened and closed here, as in load_data_from_disk
+        data = joblib.load(stream)
     data.timestamp = read_timestamp()
     data.path = save_dir
     # load_data()'s set_path() normally pre-creates the out_<yr> dirs that
@@ -496,5 +501,5 @@ def save_data_to_disk(data: Data, path: str, compress_level=3) -> None:
     # Write to .tmp first, then rename atomically (os.replace → POSIX rename()).
     # If the job is killed mid-write, only the .tmp is left partial; the final
     # .lz4 is never created until the write completes successfully.
-    os.replace(tmp, path)
+    Path(tmp).replace(path)
     print(f'Saved data to {path} in {round(time.time() - start_time)} seconds', flush=True)

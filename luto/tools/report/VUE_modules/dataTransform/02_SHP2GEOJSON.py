@@ -1,3 +1,4 @@
+from pathlib import Path
 import json
 import geopandas as gpd
 import pandas as pd
@@ -138,7 +139,7 @@ for folder, layer_name, model_file, js_name, region_id_of in WATER_REGIONS:
     asset_path = f'{ASSETS}/{folder}/{folder}.shp'
 
     # 1. The simplified asset, built once from the GeoFabric
-    if not os.path.exists(asset_path):
+    if not Path(asset_path).exists():
         layer = gpd.read_file(GEOFABRIC, layer=layer_name)
         with xr.open_dataset(model_file) as model_regions:
             model_names = dict(zip(model_regions['region_id'].values.tolist(), model_regions['NAME'].values.tolist()))
@@ -157,7 +158,7 @@ for folder, layer_name, model_file, js_name, region_id_of in WATER_REGIONS:
         regions = regions.set_geometry(simplified)
         regions = regions[~regions.geometry.is_empty]
 
-        os.makedirs(os.path.dirname(asset_path), exist_ok=True)
+        Path(asset_path).parent.mkdir(parents=True, exist_ok=True)
         regions.to_file(asset_path)
 
     # 2. The asset -> JS (EPSG:4326 for Leaflet), and the centroid / bounding box of every region and of the country

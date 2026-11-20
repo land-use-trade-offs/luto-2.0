@@ -18,6 +18,7 @@
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
 
+from pathlib import Path
 import os
 import re
 import glob
@@ -78,8 +79,8 @@ def write_geotiff_index(flat_data: dict, dim_names: list, prefix: str) -> None:
     data_dict : {'cells_b64': str, 'intOrFloat': ..., 'min_max'|'legendKey': ...}
     cells_b64 is excluded from the index — it lives in the per-combo JS files.
     """
-    base_name = os.path.basename(prefix)
-    os.makedirs(os.path.dirname(prefix) or '.', exist_ok=True)
+    base_name = Path(prefix).name
+    Path(prefix).parent.mkdir(parents=True, exist_ok=True)
 
     combo_map: dict = {}
     for tp, data in flat_data.items():
@@ -110,9 +111,9 @@ def write_split_by_combo_geotiff(flat_data: dict, dim_names: list, prefix: str, 
           2025: {cells_b64: "...", ...},
       };
     """
-    base_name = os.path.basename(prefix)
-    tif_dir = os.path.dirname(prefix)
-    os.makedirs(tif_dir, exist_ok=True)
+    base_name = Path(prefix).name
+    tif_dir = Path(prefix).parent
+    Path(tif_dir).mkdir(parents=True, exist_ok=True)
 
     combos: dict = {}
     for tp, data in flat_data.items():
@@ -126,7 +127,7 @@ def write_split_by_combo_geotiff(flat_data: dict, dim_names: list, prefix: str, 
         var_suffix = '__'.join(safe_key(v) for v in combo)
         js_filename = f'{base_name}__{var_suffix}.js'
         var_name = js_filename.removesuffix('.js')
-        with open(os.path.join(tif_dir, js_filename), 'w') as f:
+        with open(Path(tif_dir) / js_filename, 'w') as f:
             f.write(f'window["{var_name}"] = ')
             json.dump(year_data, f, separators=(',', ':'))
             f.write(';\n')
@@ -233,7 +234,7 @@ def build_year_meta(year: int, base_dir: str) -> tuple:
       geo_meta_merc — rasterio write kwargs for the reprojected grid
       real_area_1d  — 1D float32[cell] ha per cell, or None if file missing
     """
-    ds_template = os.path.join(base_dir, f'xr_map_template_{year}.nc')
+    ds_template = Path(base_dir) / f'xr_map_template_{year}.nc'
     with xr.load_dataset(ds_template) as ds:
         crs   = ds['spatial_ref'].attrs['crs_wkt']
         valid = ds['layer'].values >= 0
@@ -256,9 +257,9 @@ def build_year_meta(year: int, base_dir: str) -> tuple:
         'nodata':    -9999.0, 'compress': 'deflate', 'predictor': 2,
     }
 
-    real_area_path = os.path.join(base_dir, f'xr_area_real_area_ha_{year}.nc')
+    real_area_path = Path(base_dir) / f'xr_area_real_area_ha_{year}.nc'
     real_area_1d = None
-    if os.path.exists(real_area_path):
+    if Path(real_area_path).exists():
         with xr.open_dataset(real_area_path) as ra_ds:
             real_area_1d = ra_ds['data'].values.squeeze().astype(np.float32)
 
@@ -326,7 +327,7 @@ def get_map2json(
             continue
 
         dim_names = list(rename_reorder_hierarchy(valid_layers[0]).keys())
-        index_merc, geo_meta_merc, real_area_1d = build_year_meta(int(row['Year']), os.path.dirname(row['path']))
+        index_merc, geo_meta_merc, real_area_1d = build_year_meta(int(row['Year']), Path(row['path']).parent)
 
         # GBF NRM-mode layers carry an is_selected coord marking which cells belong to the
         # selected NRM region; prebuilt once per file rather than reconstructed per layer.
@@ -435,8 +436,8 @@ def find_chunks_dirs(raw_data_dir: str, base_pattern: str, years: list) -> dict:
     """Return {year: chunks_dir_path} for every year that has a chunks directory."""
     result = {}
     for yr in years:
-        cdir = os.path.join(raw_data_dir, f'out_{yr}', f'{base_pattern}_{yr}_chunks')
-        if os.path.isdir(cdir):
+        cdir = Path(raw_data_dir) / f'out_{yr}' / f'{base_pattern}_{yr}_chunks'
+        if Path(cdir).is_dir():
             result[yr] = cdir
     return result
 
@@ -458,15 +459,15 @@ def write_split_by_combo_paged(
                     "Species B": {...},
                   }
     """
-    base_name = os.path.basename(prefix)
-    tif_dir   = os.path.dirname(prefix)
-    os.makedirs(tif_dir, exist_ok=True)
+    base_name = Path(prefix).name
+    tif_dir   = Path(prefix).parent
+    Path(tif_dir).mkdir(parents=True, exist_ok=True)
 
     for combo_tp, sp_year_data in combo_sp_data.items():
         var_suffix  = '__'.join(safe_key(v) for v in combo_tp)
         var_name    = f'{base_name}__{var_suffix}'
         js_filename = f'{var_name}_{page_start}_{page_end}.js'
-        with open(os.path.join(tif_dir, js_filename), 'w') as f:
+        with open(Path(tif_dir) / js_filename, 'w') as f:
             f.write(f'window["{var_name}"] = ')
             json.dump(sp_year_data, f, separators=(',', ':'))
             f.write(';\n')
@@ -490,8 +491,8 @@ def write_paged_index(combo_attrs: dict, dim_names: list, manifest: dict,
           paged:    true
         }
     """
-    base_name = os.path.basename(prefix)
-    os.makedirs(os.path.dirname(prefix) or '.', exist_ok=True)
+    base_name = Path(prefix).name
+    Path(prefix).parent.mkdir(parents=True, exist_ok=True)
 
     tree = build_tree(list(combo_attrs.keys()))
     combos_out = {
@@ -568,14 +569,14 @@ def get_map2json_paged(
     # Pre-build EPSG:3857 metadata once per year.
     year_meta: dict = {}
     for year, chunks_dir in chunks_dirs.items():
-        year_meta[year] = build_year_meta(year, os.path.dirname(chunks_dir))
+        year_meta[year] = build_year_meta(year, Path(chunks_dir).parent)
 
     # Read manifest from the first year's chunks dir.
     first_dir  = next(iter(chunks_dirs.values()))
-    chunk_files_first = sorted(glob.glob(os.path.join(first_dir, 'chunk_*.nc')))
+    chunk_files_first = sorted(glob.glob(Path(first_dir) / 'chunk_*.nc'))
     if not chunk_files_first:
         return
-    with open(os.path.join(first_dir, 'manifest.json')) as f:
+    with open(Path(first_dir) / 'manifest.json') as f:
         manifest = json.load(f)   # {"0": [sp1, sp2, ...], "1": [...], ...}
 
     # Introspect dimension names from the first chunk (species-like dim excluded).
@@ -588,7 +589,7 @@ def get_map2json_paged(
     dim_names = list(rename_reorder_hierarchy(sample_no_sp).keys())
 
     chunk_indices = sorted(
-        int(re.search(r'chunk_(\d+)', os.path.basename(f)).group(1))
+        int(re.search(r'chunk_(\d+)', Path(f).name).group(1))
         for f in chunk_files_first
     )
     # Pre-compute cumulative page starts from the manifest (agnostic to batch size).
@@ -612,8 +613,8 @@ def get_map2json_paged(
 
         for chunk_idx in group:
             for year, chunks_dir in sorted(chunks_dirs.items()):
-                nc_path = os.path.join(chunks_dir, f'chunk_{chunk_idx:06d}.nc')
-                if not os.path.exists(nc_path):
+                nc_path = Path(chunks_dir) / f'chunk_{chunk_idx:06d}.nc'
+                if not Path(nc_path).exists():
                     continue
 
                 index_merc, geo_meta_merc, real_area_1d = year_meta[year]
@@ -735,7 +736,7 @@ def save_input_layers(raw_dir: str, save_dir: str):
     files['Year'] = files['Year'].astype(int)
 
     first_template = files.query('base_name == "xr_map_template"').sort_values('Year').iloc[0]
-    index_merc, geo_meta_merc, _ = build_year_meta(int(first_template['Year']), os.path.dirname(first_template['path']))
+    index_merc, geo_meta_merc, _ = build_year_meta(int(first_template['Year']), Path(first_template['path']).parent)
     write_cell_index(index_merc, geo_meta_merc, f'{save_dir}/map_layers', name='map_input_cell_index')
 
     # One theme at a time: with every option a theme holds thousands of layers
@@ -754,8 +755,8 @@ def save_report_layer(raw_data_dir: str):
         cell_magnitudes = json.load(f)
 
     # Create the directory if it does not exist
-    if not os.path.exists(f'{SAVE_DIR}/map_layers'):
-        os.makedirs(f'{SAVE_DIR}/map_layers', exist_ok=True)
+    if not Path(f'{SAVE_DIR}/map_layers').exists():
+        Path(f'{SAVE_DIR}/map_layers').mkdir(parents=True, exist_ok=True)
 
     # Get all LUTO output files and store them in a dataframe
     files = get_all_files(raw_data_dir).query('category == "xarray_layer"')
@@ -793,7 +794,7 @@ def save_report_layer(raw_data_dir: str):
     ####################################################
     # Every layer is a 1D vector of cells (map2cells); the browser paints it through this one raster.
     first_template = files.query('base_name == "xr_map_template"').sort_values('Year').iloc[0]
-    index_merc, geo_meta_merc, _ = build_year_meta(int(first_template['Year']), os.path.dirname(first_template['path']))
+    index_merc, geo_meta_merc, _ = build_year_meta(int(first_template['Year']), Path(first_template['path']).parent)
     write_cell_index(index_merc, geo_meta_merc, f'{SAVE_DIR}/map_layers')
     print('│   ├── Cell index raster saved.')
     

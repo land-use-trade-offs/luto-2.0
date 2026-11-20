@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License along with
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
-import os
+from pathlib import Path
 import re
 import json
 import shutil
@@ -305,9 +305,9 @@ def _paged_species_order(bio_paths: pd.DataFrame, chunks_base: str) -> list | No
     if bio_paths.empty:
         return None
     for _, row in bio_paths.sort_values('Year').iterrows():
-        out_dir = os.path.dirname(row['path'])
-        manifest_path = os.path.join(out_dir, f"{chunks_base}_{row['Year']}_chunks", 'manifest.json')
-        if not os.path.isfile(manifest_path):
+        out_dir = Path(row['path']).parent
+        manifest_path = Path(out_dir) / f"{chunks_base}_{row['Year']}_chunks" / 'manifest.json'
+        if not Path(manifest_path).is_file():
             continue
         with open(manifest_path) as f:
             manifest = json.load(f)
@@ -378,14 +378,14 @@ def save_report_data(raw_data_dir:str):
     years = sorted(settings.SIM_YEARS)
 
     # Create the directory if it does not exist
-    if not os.path.exists(SAVE_DIR):
-        os.makedirs(SAVE_DIR)
+    if not Path(SAVE_DIR).exists():
+        Path(SAVE_DIR).mkdir(parents=True)
 
     # Move the GBF2 mask GeoJSON written by write_data into the report geo dir
-    gbf2_src = os.path.join(raw_data_dir, 'biodiversity_GBF2_mask.js')
-    gbf2_dst = os.path.join(SAVE_DIR, 'geo', 'biodiversity_GBF2_mask.js')
-    if os.path.exists(gbf2_src) and not os.path.exists(gbf2_dst):
-        os.makedirs(os.path.dirname(gbf2_dst), exist_ok=True)
+    gbf2_src = Path(raw_data_dir) / 'biodiversity_GBF2_mask.js'
+    gbf2_dst = Path(SAVE_DIR) / 'geo' / 'biodiversity_GBF2_mask.js'
+    if Path(gbf2_src).exists() and not Path(gbf2_dst).exists():
+        Path(gbf2_dst).parent.mkdir(parents=True, exist_ok=True)
         shutil.move(gbf2_src, gbf2_dst)
 
     # Get all LUTO output files and store them in a dataframe
@@ -2532,7 +2532,7 @@ def process_transition_data(files, SAVE_DIR):
     # Collect all years from file paths so the base year (e.g. 2010) is represented
     # even when its CSV is empty and has no transitions to plot.
     all_years_from_files = sorted(
-        os.path.basename(p).split('_')[-1].replace('.csv', '')
+        Path(p).name.split('_')[-1].replace('.csv', '')
         for p in trans_area_files['path']
     )
 
@@ -2616,7 +2616,7 @@ def process_transition_data(files, SAVE_DIR):
     trans_area_ag2nonag_files = files.query('base_name == "transition_ag2nonag_area"').reset_index(drop=True)
 
     all_years_ag2nonag = sorted(
-        os.path.basename(p).split('_')[-1].replace('.csv', '')
+        Path(p).name.split('_')[-1].replace('.csv', '')
         for p in trans_area_ag2nonag_files['path']
     )
 
@@ -3167,7 +3167,7 @@ def process_biodiversity_data(files, SAVE_DIR):
     # nothing when the matching target is off (nothing is constrained, so there is no selection to
     # write). Reading that empty set gives a frame with no 'species' column, and the queries below then
     # fail with an opaque NameError -- AFTER the whole simulation has solved. Guard on the files being
-    # present, as the region-species blocks further down already do via os.path.exists.
+    # present, as the region-species blocks further down already do via Path.exists().
     _nvis_written = not files.query('base_name.str.contains("biodiversity_GBF3_NVIS_scores")').empty
     if settings.WRITE_GBF3_NVIS != 'off' and _nvis_written:
         filter_str = '''
@@ -3338,7 +3338,7 @@ def process_biodiversity_data(files, SAVE_DIR):
     # nothing when the matching target is off (nothing is constrained, so there is no selection to
     # write). Reading that empty set gives a frame with no 'species' column, and the queries below then
     # fail with an opaque NameError -- AFTER the whole simulation has solved. Guard on the files being
-    # present, as the region-species blocks further down already do via os.path.exists.
+    # present, as the region-species blocks further down already do via Path.exists().
     _snes_written = not files.query('base_name.str.contains("biodiversity_GBF4_SNES_scores")').empty
     if settings.WRITE_GBF4_SNES != 'off' and _snes_written:
 
@@ -3506,7 +3506,7 @@ def process_biodiversity_data(files, SAVE_DIR):
     # nothing when the matching target is off (nothing is constrained, so there is no selection to
     # write). Reading that empty set gives a frame with no 'species' column, and the queries below then
     # fail with an opaque NameError -- AFTER the whole simulation has solved. Guard on the files being
-    # present, as the region-species blocks further down already do via os.path.exists.
+    # present, as the region-species blocks further down already do via Path.exists().
     _ecnes_written = not files.query('base_name.str.contains("biodiversity_GBF4_ECNES_scores")').empty
     if settings.WRITE_GBF4_ECNES != 'off' and _ecnes_written:
         #---------------- (GBF4 ECNES) ----------------
@@ -3958,7 +3958,7 @@ def process_supporting_info_data(SAVE_DIR, years, raw_data_dir):
 
     mem_log_path = f'{raw_data_dir}/RES_{settings.RESFACTOR}_mem_log.txt'
     mem_logs_obj = []
-    if os.path.exists(mem_log_path):
+    if Path(mem_log_path).exists():
         with open(mem_log_path, 'r', encoding='utf-8') as f:
             rows = [line.split('\t') for line in f if line.strip()]
         if rows:
@@ -3973,8 +3973,8 @@ def process_supporting_info_data(SAVE_DIR, years, raw_data_dir):
     # Uses one year's CSV (targets are constant across years); stored in supporting_info for downstream visuals.
     gbf3_nvis_selected_region_species = {}
     if settings.WRITE_GBF3_NVIS != 'off':
-        _scores_path = os.path.join(raw_data_dir, f'out_{_last_yr}', f'biodiversity_GBF3_NVIS_scores_{_last_yr}.csv')
-        if os.path.exists(_scores_path):
+        _scores_path = Path(raw_data_dir) / f'out_{_last_yr}' / f'biodiversity_GBF3_NVIS_scores_{_last_yr}.csv'
+        if Path(_scores_path).exists():
             _sc = pd.read_csv(_scores_path, low_memory=False, usecols=['Vegetation Group', 'region', 'region_level', 'Target_by_Percent'])
             _sc = _sc[_sc['Target_by_Percent'].notna() & (_sc['region'] != 'AUSTRALIA')][['Vegetation Group', 'region', 'region_level']].drop_duplicates()
             for _, row in _sc.iterrows():
@@ -3986,8 +3986,8 @@ def process_supporting_info_data(SAVE_DIR, years, raw_data_dir):
     # Build GBF4 SNES selected region-species map (species × region pairs with a constraint target).
     snes_selected_region_species = {}
     if settings.WRITE_GBF4_SNES != 'off':
-        _scores_path = os.path.join(raw_data_dir, f'out_{_last_yr}', f'biodiversity_GBF4_SNES_scores_{_last_yr}.csv')
-        if os.path.exists(_scores_path):
+        _scores_path = Path(raw_data_dir) / f'out_{_last_yr}' / f'biodiversity_GBF4_SNES_scores_{_last_yr}.csv'
+        if Path(_scores_path).exists():
             _sc = pd.read_csv(_scores_path, low_memory=False, usecols=['species', 'region', 'region_level', 'Target by Percent (%)'])
             _sc = _sc[_sc['Target by Percent (%)'].notna() & (_sc['region'] != 'AUSTRALIA')][['species', 'region', 'region_level']].drop_duplicates()
             for _, row in _sc.iterrows():
@@ -3999,8 +3999,8 @@ def process_supporting_info_data(SAVE_DIR, years, raw_data_dir):
     # Build GBF4 ECNES selected region-species map (ecological communities × region pairs with a constraint target).
     ecnes_selected_region_species = {}
     if settings.WRITE_GBF4_ECNES != 'off':
-        _scores_path = os.path.join(raw_data_dir, f'out_{_last_yr}', f'biodiversity_GBF4_ECNES_scores_{_last_yr}.csv')
-        if os.path.exists(_scores_path):
+        _scores_path = Path(raw_data_dir) / f'out_{_last_yr}' / f'biodiversity_GBF4_ECNES_scores_{_last_yr}.csv'
+        if Path(_scores_path).exists():
             _sc = pd.read_csv(_scores_path, low_memory=False, usecols=['species', 'region', 'region_level', 'Target by Percent (%)'])
             _sc = _sc[_sc['Target by Percent (%)'].notna() & (_sc['region'] != 'AUSTRALIA')][['species', 'region', 'region_level']].drop_duplicates()
             for _, row in _sc.iterrows():

@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License along with
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
-import os
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -373,7 +373,7 @@ def report_row_bounds(rows: xr.Dataset, bounds: xr.Dataset, target_year: int, ou
     for field in ('region', 'GBF_target', 'GBF4_presence', 'demand_commodity', 'demand_bound'):
         report[field] = rows[field].values[listed]
     report['ag_management'] = np.array([*settings.AG_MANAGEMENTS, None], dtype=object)[rows['am_idx'].values[listed]]   # the option by name; am_idx -1 (no option) reads the last: None
-    os.makedirs(out_dir, exist_ok=True)
+    Path(out_dir).mkdir(parents=True, exist_ok=True)
     report.to_csv(f"{out_dir}/bound_report_{target_year}.csv", index=False)
 
     # ── bound_preflight_<year>.csv: the column counts per block ──

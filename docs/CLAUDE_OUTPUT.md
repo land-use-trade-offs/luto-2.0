@@ -264,7 +264,7 @@ Key points:
 - **Valid-layer filtering is the caller's job, NOT save2nc's.** Callers compute the non-empty layers and `.sel(layer=valid_layers)` *before* calling save2nc. There is no `valid_layers` NetCDF attribute and no min/max attribute. Examples in `write_dvar_and_mosaic_map`:
   ```python
   valid_layers_ag = (ag_map_stack.sum('cell') > 0.001).to_dataframe('valid').query('valid == True').index
-  save2nc(ag_map_stack.sel(layer=valid_layers_ag), os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc'))
+  save2nc(ag_map_stack.sel(layer=valid_layers_ag), Path(path) / f'xr_dvar_ag_{yr_cal}.nc')
   ```
 
 ## Greyscale Ramp for Unselected Cells (`is_selected` Coord)
@@ -300,9 +300,9 @@ bio_snes_sr = bio_snes_sr.assign_coords(is_selected=('cell', sel_mask))
 # ... compute products and add_all ...
 
 # No .assign_coords needed at save sites — already present:
-save2nc(valid_layers_stack_ag,     os.path.join(path, f'xr_biodiversity_<METRIC>_ag_{yr_cal}.nc'))
-save2nc(valid_layers_stack_non_ag, os.path.join(path, f'xr_biodiversity_<METRIC>_non_ag_{yr_cal}.nc'))
-save2nc(valid_layers_stack_am,     os.path.join(path, f'xr_biodiversity_<METRIC>_ag_management_{yr_cal}.nc'))
+save2nc(valid_layers_stack_ag,     Path(path) / f'xr_biodiversity_<METRIC>_ag_{yr_cal}.nc')
+save2nc(valid_layers_stack_non_ag, Path(path) / f'xr_biodiversity_<METRIC>_non_ag_{yr_cal}.nc')
+save2nc(valid_layers_stack_am,     Path(path) / f'xr_biodiversity_<METRIC>_ag_management_{yr_cal}.nc')
 ```
 
 CSV / region / AUS aggregations use `.where(is_selected_da)` on the fly — no separate
@@ -728,9 +728,12 @@ Each NetCDF file contains three data variables representing different carbon poo
 
 ```python
 import xarray as xr
-# Load NetCDF and select specific age from CARBON_EFFECTS_WINDOW setting
-ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_block.nc"))
-ds = ds.sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
+# Load NetCDF, select the CARBON_EFFECTS_WINDOW age, and read each variable at the model cells
+# (get_resfactored_average: the layer at the land-use cells at RES1, the block mean over them at RESFACTOR > 1)
+with xr.open_dataset(Path(settings.INPUT_DIR) / "tCO2_ha_ep_block.nc") as ds:
+    ds = ds.sel(age=settings.CARBON_EFFECTS_WINDOW)
+    ds = xr.Dataset({name: self.get_resfactored_average(ds[name], f'tCO2_ha_ep_block_age{settings.CARBON_EFFECTS_WINDOW}_{name}')
+                     for name in ds.data_vars})
 
 # Calculate total sequestration with risk discounting
 total_co2 = (

@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License along with
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
-import os
+from pathlib import Path
 import re
 import numpy as np
 import pandas as pd
@@ -58,7 +58,7 @@ def extract_dtype_from_path(path):
             'xarray_layer':['xr_'],
     }
 
-    base_name = os.path.basename(path)
+    base_name = Path(path).name
 
     # Check the file type
     for ftype, fpat in f_cat.items():
@@ -94,7 +94,7 @@ def get_all_files(data_root):
     file_paths = []
 
     # Walk through the folder and its subfolders
-    for foldername, dirnames, filenames in os.walk(data_root):
+    for folder, dirnames, filenames in Path(data_root).walk():
         # Chunked biodiversity outputs (<base>_{year}_chunks) are read straight off disk by
         # create_report_layers.find_chunks_dirs(), never through this index. Prune them so their
         # chunk_*.nc / manifest.json neither spam the Unknown-file report nor add hundreds of rows
@@ -102,7 +102,7 @@ def get_all_files(data_root):
         dirnames[:] = [d for d in dirnames if not re.search(r'_\d{4}_chunks$', d)]
         for filename in filenames:
             # Create the full path to the file by joining the foldername and filename
-            file_path = os.path.join(foldername, filename)
+            file_path = str(folder / filename)              # a str: the paths below are matched as text
             # Append the file path to the list
             file_paths.append(file_path)
 
@@ -120,7 +120,7 @@ def get_all_files(data_root):
     file_paths.insert(1, 'category', f_cats)
 
     # Get the base name and extension of the file path
-    file_paths[['base_name','base_ext']] = [os.path.splitext(os.path.basename(i)) for i in file_paths['path']]
+    file_paths[['base_name','base_ext']] = [(Path(i).stem, Path(i).suffix) for i in file_paths['path']]
     file_paths = file_paths.reindex(columns=['Year','category','base_name','base_ext','path'])
 
     # Remove the datatime stamp <YYYY_MM_DD__HH_mm_SS> from the base_name

@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU General Public License along with
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
-import os
 
 import gurobipy as gp
 import numpy as np
@@ -181,7 +180,7 @@ def save_model_to_disk(gurobi_model, out_dir: str, base_year: int, target_year: 
     # "....mps.tmp" fails with "Unknown file type" and the save is silently lost.
     tmp = dest.with_name(f"{dest.stem}.tmp{dest.suffix}")
     try:
-        os.makedirs(out_dir, exist_ok=True)
+        Path(out_dir).mkdir(parents=True, exist_ok=True)
         gurobi_model.write(str(tmp))
         # `tmp` must be excluded here: it ends in .mps (Gurobi picks its writer from the extension,
         # so it has to) which means this very glob matches the file just written, and deleting it

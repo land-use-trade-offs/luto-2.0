@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License along with
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
-import os, re, json, time
+import re, json, time
 import shutil, itertools, subprocess, zipfile
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -31,7 +31,7 @@ from matplotlib import patches
 from luto import settings
 from luto.tools.create_task_runs.parameters import EXCLUDE_DIRS, HATCH_PATTERNS, SERVER_PARAMS, PLOT_COL_WIDTH
 
-LUTO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../'))
+LUTO_ROOT = Path(__file__).resolve().parents[3]
 
 
 def get_settings_df(task_root_dir:str) -> pd.DataFrame:
@@ -40,11 +40,11 @@ def get_settings_df(task_root_dir:str) -> pd.DataFrame:
     '''
 
     # Save the settings template to the root task folder
-    if not os.path.exists(task_root_dir):
-        os.makedirs(task_root_dir, exist_ok=True)
+    if not Path(task_root_dir).exists():
+        Path(task_root_dir).mkdir(parents=True, exist_ok=True)
     
     # Get the settings from luto.settings
-    with open(os.path.join(LUTO_ROOT, 'luto/settings.py'), 'r') as file, \
+    with open(Path(LUTO_ROOT) / 'luto/settings.py', 'r') as file, \
          open(f'{task_root_dir}/non_str_val.txt', 'w') as non_str_val_file:
         
         # Regex patterns that matches variable assignments from settings
@@ -117,7 +117,7 @@ def get_grid_search_settings_df(task_root_dir:str, settings_df:pd.DataFrame, gri
     '''
     
     template_grid_search = settings_df.copy()
-    task_dir = os.path.basename(os.path.normpath(task_root_dir))
+    task_dir = Path(task_root_dir).name
 
     # Loop through the permutations DataFrame and create new columns with updated settings
     run_settings_dfs = []
@@ -139,13 +139,13 @@ def get_grid_search_settings_df(task_root_dir:str, settings_df:pd.DataFrame, gri
 
 def copy_folder_custom(source, destination, ignore_dirs=None):
     ignore_dirs = set() if ignore_dirs is None else set(ignore_dirs)
-    os.makedirs(destination, exist_ok=True)
+    Path(destination).mkdir(parents=True, exist_ok=True)
     jobs = []
-    for item in os.listdir(source):
+    for item in (path.name for path in Path(source).iterdir()):
         if item in ignore_dirs: continue   
-        s = os.path.join(source, item)
-        d = os.path.join(destination, item)
-        jobs += copy_folder_custom(s, d) if os.path.isdir(s) else [(s, d)]
+        s = Path(source) / item
+        d = Path(destination) / item
+        jobs += copy_folder_custom(s, d) if Path(s).is_dir() else [(s, d)]
     return jobs   
 
 def create_run_folders(task_root_dir:str, col:str, n_workers:int):
@@ -155,15 +155,15 @@ def create_run_folders(task_root_dir:str, col:str, n_workers:int):
     from_to_files = copy_folder_custom(src_dir, dst_dir, EXCLUDE_DIRS)
     Parallel(n_jobs=n_workers)(delayed(shutil.copy2)(s, d) for s, d in from_to_files)
     # Create an output folder for the task
-    os.makedirs(f'{dst_dir}/output', exist_ok=True)
+    Path(f'{dst_dir}/output').mkdir(parents=True, exist_ok=True)
     
     
 def submit_task(task_root_dir:str, col:str, mode:Literal['single','cluster']='cluster', max_concurrent_tasks:int=300):
-    _bash_scripts = os.path.join(LUTO_ROOT, 'luto/tools/create_task_runs/bash_scripts')
+    _bash_scripts = Path(LUTO_ROOT) / 'luto/tools/create_task_runs/bash_scripts'
 
     # Deposit the run scripts; needed regardless of mode or platform (Windows/Linux)
-    shutil.copyfile(os.path.join(_bash_scripts, 'python_script.py'), f'{task_root_dir}/{col}/python_script.py')
-    shutil.copyfile(os.path.join(_bash_scripts, 'cmd.sh'),           f'{task_root_dir}/{col}/cmd.sh')
+    shutil.copyfile(Path(_bash_scripts) / 'python_script.py', f'{task_root_dir}/{col}/python_script.py')
+    shutil.copyfile(Path(_bash_scripts) / 'cmd.sh',           f'{task_root_dir}/{col}/cmd.sh')
 
     if mode == 'single':
         # User executes each run manually
@@ -207,7 +207,7 @@ def submit_task(task_root_dir:str, col:str, mode:Literal['single','cluster']='cl
 
     
 def write_settings(task_dir:str, settings_dict:dict):
-    with open(os.path.join(LUTO_ROOT, 'luto/settings.py'), 'r') as src:
+    with open(Path(LUTO_ROOT) / 'luto/settings.py', 'r') as src:
         src_text = src.read()
 
     # Reorder settings_dict to match the original settings.py key order
@@ -266,8 +266,8 @@ def create_task_runs(
     if mode not in ['single', 'cluster']:
         raise ValueError('Mode must be either "single" or "cluster"!')
 
-    _bash_scripts = os.path.join(LUTO_ROOT, 'luto/tools/create_task_runs/bash_scripts')
-    shutil.copyfile(os.path.join(_bash_scripts, 'run_all.py'), os.path.join(task_root_dir, 'run_all.py'))
+    _bash_scripts = Path(LUTO_ROOT) / 'luto/tools/create_task_runs/bash_scripts'
+    shutil.copyfile(Path(_bash_scripts) / 'run_all.py', Path(task_root_dir) / 'run_all.py')
 
     # Read the custom settings file
     custom_settings = custom_settings.dropna(how='all', axis=1)
@@ -298,7 +298,7 @@ def create_task_runs(
 
 
 def get_json_data_from_zip(zip_path, json_filename):
-    with zipfile.ZipFile(os.path.join(zip_path), 'r') as zip_ref:
+    with zipfile.ZipFile(Path(zip_path), 'r') as zip_ref:
         if f'DATA_REPORT/data/{json_filename}' not in zip_ref.namelist():
             return {}
         with zip_ref.open(f'DATA_REPORT/data/{json_filename}') as f:
@@ -434,7 +434,7 @@ def get_report_df(json_dir_path, run_paras):
 def process_task_root_dirs(task_root_dir, n_workers=10):
     
     grid_search_params = pd.read_csv(f"{task_root_dir}/grid_search_parameters_unique.csv")
-    run_dirs = [i for i in os.listdir(task_root_dir) if os.path.isdir(os.path.join(task_root_dir, i))]
+    run_dirs = [path.name for path in Path(task_root_dir).iterdir() if path.is_dir()]
     run_dirs = sorted([i for i in run_dirs if 'Run_' in i])
     
     tasks = []
@@ -443,8 +443,8 @@ def process_task_root_dirs(task_root_dir, n_workers=10):
         run_paras = grid_search_params.query(f'run_idx == {int(run_idx)}').to_dict(orient='records')[0]
 
         # Depending on output structure, the report can be found in different places
-        json_dir_path = os.path.join(task_root_dir, 'Report_Data', f'Run_{run_idx}.zip')
-        if not os.path.exists(json_dir_path):
+        json_dir_path = Path(task_root_dir) / 'Report_Data' / f'Run_{run_idx}.zip'
+        if not Path(json_dir_path).exists():
             print(f'Warning: No output found for {run_dir}, skipping...')
             continue
         tasks.append(delayed(get_report_df)(json_dir_path, run_paras))
