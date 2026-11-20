@@ -17,8 +17,24 @@ or reshape raw data.
 This keeps a run fast, and keeps every input visible as a file that can be opened and checked on its own.
 
 New data your work adds goes in one folder of its own under `input/` (e.g. `input/<your_name>_build/`), so it can be
-sent as it is and stays apart from the existing inputs. The scripts that build it stay outside `luto/`, like test code.
-Say in each PR which files a run needs.
+sent as it is and stays apart from the existing inputs. The scripts that build it go in its `scripts/` folder
+(`input/Nick_build/scripts/`): git tracks that folder and ignores the built data beside it (`input/.gitignore`). They
+stay outside `luto/` and don't import it. Say in each PR which files a run needs.
+
+> **Important reminder: NaN in the inputs.** In an input, NaN means "not applicable". Where a land use is applicable
+> is said by one mask, `x_mrj.nc` (built in `dataprep.py`), not by the NaN in the data. So handle every NaN when the
+> file is built, and leave none in `input/`: LUTO never fills, masks or replaces NaN (rule 5).
+>
+> Example: Apples yield is NaN on every cell of an SA2 that grows no apples.
+>
+> - Where `x_mrj` says Apples is **not allowed**, the NaN only repeats the mask. Write 0: the model never uses it.
+> - Where `x_mrj` says Apples **is allowed** (say, a cell that grew apples in 2010 but whose SA2 has no apples data),
+>   the NaN is a real gap. A 0 would give the model apples at no cost, or with no yield. Supply a real value (from a
+>   neighbouring or regional figure), or switch Apples off on that cell in the mask, and say which in the build script.
+>
+> One exception, until it is re-encoded: the transition matrices (`ag_tmatrix.npy`, `ag_to_ep_tmatrix.npy`,
+> `ep_to_ag_tmatrix.npy`, `ag_to_destock_tmatrix.npy`) use NaN to mean "this land-use change is not allowed". Never
+> fill that NaN: a 0 there would make a forbidden change allowed and free, and nothing would crash.
 
 ## 3. `Data` holds the inputs; the economics modules turn them into solver inputs
 
@@ -69,8 +85,9 @@ disagree with another. Nothing crashes, and the results are just wrong. So:
   modules compute.
 - **Labels travel with the data.** Use xarray with named dimensions (`cell`, `lm`, `lu`, `year`) and select by name
   (`.sel(lm='dry', lu='Apples')`), not by position. A wrong position gives a wrong number; a wrong name gives an error.
-- **Fail loudly.** A missing value is not zero. In LUTO's inputs, NaN means "not allowed" (upper bound 0) and has to
-  be handled as such, never filled with 0 to make a run go through.
+- **Fail loudly.** A missing value is not zero. If NaN reaches the model, let the run crash: don't add `fillna`,
+  `nan_to_num`, `np.where(np.isnan(...), ...)` or a NaN check to make it go through. The crash says the input is wrong,
+  and the fix goes in the input file and its build script (rule 2), never in `luto/`.
 - **One change, one PR.** A PR does one thing and starts from the latest `jinzhu`. Once it's merged it's frozen: a
   fix is a new PR, and a merged branch is never rebased or force-pushed.
 

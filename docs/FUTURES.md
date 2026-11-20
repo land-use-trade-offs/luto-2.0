@@ -5,6 +5,31 @@ Entries are in **descending date order** (newest first). Each entry stands on it
 
 ---
 
+## 20261120 — transition matrices: store "not allowed" without NaN
+
+### TL;DR
+
+`docs/COLLABORATION.md` (rules 2 and 5) now says no input file may hold NaN and LUTO never fills NaN. The transition matrices are the written exception: they use NaN to mean "this land-use change is not allowed". Re-encode that so they can follow the rule too.
+
+### Today
+
+| File | Shape | NaN |
+|---|---|---|
+| `ag_tmatrix.npy` | 28 × 28 (from, to ag land use) | 103 |
+| `ag_to_destock_tmatrix.npy` | 28 | 25 |
+| `ag_to_ep_tmatrix.npy` | 28 | 4 |
+| `ep_to_ag_tmatrix.npy` | 28 | 1 |
+
+`transition_cost_clearing_forest.npz` holds no NaN. The NaN is read as "no arc" (`T_MAT`: `~np.isnan`) and in the `t_ij` / `t_*_j` readers (`agricultural/transitions.py`, `non_agricultural/transitions.py`). Filling it with 0 would make the forbidden changes allowed and free, silently.
+
+### What to do
+
+1. In `dataprep.py`, write each matrix as two files: the cost with 0 where not allowed, and a yes/no file of the allowed changes.
+2. Read the allowed mask wherever `np.isnan` of a transition matrix is read today; the cost is then read with no NaN.
+3. Check that the arcs and transition costs of one solve step are identical before and after, then drop the exception from `COLLABORATION.md` and the "NaN in a transition matrix" line from `CLAUDE.md`.
+
+---
+
 ## 20261119 — inputs: no NaN upstream of dataprep; the exclusion mask alone says where a land use is on
 
 ### TL;DR
@@ -49,6 +74,10 @@ Measured at RES5 on 2026-11-19 with plain centre picking: 14,555 of 1,441,891 el
 ---
 
 ## 20261119 — stubble grazing: the effective stubble rate comes from the input file, not from a function in `Data`
+
+### Status (20261120)
+
+Steps 2 and the scope-1 open point are done: `get_stubble_effective_rate` and `STUBBLE_SHEEP_AGEC_FIELDS` are gone from `luto/data.py`, which now reads the stubble file and block-averages it, nothing else (a TODO there points here). The rule lives in `input/Nick_build/scripts/stubble_dse.py`, which applies it to the raw rate at full resolution and checks every sheep emission source (on the current inputs exactly the same cells as the scope-1 sources only). Waiting on: Nick's raw stubble rate, to run the script on (step 1); until then `STUBBLE_DSE_FILE` must stay `None`, because a raw file read directly would skip the rule.
 
 ### TL;DR
 
