@@ -44,54 +44,6 @@ from dataclasses import dataclass
 
 
 
-# The sheep per-head fields the stubble consumers read (quantity, revenue, cost, water)
-STUBBLE_SHEEP_AGEC_FIELDS = ['QC', 'WR_DRN', 'F1', 'Q1', 'P1', 'F2', 'Q2', 'P2', 'F3', 'Q3', 'P3']
-
-
-def dict2matrix(d, fromlist, tolist):
-    """Return 0-1 matrix mapping 'from-vectors' to 'to-vectors' using dict d."""
-    A = np.zeros((len(tolist), len(fromlist)), dtype=np.int8)
-    for j, jstr in enumerate(fromlist):
-        for istr in d[jstr]:
-            i = tolist.index(istr)
-            A[i, j] = True
-    return A
-
-
-def get_base_am_vars(ncells, ncms, n_ag_lus):
-    """
-    Get the 2010 agricultural management option vars.
-    It is assumed that no agricultural management options were used in 2010,
-    so get zero arrays in the correct format.
-    """
-    am_vars = {}
-    for am in settings.AG_MANAGEMENTS_TO_LAND_USES:
-        am_vars[am] = np.zeros((ncms, ncells, n_ag_lus))
-
-    return am_vars
-
-
-
-def lumap2non_ag_l_mk(lumap, num_non_ag_land_uses: int):
-    """
-    Convert the land-use map to a decision variable X_rk, where 'r' indexes cell and
-    'k' indexes non-agricultural land use.
-
-    Cells used for agricultural purposes have value 0 for all k.
-    """
-    base_code = settings.NON_AGRICULTURAL_LU_BASE_CODE
-    non_ag_lu_codes = list(range(base_code, base_code + num_non_ag_land_uses))
-
-    # Set up a container array of shape r, k.
-    x_rk = np.zeros((lumap.shape[0], num_non_ag_land_uses), dtype=bool)
-
-    for i,k in enumerate(non_ag_lu_codes):
-        kmap = np.where(lumap == k, True, False)
-        x_rk[:, i] = kmap
-
-    return x_rk.astype(bool)
-
-
 @dataclass
 class Data:
     """
@@ -383,7 +335,11 @@ class Data:
         # A reverse dictionary for convenience.
         self.PR2LU_DICT = {pr: key for key, val in self.LU2PR_DICT.items() for pr in val}
 
-        self.LU2PR = dict2matrix(self.LU2PR_DICT, self.AGRICULTURAL_LANDUSES, self.PRODUCTS)
+        # 0-1 matrix (product × land use): 1 where the land use yields the product
+        self.LU2PR = np.zeros((self.NPRS, len(self.AGRICULTURAL_LANDUSES)), dtype=np.int8)
+        for j, lu in enumerate(self.AGRICULTURAL_LANDUSES):
+            for pr in self.LU2PR_DICT[lu]:
+                self.LU2PR[self.PRODUCTS.index(pr), j] = 1
         
         self.lu2pr_xr = xr.DataArray(
             self.LU2PR.astype(np.float32),
@@ -428,7 +384,11 @@ class Data:
                 else:
                     ... # Do nothing, this should be a crop.
 
-        self.PR2CM = dict2matrix(self.CM2PR_DICT, self.COMMODITIES, self.PRODUCTS).T # Note the transpose.
+        # 0-1 matrix (commodity × product): 1 where the product counts towards the commodity
+        self.PR2CM = np.zeros((self.NCMS, self.NPRS), dtype=np.int8)
+        for cm_index, cm in enumerate(self.COMMODITIES):
+            for pr in self.CM2PR_DICT[cm]:
+                self.PR2CM[cm_index, self.PRODUCTS.index(pr)] = 1
         
         self.pr2cm_xr = xr.DataArray(
             self.PR2CM.astype(np.float32),
@@ -521,8 +481,13 @@ class Data:
 
         
 
-        self.NON_AG_L_RK = lumap2non_ag_l_mk(
-            self.LUMAP, len(self.NON_AGRICULTURAL_LANDUSES)     # Int8
+        # base-year non-ag dvar X_rk (bool, cell × non-ag land use): a cell is in k where its lumap code is k's; ag cells are False for every k
+        self.NON_AG_L_RK = np.stack(
+            [
+                self.LUMAP == settings.NON_AGRICULTURAL_LU_BASE_CODE + k 
+                for k in range(len(self.NON_AGRICULTURAL_LANDUSES))
+            ],
+            axis=1,
         )
         self.add_non_ag_dvars(self.YR_CAL_BASE, self.NON_AG_L_RK)
 
@@ -689,10 +654,14 @@ class Data:
         # The stubble carrying rate <unit: DSE per ha, annualised>, read on every cell and applied on the cereal land uses
         # only (quantity.get_stubble_yield_pot); 0 where no file is given
         if settings.STUBBLE_DSE_FILE:
-            stubble_raw = self.get_resfactored_average(xr.load_dataarray(Path(settings.INPUT_DIR) / settings.STUBBLE_DSE_FILE), settings.STUBBLE_DSE_FILE)   # before its fill: get_stubble_effective_rate keeps NaN
-            self.STUBBLE_DSE_HA = stubble_raw.fillna(0)
+            # TODO: the file must already hold 0 on every cell without the sheep per-head data the stubble consumers read
+            #   (the sheep fields of agec_lvstk.nc, the sheep sources of agGHG_lvstk.nc, water_delivery_price.nc), so a cell
+            #   carries no stubble emissions without stubble production, revenue and cost. Build it from Nick's raw rate with
+            #   input/Nick_build/scripts/stubble_dse.py; Data no longer applies that rule (get_stubble_effective_rate, removed
+            #   2026-11-20). Nick's raw file is not here yet.
+            stubble_raw = xr.load_dataarray(Path(settings.INPUT_DIR) / settings.STUBBLE_DSE_FILE)
+            self.STUBBLE_DSE_HA = self.get_resfactored_average(stubble_raw, settings.STUBBLE_DSE_FILE)
         else:
-            stubble_raw = None
             self.STUBBLE_DSE_HA = xr.DataArray(np.zeros(self.NCELLS, dtype=np.float32), dims=['cell'], coords={'cell': np.arange(self.NCELLS)})
 
         self.PASTURE_KG_DM_HA = self.get_resfactored_average(xr.load_dataarray(Path(settings.INPUT_DIR) / "pasture_kg_dm_ha.nc").astype(np.float32), "pasture_kg_dm_ha.nc")   # int16 on file
@@ -959,17 +928,12 @@ class Data:
             self.AGGHG_CROPS = self.get_resfactored_average(table['AGGHG_CROPS'], "agGHG_crops.nc").set_xindex(['field', 'lm', 'lu'])
         with xr.open_dataset(Path(settings.INPUT_DIR) / "agGHG_lvstk.nc") as table:
             self.AGGHG_LVSTK = self.get_resfactored_average(table['AGGHG_LVSTK'], "agGHG_lvstk.nc").set_xindex(['animal', 'field'])
+        
         agghg_irrpast = xr.load_dataset(Path(settings.INPUT_DIR) / "agGHG_irrpast.nc")
         self.AGGHG_IRRPAST = xr.Dataset({                                     # the CO2E columns; CELL_ID and SA2_ID (ids) are not read
             name: self.get_resfactored_average(agghg_irrpast[name].astype(np.float32), f'agGHG_irrpast_{name}')   # CO2E_KG_HA_HARVEST is int8 on file
             for name in agghg_irrpast.data_vars if name.startswith('CO2E')
         })
-
-        # A cell without the sheep per-head data the stubble consumers read carries no stubble sheep: its stubble rate is 0
-        # for quantity, revenue, cost, GHG and water alike. A NaN rate stays NaN for the guard.
-        if stubble_raw is not None:
-            stubble_raw = self.get_stubble_effective_rate(stubble_raw)
-            self.STUBBLE_DSE_HA = stubble_raw.fillna(0)
 
 
         # Raw transition cost matrix. In AUD/ha and ordered lexicographically.
@@ -1189,12 +1153,9 @@ class Data:
         )
 
         # Spatially explicit costs of a water licence per ML.
-        self.WATER_LICENCE_PRICE = (
-            self.get_resfactored_average(
-                xr.load_dataarray(Path(settings.INPUT_DIR) / "water_licence_price.nc").astype(np.float32),   # int16 on file: a price, averaged as one
-                "water_licence_price.nc",
-            )
-            .fillna(0)                                                          # NaN filled with 0 as before (see the A1 NaN audit)
+        self.WATER_LICENCE_PRICE = self.get_resfactored_average(
+            xr.load_dataarray(Path(settings.INPUT_DIR) / "water_licence_price.nc").astype(np.float32),   # int16 on file: a price, averaged as one; no NaN
+            "water_licence_price.nc",
         )
 
         # Spatially explicit costs of water delivery per ML.
@@ -1271,7 +1232,11 @@ class Data:
         # Calculate base year production 
         ###############################################################
 
-        self.AG_MAN_L_MRJ_DICT = get_base_am_vars(self.NCELLS, self.NLMS, self.N_AG_LUS)
+        # base-year ag-mgt dvars: no option was adopted in the base year, so every option is zeros over (m, r, j)
+        self.AG_MAN_L_MRJ_DICT = {
+            am: np.zeros((self.NLMS, self.NCELLS, self.N_AG_LUS)) 
+            for am in settings.AG_MANAGEMENTS_TO_LAND_USES
+        }
         self.add_ag_man_dvars(self.YR_CAL_BASE, self.AG_MAN_L_MRJ_DICT)
         
         print("├── Calculating base year productivity", flush=True)
@@ -2198,17 +2163,6 @@ class Data:
         states, state_idx_of_cell = np.unique(self.REGION_STATE_NAME.astype(str), return_inverse=True)
         return price_of_state.loc[states].to_numpy(np.float32)[state_idx_of_cell]
 
-
-    def get_stubble_effective_rate(self, rate: np.ndarray) -> np.ndarray:
-        """The stubble rate at the model's cells, 0 where the sheep per-head data the stubble consumers read is missing
-        (AGEC_LVSTK STUBBLE_SHEEP_AGEC_FIELDS, the AGGHG_LVSTK sources, WATER_DELIVERY_PRICE); NaN stays NaN."""
-        sources = [field for animal, field in self.AGGHG_LVSTK.indexes['column']
-                   if animal == 'SHEEP' and (not settings.USE_GHG_SCOPE_1 or field in settings.LVSTK_GHG_SCOPE_1)]
-        water_price = self.get_resfactored_average(xr.load_dataarray(Path(settings.INPUT_DIR) / "water_delivery_price.nc"), "water_delivery_price.nc").values      # before its fill: NaN where no price
-        sheep_data = (np.isfinite(np.stack([self.AGEC_LVSTK.sel(field=f, animal='SHEEP').values for f in STUBBLE_SHEEP_AGEC_FIELDS])).all(axis=0)
-                      & np.isfinite(np.stack([self.AGGHG_LVSTK.sel(animal='SHEEP', field=f).values for f in sources])).all(axis=0)
-                      & np.isfinite(water_price))
-        return rate.where(sheep_data | ~np.isfinite(rate), 0.0)
 
     def get_potential_production_lyr(self, yr_cal:int):
         '''
