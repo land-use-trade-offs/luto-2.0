@@ -161,7 +161,7 @@ def get_ghg_stubble(data:Data, lu, lm) -> pd.DataFrame:
     sheep per-head factors (AGGHG_LVSTK; the scope-1 fields when settings.USE_GHG_SCOPE_1) at the stubble stocking
     rate. Sources are named 'STUBBLE_SHEEP_<field>'. Provisional: the cell's sheep factors, pending the emission
     factor rebuild."""
-    agghg = data.stubble(lu, lm)['AGGHG_LVSTK']
+    agghg = data.AGGHG_LVSTK
     sources = [src for animal, src in agghg.indexes['column']
                if animal == 'SHEEP' and (not settings.USE_GHG_SCOPE_1 or src in settings.LVSTK_GHG_SCOPE_1)]
     ghg_raw = np.stack([agghg.sel(animal='SHEEP', field=src).values for src in sources], axis=1)   # (cell, source)
@@ -204,7 +204,7 @@ def get_ghg_lvstk( data:Data    # Data object.
 
     # Get the yield potential, i.e. the total number of livestock head per hectare.
     yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
-    agghg_lvstk = data.agghg_lvstk(lu, lm)
+    agghg_lvstk = data.AGGHG_LVSTK
 
     # Get GHG emissions by source in kg CO2e per head of livestock.  settings.LVSTK_GHG_SCOPE_1
     # Note: ghg_rs (r -> each cell, s -> each GHG source)
@@ -222,7 +222,7 @@ def get_ghg_lvstk( data:Data    # Data object.
 
     # Add pasture irrigation emissions.
     if lm == 'irr':
-        ghg_lvstk_irr = data.agghg_irrpast(lu, lm)
+        ghg_lvstk_irr = data.AGGHG_IRRPAST
         ghg_lvstk_irr_cols = [i for i in ghg_lvstk_irr.data_vars if 'CO2E' in i]
         
         ghg_rs = pd.concat([ghg_rs, ghg_lvstk_irr[ghg_lvstk_irr_cols].to_dataframe()], axis = 1)
@@ -349,8 +349,7 @@ def get_irrpast_energy_ghg_matrices(data: Data) -> np.ndarray:
     m = data.LANDMANS.index('irr')
     for j, lu in enumerate(data.AGRICULTURAL_LANDUSES):
         if lu in data.LU_LVSTK:
-            irrpast = data.agghg_irrpast(lu, 'irr')       # block-aggregated per (lm, lu) at RESFACTOR > 1, as get_ghg_lvstk reads it
-            g_mrj[m, :, j] = (irrpast[energy_cols].to_dataframe()[energy_cols].sum(axis=1).to_numpy() / 1000 * data.REAL_AREA.values).astype(np.float32)
+            g_mrj[m, :, j] = (data.AGGHG_IRRPAST[energy_cols].to_dataframe()[energy_cols].sum(axis=1).to_numpy() / 1000 * data.REAL_AREA.values).astype(np.float32)
     return g_mrj
 
 
@@ -470,7 +469,7 @@ def get_asparagopsis_effect_g_mrj(data:Data, yr_idx, separate=False):
                 yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
 
                 reduction_amnt = (
-                    data.agghg_lvstk(lu, lm).sel(animal=lvstype, field="CO2E_KG_HEAD_ENTERIC").values
+                    data.AGGHG_LVSTK.sel(animal=lvstype, field="CO2E_KG_HEAD_ENTERIC").values
                     * yield_pot
                     * ch4_reduction_perc
                     / 1000            # convert to tonnes
@@ -574,7 +573,7 @@ def get_ecological_grazing_effect_g_mrj(data:Data, yr_idx, separate=False):
                 yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
 
                 leach_reduction_amnt = (
-                    data.agghg_lvstk(lu, lm).sel(animal=lvstype, field='CO2E_KG_HEAD_IND_LEACH_RUNOFF').values
+                    data.AGGHG_LVSTK.sel(animal=lvstype, field='CO2E_KG_HEAD_IND_LEACH_RUNOFF').values
                     * yield_pot       # convert to HAs
                     * leach_reduction_perc
                     / 1000            # convert to tonnes

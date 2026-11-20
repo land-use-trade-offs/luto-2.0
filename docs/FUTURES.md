@@ -5,6 +5,80 @@ Entries are in **descending date order** (newest first). Each entry stands on it
 
 ---
 
+## 20261119 — inputs: no NaN upstream of dataprep; the exclusion mask alone says where a land use is on
+
+### TL;DR
+
+Every input layer is to be dense over all 6,956,407 land cells, with no NaN, even on cells where its land use is not valid. Whether a land use is on or off in a cell is decided by the exclusion mask (`x_mrj`, read into `Data.EXCLUDE`) and by nothing else. With that, reading a coarse block's inputs at its centre cell always finds a value, and the special handling in `Data` goes away.
+
+### Why
+
+Today an input is filled only where its land use occurs: irrigated pear yield has a value on 6,224 of the 6,956,407 cells and NaN elsewhere. Two things then say "off": the mask, and NaN in the data. At `RESFACTOR > 1` they disagree.
+
+| Step | What happens |
+|---|---|
+| 1 | A block is on for a land use when any of its full-resolution cells is on (the mask is aggregated over the block) |
+| 2 | The block's inputs are read at its centre cell |
+| 3 | If the centre cell is off, its inputs are NaN: the block is on with no data (the NaN issue) |
+| 4 | Dropping or zeroing that entry discards the land use the block really holds (the dropping issue) |
+
+Measured at RES5 on 2026-11-19 with plain centre picking: 14,555 of 1,441,891 eligible entries had no data; they held 68,500 ha of base-year land, 2-11 % of the area of the small horticultural land uses (pears 10.9 %, apples 6.1 %).
+
+### What to do
+
+1. **Upstream of `dataprep.py`:** each layer is delivered dense. A cell without a value of its own takes the value of the nearest cell that has one (`scipy.ndimage.distance_transform_edt(..., return_indices=True)` on the 2D grid: about 1 s per layer on the 3,364 x 4,071 grid).
+2. **Before that fill:** check that every cell where the land use is on already has a real value, and stop if one does not. After the fill a missing value can no longer be seen, so this is the only place the check can run.
+3. **`dataprep.py`:** refuse any input that contains NaN.
+4. **`Data`:** nothing to remove any more: the NaN guards (`check_eligible_nan` with its `RESFACTOR > 1` not-allowed branch, `check_ag_man_nan`, `raise_nan_report`) were removed on 2026-11-19; no NaN in an input is a rule of data processing, not a check in LUTO. The coarse reader `Data.get_resfactored_average` (`Data.block_mean`: the mean over a block's land-use cells that have a value, cached in `input/_cache`) keeps working on dense inputs: the mean then runs over every land-use cell of the block, so decide at that point whether a land use's values on cells where it is off should count in its block mean. Which inputs hold NaN today (2026-11-19 survey): `AGEC_CROPS` / `AGGHG_CROPS` (87 % of land-use cells, NaN wherever the crop does not occur), `CLIMATE_CHANGE_IMPACT` (82 %, every climate file), `cell_BECCS.nc` (92 %), `AGEC_LVSTK`, `FEED_REQ`, `WATER_DELIVERY_PRICE` (0.11 %); every other input is NaN-free.
+5. **Readers:** remove the `fillna(0)` / `np.nan_to_num` calls on these inputs once the files are dense; each one is then dead code. LUTO then breaks fast on a NaN input (Gurobi rejects a NaN coefficient); there is no NaN guard in `Data` any more (`check_eligible_nan`, `check_ag_man_nan`, `raise_nan_report` removed 2026-11-19). The calls, as of 2026-11-19:
+   - `luto/data.py`: `FEED_REQ`, `LVSTK_K`, `STUBBLE_DSE_HA` (two), `WREQ_DRY_RJ` / `WREQ_IRR_RJ`, `WATER_LICENCE_PRICE`, `WATER_DELIVERY_PRICE`
+   - `luto/economics/agricultural/`: `quantity.py` (climate multiplier filled with 1, stubble quantity, `q_rp`), `cost.py` (stubble cost, `cost.fillna`), `revenue.py` (two), `ghg.py` (stubble, `g_rj`, the four `AGGHG_CROPS` reads), `water.py` (stubble drinking water)
+   - `luto/economics/non_agricultural/`: BECCS in `cost.py`, `revenue.py` (two), `ghg.py` (two); in `transitions.py` the two water licence costs (water requirement x licence price: an input, not a transition matrix)
+   - `luto/solvers/row_inputs.py`: the three objective arrays (`ag_obj_mrj`, `non_ag_obj_rk`, `ag_man_objs`)
+
+   They stay: NaN in a transition matrix means "transition not allowed" (`agricultural/transitions.py` `t_ij`, every `t_j` / `t_*_j` and `base_ep_to_ag_t` in `non_agricultural/transitions.py`); `solvers/rowgen.py` fills computed values (a shortfall, the duals not read), not inputs; `tools/ag_mgt_caps.py` parses blanks in a source spreadsheet (data building).
+
+### Open points
+
+- An inventory of which input files contain NaN today, and how many cells each, has not been made.
+- `T_MAT` uses NaN to mean "this transition is not allowed". It is a land-use by land-use table, not a spatial layer; decide whether the rule covers it.
+- Dense files take more disk; a nearest-value fill is piecewise constant and should compress well. Not measured.
+- The inputs must be regenerated and copied to every machine that runs the model; runs on the old and the new files are comparable at RES1 (no cell that is on changes) but not at `RESFACTOR > 1`.
+- Natural moment: the rebuild of the inputs for the 2021 base year.
+
+---
+
+## 20261119 — stubble grazing: the effective stubble rate comes from the input file, not from a function in `Data`
+
+### TL;DR
+
+`Data.get_stubble_effective_rate` (`luto/data.py`) rewrites the stubble carrying rate after it is read: the rate is set to 0 on every cell that lacks the sheep per-head data the stubble code needs. That rule is a property of the input and should be applied when the input file is built, so `Data` only reads it. Remove the function and feed the finished rate in.
+
+### What the function does today
+
+It runs once, where `STUBBLE_DSE_HA` is loaded, and only when `settings.STUBBLE_DSE_FILE` is set (default `None`: the feature is off and no stubble file is in `input/`).
+
+| Step | Detail |
+|---|---|
+| Reads | the stubble rate (DSE per ha, per cell); the sheep fields of `AGEC_LVSTK` listed in `STUBBLE_SHEEP_AGEC_FIELDS`; the sheep sources of `AGGHG_LVSTK` (scope 1 only when `USE_GHG_SCOPE_1`); `water_delivery_price.nc`, read a second time before its NaN fill |
+| Rule | a cell missing any of those values gets rate 0: no stubble sheep there, for quantity, revenue, cost, GHG and water alike |
+| Keeps | a NaN rate stays NaN (the NaN guard that reported it was removed on 2026-11-19; the fill to 0 follows) |
+
+Why it exists: the five stubble consumers each read different sheep fields and each turn their own NaN into 0. Without one shared rule, a cell with sheep quantities but no water price would produce stubble meat at no water cost.
+
+### What to do
+
+1. Apply the rule where the stubble file is built (the livestock allocation tooling, outside `luto/`), so the file already holds 0 on cells without sheep data. The author of that tooling has stated that its next regeneration does this.
+2. In `Data`, read the rate and nothing else: delete `get_stubble_effective_rate` and its call.
+3. Check the rule where the file is built: LUTO no longer has a NaN guard (removed 2026-11-19), so a file that breaks it is silently zeroed at load.
+
+### Open points
+
+- The rule depends on `USE_GHG_SCOPE_1` (which sheep emission sources count as needed). A file built once cannot follow a setting. Either build the file for the stricter case (all sources), or drop that dependence.
+- Whether stubble grazing stays a fixed co-product of the cereal land uses at all, or becomes an agricultural management option fed from a bundle plus a rate layer (as solar and wind are), is undecided. If it becomes an option, this item is done as part of that change.
+
+---
+
 ## 20261118 — model build: stop computing the same input several times a year (caches, one hoisted call)
 
 ### TL;DR
@@ -327,6 +401,13 @@ Start with the small independent fixes, then the two that change the model most.
 | #230 | `24984b54` | Validation scripts cover k and stubble | Moved out of `luto/` |
 | #230 | `8e0f1e9e` | No sheep per-head data means no stubble sheep | `get_stubble_effective_rate` |
 | merge | `948d88b0` | **Conflict resolutions: Nick's stack + S2 / S6** | |
+
+### Status 2026-11-19
+
+- `coarsen_guarded_arrays` and the livestock / stubble accessors are **removed**. At `RESFACTOR > 1` every per-ha / per-head input is the unweighted mean over the block's land-use cells (`Data.get_resfactored_average`, cached in `input/_cache`), `REAL_AREA` is the block's land-use area, shares are means over the same cells (`Data.block_mean`). Measured at RES5 against RES1 (base year): area exact; revenue -0.3 %, cost -0.9 %, production 0.7 % mean per commodity (the chains got the agricultural economics to ~0, the plain mean is the price of treating every input alike). Details: `docs/FINDINGS.md`, 20261119.
+- The NaN guards (`check_eligible_nan`, `check_ag_man_nan`, `raise_nan_report`) are **removed**; no NaN in an input is a data-processing rule.
+- `ghg_targets.py` and `ag_mgt_caps.py` **moved out of `luto/`** (they build inputs); their output lives in `input/Nick_build/`, `dataprep.py` only points there. `ag_mgt_caps` is not built locally: the CER register no longer matches its sha256 pin.
+- The NaN-fill audit below is partly answered: the fills to remove once inputs are dense, and the ones that stay, are listed in the 20261119 entry "inputs: no NaN upstream of dataprep", step 5.
 
 ### Open questions carried over
 

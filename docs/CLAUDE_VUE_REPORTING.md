@@ -548,8 +548,12 @@ The inputs shown on the Home page are **not written by a run**. They are built o
   `python -c "from luto.tools.write_input import rebuild_input_cache_themes; rebuild_input_cache_themes(['Biodiversity'])"`
 - **One cache for every run.** Inputs with option buttons hold every option; the others (economics, transition
   costs, exclusion) are those of the settings in force when the cache was built (listed in its `DONE.json`).
-- **Raw values.** At RESFACTOR > 1 `Data` replaces the economics / emissions / climate values of a cell by block
-  means (`coarsen_guarded_arrays`); the cache puts the centre-cell values back (`use_centre_cell_values`).
+- **Block values.** At RESFACTOR > 1 `Data` reads every per-ha / per-head input as the mean over the block's land-use
+  cells (`Data.get_resfactored_average`), and shares (land use, eligibility, habitat, GBF2 mask) as their share of
+  those cells (`Data.block_mean`); the climate table the cache re-reads under each climate goes through the same
+  function. `write_input.use_block_mean_layers` and `set_carbon_option` still average some layers on their own (the
+  product's mean for sequestration, any-cell savanna eligibility, values > 0 only for water and BECCS), so those maps
+  can differ slightly from what the model reads.
 - **Years** `INPUT_CACHE_YEARS` (2010-2050 every ten). A layer that is the same in every year is stored once
   (year key `ALL`); the view shows the kept year nearest to the selected one.
 - **Options** (`INPUT_OPTIONS`): SSP x CO2 fertilisation (yield climate), SSP (water), scope 1 (ag emissions), carbon

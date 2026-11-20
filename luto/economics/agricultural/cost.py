@@ -145,7 +145,7 @@ def get_cost_lvstk(data:Data, lu, lm, yr_idx):
 
     # Get the yield potential, i.e. the total number of head per hectare.
     yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
-    agec = data.agec_lvstk(lu, lm)
+    agec = data.AGEC_LVSTK
 
     # Variable costs - quantity-dependent costs as costs per head x heads per hectare.
     costs_q = agec.sel(field='QC', animal=lvstype).to_series() * yield_pot * data.QC_COST_MULTS.loc[yr_cal, lvstype_capital]
@@ -168,7 +168,7 @@ def get_cost_lvstk(data:Data, lu, lm, yr_idx):
 
     # Water delivery costs equal drinking water plus irrigation water req per head * yield (head/ha)
     costs_w = (agec.sel(field='WR_DRN', animal=lvstype).to_series() * settings.LIVESTOCK_DRINKING_WATER + WR_IRR) * yield_pot
-    costs_w *= data.water_delivery_price(lu, lm) * data.WP_COST_MULTS[yr_cal]  # $/ha
+    costs_w *= data.WATER_DELIVERY_PRICE.values * data.WP_COST_MULTS[yr_cal]  # $/ha
 
     # Convert costs to $ per cell including resfactor.
     costs_a *= data.REAL_AREA.values
@@ -199,10 +199,9 @@ def get_cost_stubble(data:Data, lu, lm, yr_idx):
     Provisional: the per-head values are the cell's sheep values (AGEC_LVSTK), pending the livestock economics rebuild."""
     yr_cal = data.YR_CAL_BASE + yr_idx
     head_ha = get_stubble_yield_pot(data, lu, lm)
-    s = data.stubble(lu, lm)
-    costs_q = s['AGEC_LVSTK'].sel(field='QC', animal='SHEEP').values * head_ha * data.QC_COST_MULTS.loc[yr_cal, 'Sheep']
-    costs_w = (s['AGEC_LVSTK'].sel(field='WR_DRN', animal='SHEEP').values * settings.LIVESTOCK_DRINKING_WATER * head_ha
-               * s['WATER_DELIVERY_PRICE'] * data.WP_COST_MULTS[yr_cal])
+    costs_q = data.AGEC_LVSTK.sel(field='QC', animal='SHEEP').values * head_ha * data.QC_COST_MULTS.loc[yr_cal, 'Sheep']
+    costs_w = (data.AGEC_LVSTK.sel(field='WR_DRN', animal='SHEEP').values * settings.LIVESTOCK_DRINKING_WATER * head_ha
+               * data.WATER_DELIVERY_PRICE.values * data.WP_COST_MULTS[yr_cal])
     return pd.DataFrame(
         np.nan_to_num(np.stack([costs_q * data.REAL_AREA.values, costs_w * data.REAL_AREA.values]).T),   # no sheep data: no stubble sheep
         columns=pd.MultiIndex.from_product([[lu], [lm], ['Stubble sheep quantity cost', 'Stubble sheep water cost']])
@@ -378,7 +377,7 @@ def get_ecological_grazing_effect_c_mrj(data:Data, yr_idx):
         lvstype, _ = lvs_veg_types(lu)
 
         for m, lm in enumerate(data.LANDMANS):
-            agec = data.agec_lvstk(lu, lm)
+            agec = data.AGEC_LVSTK
 
             # Get effects on operating costs
             operating_mult = data.ECOLOGICAL_GRAZING_DATA[lu].loc[yr_cal, 'Operating_cost_multiplier']

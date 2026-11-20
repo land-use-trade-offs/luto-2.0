@@ -251,6 +251,9 @@ Every constraint is hard by default: there are no soft / penalised options (the 
    - **Carbon data**: Loads NetCDF files using xarray, selects data at `CARBON_EFFECTS_WINDOW` age
    - Carbon sequestration components: Trees + Debris (aboveground, risk-discounted) + Soil (belowground)
    - **Renewable energy data**: Loads targets (CSV), electricity prices (separate CSV per type: solar, wind), spatial layers (NetCDF), and bundle parameters (CSV)
+   - **Coarse runs (`RESFACTOR > 1`, 2026-11-19)**: a model cell is its block's **land-use cells** (the cells RES1 models). `REAL_AREA` = their summed area (`Data.block_sum`); every share (`AG_L_MRJ`, `EXCLUDE`, the GBF2 mask, GBF3 / GBF4 layers, existing renewables) = their share (`Data.block_mean`); every per-ha / per-head input = their mean over the cells with a value (`Data.get_resfactored_average(layer, cache_name)`: one DataArray in, the caller loops over a Dataset's variables and casts an integer quantity to float; cached in `input/_cache/cache_<name>_RES<n>.nc`, keyed on the Data's own resolution; no cache at RES1). Codes, labels and flags stay at the representative cell. Measured against RES1: `docs/FINDINGS.md`, 20261119
+   - **No NaN guard**: an input must hold no NaN on land a land use may occupy — a data-processing rule, not a check in LUTO (the guards were removed 2026-11-19). The readers' `fillna(0)` / `nan_to_num` stay until the inputs are dense (`docs/FUTURES.md`, 20261119); NaN in a transition matrix still means "not allowed"
+   - **Inputs built outside LUTO** sit in `input/Nick_build/` (`ghg_targets/`, `ag_mgt_caps/`); their build scripts are not in `luto/`, and `dataprep.py` does not run them
 2. **Preprocessing**: `dataprep.py` processes raw data into model-ready formats
    - Copies demand elasticity data from source to input directory
    - **Carbon data preparation**: Converts 3D timeseries to NetCDF format with age dimension
@@ -286,9 +289,12 @@ Results saved in `/output/<timestamp>/`:
 
 ```python
 import xarray as xr
-# Load NetCDF and select specific age from CARBON_EFFECTS_WINDOW setting
-ds = xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_block.nc"))
-ds = ds.sel(age=settings.CARBON_EFFECTS_WINDOW, cell=self.MASK)
+# Load NetCDF, select the CARBON_EFFECTS_WINDOW age, and read each variable at the model cells
+# (get_resfactored_average: the layer at the land-use cells at RES1, the block mean over them at RESFACTOR > 1)
+with xr.open_dataset(Path(settings.INPUT_DIR) / "tCO2_ha_ep_block.nc") as ds:
+    ds = ds.sel(age=settings.CARBON_EFFECTS_WINDOW)
+    ds = xr.Dataset({name: self.get_resfactored_average(ds[name], f'tCO2_ha_ep_block_age{settings.CARBON_EFFECTS_WINDOW}_{name}')
+                     for name in ds.data_vars})
 
 # Calculate total sequestration with risk discounting
 total_co2 = (

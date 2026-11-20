@@ -18,6 +18,7 @@
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
 
+from pathlib import Path
 import os
 import re
 import sys
@@ -112,7 +113,7 @@ def save_input_layers(data: Data, yr_cal, path, tag, catalogue, layers):
             kept.append((name, lm, option, lu, values_r.astype(np.float32)))
 
     catalogue[catalogue['input'].isin({name for name, *_ in kept}) | (catalogue['kind'] == 'chart')]\
-        .to_csv(os.path.join(path, f'inputs_catalogue_{tag}_{yr_cal}.csv'), index=False)
+        .to_csv(Path(path) / f'inputs_catalogue_{tag}_{yr_cal}.csv', index=False)
     if not kept:
         return f"Inputs ({tag}) for year {yr_cal}: no layer"
 
@@ -122,7 +123,7 @@ def save_input_layers(data: Data, yr_cal, path, tag, catalogue, layers):
         dims=['layer', 'cell'],
         coords={**xr.Coordinates.from_pandas_multiindex(layer_index, 'layer'), 'cell': np.arange(data.NCELLS)},
     )
-    save2nc(layers_xr, os.path.join(path, f'xr_input_layers_{tag}_{yr_cal}.nc'))
+    save2nc(layers_xr, Path(path) / f'xr_input_layers_{tag}_{yr_cal}.nc')
 
     return f"Inputs ({tag}) written for year {yr_cal}: {len(kept)} layers"
 
@@ -167,12 +168,12 @@ def get_yield_trend_sources() -> pd.DataFrame:
             long = long[long['lm'] == 'dry'].assign(lm='ALL')
         return long.replace({'lm': {'dry': 'Dryland', 'irr': 'Irrigated'}})
 
-    bau = pd.read_csv(os.path.join(settings.INPUT_DIR, 'yieldincreases_bau2022.csv'), header=[0, 1]).astype(np.float64)
+    bau = pd.read_csv(Path(settings.INPUT_DIR) / 'yieldincreases_bau2022.csv', header=[0, 1]).astype(np.float64)
     bau.index = bau.index + 2010                   # the csv has no year column: its first row is 2010
     parts = [to_groups(bau).assign(source='BAU', scenario='BAU', kind='projection')]
 
     scenarios = {
-        scenario: pd.read_excel(os.path.join(settings.INPUT_DIR, 'yieldincreases_ag_2050.xlsx'), sheet_name=f'{scenario}_actual', header=[0, 1], index_col=0).astype(np.float64)
+        scenario: pd.read_excel(Path(settings.INPUT_DIR) / 'yieldincreases_ag_2050.xlsx', sheet_name=f'{scenario}_actual', header=[0, 1], index_col=0).astype(np.float64)
         for scenario in ['low', 'medium', 'high', 'very_high']
     }
     first, *others = scenarios.values()
@@ -206,7 +207,7 @@ def input_yield(data: Data, yr_cal, path):
             climate_r = ag_quantity.get_ccimpact(data, lu, lm, yr_idx)
             layers.append(('Climate change', lm, lu, np.where(allowed_r, (climate_r - 1) * 100, 0)))
 
-    get_yield_trend_sources().to_csv(os.path.join(path, f'inputs_yield_trend_{yr_cal}.csv'), index=False)
+    get_yield_trend_sources().to_csv(Path(path) / f'inputs_yield_trend_{yr_cal}.csv', index=False)
 
     catalogue = [
         {'theme': 'Yield', 'input': 'Climate change', 'unit': '%', 'kind': 'layer'},
@@ -444,9 +445,9 @@ def get_transition_matrix(data: Data) -> pd.DataFrame:
     rows = [(from_lu, to_lu, 'Total', 0.0 if pd.isna(total.loc[from_lu, to_lu]) else float(total.loc[from_lu, to_lu]), bool(pd.notna(total.loc[from_lu, to_lu])))
             for from_lu in lus for to_lu in lus]
 
-    workbook = os.path.join(settings.INPUT_DIR, 'transitions_costs.xlsx')
-    categories = os.path.join(settings.INPUT_DIR, 'tmatrix_cat2lus.csv')
-    if not (os.path.exists(workbook) and os.path.exists(categories)):
+    workbook = Path(settings.INPUT_DIR) / 'transitions_costs.xlsx'
+    categories = Path(settings.INPUT_DIR) / 'tmatrix_cat2lus.csv'
+    if not (Path(workbook).exists() and Path(categories).exists()):
         raise FileNotFoundError(
             f'The transition cost matrix needs {workbook} and {categories}: the transition cost workbook and its '
             'category table, copied into the inputs by dataprep.py.')
@@ -461,7 +462,7 @@ def get_transition_matrix(data: Data) -> pd.DataFrame:
               if to_lu != 'Unallocated - modified land']
 
     # non-ag -> unallocated modified land: clearing the planting
-    clearing = np.load(os.path.join(settings.INPUT_DIR, 'transition_cost_clearing_forest.npz'))
+    clearing = np.load(Path(settings.INPUT_DIR) / 'transition_cost_clearing_forest.npz')
     light, dense, barrier = (float(clearing[name]) for name in ('tmat_clear_light_wood', 'tmat_clear_dense_wood', 'tmat_clear_wood_barrier'))
     tree_share = {'Sheep Agroforestry': settings.AF_PROPORTION, 'Beef Agroforestry': settings.AF_PROPORTION,
                   'Sheep Carbon Plantings (Belt)': settings.CP_BELT_PROPORTION, 'Beef Carbon Plantings (Belt)': settings.CP_BELT_PROPORTION}
@@ -527,7 +528,7 @@ def input_transition_cost(data: Data, yr_cal, path):
         layers.append(('Transition cost to non-agriculture', 'ALL', lu, np.where(has_source_r, to_non_ag_rk[:, k] / safe_share_r / real_area, 0)))
 
     # The from-to table behind them, the same in every year: no map, a matrix (kind 'chart')
-    get_transition_matrix(data).to_csv(os.path.join(path, f'inputs_transition_matrix_{yr_cal}.csv'), index=False)
+    get_transition_matrix(data).to_csv(Path(path) / f'inputs_transition_matrix_{yr_cal}.csv', index=False)
 
     catalogue = [
         {'theme': 'Economics', 'input': 'Transition cost to agriculture', 'unit': unit, 'kind': 'layer'},
@@ -573,7 +574,7 @@ def get_connectivity_score_fullres(data: Data) -> np.ndarray:
     if settings.CONNECTIVITY_SOURCE == 'NONE':
         return np.ones(data.LUMASK.size, dtype=np.float64)
     variable = {'NCI': 'DCCEEW_NCI', 'DWI': 'NATURAL_AREA_CONNECTIVITY'}[settings.CONNECTIVITY_SOURCE]
-    with xr.open_dataset(os.path.join(settings.INPUT_DIR, 'bio_OVERALL_PRIORITY_RANK_AND_AREA_CONNECTIVITY.nc')) as bio_priority:
+    with xr.open_dataset(Path(settings.INPUT_DIR) / 'bio_OVERALL_PRIORITY_RANK_AND_AREA_CONNECTIVITY.nc') as bio_priority:
         raw = bio_priority[variable].values.astype(np.float32)
     span = (raw[data.MASK].min(), raw[data.MASK].max())                       # the range of the model cells, as data.py
     scaled_to = (settings.CONNECTIVITY_LB, 1) if settings.CONNECTIVITY_SOURCE == 'NCI' else (1, settings.CONNECTIVITY_LB)
@@ -586,7 +587,7 @@ INPUT_HCAS_SOURCES = ['10', '25', '50', '75', '90', 'CSV_DEFINED', 'AG_UNIFORM']
 def get_hcas_contribution(data: Data, source: str) -> dict:
     """{agricultural land-use code: habitat contribution (0-1)} under a source of settings.HCAS_CONTRIBUTION_PERCENTILE,
     worked out as Data.__init__ works out BIO_HABITAT_CONTRIBUTION_LOOK_UP for the source of the run."""
-    lookup = pd.read_csv(os.path.join(settings.INPUT_DIR, 'bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv')).set_index('lu')
+    lookup = pd.read_csv(Path(settings.INPUT_DIR) / 'bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv').set_index('lu')
     if source in ('10', '25', '50', '75', '90'):
         # the percentile of the condition observed under each land use, relative to unallocated natural land
         contribution = lookup[f'PERCENTILE_{source}'].to_dict()
@@ -654,8 +655,7 @@ def input_biodiversity(data: Data, yr_cal, path):
     # At RESFACTOR > 1 a model cell reads a layer at its block's centre cell, and where that cell is not a land-use
     # cell (public land, water: about one model cell in ten at RES5, the blocks along the edge of the model's land)
     # the value is that of land the model does not hold, often much higher. The maps show the mean over the block's
-    # land-use cells instead (Data.get_resfactored_average_fraction of the layer with the other cells zeroed, divided
-    # by the count of the cells that carry a value): the quality of the land the cell stands for.
+    # land-use cells that carry a value (above zero) instead: the quality of the land the cell stands for.
     every_cell = np.ones(data.LUMASK.size, dtype=bool)
     connectivity = get_connectivity_score_fullres(data)
     layers = []
@@ -669,10 +669,10 @@ def input_biodiversity(data: Data, yr_cal, path):
             continue
         quality = np.asarray(quality, dtype=np.float64)
         in_priority_area = (quality >= curve[settings.GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT]).astype(np.float64)
-        quality_r = data.get_resfactored_average_fraction(quality * connectivity * data.LUMASK, use_valid_cell_count=True)
+        quality_r = data.block_sum(quality * connectivity) / np.maximum(data.block_sum(quality * connectivity > 0), 1)   # the mean over the land-use cells above zero
         layers.append(('Biodiversity quality', 'ALL', 'ALL', quality_r.astype(np.float64), option))
         # the mask of a coarse cell: priority degraded area where at least half of its land-use cells are
-        share_in_priority_area = data.get_resfactored_sum(in_priority_area) / data.get_resfactored_sum(np.ones(data.LUMASK.size))
+        share_in_priority_area = data.block_sum(in_priority_area) / data.block_sum(np.ones(data.LUMASK.size))
         layers.append(('GBF2 priority degraded areas', 'ALL', 'ALL', (share_in_priority_area >= 0.5).astype(np.float64), option))
     catalogue = [
         {'theme': 'Biodiversity', 'input': 'Biodiversity quality', 'unit': 'score', 'kind': 'layer'},
@@ -681,7 +681,7 @@ def input_biodiversity(data: Data, yr_cal, path):
 
     # The habitat contribution table is an input of its own in the report (no map: kind 'chart'), under the name it is written with
     catalogue.append({'theme': 'Biodiversity', 'input': 'Habitat contribution of a land use (HCAS)', 'unit': '0 - 1', 'kind': 'chart'})
-    get_hcas_table(data).assign(Year=yr_cal).to_csv(os.path.join(path, f'inputs_tables_{yr_cal}.csv'), index=False)
+    get_hcas_table(data).assign(Year=yr_cal).to_csv(Path(path) / f'inputs_tables_{yr_cal}.csv', index=False)
 
     return input_theme('biodiversity', catalogue, layers)
 
@@ -722,7 +722,7 @@ def input_social_licence(data: Data, yr_cal, path):
                          'cap_percent': float(limit_ha) / region_ha * 100 if region_ha > 0 else 0.0, 'cap_ha': float(limit_ha)})
 
     pd.DataFrame(rows, columns=['region', 'target', 'cap_percent', 'cap_ha']).assign(Year=yr_cal)\
-        .to_csv(os.path.join(path, f'inputs_adoption_caps_{yr_cal}.csv'), index=False)
+        .to_csv(Path(path) / f'inputs_adoption_caps_{yr_cal}.csv', index=False)
     return f"Inputs (social licence) written for year {yr_cal}: {len(rows)} caps"
 
 
@@ -783,7 +783,7 @@ def input_ag_management(data: Data, yr_cal, path):
         .assign(am=option, group=group)
         for option, groups in bundles for group, table in groups.items()
     ]
-    pd.concat(records, ignore_index=True).to_csv(os.path.join(path, f'inputs_bundles_{yr_cal}.csv'), index=False)
+    pd.concat(records, ignore_index=True).to_csv(Path(path) / f'inputs_bundles_{yr_cal}.csv', index=False)
 
     return f"Inputs (ag-management bundles) written for year {yr_cal}"
 
@@ -834,7 +834,7 @@ def get_input_cache_dir() -> str:
     another set of settings: the inputs every option changes are all in it, and the others are those of the settings
     in force when it was built (listed in its DONE.json). Delete the folder, or raise INPUT_CACHE_VERSION, to build
     it again."""
-    return os.path.abspath(os.path.join(settings.INPUT_DIR, '_cache', f'report_inputs_RES{INPUT_CACHE_RESFACTOR}_v{INPUT_CACHE_VERSION}'))
+    return (Path(settings.INPUT_DIR) / '_cache' / f'report_inputs_RES{INPUT_CACHE_RESFACTOR}_v{INPUT_CACHE_VERSION}').resolve()
 
 
 def clear_economics_caches():
@@ -848,23 +848,22 @@ def clear_economics_caches():
 
 def block_mean(data: Data, values_fullres) -> np.ndarray:
     """A full-resolution layer (one value per land cell) as one value per model cell: the mean over every land-use
-    cell of the cell's block, Data.get_resfactored_sum of the layer over the count of those cells. For a layer that
+    cell of the cell's block, Data.block_sum of the layer over the count of those cells. For a layer that
     has a value on every land-use cell, of either sign (soil carbon and the carbon stock of natural land can be
-    negative, a water yield can be zero): Data.get_resfactored_average_fraction counts only the cells above zero, so
-    it would leave those out of the count while keeping them in the sum."""
+    negative, a water yield can be zero)."""
     values = np.nan_to_num(np.asarray(values_fullres, dtype=np.float64))
-    return (data.get_resfactored_sum(values) / data.get_resfactored_sum(np.ones(data.LUMASK.size))).astype(np.float32)
+    return (data.block_sum(values) / data.block_sum(np.ones(data.LUMASK.size))).astype(np.float32)
 
 
 def block_mean_where_valued(data: Data, values_fullres) -> np.ndarray:
     """A full-resolution layer as one value per model cell: the mean over the land-use cells of the block that carry
     a value (> 0), 0 where none does. For a layer that only some cells have, and that is never negative (BECCS, the
-    price of a water licence): Data.get_resfactored_average_fraction of the layer with the cells the model does not
-    hold zeroed, so they count neither in the sum nor in the count."""
+    price of a water licence): the cells the model does not hold are zeroed, so they count neither in the sum nor in
+    the count."""
     values = np.nan_to_num(np.asarray(values_fullres, dtype=np.float64)) * data.LUMASK
     if (values < 0).any():
         raise ValueError('block_mean_where_valued: the layer has negative values, which the count of its cells (> 0) would leave out')
-    return data.get_resfactored_average_fraction(values, use_valid_cell_count=True)
+    return (data.block_sum(values) / np.maximum(data.block_sum(values > 0), 1)).astype(np.float32)
 
 
 def use_block_mean_layers(data: Data):
@@ -872,25 +871,25 @@ def use_block_mean_layers(data: Data):
     layers at the centre cell of a model cell's block; where that cell is not a land-use cell (public land, water:
     one model cell in ten at RES5, along the edge of the model's land) the value is that of land the model does not
     hold. This reads those layers again at full resolution and gives each model cell the mean over its block's
-    land-use cells (block_mean; block_mean_where_valued for a layer only some cells have). The agricultural tables are block means already (Data.coarsen_guarded_arrays), the
+    land-use cells (block_mean; block_mean_where_valued for a layer only some cells have). The agricultural tables stay at the centre cell, as the model reads them; the
     climate and carbon options are set by set_climate_option / set_carbon_option. Nothing here is for a Data that is
     solved afterwards."""
     if settings.RESFACTOR == 1:
         return
 
     # The establishment cost of the plantings (as Data.__init__: riparian and agroforestry take the environmental one)
-    with xr.open_dataset(os.path.join(settings.INPUT_DIR, "plantings_est_cost_ha.nc")) as est_cost:
+    with xr.open_dataset(Path(settings.INPUT_DIR) / "plantings_est_cost_ha.nc") as est_cost:
         data.EP_EST_COST_HA = data.EP_EST_COST_HA.copy(data=block_mean(data, est_cost['EP_EST_COST_HA'].values))
         data.CP_EST_COST_HA = data.CP_EST_COST_HA.copy(data=block_mean(data, est_cost['CP_EST_COST_HA'].values))
     data.RP_EST_COST_HA = data.EP_EST_COST_HA.copy()
     data.AF_EST_COST_HA = data.EP_EST_COST_HA.copy()
 
     # The price of a water licence (no price: 0, as Data.__init__ fills it)
-    water_licence_price = xr.load_dataarray(os.path.join(settings.INPUT_DIR, "water_licence_price.nc"))
+    water_licence_price = xr.load_dataarray(Path(settings.INPUT_DIR) / "water_licence_price.nc")
     data.WATER_LICENCE_PRICE = data.WATER_LICENCE_PRICE.copy(data=block_mean_where_valued(data, water_licence_price.values).astype(data.WATER_LICENCE_PRICE.dtype))
 
     # The historical water yields; the yield of natural land is worked out cell by cell, then averaged
-    with xr.open_dataset(os.path.join(settings.INPUT_DIR, "water_yield_baselines.nc")) as baselines:
+    with xr.open_dataset(Path(settings.INPUT_DIR) / "water_yield_baselines.nc") as baselines:
         hist_dr = baselines['WATER_YIELD_HIST_DR_ML_HA'].values.astype(np.float64)
         hist_sr = baselines['WATER_YIELD_HIST_SR_ML_HA'].values.astype(np.float64)
         deep_rooted = np.nan_to_num(baselines['DEEP_ROOTED_PROPORTION'].values.astype(np.float64))
@@ -901,15 +900,15 @@ def use_block_mean_layers(data: Data):
 
     # Savanna burning: a cell is eligible where any of its land-use cells is, with the mean abatement of those cells
     # (a few are slightly negative, so the mean is their sum over their count)
-    with xr.open_dataset(os.path.join(settings.INPUT_DIR, 'cell_savanna_burning.nc')) as savburn:
+    with xr.open_dataset(Path(settings.INPUT_DIR) / 'cell_savanna_burning.nc') as savburn:
         eligible = savburn['ELIGIBLE_AREA'].values.astype(np.float64)
         abatement = np.nan_to_num(savburn['AEA_TOTAL_TCO2E_HA'].values.astype(np.float64))
-    eligible_cells = data.get_resfactored_sum(eligible)
+    eligible_cells = data.block_sum(eligible)
     data.SAVBURN_ELIGIBLE = data.SAVBURN_ELIGIBLE.copy(data=(eligible_cells > 0).astype(data.SAVBURN_ELIGIBLE.dtype))
-    data.SAVBURN_TOTAL_TCO2E_HA = data.SAVBURN_TOTAL_TCO2E_HA.copy(data=(data.get_resfactored_sum(abatement * eligible) / np.maximum(eligible_cells, 1)).astype(np.float32))
+    data.SAVBURN_TOTAL_TCO2E_HA = data.SAVBURN_TOTAL_TCO2E_HA.copy(data=(data.block_sum(abatement * eligible) / np.maximum(eligible_cells, 1)).astype(np.float32))
 
     # BECCS
-    with xr.open_dataset(os.path.join(settings.INPUT_DIR, 'cell_BECCS.nc')) as beccs:
+    with xr.open_dataset(Path(settings.INPUT_DIR) / 'cell_BECCS.nc') as beccs:
         data.BECCS_COSTS_AUD_HA_YR = data.BECCS_COSTS_AUD_HA_YR.copy(data=block_mean_where_valued(data, beccs['BECCS_COSTS_AUD_HA_YR'].values))
         data.BECCS_REV_AUD_HA_YR = data.BECCS_REV_AUD_HA_YR.copy(data=block_mean_where_valued(data, beccs['BECCS_REV_AUD_HA_YR'].values))
         data.BECCS_TCO2E_HA_YR = data.BECCS_TCO2E_HA_YR.copy(data=block_mean_where_valued(data, beccs['BECCS_TCO2E_HA_YR'].values))
@@ -929,29 +928,14 @@ def set_climate_option(data: Data, ssp: str, co2_fert: str):
     settings.SSP, settings.YIELD_RCP, settings.SCENARIO, settings.CO2_FERT = ssp, rcp, 'SSP' + ssp[0], co2_fert
 
     # as Data.__init__, "Climate change impact data"
-    with xr.open_dataset(os.path.join(settings.INPUT_DIR, "climate_change_impacts_" + settings.YIELD_RCP + "_CO2_FERT_" + settings.CO2_FERT.upper() + ".nc")) as cci_file:
-        cci = cci_file['CLIMATE_CHANGE_IMPACT']
-        data.CLIMATE_CHANGE_IMPACT = xr.DataArray(
-            np.stack([cci.isel(column=i).values[data.MASK] for i in range(cci.sizes['column'])]),
-            dims=['column', 'cell'],
-            name='CLIMATE_CHANGE_IMPACT',
-            coords={
-                'lm': ('column', cci['lm'].values),
-                'lu': ('column', cci['lu'].values),
-                'year': ('column', cci['year'].values),
-                'cell': np.arange(data.MASK.sum()),
-            },
-        ).set_xindex(['lm', 'lu', 'year'])
+    cci_name = "climate_change_impacts_" + settings.YIELD_RCP + "_CO2_FERT_" + settings.CO2_FERT.upper() + ".nc"
+    with xr.open_dataset(Path(settings.INPUT_DIR) / cci_name) as table:
+        data.CLIMATE_CHANGE_IMPACT = data.get_resfactored_average(table['CLIMATE_CHANGE_IMPACT'], cci_name).set_xindex(['lm', 'lu', 'year'])
 
-    # At RESFACTOR > 1 that is the value of each block's centre cell: the block means of the agricultural tables are
-    # worked out again under this climate, as Data.__init__ does after reading them (Data.coarsen_guarded_arrays), so
-    # that a map shows the value of the land a coarse cell stands for.
-    if settings.RESFACTOR > 1:
-        x_mrj_full = xr.load_dataarray(os.path.join(settings.INPUT_DIR, "x_mrj.nc"))
-        data.LVSTK_COARSE = data.coarsen_guarded_arrays(x_mrj_full)
+    # At RESFACTOR > 1 that is the block mean (Data.get_resfactored_average), as Data.__init__ reads it.
 
     # as Data.__init__, the water yield of the SSP (read year by year on demand: Data.get_water_yield)
-    data.WATER_YIELD_SSP_FILE = os.path.join(settings.INPUT_DIR, f'water_yield_ssp{settings.SSP}_2010_2100_ml_ha.nc')
+    data.WATER_YIELD_SSP_FILE = Path(settings.INPUT_DIR) / f'water_yield_ssp{settings.SSP}_2010_2100_ml_ha.nc'
     data.WATER_YIELD_BY_YEAR = {}
     # At RESFACTOR > 1 the years of the cache are put in as block means (Data.get_water_yield would read each at the
     # block's centre cell); any other year is still read by Data.get_water_yield
@@ -975,12 +959,12 @@ def set_carbon_option(data: Data, window: int, fire_risk: str):
     settings.CARBON_EFFECTS_WINDOW, settings.FIRE_RISK = window, fire_risk
     cells = np.arange(data.NCELLS)
 
-    with xr.open_dataset(os.path.join(settings.INPUT_DIR, "fire_risk.nc")) as fire_risk_ds:
+    with xr.open_dataset(Path(settings.INPUT_DIR) / "fire_risk.nc") as fire_risk_ds:
         fire_risk_full = fire_risk_ds['FD_RISK'].sel(fire_risk=fire_risk, drop=True).load()
 
     # as Data.__init__: the five plantings, one after the other
     # Environmental plantings (block)
-    with xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_block.nc")) as ds:
+    with xr.open_dataset(Path(settings.INPUT_DIR) / "tCO2_ha_ep_block.nc") as ds:
         ds = ds.sel(age=window).load()
     ep_block = (
         (ds['EP_BLOCK_TREES_T_CO2_HA'] + ds['EP_BLOCK_DEBRIS_T_CO2_HA'])
@@ -990,7 +974,7 @@ def set_carbon_option(data: Data, window: int, fire_risk: str):
     data.EP_BLOCK_AVG_T_CO2_HA_PER_YR = xr.DataArray(block_mean(data, ep_block.values), dims=['cell'], coords={'cell': cells})
 
     # Environmental plantings (belt)
-    with xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_belt.nc")) as ds:
+    with xr.open_dataset(Path(settings.INPUT_DIR) / "tCO2_ha_ep_belt.nc") as ds:
         ds = ds.sel(age=window).load()
     ep_belt = (
         (ds['EP_BELT_TREES_T_CO2_HA'] + ds['EP_BELT_DEBRIS_T_CO2_HA'])
@@ -1000,7 +984,7 @@ def set_carbon_option(data: Data, window: int, fire_risk: str):
     data.EP_BELT_AVG_T_CO2_HA_PER_YR = xr.DataArray(block_mean(data, ep_belt.values), dims=['cell'], coords={'cell': cells})
 
     # Environmental plantings (riparian)
-    with xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_ep_rip.nc")) as ds:
+    with xr.open_dataset(Path(settings.INPUT_DIR) / "tCO2_ha_ep_rip.nc") as ds:
         ds = ds.sel(age=window).load()
     ep_rip = (
         (ds['EP_RIP_TREES_T_CO2_HA'] + ds['EP_RIP_DEBRIS_T_CO2_HA'])
@@ -1010,7 +994,7 @@ def set_carbon_option(data: Data, window: int, fire_risk: str):
     data.EP_RIP_AVG_T_CO2_HA_PER_YR = xr.DataArray(block_mean(data, ep_rip.values), dims=['cell'], coords={'cell': cells})
 
     # Carbon plantings (block)
-    with xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_cp_block.nc")) as ds:
+    with xr.open_dataset(Path(settings.INPUT_DIR) / "tCO2_ha_cp_block.nc") as ds:
         ds = ds.sel(age=window).load()
     cp_block = (
         (ds['CP_BLOCK_TREES_T_CO2_HA'] + ds['CP_BLOCK_DEBRIS_T_CO2_HA'])
@@ -1020,7 +1004,7 @@ def set_carbon_option(data: Data, window: int, fire_risk: str):
     data.CP_BLOCK_AVG_T_CO2_HA_PER_YR = xr.DataArray(block_mean(data, cp_block.values), dims=['cell'], coords={'cell': cells})
 
     # Farm forestry, i.e. carbon plantings (belt)
-    with xr.open_dataset(os.path.join(settings.INPUT_DIR, "tCO2_ha_cp_belt.nc")) as ds:
+    with xr.open_dataset(Path(settings.INPUT_DIR) / "tCO2_ha_cp_belt.nc") as ds:
         ds = ds.sel(age=window).load()
     cp_belt = (
         (ds['CP_BELT_TREES_T_CO2_HA'] + ds['CP_BELT_DEBRIS_T_CO2_HA'])
@@ -1030,7 +1014,7 @@ def set_carbon_option(data: Data, window: int, fire_risk: str):
     data.CP_BELT_AVG_T_CO2_HA_PER_YR = xr.DataArray(block_mean(data, cp_belt.values), dims=['cell'], coords={'cell': cells})
 
     # The carbon stock of natural land (the one-off loss on clearing), and its regrowth per year
-    nat_land_CO2 = xr.load_dataset(os.path.join(settings.INPUT_DIR, "natural_land_t_co2_ha.nc"))
+    nat_land_CO2 = xr.load_dataset(Path(settings.INPUT_DIR) / "natural_land_t_co2_ha.nc")
     natural_stock = (
         nat_land_CO2['NATURAL_LAND_TREES_DEBRIS_SOIL_TCO2_HA'] - (nat_land_CO2['NATURAL_LAND_AGB_DEBRIS_TCO2_HA'] * (100 - fire_risk_full) / 100)
     )
@@ -1048,7 +1032,7 @@ def set_carbon_price_option(data: Data, field: str):
         data.CARBON_PRICES = {yr: 0.0 for yr in range(2010, 2101)}
     else:
         data.CARBON_PRICES = pd.read_excel(
-            os.path.join(settings.INPUT_DIR, 'carbon_prices.xlsx'),
+            Path(settings.INPUT_DIR) / 'carbon_prices.xlsx',
             sheet_name=field,
             usecols="A,B",
             names=["Year", "Carbon_price_$_tCO2e"],
@@ -1068,7 +1052,7 @@ def get_climate_options() -> list:
             if rcp == 'rcp7p0':                                                # as settings.py: SSP 370 reads the RCP 6.0 yield impacts
                 rcp = 'rcp6p0'
             file = f"climate_change_impacts_{rcp}_CO2_FERT_{co2_fert.upper()}.nc"
-            if os.path.exists(os.path.join(settings.INPUT_DIR, file)):
+            if (Path(settings.INPUT_DIR) / file).exists():
                 pairs.append((ssp, co2_fert))
             else:
                 print(f'Inputs: SSP {ssp}, CO2 fertilisation {co2_fert} left out: no {file} in the inputs', flush=True)
@@ -1099,7 +1083,7 @@ def write_input_cache_layers(data: Data, raw_dir: str, years: list, writers=None
         'CARBON_EFFECTS_WINDOW': settings.CARBON_EFFECTS_WINDOW,
         'FIRE_RISK': settings.FIRE_RISK,
     }
-    path_of = {yr_cal: os.path.join(raw_dir, f'out_{yr_cal}') for yr_cal in years}
+    path_of = {yr_cal: Path(raw_dir) / f'out_{yr_cal}' for yr_cal in years}
     themes = {yr_cal: {} for yr_cal in years}                                  # year -> tag -> (catalogue, layers)
     wanted = lambda name: writers is None or name in writers
 
@@ -1193,11 +1177,11 @@ def write_species_files(save_dir, set_dir, variant, leaves):
     data/map_layers/input_species/<set>/<variant>/<k>.js holds window["sp_<set>_<variant>_<k>"] = {position: leaf}
     for the items k * SPECIES_PER_FILE onwards. One file per item was tried first: the 21 000 files of GBF8 took
     longer to copy into a report than everything else took to build."""
-    folder = os.path.join(save_dir, 'map_layers', 'input_species', set_dir, str(variant))
-    os.makedirs(folder, exist_ok=True)
+    folder = Path(save_dir) / 'map_layers' / 'input_species' / set_dir / str(variant)
+    Path(folder).mkdir(parents=True, exist_ok=True)
     for first in range(0, len(leaves), SPECIES_PER_FILE):
         number = first // SPECIES_PER_FILE
-        with open(os.path.join(folder, f'{number}.js'), 'w') as file:
+        with open(Path(folder) / f'{number}.js', 'w') as file:
             file.write(f'window["sp_{set_dir}_{variant}_{number}"] = ')
             json.dump({position: leaves[position] for position in range(first, min(first + SPECIES_PER_FILE, len(leaves)))}, file, separators=(',', ':'))
             file.write(';\n')
@@ -1207,7 +1191,7 @@ def write_species_block_layers(data: Data, save_dir: str) -> dict:
     """The vegetation groups (GBF3) and the species and communities of national significance (GBF4), on the cells
     of `data`: the share of each cell the item covers, in percent. A cell of the cache is a block of full-resolution
     cells, and a small range would vanish if only the block's centre cell were read: the value is the mean over the
-    block (Data.get_resfactored_average_fraction over all its cells), so a range that touches a block shows in it."""
+    block's land-use cells (Data.block_mean), so a range that touches a block shows in it."""
     sets = {}
     sources = [
         ('GBF3 vegetation groups', 'GBF3', f'bio_GBF3_{settings.GBF3_NVIS_TARGET_CLASS}_sparse.nc', 'group', 1.0),       # stored as percent
@@ -1223,7 +1207,7 @@ def write_species_block_layers(data: Data, save_dir: str) -> dict:
             for item in items:
                 selected = layer.sel({item_dim: item, **({'presence': variant} if 'presence' in layer.dims else {})})
                 full_res = np.asarray(selected.data.todense(), dtype=np.float32)
-                leaves.append(species_leaf(data.get_resfactored_average_fraction(full_res, use_valid_cell_count=False) * to_percent, 100.0))
+                leaves.append(species_leaf(data.block_mean(full_res) * to_percent, 100.0))
             write_species_files(save_dir, set_dir, variant, leaves)
         sets[name] = {'dir': set_dir, 'grid': 'map_input_cell_index', 'unit': '% of the cell', 'variants': variants,
                       'variant_name': 'Presence' if len(variants) > 1 else None, 'items': items, 'per_file': SPECIES_PER_FILE}
@@ -1235,8 +1219,8 @@ def write_species_gbf8_layers(save_dir: str, limit: int | None = None) -> dict:
     """The climate suitability of every GBF8 species, as it is in the input: the rasters are read as they are, on
     their own grid (map_gbf8_cell_index.js: one cell per land pixel of the raster), for the SSP the settings hold and
     the years INPUT_GBF8_YEARS. `limit` keeps the first species only (to try it)."""
-    raster_file = os.path.join(settings.INPUT_DIR, f'bio_GBF8_ssp{settings.SSP}_EnviroSuit.nc')
-    group_file = os.path.join(settings.INPUT_DIR, f'bio_GBF8_ssp{settings.SSP}_EnviroSuit_group.nc')
+    raster_file = Path(settings.INPUT_DIR) / f'bio_GBF8_ssp{settings.SSP}_EnviroSuit.nc'
+    group_file = Path(settings.INPUT_DIR) / f'bio_GBF8_ssp{settings.SSP}_EnviroSuit_group.nc'
     with xr.open_dataset(group_file) as groups:
         land = (groups['data'].max([dim for dim in groups['data'].dims if dim not in ('y', 'x')]) > 0).load()    # the pixels any group lives on
 
@@ -1245,8 +1229,8 @@ def write_species_gbf8_layers(save_dir: str, limit: int | None = None) -> dict:
     numbers[land.values] = np.arange(int(land.values.sum()), dtype=np.float32)
     numbered = xr.DataArray(numbers, dims=('y', 'x'), coords={'y': land['y'].values, 'x': land['x'].values})\
         .rio.write_nodata(-1.0).rio.write_crs('EPSG:4326').rio.reproject('EPSG:3857', nodata=-1.0)
-    os.makedirs(os.path.join(save_dir, 'map_layers'), exist_ok=True)
-    write_cell_index(np.round(numbered.values).astype(np.int32), {'transform': numbered.rio.transform()}, os.path.join(save_dir, 'map_layers'), name='map_gbf8_cell_index')
+    (Path(save_dir) / 'map_layers').mkdir(parents=True, exist_ok=True)
+    write_cell_index(np.round(numbered.values).astype(np.int32), {'transform': numbered.rio.transform()}, Path(save_dir) / 'map_layers', name='map_gbf8_cell_index')
 
     with xr.open_dataset(raster_file) as raster:
         species = [str(name) for name in raster['species'].values][:limit]
@@ -1263,7 +1247,7 @@ def write_species_inputs(data: Data, save_dir: str):
     """Every species layer (write_species_block_layers, write_species_gbf8_layers) and the list of them,
     data/Inputs_species.js: {set: {dir, grid, unit, variants, variant_name, items, per_file}}."""
     sets = {**write_species_block_layers(data, save_dir), **write_species_gbf8_layers(save_dir)}
-    with open(os.path.join(save_dir, 'Inputs_species.js'), 'w') as file:
+    with open(Path(save_dir) / 'Inputs_species.js', 'w') as file:
         file.write('window["Inputs_species"] = ')
         json.dump(sets, file, separators=(',', ':'))
         file.write(';\n')
@@ -1290,7 +1274,7 @@ def merge_input_themes(built_dir: str, cache_data_dir: str, themes: list):
     cache held for those themes is taken out first, the rest of the cache is left as it is."""
     def read_js(path):
         """(the text before the content, the content) of a window[...] = <json>; file, (None, {}) if it is not there"""
-        if not os.path.exists(path):
+        if not Path(path).exists():
             return None, {}
         with open(path, 'r', encoding='utf-8') as file:
             text = file.read()
@@ -1313,43 +1297,43 @@ def merge_input_themes(built_dir: str, cache_data_dir: str, themes: list):
                 yield path + (leaf,)
 
     # The catalogue and the tables: keyed by theme
-    old_catalogue = read_js(os.path.join(cache_data_dir, 'Inputs_catalogue.js'))[1]
+    old_catalogue = read_js(Path(cache_data_dir) / 'Inputs_catalogue.js')[1]
     for filename in ('Inputs_catalogue.js', 'Inputs_tables.js'):
-        head, old = read_js(os.path.join(cache_data_dir, filename))
-        new_head, new = read_js(os.path.join(built_dir, filename))
+        head, old = read_js(Path(cache_data_dir) / filename)
+        new_head, new = read_js(Path(built_dir) / filename)
         for theme in themes:
             if theme in new:
                 old[theme] = new[theme]                # in its place: the themes keep their order on the page
             else:
                 old.pop(theme, None)
-        write_js(os.path.join(cache_data_dir, filename), head or new_head, old)
+        write_js(Path(cache_data_dir) / filename, head or new_head, old)
 
     # The layers: every layer of the inputs of these themes out (files and index entries), the rebuilt ones in
-    layer_dir = os.path.join(cache_data_dir, 'map_layers')
-    head, index = read_js(os.path.join(layer_dir, 'map_in__index.js'))
-    new_head, new_index = read_js(os.path.join(built_dir, 'map_layers', 'map_in__index.js'))
+    layer_dir = Path(cache_data_dir) / 'map_layers'
+    head, index = read_js(Path(layer_dir) / 'map_in__index.js')
+    new_head, new_index = read_js(Path(built_dir) / 'map_layers' / 'map_in__index.js')
     stale = {entry['input'] for theme in themes for entry in old_catalogue.get(theme, [])} | set(new_index.get('tree', {}))
     for name in stale & set(index.get('tree', {})):
         for combo in combos_of(index['tree'].pop(name), (name,)):
             key = '__'.join(safe_key(part) for part in combo)
             index['combos'].pop(key, None)
-            layer_file = os.path.join(layer_dir, f'map_in__{key}.js')
-            if os.path.exists(layer_file):
-                os.remove(layer_file)
+            layer_file = Path(layer_dir) / f'map_in__{key}.js'
+            if Path(layer_file).exists():
+                Path(layer_file).unlink()
     if new_index:
         index.setdefault('dims', new_index['dims'])
         index.setdefault('tree', {}).update(new_index['tree'])
         index.setdefault('combos', {}).update(new_index['combos'])
-        for filename in os.listdir(os.path.join(built_dir, 'map_layers')):
+        for filename in (path.name for path in (Path(built_dir) / 'map_layers').iterdir()):
             if filename != 'map_in__index.js':
-                shutil.copy2(os.path.join(built_dir, 'map_layers', filename), os.path.join(layer_dir, filename))
-    write_js(os.path.join(layer_dir, 'map_in__index.js'), head or new_head, index, indent=2)
+                shutil.copy2(Path(built_dir) / 'map_layers' / filename, Path(layer_dir) / filename)
+    write_js(Path(layer_dir) / 'map_in__index.js', head or new_head, index, indent=2)
 
     # The files only one theme writes
     for theme in themes:
         for filename in INPUT_THEMES[theme]['files']:
-            if os.path.exists(os.path.join(built_dir, filename)):
-                shutil.copy2(os.path.join(built_dir, filename), os.path.join(cache_data_dir, filename))
+            if (Path(built_dir) / filename).exists():
+                shutil.copy2(Path(built_dir) / filename, Path(cache_data_dir) / filename)
 
 
 def copy_input_cache(SAVE_DIR):
@@ -1358,17 +1342,17 @@ def copy_input_cache(SAVE_DIR):
     process_inputs_data and the layers of create_report_layers.save_input_layers -- for every option of the model, at
     the cache's own resolution: the inputs are the same whatever a run then does with them."""
     cache_dir = ensure_input_cache()
-    shutil.copytree(os.path.join(cache_dir, 'data'), SAVE_DIR, dirs_exist_ok=True)
+    shutil.copytree(Path(cache_dir) / 'data', SAVE_DIR, dirs_exist_ok=True)
     write_input_years(cache_dir, SAVE_DIR)
-    return f"Inputs copied from the input cache ({os.path.basename(cache_dir)})"
+    return f"Inputs copied from the input cache ({Path(cache_dir).name})"
 
 
 def write_input_years(cache_dir, SAVE_DIR):
     """Inputs_years.js: the years the input cache holds (its DONE.json), which are not those of the run. The year
     slider of the Inputs view steps through them."""
-    with open(os.path.join(cache_dir, 'DONE.json'), 'r', encoding='utf-8') as file:
+    with open(Path(cache_dir) / 'DONE.json', 'r', encoding='utf-8') as file:
         years = json.load(file)['years']
-    with open(os.path.join(SAVE_DIR, 'Inputs_years.js'), 'w', encoding='utf-8') as file:
+    with open(Path(SAVE_DIR) / 'Inputs_years.js', 'w', encoding='utf-8') as file:
         file.write(f'window["Inputs_years"] = {json.dumps(years)};\n')
 
 
@@ -1495,8 +1479,8 @@ def build_input_cache(themes=None):
     `themes` (names of INPUT_THEMES): rebuild these themes only, in a cache that is already built, and merge them
     in (merge_input_themes); the rest of the cache, the species layers included, is left as it is."""
     cache_dir = get_input_cache_dir()
-    need_inputs = not os.path.exists(os.path.join(cache_dir, 'DONE.json'))
-    need_species = not os.path.exists(os.path.join(cache_dir, 'DONE_species.json'))
+    need_inputs = not (Path(cache_dir) / 'DONE.json').exists()
+    need_species = not (Path(cache_dir) / 'DONE_species.json').exists()
     if themes and need_inputs:
         themes = None                               # no cache to merge into: build it whole
     if themes:
@@ -1510,41 +1494,41 @@ def build_input_cache(themes=None):
     # The inputs need none of the biodiversity targets' layers: left off, the data loads faster
     settings.SIM_YEARS = list(INPUT_CACHE_YEARS)
     settings.GBF3_NVIS_TARGET = settings.GBF4_TARGET_SNES = settings.GBF4_TARGET_ECNES = settings.GBF8_TARGET = 'off'
-    data = Data()                               # at RESFACTOR > 1 its agricultural tables are block means (Data.coarsen_guarded_arrays): what the maps show
-    use_block_mean_layers(data)                 # ... and the layers it read at the block's centre cell become block means too
+    data = Data()                               # at RESFACTOR > 1 its agricultural tables are those of each block's centre cell, as the model reads them
+    use_block_mean_layers(data)                 # ... the other layers it read at the block's centre cell become block means
 
     def move_in(building, marker, content):
         """The files of a finished part into the cache, then its marker"""
-        shutil.copytree(os.path.join(building, 'data'), os.path.join(cache_dir, 'data'), dirs_exist_ok=True)
+        shutil.copytree(Path(building) / 'data', Path(cache_dir) / 'data', dirs_exist_ok=True)
         shutil.rmtree(building, ignore_errors=True)
-        with open(os.path.join(cache_dir, marker), 'w') as done:
+        with open(Path(cache_dir) / marker, 'w') as done:
             json.dump(content, done, indent=1, default=str)
 
     if need_inputs:
         building = f'{cache_dir}.building_{os.getpid()}'
-        raw_dir, save_dir = os.path.join(building, 'raw'), os.path.join(building, 'data')
+        raw_dir, save_dir = Path(building) / 'raw', Path(building) / 'data'
         template = xr.Dataset({'layer': tools.arr_to_xr(data, data.lumaps[data.YR_CAL_BASE].astype(np.float32))})
         for yr_cal in INPUT_CACHE_YEARS:
-            path = os.path.join(raw_dir, f'out_{yr_cal}')
-            os.makedirs(path, exist_ok=True)
-            template.to_netcdf(os.path.join(path, f'xr_map_template_{yr_cal}.nc'))   # the grid the layers are drawn on
+            path = Path(raw_dir) / f'out_{yr_cal}'
+            Path(path).mkdir(parents=True, exist_ok=True)
+            template.to_netcdf(Path(path) / f'xr_map_template_{yr_cal}.nc')   # the grid the layers are drawn on
         writers = [writer for theme in themes for writer in INPUT_THEMES[theme]['writers']] if themes else None
         for message in write_input_cache_layers(data, raw_dir, INPUT_CACHE_YEARS, writers):
             print(message, flush=True)
 
         # The report's own files, made once: the layers (create_report_layers) and the tables (create_report_data)
-        os.makedirs(os.path.join(save_dir, 'map_layers'), exist_ok=True)
+        (Path(save_dir) / 'map_layers').mkdir(parents=True, exist_ok=True)
         save_input_report_layers(raw_dir, save_dir)
         print(process_inputs_data(get_all_files(raw_dir), save_dir), flush=True)
         shutil.rmtree(raw_dir)
         if themes:
             # These themes only: merged into the cache, whose marker notes when each theme was last rebuilt
-            merge_input_themes(save_dir, os.path.join(cache_dir, 'data'), themes)
+            merge_input_themes(save_dir, Path(cache_dir) / 'data', themes)
             shutil.rmtree(building, ignore_errors=True)
-            with open(os.path.join(cache_dir, 'DONE.json'), 'r') as done:
+            with open(Path(cache_dir) / 'DONE.json', 'r') as done:
                 content = json.load(done)
             content.setdefault('themes_rebuilt', {}).update({theme: pd.Timestamp.now().isoformat(timespec='seconds') for theme in themes})
-            with open(os.path.join(cache_dir, 'DONE.json'), 'w') as done:
+            with open(Path(cache_dir) / 'DONE.json', 'w') as done:
                 json.dump(content, done, indent=1, default=str)
             print(f'Themes rebuilt and merged into the cache: {", ".join(themes)}', flush=True)
         else:
@@ -1553,7 +1537,7 @@ def build_input_cache(themes=None):
 
     if need_species:
         building = f'{cache_dir}.building_species_{os.getpid()}'
-        write_species_inputs(data, os.path.join(building, 'data'))
+        write_species_inputs(data, Path(building) / 'data')
         move_in(building, 'DONE_species.json', {'version': INPUT_CACHE_VERSION, 'gbf8_ssp': built_with['SSP'], 'gbf8_years': INPUT_GBF8_YEARS})
 
     print(f'INPUT_CACHE_DIR={cache_dir}', flush=True)
@@ -1580,15 +1564,15 @@ def ensure_input_cache(themes=None) -> str:
     to <the folder>.log, to follow it while it runs (a quarter of an hour or more). `themes`: rebuild these themes
     even though the cache is there (rebuild_input_cache_themes)."""
     cache_dir = get_input_cache_dir()
-    markers = [os.path.join(cache_dir, marker) for marker in ('DONE.json', 'DONE_species.json')]
-    if all(os.path.exists(marker) for marker in markers) and not themes:
+    markers = [Path(cache_dir) / marker for marker in ('DONE.json', 'DONE_species.json')]
+    if all(Path(marker).exists() for marker in markers) and not themes:
         return cache_dir
 
     code = (f'import luto.settings as settings; settings.RESFACTOR = {INPUT_CACHE_RESFACTOR}; '
             f'import luto.tools.write_input as write_input; write_input.build_input_cache({themes!r})')
-    os.makedirs(os.path.dirname(cache_dir), exist_ok=True)
+    Path(cache_dir).parent.mkdir(parents=True, exist_ok=True)
     with open(cache_dir + '.log', 'a') as log:
         built = subprocess.run([sys.executable, '-u', '-c', code], stdout=log, stderr=subprocess.STDOUT)     # in the repository root, as this process
-    if built.returncode != 0 or not all(os.path.exists(marker) for marker in markers):
+    if built.returncode != 0 or not all(Path(marker).exists() for marker in markers):
         raise RuntimeError(f'The input cache could not be built: see {cache_dir}.log')
     return cache_dir

@@ -23,9 +23,10 @@
 Pure helper functions and other tools.
 """
 
+from pathlib import Path
 import re
 import sys
-import os.path
+import os
 import time
 import traceback
 import functools
@@ -47,14 +48,14 @@ import luto.settings as settings
 
 def write_timestamp():
     timestamp = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
-    timestamp_path = os.path.join(settings.OUTPUT_DIR, '.timestamp')
+    timestamp_path = Path(settings.OUTPUT_DIR) / '.timestamp'
         
     with open(timestamp_path, 'w') as f: f.write(timestamp)
     return timestamp
 
 def read_timestamp():
-    timestamp_path = os.path.join(settings.OUTPUT_DIR, '.timestamp')
-    if os.path.exists(timestamp_path):
+    timestamp_path = Path(settings.OUTPUT_DIR) / '.timestamp'
+    if Path(timestamp_path).exists():
         with open(timestamp_path, 'r') as f: timestamp = f.read()
     else:
         raise FileNotFoundError(f"Timestamp file not found at {timestamp_path}")
@@ -241,14 +242,6 @@ def arr_to_2d(data, arr: np.ndarray, fill: float = np.nan, dtype=np.float32) -> 
     return arr_2d, geo_meta
 
 
-def block_sum(data, arr: np.ndarray) -> np.ndarray:
-    """Sum a full-res 1D array (len = the full-res land cells) over the block of each model cell: float64, one value
-    per model cell (len = NCELLS). Cells in no modelled block (FULL2RES_IDX_MAP == -1) are left out. NaN is not
-    skipped — a NaN cell makes its block NaN."""
-    in_block = data.FULL2RES_IDX_MAP >= 0
-    return np.bincount(data.FULL2RES_IDX_MAP[in_block], weights=np.asarray(arr, dtype=np.float64)[in_block], minlength=data.RES_1D_TO_2D.shape[1])
-
-
 def arr_to_xr(data, arr: np.ndarray) -> xr.DataArray:
     """Convert a 1D cell array (any length `arr_to_2d` accepts) to a georeferenced 2D xarray DataArray on (y, x)."""
     arr_2d, geo_meta = arr_to_2d(data, arr)
@@ -307,8 +300,7 @@ def set_path() -> str:
         paths = [path] + [f"{path}/out_{yr}" for yr in years]
         
         for p in paths:
-            if not os.path.exists(p):
-                os.mkdir(p)
+            Path(p).mkdir(exist_ok=True)
   
 
 class _TeeIO:
@@ -338,8 +330,8 @@ class LogToFile:
         self.log_path_stdout = f"{log_path}_stdout.log"
         self.log_path_stderr = f"{log_path}_stderr.log"
         self.mode = mode
-        os.makedirs(os.path.dirname(self.log_path_stdout), exist_ok=True)
-        os.makedirs(os.path.dirname(self.log_path_stderr), exist_ok=True)
+        Path(self.log_path_stdout).parent.mkdir(parents=True, exist_ok=True)
+        Path(self.log_path_stderr).parent.mkdir(parents=True, exist_ok=True)
 
     def __call__(self, func):
         @functools.wraps(func)

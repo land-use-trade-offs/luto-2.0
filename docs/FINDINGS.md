@@ -5,6 +5,191 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20261120 — a coarse run (RESFACTOR > 1) is not made to match RES1 by adjusting its inputs; the gaps are block accounting, not input values
+
+### TL;DR
+
+The question: can a coarse run (`RESFACTOR > 1`, any block size) be made to give RES1's answer by correcting what it
+reads — distribution matching, per-input or per-mask adjustments? Measured at RES5, the case at hand. At RES5 (block
+means of the inputs, section 20261119) the 2010 -> 2050 land use differs from RES1 by 0.91 % nationally,
+1.46 % by state and 1.87 % by NRM; the largest gaps are Savanna Burning +61 % (6.35 against 3.95 Mha), Riparian
+Plantings +70 % and Destocked natural land (1.47 Mha against 4 kha). Matching an input's distribution to RES1 changed
+nothing, and the Savanna Burning gap turned out to be how a block counts a 0/1 mask, not a value. **Decision (Jinzhu):
+no input-level correction of any coarse run** (no distribution matching, no per-input or per-mask fixes, at any
+RESFACTOR): each would be one hand-built correction per input or per pair of masks, the same cost that retired the
+chain weighting, and none can do better than exact aggregation. A coarse run keeps one rule (block means) and documents
+its gaps; making a coarse model match RES1 belongs in the model space (build the coefficients at RES1, aggregate them
+over sets of cells), which cell grouping already does — a RESFACTOR block is then just one choice of those sets.
+
+### Savanna Burning: the gap is GBF2 area accounting
+
+Abatement per ha on eligible land under a compatible land use, base year:
+
+| | land (Mha) | total abatement (MtCO2e/yr) | median | p90 | max |
+|---|---|---|---|---|---|
+| RES1 cells | 47.83 | 1.403 | 0.0182 | 0.0731 | 0.624 |
+| RES5 block mean | 47.80 | 1.215 (-13 %) | 0.0148 | 0.0625 | 0.369 |
+| RES5 quantile-mapped to RES1 | 47.80 | 1.402 | 0.0182 | 0.0731 | 0.624 |
+
+Averaging squeezes the distribution, but RES5 offers LESS abatement than RES1 and still adopts 61 % more land. Mapping
+every block to the RES1 value at its area-weighted rank and solving again left Savanna Burning at 6,350 kha to the
+hectare (Destocked and Riparian unchanged too). The 2050 shadow prices say why:
+
+| row | RES1 | RES5 |
+|---|---|---|
+| GBF2 | -12,690 AUD/ha | -14,710 AUD/ha (+16 %) |
+| GHG agriculture / LULUCF | not binding (slack 17 Mt / 147 Mt) | not binding |
+| water, South East Coast (Victoria) | not binding | binding, -295 AUD/ML |
+| demand (25 equality rows) | binding | binding, similar prices |
+
+No GHG row binds, so abatement is worth nothing; Savanna Burning (10 AUD/ha) is adopted for GBF2, where it wins back
+the late-dry-season penalty, (1 - `BIO_CONTRIBUTION_LDS`) = 0.25 ha per ha adopted on eligible land in the GBF2 mask:
+
+| | land where it raises GBF2 | GBF2 area it can win back | gain per ha adopted |
+|---|---|---|---|
+| RES1 cells | 3.946 Mha | 0.987 Mha | 0.25 |
+| RES5 blocks | 6.350 Mha | 0.967 Mha | 0.15 |
+
+The land where it raises GBF2 IS the 2050 adopted area at each resolution: it is adopted wherever it helps GBF2. The
+GBF2 area won back is the same; RES5 spreads it over more land because the GBF2 mask is a block fraction and
+eligibility the centre cell's flag, so a block with 9 eligible in-mask cells of 25 adopts all 25 at 9/25 of the value
+(and pays the cost on 25). The +61 % is an area-accounting artefact, not a different decision; the GBF2 outcome
+matches.
+
+Confirmed by making the area consistent in a RES5 run (a test patch, not adopted): each Savanna Burning column capped
+at its block's eligible, in-mask, host share; 0.25 per adopted ha in GBF2; the base-year penalty as RES1 counts it.
+Savanna Burning came out at **3,946 kha, RES1's figure exactly**, and nothing else moved: GBF2 shadow price -14,686
+AUD/ha (unchanged), the water row still binding (-294 AUD/ML), Destocked 1,443 kha (1,468 before), Riparian 1,456 kha,
+land use off 0.91 / 1.46 / 1.87 % (unchanged). So the Savanna Burning gap is pure accounting, and the Destocked,
+Riparian and GBF2-price gaps have other causes.
+
+### Why input-level matching is the wrong tool (at any RESFACTOR)
+
+The causes below are structural — they come from a block standing for many cells — so they grow with the block size
+and do not depend on which inputs are corrected.
+
+- **Masks are categorical.** At RES1 a cell is in or out (GBF2 mask, eligibility, stream buffer, no-go areas); RES1
+  combines them per cell (eligible AND in the mask AND grazing). At RES5 each becomes a block fraction, and the
+  fraction of an AND is not the product of the fractions — the masks' version of "the mean of a product is not the
+  product of the means". There is no distribution to match, and an area-consistent fix for Savanna Burning alone needs
+  four coordinated changes (the column bound, the GBF2 contribution, the base-year penalty, the eligibility flag); every
+  other pair of masks would need its own set.
+- **Matching one input moves values between blocks.** A quantile-mapped block carries the RES1 value at its rank, not
+  its own cells' value: the national distribution is right, each block is not.
+- **It cannot beat exact aggregation.** Matching needs the RES1 values; once they exist, summing each block's cells'
+  finished coefficients is exact, with nothing to align. That is cell grouping (`luto/solvers/aggregate.py`) with the
+  RES5 block in the blob key.
+
+### What stays
+
+- Coarse runs keep block means (one rule, every RESFACTOR) and their known gaps are documented, from RES5: Savanna
+  Burning's reported area about 1.6x for the same GBF2 gain (a 0/1 mask read as a block fraction: any coarse run with
+  an option tied to an AND of masks reports area this way); a water row (South East Coast, Victoria) that binds only at
+  RES5; Destocked and the 16 % dearer GBF2 there. Larger blocks (RES10 and up) mix more cells per block, so the same
+  gaps are expected to be at least as large (not measured).
+- Comparing a coarse run with RES1: compare outcomes in the units the targets use (GBF2 area won back, production,
+  emissions), not only the area a land use or option is reported on — the Savanna Burning case matches RES1 on GBF2
+  and differs only in reported area.
+- **Answered (2026-11-20 12:12): a coarse model built at RES1 and aggregated by block reproduces RES1.** The RES1 2050
+  step (2010 -> 2050) was built at RES1 (every cell's coefficients and rows, as usual) and grouped with blob = the
+  exact key x the RES5 block: the cells of one 5 x 5 block that start from the same land-use mix, lie in the same state
+  and NRM, count toward the same GBF rows and fall in the same Riparian cap bin share one decision; no SVD, so within a
+  block no values are compared (nearness stands in for similarity). Coefficients are the sums of the cells' finished
+  coefficients, so no input is averaged and no mask becomes a fraction. 642,101 blobs (240,499 of one cell) from
+  187,755 blocks; 24.4 M columns, 119.8 M nonzeros (SVD grouping: 252,400 blobs, 11.4 M, 56.6 M). Every row of the full
+  RES1 model holds at the mapped-back answer (worst 4.7e-10).
+
+  | 2050 | RES1, SVD grouping | RES1, grouped by RES5 block | RES5, block means |
+  |---|---|---|---|
+  | land use off vs RES1 SVD (national / state / NRM) | - | 0.06 / 0.17 / 0.24 % | 0.91 / 1.46 / 1.87 % |
+  | Savanna Burning | 3,946 kha | 3,946 kha | 6,350 kha |
+  | Destocked natural land | 4 kha | 12 kha | 1,468 kha |
+  | Riparian Plantings | 855 kha | 919 kha | 1,456 kha |
+  | Environmental Plantings | 20,521 kha | 20,390 kha | 20,812 kha |
+  | objective, full model at the mapped x (M AUD) | -167,714.59 | **-166,769.75** | (another model) |
+  | Gurobi (Gadi normalsr, 32 threads) | 1,711 s (212 barrier it) | 2,326 s (147 it; crossover 305 s) | - |
+
+  So RES5's gaps come from building it out of averaged inputs and fractional masks, not from one decision per 5 x 5
+  block: the same blocks over exact RES1 coefficients land within 0.2 % of RES1. The route for a coarse model that
+  matches RES1 is build at RES1, aggregate by block — no input corrections. Its cost is the RES1 build (time and memory:
+  the solve is the only saving), and its model is about twice SVD grouping's.
+- **Found on the way: SVD grouping loses at least 0.56 % on this step.** Both answers are feasible for the full model
+  and scored by its objective; the block-grouped one is 945 M AUD (0.56 %) higher, so SVD grouping (the default) is at
+  least that far below the full optimum on a single 40-year step (2010 -> 2050). The 0.015 % measured earlier was a
+  2045 -> 2050 step on older code; a long step moves far more land, which is harder on blobs that join similar cells
+  across the continent. Not an equal-size comparison (642 k against 252 k blobs). Open: SVD grouping's loss on 5-year
+  steps (the 2020-2050 series, running), and at an SVD tolerance that gives ~640 k blobs.
+
+---
+
+## 20261119 — coarse inputs (RESFACTOR > 1): the block's land-use cells, not its centre cell or its 25 cells
+
+### TL;DR
+
+At `RESFACTOR > 1` a model cell stands for a block of RESFACTOR x RESFACTOR full-resolution cells. Measured at RES5
+against RES1, four coarse rules were wrong by far more than any weighting question: the model area (+11 %), the GBF2
+priority area (+72 %), existing wind (4-8x) and GBF4 habitat (+9 %). All four now equal RES1. The rule behind every
+fix: **a block is its land-use cells** (the cells RES1 models). Its area is their summed area, a rate is their mean,
+a share is their share.
+
+### What was wrong, and the measurement (RES5, 2010)
+
+| Quantity | RES1 | before | now | cause |
+|---|---|---|---|---|
+| model area (sum of `REAL_AREA`) | 465.08 Mha | 516.36 Mha (+11.0 %) | 465.08 Mha | `REAL_AREA` was the representative cell's area x 25: a block's sea, public, urban and water cells counted as land (edge blocks, and interior blocks with a town or reservoir) |
+| GBF2 priority area | 69.762 Mha | 119.781 Mha (+71.7 %) | 69.762 Mha | the cut on the priority rank was made at the centre cell and the block counted whole |
+| existing onshore wind area, 2000 / 2035 | 42 / 371 ha | 348 / 1,502 ha | 42 / 371 ha | the existing-renewable fraction was averaged over the block's cells above zero only: one built cell made the block built |
+| GBF4 SNES likely habitat, 20 species | 6,200,594 ha | +8.82 % | -0.000 % | habitat on the block's non-land-use cells counted |
+| eligible (lm, cell, lu) entries with no data | 0 | 14,555 of 1,441,891 (68,500 ha of base-year land; pears 10.9 %, apples 6.1 % of their area) | 0 | inputs read at the centre cell, which often lacks the land use the block holds |
+
+Every-cell potentials followed the area: EP sequestration +23.5 %, natural-land carbon +21.1 %, natural-land water
+yield +43.4 % before; -0.007 %, -0.004 %, +0.002 % now. So before the fix the non-agricultural land uses had about 11 %
+more land at RES5 than at RES1.
+
+### The coarse rules now (`luto/data.py`)
+
+| Function | Computes | Used for |
+|---|---|---|
+| `Data.block_sum(arr)` | sum over the block's land-use cells; a NaN cell adds nothing | existing renewable MWh, stream length, the renewable no-go masks (any land-use cell in) |
+| `Data.block_mean(arr)` | `block_sum(arr) / block_sum(~isnan(arr))`: the mean over the block's land-use cells with a value | shares (`EXCLUDE` > 0, `AG_L_MRJ`, GBF2 mask, GBF3 / GBF4 layers, existing renewables) and, through the next, every rate |
+| `Data.get_resfactored_average(layer, cache_name)` | `block_mean` of each slice of an input layer, cached in `input/_cache/cache_<name>_RES<n>.nc` (none at RES1) | every per-ha / per-head input: the agricultural tables, climate impact, pasture, plantings, carbon, water, BECCS, biodiversity, renewable layers |
+| `REAL_AREA` | `block_sum(REAL_AREA_NO_RESFACTOR)` | share x `REAL_AREA` = the land's own area |
+
+Labels, codes and flags (regions, zones, the land-use map, the savanna eligibility flag) stay at the representative
+cell; stream length stays a block total (#228).
+
+### The weighting question (base-year totals, RES5 vs RES1, %)
+
+| Total | block mean (now) | centre cell | Nick's chain weighting (retired) |
+|---|---|---|---|
+| revenue | -0.32 | -1.53 | -0.00001 |
+| cost | -0.93 | -1.84 | 0.00002 |
+| agricultural GHG | -0.43 | -0.15 | 0.00004 |
+| water requirement | -0.13 | -0.94 | -0.000003 |
+| production, mean of 26 commodities' abs. % | 0.69 | 2.49 | 0.001 |
+
+The chains (one hand-derived weight per agricultural input: area x yield x price ...) reproduce RES1 for the
+agricultural economics; the unweighted block mean is 4x closer than the centre cell but carries the mean-of-factors
+bias (mean yield x mean price is not the mean revenue): pears revenue -11.7 %, dairy on natural land cost +6.5 %, the
+rest of the land uses under 3 %. The chains covered the agricultural tables only and kept the centre-cell GBF2 mask
+and the x 25 area, the two largest errors above. Retired for one rule applied to every input.
+
+### Also found on the way
+
+- The cache must follow the `Data` it serves: a joblib worker of `write_outputs` re-imports `luto.settings`, so a
+  run whose `RESFACTOR` was set in code read the default resolution's cache in the worker (shapes 187,755 vs
+  49,753). `get_resfactored_average` now takes the resolution from `Data.RESMULT`. The GBF8 species cache
+  (`cache_bio_GBF8_..._RES{settings.RESFACTOR}`) has the same pattern and is unchanged.
+- Integer quantities on file (`pasture_kg_dm_ha.nc` int16, `water_licence_price.nc` int16, `CO2E_KG_HA_HARVEST`
+  int8) are cast to float where they are read, and the cache is saved without the input's encoding (an int16
+  encoding rounded the means back to integers).
+
+### Consequence
+
+Coarse results from before and after 2026-11-19 do not compare; RES1 results are unaffected.
+
+---
+
 ## 20261119 — cuOpt's GPU barrier does not solve the default grouped RES1 model; Gurobi stays the engine
 
 ### TL;DR

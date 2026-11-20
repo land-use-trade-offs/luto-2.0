@@ -124,13 +124,12 @@ def get_yield_pot(data, lvstype, vegtype, lm, yr_idx):
     if vegtype not in ('natural land', 'modified land'):
         raise KeyError(f"Land cover type '{vegtype}' not identified.")
     lu = f'{lvstype.capitalize()} - {vegtype}'
-    _, pasture_kg_dm_ha, safe_pur = data.lvstk_pasture(lu, lm)
 
-    # Base potential: the type's stocking calibration k (FEED_REQ without a per-type file; block-aggregated at RESFACTOR > 1).
-    yield_pot = data.lvstk_k(lu, lm) * pasture_kg_dm_ha / denominator
+    # Base potential: the type's stocking calibration k (FEED_REQ without a per-type file).
+    yield_pot = data.LVSTK_K[lvstype].values * data.PASTURE_KG_DM_HA.values / denominator
 
     # Multiply potential by appropriate SAFE_PUR (safe pasture utilisation rate; NATL or MODL by vegtype).
-    yield_pot *= safe_pur
+    yield_pot *= (data.SAFE_PUR_NATL if vegtype == 'natural land' else data.SAFE_PUR_MODL).values
 
     # Multiply livestock yield potential by appropriate irrigation factor (i.e., 2).
     if lm == 'irr':
@@ -147,11 +146,10 @@ def get_stubble_yield_pot(data, lu, lm):
     """
     Return sheep grazing cereal stubble <unit: head/ha of cereal>: k_sheep x STUBBLE_DSE_HA / (DSE per head x grassfed
     factor), the pasture basis with the stubble carrying rate (DSE per ha, annualised) in place of the pasture feed.
-    No irrigation factor and no climate multiplier. 0 without a stubble file. (`lu`, `lm`) select the block-aggregated
-    values at RESFACTOR > 1 (Data.stubble); at RESFACTOR 1 every stubble land use and lm has the same cell values.
+    No irrigation factor and no climate multiplier. 0 without a stubble file. Every stubble land use and lm has the
+    same cell values (`lu`, `lm` are kept for the callers, which loop over them).
     """
-    s = data.stubble(lu, lm)
-    return s['K_SHEEP'] * s['STUBBLE_DSE_HA'] / (DSE_PER_HEAD['SHEEP'] * GRASSFED_FACTOR['SHEEP'])
+    return data.LVSTK_K['SHEEP'].values * data.STUBBLE_DSE_HA.values / (DSE_PER_HEAD['SHEEP'] * GRASSFED_FACTOR['SHEEP'])
 
 
 def get_quantity_stubble(data, pr, lm):
@@ -160,7 +158,7 @@ def get_quantity_stubble(data, pr, lm):
     stubble stocking rate."""
     fq = {'MEAT': ('F1', 'Q1'), 'WOOL': ('F2', 'Q2'), 'LEXP': ('F3', 'Q3')}[pr.split()[-1]]
     lu = data.PR2LU_DICT[pr]
-    agec = data.stubble(lu, lm)['AGEC_LVSTK']
+    agec = data.AGEC_LVSTK
     quantity = agec.sel(field=fq[0], animal='SHEEP').values * agec.sel(field=fq[1], animal='SHEEP').values
     return np.nan_to_num(quantity * get_stubble_yield_pot(data, lu, lm) * data.REAL_AREA.values)   # a new array, writable (get_quantity scales it in place); no sheep data: 0
 
@@ -188,7 +186,7 @@ def get_quantity_lvstk(data, pr, lm, yr_idx):
 
     # Get the yield potential. Since [20251027], here uses a constant multiplier from settings for production intensification
     yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
-    agec = data.agec_lvstk(f'{lvstype.capitalize()} - {vegtype}', lm)
+    agec = data.AGEC_LVSTK
 
     # Determine base quantity case-by-case.
 

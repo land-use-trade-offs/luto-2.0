@@ -159,20 +159,24 @@ The biodiversity module follows consistent naming conventions for GBF (Global Bi
 4. **GBF8**: Species conservation
    - Function: `get_GBF8_matrix_sr(data, target_year)`
 
-### Mask Proportion Strategy (`AG_MASK_PROPORTION_R`)
+### Coarse cells (`RESFACTOR > 1`): a block is its land-use cells
 
-When `RESFACTOR > 1`, each coarsened cell may only partially overlap the LUTO study area. `AG_MASK_PROPORTION_R` (defined in `data.py` as `AG_L_MRJ.sum(0).sum(1)`) captures the fraction of each coarsened cell that is inside LUTO. Whether a biodiversity constraint needs this correction depends on how its area coefficients are computed:
+A model cell stands for a block of RESFACTOR x RESFACTOR full-resolution cells, and stands only for the block's
+**land-use cells** (the cells RES1 models; `LUMASK`). Since 2026-11-19 (`docs/FINDINGS.md`):
 
-**Needs `AG_MASK_PROPORTION_R`:**
-- **GBF2** — `BIO_GBF2_MASK` is a **binary mask** (`bio_quality_raw >= threshold`), which is `True/False` for the entire coarsened cell regardless of partial coverage. So `BIO_GBF2_MASK * REAL_AREA` overstates the area for boundary cells. The mask proportion is applied in:
-  - `get_GBF2_MASK_area()` → `BIO_GBF2_MASK * REAL_AREA * AG_MASK_PROPORTION_R`
-  - `BIO_GBF2_BASE_YR` einsum result → `* AG_MASK_PROPORTION_R`
-  - `get_GBF2_target_for_yr_cal()` baseline sum → `* AG_MASK_PROPORTION_R`
+- `REAL_AREA` = the summed area of the block's land-use cells (`Data.block_sum(REAL_AREA_NO_RESFACTOR)`), not the
+  representative cell's area x RESFACTOR².
+- Every share is a mean over the same cells (`Data.block_mean`): `AG_L_MRJ`, `EXCLUDE` (> 0), `BIO_GBF2_MASK` (the
+  share of land-use cells above the priority cut, made at full resolution), the GBF3 / GBF4 layers, existing
+  renewables. So share x `REAL_AREA` is the land's own area, with no further correction.
+- Every per-ha / per-head input is the mean over the block's land-use cells that have a value
+  (`Data.get_resfactored_average`, cached in `input/_cache`).
 
-**Does NOT need `AG_MASK_PROPORTION_R`:**
-- **GBF3 NVIS/IBRA, GBF4 SNES/ECNES, GBF8** — Their layer arrays (`GBF3_NVIS_LAYERS_LDS`, `GBF4_SNES_LAYERS_SEL`, etc.) are built via `get_resfactored_average_fraction()`, which coarsens by computing `mean()` over all RESFACTOR² subcells (including zeros outside LUTO). A boundary cell with 7/25 subcells in LUTO gets fraction 7/25. Multiplied by `REAL_AREA` (= cell_area × RESFACTOR²), this correctly yields `7 × cell_area`. The partial-cell correction is already implicit in the fractional layer values.
-
-**Rule of thumb:** If the constraint coefficient is a **binary mask** or scalar per coarsened cell, multiply by `AG_MASK_PROPORTION_R`. If it comes from `get_resfactored_average_fraction()`, the correction is already built in.
+`AG_MASK_PROPORTION_R` (`AG_L_MRJ.sum(0).sum(1)`) is therefore 1 in every cell at every resolution: every land-use
+cell holds one (lm, lu). It is still multiplied in where it was (`BIO_GBF2_BASE_YR`, the GBF2 baseline sum in
+`get_GBF2_target_for_yr_cal()` and in `write_output`, the non-ag lower-bound cap in
+`non_agricultural/transitions.py`) and changes nothing there. Before 2026-11-19 it was the fraction of the 25 cells
+that were land-use cells and corrected the binary GBF2 mask x the 25-cell area; both are gone.
 
 ## Renewable Energy Module
 
