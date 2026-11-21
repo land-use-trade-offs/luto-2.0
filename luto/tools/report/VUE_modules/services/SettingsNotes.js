@@ -255,6 +255,20 @@ window.SettingsNotes = {
       "Used when USE_GHG_SCOPE_1 is True. Soil nitrous oxide only.",
     ],
   },
+  CROP_GHG_INVENTORY_FIELDS: {
+    what: "Whether crop residue nitrous oxide, field burning and rice methane count as direct crop emissions.",
+    detail: [
+      "These are the crop categories of the national inventory beyond fertiliser nitrous oxide. Only the 2020-21 crop emissions table has them; the run stops if it is on with a table that lacks them.",
+      "The agricultural management options do not reduce them.",
+    ],
+    options: [
+      ["True", "Crop residues, field burning and rice methane count, with CROP_GHG_SCOPE_1."],
+      ["False", "CROP_GHG_SCOPE_1 alone, as before."],
+    ],
+  },
+  CROP_GHG_INVENTORY_FIELD_NAMES: {
+    what: "The crop emission fields that CROP_GHG_INVENTORY_FIELDS adds: crop residues, field burning and rice methane.",
+  },
   LVSTK_GHG_SCOPE_1: {
     what: "The livestock emission sources that count as direct emissions.",
     detail: [
