@@ -234,12 +234,18 @@ def get_rev_beccs(data: Data, yr_cal: int) -> np.ndarray:
     return base_rev + np.nan_to_num(data.BECCS_TCO2E_HA_YR.values) * data.REAL_AREA.values * data.get_carbon_price_by_year(yr_cal)
 
 
-def get_rev_destocked(data: Data, ag_r_mrj: np.ndarray) -> np.ndarray:
+def get_rev_destocked(data: Data, yr_cal: int, ag_r_mrj: np.ndarray) -> np.ndarray:
     """
+    The revenue of unallocated natural land, plus carbon revenue on the cells where get_ghg_destocked_land books regrowth (livestock natural land in the
+    base year, lumaps[YR_CAL_BASE]): the ACCUs issued per cell (HIR_ISSUANCE_T_CO2E_HA_PER_YR x REAL_AREA, t CO2e/yr) x the year's carbon price. Its own
+    sign, as HIR's: removals counted positive, so the revenue is positive at a positive price. No carbon term without a rate layer.
+
     Parameters
     ----------
     data: object/module
         Data object or module with fields like in `luto.data`.
+    yr_cal: int
+        The year (carbon price).
     ag_r_mrj: np.ndarray
         Agricultural revenue matrix.
 
@@ -248,7 +254,12 @@ def get_rev_destocked(data: Data, ag_r_mrj: np.ndarray) -> np.ndarray:
     np.ndarray
     """
     unallocated_j = data.DESC2AGLU['Unallocated - natural land']
-    return ag_r_mrj[0, :, unallocated_j]
+    issuance = getattr(data, 'HIR_ISSUANCE_T_CO2E_HA_PER_YR', None)
+    if issuance is None:
+        return ag_r_mrj[0, :, unallocated_j]
+    destocked_r = np.isin(data.lumaps[data.YR_CAL_BASE], data.LU_LVSTK_NATURAL)      # the cells of get_ghg_destocked_land
+    removals_t = np.where(destocked_r, issuance * data.REAL_AREA.values, 0)
+    return ag_r_mrj[0, :, unallocated_j] + removals_t * data.get_carbon_price_by_year(yr_cal)
 
 
 def get_rev_matrix(data: Data, yr_cal: int, ag_r_mrj) -> np.ndarray:
@@ -274,7 +285,7 @@ def get_rev_matrix(data: Data, yr_cal: int, ag_r_mrj) -> np.ndarray:
         get_rev_sheep_carbon_plantings_belt(data, yr_cal, ag_r_mrj, cp_belt_x_r),
         get_rev_beef_carbon_plantings_belt(data, yr_cal, ag_r_mrj, cp_belt_x_r),
         get_rev_beccs(data, yr_cal),
-        get_rev_destocked(data, ag_r_mrj),
+        get_rev_destocked(data, yr_cal, ag_r_mrj),
     ]
 
     return np.concatenate(

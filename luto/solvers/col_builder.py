@@ -293,12 +293,17 @@ def nonag_space(data: Data, feasible_nonag_rk: np.ndarray, trans_lb_nonag_rk: np
 
 
 def am_space(data: Data, feasible_ag_mrj: np.ndarray, mask_gbf2_solar: np.ndarray, mask_gbf2_wind: np.ndarray, trans_lb_ag_man_mrj: dict) -> dict:
-    """The ag-management columns — its slot, option, land use, the ag (lm, lu) it sits on, cell and lb; ub = 1 — in (slot = (am, lu), lm, cell) order."""
+    """The ag-management columns — its slot, option, land use, the ag (lm, lu) it sits on, cell, lb and ub (1, or the base-year adoption when adoption above the base is off) — in (slot = (am, lu), lm, cell) order."""
     slots = [(am, lu_code) for am, lu_codes in data.AGMAN2LU.items() for lu_code in lu_codes]   # the (option, land use) slots, in slot order
 
     valid = np.zeros((len(slots), data.NLMS, data.NCELLS), dtype=bool)
     lb_smr = np.zeros((len(slots), data.NLMS, data.NCELLS), dtype=np.float32)
+    ub_smr = np.ones((len(slots), data.NLMS, data.NCELLS), dtype=np.float32)
     savanna_mask = data.SAVBURN_ELIGIBLE.values == 1                                          # cells eligible for savanna burning
+    # no adoption above the base year (calibration and gate runs): every option at most at its base-year adoption,
+    # clamped and truncated as the lock-in floor is
+    base_am = (None if settings.AG_MANAGEMENT_ADOPTION_ABOVE_BASE
+               else ag_transition.get_trans_lb_ag_man(data, data.YR_CAL_BASE))
 
     for slot, (am, j) in enumerate(slots):
         slot_valid = feasible_ag_mrj[:, :, j].copy()                                 # (lm, cell): where the ag column exists
@@ -312,6 +317,14 @@ def am_space(data: Data, feasible_ag_mrj: np.ndarray, mask_gbf2_solar: np.ndarra
         # set lower bounds for non-reversible options
         if not settings.AG_MANAGEMENTS_REVERSIBLE[am]:
             lb_smr[slot] = trans_lb_ag_man_mrj[am][:, :, j]                            # (lm, cell) of land use j
+        if base_am is not None:
+            ub_smr[slot] = base_am[am][:, :, j]
+            lb_smr[slot] = np.minimum(lb_smr[slot], ub_smr[slot])                     # never above the ub
+        # new HIR only where the gross rate is above 0 (settings.HIR_NEW_ONLY_WHERE_RATE_POSITIVE): elsewhere the option is held at its
+        # existing adoption, the lock-in floor, so base-year projects stay
+        if settings.HIR_NEW_ONLY_WHERE_RATE_POSITIVE and am.startswith('HIR'):
+            zero_rate = ~(np.asarray(data.HIR_REGROWTH_T_CO2E_HA_PER_YR) > 0)           # (cell,) the layer at the model's resolution
+            ub_smr[slot][:, zero_rate] = lb_smr[slot][:, zero_rate]
         # assign the slot's column existence
         valid[slot] = slot_valid
 
@@ -329,7 +342,7 @@ def am_space(data: Data, feasible_ag_mrj: np.ndarray, mask_gbf2_solar: np.ndarra
         j=j_of_slot[slot],
         cell=r,
         lb=lb_smr[slot, m, r],                                                         # attribute: the base-year adoption for non-reversible options, else 0
-        ub=1.0
+        ub=ub_smr[slot, m, r],                                                         # 1, or the base-year adoption when settings.AG_MANAGEMENT_ADOPTION_ABOVE_BASE is False
     )
 
 

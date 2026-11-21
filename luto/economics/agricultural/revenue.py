@@ -417,9 +417,26 @@ def get_biochar_effect_r_mrj(data:Data, r_mrj, yr_idx):
 
 
 
-def get_beef_hir_effect_r_mrj(data: Data, r_mrj):
+def get_hir_carbon_revenue_r(data: Data, yr_idx: int) -> np.ndarray | None:
     """
-    Applies the effects of using HIR to the beef revenue data
+    HIR carbon revenue <unit: $/cell/yr>, (r): the ACCUs issued per cell (HIR_ISSUANCE_T_CO2E_HA_PER_YR x REAL_AREA, t CO2e/yr) x the year's carbon
+    price. Its own sign: the issued tonnes are removals counted positive, so the revenue is positive at a positive price, while the GHG rows carry the
+    gross removals as negative emissions. No productivity or ceiling scaling and no baseline: every hectare the model adopts earns its issuance.
+    None without a rate layer or at a zero carbon price. The effect arrays then retain the livestock term exactly.
+    """
+    issuance = getattr(data, 'HIR_ISSUANCE_T_CO2E_HA_PER_YR', None)
+    if issuance is None:
+        return None
+    price = data.get_carbon_price_by_yr_idx(yr_idx)
+    if price == 0:
+        return None
+    return (issuance * data.REAL_AREA.values * price).astype(np.float32)
+
+
+def get_beef_hir_effect_r_mrj(data: Data, r_mrj, yr_idx):
+    """
+    Applies the effects of using HIR to the beef revenue data: livestock revenue x (HIR_PRODUCTIVITY_CONTRIBUTION - 1), plus the HIR carbon
+    revenue (get_hir_carbon_revenue_r) on every lm.
     """
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
@@ -430,17 +447,20 @@ def get_beef_hir_effect_r_mrj(data: Data, r_mrj):
     if not settings.AG_MANAGEMENTS['HIR - Beef']:
         return r_mrj_effect
     
+    carbon_r = get_hir_carbon_revenue_r(data, yr_idx)
     # Update values in the new matrix    
     for lu_idx in range(len(land_uses)):
         j = lu_codes[lu_idx]
-        r_mrj_effect[:, :, lu_idx] = r_mrj[:, :, j] * (settings.HIR_PRODUCTIVITY_CONTRIBUTION - 1)
+        livestock_r = r_mrj[:, :, j] * (settings.HIR_PRODUCTIVITY_CONTRIBUTION - 1)
+        r_mrj_effect[:, :, lu_idx] = livestock_r if carbon_r is None else livestock_r + carbon_r
 
     return r_mrj_effect
 
 
-def get_sheep_hir_effect_r_mrj(data: Data, r_mrj):
+def get_sheep_hir_effect_r_mrj(data: Data, r_mrj, yr_idx):
     """
-    Applies the effects of using HIR to the sheep revenue data
+    Applies the effects of using HIR to the sheep revenue data: livestock revenue x (HIR_PRODUCTIVITY_CONTRIBUTION - 1), plus the HIR carbon
+    revenue (get_hir_carbon_revenue_r) on every lm.
     """
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
@@ -451,10 +471,12 @@ def get_sheep_hir_effect_r_mrj(data: Data, r_mrj):
     if not settings.AG_MANAGEMENTS['HIR - Sheep']:
         return r_mrj_effect
     
+    carbon_r = get_hir_carbon_revenue_r(data, yr_idx)
     # Update values in the new matrix    
     for lu_idx in range(len(land_uses)):
         j = lu_codes[lu_idx]
-        r_mrj_effect[:, :, lu_idx] = r_mrj[:, :, j] * (settings.HIR_PRODUCTIVITY_CONTRIBUTION - 1)
+        livestock_r = r_mrj[:, :, j] * (settings.HIR_PRODUCTIVITY_CONTRIBUTION - 1)
+        r_mrj_effect[:, :, lu_idx] = livestock_r if carbon_r is None else livestock_r + carbon_r
 
     return r_mrj_effect
 
@@ -615,8 +637,8 @@ def get_agricultural_management_revenue_matrices(data:Data, r_mrj, yr_idx: int) 
     ag_man_r_mrj['Savanna Burning'] = get_savanna_burning_effect_r_mrj(data, yr_idx)                       
     ag_man_r_mrj['AgTech EI'] = get_agtech_ei_effect_r_mrj(data, r_mrj, yr_idx)                            
     ag_man_r_mrj['Biochar'] = get_biochar_effect_r_mrj(data, r_mrj, yr_idx)                                
-    ag_man_r_mrj['HIR - Beef'] = get_beef_hir_effect_r_mrj(data, r_mrj)                                    
-    ag_man_r_mrj['HIR - Sheep'] = get_sheep_hir_effect_r_mrj(data, r_mrj)
+    ag_man_r_mrj['HIR - Beef'] = get_beef_hir_effect_r_mrj(data, r_mrj, yr_idx)
+    ag_man_r_mrj['HIR - Sheep'] = get_sheep_hir_effect_r_mrj(data, r_mrj, yr_idx)
     ag_man_r_mrj['Utility Solar PV'] = get_utility_solar_pv_effect_r_mrj(data, r_mrj, yr_idx)
     ag_man_r_mrj['Onshore Wind'] = get_onshore_wind_effect_r_mrj(data, r_mrj, yr_idx)
 

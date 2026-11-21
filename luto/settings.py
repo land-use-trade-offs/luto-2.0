@@ -161,6 +161,12 @@ TECH_ADOPT_MULT = 1
 # file's last year, and an (option, land use) with no rows keeps its current limit.
 AG_MANAGEMENT_OBSERVED_CAPS = None
 
+# Whether ag-management adoption may rise above its base-year level. True (default): the usual limits apply.
+# False (calibration and gate runs): each option is held at most at its base-year adoption on every cell, in every
+# year; HIR at the existing projects (HIR_BASE_YEAR_PROJECTS), every other option at 0, since the base-year emission
+# factors, calibrated to the national inventory, already embody the base-year adoption of those options.
+AG_MANAGEMENT_ADOPTION_ABOVE_BASE = True
+
 # Set whether to use demand elasticity when calculating commodity prices
 DYNAMIC_PRICE = True
 
@@ -843,11 +849,44 @@ HIR_PRODUCTIVITY_CONTRIBUTION = 0.5
 # HIR celling factor, assuming HIR achienves x% of bio/GHG benefits of the Destocked - natural land land use
 HIR_CEILING_PERCENTAGE = 0.8
 
-# Existing-HIR-project baseline on the two GHG rows. None = off. Otherwise a folder under INPUT_DIR built outside LUTO
-# (e.g. 'Nick_build/ag_mgt_caps'). LUTO's HIR then counts only above the regrowth (LULUCF row) and
-# destocking (AG row) of the existing ACCU HIR projects on their mapped cells, as its plantings count above the
-# plantings baseline: the NIR series already carry those projects.
+HIR_RATE_FILE = None
+'''
+Per-cell HIR carbon rates. None (default): the regrowth carbon of HIR - Beef, HIR - Sheep and Destocked natural land is the
+natural-land carbon stock over CARBON_EFFECTS_WINDOW (HIR_CEILING_PERCENTAGE applies to HIR's share of it), as before.
+Otherwise a NetCDF file (relative to INPUT_DIR, or an absolute path, e.g. 'Nick_build/hir_layer/hir_rate_layer_gross.nc') with one value
+per full-resolution cell, built from the CER ACCU project register (mean FY2020-24 issuance per project; regional rate =
+issuance / CEA hectares by NRM region; regions with fewer than 3 mapped projects take their state's pooled rate):
+- HIR_RATE_ISSUANCE: ACCUs issued, t CO2e per ha per yr; with the file set, the carbon revenue of HIR - Beef, HIR - Sheep and Destocked natural
+  land (these tonnes x the year's carbon price, no baseline and no stocking or ceiling scale; Destocked on the cells of its regrowth);
+- HIR_RATE: the same grossed up for the 5 per cent risk-of-reversal buffer and the permanence discount, t CO2e per ha per yr;
+  with the file set, this is the regrowth carbon of HIR - Beef, HIR - Sheep and Destocked natural land on the LULUCF row,
+  the same on every land use and land management (HIR_CEILING_PERCENTAGE then applies to biodiversity only);
+- HIR_ELIGIBLE: 1 in NRM regions with a mapped HIR project, 0 elsewhere (both rates 0 there).
+Land clearing and the unallocated to livestock-natural conversion still read the natural-land stock.
+'''
+
+HIR_NEW_ONLY_WHERE_RATE_POSITIVE = False
+'''
+False (default): HIR - Beef and HIR - Sheep may be adopted on every cell where the land use exists, as before.
+True: new HIR is allowed only on cells whose gross rate (HIR_RATE_FILE, at the model's resolution) is above 0; on the other
+cells each HIR option is held at its existing adoption (the lock-in floor, so base-year HIR projects stay, including any on a
+zero-rate cell). Needs HIR_RATE_FILE; with no layer the setting raises an error instead of doing nothing.
+'''
+
+# Retired: the existing-HIR-project baseline subtraction on the two GHG rows. Existing projects now start as base-year
+# adoption (HIR_BASE_YEAR_PROJECTS), and HIR counts on each row only above each cell's base-year adoption. Data stops
+# with an error if this is set.
 HIR_BASELINE = None
+
+# Existing HIR projects as base-year management. None = off (no ag-management adoption in the base year). Otherwise a
+# folder under INPUT_DIR written by input/Nick_build/scripts/ag_mgt_caps.py (e.g. 'Nick_build/ag_mgt_caps_2021', the 2021-map run): the ACCU HIR projects registered up
+# to its baseline FY start as base-year adoption of HIR - Beef and HIR - Sheep on the cells of their Carbon Estimation
+# Areas whose base-year land use is the option's own (Beef or Sheep natural land), as the share of the cell inside the
+# projects (capped at the land use's share). Project area on other land uses is not adopted. HIR regrowth counts on the
+# LULUCF row only above each cell's base-year adoption: the existing projects' removals are in the national inventory, so
+# in the exogenous series. Their destocking counts on the AG row as part of the base state (NIR's livestock figures reflect
+# it and the stocking calibration k is calibrated with it in place); its constant is 0 (ghg.get_hir_base_year_t).
+HIR_BASE_YEAR_PROJECTS = None
 
 # Maintainace cost for HIR
 BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100 * CPI_2010_TO_ECONOMICS  # AUD per ha and year to maintain human-induced regeneration on beef land.
