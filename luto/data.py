@@ -1230,6 +1230,9 @@ class Data:
         # HIR regrowth per cell (settings.HIR_RATE_FILE, t CO2e/ha/yr, gross removals): the regrowth carbon of HIR - Beef, HIR - Sheep
         # and Destocked natural land. None with the setting off. Non-negative, and 0 outside the NRM regions with HIR projects.
         self.HIR_REGROWTH_T_CO2E_HA_PER_YR = None
+        # HIR carbon issuance per cell (settings.HIR_RATE_FILE, field HIR_RATE_ISSUANCE, t CO2e/ha/yr, the ACCUs issued): the carbon revenue basis of
+        # HIR - Beef, HIR - Sheep and Destocked natural land (tonnes x the year's carbon price). None with the layer off.
+        self.HIR_ISSUANCE_T_CO2E_HA_PER_YR = None
         if settings.HIR_NEW_ONLY_WHERE_RATE_POSITIVE and settings.HIR_RATE_FILE is None:
             raise ValueError("settings.HIR_NEW_ONLY_WHERE_RATE_POSITIVE needs settings.HIR_RATE_FILE (the gross rate is what the rule gates on)")
         if settings.HIR_RATE_FILE is not None:
@@ -1241,6 +1244,16 @@ class Data:
             n_bad = int((self.HIR_REGROWTH_T_CO2E_HA_PER_YR[hir_rates['HIR_ELIGIBLE'].values == 0] != 0).sum())
             if n_bad:
                 raise ValueError(f"{settings.HIR_RATE_FILE}: HIR_RATE is not 0 on {n_bad:,} cells where HIR_ELIGIBLE is 0")
+            self.HIR_ISSUANCE_T_CO2E_HA_PER_YR = hir_rates['HIR_RATE_ISSUANCE'].values.astype(np.float32)
+            n_bad = int((np.isnan(self.HIR_ISSUANCE_T_CO2E_HA_PER_YR) | (self.HIR_ISSUANCE_T_CO2E_HA_PER_YR < 0)).sum())
+            if n_bad:
+                raise ValueError(f"{settings.HIR_RATE_FILE}: HIR_RATE_ISSUANCE has NaN or negative values on {n_bad:,} cells")
+            n_bad = int((self.HIR_ISSUANCE_T_CO2E_HA_PER_YR[hir_rates['HIR_ELIGIBLE'].values == 0] != 0).sum())
+            if n_bad:
+                raise ValueError(f"{settings.HIR_RATE_FILE}: HIR_RATE_ISSUANCE is not 0 on {n_bad:,} cells where HIR_ELIGIBLE is 0")
+            n_bad = int((self.HIR_ISSUANCE_T_CO2E_HA_PER_YR > self.HIR_REGROWTH_T_CO2E_HA_PER_YR * (1 + 1e-6)).sum())
+            if n_bad:
+                raise ValueError(f"{settings.HIR_RATE_FILE}: HIR_RATE_ISSUANCE exceeds the gross HIR_RATE on {n_bad:,} cells")
         
         
         ###############################################################

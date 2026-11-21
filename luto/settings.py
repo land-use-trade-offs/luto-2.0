@@ -809,7 +809,8 @@ natural-land carbon stock over CARBON_EFFECTS_WINDOW (HIR_CEILING_PERCENTAGE app
 Otherwise a NetCDF file (relative to INPUT_DIR, or an absolute path, e.g. 'Nick_build/hir_layer/hir_rate_layer_gross.nc') with one value
 per full-resolution cell, built from the CER ACCU project register (mean FY2020-24 issuance per project; regional rate =
 issuance / CEA hectares by NRM region; regions with fewer than 3 mapped projects take their state's pooled rate):
-- HIR_RATE_ISSUANCE: ACCUs issued, t CO2e per ha per yr;
+- HIR_RATE_ISSUANCE: ACCUs issued, t CO2e per ha per yr; with the file set, the carbon revenue of HIR - Beef, HIR - Sheep and Destocked natural
+  land (these tonnes x the year's carbon price, no baseline and no stocking or ceiling scale; Destocked on the cells of its regrowth);
 - HIR_RATE: the same grossed up for the 5 per cent risk-of-reversal buffer and the permanence discount, t CO2e per ha per yr;
   with the file set, this is the regrowth carbon of HIR - Beef, HIR - Sheep and Destocked natural land on the LULUCF row,
   the same on every land use and land management (HIR_CEILING_PERCENTAGE then applies to biodiversity only);
