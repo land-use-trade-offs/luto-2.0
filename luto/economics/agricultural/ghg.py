@@ -763,8 +763,13 @@ def get_beef_hir_effect_g_mrj(data: Data, yr_idx, separate=False):
     regrowth = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
     destocking = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
 
-    # GHG abatement from Land Use Change
+    # GHG abatement from Land Use Change: gross HIR regrowth (settings.HIR_RATE_FILE), the same on every land use and land
+    # management; without the file, the natural-land stock over the regrowth window (habitat-score gap less ceiling gap)
+    hir_rate = getattr(data, 'HIR_REGROWTH_T_CO2E_HA_PER_YR', None)
     for j_idx, lu in enumerate(land_uses):
+        if hir_rate is not None:
+            regrowth[:, :, j_idx] -= hir_rate * data.REAL_AREA.values
+            continue
         regrowth[:, :, j_idx] -= (
             (
                 data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR.values
@@ -790,8 +795,13 @@ def get_sheep_hir_effect_g_mrj(data: Data, yr_idx, separate=False):
     regrowth = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
     destocking = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
 
-    # GHG abatement from Land Use Change
+    # GHG abatement from Land Use Change: gross HIR regrowth (settings.HIR_RATE_FILE), the same on every land use and land
+    # management; without the file, the natural-land stock over the regrowth window (habitat-score gap less ceiling gap)
+    hir_rate = getattr(data, 'HIR_REGROWTH_T_CO2E_HA_PER_YR', None)
     for j_idx, lu in enumerate(land_uses):
+        if hir_rate is not None:
+            regrowth[:, :, j_idx] -= hir_rate * data.REAL_AREA.values
+            continue
         regrowth[:, :, j_idx] -= (
             (
                 data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR.values

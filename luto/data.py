@@ -1226,6 +1226,19 @@ class Data:
         )
         # Annualised over the regrowth window (t CO2e/ha/yr): HIR and Destocked regrowth only, not clearing
         self.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR = self.CO2E_STOCK_UNALL_NATURAL_TCO2_HA / settings.CARBON_EFFECTS_WINDOW
+
+        # HIR regrowth per cell (settings.HIR_RATE_FILE, t CO2e/ha/yr, gross removals): the regrowth carbon of HIR - Beef, HIR - Sheep
+        # and Destocked natural land. None with the setting off. Non-negative, and 0 outside the NRM regions with HIR projects.
+        self.HIR_REGROWTH_T_CO2E_HA_PER_YR = None
+        if settings.HIR_RATE_FILE is not None:
+            hir_rates = xr.load_dataset(os.path.join(settings.INPUT_DIR, settings.HIR_RATE_FILE)).isel(cell=self.MASK)
+            self.HIR_REGROWTH_T_CO2E_HA_PER_YR = hir_rates['HIR_RATE'].values.astype(np.float32)
+            n_bad = int((np.isnan(self.HIR_REGROWTH_T_CO2E_HA_PER_YR) | (self.HIR_REGROWTH_T_CO2E_HA_PER_YR < 0)).sum())
+            if n_bad:
+                raise ValueError(f"{settings.HIR_RATE_FILE}: HIR_RATE has NaN or negative values on {n_bad:,} cells")
+            n_bad = int((self.HIR_REGROWTH_T_CO2E_HA_PER_YR[hir_rates['HIR_ELIGIBLE'].values == 0] != 0).sum())
+            if n_bad:
+                raise ValueError(f"{settings.HIR_RATE_FILE}: HIR_RATE is not 0 on {n_bad:,} cells where HIR_ELIGIBLE is 0")
         
         
         ###############################################################
