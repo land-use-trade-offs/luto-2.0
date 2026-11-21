@@ -38,6 +38,22 @@ INPUT_DIR = 'input'  # Folder of the model-ready input data, relative to the rep
 OUTPUT_DIR = 'output'  # Folder the runs are written to, one timestamped sub-folder per run.
 RAW_DATA = '../raw_data'  # Folder of the raw source data that dataprep.py turns into INPUT_DIR; not read during a run.
 
+INPUT_SET = '2010'
+'''
+The input set the base-year files come from.
+- '2010': every input from INPUT_DIR (the NLUM 2010-11 base), as before.
+- '2021': the 2020-21 base files listed in luto.data.INPUT_SET_2021_FILES (land use and land management maps,
+  eligibility, crop and livestock economics, emission factors, pasture productivity, climate change impact
+  multipliers, water delivery and licence prices, the flat-wool productivity trend yieldincreases_bau2022.csv and the 2021
+  domestic water use Water_Use_Domestic.csv) are read from INPUT_DIR/Nick_build/<dataset folder>/<file> (the folder of each is
+  its build script's: livestock_map, eligibility, crop_economics, livestock_economics, ghg_factors, pasture_productivity,
+  water_licence_price, water_domestic, cci_fill); every other input from INPUT_DIR. LVSTK_K_FILE and STUBBLE_DSE_FILE, when None,
+  are set to the 2020-21 files (luto.data.INPUT_SET_2021_DEFAULTS: 'Nick_build/livestock_map/lvstk_k.nc',
+  'Nick_build/stubble_dse/stubble_dse_ha.nc'); a value set by the user is kept. The stocking rate divides by the NIR FY2021 intake
+  ratings those files were calibrated at, read at build precision from Nick_build/livestock_map/livestock_dse_ratings.csv.
+  named with the input set (cache_2021_<name>_RES<n>.nc), so it never reads the 2010 file's cache of the same name.
+'''
+
 
 # ---------------------------------------------------------------------------- #
 # Scenario parameters.                                                         #
