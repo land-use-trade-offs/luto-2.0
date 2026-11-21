@@ -470,6 +470,7 @@ def write_data(data: Data):
     if not years:
         print('No solved year and WRITE_BASE_YEAR is off: nothing to write beyond the settings.', flush=True)
         return
+    write_demand_reanchor_report(data)
 
     # Cap workers 
     max_workers = min(os.cpu_count(), 32)
@@ -539,6 +540,15 @@ def write_settings(path):
         ordered = {k: all_settings[k] for k in order if k in all_settings}
     with open(Path(path) / 'model_run_settings.txt', 'w') as f:
         f.writelines(f'{k}:{v}\n' for k, v in ordered.items())
+
+
+def write_demand_reanchor_report(data: Data):
+    """With settings.DEMAND_REANCHOR_TO_BASE_YEAR, write Data.DEMAND_REANCHOR_REPORT (the demand-to-production report at
+    the base year, one row per on-land commodity) to demand_to_production_report_<YR_CAL_BASE>.csv in the run's output
+    folder; nothing is written with the setting off."""
+    if not settings.DEMAND_REANCHOR_TO_BASE_YEAR:
+        return
+    data.DEMAND_REANCHOR_REPORT.to_csv(os.path.join(data.path, f'demand_to_production_report_{data.YR_CAL_BASE}.csv'))
 
 
 

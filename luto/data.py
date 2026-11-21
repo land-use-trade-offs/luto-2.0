@@ -1436,6 +1436,15 @@ class Data:
                       f"{bad.sizes['year']} year(s) from {bad['year'].min().item()}, min {bad.min().item():,.0f}", flush=True)
             self.DEMAND_C = self.DEMAND_C.clip(min=0)
 
+        # The demand-to-production report at the base year; with settings.DEMAND_REANCHOR_TO_BASE_YEAR each on-land
+        # commodity's demand path is multiplied by its ratio_applied (base-year production / base-year demand)
+        self.DEMAND_REANCHOR_REPORT = self.get_demand_reanchor_report()
+        if settings.DEMAND_REANCHOR_TO_BASE_YEAR:
+            ratio = self.DEMAND_REANCHOR_REPORT['ratio_applied'].reindex(self.DEMAND_C['Commodity'].values)
+            self.DEMAND_C = self.DEMAND_C * xr.DataArray(ratio.to_numpy(), dims=['Commodity'], coords={'Commodity': self.DEMAND_C['Commodity']})
+            print(f"│   ├── Demand re-anchored to {self.YR_CAL_BASE} production: "
+                  f"{int((ratio != 1).sum())} of {len(ratio)} commodities scaled", flush=True)
+
         # The demand the solver reads (row_inputs, the demand rows' rhs), float32 as it has always been
         self.DEMAND_C = self.DEMAND_C.astype(np.float32)
 
@@ -2116,6 +2125,24 @@ class Data:
         """
         self.ag_man_dvars[yr] = ag_man_dvars
                 
+
+
+    def get_demand_reanchor_report(self) -> pd.DataFrame:
+        """The demand-to-production report at the base year, one row per on-land commodity (DEMAND_C, before
+        re-anchoring): base-year production (BASE_YR_production_t, the base-year allocation's actual production, over
+        COMMODITIES), demand in the base year, their ratio, and the ratio re-anchoring applies (production / demand where
+        both are above 0; else 1, with a note, and the file's path is kept)."""
+        demand = self.DEMAND_C.sel(year=self.YR_CAL_BASE).to_pandas().astype(np.float64)
+        prod = pd.Series(np.asarray(self.BASE_YR_production_t, dtype=np.float64), index=self.COMMODITIES)
+        rep = pd.DataFrame({'production_t': prod.reindex(demand.index), 'demand_t': demand})
+        rep['production_over_demand'] = np.divide(rep['production_t'].to_numpy(), rep['demand_t'].to_numpy(),
+                                                  out=np.full(len(rep), np.nan), where=rep['demand_t'].to_numpy() > 0)
+        ok = (rep['production_t'] > 0) & (rep['demand_t'] > 0)
+        rep['ratio_applied'] = np.where(ok, rep['production_over_demand'], 1.0)
+        rep['note'] = np.where(ok, '', np.where(rep['demand_t'] > 0, 'no base-year production: file path kept',
+                                                 'no base-year demand: file path kept'))
+        rep.index.name = 'commodity'
+        return rep
 
 
     def get_exact_resfactored_lumap_mrj(self):
