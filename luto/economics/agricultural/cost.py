@@ -198,7 +198,7 @@ def get_cost_stubble(data:Data, lu, lm, yr_idx):
     (quantity costs, drinking water delivery) at the stubble stocking rate. The area and fixed costs stay the crop's.
     Provisional: the per-head values are the cell's sheep values (AGEC_LVSTK), pending the livestock economics rebuild."""
     yr_cal = data.YR_CAL_BASE + yr_idx
-    head_ha = get_stubble_yield_pot(data, lu, lm)
+    head_ha = get_stubble_yield_pot(data, lu, lm, yr_idx)
     costs_q = data.AGEC_LVSTK.sel(field='QC', animal='SHEEP').values * head_ha * data.QC_COST_MULTS.loc[yr_cal, 'Sheep']
     costs_w = (data.AGEC_LVSTK.sel(field='WR_DRN', animal='SHEEP').values * settings.LIVESTOCK_DRINKING_WATER * head_ha
                * data.WATER_DELIVERY_PRICE.values * data.WP_COST_MULTS[yr_cal])
@@ -314,7 +314,7 @@ def get_asparagopsis_effect_c_mrj(data:Data, yr_idx):
         for j_idx, lu in enumerate(land_uses):
             lvstype, vegtype = lvs_veg_types(lu)
             yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
-            cost_per_animal = data.ASPARAGOPSIS_DATA[lu].loc[yr_cal, 'Annual Cost Per Animal (A$2010/yr)']
+            cost_per_animal = data.ASPARAGOPSIS_DATA[lu].loc[yr_cal, 'Annual Cost Per Animal (A$2010/yr)'] * settings.CPI_2010_TO_ECONOMICS
             cost_per_cell = cost_per_animal * yield_pot * data.REAL_AREA.values
 
             new_c_mrj[m, :, j_idx] = cost_per_cell
@@ -345,7 +345,7 @@ def get_precision_agriculture_effect_c_mrj(data:Data, yr_idx):
 
     for m in range(data.NLMS):
         for j_idx, lu in enumerate(land_uses):
-            cost_per_ha = data.PRECISION_AGRICULTURE_DATA[settings.LU2TYPE[lu]].loc[yr_cal, 'AnnCost_per_Ha']
+            cost_per_ha = data.PRECISION_AGRICULTURE_DATA[settings.LU2TYPE[lu]].loc[yr_cal, 'AnnCost_per_Ha'] * settings.CPI_2010_TO_ECONOMICS    # 2010 dollars
             new_c_mrj[m, :, j_idx] = cost_per_ha * data.REAL_AREA.values
 
     return new_c_mrj
@@ -447,7 +447,7 @@ def get_agtech_ei_effect_c_mrj(data:Data, yr_idx):
 
     for m in range(data.NLMS):
         for j_idx, lu in enumerate(land_uses):
-            cost_per_ha = data.AGTECH_EI_DATA[settings.LU2TYPE[lu]].loc[yr_cal, 'AnnCost_per_Ha']
+            cost_per_ha = data.AGTECH_EI_DATA[settings.LU2TYPE[lu]].loc[yr_cal, 'AnnCost_per_Ha'] * settings.CPI_2010_TO_ECONOMICS    # 2010 dollars
             new_c_mrj[m, :, j_idx] = cost_per_ha * data.REAL_AREA.values
 
     return new_c_mrj
@@ -476,7 +476,7 @@ def get_biochar_effect_c_mrj(data:Data, yr_idx: int):
 
     for m in range(data.NLMS):
         for j_idx, lu in enumerate(land_uses):
-            cost_per_ha = data.BIOCHAR_DATA[settings.LU2TYPE[lu]].loc[yr_cal, 'AnnCost_per_Ha']
+            cost_per_ha = data.BIOCHAR_DATA[settings.LU2TYPE[lu]].loc[yr_cal, 'AnnCost_per_Ha'] * settings.CPI_2010_TO_ECONOMICS    # 2010 dollars
             new_c_mrj[m, :, j_idx] = cost_per_ha * data.REAL_AREA.values
 
     return new_c_mrj
@@ -579,14 +579,14 @@ def get_utility_solar_pv_effect_c_mrj(data: Data, c_mrj, yr_idx, aggregate: bool
         re_cost_operation_AUD_ha = (
             re_lyr['Cost_of_operation_AUD_kw']
             * 1000                                                  # Convert from AUD/kW to AUD/MW
-            * 0.6944                                                # Adjust AUD from 2024 to 2010
+            * 0.6944 * settings.CPI_2010_TO_ECONOMICS               # Adjust AUD from 2024 to 2010, then to the economics' dollar year
             * settings.INSTALL_CAPACITY_MW_HA['Utility Solar PV']   # Convert from AUD/MW to AUD/ha
             * data.REAL_AREA.values                                        # Convert from AUD/ha to AUD/cell
         )
         re_cost_install_AUD_ha = tools.amortise(
             re_lyr['Cost_of_install_AUD_kw']
             * 1000                                                  # Convert from AUD/kW to AUD/MW
-            * 0.6944                                                # Adjust AUD from 2024 to 2010
+            * 0.6944 * settings.CPI_2010_TO_ECONOMICS               # Adjust AUD from 2024 to 2010, then to the economics' dollar year
             * settings.INSTALL_CAPACITY_MW_HA['Utility Solar PV']   # Convert from AUD/MW to AUD/ha
             * data.REAL_AREA.values                                        # Convert from AUD/ha to AUD/cell
         )
@@ -643,14 +643,14 @@ def get_onshore_wind_effect_c_mrj(data: Data, c_mrj, yr_idx, aggregate: bool = T
         re_cost_operation_AUD_ha = (
             re_lyr['Cost_of_operation_AUD_kw']
             * 1000                                                  # Convert from AUD/kW to AUD/MW
-            * 0.6944                                                # Adjust AUD from 2024 to 2010
+            * 0.6944 * settings.CPI_2010_TO_ECONOMICS               # Adjust AUD from 2024 to 2010, then to the economics' dollar year
             * settings.INSTALL_CAPACITY_MW_HA['Onshore Wind']       # Convert from AUD/MW to AUD/ha
             * data.REAL_AREA.values                                        # Convert from AUD/ha to AUD/cell
         )
         re_cost_install_AUD_ha = tools.amortise(
             re_lyr['Cost_of_install_AUD_kw']
             * 1000                                                  # Convert from AUD/kW to AUD/MW
-            * 0.6944                                                # Adjust AUD from 2024 to 2010
+            * 0.6944 * settings.CPI_2010_TO_ECONOMICS               # Adjust AUD from 2024 to 2010, then to the economics' dollar year
             * settings.INSTALL_CAPACITY_MW_HA['Onshore Wind']       # Convert from AUD/MW to AUD/ha
             * data.REAL_AREA.values                                        # Convert from AUD/ha to AUD/cell
         )
