@@ -35,23 +35,67 @@ import luto.economics.non_agricultural.quantity as non_ag_quantity
 import luto.economics.agricultural.water as ag_water
 
 from collections import defaultdict
+from collections.abc import MutableMapping
 from pathlib import Path
 from typing import Any, Literal, Optional
 from affine import Affine
 from scipy.interpolate import interp1d
+from scipy.sparse import coo_array
 from math import ceil
-from dataclasses import dataclass
 
 
 
-@dataclass
+class SparseYears(MutableMapping):
+    """{year: solution} as `Data` holds it for every solved year, the arrays kept sparse (2026-11-23).
+
+    Written and read like the dict it replaces: `store[year] = array` (or a dict of arrays) keeps each array as a
+    scipy `coo_array`, `store[year]` gives the dense array (or the dict of dense arrays) back, equal to what was
+    stored. A solution is almost all zeros (a cell holds one or two land uses of 28): dense, a RES1 year costs about
+    8 GB (one (lm, cell, lu) float32 array for the ag land uses and one per ag-management option) and stayed in memory
+    to the end of the run. Every reader gets a fresh dense array: a change made to it in place is not kept."""
+
+    def __init__(self):
+        self._years = {}
+
+    def __setitem__(self, year, solution):
+        self._years[year] = self.to_sparse(solution)
+
+    def __getitem__(self, year):
+        return self.to_dense(self._years[year])
+
+    def __delitem__(self, year):
+        del self._years[year]
+
+    def __iter__(self):
+        return iter(self._years)
+
+    def __len__(self):
+        return len(self._years)
+
+    def __contains__(self, year):
+        return year in self._years
+
+    def to_sparse(self, solution):
+        """A solved array as a scipy `coo_array`; a dict of arrays as a dict of them; anything else as it is."""
+        if isinstance(solution, np.ndarray):
+            return coo_array(solution)
+        if isinstance(solution, dict):
+            return {key: self.to_sparse(value) for key, value in solution.items()}
+        return solution
+
+    def to_dense(self, solution):
+        """The reverse of `to_sparse`: the dense array, or the dict of dense arrays, that was stored."""
+        if isinstance(solution, coo_array):
+            return solution.toarray()
+        if isinstance(solution, dict):
+            return {key: self.to_dense(value) for key, value in solution.items()}
+        return solution
+
+
 class Data:
     """
     Contains all data required for the LUTO model to run. Loads all data upon initialisation.
     """
-
-    # Restore identity-based hashing (dataclass __eq__ silently sets __hash__ = None)
-    __hash__ = object.__hash__
 
     def __init__(self) -> None:
         """
@@ -67,15 +111,18 @@ class Data:
         self.last_year = None
 
         # Setup output containers
+        #   The solved shares are almost all zeros and are held for every solved year: kept sparse (SparseYears,
+        #   written and read like a dict). lumaps and lmmaps stay plain dicts, nothing to gain: one int8 per cell
+        #   (4 MB a year at RES1), and a lumap has a land-use code in nearly every cell, so sparse it is 9 times larger
         self.lumaps = {}
         self.lmmaps = {}
-        self.ammaps = {}
-        self.ag_dvars = {}
-        self.non_ag_dvars = {}
-        self.delta_dvars_ag2nonag = {}
-        self.ag_man_dvars = {}
-        self.delta_dvars_ag2ag = {}
-        self.delta_dvars_nonag2ag = {}
+        self.ammaps = SparseYears()
+        self.ag_dvars = SparseYears()
+        self.non_ag_dvars = SparseYears()
+        self.delta_dvars_ag2nonag = SparseYears()
+        self.ag_man_dvars = SparseYears()
+        self.delta_dvars_ag2ag = SparseYears()
+        self.delta_dvars_nonag2ag = SparseYears()
         self.prod_data = {}
         self.obj_vals = {}
 
@@ -103,14 +150,14 @@ class Data:
         with rasterio.open(Path(settings.INPUT_DIR) / "NLUM_2010-11_mask.tif") as rst:
             self.NLUM_MASK = rst.read(1).astype(np.int8)                                                                # 2D map,  0 for ocean, 1 for land
             self.LUMAP_2D_FULLRES = np.full_like(self.NLUM_MASK, self.NODATA, dtype=np.int16)                           # 2D map,  full of nodata (-9999)
-            np.place(self.LUMAP_2D_FULLRES, self.NLUM_MASK == 1, self.LUMAP_NO_RESFACTOR.values)                               # 2D map,  -9999 for ocean; -1 for desert, urban, water, etc; 0-27 for land uses
+            np.place(self.LUMAP_2D_FULLRES, self.NLUM_MASK == 1, self.LUMAP_NO_RESFACTOR.values)                        # 2D map,  -9999 for ocean; -1 for desert, urban, water, etc; 0-27 for land uses
             self.GEO_META_FULLRES = rst.meta                                                                            # dict,  key-value pairs of geospatial metadata for the full resolution land-use map
             self.GEO_META_FULLRES['dtype'] = 'float32'                                                                  # Set the data type to float32
             self.GEO_META_FULLRES['nodata'] = self.NODATA                                                               # Set the nodata value to -9999
 
 
         # Mask out non-agricultural, non-environmental plantings land (i.e., -1) from lumap 
-        self.LUMASK = self.LUMAP_NO_RESFACTOR.values != self.MASK_LU_CODE                                                      # 1D (ij flattend);  `True` for land uses; `False` for desert, urban, water, etc
+        self.LUMASK = self.LUMAP_NO_RESFACTOR.values != self.MASK_LU_CODE                                               # 1D (ij flattend);  `True` for land uses; `False` for desert, urban, water, etc
         self.FULLRES_1D_TO_2D = np.vstack(np.nonzero(self.NLUM_MASK))
 
         if settings.RESFACTOR > 1:
