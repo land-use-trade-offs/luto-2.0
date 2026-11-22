@@ -35,6 +35,7 @@ import luto.economics.non_agricultural.quantity as non_ag_quantity
 import luto.economics.agricultural.water as ag_water
 
 from collections import defaultdict
+from functools import cached_property
 from pathlib import Path
 from typing import Any, Literal, Optional
 from affine import Affine
@@ -48,6 +49,7 @@ from dataclasses import dataclass
 _CCI_FILES = [f'climate_change_impacts_{rcp}_CO2_FERT_{fert}.nc' for rcp in ('rcp2p6', 'rcp4p5', 'rcp6p0', 'rcp8p5') for fert in ('ON', 'OFF')]
 INPUT_SET_2021_FILES = {
     'lumap.nc': 'livestock_map', 'lmmap.nc': 'livestock_map', 'x_mrj.nc': 'eligibility',
+    'livestock_dse_ratings.csv': 'livestock_map',
     'agec_crops.nc': 'crop_economics', 'agGHG_crops.nc': 'crop_economics',
     'agec_lvstk.nc': 'livestock_economics', 'water_delivery_price.nc': 'livestock_economics',
     'agGHG_lvstk.nc': 'ghg_factors', 'agGHG_irrpast.nc': 'ghg_factors',
@@ -112,6 +114,18 @@ class Data:
     # Restore identity-based hashing (dataclass __eq__ silently sets __hash__ = None)
     __hash__ = object.__hash__
 
+    @cached_property
+    def LVSTK_INTAKE_KG_DM_HEAD_DAY(self) -> dict[str, float]:
+        """Read the full-precision intake ratings used to build the 2020-21 stocking layers."""
+        path = input_path('livestock_dse_ratings.csv')
+        ratings = pd.read_csv(path, usecols=['animal', 'intake_kg_dm_day'],
+                              dtype={'intake_kg_dm_day': float},
+                              float_precision='round_trip').set_index('animal')['intake_kg_dm_day']
+        if (not ratings.index.is_unique or set(ratings.index) != set(ag_quantity.DSE_PER_HEAD)
+                or not np.isfinite(ratings).all() or not (ratings > 0).all()):
+            raise ValueError(f"{path} must give one positive, finite intake rating each for BEEF, SHEEP and DAIRY.")
+        return ratings.to_dict()
+
     def __init__(self) -> None:
         """
         Sets up output containers (lumaps, lmmaps, etc) and loads all LUTO data, adjusted
@@ -152,6 +166,7 @@ class Data:
         if settings.INPUT_SET not in ('2010', '2021'):
             raise ValueError(f"INPUT_SET must be '2010' or '2021', not {settings.INPUT_SET!r}.")
         if settings.INPUT_SET == '2021':
+            print(f"Livestock intake ratings from the FY2021 build: {self.LVSTK_INTAKE_KG_DM_HEAD_DAY}", flush=True)
             for name, fname in INPUT_SET_2021_DEFAULTS.items():
                 if getattr(settings, name) is None:
                     setattr(settings, name, fname)

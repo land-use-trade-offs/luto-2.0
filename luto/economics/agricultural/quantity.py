@@ -100,16 +100,11 @@ def get_ccimpact(data, lu, lm, yr_idx):
 DSE_PER_HEAD = {'BEEF': 8, 'SHEEP': 1.5, 'DAIRY': 17}
 GRASSFED_FACTOR = {'BEEF': 0.85, 'SHEEP': 0.85, 'DAIRY': 0.65}
 
-# Feed per head under settings.INPUT_SET '2021' <unit: kg DM per head per day>: the national FY2021 intake per head from NIR
-# enteric CH4 per head (NIR equations: Charmley et al. 2015 for cattle; Howden et al. 1994 for sheep, flock-weighted), the
-# ratings the 2020-21 stocking files (Nick_build/livestock_map/lvstk_k.nc and stubble_dse/stubble_dse_ha.nc) are calibrated at.
-INVENTORY_INTAKE_PER_HEAD = {'BEEF': 6.670, 'SHEEP': 0.887, 'DAIRY': 12.678}
-
-
-def get_feed_per_head(lvstype):
-    """The feed rating per head of `lvstype` the stocking rate divides by: INVENTORY_INTAKE_PER_HEAD under
-    settings.INPUT_SET '2021', DSE_PER_HEAD otherwise."""
-    return (INVENTORY_INTAKE_PER_HEAD if settings.INPUT_SET == '2021' else DSE_PER_HEAD)[lvstype]
+def get_feed_per_head(data, lvstype):
+    """Use the FY2021 build's intake in kg DM/head/day for the 2021 inputs."""
+    if settings.INPUT_SET == '2021':
+        return data.LVSTK_INTAKE_KG_DM_HEAD_DAY[lvstype]
+    return DSE_PER_HEAD[lvstype]
 
 
 def get_yield_pot(data, lvstype, vegtype, lm, yr_idx):
@@ -128,7 +123,7 @@ def get_yield_pot(data, lvstype, vegtype, lm, yr_idx):
     """
 
     # Factors varying as a function of `lvstype`.
-    denominator = (365 * get_feed_per_head(lvstype) * GRASSFED_FACTOR[lvstype])
+    denominator = (365 * get_feed_per_head(data, lvstype) * GRASSFED_FACTOR[lvstype])
 
     if vegtype not in ('natural land', 'modified land'):
         raise KeyError(f"Land cover type '{vegtype}' not identified.")
@@ -159,7 +154,7 @@ def get_stubble_yield_pot(data, lu, lm, yr_idx):
     irrigation factor. 0 without a stubble file. Every stubble land use and lm has the same cell values apart from that
     multiplier.
     """
-    return (data.LVSTK_K['SHEEP'].values * data.STUBBLE_DSE_HA.values / (get_feed_per_head('SHEEP') * GRASSFED_FACTOR['SHEEP'])
+    return (data.LVSTK_K['SHEEP'].values * data.STUBBLE_DSE_HA.values / (get_feed_per_head(data, 'SHEEP') * GRASSFED_FACTOR['SHEEP'])
             * get_ccimpact(data, lu, lm, yr_idx))
 
 

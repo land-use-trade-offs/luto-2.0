@@ -50,8 +50,7 @@ The input set the base-year files come from.
   water_licence_price, water_domestic, cci_fill); every other input from INPUT_DIR. LVSTK_K_FILE and STUBBLE_DSE_FILE, when None,
   are set to the 2020-21 files (luto.data.INPUT_SET_2021_DEFAULTS: 'Nick_build/livestock_map/lvstk_k.nc',
   'Nick_build/stubble_dse/stubble_dse_ha.nc'); a value set by the user is kept. The stocking rate divides by the NIR FY2021 intake
-  ratings those files are calibrated at (luto.economics.agricultural.quantity.INVENTORY_INTAKE_PER_HEAD: beef 6.670, sheep
-  0.887, dairy 12.678 kg DM per head per day) in place of DSE_PER_HEAD (8, 1.5, 17). The block-mean cache of a 2020-21 file is
+  ratings those files were calibrated at, read at build precision from Nick_build/livestock_map/livestock_dse_ratings.csv.
   named with the input set (cache_2021_<name>_RES<n>.nc), so it never reads the 2010 file's cache of the same name.
 '''
 
