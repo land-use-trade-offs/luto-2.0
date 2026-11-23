@@ -523,7 +523,7 @@ def write_data(data: Data):
 
 def write_settings(path):
     pattern = re.compile(r"^(\s*[A-Z].*?)\s*=")
-    all_settings = {k: getattr(settings, k) for k in dir(settings) if k.isupper()}
+    all_settings = {name: value for name, value in vars(settings).items() if name.isupper()}
     with open('luto/settings.py') as f:
         order = [m[1].strip() for line in f if (m := pattern.match(line))]
         ordered = {k: all_settings[k] for k in order if k in all_settings}

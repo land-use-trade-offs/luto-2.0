@@ -53,7 +53,7 @@ def get_settings_df(task_root_dir:str) -> pd.DataFrame:
         settings_keys = [match[1].strip() for line in lines if (match := parameter_reg.match(line))]
 
         # Reorder the settings dictionary to match the order in the settings.py file
-        settings_dict = {i: getattr(settings, i) for i in dir(settings) if i.isupper()}
+        settings_dict = {name: value for name, value in vars(settings).items() if name.isupper()}
         settings_dict = {key: settings_dict[key] for key in settings_keys if key in settings_dict}
 
         # Write the non-string values to a file; this helps to evaluate the settings later

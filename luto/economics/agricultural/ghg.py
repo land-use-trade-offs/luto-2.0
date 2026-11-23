@@ -820,7 +820,7 @@ def get_hir_baseline_t(data: Data, yr_idx) -> dict:
     land use, not the block's project share x its share in the land use, which assumed projects spread evenly over the
     block's land uses. LUTO's HIR counts on each row only above it, as its plantings do."""
     out = {'HIR_BASELINE_AG_t': 0.0, 'HIR_BASELINE_LULUCF_t': 0.0}
-    if getattr(data, "HIR_BASELINE_HA", None) is None:          # off, or a Data pickled before the setting existed
+    if data.HIR_BASELINE_HA is None:                            # off (Data sets it to None then)
         return out
     hb = data.HIR_BASELINE_HA
     fy = min(data.YR_CAL_BASE + yr_idx, hb['baseline_fy'])

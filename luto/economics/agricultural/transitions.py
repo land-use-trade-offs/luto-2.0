@@ -362,7 +362,7 @@ def get_agricultural_management_adoption_limits(data: Data, yr_idx) -> Dict[str,
     ag_management_data['Utility Solar PV'] = get_utility_solar_pv_adoption_limit(data)
     ag_management_data['Onshore Wind'] = get_onshore_wind_adoption_limit(data)
 
-    if getattr(data, "AG_MAN_OBSERVED_CAPS", None) is not None:
+    if data.AG_MAN_OBSERVED_CAPS is not None:
         yr_cal = data.YR_CAL_BASE + yr_idx
         for (am, lu), cap in data.AG_MAN_OBSERVED_CAPS.items():
             observed = cap[cap.index <= yr_cal]                   # held flat after the last observed year

@@ -1627,22 +1627,26 @@ class Data:
 
         # Renewable energy exclusion masks using biodiversity quality and independent cut values
         if any(settings.RENEWABLES_OPTIONS.values()) and settings.EXCLUDE_RENEWABLES_IN_GBF2_MASKED_CELLS:
+            no_go = {}
             for tech, cut_setting in (('SOLAR', settings.RENEWABLE_GBF2_CUT_SOLAR), ('WIND', settings.RENEWABLE_GBF2_CUT_WIND)):
                 renewable_cut = conservation_performance_curve[cut_setting]
-                no_go = (
+                no_go[tech] = (
                     bio_quality_raw >= renewable_cut if settings.RESFACTOR == 1
                     else self.block_sum(bio_quality_fullres >= renewable_cut) > 0       # any land-use cell of the block
                 )
-                setattr(self, f'RENEWABLE_GBF2_MASK_{tech}', no_go)
+            self.RENEWABLE_GBF2_MASK_SOLAR = no_go['SOLAR']
+            self.RENEWABLE_GBF2_MASK_WIND = no_go['WIND']
 
         # Renewable energy exclusion masks using EPBC MNES prioritization layer
         if any(settings.RENEWABLES_OPTIONS.values()) and settings.EXCLUDE_RENEWABLES_IN_EPBC_MNES_MASK:
             mnes_rank_fullres = xr.load_dataarray(Path(settings.INPUT_DIR) / 'renewable_QLD_EPBC_MNES_prioritization.nc').values
             mnes_performance = pd.read_csv(Path(settings.INPUT_DIR) / 'renewable_QLD_EPBC_MNES_prioritization_performance.csv').set_index('AREA_COVERAGE_PERCENT')['PRIORITY_RANK'].to_dict()
+            no_go = {}
             for tech, cut_setting in (('SOLAR', settings.RENEWABLE_EPBC_MNES_CUT_SOLAR), ('WIND', settings.RENEWABLE_EPBC_MNES_CUT_WIND)):
                 above_cut = mnes_rank_fullres >= mnes_performance[cut_setting]
-                no_go = above_cut[self.MASK] if settings.RESFACTOR == 1 else self.block_sum(above_cut) > 0   # any land-use cell of the block
-                setattr(self, f'RENEWABLE_MNES_MASK_{tech}', no_go)
+                no_go[tech] = above_cut[self.MASK] if settings.RESFACTOR == 1 else self.block_sum(above_cut) > 0   # any land-use cell of the block
+            self.RENEWABLE_MNES_MASK_SOLAR = no_go['SOLAR']
+            self.RENEWABLE_MNES_MASK_WIND = no_go['WIND']
 
 
         ###############################################################
