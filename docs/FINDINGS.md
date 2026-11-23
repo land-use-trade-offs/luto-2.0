@@ -5,6 +5,58 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20261123 — a RES1 step's work outside the solve: 22 min -> 13 min, every result the same
+
+### TL;DR
+
+Eight commits of 2026-11-23 (`8678a0a7` to `8efc0bc0`) take the work of one RES1 solve step outside the solve from
+1,339 s to 774 s (−42 %) on the same machine, the same saved `Data` and the same step, and every result is what it was.
+The largest gains: the economics (with `DYNAMIC_PRICE` off the old code still computed the target year's potential
+production, about 14 GB of quantity layers, for a price multiplier it then set to 1), cell grouping, and bound
+propagation over the grouped tables.
+
+### Measured (RES1, 2020 -> 2025, one saved Data, cell grouping on, DYNAMIC_PRICE off: Xinhao's settings)
+
+Old code `e97c7118` against new code `8efc0bc0` on the local machine, each run with no other job on it
+(`stage_benchmark.py`, each stage as `simulation.solve_timeseries` runs it):
+
+| Stage | Old (s) | New (s) | What changed |
+|---|---|---|---|
+| column space | 73 | 41 | the base year read once for every arc source (Data keeps solved years sparse: each read rebuilt the array); block labels as fixed-width strings |
+| row inputs | 139 | 87 | the `get_*` calls in two waves of threads (`LOADING_THREADS`); `get_ccimpact` cached |
+| rows | 211 | 155 | `make_part` builds a family's table without pandas' string inference (18 s for the link rows alone) |
+| economics (objective) | 226 | 60 | threads; the elasticity multiplier returns 1 before the potential production when `DYNAMIC_PRICE` is off |
+| cell grouping | 360 | 232 | the column types once, numbered by hashing instead of sorting 100 M columns; the SVD dimensions by lookup |
+| bound propagation | 138 | 16 | over the grouped tables (8.5 M rows) instead of the full ones (75.6 M) |
+| after the solve: Production | 145 | 148 | read off the step's own quantities: a design change (one source for the demand rows and the report), not a speed-up — the time is the product of the shares and the quantities over every cell, not the quantities |
+| after the solve: GHG report | 46 | 36 | the GHG sub-terms read off `RowInputs` instead of computed again |
+| **total** | **1,339** | **774** | |
+
+Loading the saved `Data` (once a run: 150 s and 169 s) is not in the total. Not measured here: building the Gurobi
+model and the yearly checkpoint (224 s -> 4 s at RES1 since `59f097d3`). The saved `Data` is an older one with its
+solved years dense, so neither run paid for rebuilding a solved year from the sparse store; a run of the new code
+does, about 1 s for each of the dozen or so base-year reads a step still makes.
+
+Compared, old against new: the column table, the row table and matrix, the objective, every cell's blob, the grouped
+row matrix, row table (but the grouped per-cell rows' `cell` label, changed on purpose by `b6359883`), column table and
+objective, the stored Production and the GHG report — 11 results, 0 differ.
+
+A first measurement of the old code (2,173 s) overlapped a RES1 run started by mistake and was discarded; the numbers
+above were measured again with nothing else running.
+
+### What it means for a run
+
+In Xinhao's RES1 run (yearly steps, Gadi) the work outside the solve took 32 min a year (median; growing to over 40 min
+with the checkpoint), the solve 34.5 min. At these rates a 40-year RES1 run spends about 8.6 h outside the solve,
+against about 15 h with the old code on the same machine.
+
+### Tried and rejected
+
+loky processes in place of threads for the `get_*` calls: 67 s against 14 s one after another at RES5; at RES1 a worker
+died with 132 GB of memory-mapped `Data` in `/dev/shm`. Every process needs the `Data`, and every result comes back.
+
+---
+
 ## 20261123 — the yearly checkpoint rewrote the whole `Data`: 224 s a year at RES1, 4 s when only the solved state is saved
 
 ### TL;DR
