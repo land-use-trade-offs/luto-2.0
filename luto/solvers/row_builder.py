@@ -802,7 +802,8 @@ def get_ag_mgt_link(inputs: RowInputs, cols: xr.Dataset, support: ColSupport):
     j        = cols['j'].values[am_cols]
     cells    = cols['cell'].values[am_cols]
     ag_cols  = support.ag_mrj2col[m, cells, j]                                          # ... and the ag column each sits on
-    names    = [f"const_ag_man_{options[a]}_usage_{inputs.landmans[lm]}_{lu}_{r}".replace(" ", "_") for a, lm, lu, r in zip(am_idx, m, j, cells)]
+    option_names = [option.replace(" ", "_") for option in options]                    # once per option, not once per row (38.9 M rows at RES1)
+    names    = [f"const_ag_man_{option_names[a]}_usage_{inputs.landmans[lm]}_{lu}_{r}" for a, lm, lu, r in zip(am_idx, m, j, cells)]
     n_rows = am_cols.size
     rows = np.arange(n_rows)
     row_matrix = sparse.csr_matrix(

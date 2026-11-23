@@ -18,6 +18,7 @@
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
+import pandas as pd
 import xarray as xr
 
 from scipy import sparse
@@ -61,15 +62,19 @@ def make_part(family: str, row_matrix: sparse.csr_matrix, rhs, sense, names, sca
 
     sense = np.full(n_rows, sense, dtype=object) if isinstance(sense, str) else np.asarray(sense, dtype=object)
 
-    table = xr.Dataset(
-        dict(family=(('row',), np.full(n_rows, family, dtype=object)),
-             **fields,
-             rhs=(('row',), np.asarray(rhs, dtype=np.float64)),
-             sense=(('row',), sense),
-             name=(('row',), np.asarray(names, dtype=object)),
-             scale=(('row',), np.ones(n_rows, dtype=np.float64) if scale is None else np.asarray(scale, dtype=np.float64)),
-             active=(('row',), np.ones(n_rows, dtype=bool)),
-             redundant=(('row',), np.zeros(n_rows, dtype=bool))))
+    # The string fields stay Python str objects. Without the option, xarray hands each object array to pandas, which
+    # (pandas 3) infers its Arrow string type and converts it back: 18 s for the 38.9 M ag-mgt link rows at RES1, for the
+    # same array. Local to this call: pandas elsewhere keeps its default.
+    with pd.option_context('future.infer_string', False):
+        table = xr.Dataset(
+            dict(family=(('row',), np.full(n_rows, family, dtype=object)),
+                 **fields,
+                 rhs=(('row',), np.asarray(rhs, dtype=np.float64)),
+                 sense=(('row',), sense),
+                 name=(('row',), np.asarray(names, dtype=object)),
+                 scale=(('row',), np.ones(n_rows, dtype=np.float64) if scale is None else np.asarray(scale, dtype=np.float64)),
+                 active=(('row',), np.ones(n_rows, dtype=bool)),
+                 redundant=(('row',), np.zeros(n_rows, dtype=bool))))
 
     return row_matrix, table
 
