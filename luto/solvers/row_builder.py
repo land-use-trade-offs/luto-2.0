@@ -162,14 +162,13 @@ def weight_rows(weights, ncells: int) -> sparse.csr_matrix:
 
 def contract(block: sparse.csr_matrix, rhs=None, rescale: bool = False) -> tuple[sparse.csr_matrix, np.ndarray, np.ndarray]:
     """
-    1. Drop tiny coefficients (abs < SOLVER_COEFF_MIN) and eliminate zeros.
-    2. Sort the indices of every row (a product such as ``W @ bio_S`` leaves them unsorted): every block leaves in one layout.
-    3. If ``rescale`` is True, geometrically rescale every row and the RHS.
+    1. Eliminate the stored zeros and sort the indices of every row (a product such as ``W @ bio_S`` leaves them unsorted): every block leaves in one layout.
+    2. If ``rescale`` is True, geometrically rescale every row and the RHS.
     The block is a CSR matrix, modified in place (every caller hands over a freshly built block), and returned with float32 coefficients.
+    No coefficient is dropped: the SOLVER_COEFF_MIN floor (1e-4, before and after the rescale) was retired on 2026-11-23
+    (docs/FINDINGS.md, 20261123: no gain in speed or stability, and a net row such as GHG loses accuracy when its small entries go).
     """
 
-    # Drop tiny coefficients and eliminate zeros
-    block.data[np.abs(block.data) < settings.SOLVER_COEFF_MIN] = 0.0       # the drop
     block.eliminate_zeros()
     block.sort_indices()
     
@@ -188,14 +187,12 @@ def contract(block: sparse.csr_matrix, rhs=None, rescale: bool = False) -> tuple
     # the row's factor: the geometric mean of the two, so both land around RESCALE_FACTOR
     scale = np.sqrt(row_max * rhs_abs)
     scale[rhs_abs == 0] = row_max[rhs_abs == 0]                            # rhs = 0: the row max is the scaler
-    scale[row_max == 0] = settings.RESCALE_FACTOR                          # all-zero row (every entry under SOLVER_COEFF_MIN): RESCALE_FACTOR, so factor 1 below
+    scale[row_max == 0] = settings.RESCALE_FACTOR                          # a row with no entry: RESCALE_FACTOR, so factor 1 below
     scale /= settings.RESCALE_FACTOR
 
     # divide every entry by its row's factor
     block.data /= np.repeat(scale, np.diff(block.indptr))                  # a per-row broadcast (each row's factor over its slice of data, the sparse A / scale[:, None]); in place, in the data's own precision ...
     block.data = block.data.astype(np.float32, copy=False)                 # ... then float32 (no copy when it already is)
-    block.data[np.abs(block.data) < settings.SOLVER_COEFF_MIN] = 0.0       # floor the scaled row
-    block.eliminate_zeros()
     return block, rhs / scale, scale
 
 
@@ -220,8 +217,8 @@ def get_bio_contribution(inputs: RowInputs, cols: xr.Dataset) -> np.ndarray:
 def get_obj(econ: EconomicInputs, cols: xr.Dataset, inputs: RowInputs) -> np.ndarray:
     """The objective coefficient of every column (on ``col``), as Gurobi takes it: the operating economics on
     the accounting columns and the transition costs on the arcs, both signed for the objective in ``get_economics``
-    — raw AUD, float32 — scaled to million AUD and floored: a coefficient under SOLVER_COEFF_MIN million AUD
-    (100 AUD) is dropped."""
+    — raw AUD, float32 — scaled to million AUD. No coefficient is dropped (the floor at 100 AUD was retired on
+    2026-11-23 with the rows' own, see ``contract``)."""
     # ── one gather over the six blocks: the operating economics on the accounting columns, the transition costs on the arcs ──
     obj = gather(
         cols, inputs, econ.ag_obj_mrj, 
@@ -229,10 +226,8 @@ def get_obj(econ: EconomicInputs, cols: xr.Dataset, inputs: RowInputs) -> np.nda
         econ.flow_obj_ag2ag, econ.flow_obj_ag2nonag, econ.flow_obj_nonag2ag
     )
 
-    # ── the scaling to million AUD, floor to make a health obj range ──
-    obj = obj * (1.0 / 1e6)                                                    # raw AUD -> million AUD (float32, a reciprocal multiply as gurobipy did)
-    obj[np.abs(obj) < settings.SOLVER_COEFF_MIN] = 0.0                         # the floor: |obj| < SOLVER_COEFF_MIN million AUD (100 AUD)
-    return obj
+    # ── the scaling to million AUD ──
+    return obj * (1.0 / 1e6)                                                   # raw AUD -> million AUD (float32, a reciprocal multiply as gurobipy did)
 
 
 

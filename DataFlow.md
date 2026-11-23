@@ -565,10 +565,9 @@ input magnitudes change without a physical reason, so it is worth knowing when r
 The source-keyed dicts are rescaled explicitly (1203-1205, 1217) because `rescale_lhs` only walks one
 dict level. `limits` itself stays **raw** — the solver divides by `scale_factors[...]` inline.
 
-**Coefficient filter** (L7): `_qsum(coeffs, gurobi_vars)` in `solver.py` is called by *every*
-constraint and objective builder and drops any term with `|coeff| < settings.SOLVER_COEFF_MIN`
-(1e-4). This supersedes the removed `RESCALE_ZERO_THRESHOLD` post-rescale zeroing — there is no
-zeroing in `input_data.py` any more.
+**Coefficient filter** (L7): retired on 2026-11-23. No term is dropped for being small any more
+(`settings.SOLVER_COEFF_MIN`, 1e-4, is gone; `docs/FINDINGS.md`, 20261123), as the earlier
+`RESCALE_ZERO_THRESHOLD` post-rescale zeroing was removed before it.
 
 ---
 

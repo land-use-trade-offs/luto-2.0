@@ -162,7 +162,7 @@ def slack_unit(rhs) -> np.ndarray:
     """The unit of a shortfall column (``relax``): |rhs| of its scaled row, 1 where
     rhs = 0. The column carries the size of the target missed, s' in [0, |rhs|] on a GBF row, at coefficient ±1 and the
     penalty / unit — the same LP as a·x + rhs·s >= rhs with s the fraction missed, s = s' / unit — so the scaled rhs (up to
-    ~1e5) never sits in the matrix beside the row's own entries (down to SOLVER_COEFF_MIN): a ~1e9 range within one row,
+    ~1e5) never sits in the matrix beside the row's own small entries: a ~1e9 range or more within one row,
     the suspect in pass 1's barrier "numerical trouble" (GBF8 35–55 %, 2026-10-02). Every reader of a shortfall value
     divides by it."""
     rhs = np.asarray(rhs, dtype=np.float64)

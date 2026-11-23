@@ -359,7 +359,7 @@ On 2026-11-01 two RES1 write jobs failed after about 4 h, costing about 390 SU e
 - For each commit, answer and record:
   1. What does it change in the model's numbers? Is it on by default?
   2. What new functions, settings and input files does it add? Who calls each one? Is it still needed?
-  3. What can it stop? For every `raise` / `assert`: when does it fire, how long into a run, and is its tolerance safe against float32, `get_base_held`, `SOLUTION_SHARE_FLOOR` and `SOLVER_COEFF_MIN`?
+  3. What can it stop? For every `raise` / `assert`: when does it fire, how long into a run, and is its tolerance safe against float32, `get_base_held` and `SOLUTION_SHARE_FLOOR`?
   4. For anything comparing two totals: was it only ever run at coarse resolution?
   5. Do I agree with it? Keep, change, or remove.
 - **Review the merges too.** Conflict resolutions are changes as well, so read `git show --cc <merge>` alongside Nick's commits. `948d88b0` (Nick's stack + S2 / S6) resolved 27 conflict hunks across 9 files, and that merge's diff touches 29 files. Each resolution is new code that neither side wrote or reviewed as it stands.
