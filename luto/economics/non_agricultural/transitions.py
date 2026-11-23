@@ -337,10 +337,11 @@ def get_base_nonag_dvar_k_cell_map(data: Data, base_year: int, threshold: float 
     }
 
 
-def get_nonag2ag_ub_src(data: Data, base_year: int, from_k: int, cells: np.ndarray) -> np.ndarray:
+def get_nonag2ag_ub_src(data: Data, base_dvar_rk: np.ndarray, from_k: int, cells: np.ndarray) -> np.ndarray:
     """(NLMS, len(cells), N_AG_LUS): how much ONE non-ag source may move to every ag target, on its own cells — its base-year
     share × its own T_MAT reach row × EXCLUDE × no-go. Summed over the sources this is get_nonag2ag_ub, and above zero it is
-    the arc: the column space creates a nonag2ag arc exactly where this is positive."""
+    the arc: the column space creates a nonag2ag arc exactly where this is positive. `base_dvar_rk` is the base year's
+    non-ag shares, read ONCE by the caller for every source (Data keeps solved years sparse: each read rebuilds them)."""
     # Transition exclusion (T_MAT): this source's own row — finite = the transition is allowed, NaN = it is not.
     reach_j = (~np.isnan(
         data.T_MAT.sel(from_lu=data.NON_AGRICULTURAL_LANDUSES, to_lu=data.AGRICULTURAL_LANDUSES).values[from_k]
@@ -350,7 +351,7 @@ def get_nonag2ag_ub_src(data: Data, base_year: int, from_k: int, cells: np.ndarr
     allowed_mrj = get_ag_allowed_mrj(data, cells)
 
     # What the source holds on those cells: nothing may move that is not there.
-    share_r = data.non_ag_dvars[base_year][cells, from_k].astype(np.float32)                 # (len(cells),)
+    share_r = base_dvar_rk[cells, from_k].astype(np.float32)                                 # (len(cells),)
     return (allowed_mrj * share_r[np.newaxis, :, np.newaxis] * reach_j[np.newaxis, np.newaxis, :]).astype(np.float32)
 
 

@@ -98,30 +98,31 @@ def int_hash(values: np.ndarray) -> np.ndarray:
 
 def number_by_first(key: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """(the first position of every distinct key, the group of every position), the groups numbered in the order they first
-    appear — so grouped columns and rows keep the table's own order (the blocks and the families stay together)."""
-    _, first, group = np.unique(key, return_index=True, return_inverse=True)
-    order = np.argsort(first)
-    rank = np.empty(order.size, dtype=np.int64)
-    rank[order] = np.arange(order.size)
-    return first[order], rank[group.ravel()]
+    appear — so grouped columns and rows keep the table's own order (the blocks and the families stay together).
+    pd.factorize numbers them so by hashing (np.unique sorted 100 M keys at RES1); a position is a group's first exactly
+    where its number exceeds every number before it."""
+    group = pd.factorize(key)[0]
+    first = np.ones(group.size, dtype=bool)
+    first[1:] = group[1:] > np.maximum.accumulate(group)[:-1]
+    return np.flatnonzero(first), group.astype(np.int64)
 
 
 def get_column_types(cols: xr.Dataset) -> np.ndarray:
-    """The type of every column: its block and every field but `cell` and `local_r`, as one integer."""
+    """The type of every column: its block and every field but `cell` and `local_r`, as one integer — numbered in sorted
+    order (pd.factorize with sort=True numbers them as np.unique did, by hashing instead of sorting every column)."""
     fields = [pd.factorize(cols['block'].values)[0].astype(np.int64)]
     for field in TYPE_FIELDS:
         fields.append(cols[field].values.astype(np.int64) + 1)
-    return np.unique(np.ravel_multi_index(fields, [int(values.max()) + 1 for values in fields]), return_inverse=True)[1].ravel()
+    return pd.factorize(np.ravel_multi_index(fields, [int(values.max()) + 1 for values in fields]), sort=True)[0].astype(np.int64)
 
 
 # ═══════════════════════════ the blobs: which cells share a decision ═══════════════════════════
 
-def get_blobs(tables: Tables, area_r: np.ndarray, region2cell: xr.Dataset) -> np.ndarray:
-    """The blob of every cell: the same key (exact) and the same SVD bin (close)."""
+def get_blobs(tables: Tables, area_r: np.ndarray, region2cell: xr.Dataset, type_id: np.ndarray) -> np.ndarray:
+    """The blob of every cell: the same key (exact) and the same SVD bin (close). `type_id`: get_column_types(cols)."""
     row_matrix, rows, cols, obj = tables
     cell = cols['cell'].values.astype(np.int64)
     n_cells = area_r.size
-    type_id = get_column_types(cols)
 
     # ── the key: the column types a cell holds, each with its base; Riparian Plantings' ub in natural-break bins ──
     col_hash = mix(mix(type_id.astype(np.uint64)) ^ int_hash(np.round(cols['base'].values.astype(np.float64) * 10 ** settings.ROUND_DECIMALS)))
@@ -158,7 +159,12 @@ def get_blobs(tables: Tables, area_r: np.ndarray, region2cell: xr.Dataset) -> np
     entry_col = np.concatenate([wide.col, priced])
     entry_row = np.concatenate([wide.row.astype(np.int64), np.full(priced.size, wide.shape[0], dtype=np.int64)])
     entry_val = np.concatenate([wide.data.astype(np.float64), obj[priced].astype(np.float64)]) / area_r[cell[entry_col]]
-    entry_dim = np.unique(type_id[entry_col] * (wide.shape[0] + 1) + entry_row, return_inverse=True)[1].ravel()
+    # a dimension per (column type, wide row or the objective) that has an entry, numbered in sorted order: the used ids
+    # of the small (type x row) space ranked by a cumulative count, which is np.unique's numbering without its sort
+    raw_dim = type_id[entry_col] * (wide.shape[0] + 1) + entry_row
+    used = np.zeros(int(raw_dim.max()) + 1 if raw_dim.size else 0, dtype=bool)
+    used[raw_dim] = True
+    entry_dim = (np.cumsum(used) - 1)[raw_dim]
     n_dims = int(entry_dim.max()) + 1 if entry_dim.size else 0
     n_directions = min(settings.CELL_GROUPING_SVD_DIMS, n_dims)
     if n_directions:
@@ -184,13 +190,13 @@ def get_blobs(tables: Tables, area_r: np.ndarray, region2cell: xr.Dataset) -> np
 
 # ═══════════════════════════ the transform: the tables over blobs ═══════════════════════════
 
-def aggregate(tables: Tables, blob_of_cell: np.ndarray) -> tuple[Tables, sparse.csr_matrix, sparse.csr_matrix]:
-    """The tables with every blob's cells sharing one share per column type: (grouped tables, col_map, row_map)."""
+def aggregate(tables: Tables, blob_of_cell: np.ndarray, type_id: np.ndarray) -> tuple[Tables, sparse.csr_matrix, sparse.csr_matrix]:
+    """The tables with every blob's cells sharing one share per column type: (grouped tables, col_map, row_map).
+    `type_id`: get_column_types(cols)."""
     row_matrix, rows, cols, obj = tables
     n_rows, n_cols = row_matrix.shape
     cell = cols['cell'].values.astype(np.int64)
     blob_of_cell = blob_of_cell.astype(np.int64)
-    type_id = get_column_types(cols)
     n_types = int(type_id.max()) + 1
 
     # ── the columns: one per (blob, column type), lb the largest and ub the smallest of its cells' ──
@@ -297,8 +303,9 @@ def group_tables(tables: Tables, area_r: np.ndarray, region2cell: xr.Dataset) ->
     range narrowed when asked (``condition_grouped``)."""
     print('Grouping the cells...', flush=True)
     start = time.time()
-    blob_of_cell = get_blobs(tables, np.asarray(area_r, dtype=np.float64), region2cell)
-    grouped, col_map, row_map = aggregate(tables, blob_of_cell)
+    type_id = get_column_types(tables.cols)                                                # once: the blobs and the transform both read it
+    blob_of_cell = get_blobs(tables, np.asarray(area_r, dtype=np.float64), region2cell, type_id)
+    grouped, col_map, row_map = aggregate(tables, blob_of_cell, type_id)
     grouped = condition_grouped(grouped)
     seconds = time.time() - start
     sizes = pd.DataFrame({'': ['full', 'grouped'],
