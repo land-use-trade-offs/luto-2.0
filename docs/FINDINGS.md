@@ -5,6 +5,283 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20261123 — every solved year stayed in `Data` as dense arrays: 8.9 GB a year at RES1, 0.14 GB kept sparse
+
+### TL;DR
+
+In a RES1 run with yearly steps the memory at the START of a year grew by about 8 GB per solved year (183 GB in 2014,
+432 GB in 2042, a peak of 489 GB; the year's own work stayed at 55 GB), and the yearly checkpoint grew from 168 s to
+916 s. The cause: every solved year's shares stay in `Data` to the end of the run as dense (lm, cell, lu) float32
+arrays that are almost all zeros. Since commit 41e5cfa3 they are kept sparse (`luto/data.py`: `SparseYears`, a
+dict-like container holding scipy `coo_array`s and giving the dense array back on read, so no reader changed).
+
+### One solved RES1 year (measured on a real run; sparse size from the nonzero counts)
+
+| | Dense | Sparse (`coo_array`) | Nonzeros |
+|---|---|---|---|
+| ag-management shares (7 options) | 6.615 GB | 7 to 21 MB | 0.25 to 0.76 M |
+| ag shares | 0.945 GB | 113 to 118 MB | about 4.1 M |
+| ag → ag deltas | 0.91 to 0.95 GB | under 2 MB | 8 k to 54 k |
+| non-ag shares, the other deltas, the ag-management maps | 0.4 GB | 5 to 14 MB | |
+| **A solved year** | **8.86 GB** | **130 to 149 MB (60 to 68 times smaller)** | |
+
+Forty solved years: about 355 GB dense, about 6 GB sparse.
+
+### In a process (the base year and 7 solved years, dense dicts and then the same containers in `SparseYears`)
+
+| | Dense | Sparse |
+|---|---|---|
+| Resident memory | 145.9 GB | **84.6 GB (−61.2 GB: 8.7 GB a solved year)** |
+| The base-year reads of one solve step (ag shares 50 times: once per source) | 0 s | 54 s |
+| Writing the per-year containers to disk (lz4) | 1,543 s | **10 s** |
+| Storing one solved year sparse | | 16 to 20 s |
+
+The memory figures stand; the times were taken on a busy machine and are indicative. The trade: about a minute a year
+more to read the base year back, against a checkpoint that no longer grows (the dense arrays are zeros, but every byte
+went through the compressor at every save).
+
+### Checks and choices
+
+- RES5, one step 2010 → 2050, before and after: the stored solutions identical in every container; the files written
+  by `write_output.write_data` identical (107 files); the functions that read a solved year as the next base year
+  identical (source maps, lock-in lower bounds, the whole column table).
+- scipy's COO, not CSR: CSR cannot hold a 3-D array, and on the array reshaped to 2-D its row pointer costs 34 MB per
+  array, more than a whole ag-management array (3 MB as COO).
+- `lumaps` and `lmmaps` stay plain dicts: one int8 per cell, and a lumap is 9 times larger sparse.
+- Not done: the yearly checkpoint still rewrites the whole `Data` (about 3 min of inputs that never change); the
+  base year's dense arrays stay in `Data` as attributes.
+
+---
+
+## 20261123 — RES1 years that fail in barrier: two separate causes (redundant adoption rows; the GHG row when it first binds), and dropping small coefficients cures neither
+
+### TL;DR
+
+A RES1 run with cell grouping (2010 → 2050, yearly steps, GHG 'high', GBF2 'high', HIR on, one net GHG row) had years
+whose barrier ended in `Sub-optimal termination` or `Numerical trouble` and fell back to simplex (30 minutes in 2021,
+more than 25 hours in 2042). The cause was looked for by elimination on the exact model Gurobi was given
+(`docs/CLAUDE_SKILL/diagnose_infeasible_or_numerical.md`), one change per solve.
+
+1. **2042: six adoption rows at a 100 % limit** (HIR - Beef, HIR - Sheep, four Savanna Burning), together with the
+   conditioning of the grouped wide rows. At a 100 % limit an adoption row repeats the ag-mgt link rows (X_am ≤ X_ag):
+   it restricts nothing and has no interior. Without the six rows the year solves in 408 iterations.
+2. **2021: the net GHG row, in the first year it binds.** The limit falls from 73.9 to 47.5 Mt between 2020 and 2021
+   (the series changes from its historical reference to the 1.5 °C pathway) and the row's shadow price goes from 0 to
+   89.5 AUD / tCO2e. Without the row the year solves in 276 iterations; with it, 570 to 890 or not at all. The six
+   rows play no part in this year.
+3. **Dropping small coefficients cures neither**, at the cell level (`SOLVER_COEFF_MIN`) or the group level
+   (`CELL_GROUPING_DROP_REL`). The group drop at 1e-6 breaks the full model's GHG cap by 2 to 5 Mt. **Both drops were
+   retired on 2026-11-23** (commit 2d6de172); at RES1 that lowers profit by 0.03 to 0.5 %, so RES1 runs before and
+   after are not comparable.
+4. **Gurobi `ScaleFlag 3` (the run used 2) gets both failing years through**, the cheapest of six solver settings
+   tried. It makes the solve pass; the years stay slow (520 to 550 iterations). On a year that solves anyway it is
+   slower (2022, like for like: 669 against 456 iterations): a retry setting, not a default.
+5. **cuOpt's GPU barrier fails on the GHG (LULUCF) row** of the default RES1 model, at iteration 0, even in a year
+   where the row does not bind. Removing the row is the only change that lets it solve.
+6. **The GPU solves the binding year when the GHG row is a price in the objective**, not a row of the matrix: four
+   solves (about 720 s), then a Gurobi crossover push from that point (118 s) reaches the optimal vertex, GHG exactly
+   at its cap.
+
+Not the cause, each tested: the matrix or objective range, small coefficients, the node-balance rows, repeated or
+contradicting rows in 2021, the water and GBF2 targets.
+
+### 2042: the six redundant adoption rows
+
+The grouped model as the run built it (group drop 1e-6 and rescale on; 65 `ag_mgt_adoption` rows):
+
+| Change (one per solve, 24 threads) | Barrier |
+|---|---|
+| none | not converged after 1,000 iterations (the run itself: `Numerical trouble` at 460) |
+| zero objective / a violation variable on every wide row | solved in 215 / total violation 1.7e-8: the model is feasible |
+| without GHG, water or GBF2 | still failing |
+| without the 65 adoption rows | solved, 321 iterations |
+| **without the 6 rows at a 100 % limit** | **solved, 408 iterations** |
+| without the other 59 (the 6 kept) | `Numerical trouble` at 355 |
+| the same year built without the group drop and rescale (the 6 rows in it) | solved, 261 iterations |
+| the model as built, `ScaleFlag 3` | solved, 520 iterations |
+
+- An adoption row is Σ X_am − limit · Σ X_ag ≤ 0, counted in cells. At limit = 1 the two HIR rows equal, entry for
+  entry, Σ (cells of the blob) × (the blob's link row); 18,697 of those link rows are pinned at equality by the bounds
+  because HIR is not reversible.
+- The cause needs both the rows and the conditioning of the grouped rows; removing either cures it.
+- Fix at the source (not yet in `luto/`): do not build an adoption row whose limit is 100 % or more
+  (`row_builder.get_ag_mgt_adoption`). A row at a 0 % limit holds am entries only and is a real constraint: keep it.
+
+### 2021: the GHG row when it first binds
+
+| Year | Net GHG limit (Mt CO2e) | Shadow price (AUD / tCO2e) | Barrier in the original run (104 threads) |
+|---|---|---|---|
+| 2018 | 81.6 | 0 | 313 iterations |
+| 2019 | 69.6 | 0 | 314 |
+| 2020 | 73.9 | 0 | 337 |
+| **2021** | **47.5** | **89.5** | **699, sub-optimal**; simplex then took 30 minutes (6,186 s in all; neighbours about 1,700 s) |
+| 2022 | 32.0 | 162.7 | 293 |
+
+The model answers the 2021 limit with 33 Mt more LULUCF sequestration in one year (−71.7 → −105.1 Mt). The limit
+falls again in 2022, where the row binds harder (162.7 AUD / tCO2e), and that year solved easily in the original run:
+"the row binds" is not the whole reason.
+
+Elimination on the 2021 model (cell drop, the six rows not built, no group conditioning):
+
+| Change | Outcome | Iterations | Objective |
+|---|---|---|---|
+| none | sub-optimal | 809 | |
+| zero objective / violation variables | solved; total violation 4e-13: feasible | 30 / 47 | |
+| **without the GHG row** | **solved** | **276** | 29,636 |
+| without the 13 water rows | solved | 475 | 29,489 |
+| without the GBF2 row | solved | 584 | 29,666 |
+| without the 59 adoption rows / the source-cap rows | sub-optimal | 887 / 648 | |
+
+No row of this model is a multiple of another; 152,567 node-balance rows are pinned by the bounds, as many as in 2042
+(172,997), which solves once the six rows are gone.
+
+The same model, one solver parameter changed (the run's settings: ScaleFlag 2, BarHomogeneous 1, NumericFocus 0):
+
+| Changed parameter | Outcome | Iterations | Work units | Objective |
+|---|---|---|---|---|
+| none | sub-optimal | 809 | | |
+| **ScaleFlag 3** | **solved** | **278** | **1,102** | 29,508.85 |
+| NumericFocus 2 / 3 | solved (the same path) | 249 | 2,922 | 29,503.56 |
+| Aggregate 0 | solved | 535 | 3,282 | 29,509.40 |
+| Presolve 2 | sub-optimal | 751 | | |
+| BarHomogeneous 0 | `Numerical trouble` | 444 | | |
+
+The original run's simplex ended at 29,507.75: the three solves agree with it. Gurobi documents ScaleFlag 2 as
+geometric-mean scaling and does not say what 3 does. LUTO's own row rescale did not help this row; Gurobi scales
+columns as well as rows.
+
+2021 across configurations (24 threads unless marked; failures are borderline, the same model can fail on one machine
+and pass on another):
+
+| Configuration | 2021 |
+|---|---|
+| original run (cell drop, six rows, 104 threads) | sub-optimal at 699 |
+| cell drop, six rows kept | solved, 573 |
+| cell drop, six rows not built | sub-optimal at 809 |
+| no cell drop, six rows not built | solved, 661 |
+| no drop at any level + group rescale, six rows not built | sub-optimal at 626 |
+| the same, `ScaleFlag 3` | solved, 550 |
+
+### Dropping small coefficients: no gain in speed or stability; retired on 2026-11-23
+
+- **Group level** (`CELL_GROUPING_DROP_REL = 1e-6`): the grouped model solves, but the solution mapped back to the
+  cells breaks the full model. 2042 end to end with the run's settings and the six rows not built: barrier 275
+  iterations, GHG over its cap by 2.05 Mt and 22 demand rows off. A net row such as GHG (large positive and negative
+  entries that cancel) loses accuracy fast when its small entries go.
+- **Cell level** (`SOLVER_COEFF_MIN = 1e-4`): almost no cost in accuracy, and no steady effect: 2035 solves in 248
+  iterations with it and 303 without; 2021 fails with it and solves without it.
+- **No drop at all + the group rescale**, ten years in production (2011 to 2020): every year solved, 212 to 466
+  iterations (the original run: 162 to 482). The full model's worst row excess is 1e-4 to 2e-3 in scaled units (a few
+  tonnes): the solver's 1e-6 tolerance seen through the group rescale's factor.
+- **One test the other way, for the record**: on a RES1 grouped single step (2010 → 2050, 2026-11-20) the group drop
+  halved Gurobi's time (1,711 s → 815 s) with 4 demand rows of the full model off (508 t at most). A speed that comes
+  with broken targets is not usable; the drop is retired for accuracy, not because it never helps.
+
+**The cell-level floor in a coarse run** (RES5, default settings, no grouping, seven steps, floor 1e-4 against floor 0,
+the two runs at once on one machine):
+
+| Year | Floor 1e-4: barrier iterations / work units (barrier + crossover) | Floor 0 | Objective, relative difference |
+|---|---|---|---|
+| 2020 | 87 / 390 | 91 / 411 | 7.7e-9 |
+| 2025 | 156 / 598 | 128 / 601 | 2.2e-8 |
+| 2030 | 150 / 585 | 169 / 683 | 2.0e-7 |
+| 2035 | 122 / 568 | 135 / 512 | 1.1e-6 |
+| 2040 | 141 / 605 | 103 / 514 | 1.1e-8 |
+| 2045 | 124 / 533 | 89 / 438 | 1.3e-7 |
+| 2050 | 106 / 519 | 100 / 408 | 7.4e-6 |
+| **All** | **3,799 work units** | **3,568 (−6 %)** | |
+
+Nonzeros +0.9 % without the floor; matrix range [1e-4, 2e3] becomes [2e-9, 2e3]; the GHG rows agree to 3 t
+(agriculture) and 2,000 t of 113 Mt (LULUCF). No year is harder without the floor.
+
+**The retirement** (commit 2d6de172): `row_builder.contract` and `get_obj` drop nothing, `aggregate.condition_grouped`
+only rescales; `SOLVER_COEFF_MIN` and `CELL_GROUPING_DROP_REL` are gone.
+
+- Removing the code equals a threshold of 0: RES5, one step 2010 → 2050, the code before with both thresholds at 0
+  against the code after, without and with cell grouping: the stored solutions identical in every container (92
+  iterations and 456.78 work units both ways without grouping; 103 and 395.00 with it).
+- **At RES1 the floor changed the answer, not only the numerics.** The 2020 → 2025 default model with its two GHG
+  rows left out: 4,924.7 with the floor (cuOpt), 4,901.3 without it (Gurobi's barrier, 331 iterations; cuOpt on the
+  same model 4,902.2): **profit 0.48 % lower without the floor**. The two models were built separately and group
+  their cells slightly differently, so the figure is indicative. In Xinhao's yearly run the 2011 step was 0.03 %
+  lower without it. At RES5 the difference is a few parts in a million. Reading: a RES1 cell is 25 times smaller,
+  so many more of its real small costs and revenues fell under the 100 AUD floor on the objective. The model without
+  the floor is the more accurate one; **RES1 results before and after the retirement are not comparable.**
+- The GPU still solves without the floor: cuOpt on that model, optimal in 314 iterations and 280 s (with the floor
+  304 iterations, 238 s); 170,870 of its entries are under 1e-4, the smallest 6.9e-9.
+
+### The GPU (cuOpt 26.08 barrier, L40S) fails on the GHG row
+
+The default grouped RES1 model of section 20261119 (2020 → 2025, two GHG rows; "Search direction computation failed"
+at iteration 0):
+
+| Change | cuOpt |
+|---|---|
+| none; no cell drop; the six adoption rows removed; both | fails at iteration 0 |
+| **without the two GHG rows** | **optimal, 238 s** |
+| **without the LULUCF row only** | **optimal, about 350 s**, objective within 0.04 % of Gurobi's vertex |
+| without the AG GHG row only | past iteration 0, then diverges |
+| without GBF2 / the source-cap rows | fails at iteration 0 |
+| the LULUCF row kept and row-rescaled, divided by its largest entry, split exactly into 10 or 1,000 rows, its small entries dropped, or its rhs moved to where it cannot bind | fails at iteration 0 |
+| Ruiz equilibration of the whole model (rows and columns) | past iteration 0, no convergence in 2,400 s |
+
+- The LULUCF row holds 3.03 M entries (27 % of the columns), |a| from 1.2e-4 to 3.95e5, spread evenly over seven
+  decades. It does not bind in this year (activity −355,453 against a rhs of −1,339, scaled), yet its presence fails
+  the solve and keeps cuOpt's presolve from removing 730 k rows and 880 k columns.
+- Splitting it into short rows changes nothing: the row's length is not the mechanism.
+- No GPU simplex exists (cuOpt's dual simplex and Gurobi's simplex run on the CPU); the GPU first-order method
+  (Gurobi PDHG) did not converge on a LUTO model in 30 minutes (2026-11-04).
+
+### The GPU solves a year whose GHG row binds when the row is a price in the objective
+
+The 2021 model above (one net GHG row, binding) on cuOpt's GPU barrier. With the row in the matrix: no convergence in
+1,200 s (1,364 iterations, the dual residual diverging). With the row taken out and c.x − price · a.x maximised over
+every other row, every solve is optimal in about 180 s, and GHG falls as the price rises, so the price is found by a
+search on one number:
+
+| Price (AUD / tCO2e) | GHG − cap (scaled; the cap is 8,556) | Objective c.x |
+|---|---|---|
+| 0 | +750.7 | 29,632.77 |
+| 50.0 | +257.1 | 29,589.29 |
+| 79.9 | +10.65 | 29,507.02 |
+| 81.4 | −5.46 | 29,504.21 |
+
+- The last two solves mixed (34 % / 66 %) meet the cap exactly (−1.8e-12) and every other row within 1.9e-6: a convex
+  combination of two feasible points. Objective **29,505.16, 0.009 % under Gurobi's vertex (29,507.75)**.
+- Four solves, 736 s on one L40S, against 1,555 s for Gurobi with ScaleFlag 3 on 24 CPUs. The first price was a
+  guess of 50 AUD / tCO2e; the next ones the secant through the two solves nearest the cap.
+- The GPU solves certify their own answer: weak duality puts the optimum at 29,511.78 or less, the mix reaches
+  29,505.16 (a gap of 0.022 %, each solve's own primal-dual gap).
+- **From the mix to a vertex.** Cell grouping needs a vertex and the mix is an interior point (8.30 M of 10.59 M
+  columns strictly between their bounds). Handed to Gurobi as PStart / DStart (`LPWarmStart 2`; duals = the two
+  solves' duals mixed, the mixed price on the GHG row) on the whole model, GHG row included, the crossover push took
+  118 s and ended at the optimal vertex: 29,509.31 (Gurobi's own solves of this model: 29,508.85 and 29,509.40), GHG
+  at its cap, 1,475 columns between their bounds. GPU search + crossover: about 830 s for a year whose CPU barrier
+  fails with the run's settings.
+- A first search with a starting price eleven times too high and bisection steps used 8 solves and ended 0.06 % under:
+  the starting price and the search rule matter. Last year's shadow price is the natural start.
+- Limits: one row (two GHG rows would be a search on two numbers); one model tested; a test script
+  (`jinzhu_inspect_code/LUTO_cluster_cols/script/gpu_ghg_price.py`), nothing in `luto/`.
+
+### Open at the time of writing (2026-11-23)
+
+- The production run (no drop, group rescale, redundant adoption rows not built, `ScaleFlag 3` from 2021) solved 2021
+  in 550 iterations and 2022 in 631, and was stopped there by Jinzhu's decision: the route taken is a local pipeline
+  (the GPU price search above), not this configuration on Gadi. Whether it would have reached 2050 is not known.
+- **ScaleFlag 3 against 2, like for like** (2022 from the same state, that configuration, 24 threads, only ScaleFlag
+  differing): ScaleFlag 2 solved in 456 iterations (2,170 work units), ScaleFlag 3 in 669 (3,020): 39 % more work on
+  a year that solves anyway, the same full-model check (24 rows over 1e-5, worst 2.6e-4). ScaleFlag 3 is a retry
+  setting for a year whose barrier fails, not a default.
+- Tested and not supported: that the lock-in of the non-reversible options (non-ag land uses, HIR) makes 2021 hard and
+  the later years easy. The original settings with every option reversible in the solved year, 24 threads: 2021 still
+  sub-optimal (482 iterations; 573 solved / 699 sub-optimal with the lock-in), 2022 solved in 306 (293 with the
+  lock-in). What sets 2021 apart from 2022, where the GHG row binds harder, is still open.
+- Decided: both drops retired (above). Next in `luto/`: no adoption row at a limit of 100 % or more is built.
+
+Working files: `jinzhu_inspect_code/LUTO_cluster_cols/doc/progress.md` (every job, table and void result).
+
+---
+
 ## 20261120 — `OPTIMALITY_TOLERANCE` 1e-2 → 1e-6: the same barrier, a shorter crossover, the same answer
 
 ### TL;DR
