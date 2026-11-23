@@ -528,7 +528,13 @@ def get_GBF8_targets(inputs: RowInputs, support: ColSupport):
 
 
 def get_ag_mgt_adoption(inputs: RowInputs, cols: xr.Dataset):
-    """One row per (option, land use): Σ X_am - limit · Σ X_ag ≤ 0."""
+    """One row per (option, land use) whose limit is under 100 %: Σ X_am - limit · Σ X_ag ≤ 0.
+
+    At a limit of 100 % or more no row is built: it would say Σ X_am ≤ Σ X_ag, which the ag-mgt link rows already say
+    column by column (X_am ≤ X_ag, one row per am column; ``get_ag_mgt_link``). Such a row restricts nothing, and it
+    has no interior: six of them (HIR - Beef, HIR - Sheep, four Savanna Burning) stalled the barrier of a RES1 step
+    ("Numerical trouble"; docs/FINDINGS.md, 20261123). A row at a 0 % limit is a real constraint (it forbids the
+    option) and is built."""
     print("│   ├── Adding ag-management adoption-limit constraints...")
     am      = np.flatnonzero(cols['block'].values == 'am')
     ag      = np.flatnonzero(cols['block'].values == 'ag')
@@ -541,11 +547,15 @@ def get_ag_mgt_adoption(inputs: RowInputs, cols: xr.Dataset):
     names = []
     key_am = []
     key_lu = []
+    implied = []                                                          # the (option, land use) at a limit of 100 % or more: no row
     for option, lus in inputs.agman2lu.items():
         option_idx = inputs.am_options.index(option)                     # the option's fixed am_idx
         for lu_idx, j in enumerate(lus):
-            row = len(names)
             adoption_limit = float(inputs.ag_man_limits[option][j])
+            if adoption_limit >= 1.0:
+                implied.append(f"{option} / {j}")
+                continue
+            row = len(names)
             am_cols = am[(am_idx == option_idx) & (j_idx == lu_idx)]              # the slot's am columns, both lm, dry first
             ag_cols = ag[ag_j == j]                                               # the ag columns of j: both lm, dry first, cells ascending
             row_idx += [np.full(am_cols.size, row), np.full(ag_cols.size, row)]
@@ -555,6 +565,9 @@ def get_ag_mgt_adoption(inputs: RowInputs, cols: xr.Dataset):
             key_am.append(option_idx)
             key_lu.append(j)
     n_rows = len(names)
+    print(f"│   │   {n_rows} rows; no row at a limit of 100 % or more ({len(implied)}: {', '.join(implied) if implied else 'none'})")
+    if n_rows == 0:
+        return None, None
     row_matrix, _, _ = contract(sparse.csr_matrix((np.concatenate(vals), (np.concatenate(row_idx), np.concatenate(col_idx))), shape=(n_rows, cols.sizes['col'])))
     return make_part('ag_mgt_adoption', row_matrix, np.zeros(n_rows), '<', names, am_idx=key_am, j=key_lu)
 

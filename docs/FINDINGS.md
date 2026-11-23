@@ -64,7 +64,8 @@ more than 25 hours in 2042). The cause was looked for by elimination on the exac
 
 1. **2042: six adoption rows at a 100 % limit** (HIR - Beef, HIR - Sheep, four Savanna Burning), together with the
    conditioning of the grouped wide rows. At a 100 % limit an adoption row repeats the ag-mgt link rows (X_am ≤ X_ag):
-   it restricts nothing and has no interior. Without the six rows the year solves in 408 iterations.
+   it restricts nothing and has no interior. Without the six rows the year solves in 408 iterations. **Fixed on
+   2026-11-23: such a row is no longer built.**
 2. **2021: the net GHG row, in the first year it binds.** The limit falls from 73.9 to 47.5 Mt between 2020 and 2021
    (the series changes from its historical reference to the 1.5 °C pathway) and the row's shadow price goes from 0 to
    89.5 AUD / tCO2e. Without the row the year solves in 276 iterations; with it, 570 to 890 or not at all. The six
@@ -104,8 +105,58 @@ The grouped model as the run built it (group drop 1e-6 and rescale on; 65 `ag_mg
   entry, Σ (cells of the blob) × (the blob's link row); 18,697 of those link rows are pinned at equality by the bounds
   because HIR is not reversible.
 - The cause needs both the rows and the conditioning of the grouped rows; removing either cures it.
-- Fix at the source (not yet in `luto/`): do not build an adoption row whose limit is 100 % or more
-  (`row_builder.get_ag_mgt_adoption`). A row at a 0 % limit holds am entries only and is a real constraint: keep it.
+
+**The fix (2026-11-23, `row_builder.get_ag_mgt_adoption`): no adoption row is built at a limit of 100 % or more.**
+
+- Why it is exact: such a row says Σ X_am ≤ Σ X_ag over a land use. The ag-mgt link rows say X_am ≤ X_ag for every am
+  column on its own, and X_ag ≥ 0, so their sum already gives it. The row removes no point from the feasible set.
+- Why it matters although it restricts nothing: a row that only repeats other rows has no interior of its own (it is
+  tight exactly when the rows it repeats are), and barrier's linear system comes close to singular.
+- What is kept: a row at a limit under 100 % (a real cap), and a row at 0 % (am entries only: it forbids the option).
+- Which rows go today: Savanna Burning on its four land uses (unallocated, beef, sheep and dairy on natural land) and
+  HIR on beef and sheep natural land. The rule reads the year's own limits, so a row that reaches 100 % in a later
+  year goes then, and an observed cap under 100 % brings a row back.
+- The log names them at every step: `59 rows; no row at a limit of 100 % or more (6: Savanna Burning / 2, ...)`.
+
+Check at RES5 (one step 2010 → 2050, the code before and after):
+
+| | 65 rows (before) | 59 rows (after) |
+|---|---|---|
+| **No grouping**: barrier iterations / work units, barrier + crossover | 92 / 501.8 | 100 / 477.9 |
+| objective | −177,990.349202 | −177,990.349201 (6e-12 of it) |
+| GHG; production of the 26 commodities; area of every land use and option | | equal (GHG to 6e-7; production and areas exactly) |
+| **Cell grouping**: barrier iterations / work units, barrier + crossover | 103 / 423.3 | 102 / 419.9 |
+| grouped model | 6,071,573 columns | 6,067,713 columns (3,860 fewer) |
+| objective | −178,504.95 | −178,602.59 (5.5e-4 lower) |
+| rows of the full model over 1e-5 at the mapped-back solution | 11, worst 1.2e-4 (an adoption row) | 9, worst 2.1e-5 (a demand row) |
+
+- **Without grouping the answer is the same**: objective, GHG, production and every area. The two solutions sit on
+  different vertices (a few thousand arc entries differ, some by a whole cell), which an LP with ties allows; nothing
+  that is reported moves.
+- **The six rows hold at the new solution, far from binding**: Savanna Burning is adopted on 0 to 2 % of the land that
+  could take it, HIR on 14 to 15 %.
+- **With cell grouping the blobs change**, and with them the grouped optimum, by 0.055 % of the objective (114 kha of
+  465 Mha under another land use; Destocked natural land +85 kha). The six rows were wide rows, and a wide row's
+  coefficients are part of what makes two cells alike: with them gone, 3,860 grouped columns merge. The loss of the
+  grouping against the ungrouped optimum goes from 0.29 % to 0.34 % at RES5. This is the grouping's tolerance moving,
+  not the model: no row that restricts anything was removed. Not measured at RES1.
+
+**What the grouping's loss is, for reading the 0.055 % above.** Two cells share a decision when their key is the same.
+Half of the key is exact (the land uses the cell holds, its region, the GBF rows it has a coefficient in) and loses
+nothing. The other half is close, not equal: the cell's coefficients per hectare in the objective and in the wide
+rows, projected on 16 SVD directions and binned at one tolerance. Cells in one bin are treated as the same, and that
+is where information goes: the grouped solution is feasible for the full model (checked every year in
+`grouping_<year>.csv`), and it gives up some optimality. How much, measured so far:
+
+| Model | Loss of the grouped optimum against the ungrouped one |
+|---|---|
+| RES1, one 5-year step (2045 → 2050, older code, no GBF) | 0.015 % |
+| RES1, one 40-year step (2010 → 2050; section 20261119) | at least 0.56 % |
+| RES5, one 40-year step (2010 → 2050; this check) | 0.29 % with the six rows, 0.34 % without |
+
+So the loss is not one number: it grows with how much land a step moves (a 40-year step far more than a 5-year one),
+and anything that changes the wide rows moves the bins and the loss with them, as removing six rows did here. A change
+of a few hundredths of a percent between two grouped runs is inside what the grouping itself gives up.
 
 ### 2021: the GHG row when it first binds
 
@@ -276,7 +327,7 @@ search on one number:
   the later years easy. The original settings with every option reversible in the solved year, 24 threads: 2021 still
   sub-optimal (482 iterations; 573 solved / 699 sub-optimal with the lock-in), 2022 solved in 306 (293 with the
   lock-in). What sets 2021 apart from 2022, where the GHG row binds harder, is still open.
-- Decided: both drops retired (above). Next in `luto/`: no adoption row at a limit of 100 % or more is built.
+- Decided and done: both drops retired, and no adoption row at a limit of 100 % or more is built (both above).
 
 Working files: `jinzhu_inspect_code/LUTO_cluster_cols/doc/progress.md` (every job, table and void result).
 

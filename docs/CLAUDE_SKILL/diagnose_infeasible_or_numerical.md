@@ -206,7 +206,7 @@ for more than 15 hours.
 | 6 | The same year with no conditioning of the grouped rows holds the same 6 rows and solves in 261 iterations. Giving the adoption rows back their unconditioned scale, the 6 kept: still not converging after 762 |
 
 Cause: six redundant rows together with the conditioning of the grouped wide rows. Removing either one cures it. The
-fix at the source is not to build an adoption row whose limit is 100 % or more.
+fix at the source is not to build an adoption row whose limit is 100 % or more (done 2026-11-23, `row_builder.get_ag_mgt_adoption`).
 
 What it was not: small coefficients, the matrix or objective range, the GHG, water or GBF2 targets, the node-balance
 rows.
