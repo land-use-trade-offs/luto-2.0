@@ -338,8 +338,11 @@ THREADS = 32
 FEASIBILITY_TOLERANCE = 1e-6
 ''' Primal feasibility tolerance - Default: 1e-6, Min: 1e-9, Max: 1e-2'''
 
-OPTIMALITY_TOLERANCE = 1e-2               
-''' Dual feasility tolerance - Default: 1e-6, Min: 1e-9, Max: 1e-2'''
+OPTIMALITY_TOLERANCE = 1e-6
+''' Dual feasibility tolerance - Gurobi default: 1e-6, Min: 1e-9, Max: 1e-2.
+How much improvement a solve may leave on the table: the objective is million AUD and a column a share (0-1), so
+1e-2 let Gurobi stop with a column still worth up to $10,000. 1e-2 until 2026-11-20; 1e-6 since: on the cached RES1
+grouped 2010 -> 2050 step, barrier unchanged (212 iterations), crossover 89 s -> 30 s, objective unchanged.'''
 
 BARRIER_CONVERGENCE_TOLERANCE = 1e-5
 '''

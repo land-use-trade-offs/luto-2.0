@@ -5,6 +5,67 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20261120 — `OPTIMALITY_TOLERANCE` 1e-2 → 1e-6: the same barrier, a shorter crossover, the same answer
+
+### TL;DR
+
+`settings.OPTIMALITY_TOLERANCE` (Gurobi `OptimalityTol`) was 1e-2 until 2026-11-20 and is 1e-6 (Gurobi's own default)
+in the working tree since. Tested on two models, one change per solve. **The barrier does not read it** (identical
+iterations and work units; barrier stops on `BarConvTol`); it is the tolerance crossover and the clean-up simplex work
+to. At 1e-6 the crossover is shorter, the clean-up simplex after it all but disappears, and the objective moves by
+1e-6 of itself, in the better direction. Nothing got slower in work units, and the full model's rows stay within
+tolerance.
+
+Why 1e-2 was loose: the objective is in million AUD and a column is a share (0 to 1), so a reduced cost of 1e-2 let
+Gurobi stop with a column still worth up to 10,000 AUD per unit of share.
+
+### RES1 with cell grouping, one step 2010 → 2050 (the cached grouped model, 32 threads, Gadi)
+
+| | OptimalityTol 1e-2 | OptimalityTol 1e-6 |
+|---|---|---|
+| Barrier iterations / work units | 212 / 1,378.14 | 212 / 1,378.14 |
+| Infeasibility left after the crossover push (primal / dual) | 1.11 / 3,171 | 0.023 / 32.3 |
+| Crossover | 88.95 s (342.45 work units) | **30.39 s (61.35 work units)** |
+| Clean-up simplex iterations after uncrush | 453 | 5 |
+| Simplex iterations in all | 3,903,447 | 3,566,792 |
+| Work units in all | 1,738.05 | **1,456.96 (−16 %)** |
+| Objective (maximised) | −167,714.5885 | −167,714.3589 (+0.23, 1.4e-6 of it) |
+| Rows of the full model over tolerance at the mapped solution | 0 | 0 |
+
+Wall time was 1,666 s against 1,729 s: the barrier phase took 122 s longer in the second job on the SAME work
+(identical iterations and work units), which is the machine, not the setting. Compare work units.
+
+The same pair with every demand equality widened to a ±0.1 % band (a separate question; 25 demand rows of the full
+model then sit outside tolerance): barrier 175 iterations and 1,077.67 work units both ways; crossover 37.81 s →
+32.93 s (139.69 → 102.79 work units); clean-up simplex 475 → 0; objective −167,293.9074 → −167,293.8567.
+
+### RES5 without grouping, one step 2010 → 2020 (16 threads, Gadi, code 6716a000)
+
+| | OptimalityTol 1e-2 | OptimalityTol 1e-6 |
+|---|---|---|
+| Barrier iterations / work units | 93 / 375.26 | 93 / 375.26 |
+| Crossover | 18.56 s (54.23 work units) | 14.56 s (27.07 work units) |
+| Clean-up simplex iterations after uncrush | 3,342 | 0 |
+| Solve in all | 411.27 s, 441.66 work units | **376.79 s, 404.36 work units (−8 %)** |
+| Objective (maximised) | 5,685.173094 | 5,685.180705 (+0.0076, 1.3e-6 of it) |
+| GHG agriculture row, 2020 | 73,397,772 tCO2e | 73,397,588 tCO2e (−184 t) |
+
+### Reading
+
+- Three pairs, the same result each time: barrier untouched, crossover and clean-up cheaper, objective better by about
+  1e-6 of itself. A tighter tolerance makes the push end nearer the vertex, so the simplex that follows has little
+  left to do.
+- It does not help a year whose BARRIER fails (section 20261123): the barrier never reads this tolerance.
+- Status on 2026-11-23: changed in `luto/settings.py` in the working tree, not committed. Xinhao's RES1 paper-2 run
+  and every test made on it (section 20261123) ran with 1e-2, his copy's setting.
+
+Files (Gadi, `/g/data/jk53/jinzhu/LUTO/Custom_runs/`): `LUTO_cluster_cols/Run_cached_RES1/output/demand_band/`
+(`baseline`, `opttol_1e-6`, `band_1e-3`, `band_1e-3__opttol_1e-6`: `summary.csv`, `grouping_2050.csv` and the solver
+log of each) and `OptTol_RES5_test/` (`opttol_1e-2.log`, `opttol_1e-6.log`). Script:
+`jinzhu_inspect_code/LUTO_cluster_cols/script/test_cached_demand_band.py` (variant `opttol:<t>`).
+
+---
+
 ## 20261120 — a coarse run (RESFACTOR > 1) is not made to match RES1 by adjusting its inputs; the gaps are block accounting, not input values
 
 ### TL;DR
