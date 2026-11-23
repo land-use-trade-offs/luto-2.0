@@ -369,6 +369,10 @@ that 1 tripled solve time, 3 led to numerical problems.
    of cells) and the matrix range grows from 7 to 11-12 orders of magnitude. On the grouped RES1 model (2045 -> 2050):
    159 barrier iterations against 246, the solve 536 s against 837 s, the same objective. Not yet measured on a model
    without cell grouping. See docs/FINDINGS.md, 20261118.
+ - 20261123: 3 is a setting to retry a failed year with, not a default. It got three RES1 solves through that fail
+   with 2 (2021 twice, 2042), and took 39 % more work on a year that solves with 2 (2022: 669 against 456 barrier
+   iterations, the same answer). The "numerical problems" above were on an earlier formulation. See docs/FINDINGS.md,
+   20261123.
 '''
 
 RETRY_PARAMS = [

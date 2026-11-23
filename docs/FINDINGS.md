@@ -262,6 +262,36 @@ and pass on another):
 | no drop at any level + group rescale, six rows not built | sub-optimal at 626 |
 | the same, `ScaleFlag 3` | solved, 550 |
 
+### ScaleFlag 3: it gets a failing barrier through, and costs 39 % more work where the barrier does not fail
+
+`settings.SCALE_FLAG` is Gurobi's `ScaleFlag`, the scaling Gurobi applies to rows and columns on top of LUTO's own row
+rescale; 2 (geometric mean) since 2026-11-18. Every case below is the same model solved twice, only ScaleFlag differing
+(24 threads; the first three on the exported model or in a rerun of the year, the last from one saved state):
+
+| Model | ScaleFlag 2 | ScaleFlag 3 |
+|---|---|---|
+| 2021, the model that fails (cell drop, six rows not built, no group conditioning) | sub-optimal at 809 | **solved, 278 iterations, 1,102 work units** |
+| 2021, production configuration (no drop, group rescale, six rows not built) | sub-optimal at 626 | **solved, 550 iterations, 2,613 work units** |
+| 2042, the original model (six redundant rows in it, group drop + rescale) | `Numerical trouble` at 460 in the run; not converged after 1,000 iterations on the exported model | **solved, 520 iterations, 3,135 work units** |
+| **2022, production configuration, a year that solves either way** | **solved, 456 iterations, 2,170 work units** | solved, 669 iterations, 3,020 work units (+39 %) |
+
+The 2022 pair in full: objective 27,504.56 against 27,505.30; the same check of the full model at the mapped-back
+solution (24 rows over 1e-5, worst 2.6e-4, a demand row); GHG agriculture 73.858 against 73.859 Mt, LULUCF −112.242
+against −112.243 Mt. The two settings reach the same answer.
+
+- **Three failing solves out of three got through with ScaleFlag 3**, none of them quickly (the years around them take
+  about 300 iterations with ScaleFlag 2).
+- **On the one year measured that solves anyway it costs 39 % more work.** One pair is thin, but it is the only
+  like-for-like one: an earlier reading (631 against 293 iterations for 2022) compared two runs that also differed in
+  the cell drop and the group rescale, and said nothing.
+- So ScaleFlag 3 is a setting to RETRY a year with after its barrier fails, not a default. NumericFocus 2 does the
+  same job on the 2021 model at 2.7 times the work (table above).
+- Not implemented: ScaleFlag is set once on the Gurobi environment when `solvers/solver.py` is imported; the attempts
+  of `settings.RETRY_PARAMS` (NumericFocus, Method, Crossover, Presolve, BarHomogeneous) cannot change it.
+- What 3 does: Gurobi documents 2 as geometric-mean scaling and says of 1 and 3 only that they are "not as directly
+  connected to any specific model characteristics". The older note in `settings.py` ("3 led to numerical problems")
+  was made on an earlier formulation of the model and does not hold for these.
+
 ### Dropping small coefficients: no gain in speed or stability; retired on 2026-11-23
 
 - **Group level** (`CELL_GROUPING_DROP_REL = 1e-6`): the grouped model solves, but the solution mapped back to the
@@ -368,10 +398,7 @@ search on one number:
 - The production run (no drop, group rescale, redundant adoption rows not built, `ScaleFlag 3` from 2021) solved 2021
   in 550 iterations and 2022 in 631, and was stopped there by Jinzhu's decision: the route taken is a local pipeline
   (the GPU price search above), not this configuration on Gadi. Whether it would have reached 2050 is not known.
-- **ScaleFlag 3 against 2, like for like** (2022 from the same state, that configuration, 24 threads, only ScaleFlag
-  differing): ScaleFlag 2 solved in 456 iterations (2,170 work units), ScaleFlag 3 in 669 (3,020): 39 % more work on
-  a year that solves anyway, the same full-model check (24 rows over 1e-5, worst 2.6e-4). ScaleFlag 3 is a retry
-  setting for a year whose barrier fails, not a default.
+- ScaleFlag 3 as a retry setting is not built into the retry attempts yet (section above).
 - Tested and not supported: that the lock-in of the non-reversible options (non-ag land uses, HIR) makes 2021 hard and
   the later years easy. The original settings with every option reversible in the solved year, 24 threads: 2021 still
   sub-optimal (482 iterations; 573 solved / 699 sub-optimal with the lock-in), 2022 solved in 306 (293 with the
