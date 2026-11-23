@@ -376,9 +376,11 @@ def get_agricultural_management_adoption_limits(data: Data, yr_idx) -> Dict[str,
 
 def get_trans_lb_ag_man(data: Data, base_year) -> dict[str, dict]:
     """{am: (NLMS, NCELLS, N_AG_LUS) lower bound} for the next solve: the base-year adoption, clamped to its host ag dvar (the
-    am ≤ ag link is a row, so a reported am can exceed ag by FeasibilityTol) and floor-truncated to ROUND_DECIMALS."""
+    am ≤ ag link is a row, so a reported am can exceed ag by FeasibilityTol) and floor-truncated to ROUND_DECIMALS. In the
+    first step `base_year` is YR_CAL_BASE and the adoption is the base-year state (Data.AG_MAN_L_MRJ_DICT: the existing
+    HIR projects when settings.HIR_BASE_YEAR_PROJECTS is set, else 0)."""
 
-    if base_year == data.YR_CAL_BASE or base_year not in data.ag_man_dvars:
+    if base_year not in data.ag_man_dvars:
         return {
             am: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
             for am in settings.AG_MANAGEMENTS_TO_LAND_USES

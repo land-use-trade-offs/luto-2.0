@@ -763,8 +763,13 @@ def get_beef_hir_effect_g_mrj(data: Data, yr_idx, separate=False):
     regrowth = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
     destocking = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
 
-    # GHG abatement from Land Use Change
+    # GHG abatement from Land Use Change: gross HIR regrowth (settings.HIR_RATE_FILE), the same on every land use and land
+    # management; without the file, the natural-land stock over the regrowth window (habitat-score gap less ceiling gap)
+    hir_rate = getattr(data, 'HIR_REGROWTH_T_CO2E_HA_PER_YR', None)
     for j_idx, lu in enumerate(land_uses):
+        if hir_rate is not None:
+            regrowth[:, :, j_idx] -= hir_rate * data.REAL_AREA.values
+            continue
         regrowth[:, :, j_idx] -= (
             (
                 data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR.values
@@ -790,8 +795,13 @@ def get_sheep_hir_effect_g_mrj(data: Data, yr_idx, separate=False):
     regrowth = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
     destocking = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
 
-    # GHG abatement from Land Use Change
+    # GHG abatement from Land Use Change: gross HIR regrowth (settings.HIR_RATE_FILE), the same on every land use and land
+    # management; without the file, the natural-land stock over the regrowth window (habitat-score gap less ceiling gap)
+    hir_rate = getattr(data, 'HIR_REGROWTH_T_CO2E_HA_PER_YR', None)
     for j_idx, lu in enumerate(land_uses):
+        if hir_rate is not None:
+            regrowth[:, :, j_idx] -= hir_rate * data.REAL_AREA.values
+            continue
         regrowth[:, :, j_idx] -= (
             (
                 data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR.values
@@ -812,25 +822,26 @@ def get_sheep_hir_effect_g_mrj(data: Data, yr_idx, separate=False):
     parts = {'Regrowth carbon': regrowth, 'Destocking livestock emissions': destocking}
     return parts if separate else sum_parts(parts)
 
-def get_hir_baseline_t(data: Data, yr_idx) -> dict:
-    """The existing-HIR-project baseline on each GHG row (t CO2e, negative = reduction), for settings.HIR_BASELINE:
-    {'HIR_BASELINE_AG_t': destocking, 'HIR_BASELINE_LULUCF_t': regrowth}. LUTO's own HIR effect per cell (full
-    adoption) x the share of the cell under existing projects on the option's own (lm, land use) cells (held flat
-    after the baseline FY). At RESFACTOR > 1 that is the project area on the block's allocated cells of the option's
-    land use, not the block's project share x its share in the land use, which assumed projects spread evenly over the
-    block's land uses. LUTO's HIR counts on each row only above it, as its plantings do."""
-    out = {'HIR_BASELINE_AG_t': 0.0, 'HIR_BASELINE_LULUCF_t': 0.0}
-    if getattr(data, "HIR_BASELINE_HA", None) is None:          # off, or a Data pickled before the setting existed
+def get_hir_base_year_t(data: Data, yr_idx) -> dict:
+    """The constants of the base-year HIR adoption on each row (t CO2e, negative = reduction), for
+    settings.HIR_BASE_YEAR_PROJECTS: {'HIR_BASE_YEAR_AG_t': 0, 'HIR_BASE_YEAR_LULUCF_t': regrowth}.
+    LULUCF: LUTO's own HIR regrowth per cell in `yr_idx` x the cell's base-year adoption of the option
+    (Data.AG_MAN_L_MRJ_DICT). The row moves it to its right-hand side, so HIR regrowth counts only above each cell's
+    base-year adoption: the existing projects' removals are in the national inventory, and so in the exogenous series.
+    AG: 0. The existing projects' destocking is part of the base state: NIR's livestock figures already reflect it and the
+    stocking calibration k is calibrated with it in place, so it counts on the AG row like any other modelled emission.
+    0 when no HIR is adopted in the base year."""
+    out = {'HIR_BASE_YEAR_AG_t': 0.0, 'HIR_BASE_YEAR_LULUCF_t': 0.0}
+    if getattr(data, "HIR_BASE_YEAR_ADOPTION", None) is None:     # off, or a Data pickled before the setting existed
         return out
-    hb = data.HIR_BASELINE_HA
-    fy = min(data.YR_CAL_BASE + yr_idx, hb['baseline_fy'])
-    if fy < hb['first_fy']:
-        return out
+    base_am = data.ag_man_dvars[data.YR_CAL_BASE]
     for am, fn in (('HIR - Beef', get_beef_hir_effect_g_mrj), ('HIR - Sheep', get_sheep_hir_effect_g_mrj)):
+        if not settings.AG_MANAGEMENTS[am]:
+            continue
         j = data.DESC2AGLU[settings.AG_MANAGEMENTS_TO_LAND_USES[am][0]]
-        share = np.stack([np.minimum(hb['ha_mj'][fy][m, j] / data.REAL_AREA.values, 1.0) for m in range(data.NLMS)])   # (lm, cell)
         for name, arr in fn(data, yr_idx, separate=True).items():
-            out[f'HIR_BASELINE_{AG_MAN_GHG_SUBTERMS[am][name]}_t'] += float((arr[:, :, 0] * share).sum())
+            if AG_MAN_GHG_SUBTERMS[am][name] == 'LULUCF':             # AG (destocking) stays 0: part of the base state
+                out['HIR_BASE_YEAR_LULUCF_t'] += float((arr[:, :, 0] * base_am[am][:, :, j]).sum())
     return out
 
 
