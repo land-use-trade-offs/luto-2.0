@@ -6,10 +6,14 @@ else in `input/Nick_build/` (the built data, download caches) is ignored by git 
 ```
 input/Nick_build/
   scripts/            tracked: the build code, and any hand-made table or config it reads
-  ghg_targets/        ignored: built by scripts/ghg_targets.py
-  ag_mgt_caps/        ignored: built by scripts/ag_mgt_caps.py
-  ag_mgt_caps_cache/  ignored: downloads
+  <dataset>/          ignored, except its README.md: built by scripts/<dataset>.py (folder = script stem)
+  ag_mgt_caps_2021/   ignored, except its README.md: scripts/ag_mgt_caps.py on the 2020-21 map
+  inherited_2010/     ignored, except its README.md: frozen old-format 2010-build files the 2021-base scripts read
+  _cache/             ignored, except its README.md: shared content-addressed download cache of the 2021-base scripts
+  ag_mgt_caps_cache/  ignored: downloads of ag_mgt_caps.py
 ```
+
+Each dataset folder's `README.md` gives the raw data's source and link, the release, the script and the output files.
 
 ## Rules
 
