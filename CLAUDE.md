@@ -228,6 +228,7 @@ Every constraint is hard by default: there are no soft / penalised options (the 
 
 - `SOLVE_METHOD`: GUROBI algorithm (default: 2 for barrier method)
 - `THREADS`: Parallel threads for optimization (default: min(32, cpu_count))
+- `LOADING_THREADS`: Threads for the `get_*` calls of a solve step (`solvers/row_inputs.py`: `get_row_inputs`, `get_economics`, each in two waves — wave 1 reads `Data` only, wave 2 a wave-1 result; joblib, `prefer='threads'`; default 4). RES1: 265 → 163 s a step, every result identical; processes (loky) were slower (they need `Data` in every worker: 132 GB in `/dev/shm` at RES1)
 - `FEASIBILITY_TOLERANCE`: Primal feasibility tolerance (1e-6). Also the precision granule: `ROUND_DECIMALS` is derived from it, and the near-zero bound snap threshold is `FEASIBILITY_TOLERANCE * 10`
 - `OPTIMALITY_TOLERANCE`: Optimality tolerance (default: 1e-2)
 - `BARRIER_CONVERGENCE_TOLERANCE`: Barrier method convergence (default: 1e-5)

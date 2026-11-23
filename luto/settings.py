@@ -331,6 +331,15 @@ VERBOSE = 1
 # Number of threads to use in parallel algorithms (e.g., barrier). PBS_NCPUS is the requested CPUs on GADI hpc.
 THREADS = 32
 
+# Threads for the get_* calls of a solve step (solvers/row_inputs.py: get_row_inputs, get_economics), in two waves.
+LOADING_THREADS = 4
+'''
+The calls read the one large Data and return large arrays (GBs at RES1), so threads, not processes: threads share
+them, processes would have to pickle them. Measured 2026-11-19 (RES1, one step): 222 s one after another, 124 s with 4
+threads, 128 s with 8, every result identical; nothing gained past 4 (part of each call holds the GIL, and the array
+work competes for memory bandwidth). 1 = one after another.
+'''
+
 # Primal feasibility tolerance — defines the solver precision granule.
 # ROUND_DECIMALS is derived from this: floor-truncation keeps digits down to
 # this precision, so lb values are exact multiples of FEASIBILITY_TOLERANCE.

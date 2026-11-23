@@ -20,6 +20,7 @@
 
 import numpy as np
 import xarray as xr
+from joblib import Parallel, delayed
 
 from dataclasses import dataclass
 from typing import Any
@@ -130,6 +131,14 @@ def get_ghg_side(parts: dict, subterms: dict, side: str) -> np.ndarray:
 
 # ═══════════════════════════ the year's targets ═══════════════════════════
 
+def run_in_threads(calls: dict) -> dict:
+    """Run every call of ``calls`` ({what: function of no argument}) in settings.LOADING_THREADS threads; {what: result}.
+    A call that raises raises here. The calls of one wave must not read each other's results."""
+    print(f"Getting {', '.join(calls)} ({settings.LOADING_THREADS} threads)...", flush=True)
+    results = Parallel(n_jobs=settings.LOADING_THREADS, prefer='threads')(delayed(call)() for call in calls.values())
+    return dict(zip(calls, results))
+
+
 def get_limits(data: Data, yr_cal: int) -> dict[str, Any]:
     """The raw (unscaled) constraint targets of one calendar year — which keys are present depends on the
     active settings. The solver rescales each row together with its target (``row_builder.contract``)."""
@@ -216,6 +225,37 @@ def get_row_inputs(data: Data, base_year: int, target_year: int) -> RowInputs:
     downstream of the economics modules and ``Data``; the column space is never seen here."""
 
     target_index = target_year - data.YR_CAL_BASE
+    hist_water_yield = () if settings.WATER_CLIMATE_CHANGE_IMPACT == 'on' else (data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)
+
+    # ── the get_* calls, in two waves of threads (settings.LOADING_THREADS): wave 1 reads Data only, wave 2 reads a
+    #    wave-1 result (as before, a wave-1 array is cast to float32 before wave 2 reads it) ──
+    first = run_in_threads({
+        'transition GHG':          lambda: ag_ghg.get_ghg_transition_emissions_from_base_year(data, base_year),
+        'ag GHG':                  lambda: ag_ghg.get_ghg_matrices(data, target_index).astype(np.float32),
+        'ag water net yield':      lambda: ag_water.get_water_net_yield_matrices(data, target_index, *hist_water_yield).astype(np.float32),
+        'ag quantity':             lambda: ag_quantity.get_quantity_matrices(data, target_index).astype(np.float32),
+        'ag-mgt GHG':              lambda: ag_ghg.get_agricultural_management_ghg_matrices(data, target_index, separate=True),
+        'ag-mgt water':            lambda: ag_water.get_agricultural_management_water_matrices(data, target_index),
+        'ag-mgt adoption limits':  lambda: ag_transition.get_agricultural_management_adoption_limits(data, target_index),
+        'solar yield':             lambda: ag_quantity.get_quantity_renewable(data, 'Utility Solar PV', target_index).astype(np.float32),
+        'wind yield':              lambda: ag_quantity.get_quantity_renewable(data, 'Onshore Wind', target_index).astype(np.float32),
+        'existing solar':          lambda: ag_quantity.get_existing_renewable_dvar_fraction(data, 'Utility Solar PV', 99999),
+        'existing wind':           lambda: ag_quantity.get_existing_renewable_dvar_fraction(data, 'Onshore Wind', 99999),
+        'biodiversity ag':         lambda: ag_biodiversity.get_ag_biodiversity_contribution(data),
+        'biodiversity non-ag':     lambda: non_ag_biodiversity.get_non_ag_lu_biodiv_contribution(data),
+        'biodiversity ag-mgt':     lambda: ag_biodiversity.get_ag_management_biodiversity_contribution(data, target_year),
+        'GBF2 mask area':          lambda: ag_biodiversity.get_GBF2_MASK_area(data),           # each GBF getter owns the setting that turns
+        'GBF3 NVIS':               lambda: ag_biodiversity.get_GBF3_NVIS_matrices_vr(data),    # its family off, and returns an empty layer when it is
+        'GBF4 SNES':               lambda: ag_biodiversity.get_GBF4_SNES_matrix_sr(data),
+        'GBF4 ECNES':              lambda: ag_biodiversity.get_GBF4_ECNES_matrix_sr(data),
+        'GBF8':                    lambda: ag_biodiversity.get_GBF8_matrix_sr(data, target_year),
+    })
+    second = run_in_threads({
+        'non-ag GHG':              lambda: non_ag_ghg.get_ghg_matrix(data, first['ag GHG'], separate=True),
+        'non-ag water':            lambda: non_ag_water.get_w_net_yield_matrix(data, first['ag water net yield'], target_index, *hist_water_yield).astype(np.float32),
+        'non-ag quantity':         lambda: non_ag_quantity.get_quantity_matrix(data, first['ag quantity']).astype(np.float32),
+        'ag-mgt quantity':         lambda: ag_quantity.get_agricultural_management_quantity_matrices(data, first['ag quantity'], target_index),
+    })
 
     # ── 1. transition GHG emissions, SOURCE-KEYED over each source's base-year cells: the physical
     #       parallel of the per-arc transition cost, so the emissions of a move are charged against
@@ -224,97 +264,49 @@ def get_row_inputs(data: Data, base_year: int, target_year: int) -> RowInputs:
     #       over the step's years, so each solve year carries one year of it. step_years equals
     #       tools.write_output.get_year_gap(data, target_year) once the year is stored.
     step_years = target_year - base_year
-    trans_ghg_ag2ag = {
-        src: (arr / step_years).astype(np.float32)
-        for src, arr in ag_ghg.get_ghg_transition_emissions_from_base_year(data, base_year).items()
-    }
+    trans_ghg_ag2ag = {src: (arr / step_years).astype(np.float32) for src, arr in first['transition GHG'].items()}
 
     # ── 2. the physical streams the policy rows weight: GHG, water net yield, production quantity ──
-    hist_water_yield = () if settings.WATER_CLIMATE_CHANGE_IMPACT == 'on' else (data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)
-
-    print('Getting agricultural GHG emissions matrices...', flush=True)
-    ag_g_mrj = ag_ghg.get_ghg_matrices(data, target_index).astype(np.float32)
-
-    print('Getting agricultural water net yield matrices based on historical water yield layers ...', flush=True)
-    ag_w_mrj = ag_water.get_water_net_yield_matrices(data, target_index, *hist_water_yield).astype(np.float32)
-
-    print('Getting agricultural production quantity matrices...', flush=True)
-    ag_q_mrp = ag_quantity.get_quantity_matrices(data, target_index).astype(np.float32)
-
-    print('Getting non-agricultural GHG emissions matrices...', flush=True)
-    non_ag_g_parts = non_ag_ghg.get_ghg_matrix(data, ag_g_mrj, separate=True)
+    ag_g_mrj = first['ag GHG']
+    ag_w_mrj = first['ag water net yield']
+    ag_q_mrp = first['ag quantity']
+    non_ag_g_parts = second['non-ag GHG']
     non_ag_g_rk_ag, non_ag_g_rk_lulucf = (
         np.stack([ag_ghg.side_of_parts(non_ag_g_parts[lu], non_ag_ghg.NON_AG_GHG_SUBTERMS[lu], side)
                   for lu in data.NON_AGRICULTURAL_LANDUSES], axis=1).astype(np.float32)
         for side in ('AG', 'LULUCF')
     )
-
-    print('Getting non-agricultural water yield matrices...', flush=True)
-    non_ag_w_rk = non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj, target_index, *hist_water_yield).astype(np.float32)
-
-    print('Getting non-agricultural production quantity matrices...', flush=True)
-    non_ag_q_crk = non_ag_quantity.get_quantity_matrix(data, ag_q_mrp).astype(np.float32)
-
-    print("Getting agricultural management options' GHG emission effects...", flush=True)
+    non_ag_w_rk = second['non-ag water']
+    non_ag_q_crk = second['non-ag quantity']
     ag_man_g_mrj_ag, ag_man_g_mrj_lulucf = (
-        {am: get_ghg_side(parts, ag_ghg.AG_MAN_GHG_SUBTERMS[am], side)
-         for am, parts in ag_ghg.get_agricultural_management_ghg_matrices(data, target_index, separate=True).items()}
+        {am: get_ghg_side(parts, ag_ghg.AG_MAN_GHG_SUBTERMS[am], side) for am, parts in first['ag-mgt GHG'].items()}
         for side in ('AG', 'LULUCF')
     )
-
-    print("Getting agricultural management options' water yield effects...", flush=True)
-    ag_man_w_mrj = {am: arr.astype(np.float32) for am, arr in ag_water.get_agricultural_management_water_matrices(data, target_index).items()}
-
-    print("Getting agricultural management options' quantity effects...", flush=True)
-    ag_man_q_mrp = {am: arr.astype(np.float32) for am, arr in ag_quantity.get_agricultural_management_quantity_matrices(data, ag_q_mrp, target_index).items()}
-
-    print("Getting agricultural management options' adoption limits...", flush=True)
-    ag_man_limits = ag_transition.get_agricultural_management_adoption_limits(data, target_index)
+    ag_man_w_mrj = {am: arr.astype(np.float32) for am, arr in first['ag-mgt water'].items()}
+    ag_man_q_mrp = {am: arr.astype(np.float32) for am, arr in second['ag-mgt quantity'].items()}
+    ag_man_limits = first['ag-mgt adoption limits']
 
     # ── 3. renewable energy: the yields the state targets are met with, and the capacity already in the ground ──
-    print('Getting renewable energy - solar yield matrix...', flush=True)
-    renewable_solar_r = ag_quantity.get_quantity_renewable(data, 'Utility Solar PV', target_index).astype(np.float32)
-
-    print('Getting renewable energy - wind yield matrix...', flush=True)
-    renewable_wind_r = ag_quantity.get_quantity_renewable(data, 'Onshore Wind', target_index).astype(np.float32)
-
-    # Existing real-world capacity and LUTO-simulated capacity compete for the same cell space [0, 1].
-    # The maximum existing fraction (cumulative over ALL data years, hence yr_cal=99999) is locked in
-    # advance, so the ceiling never decreases between periods and simulated + existing never exceeds 1.
-    print('Getting existing solar capacity fraction (all years, solver ceiling)...', flush=True)
-    exist_renewable_solar_r = ag_quantity.get_existing_renewable_dvar_fraction(data, 'Utility Solar PV', 99999)
-
-    print('Getting existing wind capacity fraction (all years, solver ceiling)...', flush=True)
-    exist_renewable_wind_r = ag_quantity.get_existing_renewable_dvar_fraction(data, 'Onshore Wind', 99999)
+    #       Existing real-world capacity and LUTO-simulated capacity compete for the same cell space [0, 1]. The
+    #       maximum existing fraction (cumulative over ALL data years, hence yr_cal=99999) is locked in advance, so the
+    #       ceiling never decreases between periods and simulated + existing never exceeds 1.
+    renewable_solar_r = first['solar yield']
+    renewable_wind_r = first['wind yield']
+    exist_renewable_solar_r = first['existing solar']
+    exist_renewable_wind_r = first['existing wind']
 
     # ── 4. regions: the names the water rows are written for (the state and NRM codes are the region pair on the column support) ──
     water_region_names = data.WATER_REGION_NAMES if settings.WATER_LIMITS != 'off' else {}
 
     # ── 5. biodiversity: the contribution scales every GBF family shares, then each family's layer and selection ──
-    print('Getting biodiversity degredation data for agricultural land uses...', flush=True)
-    biodiv_contr_ag_j = ag_biodiversity.get_ag_biodiversity_contribution(data)
-
-    print('Getting biodiversity benefits data for non-agricultural land uses...', flush=True)
-    biodiv_contr_non_ag_k = non_ag_biodiversity.get_non_ag_lu_biodiv_contribution(data)
-
-    print('Getting biodiversity benefits data for agricultural management options...', flush=True)
-    biodiv_contr_ag_man = ag_biodiversity.get_ag_management_biodiversity_contribution(data, target_year)
-
-    # each getter owns the setting that turns its family off, and returns an empty layer when it is
-    print('Getting GBF2 mask area layer...', flush=True)
-    GBF2_mask_area_r = ag_biodiversity.get_GBF2_MASK_area(data)
-
-    print('Getting GBF3 NVIS vegetation matrices...', flush=True)
-    GBF3_NVIS_pre_1750_area_vr = ag_biodiversity.get_GBF3_NVIS_matrices_vr(data)
-
-    print('Getting GBF4 SNES species area matrices...', flush=True)
-    GBF4_SNES_pre_1750_area_sr = ag_biodiversity.get_GBF4_SNES_matrix_sr(data)
-
-    print('Getting GBF4 ECNES community area matrices...', flush=True)
-    GBF4_ECNES_pre_1750_area_sr = ag_biodiversity.get_GBF4_ECNES_matrix_sr(data)
-
-    print('Getting GBF8 species conservation area matrices...', flush=True)
-    GBF8_pre_1750_area_sr = ag_biodiversity.get_GBF8_matrix_sr(data, target_year)
+    biodiv_contr_ag_j = first['biodiversity ag']
+    biodiv_contr_non_ag_k = first['biodiversity non-ag']
+    biodiv_contr_ag_man = first['biodiversity ag-mgt']
+    GBF2_mask_area_r = first['GBF2 mask area']
+    GBF3_NVIS_pre_1750_area_vr = first['GBF3 NVIS']
+    GBF4_SNES_pre_1750_area_sr = first['GBF4 SNES']
+    GBF4_ECNES_pre_1750_area_sr = first['GBF4 ECNES']
+    GBF8_pre_1750_area_sr = first['GBF8']
 
     # the (region, item) each family constrains — a Data attribute that only exists while the family is on
     GBF3_NVIS_region_group    = data.BIO_GBF3_NVIS_SEL  if settings.GBF3_NVIS_TARGET  != 'off' else {}
@@ -466,32 +458,31 @@ def get_economics(data: Data, base_year: int, target_year: int) -> EconomicInput
 
     target_index = target_year - data.YR_CAL_BASE
 
-    print('Getting agricultural cost matrices...', flush=True)
-    ag_c_mrj = ag_cost.get_cost_matrices(data, target_index).astype(np.float32)
-
-    print('Getting agricultural revenue matrices...', flush=True)
-    ag_r_mrj = ag_revenue.get_rev_matrices(data, target_index).astype(np.float32)
-
-    print('Getting non-agricultural cost matrices...', flush=True)
-    non_ag_c_rk = non_ag_cost.get_cost_matrix(data, ag_c_mrj, target_year).astype(np.float32)
-
-    print('Getting non-agricultural revenue matrices...', flush=True)
-    non_ag_r_rk = non_ag_revenue.get_rev_matrix(data, target_year, ag_r_mrj).astype(np.float32)
-
-    # nonag→nonag transition cost. Currently a ZERO matrix — non-ag LUs are not allowed to transition
-    # to other non-ag LUs (get_nonag2nonag_transition_matrix returns zeros). Kept as an explicit hook
-    # so the objective wiring is ready if non-ag↔non-ag transitions are ever priced.
-    print('Getting non-agricultural transition cost matrices...', flush=True)
-    non_ag_t_rk = non_ag_transition.get_nonag2nonag_transition_matrix(data)
-
-    print("Getting agricultural management options' cost effects...", flush=True)
-    ag_man_c_mrj = ag_cost.get_agricultural_management_cost_matrices(data, ag_c_mrj, target_year)
-
-    print("Getting agricultural management options' revenue effects...", flush=True)
-    ag_man_r_mrj = ag_revenue.get_agricultural_management_revenue_matrices(data, ag_r_mrj, target_index)
-
-    print("Getting agricultural management options' transition cost effects...", flush=True)
-    ag_man_t_mrj = ag_transition.get_agricultural_management_transition_matrices(data, target_index)
+    # ── the get_* calls, in two waves of threads (settings.LOADING_THREADS): wave 1 reads Data only, wave 2 reads a
+    #    wave-1 result (as before, a wave-1 array is cast to float32 before wave 2 reads it) ──
+    first = run_in_threads({
+        'ag cost':                 lambda: ag_cost.get_cost_matrices(data, target_index).astype(np.float32),
+        'ag revenue':              lambda: ag_revenue.get_rev_matrices(data, target_index).astype(np.float32),
+        # nonag→nonag transition cost. Currently a ZERO matrix — non-ag LUs are not allowed to transition to other
+        # non-ag LUs. Kept as an explicit hook so the objective wiring is ready if they are ever priced.
+        'non-ag transition cost':  lambda: non_ag_transition.get_nonag2nonag_transition_matrix(data),
+        'ag-mgt transition cost':  lambda: ag_transition.get_agricultural_management_transition_matrices(data, target_index),
+        'ag2ag transition cost':   lambda: {(from_m, from_j): ag_transition.get_transition_matrices_ag2ag(data, target_index, from_m, from_j, cell_idx).astype(np.float32)
+                                            for (from_m, from_j), cell_idx in ag_transition.get_base_dvar_mj_cell_map(data, base_year).items()},
+        'ag2nonag transition cost': lambda: non_ag_transition.get_transition_matrix_ag2nonag(data, base_year, target_year),
+        'nonag2ag transition cost': lambda: non_ag_transition.get_transition_matrix_nonag2ag(data, base_year, target_year),
+    })
+    second = run_in_threads({
+        'non-ag cost':             lambda: non_ag_cost.get_cost_matrix(data, first['ag cost'], target_year).astype(np.float32),
+        'non-ag revenue':          lambda: non_ag_revenue.get_rev_matrix(data, target_year, first['ag revenue']).astype(np.float32),
+        'ag-mgt cost':             lambda: ag_cost.get_agricultural_management_cost_matrices(data, first['ag cost'], target_year),
+        'ag-mgt revenue':          lambda: ag_revenue.get_agricultural_management_revenue_matrices(data, first['ag revenue'], target_index),
+    })
+    ag_c_mrj, ag_r_mrj = first['ag cost'], first['ag revenue']
+    non_ag_c_rk, non_ag_r_rk = second['non-ag cost'], second['non-ag revenue']
+    non_ag_t_rk = first['non-ag transition cost']
+    ag_man_c_mrj, ag_man_r_mrj = second['ag-mgt cost'], second['ag-mgt revenue']
+    ag_man_t_mrj = first['ag-mgt transition cost']
 
     # operating economics only — revenue - production cost; the land-use transition cost is charged per arc
     ag_obj_mrj, non_ag_obj_rk, ag_man_objs = get_economic_mrj(
@@ -506,16 +497,12 @@ def get_economics(data: Data, base_year: int, target_year: int) -> EconomicInput
     # ``local_r`` indexes the cell axis of its own source's array.
 
     # ag→ag: dict[(from_m, from_j)] → ndarray(NLMS, ncells_src, N_AG_LUS)
-    print('Getting agricultural transition cost matrices...', flush=True)
-    flow_cost_ag2ag = {
-        (from_m, from_j): ag_transition.get_transition_matrices_ag2ag(data, target_index, from_m, from_j, cell_idx).astype(np.float32)
-        for (from_m, from_j), cell_idx in ag_transition.get_base_dvar_mj_cell_map(data, base_year).items()
-    }
+    flow_cost_ag2ag = first['ag2ag transition cost']
 
     # ag→nonag: the dispatcher gives dict[lu_name → dict[(from_m, from_j) → ndarray(ncells_src)]]; laid out per source
     # as ONE (local_r, to_k) array — the layout of the source's ag2nonag arc mask — NaN where a land use has no cost
     cost_by_src = {}
-    for lu_name, per_src in non_ag_transition.get_transition_matrix_ag2nonag(data, base_year, target_year).items():
+    for lu_name, per_src in first['ag2nonag transition cost'].items():
         k = data.NON_AGRICULTURAL_LANDUSES.index(lu_name)
         for src, arr in per_src.items():
             cost_by_src.setdefault(src, {})[k] = arr.astype(np.float32)
@@ -529,7 +516,7 @@ def get_economics(data: Data, base_year: int, target_year: int) -> EconomicInput
     # nonag→ag: the dispatcher gives dict[lu_name → dict[k]]; take the diagonal (cells in non-ag
     # land use k pay only k's own nonag→ag cost).
     flow_cost_nonag2ag = {}
-    for lu_name, per_k in non_ag_transition.get_transition_matrix_nonag2ag(data, base_year, target_year).items():
+    for lu_name, per_k in first['nonag2ag transition cost'].items():
         k = data.NON_AGRICULTURAL_LANDUSES.index(lu_name)
         if k in per_k:
             flow_cost_nonag2ag[k] = per_k[k].astype(np.float32)
