@@ -79,6 +79,10 @@ class RowInputs:
 
     ag_man_g_mrj_ag: dict                                               # {am: GHG emission effect [m, r, j_idx]} on the ag row (a zero view where the option has none)
     ag_man_g_mrj_lulucf: dict                                           # {am: GHG emission effect [m, r, j_idx]} on the LULUCF row (a zero view where the option has none)
+    # The sub-terms the two GHG streams above are summed from, kept for simulation.get_ghg_split (the year's GHG report
+    # by sub-term) so that it reads them here instead of computing them again after the solve (~30 s a year at RES1)
+    ag_man_g_parts: dict                                                # {am: {sub-term: [m, r, j_idx]}} (ag_ghg.get_agricultural_management_ghg_matrices, separate=True)
+    non_ag_g_parts: dict                                                # {non-ag land use: {sub-term: [r]}} (non_ag_ghg.get_ghg_matrix, separate=True)
     ag_man_w_mrj: dict                                                  # {am: water net-yield effect [m, r, j_idx]}
     ag_man_q_mrp: dict                                                  # {am: production quantity effect [m, r, p]}
     ag_man_limits: dict                                                 # {am: {j: adoption limit}}
@@ -353,6 +357,8 @@ def get_row_inputs(data: Data, base_year: int, target_year: int) -> RowInputs:
         non_ag_q_crk=non_ag_q_crk,
         ag_man_g_mrj_ag=ag_man_g_mrj_ag,
         ag_man_g_mrj_lulucf=ag_man_g_mrj_lulucf,
+        ag_man_g_parts=first['ag-mgt GHG'],
+        non_ag_g_parts=non_ag_g_parts,
         ag_man_w_mrj=ag_man_w_mrj,
         ag_man_q_mrp=ag_man_q_mrp,
         ag_man_limits=ag_man_limits,

@@ -380,7 +380,6 @@ def get_ghg_split(data: Data, target_year: int, solution, inputs: RowInputs) -> 
     ``value_t`` of the 'total' lines is the row's left-hand side; ``rhs_t`` is what it is compared with. In a year
     whose role is not 'BINDING' the row was not imposed, and ``deviation_t`` is the benchmark deviation (for AG also
     tested against the NIR tolerance in ``within_tolerance``)."""
-    target_index = target_year - data.YR_CAL_BASE
     t = inputs.limits['ghg']
     lines = []                                                              # (row, term, component, sub_term, value_t)
 
@@ -393,14 +392,14 @@ def get_ghg_split(data: Data, target_year: int, solution, inputs: RowInputs) -> 
               ('AG', 1, 'Agricultural land uses', 'Stubble-grazing sheep', stubble)]
 
     # term 2: the ag-management options, sub-term by sub-term
-    am_parts = ag_ghg.get_agricultural_management_ghg_matrices(data, target_index, separate=True)
+    am_parts = inputs.ag_man_g_parts                                       # computed for the step's GHG rows (row_inputs)
     for am, lus in inputs.agman2lu.items():
         for name, arr in am_parts[am].items():
             value = sum(float(np.dot(arr[:, :, j_idx].ravel(), solution.ag_man_X_mrj[am][:, :, j].ravel())) for j_idx, j in enumerate(lus))
             lines.append((ag_ghg.AG_MAN_GHG_SUBTERMS[am][name], 2, am, name, value))
 
     # term 3: the non-ag land uses, sub-term by sub-term
-    nonag_parts = non_ag_ghg.get_ghg_matrix(data, inputs.ag_g_mrj, separate=True)
+    nonag_parts = inputs.non_ag_g_parts                                     # computed for the step's GHG rows (row_inputs)
     for k, lu in enumerate(data.NON_AGRICULTURAL_LANDUSES):
         for name, arr in nonag_parts[lu].items():
             lines.append((non_ag_ghg.NON_AG_GHG_SUBTERMS[lu][name], 3, lu, name, float(np.dot(arr, solution.non_ag_X_rk[:, k]))))

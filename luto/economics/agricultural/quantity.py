@@ -23,6 +23,7 @@ Pure functions for calculating the production quantities of agricultural commodi
 import numpy as np
 import luto.settings as settings
 
+from functools import lru_cache
 from typing import Dict
 from scipy.interpolate import interp1d
 
@@ -63,9 +64,14 @@ def lvs_veg_types(lu) -> tuple[str, str]:
 
 
 # Climate change impact function
+@lru_cache(maxsize=128)
 def get_ccimpact(data, lu, lm, yr_idx):
     """
     Return climate change impact multiplier at (zero-based) year index.
+
+    Cached: a solve step asks for the same (lu, lm, year) several times (288 calls, at most 56 distinct, at RES5). At most
+    128 results are kept — one year's (land use or product, lm) pairs, about 2 GB at RES1 (38 MB each) — so older years
+    drop out instead of the cache growing every solved year. The array is read-only: every caller shares it.
 
     Parameters
     - data: The data object containing climate change impact data.
@@ -79,7 +85,9 @@ def get_ccimpact(data, lu, lm, yr_idx):
 
     # Check if land-use exists in CLIMATE_CHANGE_IMPACT (e.g., dryland Pears/Rice do not occur), if not return ones
     if (lm, lu) not in data.CLIMATE_CHANGE_IMPACT.indexes['column'].droplevel('year'):
-        return np.ones((data.NCELLS))
+        impact = np.ones((data.NCELLS))
+        impact.setflags(write=False)
+        return impact
 
     # Convert year index to calendar year to match the climate impact data which is by calendar year.
     yr_cal = data.YR_CAL_BASE + yr_idx
@@ -95,7 +103,9 @@ def get_ccimpact(data, lu, lm, yr_idx):
 
     # Create linear function f and interpolate climate change impact
     f = interp1d(xs, yys, kind='linear', fill_value='extrapolate')
-    return f(yr_cal)
+    impact = f(yr_cal)
+    impact.setflags(write=False)
+    return impact
 
 
 # Feed per head <unit: DSE> and the share of it from pasture, by livestock type

@@ -2366,25 +2366,25 @@ class Data:
         if yr_cal in self.DEMAND_ELASTICITY_MUL:
             return self.DEMAND_ELASTICITY_MUL[yr_cal]
 
-        # Get supply delta (0-based ratio)
-        supply_base_dvar_base_production = self.BASE_YR_production_t
-        supply_base_dvar_target_production = self.get_production_from_base_dvar_under_target_CCI_and_yield_change(yr_cal)
-        delta_supply = (supply_base_dvar_target_production - supply_base_dvar_base_production) / supply_base_dvar_base_production
-
         # Get demand delta (0-based ratio)
         demand_base_year = self.DEMAND_C.sel(year=self.YR_CAL_BASE)
         demand_target_year = self.DEMAND_C.sel(year=yr_cal)
         delta_demand = (demand_target_year - demand_base_year) / demand_base_year
 
+        # Early return when DYNAMIC_PRICE is off: the multiplier is 1, so the supply delta below — the target year's
+        # potential production, about 14 GB of quantity layers at RES1 — is not computed only to be thrown away
+        if not settings.DYNAMIC_PRICE:
+            self.DEMAND_ELASTICITY_MUL[yr_cal] = xr.ones_like(delta_demand / (self.elasticity_demand + self.elasticity_supply))
+            return self.DEMAND_ELASTICITY_MUL[yr_cal]
+
+        # Get supply delta (0-based ratio)
+        supply_base_dvar_base_production = self.BASE_YR_production_t
+        supply_base_dvar_target_production = self.get_production_from_base_dvar_under_target_CCI_and_yield_change(yr_cal)
+        delta_supply = (supply_base_dvar_target_production - supply_base_dvar_base_production) / supply_base_dvar_base_production
+
         # Calculate price_multiplier (1-based ratio); every term over Commodity, aligned by label
         price_delta = (delta_demand - delta_supply) / (self.elasticity_demand + self.elasticity_supply)
-        elasticity_multiplier = price_delta + 1
-
-        if settings.DYNAMIC_PRICE:
-            self.DEMAND_ELASTICITY_MUL[yr_cal] = elasticity_multiplier
-        else:
-            self.DEMAND_ELASTICITY_MUL[yr_cal] = xr.ones_like(elasticity_multiplier)
-
+        self.DEMAND_ELASTICITY_MUL[yr_cal] = price_delta + 1
         return self.DEMAND_ELASTICITY_MUL[yr_cal]
     
     
