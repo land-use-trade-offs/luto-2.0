@@ -105,26 +105,34 @@ class Data:
         # Path for write module - overwrite when provided with a base and target year
         self.path = None
 
-        # The latest simulation year; 
-        #   For simulation between 2010-2050, if the run stops at 2030, then it will be 2030
-        #   The last_year is updated in the solve_timeseries.simulation module
-        self.last_year = None
-
-        # Setup output containers
-        #   The solved shares are almost all zeros and are held for every solved year: kept sparse (SparseYears,
-        #   written and read like a dict). lumaps and lmmaps stay plain dicts, nothing to gain: one int8 per cell
-        #   (4 MB a year at RES1), and a lumap has a land-use code in nearly every cell, so sparse it is 9 times larger
-        self.lumaps = {}
-        self.lmmaps = {}
-        self.ammaps = SparseYears()
-        self.ag_dvars = SparseYears()
-        self.non_ag_dvars = SparseYears()
-        self.delta_dvars_ag2nonag = SparseYears()
-        self.ag_man_dvars = SparseYears()
-        self.delta_dvars_ag2ag = SparseYears()
-        self.delta_dvars_nonag2ag = SparseYears()
-        self.prod_data = {}
-        self.obj_vals = {}
+        # ── What solving writes on Data ──
+        #   Nothing else on Data changes after loading (the rest is inputs). Each entry below becomes an attribute of
+        #   that name (data.lumaps, data.ag_dvars, ...), and a run's checkpoint saves and restores exactly these names
+        #   (simulation.save_checkpoint / load_latest_checkpoint). THE ONE PLACE to change: an entry added here is an
+        #   attribute, is saved after every solved year, and is put back on a resumed run.
+        solved_state = {
+            # The latest simulation year: for a simulation between 2010-2050 that stops at 2030 it is 2030
+            # (updated in simulation.solve_timeseries)
+            'last_year': None,
+            # The output containers, {year: ...}. The solved shares are almost all zeros and are held for every solved
+            # year: kept sparse (SparseYears, written and read like a dict). lumaps and lmmaps stay plain dicts,
+            # nothing to gain: one int8 per cell (4 MB a year at RES1), and a lumap has a land-use code in nearly every
+            # cell, so sparse it is 9 times larger
+            'lumaps': {},
+            'lmmaps': {},
+            'ammaps': SparseYears(),
+            'ag_dvars': SparseYears(),
+            'non_ag_dvars': SparseYears(),
+            'delta_dvars_ag2nonag': SparseYears(),
+            'ag_man_dvars': SparseYears(),
+            'delta_dvars_ag2ag': SparseYears(),
+            'delta_dvars_nonag2ag': SparseYears(),
+            'prod_data': {},
+            'obj_vals': {},
+        }
+        for name, value in solved_state.items():
+            setattr(self, name, value)
+        self.SOLVED_STATE = tuple(solved_state)                           # the names
 
         print('')
         print(f'Data Initialization at RES{settings.RESFACTOR}')

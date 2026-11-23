@@ -187,7 +187,7 @@ Both are real gains on paper. Neither is worth its restructuring now; they are r
 ### Also worth a look, same goal
 
 - Bound propagation on the wide rows only, or on the grouped tables: most of its 75.7 M rows are per-cell rows.
-- The checkpoint: about 3 minutes per save of the data object at RES1, once before the first year and once after every year.
+- The checkpoint: about 3 minutes per save of the data object at RES1, once before the first year and once after every year. **Done 2026-11-23**: the data object is saved once, and after every year only the solved state (4 s at RES1; `docs/FINDINGS.md`, 20261123).
 
 ---
 

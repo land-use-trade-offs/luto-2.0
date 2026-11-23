@@ -12,7 +12,7 @@ Detects the platform automatically:
 A run is classified as:
   • finished    — contains Run_Archive.zip OR Data_RES*.lz4 in output/*/   → always skipped
   • running     — PBS only: its dir is the PBS_O_WORKDIR of a live job     → skipped
-  • checkpoint  — has a data_<year>.lz4 inside its output subdir           → resumed
+  • checkpoint  — has a data_<year>.lz4 inside its output subdir           → resumed (from its latest solution_<year>.lz4)
   • fresh       — none of the above                                        → fresh start
 
 Common arguments:
@@ -67,14 +67,19 @@ def get_output_subdirs(run_dir: Path) -> list[Path]:
 
 
 def get_checkpoint_lz4(run_dir: Path) -> list[Path]:
-    """Return sorted data_<year>.lz4 checkpoint files inside run_dir/output/*/."""
+    """Return the checkpoint files inside run_dir/output/*/, sorted by year: data_<year>.lz4 (the `Data`, written once
+    when the run starts) and solution_<year>.lz4 (the solved state, the latest solved year). The last one names the
+    year the run resumes from."""
     output_dir = run_dir / "output"
     if not output_dir.is_dir():
         return []
     return sorted(
-        f
-        for d in output_dir.iterdir() if d.is_dir()
-        for f in d.iterdir() if re.fullmatch(r"data_\d{4}\.lz4", f.name)
+        (
+            f
+            for d in output_dir.iterdir() if d.is_dir()
+            for f in d.iterdir() if re.fullmatch(r"(data|solution)_\d{4}\.lz4", f.name)
+        ),
+        key=lambda f: int(f.stem.split("_")[1]),
     )
 
 

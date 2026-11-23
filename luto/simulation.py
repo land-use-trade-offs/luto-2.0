@@ -56,9 +56,13 @@ from luto.tools.write_output import write_outputs
 from luto.tools import  LogToFile, log_memory_usage, set_path, write_timestamp, read_timestamp
 
 
-# Checkpoint files are named data_<year>.lz4. The same pattern drives both resume
-# discovery and stale-checkpoint rotation.
-CHECKPOINT_RE = re.compile(r'data_\d{4}\.lz4')
+# A run's checkpoint is two files in its folder (2026-11-23):
+#   data_<year>.lz4      the whole `Data`, written ONCE, before the first solve of the run (<year> = where the run starts);
+#   solution_<year>.lz4  what solving writes on `Data` (the attributes `Data.SOLVED_STATE` names: the per-year containers
+#                        and the last solved year), rewritten after every solved year, the latest kept.
+# Almost all of `Data` is inputs that never change after loading: rewriting it every year cost ~3 min at RES1.
+DATA_RE = re.compile(r'data_\d{4}\.lz4')
+SOLUTION_RE = re.compile(r'solution_\d{4}\.lz4')
 
 # Human-readable meaning of each non-optimal Gurobi status, for the failure banner.
 SOLVER_STATUS_MSGS = {
@@ -134,8 +138,8 @@ def run(
         If True, write outputs at the end of the run. Set to False to skip output
         writing (e.g. when doing a quick test run or debugging an infeasible year).
     checkpoint_dir : str or None, default None
-        Where to LOOK for a ``data_<year>.lz4`` checkpoint to resume from; the run
-        continues at the first unsolved year. Checkpoints themselves are always
+        Where to LOOK for a checkpoint to resume from (``data_<year>.lz4`` and the
+        latest ``solution_<year>.lz4``); the run continues at the first unsolved year. Checkpoints themselves are always
         written into the run's own output directory (see `solve_timeseries`) — on a
         resumed run the reused timestamp makes that the same directory. Useful for
         long NCI jobs that may be wall-time killed.
@@ -228,15 +232,13 @@ def solve_timeseries(
     """Solve each consecutive (base, target) year pair, checkpointing after each success.
 
     Stops at the first year that cannot be solved. `checkpoint_path` is where the
-    ``data_<year>.lz4`` checkpoints are written (the run's own output directory when
+    ``data_<year>.lz4`` / ``solution_<year>.lz4`` checkpoint is written (the run's own output directory when
     called from `run()`); pass None to disable checkpointing.
     """
     # ═══ the base-year checkpoint: saved before any solving, so a retry can re-attempt the first target year ═══
     #     (skipped on resume: the file already exists from a prior run)
-    if checkpoint_path is not None:
-        base_ckpt = checkpoint_path / f"data_{years_to_run[0]}.lz4"
-        if not base_ckpt.exists():
-            save_data_to_disk(data, str(base_ckpt))
+    if checkpoint_path is not None and not any(DATA_RE.fullmatch(f.name) for f in checkpoint_path.iterdir()):
+        save_data_to_disk(data, str(checkpoint_path / f"data_{years_to_run[0]}.lz4"))
 
     check_grouping_settings()                                                               # settings.CELL_GROUPING: what it cannot run with
     carry = set()                                                                            # row generation: the targets whose rows the next step starts with
@@ -451,15 +453,18 @@ def load_latest_checkpoint(
     data: Data | None,
     save_dir: str,
 ) -> tuple[Data, int | None]:
-    """Load the newest data_<year>.lz4 in `checkpoint_path`, falling back to `data`.
+    """Load the run's `Data` (data_<year>.lz4) and put the latest solved state (solution_<year>.lz4) back on it, falling
+    back to `data` when the folder holds no checkpoint.
 
-    Returns (data, resume_year); resume_year is None when starting fresh. Raises when
-    there is neither a checkpoint nor a `data` object to fall back on.
+    Returns (data, resume_year); resume_year is None when starting fresh, the year of the latest solution file when
+    there is one, else the year of the data file (nothing solved since it was written). Raises when there is neither a
+    checkpoint nor a `data` object to fall back on.
     """
     print(f"Checkpoint mode enabled: {checkpoint_path}", flush=True)
-    files = sorted(f for f in checkpoint_path.iterdir() if CHECKPOINT_RE.fullmatch(f.name))
+    data_files = sorted(f for f in checkpoint_path.iterdir() if DATA_RE.fullmatch(f.name))
+    solution_files = sorted(f for f in checkpoint_path.iterdir() if SOLUTION_RE.fullmatch(f.name))
 
-    if not files:
+    if not data_files:
         if data is None:
             raise ValueError(
                 f"No checkpoint files found in '{checkpoint_path}' and no `data` was provided; "
@@ -468,33 +473,44 @@ def load_latest_checkpoint(
         print(f"No valid checkpoint found in '{checkpoint_path}'; starting from {min(settings.SIM_YEARS)}.", flush=True)
         return data, None
 
-    checkpoint_file = files[-1]
-    resume_year = int(checkpoint_file.stem.split("_")[1])
-    with lz4.frame.open(checkpoint_file, 'rb') as stream:                 # opened and closed here, as in load_data_from_disk
+    data_file = data_files[-1]
+    resume_year = int(data_file.stem.split("_")[1])
+    with lz4.frame.open(data_file, 'rb') as stream:                       # opened and closed here, as in load_data_from_disk
         data = joblib.load(stream)
+    if solution_files:
+        solution_file = solution_files[-1]
+        with lz4.frame.open(solution_file, 'rb') as stream:
+            solved = joblib.load(stream)
+        for name in data.SOLVED_STATE:                                    # every attribute solving writes (declared in Data.__init__)
+            setattr(data, name, solved[name])
+        resume_year = int(solution_file.stem.split("_")[1])
     data.timestamp = read_timestamp()
     data.path = save_dir
     # load_data()'s set_path() normally pre-creates the out_<yr> dirs that
     # write_outputs expects; checkpoint resume bypasses load_data(), so do it here.
     set_path()
-    print(f"Resuming from checkpoint (year {resume_year}): {checkpoint_file}", flush=True)
+    print(f"Resuming from checkpoint (year {resume_year}): {data_file.name}"
+          + (f" + {solution_files[-1].name}" if solution_files else ""), flush=True)
     return data, resume_year
 
 
 def save_checkpoint(data: Data, checkpoint_path: Path, target_year: int) -> None:
-    """Write data_<target_year>.lz4 and delete older checkpoints — only the latest is kept."""
-    final_path = checkpoint_path / f"data_{target_year}.lz4"
-    save_data_to_disk(data, str(final_path))
+    """Write solution_<target_year>.lz4 (what solving writes on `Data`: the attributes `data.SOLVED_STATE` names, with
+    every solved year so far) and delete the older solution files: only the latest is kept. The `Data` file of the run
+    is left alone."""
+    final_path = checkpoint_path / f"solution_{target_year}.lz4"
+    save_data_to_disk({name: getattr(data, name) for name in data.SOLVED_STATE}, str(final_path))
     # `match` here on purpose, unlike the fullmatch in load_latest_checkpoint: the prefix form also
-    # sweeps up any `data_<year>.lz4.tmp` orphaned by an earlier killed write, which is exactly what
+    # sweeps up any `solution_<year>.lz4.tmp` orphaned by an earlier killed write, which is exactly what
     # rotation should do. Discovery must be strict; cleanup should be greedy.
     for old in checkpoint_path.iterdir():
-        if CHECKPOINT_RE.match(old.name) and old != final_path:
+        if SOLUTION_RE.match(old.name) and old != final_path:
             old.unlink()
 
 
-def save_data_to_disk(data: Data, path: str, compress_level=3) -> None:
-    """Save using joblib with atomic tmp→rename to prevent partial writes."""
+def save_data_to_disk(data, path: str, compress_level=3) -> None:
+    """Save `data` (the `Data` object, or a checkpoint's dict of solved state) using joblib with atomic tmp→rename to
+    prevent partial writes."""
     start_time = time.time()
     tmp = Path(f"{path}.tmp")
     joblib.dump(data, str(tmp), compress=('lz4', compress_level))

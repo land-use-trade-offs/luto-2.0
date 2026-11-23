@@ -312,10 +312,10 @@ IBRA bioregion targets run through the NVIS stream — select them with `GBF3_NV
 
 ### Checkpointing and Resume
 
-Long runs (typically full-resolution jobs on HPC) can checkpoint after each solved year. Pass a `checkpoint_dir`; a `data_<year>.lz4` file is written whenever a year solves to optimality, and re-running the same command resumes from the latest checkpoint instead of starting over:
+Every run checkpoints into its own output folder, as two files: `data_<year>.lz4`, the whole `Data`, written once before the first solve (`<year>` is where the run starts), and `solution_<year>.lz4`, what solving has written on `Data` so far (the attributes `Data.SOLVED_STATE` names), rewritten whenever a year solves to optimality with only the latest kept. The inputs never change after loading, so only the small file is rewritten each year (RES1: 4 s and 0.2 GB, against about 4 minutes and 4.3 GB for the whole `Data`). Pass the run's folder as `checkpoint_dir` to resume from the latest solved year instead of starting over:
 
 ```python
-sim.run(data=data, checkpoint_dir='output/my_run/checkpoint')
+sim.run(data=None, checkpoint_dir='output/<run timestamp>_RF1_2010-2050')
 ```
 
 A year is only accepted (and checkpointed) when the solver returns `GRB.OPTIMAL`. If a solve attempt fails, the next attempt listed in `settings.RETRY_PARAMS` is tried; the default lists one, so a failed year stops the run and can be resumed from its checkpoint.

@@ -5,6 +5,55 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20261123 — the yearly checkpoint rewrote the whole `Data`: 224 s a year at RES1, 4 s when only the solved state is saved
+
+### TL;DR
+
+After every solved year the run saved the whole `Data` object (`data_<year>.lz4`). Almost all of it is inputs that
+never change after loading: of its 229 attributes a solve step changes 13 in content, the 12 that hold the solved
+state and one cache. The checkpoint is now two files (`luto/simulation.py`): `data_<year>.lz4`, the whole `Data`,
+written ONCE before the first solve, and `solution_<year>.lz4`, the solved state, rewritten after every solved year.
+
+### Measured on a real RES1 `Data` (the base year and 7 solved years; quiet machine, local disk; no solve, the save and load functions called on the object)
+
+| | Time | File |
+|---|---|---|
+| Before: the whole `Data`, after every solved year | 224 s | 4.30 GB |
+| After, once per run: `data_2010.lz4` | 185 s | 4.12 GB |
+| After, every solved year: `solution_<year>.lz4` | **4 s** | **0.19 GB** |
+| Resume: both files loaded and put together | 117 s | |
+
+Over 40 yearly steps about 2.5 hours of saving become one save of 3 minutes and 40 short ones. The solution file holds
+every solved year so far (about 25 MB a year compressed), so it grows to about 1 GB and some 20 s by the last year.
+This comes on top of the sparse store of the entry below, which removed the part of the save that grew with the years
+(168 s in 2010 to 916 s in 2041 in a run with dense solutions).
+
+### What is saved, and where it is declared
+
+- The solved state is 12 attributes: `last_year`, the maps (`lumaps`, `lmmaps`, `ammaps`), the shares and deltas
+  (`ag_dvars`, `non_ag_dvars`, `ag_man_dvars`, `delta_dvars_ag2ag`, `delta_dvars_ag2nonag`, `delta_dvars_nonag2ag`),
+  `prod_data` and `obj_vals`. They are declared in ONE place, a dict in `Data.__init__`: each entry becomes the
+  attribute of that name, and the dict's keys are `Data.SOLVED_STATE`, which is all the checkpoint reads. An entry
+  added there is saved and restored without another change.
+- `DEMAND_ELASTICITY_MUL` also changes while a run solves, but it is a cache computed from inputs: not saved, and
+  rebuilt on a resumed run.
+- The final `Data_RES<n>.lz4` at the end of a run is unchanged (the whole object, read by `write_output.py`).
+- A checkpoint written before this change is not supported: its `Data` carries no `SOLVED_STATE`, so the first save
+  after a resume fails. No conversion is kept in the code (a decision: one would be written if an old run had to be
+  resumed).
+
+### Checks
+
+- RES1: the `Data` put together from the two files against the one in memory, every attribute compared by content:
+  228 compared, 0 differ.
+- RES5, one step 2010 → 2050 run start to end, then the same folder resumed from its two files: the stored solutions
+  identical to the run before this change in every container; the resumed `Data` identical to the run's in every
+  container and in 229 of 230 attributes. The one that differs is the cache `DEMAND_ELASTICITY_MUL` ({2050: ...} in
+  the run, empty on the resumed `Data`: filled again when asked). At RES5: `data_2010.lz4` 26 s and 1.02 GB once,
+  `solution_2050.lz4` under a second.
+
+---
+
 ## 20261123 — every solved year stayed in `Data` as dense arrays: 8.9 GB a year at RES1, 0.14 GB kept sparse
 
 ### TL;DR
@@ -48,8 +97,8 @@ went through the compressor at every save).
 - scipy's COO, not CSR: CSR cannot hold a 3-D array, and on the array reshaped to 2-D its row pointer costs 34 MB per
   array, more than a whole ag-management array (3 MB as COO).
 - `lumaps` and `lmmaps` stay plain dicts: one int8 per cell, and a lumap is 9 times larger sparse.
-- Not done: the yearly checkpoint still rewrites the whole `Data` (about 3 min of inputs that never change); the
-  base year's dense arrays stay in `Data` as attributes.
+- The yearly checkpoint no longer rewrites the whole `Data` (the entry above). Not done: the base year's dense
+  arrays stay in `Data` as attributes.
 
 ---
 
