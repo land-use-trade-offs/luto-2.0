@@ -2232,13 +2232,22 @@ class Data:
         Note: the 'potential' means the production is calculated based on production potential matrices,
         meaning the production is calculated without considering the actual land-use, but only using the quality marices.
         '''
-        
-        # Calculate year index (i.e., number of years since 2010)
-        yr_idx = yr_cal - self.YR_CAL_BASE
-        
-        # Get commodity matrices
+        yr_idx = yr_cal - self.YR_CAL_BASE                                  # number of years since the base year
+        ag_q_mrp = ag_quantity.get_quantity_matrices(self, yr_idx).astype(np.float32)
+        non_ag_q_crk = non_ag_quantity.get_quantity_matrix(self, ag_q_mrp).astype(np.float32)
+        ag_man_q_mrp = ag_quantity.get_agricultural_management_quantity_matrices(self, ag_q_mrp, yr_idx)
+        return self.label_production_layers(ag_q_mrp, non_ag_q_crk, ag_man_q_mrp)
+
+
+    def label_production_layers(self, ag_q_mrp: np.ndarray, non_ag_q_crk: np.ndarray, ag_man_q_mrp: dict):
+        '''
+        The three quantity arrays of a year — ag [lm, cell, product], non-ag [Commodity, cell, lu], {ag-mgt option:
+        [lm, cell, product]} — as the labelled layers `get_actual_production_lyr` multiplies the shares by. Separate from
+        computing them so that a caller that has them already (simulation.store_solution: the step's RowInputs, what
+        its demand rows were built from) does not compute them again.
+        '''
         ag_q_mrp_xr = xr.DataArray(
-            ag_quantity.get_quantity_matrices(self, yr_idx).astype(np.float32),
+            ag_q_mrp.astype(np.float32),
             dims=['lm','cell','product'],
             coords={
                 'lm': self.LANDMANS,
@@ -2250,7 +2259,7 @@ class Data:
         )
 
         non_ag_crk_xr = xr.DataArray(
-            non_ag_quantity.get_quantity_matrix(self, ag_q_mrp_xr).astype(np.float32),
+            non_ag_q_crk.astype(np.float32),
             dims=['Commodity', 'cell', 'lu'],
             coords={
                 'Commodity': self.COMMODITIES,
@@ -2262,7 +2271,7 @@ class Data:
         )
 
         ag_man_q_amrp_xr = xr.DataArray(
-            np.stack(list(ag_quantity.get_agricultural_management_quantity_matrices(self, ag_q_mrp_xr, yr_idx).values())).astype(np.float32),
+            np.stack(list(ag_man_q_mrp.values())).astype(np.float32),
             dims=['am', 'lm', 'cell', 'product'],
             coords={
                 'am': self.AG_MAN_DESC,
@@ -2277,7 +2286,7 @@ class Data:
         return (ag_q_mrp_xr.compute(), non_ag_crk_xr.compute(), ag_man_q_amrp_xr.compute())
     
     
-    def get_actual_production_lyr(self, yr_cal:int, threshold: float = 0.01):
+    def get_actual_production_lyr(self, yr_cal:int, threshold: float = 0.01, potential: tuple | None = None):
         '''
         Return the production data for a given year as xarray DataArrays.
         The returned DataArrays are spatial layers where each cell is the production of a commodity.
@@ -2289,6 +2298,9 @@ class Data:
         `threshold`: a cell whose total ag / non-ag / ag-mgt share is at or below it is zeroed before the product
         (the converters' map clean-up, 0.01 = 1 % of a cell). Pass 0 for an accounting total that counts every
         share (`simulation.store_solution`: the solver met demand with every share, so the total must too).
+
+        `potential`: the year's potential production layers (`label_production_layers`) when the caller has them;
+        computed here (`get_potential_production_lyr`) when not.
         '''
         # Get dvars and production potential matrices
         if yr_cal == self.YR_CAL_BASE:
@@ -2305,7 +2317,7 @@ class Data:
             non_ag_X_rk = self.non_ag_dvars[yr_cal]
             ag_man_X_mrj = self.ag_man_dvars[yr_cal]
             
-            ag_q_mrp_xr, non_ag_crk_xr, ag_man_q_amrp_xr = self.get_potential_production_lyr(yr_cal)
+            ag_q_mrp_xr, non_ag_crk_xr, ag_man_q_amrp_xr = potential if potential is not None else self.get_potential_production_lyr(yr_cal)
 
         # Convert dvar array to xr.DataArray; Chunk the data to reduce memory usage
         ag_X_mrj_xr = tools.ag_mrj_to_xr(self, ag_X_mrj, threshold).chunk({'cell': min(settings.WRITE_CHUNK_SIZE, self.NCELLS)})

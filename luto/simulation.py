@@ -375,7 +375,9 @@ def store_solution(data: Data, target_year: int, solution, obj_val: float, input
     # Production from the stored dvars, the way the base year's is (data.py, at load): t / KL per commodity — every share
     # counted (threshold 0: the map clean-up that drops a cell's slivers under 1 % would leave the total 0.1–0.8 % under
     # the demand the solver met)
-    ag_mrc, non_ag_rc, am_amrc = data.get_actual_production_lyr(target_year, threshold=0.0)
+    # the quantities are the step's own (RowInputs): what its demand rows were built from, not computed a second time
+    potential = data.label_production_layers(inputs.ag_q_mrp, inputs.non_ag_q_crk, inputs.ag_man_q_mrp)
+    ag_mrc, non_ag_rc, am_amrc = data.get_actual_production_lyr(target_year, threshold=0.0, potential=potential)
     production = (ag_mrc.sum(['cell', 'lm']) + non_ag_rc.sum(['cell']) + am_amrc.sum(['cell', 'am', 'lm'])).compute().values
     data.add_production_data(target_year, 'Production', production)
 
