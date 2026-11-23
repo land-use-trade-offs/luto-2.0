@@ -102,6 +102,13 @@ def side_of_parts(parts: dict, subterms: dict, side: str) -> np.ndarray:
     return total
 
 
+def get_crop_ghg_scope_1_fields() -> list:
+    """The crop emission fields kept under settings.USE_GHG_SCOPE_1: settings.CROP_GHG_SCOPE_1, and with
+    settings.CROP_GHG_INVENTORY_FIELDS also settings.CROP_GHG_INVENTORY_FIELD_NAMES (crop residue N2O, field burning,
+    rice CH4)."""
+    return settings.CROP_GHG_SCOPE_1 + (settings.CROP_GHG_INVENTORY_FIELD_NAMES if settings.CROP_GHG_INVENTORY_FIELDS else [])
+
+
 def get_ghg_crop(data:Data, lu, lm, aggregate):
     """Return crop GHG emissions <unit: t/cell>  of `lu`+`lm` in `yr_idx` 
     as (np array|pd.DataFrame) depending on aggregate (True|False).
@@ -115,7 +122,7 @@ def get_ghg_crop(data:Data, lu, lm, aggregate):
     Returns
         np.array or pd.DataFrame: Crop GHG emissions <unit: t/cell>  of `lu`+`lm` in `yr_idx`.
 
-    Crop GHG emissions include:
+    Crop GHG emissions include (under settings.USE_GHG_SCOPE_1 only the get_crop_ghg_scope_1_fields() fields):
         - 'CO2E_KG_HA_CHEM_APPL'
         - 'CO2E_KG_HA_CROP_MGT'
         - 'CO2E_KG_HA_CULTIV'
@@ -125,6 +132,8 @@ def get_ghg_crop(data:Data, lu, lm, aggregate):
         - 'CO2E_KG_HA_PEST_PROD'
         - 'CO2E_KG_HA_SOIL'
         - 'CO2E_KG_HA_SOWING'
+        - 'CO2E_KG_HA_RESIDUES', 'CO2E_KG_HA_BURNING', 'CO2E_KG_HA_RICE_CH4' (2020-21 table only; scope 1 with
+          settings.CROP_GHG_INVENTORY_FIELDS)
     """
     
     # Process GHG_crop only if the land-use (lu) and land management (lm) combination exists (e.g., dryland Pears/Rice do not occur)
@@ -133,7 +142,7 @@ def get_ghg_crop(data:Data, lu, lm, aggregate):
         # Get the data column {ghg_rs: r -> each pixel,  s -> each GHG source}: the (lm, lu) sources, over (field, cell)
         ghg_fs = data.AGGHG_CROPS.sel(lm=lm, lu=lu)
         if settings.USE_GHG_SCOPE_1:
-            ghg_fs = ghg_fs.isel(field=np.isin(ghg_fs['field'].values, settings.CROP_GHG_SCOPE_1))
+            ghg_fs = ghg_fs.isel(field=np.isin(ghg_fs['field'].values, get_crop_ghg_scope_1_fields()))
         ghg_rs = ghg_fs.to_pandas().T.copy()                            # DataFrame (cell, source), its own copy (scaled in place below)
 
         # Convert kg CO2e per ha to tonnes. 

@@ -938,6 +938,24 @@ inter-model consistency (energy-related CO2 displacement is handled by AusTIMES)
 CROP_GHG_SCOPE_1 = ['CO2E_KG_HA_SOIL']  # The emission sources of crops kept when USE_GHG_SCOPE_1 is True (columns of the crop emissions table): soil N2O only.
 LVSTK_GHG_SCOPE_1 = ['CO2E_KG_HEAD_DUNG_URINE', 'CO2E_KG_HEAD_ENTERIC', 'CO2E_KG_HEAD_IND_LEACH_RUNOFF', 'CO2E_KG_HEAD_MANURE_MGT']  # The emission sources of livestock kept when USE_GHG_SCOPE_1 is True (columns of the livestock emissions table): dung and urine, enteric methane, indirect leaching and runoff, manure management.
 
+CROP_GHG_INVENTORY_FIELDS = False
+'''
+Whether the crop fields of NIR category 3 beyond fertiliser N2O count as scope-1 crop emissions (USE_GHG_SCOPE_1 True).
+The fields, CROP_GHG_INVENTORY_FIELD_NAMES, are in the 2020-21 crop emissions table (Nick_build/agGHG_crops.nc), whose
+CO2E_KG_HA_SOIL is fertiliser N2O only (NIR 3.D.a.1, 3.D.b.1.i, 3.D.b.2.i); the 2010 table has none of them.
+- CO2E_KG_HA_RESIDUES: crop residue N2O, direct and leaching (3.D.a.4, 3.D.b.2.v);
+- CO2E_KG_HA_BURNING: field burning of agricultural residues, CH4 and N2O (3.F);
+- CO2E_KG_HA_RICE_CH4: rice cultivation CH4 (3.C).
+True: the three fields count with CROP_GHG_SCOPE_1, and Data stops if a crop column of the table lacks one. The
+ag-management options scale CO2E_KG_HA_SOIL only (each by its own multiplier), not these fields. Urea (3.H), liming
+(3.G) and pasture residues are not crop fields (NIR gives them no land-use split): they stay in the exogenous
+agriculture series. With True, the NIR leaves the three fields model (the crop leaves of 3.C, 3.D.a.4, 3.D.b.2.v and 3.F,
+luto.data.CROP_GHG_INVENTORY_NIR_CODES) leave the exogenous agriculture series, from the GHG target folder's
+scope_matrix.csv and series_components_long.csv (Data stops if they are missing); the target folder is not changed.
+False (default): CROP_GHG_SCOPE_1 alone and the exogenous series as read, as before.
+'''
+CROP_GHG_INVENTORY_FIELD_NAMES = ['CO2E_KG_HA_RESIDUES', 'CO2E_KG_HA_BURNING', 'CO2E_KG_HA_RICE_CH4']
+
 
 
 

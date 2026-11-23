@@ -223,6 +223,9 @@ GHG_NAMES = {
     'TCO2E_MANURE_MGT': 'Livestock Manure Management (biogenic)',
     'TCO2E_SEED': 'Pasture Seed production',
     'TCO2E_SOIL': 'Agricultural soils: Direct Soil Emissions (biogenic)',
+    'TCO2E_RESIDUES': 'Agricultural soils: Crop residues',
+    'TCO2E_BURNING': 'Field burning of agricultural residues',
+    'TCO2E_RICE_CH4': 'Rice cultivation',
     'TCO2E_DUNG_URINE': 'Agricultural soils: Animal production, dung and urine',
     'TCO2E_ENTERIC': 'Livestock Enteric Fermentation (biogenic)',
     # Agricultural Management
@@ -367,6 +370,9 @@ COLORS_PLOT = {
     'TCO2E_MANURE_MGT':                         '#e4d354',
     'TCO2E_SEED':                               '#2b908f',
     'TCO2E_SOIL':                               '#f45b5b',
+    'TCO2E_RESIDUES':                           '#8d4653',
+    'TCO2E_BURNING':                            '#b0a8b9',
+    'TCO2E_RICE_CH4':                           '#4b8bbe',
     'TCO2E_DUNG_URINE':                         '#7cb5ec',
     'TCO2E_ENTERIC':                            '#434348',
 

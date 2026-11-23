@@ -410,7 +410,7 @@ def get_ghg_split(data: Data, target_year: int, solution, inputs: RowInputs) -> 
     # term 5 and the exogenous constants
     lines += [('AG', 5, 'Off-land commodities', 'Livestock emissions (enteric, manure)', inputs.offland_ghg - inputs.offland_ghg_energy),
               ('AG', 5, 'Off-land commodities', 'On-farm energy CO2 (direct, embedded)', inputs.offland_ghg_energy),
-              ('AG', 'exogenous', 'Exogenous agriculture', 'series_agriculture_exogenous.csv (none built: 0)' if t['AG_EXO_t'] == 0 else 'series_agriculture_exogenous.csv', t['AG_EXO_t']),
+              ('AG', 'exogenous', 'Exogenous agriculture', 'series_agriculture_exogenous.csv (none built: 0)' if t['AG_EXO_t'] == 0 else 'series_agriculture_exogenous.csv' + (", less the crop inventory fields' NIR leaves (on term 1)" if 'AG_EXO_CROP_FIELDS_t' in t else ''), t['AG_EXO_t']),
               ('LULUCF', 'exogenous', 'Exogenous LULUCF', 'LULUCF_EXO (series_lulucf_exogenous.csv)', t['LULUCF_EXO_t']),
               ('LULUCF', 'baseline', 'Plantings baseline', 'Baseline new-plantings removals, subtracted (plantings_baseline.csv)', -t['PLANTINGS_BASELINE_t']),
               ('AG', 'baseline', 'HIR baseline', 'Existing HIR projects destocking, subtracted (ag_mgt_caps)', -t['HIR_BASELINE_AG_t']),
