@@ -23,7 +23,6 @@ Pure functions for calculating the production quantities of agricultural commodi
 import numpy as np
 import luto.settings as settings
 
-from functools import lru_cache
 from typing import Dict
 from scipy.interpolate import interp1d
 
@@ -64,14 +63,13 @@ def lvs_veg_types(lu) -> tuple[str, str]:
 
 
 # Climate change impact function
-@lru_cache(maxsize=128)
 def get_ccimpact(data, lu, lm, yr_idx):
     """
     Return climate change impact multiplier at (zero-based) year index.
 
-    Cached: a solve step asks for the same (lu, lm, year) several times (288 calls, at most 56 distinct, at RES5). At most
-    128 results are kept — one year's (land use or product, lm) pairs, about 2 GB at RES1 (38 MB each) — so older years
-    drop out instead of the cache growing every solved year. The array is read-only: every caller shares it.
+    Kept for the year (`get_ccimpact.results`): a solve step asks for the same (lu, lm) several times (288 calls, at most
+    56 distinct, at RES5), and the next year never asks for this year's again, so a new year (or a new Data) drops the
+    previous year's results (about 2 GB at RES1, 38 MB each). The arrays are read-only: every caller shares them.
 
     Parameters
     - data: The data object containing climate change impact data.
@@ -82,30 +80,42 @@ def get_ccimpact(data, lu, lm, yr_idx):
     Returns
     - The climate change impact multiplier at the specified year index.
     """
+    def _get_ccimpact():
+        # Check if land-use exists in CLIMATE_CHANGE_IMPACT (e.g., dryland Pears/Rice do not occur), if not return ones
+        if (lm, lu) not in data.CLIMATE_CHANGE_IMPACT.indexes['column'].droplevel('year'):
+            impact = np.ones((data.NCELLS))
+            impact.setflags(write=False)
+            return impact
 
-    # Check if land-use exists in CLIMATE_CHANGE_IMPACT (e.g., dryland Pears/Rice do not occur), if not return ones
-    if (lm, lu) not in data.CLIMATE_CHANGE_IMPACT.indexes['column'].droplevel('year'):
-        impact = np.ones((data.NCELLS))
+        # Convert year index to calendar year to match the climate impact data which is by calendar year.
+        yr_cal = data.YR_CAL_BASE + yr_idx
+
+        # Interpolate climate change damage for lu, lm, and year for each cell using a linear function.
+        anchor = data.CLIMATE_CHANGE_IMPACT_ANCHOR_YEAR          # The year the file's multipliers are relative to (2010)
+        xs = set(data.CLIMATE_CHANGE_IMPACT['year'].values.tolist())  # Returns set {2020, 2050, 2080}
+        xs.add(anchor)                                           # Adds the anchor year and returns set {2010, 2020, 2050, 2080}
+        xs = sorted(xs)                                          # Returns list and ensures sorted lowest to highest [2010, 2020, 2050, 2080]
+        yys = data.CLIMATE_CHANGE_IMPACT.sel(lm=lm, lu=lu).to_pandas().T.fillna(1)   # The (cell, year) columns, NaNs replaced with ones to avoid issues with calculating water use limits
+        yys.insert(0, str(anchor), 1)                            # Insert a new column for the anchor year with value of 1 to ensure no climate change impact there
+        yys = yys.astype(np.float32)
+
+        # Create linear function f and interpolate climate change impact
+        f = interp1d(xs, yys, kind='linear', fill_value='extrapolate')
+        impact = f(yr_cal)
         impact.setflags(write=False)
         return impact
 
-    # Convert year index to calendar year to match the climate impact data which is by calendar year.
-    yr_cal = data.YR_CAL_BASE + yr_idx
+    results = get_ccimpact.results
+    if results.get('year') != (data, yr_idx):                          # a new year: the previous year's results go
+        results.clear()
+        results['year'] = (data, yr_idx)                                 # the Data itself, not its id: a freed id can be reused
+    if (lu, lm) not in results:
+        results[(lu, lm)] = _get_ccimpact()
+    return results[(lu, lm)]
 
-    # Interpolate climate change damage for lu, lm, and year for each cell using a linear function.
-    anchor = data.CLIMATE_CHANGE_IMPACT_ANCHOR_YEAR          # The year the file's multipliers are relative to (2010)
-    xs = set(data.CLIMATE_CHANGE_IMPACT['year'].values.tolist())  # Returns set {2020, 2050, 2080}
-    xs.add(anchor)                                           # Adds the anchor year and returns set {2010, 2020, 2050, 2080}
-    xs = sorted(xs)                                          # Returns list and ensures sorted lowest to highest [2010, 2020, 2050, 2080]
-    yys = data.CLIMATE_CHANGE_IMPACT.sel(lm=lm, lu=lu).to_pandas().T.fillna(1)   # The (cell, year) columns, NaNs replaced with ones to avoid issues with calculating water use limits
-    yys.insert(0, str(anchor), 1)                            # Insert a new column for the anchor year with value of 1 to ensure no climate change impact there
-    yys = yys.astype(np.float32)
 
-    # Create linear function f and interpolate climate change impact
-    f = interp1d(xs, yys, kind='linear', fill_value='extrapolate')
-    impact = f(yr_cal)
-    impact.setflags(write=False)
-    return impact
+get_ccimpact.results = {}                                                # {'year': (data, yr_idx), (lu, lm): the multiplier}
+get_ccimpact.cache_clear = get_ccimpact.results.clear                    # as an lru_cache's, for tools.write_input
 
 
 # Feed per head <unit: DSE> and the share of it from pasture, by livestock type
