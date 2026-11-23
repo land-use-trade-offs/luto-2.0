@@ -31,6 +31,12 @@ from luto.solvers.row_inputs import EconomicInputs, RowInputs
 from luto.solvers.row_table import ROW_FILL, ROW_SCHEMA, make_part
 
 
+# The families whose every row lies in ONE cell — one row per ag-mgt column, cell, source or node: the structural rows
+# of get_rows, listed after the wide ones. Cell grouping (aggregate.py) joins such rows within a blob; every other
+# family is a wide row. A family added to get_rows whose rows each sit in one cell belongs here.
+PER_CELL_FAMILIES = ('ag_mgt_link', 'renewable_ceiling', 'source_cap_ag', 'source_cap_nonag', 'node_balance_ag', 'node_balance_nonag')
+
+
 # ═══════════════════════════ get_rows: the row space of one step ═══════════════════════════
 
 def get_rows(inputs: RowInputs, cols: xr.Dataset, support: ColSupport) -> tuple[sparse.csr_matrix, xr.Dataset]:

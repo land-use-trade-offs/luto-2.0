@@ -50,12 +50,11 @@ import xarray as xr
 from scipy import sparse
 
 from luto import settings
-from luto.solvers.row_builder import contract
+from luto.solvers.row_builder import PER_CELL_FAMILIES, contract
 from luto.solvers.tables import Tables
 
 
-TYPE_FIELDS = ('m', 'j', 'k', 'am_idx', 'j_idx', 'from_m', 'from_j', 'from_k')          # with `block`: a column's type — every field but `cell` and `local_r`
-PER_CELL_FAMILIES = ('ag_mgt_link', 'renewable_ceiling', 'source_cap_ag', 'source_cap_nonag', 'node_balance_ag', 'node_balance_nonag')   # every other family is a wide row
+LOCATION_FIELDS = ('cell', 'local_r')                                                    # where a column is; every other integer field of the column table says what it is (its type)
 SKETCH_WIDTH = 40                                                                        # the random sketch the SVD directions are taken from
 
 
@@ -66,6 +65,28 @@ class Grouping(NamedTuple):
     row_map: sparse.csr_matrix                  # grouped rows × rows, 1 / the number of rows joined
     blob_of_cell: np.ndarray                    # the blob of every cell
     seconds: float                              # spent grouping
+
+
+# ═══════════════════════════ group_tables: the grouping of one step ═══════════════════════════
+
+def group_tables(tables: Tables, area_r: np.ndarray, region2cell: xr.Dataset) -> Grouping:
+    """The step's tables grouped: the blobs (``get_blobs``), the transform (``aggregate``), then the grouped wide rows'
+    range narrowed when asked (``condition_grouped``)."""
+    print('Grouping the cells...', flush=True)
+    start = time.time()
+    type_id = get_column_types(tables.cols)                                                # once: the blobs and the transform both read it
+    blob_of_cell = get_blobs(tables, np.asarray(area_r, dtype=np.float64), region2cell, type_id)
+    grouped, col_map, row_map = aggregate(tables, blob_of_cell, type_id)
+    grouped = condition_grouped(grouped)
+    seconds = time.time() - start
+    sizes = pd.DataFrame({'': ['full', 'grouped'],
+                          'rows': [tables.row_matrix.shape[0], grouped.row_matrix.shape[0]],
+                          'columns': [tables.row_matrix.shape[1], grouped.row_matrix.shape[1]],
+                          'nonzeros': [tables.row_matrix.nnz, grouped.row_matrix.nnz]})
+    for line in sizes.to_markdown(index=False, tablefmt='psql', intfmt=',').split('\n'):
+        print(f"│   {line}", flush=True)
+    print(f"└── {tables.row_matrix.nnz / grouped.row_matrix.nnz:.1f}× fewer nonzeros, in {seconds:,.0f} s", flush=True)
+    return Grouping(grouped, col_map, row_map, blob_of_cell, seconds)
 
 
 def check_grouping_settings() -> None:
@@ -84,38 +105,6 @@ def check_grouping_settings() -> None:
               'leaves most cells with fractional shares.', flush=True)
 
 
-def mix(values: np.ndarray) -> np.ndarray:
-    """A 64-bit hash of every value (splitmix64), so that keys of many parts can be combined without a collision in practice."""
-    hashed = values + np.uint64(0x9E3779B97F4A7C15)
-    hashed = (hashed ^ (hashed >> np.uint64(30))) * np.uint64(0xBF58476D1CE4E5B9)
-    hashed = (hashed ^ (hashed >> np.uint64(27))) * np.uint64(0x94D049BB133111EB)
-    return hashed ^ (hashed >> np.uint64(31))
-
-
-def int_hash(values: np.ndarray) -> np.ndarray:
-    return mix(np.asarray(values).astype(np.int64).astype(np.uint64))
-
-
-def number_by_first(key: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """(the first position of every distinct key, the group of every position), the groups numbered in the order they first
-    appear — so grouped columns and rows keep the table's own order (the blocks and the families stay together).
-    pd.factorize numbers them so by hashing (np.unique sorted 100 M keys at RES1); a position is a group's first exactly
-    where its number exceeds every number before it."""
-    group = pd.factorize(key)[0]
-    first = np.ones(group.size, dtype=bool)
-    first[1:] = group[1:] > np.maximum.accumulate(group)[:-1]
-    return np.flatnonzero(first), group.astype(np.int64)
-
-
-def get_column_types(cols: xr.Dataset) -> np.ndarray:
-    """The type of every column: its block and every field but `cell` and `local_r`, as one integer — numbered in sorted
-    order (pd.factorize with sort=True numbers them as np.unique did, by hashing instead of sorting every column)."""
-    fields = [pd.factorize(cols['block'].values)[0].astype(np.int64)]
-    for field in TYPE_FIELDS:
-        fields.append(cols[field].values.astype(np.int64) + 1)
-    return pd.factorize(np.ravel_multi_index(fields, [int(values.max()) + 1 for values in fields]), sort=True)[0].astype(np.int64)
-
-
 # ═══════════════════════════ the blobs: which cells share a decision ═══════════════════════════
 
 def get_blobs(tables: Tables, area_r: np.ndarray, region2cell: xr.Dataset, type_id: np.ndarray) -> np.ndarray:
@@ -124,35 +113,82 @@ def get_blobs(tables: Tables, area_r: np.ndarray, region2cell: xr.Dataset, type_
     cell = cols['cell'].values.astype(np.int64)
     n_cells = area_r.size
 
-    # ── the key: the column types a cell holds, each with its base; Riparian Plantings' ub in natural-break bins ──
+    key = column_key(cols, type_id, cell, n_cells)                                       # the column types a cell holds, each with its base
+    key = with_regions(key, region2cell)                                                 # the cell's region in every layer
+    key = with_gbf_footprints(key, row_matrix, rows, cell, n_cells)                      # the GBF rows the cell has a coefficient in
+    n_key = np.unique(key).size
+    soft, n_directions, n_dims = svd_bins(row_matrix, rows, obj, cell, area_r, type_id)  # close: the SVD bin of the cell's coefficients
+    key = key + soft
+
+    blob_of_cell = np.unique(key, return_inverse=True)[1].ravel().astype(np.int32)
+    print(f"│   ├── {n_cells:,} cells: {n_key:,} distinct keys, {int(blob_of_cell.max()) + 1:,} blobs with the SVD "
+          f"({n_directions} directions of {n_dims:,} dimensions, tolerance {settings.CELL_GROUPING_TOLERANCE:g})", flush=True)
+    return blob_of_cell
+
+
+def column_key(cols: xr.Dataset, type_id: np.ndarray, cell: np.ndarray, n_cells: int) -> np.ndarray:
+    """Every cell's key from its columns: the column types it holds, each with its base to ROUND_DECIMALS, and Riparian
+    Plantings' upper bound in its bin (``riparian_ub_bins``) — summed over the cell's columns, so the order of the columns
+    does not matter."""
     col_hash = mix(mix(type_id.astype(np.uint64)) ^ int_hash(np.round(cols['base'].values.astype(np.float64) * 10 ** settings.ROUND_DECIMALS)))
+    riparian, bin_of_cap = riparian_ub_bins(cols)
+    if bin_of_cap is not None:
+        col_hash[riparian] = mix(col_hash[riparian] ^ int_hash(bin_of_cap))
+    key = np.zeros(n_cells, dtype=np.uint64)
+    np.add.at(key, cell, col_hash)                                                       # order-free over the cell's columns
+    return key
+
+
+def riparian_ub_bins(cols: xr.Dataset) -> tuple[np.ndarray, np.ndarray | None]:
+    """(Riparian Plantings' columns, the natural-break bin of each one's upper bound), or (columns, None) with fewer than
+    two distinct bounds. Every other upper bound follows from the cell's base (col_builder: the share its sources can
+    move), and the base is in the key; Riparian Plantings' is each cell's own stream share. That is a fact of
+    col_builder's bounds known here by name: a new upper bound that varies by cell would have to be added here too."""
     riparian = (cols['block'].values == 'nonag') & (cols['k'].values == list(settings.NON_AG_LAND_USES).index('Riparian Plantings'))
     caps = cols['ub'].values[riparian].astype(np.float64)
     n_bins = min(settings.CELL_GROUPING_RIPARIAN_BINS, np.unique(caps).size)
-    if n_bins > 1:                                                                       # the one ub that does not follow from the base: each cell's own stream share
-        centres = np.quantile(caps, (np.arange(n_bins) + 0.5) / n_bins)
-        for _ in range(100):                                                             # natural breaks: 1-D k-means
-            bin_of_cap = np.searchsorted((centres[1:] + centres[:-1]) / 2, caps)
-            updated = np.bincount(bin_of_cap, caps, n_bins) / np.maximum(np.bincount(bin_of_cap, minlength=n_bins), 1)
-            if np.allclose(updated, centres):
-                break
-            centres = updated
-        col_hash[riparian] = mix(col_hash[riparian] ^ int_hash(np.searchsorted((centres[1:] + centres[:-1]) / 2, caps)))
-    key = np.zeros(n_cells, dtype=np.uint64)
-    np.add.at(key, cell, col_hash)                                                       # order-free over the cell's columns
-    for layer in region2cell.data_vars:                                                  # for quality only: mixing regions stays exact
-        key = mix(key ^ int_hash(pd.factorize(region2cell[layer].values)[0]))
-    family = rows['family'].values.astype(str)
-    gbf_rows = np.flatnonzero(np.char.startswith(family, 'GBF') & rows['active'].values)    # a target over a mask: a blob must not mix cells inside and outside it
-    if gbf_rows.size:
-        footprint = row_matrix[gbf_rows].tocoo()
-        inside = np.unique(footprint.row.astype(np.int64) * n_cells + cell[footprint.col])    # every (GBF row, cell) with a coefficient, once
-        footprint_set = np.zeros(n_cells, dtype=np.uint64)
-        np.add.at(footprint_set, inside % n_cells, int_hash(inside // n_cells + 1))            # the set of GBF rows a cell is in, order-free
-        key = mix(key ^ mix(footprint_set))
-    n_key = np.unique(key).size
+    if n_bins <= 1:
+        return riparian, None
+    centres = np.quantile(caps, (np.arange(n_bins) + 0.5) / n_bins)
+    for _ in range(100):                                                                 # natural breaks: 1-D k-means
+        bin_of_cap = np.searchsorted((centres[1:] + centres[:-1]) / 2, caps)
+        updated = np.bincount(bin_of_cap, caps, n_bins) / np.maximum(np.bincount(bin_of_cap, minlength=n_bins), 1)
+        if np.allclose(updated, centres):
+            break
+        centres = updated
+    return riparian, np.searchsorted((centres[1:] + centres[:-1]) / 2, caps)
 
-    # ── the SVD: a cell's coefficients per hectare, one dimension per (column type, wide row) and (column type, objective) ──
+
+def with_regions(key: np.ndarray, region2cell: xr.Dataset) -> np.ndarray:
+    """The key with the cell's region in every layer of the column support: a blob never mixes regions, so every
+    regional row (water, renewable, regional caps) reads its cells exactly. For quality only: mixing regions stays exact."""
+    for layer in region2cell.data_vars:
+        key = mix(key ^ int_hash(pd.factorize(region2cell[layer].values)[0]))
+    return key
+
+
+def with_gbf_footprints(key: np.ndarray, row_matrix: sparse.csr_matrix, rows: xr.Dataset, cell: np.ndarray, n_cells: int) -> np.ndarray:
+    """The key with the set of active GBF rows the cell has a coefficient in: a target over a mask, so a blob must not
+    mix cells inside and outside it (without GBF2's footprint: 9.3 % objective loss at RES5)."""
+    family = rows['family'].values.astype(str)
+    gbf_rows = np.flatnonzero(np.char.startswith(family, 'GBF') & rows['active'].values)
+    if not gbf_rows.size:
+        return key
+    footprint = row_matrix[gbf_rows].tocoo()
+    inside = np.unique(footprint.row.astype(np.int64) * n_cells + cell[footprint.col])    # every (GBF row, cell) with a coefficient, once
+    footprint_set = np.zeros(n_cells, dtype=np.uint64)
+    np.add.at(footprint_set, inside % n_cells, int_hash(inside // n_cells + 1))            # the set of GBF rows a cell is in, order-free
+    return mix(key ^ mix(footprint_set))
+
+
+def svd_bins(row_matrix: sparse.csr_matrix, rows: xr.Dataset, obj: np.ndarray, cell: np.ndarray, area_r: np.ndarray,
+             type_id: np.ndarray) -> tuple[np.ndarray, int, int]:
+    """(every cell's SVD bin as a hash, the directions, the dimensions): the cell's coefficients per hectare, one
+    dimension per (column type, wide row) and (column type, objective), reduced to settings.CELL_GROUPING_SVD_DIMS
+    directions (a randomised SVD of the cells' signature) and binned at settings.CELL_GROUPING_TOLERANCE. Zeros when
+    there is no dimension."""
+    n_cells = area_r.size
+    family = rows['family'].values.astype(str)
     wide_rows = np.flatnonzero(~np.isin(family, PER_CELL_FAMILIES) & rows['active'].values)
     wide = row_matrix[wide_rows].tocoo()
     priced = np.flatnonzero(obj != 0)
@@ -167,25 +203,21 @@ def get_blobs(tables: Tables, area_r: np.ndarray, region2cell: xr.Dataset, type_
     entry_dim = (np.cumsum(used) - 1)[raw_dim]
     n_dims = int(entry_dim.max()) + 1 if entry_dim.size else 0
     n_directions = min(settings.CELL_GROUPING_SVD_DIMS, n_dims)
-    if n_directions:
-        dim_scale = np.bincount(entry_dim, np.abs(entry_val)) / np.bincount(entry_dim)   # every dimension in units of its own mean size
-        dim_scale[dim_scale == 0] = 1.0
-        signature = sparse.csr_matrix(((entry_val / dim_scale[entry_dim]).astype(np.float32), (cell[entry_col], entry_dim)), shape=(n_cells, n_dims))
-        sketch = signature @ np.random.default_rng(0).standard_normal((n_dims, min(SKETCH_WIDTH, n_dims)), dtype=np.float32)
-        basis, _ = np.linalg.qr(signature @ (signature.T @ sketch))
-        small = signature.T @ basis
-        left, values, _ = np.linalg.svd(small.T @ small, hermitian=True)
-        scores = (basis @ left) * np.sqrt(values)                                        # the cells on the leading directions, largest first
-        bin_width = settings.CELL_GROUPING_TOLERANCE * np.sqrt(entry_val.size / n_cells / n_directions)   # in the signature's own units: the same meaning in every run
-        soft = np.zeros(n_cells, dtype=np.uint64)
-        for direction in range(n_directions):
-            soft = mix(soft ^ int_hash(np.floor(scores[:, direction] / bin_width)))
-        key = key + soft
-
-    blob_of_cell = np.unique(key, return_inverse=True)[1].ravel().astype(np.int32)
-    print(f"│   ├── {n_cells:,} cells: {n_key:,} distinct keys, {int(blob_of_cell.max()) + 1:,} blobs with the SVD "
-          f"({n_directions} directions of {n_dims:,} dimensions, tolerance {settings.CELL_GROUPING_TOLERANCE:g})", flush=True)
-    return blob_of_cell
+    soft = np.zeros(n_cells, dtype=np.uint64)
+    if not n_directions:
+        return soft, n_directions, n_dims
+    dim_scale = np.bincount(entry_dim, np.abs(entry_val)) / np.bincount(entry_dim)       # every dimension in units of its own mean size
+    dim_scale[dim_scale == 0] = 1.0
+    signature = sparse.csr_matrix(((entry_val / dim_scale[entry_dim]).astype(np.float32), (cell[entry_col], entry_dim)), shape=(n_cells, n_dims))
+    sketch = signature @ np.random.default_rng(0).standard_normal((n_dims, min(SKETCH_WIDTH, n_dims)), dtype=np.float32)
+    basis, _ = np.linalg.qr(signature @ (signature.T @ sketch))
+    small = signature.T @ basis
+    left, values, _ = np.linalg.svd(small.T @ small, hermitian=True)
+    scores = (basis @ left) * np.sqrt(values)                                            # the cells on the leading directions, largest first
+    bin_width = settings.CELL_GROUPING_TOLERANCE * np.sqrt(entry_val.size / n_cells / n_directions)   # in the signature's own units: the same meaning in every run
+    for direction in range(n_directions):
+        soft = mix(soft ^ int_hash(np.floor(scores[:, direction] / bin_width)))
+    return soft, n_directions, n_dims
 
 
 # ═══════════════════════════ the transform: the tables over blobs ═══════════════════════════
@@ -194,12 +226,23 @@ def aggregate(tables: Tables, blob_of_cell: np.ndarray, type_id: np.ndarray) -> 
     """The tables with every blob's cells sharing one share per column type: (grouped tables, col_map, row_map).
     `type_id`: get_column_types(cols)."""
     row_matrix, rows, cols, obj = tables
-    n_rows, n_cols = row_matrix.shape
+    row_matrix = row_matrix.tocsr()
     cell = cols['cell'].values.astype(np.int64)
     blob_of_cell = blob_of_cell.astype(np.int64)
-    n_types = int(type_id.max()) + 1
+    cols_grouped, col_map = group_columns(cols, cell, blob_of_cell, type_id)
+    rows_grouped, row_map = group_rows(row_matrix, rows, cell, blob_of_cell, type_id)
+    row_matrix_grouped = (row_map @ row_matrix.astype(np.float64) @ col_map).tocsr()
+    row_matrix_grouped.eliminate_zeros()
+    row_matrix_grouped.sort_indices()
+    obj_grouped = col_map.T @ obj.astype(np.float64)
+    return Tables(row_matrix_grouped, rows_grouped, cols_grouped, obj_grouped), col_map, row_map
 
-    # ── the columns: one per (blob, column type), lb the largest and ub the smallest of its cells' ──
+
+def group_columns(cols: xr.Dataset, cell: np.ndarray, blob_of_cell: np.ndarray, type_id: np.ndarray) -> tuple[xr.Dataset, sparse.csr_matrix]:
+    """(the grouped column table, col_map): one column per (blob, column type), lb the largest and ub the smallest of
+    its cells'."""
+    n_cols = cell.size
+    n_types = int(type_id.max()) + 1
     first_col, new_col = number_by_first(blob_of_cell[cell] * n_types + type_id)
     n_new_cols = first_col.size
     col_map = sparse.csr_matrix((np.ones(n_cols), (np.arange(n_cols), new_col)), shape=(n_cols, n_new_cols))
@@ -220,10 +263,15 @@ def aggregate(tables: Tables, blob_of_cell: np.ndarray, type_id: np.ndarray) -> 
                              f'{margin:g} (largest {gap.max():.3g}) — cells whose bounds exclude each other share a blob.')
         lb_grouped[inverted] = ub_grouped[inverted] = (lb_grouped[inverted] + ub_grouped[inverted]) / 2
         print(f"│   ├── {inverted.size:,} grouped column(s) whose cells' bounds cross by at most {gap.max():.3g}: set to the midpoint", flush=True)
-    cols_grouped = cols.isel(col=first_col).assign(lb=(('col',), lb_grouped), ub=(('col',), ub_grouped))
+    return cols.isel(col=first_col).assign(lb=(('col',), lb_grouped), ub=(('col',), ub_grouped)), col_map
 
-    # ── the rows: a wide row stays; a per-cell row joins the rows of its blob that read the same over the grouped columns ──
-    row_matrix = row_matrix.tocsr()
+
+def group_rows(row_matrix: sparse.csr_matrix, rows: xr.Dataset, cell: np.ndarray, blob_of_cell: np.ndarray,
+               type_id: np.ndarray) -> tuple[xr.Dataset, sparse.csr_matrix]:
+    """(the grouped row table, row_map): a wide row stays; a per-cell row (PER_CELL_FAMILIES) joins the rows of its blob
+    that read the same over the grouped columns — the same column types with the same coefficients, family, sense, rhs
+    to ROUND_DECIMALS and active flag — as their average."""
+    n_rows = row_matrix.shape[0]
     family = rows['family'].values.astype(str)
     per_cell = np.isin(family, PER_CELL_FAMILIES)
     n_entries = np.diff(row_matrix.indptr)
@@ -258,12 +306,7 @@ def aggregate(tables: Tables, blob_of_cell: np.ndarray, type_id: np.ndarray) -> 
     grouped_cell = rows_grouped['cell'].values.copy()
     relabel = per_cell[first_row] & (grouped_cell >= 0)
     grouped_cell[relabel] = first_cell[blob_of_cell[grouped_cell[relabel]]]
-    rows_grouped = rows_grouped.assign(cell=(('row',), grouped_cell))
-    row_matrix_grouped = (row_map @ row_matrix.astype(np.float64) @ col_map).tocsr()
-    row_matrix_grouped.eliminate_zeros()
-    row_matrix_grouped.sort_indices()
-    obj_grouped = col_map.T @ obj.astype(np.float64)
-    return Tables(row_matrix_grouped, rows_grouped, cols_grouped, obj_grouped), col_map, row_map
+    return rows_grouped.assign(cell=(('row',), grouped_cell)), row_map
 
 
 def condition_grouped(tables: Tables) -> Tables:
@@ -296,26 +339,6 @@ def condition_grouped(tables: Tables) -> Tables:
     magnitude = np.abs(row_matrix.data)
     print(f"│   ├── now |a| [{magnitude.min():.1e}, {magnitude.max():.1e}], {row_matrix.nnz:,} entries", flush=True)
     return Tables(row_matrix, rows, cols, obj)
-
-
-def group_tables(tables: Tables, area_r: np.ndarray, region2cell: xr.Dataset) -> Grouping:
-    """The step's tables grouped: the blobs (``get_blobs``), the transform (``aggregate``), then the grouped wide rows'
-    range narrowed when asked (``condition_grouped``)."""
-    print('Grouping the cells...', flush=True)
-    start = time.time()
-    type_id = get_column_types(tables.cols)                                                # once: the blobs and the transform both read it
-    blob_of_cell = get_blobs(tables, np.asarray(area_r, dtype=np.float64), region2cell, type_id)
-    grouped, col_map, row_map = aggregate(tables, blob_of_cell, type_id)
-    grouped = condition_grouped(grouped)
-    seconds = time.time() - start
-    sizes = pd.DataFrame({'': ['full', 'grouped'],
-                          'rows': [tables.row_matrix.shape[0], grouped.row_matrix.shape[0]],
-                          'columns': [tables.row_matrix.shape[1], grouped.row_matrix.shape[1]],
-                          'nonzeros': [tables.row_matrix.nnz, grouped.row_matrix.nnz]})
-    for line in sizes.to_markdown(index=False, tablefmt='psql', intfmt=',').split('\n'):
-        print(f"│   {line}", flush=True)
-    print(f"└── {tables.row_matrix.nnz / grouped.row_matrix.nnz:.1f}× fewer nonzeros, in {seconds:,.0f} s", flush=True)
-    return Grouping(grouped, col_map, row_map, blob_of_cell, seconds)
 
 
 # ═══════════════════════════ after the solve: the full model at the mapped x ═══════════════════════════
@@ -354,3 +377,40 @@ def report_grouping(grouping: Grouping, tables: Tables, x: np.ndarray, target_ye
     print(f"Year {target_year}: grouped solution mapped back to {grouping.blob_of_cell.size:,} cells — rows of the full model over "
           f"{tolerance:g}: {int((excess > tolerance).sum()):,} (worst {excess.max():.3g}, {family[int(excess.argmax())]}); "
           f"worst bound excess {bound_excess:.3g}; cells without a whole land use: {n_fractional:,}", flush=True)
+
+
+# ═══════════════════════════ hashing and numbering ═══════════════════════════
+
+def mix(values: np.ndarray) -> np.ndarray:
+    """A 64-bit hash of every value (splitmix64), so that keys of many parts can be combined without a collision in practice."""
+    hashed = values + np.uint64(0x9E3779B97F4A7C15)
+    hashed = (hashed ^ (hashed >> np.uint64(30))) * np.uint64(0xBF58476D1CE4E5B9)
+    hashed = (hashed ^ (hashed >> np.uint64(27))) * np.uint64(0x94D049BB133111EB)
+    return hashed ^ (hashed >> np.uint64(31))
+
+
+def int_hash(values: np.ndarray) -> np.ndarray:
+    return mix(np.asarray(values).astype(np.int64).astype(np.uint64))
+
+
+def number_by_first(key: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """(the first position of every distinct key, the group of every position), the groups numbered in the order they first
+    appear — so grouped columns and rows keep the table's own order (the blocks and the families stay together).
+    pd.factorize numbers them so by hashing (np.unique sorted 100 M keys at RES1); a position is a group's first exactly
+    where its number exceeds every number before it."""
+    group = pd.factorize(key)[0]
+    first = np.ones(group.size, dtype=bool)
+    first[1:] = group[1:] > np.maximum.accumulate(group)[:-1]
+    return np.flatnonzero(first), group.astype(np.int64)
+
+
+def get_column_types(cols: xr.Dataset) -> np.ndarray:
+    """The type of every column — what it is: its block and every integer field of the column table but where it is
+    (LOCATION_FIELDS) — as one integer, numbered in sorted order. Read off the table, so a field added to the column
+    space is part of the type without a change here. pd.factorize with sort=True numbers them as np.unique did, by
+    hashing instead of sorting every column."""
+    fields = [pd.factorize(cols['block'].values)[0].astype(np.int64)]
+    for name in cols.data_vars:
+        if cols[name].dtype.kind == 'i' and name not in LOCATION_FIELDS:
+            fields.append(cols[name].values.astype(np.int64) + 1)
+    return pd.factorize(np.ravel_multi_index(fields, [int(values.max()) + 1 for values in fields]), sort=True)[0].astype(np.int64)
