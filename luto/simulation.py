@@ -272,12 +272,25 @@ def solve_timeseries(
             print('!' * 100, flush=True)
             break
 
-        # ─────────────── 4. the pre-solve diagnosis: bound propagation over the rows ───────────────
-        bounds = get_row_bounds(row_matrix, rows, cols)                                     # every row's interval over the column box, and its verdict
-        drop_redundant_rows(rows, bounds, settings.BOUND_PROP_DROP_FAMILIES)                # opt-in per family: rows every point of the box satisfies never reach the solver
-        report_row_bounds(rows, bounds, target_year, out_dir)                               # the log table, bound_report_<year>.csv, bound_preflight_<year>.csv
+        # ─────────────── 4. the objective ───────────────
+        obj = get_obj(get_economics(data, base_year, target_year), cols, inputs)            # million AUD; the economy streams (~300 MB at RES5, ~7 GB at RES1) die with the call
+
+        # ─────────────── 5. the tables the solver takes: settings.CELL_GROUPING groups alike cells into blobs ───────────────
+        #     (the grouped solver's x is mapped back to every cell below)
+        tables = Tables(row_matrix, rows, cols, obj)
+        grouping = group_tables(tables, data.REAL_AREA.values, col_support.region2cell) if settings.CELL_GROUPING else None
+        solved = tables if grouping is None else grouping.tables
+
+        # ─────────────── 6. the pre-solve diagnosis: bound propagation over the rows of the tables the solver takes ───────────────
+        #     On the grouped tables under CELL_GROUPING (2026-11-23): ~10 times fewer rows than the full model, and the model
+        #     actually solved. Nothing is missed: a grouped column's box lies inside its cells' (lb the largest, ub the
+        #     smallest), so a row impossible over the full box is impossible over the grouped one; a row impossible only
+        #     when grouped is one the grouped solve would fail on. The cost: a year it stops has built its economics and blobs.
+        bounds = get_row_bounds(solved.row_matrix, solved.rows, solved.cols)               # every row's interval over the column box, and its verdict
+        drop_redundant_rows(solved.rows, bounds, settings.BOUND_PROP_DROP_FAMILIES)         # opt-in per family: rows every point of the box satisfies never reach the solver
+        report_row_bounds(solved.rows, bounds, target_year, out_dir)                        # the log table, bound_report_<year>.csv, bound_preflight_<year>.csv
         impossible = (bounds['status'].values == STATUS.index('impossible')) | (bounds['status_implied'].values == STATUS.index('impossible'))
-        n_impossible = int((impossible & ~elastic_absorbs(rows, bounds)).sum())            # an elastic row whose slack can reach the rhs does not stop the year
+        n_impossible = int((impossible & ~elastic_absorbs(solved.rows, bounds)).sum())     # an elastic row whose slack can reach the rhs does not stop the year
         if n_impossible and settings.BOUND_PROP_ON_IMPOSSIBLE == 'stop':
             print('!' * 100, flush=True)
             print(f"Year {target_year}: {n_impossible:,} row(s) cannot hold at any point the column box and the rows' own bounds allow, so no solve can succeed "
@@ -285,15 +298,9 @@ def solve_timeseries(
             print('!' * 100, flush=True)
             break
 
-        # ─────────────── 5. the objective ───────────────
-        obj = get_obj(get_economics(data, base_year, target_year), cols, inputs)            # million AUD; the economy streams (~300 MB at RES5, ~7 GB at RES1) die with the call
-
-        # ─────────────── 6. the solve: the tables are the state, a solver is built from them for every solve ───────────────
+        # ─────────────── 7. the solve: the tables are the state, a solver is built from them for every solve ───────────────
         on_first_model = (lambda model: save_model_to_disk(model, data.path, base_year, target_year)) if settings.WRITE_DEBUG_MPS else None   # the debug MPS, BEFORE the first solve (off by default: ~5 GB a year)
-        #     settings.CELL_GROUPING: the solver takes the tables over blobs of alike cells; its x is mapped back to every cell below
-        tables = Tables(row_matrix, rows, cols, obj)
-        grouping = group_tables(tables, data.REAL_AREA.values, col_support.region2cell) if settings.CELL_GROUPING else None
-        accepted, x_solved, status, luto_solver = solve_step(tables if grouping is None else grouping.tables, inputs, rowgen, target_year, out_dir, on_first_model=on_first_model)
+        accepted, x_solved, status, luto_solver = solve_step(solved, inputs, rowgen, target_year, out_dir, on_first_model=on_first_model)
         if grouping is None:
             cols, obj = luto_solver.cols, luto_solver.obj                                    # the final tables: with the shortfall columns, the dropped rows off
 
@@ -305,7 +312,7 @@ def solve_timeseries(
             print('\n', flush=True)
             break
 
-        # ─────────────── 7. the solution: stored, reported, checkpointed ───────────────
+        # ─────────────── 8. the solution: stored, reported, checkpointed ───────────────
         x = x_solved if grouping is None else grouping.col_map @ x_solved                    # over the full column table: every cell of a blob takes the blob's share
         if grouping is not None:
             report_grouping(grouping, tables, x, target_year, out_dir)                       # every row of the full model at the mapped x; grouping_<year>.csv

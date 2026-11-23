@@ -245,6 +245,14 @@ def aggregate(tables: Tables, blob_of_cell: np.ndarray) -> tuple[Tables, sparse.
     row_map = sparse.csr_matrix((1.0 / np.bincount(new_row)[new_row], (new_row, np.arange(n_rows))), shape=(first_row.size, n_rows))
 
     rows_grouped = rows.isel(row=first_row).assign(rhs=(('row',), row_map @ rows['rhs'].values.astype(np.float64)))
+    # A grouped per-cell row is labelled with its blob's first cell, so that all the per-cell rows of a blob carry one
+    # `cell`: bound propagation sums a cell's node-balance rows into the cell's total (row_bounds.conservation_rows)
+    first_cell = np.full(int(blob_of_cell.max()) + 1, blob_of_cell.size, dtype=np.int64)
+    np.minimum.at(first_cell, blob_of_cell, np.arange(blob_of_cell.size))
+    grouped_cell = rows_grouped['cell'].values.copy()
+    relabel = per_cell[first_row] & (grouped_cell >= 0)
+    grouped_cell[relabel] = first_cell[blob_of_cell[grouped_cell[relabel]]]
+    rows_grouped = rows_grouped.assign(cell=(('row',), grouped_cell))
     row_matrix_grouped = (row_map @ row_matrix.astype(np.float64) @ col_map).tocsr()
     row_matrix_grouped.eliminate_zeros()
     row_matrix_grouped.sort_indices()
