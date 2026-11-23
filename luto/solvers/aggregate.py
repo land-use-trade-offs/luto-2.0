@@ -246,6 +246,15 @@ def group_columns(cols: xr.Dataset, cell: np.ndarray, blob_of_cell: np.ndarray, 
     first_col, new_col = number_by_first(blob_of_cell[cell] * n_types + type_id)
     n_new_cols = first_col.size
     col_map = sparse.csr_matrix((np.ones(n_cols), (np.arange(n_cols), new_col)), shape=(n_cols, n_new_cols))
+    # The key said the cells of a blob hold the same base (to ROUND_DECIMALS) in every column type, through a 64-bit hash:
+    # checked here exactly, so that a hash collision — never seen, but possible — cannot merge cells unnoticed
+    base = cols['base'].values.astype(np.float64)
+    base_largest, base_smallest = np.full(n_new_cols, -np.inf), np.full(n_new_cols, np.inf)
+    np.maximum.at(base_largest, new_col, base)
+    np.minimum.at(base_smallest, new_col, base)
+    if (base_largest - base_smallest > 10 ** -settings.ROUND_DECIMALS).any():
+        raise ValueError(f'Cell grouping: {int((base_largest - base_smallest > 10 ** -settings.ROUND_DECIMALS).sum()):,} grouped column(s) join cells '
+                         f'whose base differs (largest gap {(base_largest - base_smallest).max():.3g}): a hash collision in the blob key.')
     lb_grouped = np.full(n_new_cols, -np.inf)
     ub_grouped = np.full(n_new_cols, np.inf)
     np.maximum.at(lb_grouped, new_col, cols['lb'].values.astype(np.float64))
@@ -296,6 +305,21 @@ def group_rows(row_matrix: sparse.csr_matrix, rows: xr.Dataset, cell: np.ndarray
     del reads, per_cell_key
     first_row, new_row = number_by_first(row_key)
     del row_key
+    # The rows joined read the same — said by a 64-bit hash of their entries: checked here on what a collision would change,
+    # so that it cannot join rows that differ unnoticed. Each coefficient and the rhs were rounded to ROUND_DECIMALS in
+    # the key, so rows that truly read the same differ by less than one granule in the rhs and per entry in the sum.
+    def spread(value):
+        largest, smallest = np.full(first_row.size, -np.inf), np.full(first_row.size, np.inf)
+        np.maximum.at(largest, new_row, value)
+        np.minimum.at(smallest, new_row, value)
+        return largest - smallest
+    granule = 10 ** -settings.ROUND_DECIMALS
+    joined_badly = ((spread(n_entries.astype(np.float64)) > 0)
+                    | (spread(rows['rhs'].values.astype(np.float64)) > granule)
+                    | (spread(row_matrix @ np.ones(row_matrix.shape[1])) > granule * np.maximum(n_entries[first_row], 1)))
+    if joined_badly.any():
+        raise ValueError(f'Cell grouping: {int(joined_badly.sum()):,} grouped per-cell row(s) join rows that differ in their entries, rhs or '
+                         f'coefficients: a hash collision in the row key.')
     row_map = sparse.csr_matrix((1.0 / np.bincount(new_row)[new_row], (new_row, np.arange(n_rows))), shape=(first_row.size, n_rows))
 
     rows_grouped = rows.isel(row=first_row).assign(rhs=(('row',), row_map @ rows['rhs'].values.astype(np.float64)))
@@ -374,6 +398,10 @@ def report_grouping(grouping: Grouping, tables: Tables, x: np.ndarray, target_ye
         'grouping_seconds': round(grouping.seconds, 1), 'objective_full_model_at_mapped_x': float(obj.astype(np.float64) @ x),
         'max_row_excess': float(excess.max()), 'rows_over_tolerance': int((excess > tolerance).sum()), 'max_bound_excess': bound_excess,
         'cells_without_a_whole_land_use': n_fractional}]).to_csv(f'{out_dir}/grouping_{target_year}.csv', index=False)
+    if (excess > tolerance).any() or bound_excess > tolerance:
+        print(f"⚠ WARNING: Year {target_year}: the grouped solution mapped back breaks the FULL model beyond {tolerance:g}: "
+              f"{int((excess > tolerance).sum()):,} row(s), worst {excess.max():.3g} ({family[int(excess.argmax())]}); bound excess {bound_excess:.3g} "
+              f"(grouping_rows_{target_year}.csv)", flush=True)
     print(f"Year {target_year}: grouped solution mapped back to {grouping.blob_of_cell.size:,} cells — rows of the full model over "
           f"{tolerance:g}: {int((excess > tolerance).sum()):,} (worst {excess.max():.3g}, {family[int(excess.argmax())]}); "
           f"worst bound excess {bound_excess:.3g}; cells without a whole land use: {n_fractional:,}", flush=True)
