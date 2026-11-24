@@ -450,7 +450,8 @@ def get_utility_solar_pv_effect_w_mrj(data, yr_idx):
         water_impact = data.RENEWABLE_BUNDLE_SOLAR.query('Year == @yr_cal and Commodity == @lu')['INPUT-wrt_water-required'].item()
         if water_impact != 1:
             j = lu_codes[lu_idx]
-            w_mrj_effect[:, :, lu_idx] = wreq_mrj[:, :, j] * (water_impact - 1)
+            # A multiplier below 1 is less water used: a gain in net yield (positive), as for the other options
+            w_mrj_effect[:, :, lu_idx] = wreq_mrj[:, :, j] * (1 - water_impact)
     return w_mrj_effect
 
 def get_onshore_wind_effect_w_mrj(data, yr_idx):
@@ -478,7 +479,8 @@ def get_onshore_wind_effect_w_mrj(data, yr_idx):
         water_impact = data.RENEWABLE_BUNDLE_WIND.query('Year == @yr_cal and Commodity == @lu')['INPUT-wrt_water-required'].item()
         if water_impact != 1:
             j = lu_codes[lu_idx]
-            w_mrj_effect[:, :, lu_idx] = wreq_mrj[:, :, j] * (water_impact - 1)
+            # A multiplier below 1 is less water used: a gain in net yield (positive), as for the other options
+            w_mrj_effect[:, :, lu_idx] = wreq_mrj[:, :, j] * (1 - water_impact)
     return w_mrj_effect
 
 def get_agricultural_management_water_matrices(data, yr_idx) -> dict[str, np.ndarray]:
