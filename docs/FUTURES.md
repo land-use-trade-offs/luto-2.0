@@ -5,6 +5,105 @@ Entries are in **descending date order** (newest first). Each entry stands on it
 
 ---
 
+## 20261123 — the two GHG rows (agriculture, net LULUCF): review before talking with Nick
+
+### TL;DR
+
+The GHG constraint was split into an agriculture row and a net LULUCF row (`cdc90a0d`, PR #229, merged 2026-10-22;
+before it, one net row over ag + non-ag + ag-mgt + transitions, as in the 2010-base code Xinhao's runs use). A first
+read of the code (2026-11-23) found the split's algebra sound — every sub-term sits on exactly one row and the two rows
+sum to the old net row — but three accounting questions, and a default under which **neither row ever binds**. Several
+parts also break the design rules of `docs/COLLABORATION.md`. Nothing has been changed. To go through, then decide
+with Nick.
+
+### 1. Decide first: what the GHG target is meant to do
+
+The rows hold LUTO to the DCCEEW 2025 projection: agriculture ≤ the AG series (about 75 Mt, flat from 2040), net
+LULUCF ≤ the projection ("modelled" part 0). In the default RES1 run of 2026-11-18 (2020 → 2050, 5-year steps,
+current code) the slack of each row was:
+
+| Year | AG row: LUTO vs series | slack | LULUCF row: LUTO vs series | slack |
+|---|---|---|---|---|
+| 2025 | 72.8 vs 75.2 Mt | 2.4 Mt | −114.8 vs −51.4 Mt | 63 Mt |
+| 2030 | 69.3 vs 75.3 Mt | 6.0 Mt | −126.5 vs −46.3 Mt | 80 Mt |
+| 2035 | 66.2 vs 75.7 Mt | 9.5 Mt | −140.5 vs −44.2 Mt | 96 Mt |
+| 2040 | 63.9 vs 75.9 Mt | 12.0 Mt | −159.0 vs −47.3 Mt | 112 Mt |
+
+At the carbon price in the objective LUTO already does better than the projection, so the GHG policy has no effect in
+the default settings. (The old net row in the 2010-base code binds hard: 73.9 → 47.5 Mt from 2020 to 2021, shadow price
+89.5 AUD/t.)
+
+- [ ] Is "no worse than the projection" the intended target, or should it be a reduction pathway?
+- [ ] Two rows or one net row? Two rows forbid trading agriculture emissions against LULUCF removals (more cattle paid
+      for by more plantings); one net row allows it. A policy choice, not a solver need.
+- [ ] Is the cumulative LULUCF budget (`budget.csv`, loaded as `Data.GHG_LULUCF_BUDGET`) meant to be imposed? It is
+      read and never used.
+
+### 2. Accounting questions
+
+- [ ] **Double count from the 2010 base year.** In 2020, a reference year, LUTO's LULUCF row is −93.6 Mt against the
+      inventory's −60.3 Mt: 33 Mt lower before any target applies. The exogenous series (`LULUCF_EXO`) reflects what
+      actually happened, and LUTO's own plantings and regrowth since 2010 are added on top of it as additional. Check
+      what EXO contains; the move of the base year to 2021 should shrink this.
+- [ ] **Scope of the AG row.** It holds energy and lifecycle emissions NIR sector 3 does not (Precision Agriculture,
+      AgTech EI, irrigated pasture energy, the off-land on-farm energy CO2). Nick's comment in
+      `economics/agricultural/ghg.py` calls them scope-1 leaks to be moved out. Size them, then decide.
+- [ ] **BECCS** is off both inventories but sits on the LULUCF row (off by default).
+- [ ] **Savanna burning on LULUCF**: the comment says NIR 2024 reports savanna fire under 4(IV), 3.E being IE. Check
+      against the NIR.
+- [ ] **AG benchmark tolerance** is ±14.3 Mt (about 20 % of the series): too wide to tell a calibration error.
+- [ ] **HIR baseline** (existing projects): LUTO's HIR counts only above the existing projects' regrowth and destocking,
+      while those projects are not in LUTO's base-year state. If LUTO does not adopt HIR on those cells, the rows ask
+      for the same amount from elsewhere. Would putting the projects in the base-year state be cleaner?
+- [ ] Not yet read: the build script `input/Nick_build/scripts/ghg_targets.py` and the NIR category mapping
+      (`scope_matrix.csv`).
+
+### 3. Design-rule breaks (`docs/COLLABORATION.md`)
+
+- [ ] **Rule 2, `Data` only reads.** `Data.load_ghg_targets` (`luto/data.py`) selects the plantings-baseline row by
+      matching "(LEAN)" in a status text, takes the anchor year out of a free-text field with a regex, and computes
+      rate × (year − anchor). The build script should write it as a yearly series file; `Data` should only read it.
+- [ ] **Rule 5, fail loudly.**
+  - `series_agriculture_exogenous.csv` missing → 0 for every year.
+  - The AG tolerance is NaN in years without one.
+  - The HIR baseline clips a project share above 1 with `np.minimum(..., 1.0)` (`get_hir_baseline_t`) instead of
+    raising.
+  - The off-land energy part is found by the substring "energy" in `Emission Type` (`row_inputs.get_row_inputs`); the
+    input file should carry the scope as a column.
+- [ ] **Rule 5, one quantity in one place.** The rows' left-hand side is computed three times: the row coefficients
+      (`row_builder.get_ghg_coeffs`), the GHG total in `simulation.store_solution`, and `simulation.get_ghg_split`,
+      which calls the economics functions again and splits term 1 by subtraction a second time (as
+      `get_ghg_matrices_parts` does). The constants on the right-hand side (EXO, the two baselines) are written in
+      `get_ghg_rhs` and again in `get_ghg_split`. They agree today; a change in one will not show in the other.
+- [ ] **One family, one `get_*` (the row_builder rule).** Today one `get_ghg` builds both rows, their coefficients and
+      right-hand sides computed together as `{'AG': ..., 'LULUCF': ...}` dicts (`get_ghg_coeffs`, `get_ghg_rhs`), and
+      the single net row of Xinhao's Paper 2 runs is a branch inside it (`GHG_NET_ROW`). Jinzhu's alternative: one
+      self-contained function per row — `get_ghg_ag`, `get_ghg_lulucf` (and `get_ghg_net`), each reading its own
+      target and building its own row — and the year's GHG report read off the rows themselves (each row's
+      coefficients · x plus its constants), so that `simulation.get_ghg_split` (Nick's, `cdc90a0d`) no longer computes
+      the left-hand side and the constants a second time.
+- [ ] **Unused input**: `Data.GHG_LULUCF_BUDGET` (above).
+- [ ] Smaller:
+  - `get_ghg_rhs` writes the LULUCF right-hand side as (MOD + EXO) − EXO.
+  - The HIR baseline indexes by position (`[:, :, 0]`, `ha_mj[fy][m, j]`).
+  - `GHG_EMISSIONS_LIMITS` 'low' / 'high' no longer choose the targets, only the AusTIMES demand pathway and the carbon
+    price, so the name misleads.
+
+### What is right and should stay
+
+- The sub-term → row tables sit beside the functions that make the sub-terms (`AG_MAN_GHG_SUBTERMS`,
+  `NON_AG_GHG_SUBTERMS`), keyed by name; a name that does not match raises.
+- The rows are added only in years whose role is BINDING (from 2025); `GHG_BENCHMARK_ROWS` is checked loudly.
+- The series files are checked on reading: years aligned, no blanks, the roles of the series agree.
+
+### For the solver (GPU pipeline)
+
+The LULUCF row is what the GPU barrier fails on, even where it does not bind (a 2025 RES1 model: optimal without it,
+numerical error with it); the AG row can stay in the matrix. While neither row binds, a solve without the LULUCF row
+followed by a check that it holds is enough. A price search on it is needed only once the target binds.
+
+---
+
 ## 20261120 — transition matrices: store "not allowed" without NaN
 
 ### TL;DR
