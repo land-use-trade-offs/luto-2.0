@@ -5,6 +5,42 @@ Entries are in **descending date order** (newest first). Each entry stands on it
 
 ---
 
+## 20261124 — clear small shares every year, and make irreversibility hold only above the floor
+
+### TL;DR
+
+Every share a solved year leaves in a cell becomes the next year's source: its own transition arcs, a node-balance row
+whose constant is that share, and, for an irreversible land use, a lower bound carried on for good. Small shares pile
+up year on year (distinct cell-grouping keys in a RES1 annual run: 37 k in 2024, 43 k in 2026, 49 k in 2027), and from
+2027 cuOpt's barrier needed 5–10x the iterations it needed before (1,600–3,000 against 210–355). The tool exists:
+`settings.SOLUTION_SHARE_FLOOR` (`post_solve.clear_specks`) clears every ag / non-ag share at or below the floor before
+the solution is stored and adds it to the cell's largest share of the same kind. It is off (`None`); its comment
+recommends `1e-4`, for barrier runs without crossover. The plan is to use it at **0.01** and to amend the
+irreversibility rule to match.
+
+### The amended rule
+
+An irreversible land use (the non-ag land uses with `NON_AG_LAND_USES_REVERSIBLE` False; HIR, Utility Solar PV, Onshore
+Wind in `AG_MANAGEMENTS_REVERSIBLE`) cannot be removed once its share of a cell is **above** `SOLUTION_SHARE_FLOOR`; a
+share at or below it is cleared like any other. The code already behaves this way when the floor is set — the
+irreversibility bounds are read from the stored, cleared solution — so the change is to the rule as written (settings
+comments, docs). Irreversibility then protects decisions, not the slivers a vertex or numerical dust leaves.
+
+### To decide and to state when it is adopted
+
+- [ ] Test first (Gurobi only, so the effect is the model's size, not one engine's): the same scenario twice, floor
+      `None` against `0.01`; compare per-year solve time, model size (rows, columns, nonzeros) and the results
+      (objective, production, GHG, GBF scores) year by year.
+- [ ] Carbon continuity: a cleared planting's sequestration stops the next year; no emission or transition cost is
+      charged for its removal. Small at 1 % of a cell, but an accounting break to state in the report.
+- [ ] 1 % of a cell is a different area at each resolution (about 1 ha at RES1, about 25 ha at RES5). A floor in
+      hectares would be resolution-free.
+- [ ] A floor changes results: runs with it are not comparable with runs without it.
+- [ ] Considered and dropped: "at most three land uses per cell" (a cardinality rule needs a binary per (cell, land
+      use) — a MIP with hundreds of millions of binaries at RES1).
+
+---
+
 ## 20261123 — the two GHG rows (agriculture, net LULUCF): review before talking with Nick
 
 ### TL;DR
