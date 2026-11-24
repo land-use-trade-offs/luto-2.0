@@ -21,7 +21,6 @@
 from pathlib import Path
 import os
 import re
-import glob
 import json
 import base64
 import zlib
@@ -573,7 +572,7 @@ def get_map2json_paged(
 
     # Read manifest from the first year's chunks dir.
     first_dir  = next(iter(chunks_dirs.values()))
-    chunk_files_first = sorted(glob.glob(Path(first_dir) / 'chunk_*.nc'))
+    chunk_files_first = sorted(Path(first_dir).glob('chunk_*.nc'))
     if not chunk_files_first:
         return
     with open(Path(first_dir) / 'manifest.json') as f:

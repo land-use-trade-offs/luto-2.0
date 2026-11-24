@@ -22,7 +22,6 @@ from pathlib import Path
 import os
 import gc
 import re
-import glob
 import json
 import shutil
 import threading
@@ -194,14 +193,14 @@ def concat_tmp2nc(tmp_dir: str, save_path: str):
     Files are loaded eagerly (not lazily) so Windows releases file handles before
     the tmp dir is deleted.
     """
-    nc_files = sorted(glob.glob(Path(tmp_dir) / 'layer_*.nc'))
+    nc_files = sorted(Path(tmp_dir).glob('layer_*.nc'))
     n_cells  = xr.open_dataarray(nc_files[0]).sizes['cell']
 
     das = []
     for nc_f in nc_files:
         with xr.open_dataarray(nc_f) as raw:
             da = raw.load()                          # eager — releases file handle on context exit
-        csv_f = nc_f.replace('.nc', '_coords.csv')
+        csv_f = nc_f.with_name(f'{nc_f.stem}_coords.csv')
         if Path(csv_f).exists():
             coord_df = pd.read_csv(csv_f)
             mindex   = pd.MultiIndex.from_frame(coord_df)
