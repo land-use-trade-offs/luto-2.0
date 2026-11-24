@@ -26,6 +26,7 @@ model that has 'global' varying state.
 """
 
 import re
+import gc
 import time
 import threading
 import joblib
@@ -244,98 +245,110 @@ def solve_timeseries(
     carry = set()                                                                            # row generation: the targets whose rows the next step starts with
 
     for base_year, target_year in zip(years_to_run[:-1], years_to_run[1:]):
-        print( "-------------------------------------------------", flush=True)
-        print( f"Running for year {target_year}"   , flush=True)
-        print( "-------------------------------------------------\n", flush=True)
-        start_time = time.time()
-        out_dir = f"{data.path}/out_{target_year}"
-
-        # ─────────────── 1. the columns: the unknowns ───────────────
-        cols, col_support = get_cols(data, base_year)                                       # the column table, and what the row side reads beside it
-
-        # ─────────────── 2. the rows: the constraints ───────────────
-        inputs = get_row_inputs(data, base_year, target_year)                               # the coefficient streams and targets
-        row_matrix, rows = get_rows(inputs, cols, col_support)                              # the matrix, and the row table on the same rows
-
-        # ─────────────── 3. row generation: the biodiversity targets and their screen (settings.BIO_ROW_GENERATION) ───────────────
-        #     built here, while the column support still holds cell2col / ag_mrj2col
-        rowgen = None
-        bio_on = any(target != 'off' for target in (settings.GBF2_TARGET, settings.GBF3_NVIS_TARGET, settings.GBF4_TARGET_SNES,
-                                                    settings.GBF4_TARGET_ECNES, settings.GBF8_TARGET))
-        if settings.BIO_ROW_GENERATION and bio_on:
-            rowgen = RowGen(data, inputs, cols, col_support, base_year, target_year, carry)
-        col_support.cell2col = col_support.ag_mrj2col = col_support.nonag_rk2col = None     # freed before the solve (GBs at RES1); the masks and the regions stay for post_solve
-        if rowgen is not None and rowgen.blocked.any() and settings.BOUND_PROP_ON_IMPOSSIBLE == 'stop':
-            print('!' * 100, flush=True)
-            print(f"Year {target_year}: {int(rowgen.blocked.sum()):,} hard biodiversity target(s) cannot be met at any feasible point (the screen), so no solve can succeed. "
-                  f"Stopping before the model is built.", flush=True)
-            print('!' * 100, flush=True)
+        solved, carry = solve_year(data, base_year, target_year, carry, checkpoint_path)
+        gc.collect()                                                                          # the year's tables are unreachable now: free them before the next year builds its own
+        if not solved:
             break
 
-        # ─────────────── 4. the objective ───────────────
-        obj = get_obj(get_economics(data, base_year, target_year), cols, inputs)            # million AUD; the economy streams (~300 MB at RES5, ~7 GB at RES1) die with the call
 
-        # ─────────────── 5. the tables the solver takes: settings.CELL_GROUPING groups alike cells into blobs ───────────────
-        #     (the grouped solver's x is mapped back to every cell below)
-        tables = Tables(row_matrix, rows, cols, obj)
-        grouping = group_tables(tables, data.REAL_AREA.values, col_support.region2cell) if settings.CELL_GROUPING else None
-        solved = tables if grouping is None else grouping.tables
+def solve_year(data: Data, base_year: int, target_year: int, carry: set, checkpoint_path: Path | None) -> tuple[bool, set]:
+    """One step, base_year -> target_year: build the tables, solve, store the solution, checkpoint. (solved, the row
+    generation's carry for the next step). Every table, array and solver the step builds is local here, so it is freed
+    when the step returns — not kept until the next step overwrites it (about 90 GB at RES1, 2026-11-23)."""
+    print( "-------------------------------------------------", flush=True)
+    print( f"Running for year {target_year}"   , flush=True)
+    print( "-------------------------------------------------\n", flush=True)
+    start_time = time.time()
+    out_dir = f"{data.path}/out_{target_year}"
 
-        # ─────────────── 6. the pre-solve diagnosis: bound propagation over the rows of the tables the solver takes ───────────────
-        #     On the grouped tables under CELL_GROUPING (2026-11-23): ~10 times fewer rows than the full model, and the model
-        #     actually solved. Nothing is missed: a grouped column's box lies inside its cells' (lb the largest, ub the
-        #     smallest), so a row impossible over the full box is impossible over the grouped one; a row impossible only
-        #     when grouped is one the grouped solve would fail on. The cost: a year it stops has built its economics and blobs.
-        bounds = get_row_bounds(solved.row_matrix, solved.rows, solved.cols)               # every row's interval over the column box, and its verdict
-        drop_redundant_rows(solved.rows, bounds, settings.BOUND_PROP_DROP_FAMILIES)         # opt-in per family: rows every point of the box satisfies never reach the solver
-        report_row_bounds(solved.rows, bounds, target_year, out_dir)                        # the log table, bound_report_<year>.csv, bound_preflight_<year>.csv
-        impossible = (bounds['status'].values == STATUS.index('impossible')) | (bounds['status_implied'].values == STATUS.index('impossible'))
-        n_impossible = int((impossible & ~elastic_absorbs(solved.rows, bounds)).sum())     # an elastic row whose slack can reach the rhs does not stop the year
-        if n_impossible and settings.BOUND_PROP_ON_IMPOSSIBLE == 'stop':
-            print('!' * 100, flush=True)
-            print(f"Year {target_year}: {n_impossible:,} row(s) cannot hold at any point the column box and the rows' own bounds allow, so no solve can succeed "
-                  f"(see {out_dir}/bound_report_{target_year}.csv). Stopping before the model is built.", flush=True)
-            print('!' * 100, flush=True)
-            break
+    # ─────────────── 1. the columns: the unknowns ───────────────
+    cols, col_support = get_cols(data, base_year)                                       # the column table, and what the row side reads beside it
 
-        # ─────────────── 7. the solve: the tables are the state, a solver is built from them for every solve ───────────────
-        on_first_model = (lambda model: save_model_to_disk(model, data.path, base_year, target_year)) if settings.WRITE_DEBUG_MPS else None   # the debug MPS, BEFORE the first solve (off by default: ~5 GB a year)
-        accepted, x_solved, status, luto_solver = solve_step(solved, inputs, rowgen, target_year, out_dir, on_first_model=on_first_model)
-        if grouping is None:
-            cols, obj = luto_solver.cols, luto_solver.obj                                    # the final tables: with the shortfall columns, the dropped rows off
+    # ─────────────── 2. the rows: the constraints ───────────────
+    inputs = get_row_inputs(data, base_year, target_year)                               # the coefficient streams and targets
+    row_matrix, rows = get_rows(inputs, cols, col_support)                              # the matrix, and the row table on the same rows
 
-        if not accepted:
-            print(f'Processing for {target_year} completed in {round(time.time() - start_time)} seconds\n\n' , flush=True)
-            print('!' * 100, flush=True)
-            print(f"Solver status for year {target_year}: {SOLVER_STATUS_MSGS.get(status, f'unexpected status {status}')}", flush=True)
-            print('!' * 100, flush=True)
-            print('\n', flush=True)
-            break
+    # ─────────────── 3. row generation: the biodiversity targets and their screen (settings.BIO_ROW_GENERATION) ───────────────
+    #     built here, while the column support still holds cell2col / ag_mrj2col
+    rowgen = None
+    bio_on = any(target != 'off' for target in (settings.GBF2_TARGET, settings.GBF3_NVIS_TARGET, settings.GBF4_TARGET_SNES,
+                                                settings.GBF4_TARGET_ECNES, settings.GBF8_TARGET))
+    if settings.BIO_ROW_GENERATION and bio_on:
+        rowgen = RowGen(data, inputs, cols, col_support, base_year, target_year, carry)
+    col_support.cell2col = col_support.ag_mrj2col = col_support.nonag_rk2col = None     # freed before the solve (GBs at RES1); the masks and the regions stay for post_solve
+    if rowgen is not None and rowgen.blocked.any() and settings.BOUND_PROP_ON_IMPOSSIBLE == 'stop':
+        print('!' * 100, flush=True)
+        print(f"Year {target_year}: {int(rowgen.blocked.sum()):,} hard biodiversity target(s) cannot be met at any feasible point (the screen), so no solve can succeed. "
+              f"Stopping before the model is built.", flush=True)
+        print('!' * 100, flush=True)
+        return False, carry
 
-        # ─────────────── 8. the solution: stored, reported, checkpointed ───────────────
-        x = x_solved if grouping is None else grouping.col_map @ x_solved                    # over the full column table: every cell of a blob takes the blob's share
-        if grouping is not None:
-            report_grouping(grouping, tables, x, target_year, out_dir)                       # every row of the full model at the mapped x; grouping_<year>.csv
-        solution = post_solve(x, cols, col_support, inputs)                                    # the LUTO 1-D format
-        slack = cols['block'].values == 'slack'                                               # the elastic rows' shortfall columns (settings.ELASTIC_FAMILIES)
-        penalty = float(obj[slack] @ x[slack]) if slack.any() else 0.0                      # million AUD: the penalty in the objective, bookkeeping not money
-        if penalty:
-            print(f"Year {target_year}: objective {luto_solver.gurobi_model.ObjVal:,.2f} includes the elastic penalty {penalty:,.2f} (million AUD); "
-                  f"stored without it: {luto_solver.gurobi_model.ObjVal - penalty:,.2f}", flush=True)
-        store_solution(data, target_year, solution, luto_solver.gurobi_model.ObjVal - penalty, inputs)
-        data.last_year = target_year                                                            # only a solved and stored year: the writers report through it
+    # ─────────────── 4. the objective ───────────────
+    obj = get_obj(get_economics(data, base_year, target_year), cols, inputs)            # million AUD; the economy streams (~300 MB at RES5, ~7 GB at RES1) die with the call
 
-        record_shadow_prices(luto_solver, target_year, out_dir)
-        if not settings.ELASTIC_DROP_SHORT:                                                   # under the two-pass step, pass 1's shortfall was written before the drop
-            report_shortfall(x_solved, luto_solver.rows, target_year, out_dir)
-        if rowgen is not None:
-            rowgen.report(luto_solver.rows, out_dir)
-            carry = rowgen.carry_next(luto_solver.rows)
+    # ─────────────── 5. the tables the solver takes: settings.CELL_GROUPING groups alike cells into blobs ───────────────
+    #     (the grouped solver's x is mapped back to every cell below)
+    tables = Tables(row_matrix, rows, cols, obj)
+    grouping = group_tables(tables, data.REAL_AREA.values, col_support.region2cell) if settings.CELL_GROUPING else None
+    solved = tables if grouping is None else grouping.tables
 
-        if checkpoint_path is not None:
-            save_checkpoint(data, checkpoint_path, target_year)
+    # ─────────────── 6. the pre-solve diagnosis: bound propagation over the rows of the tables the solver takes ───────────────
+    #     On the grouped tables under CELL_GROUPING (2026-11-23): ~10 times fewer rows than the full model, and the model
+    #     actually solved. Nothing is missed: a grouped column's box lies inside its cells' (lb the largest, ub the
+    #     smallest), so a row impossible over the full box is impossible over the grouped one; a row impossible only
+    #     when grouped is one the grouped solve would fail on. The cost: a year it stops has built its economics and blobs.
+    bounds = get_row_bounds(solved.row_matrix, solved.rows, solved.cols)               # every row's interval over the column box, and its verdict
+    drop_redundant_rows(solved.rows, bounds, settings.BOUND_PROP_DROP_FAMILIES)         # opt-in per family: rows every point of the box satisfies never reach the solver
+    report_row_bounds(solved.rows, bounds, target_year, out_dir)                        # the log table, bound_report_<year>.csv, bound_preflight_<year>.csv
+    impossible = (bounds['status'].values == STATUS.index('impossible')) | (bounds['status_implied'].values == STATUS.index('impossible'))
+    n_impossible = int((impossible & ~elastic_absorbs(solved.rows, bounds)).sum())     # an elastic row whose slack can reach the rhs does not stop the year
+    if n_impossible and settings.BOUND_PROP_ON_IMPOSSIBLE == 'stop':
+        print('!' * 100, flush=True)
+        print(f"Year {target_year}: {n_impossible:,} row(s) cannot hold at any point the column box and the rows' own bounds allow, so no solve can succeed "
+              f"(see {out_dir}/bound_report_{target_year}.csv). Stopping before the model is built.", flush=True)
+        print('!' * 100, flush=True)
+        return False, carry
 
+    # ─────────────── 7. the solve: the tables are the state, a solver is built from them for every solve ───────────────
+    on_first_model = (lambda model: save_model_to_disk(model, data.path, base_year, target_year)) if settings.WRITE_DEBUG_MPS else None   # the debug MPS, BEFORE the first solve (off by default: ~5 GB a year)
+    accepted, x_solved, status, luto_solver = solve_step(solved, inputs, rowgen, target_year, out_dir, on_first_model=on_first_model)
+    if grouping is None:
+        cols, obj = luto_solver.cols, luto_solver.obj                                    # the final tables: with the shortfall columns, the dropped rows off
+
+    if not accepted:
         print(f'Processing for {target_year} completed in {round(time.time() - start_time)} seconds\n\n' , flush=True)
+        print('!' * 100, flush=True)
+        print(f"Solver status for year {target_year}: {SOLVER_STATUS_MSGS.get(status, f'unexpected status {status}')}", flush=True)
+        print('!' * 100, flush=True)
+        print('\n', flush=True)
+        return False, carry
+
+    # ─────────────── 8. the solution: stored, reported, checkpointed ───────────────
+    x = x_solved if grouping is None else grouping.col_map @ x_solved                    # over the full column table: every cell of a blob takes the blob's share
+    if grouping is not None:
+        report_grouping(grouping, tables, x, target_year, out_dir)                       # every row of the full model at the mapped x; grouping_<year>.csv
+    solution = post_solve(x, cols, col_support, inputs)                                    # the LUTO 1-D format
+    slack = cols['block'].values == 'slack'                                               # the elastic rows' shortfall columns (settings.ELASTIC_FAMILIES)
+    penalty = float(obj[slack] @ x[slack]) if slack.any() else 0.0                      # million AUD: the penalty in the objective, bookkeeping not money
+    if penalty:
+        print(f"Year {target_year}: objective {luto_solver.gurobi_model.ObjVal:,.2f} includes the elastic penalty {penalty:,.2f} (million AUD); "
+              f"stored without it: {luto_solver.gurobi_model.ObjVal - penalty:,.2f}", flush=True)
+    store_solution(data, target_year, solution, luto_solver.gurobi_model.ObjVal - penalty, inputs)
+    data.last_year = target_year                                                            # only a solved and stored year: the writers report through it
+
+    record_shadow_prices(luto_solver, target_year, out_dir)
+    if not settings.ELASTIC_DROP_SHORT:                                                   # under the two-pass step, pass 1's shortfall was written before the drop
+        report_shortfall(x_solved, luto_solver.rows, target_year, out_dir)
+    if rowgen is not None:
+        rowgen.report(luto_solver.rows, out_dir)
+        carry = rowgen.carry_next(luto_solver.rows)
+
+    if checkpoint_path is not None:
+        save_checkpoint(data, checkpoint_path, target_year)
+
+    luto_solver.gurobi_model.dispose()                                                      # the model's memory is Gurobi's (C), freed now rather than when Python collects it
+    print(f'Processing for {target_year} completed in {round(time.time() - start_time)} seconds\n\n' , flush=True)
+    return True, carry
 
 
 def store_solution(data: Data, target_year: int, solution, obj_val: float, inputs: RowInputs) -> None:
