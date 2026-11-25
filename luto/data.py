@@ -369,12 +369,11 @@ class Data:
             'SHEEP - NATURAL LAND WOOL'
         ]
         
-        # Sheep grazing cereal stubble (settings.STUBBLE_DSE_FILE): its own products on each cereal land use, so that
+        # Sheep grazing cereal stubble (settings.STUBBLE_GRAZING): its own products on each cereal land use, so that
         # cereal columns carry sheep meat, wool and live exports into the sheep commodities' demand rows. One set per
         # stubble land use ('SHEEP - STUBBLE WINTER MEAT', ...), so each product has one land use and its quantity can
         # follow that land use's cells; the names never contain both words of a crop commodity.
-        stubble_dse_file = 'Nick_build/stubble_dse/stubble_dse_ha.nc' if settings.INPUT_SET == '2021' else settings.STUBBLE_DSE_FILE   # 2020-21: always grazed
-        self.LU_STUBBLE = settings.STUBBLE_LAND_USES if stubble_dse_file else []
+        self.LU_STUBBLE = settings.STUBBLE_LAND_USES if settings.STUBBLE_GRAZING else []
         self.LU2PR_STUBBLE = {lu: [f'SHEEP - STUBBLE {lu.split()[0].upper()} {x}' for x in ('LEXP', 'MEAT', 'WOOL')]
                               for lu in self.LU_STUBBLE}
         self.PR_STUBBLE = [pr for prs in self.LU2PR_STUBBLE.values() for pr in prs]
@@ -729,11 +728,11 @@ class Data:
             self.FEED_PER_HEAD = {'BEEF': 8, 'SHEEP': 1.5, 'DAIRY': 17}
 
         # The stubble carrying rate <unit: DSE per ha, annualised>, read on every cell and applied on the cereal land uses
-        # only (quantity.get_stubble_yield_pot); 0 where no file is given
-        if stubble_dse_file:
+        # only (quantity.get_stubble_yield_pot); 0 without stubble grazing
+        if settings.STUBBLE_GRAZING:
             # Built by input/Nick_build/scripts/stubble_dse.py: 0 on every cell without the sheep per-head data, no NaN
-            stubble_raw = xr.load_dataarray(Path(settings.INPUT_DIR) / stubble_dse_file)
-            self.STUBBLE_DSE_HA = self.get_resfactored_average(stubble_raw, stubble_dse_file)
+            stubble_raw = xr.load_dataarray(Path(settings.INPUT_DIR) / 'Nick_build/stubble_dse/stubble_dse_ha.nc')
+            self.STUBBLE_DSE_HA = self.get_resfactored_average(stubble_raw, 'stubble_dse_ha')
         else:
             self.STUBBLE_DSE_HA = xr.DataArray(np.zeros(self.NCELLS, dtype=np.float32), dims=['cell'], coords={'cell': np.arange(self.NCELLS)})
 

@@ -165,7 +165,7 @@ def get_stubble_yield_pot(data, lu, lm):
     """
     Return sheep grazing cereal stubble <unit: head/ha of cereal>: k_sheep x STUBBLE_DSE_HA / (feed per head (data.FEED_PER_HEAD) x grassfed
     factor), the pasture basis with the stubble carrying rate (DSE per ha, annualised) in place of the pasture feed.
-    No irrigation factor and no climate multiplier. 0 without a stubble file. Every stubble land use and lm has the
+    No irrigation factor and no climate multiplier. 0 without stubble grazing (settings.STUBBLE_GRAZING). Every stubble land use and lm has the
     same cell values (`lu`, `lm` are kept for the callers, which loop over them).
     """
     return data.LVSTK_K['SHEEP'].values * data.STUBBLE_DSE_HA.values / (data.FEED_PER_HEAD['SHEEP'] * GRASSFED_FACTOR['SHEEP'])

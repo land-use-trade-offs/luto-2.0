@@ -47,9 +47,9 @@ the base year is flipped to 2020-21.
   crop and livestock economics, emission factors, pasture productivity, the filled climate change impact multipliers, water
   delivery and licence prices, the productivity trend, domestic water use); every other input from INPUT_DIR. Each of them
   is chosen at its own read line in luto/data.py (search for INPUT_SET there). The livestock numbers follow the input set
-  too, whatever LVSTK_K_FILE and STUBBLE_DSE_FILE say: the per-type stocking k (Nick_build/livestock_map/lvstk_k.nc), the feed
-  per head it was calibrated with (livestock_dse_ratings.csv beside it) and sheep grazing cereal stubble, always on
-  (Nick_build/stubble_dse/stubble_dse_ha.nc). settings is never changed by Data.
+  too, whatever LVSTK_K_FILE says: the per-type stocking k (Nick_build/livestock_map/lvstk_k.nc) and the feed per head it was
+  calibrated with (livestock_dse_ratings.csv beside it). Sheep grazing cereal stubble is its own switch, STUBBLE_GRAZING: the
+  2020-21 livestock map is calibrated with it, so set it True with '2021'. settings is never changed by Data.
   The block-mean caches of the 22 files carry '_2021' in their name (input/_cache).
 '''
 
@@ -843,18 +843,19 @@ The per-type stocking calibration k, in place of FEED_REQ in the stocking rate (
   'DAIRY' over `cell` (every full-resolution land cell, the same cells as feed_req.nc): each cell's SA2 k per type.
 '''
 
-STUBBLE_DSE_FILE = None
+STUBBLE_GRAZING = False
 '''
 Sheep grazing cereal stubble, a co-product of the cereal land uses (STUBBLE_LAND_USES).
-- None: no stubble sheep; the product list is as before.
-- A file name (relative to INPUT_DIR, or an absolute path): a NetCDF file with one float variable over `cell` (every
-  full-resolution land cell) holding the stubble carrying rate in DSE per ha, annualised. Cereal cells then carry
-  k_sheep x rate / (DSE per head x grassfed factor) sheep per ha, whose meat, wool and live exports (products
-  'SHEEP - STUBBLE <WINTER|SUMMER> MEAT / WOOL / LEXP', one set per stubble land use) count toward the sheep demand
-  rows and whose emissions sit on the agriculture row. Per-head economics and emission factors are the cell's sheep
-  values (provisional).
+- False: no stubble sheep; the product list is as before.
+- True: Data reads the stubble carrying rate (INPUT_DIR/Nick_build/stubble_dse/stubble_dse_ha.nc: DSE per ha, annualised,
+  over every full-resolution land cell). Cereal cells then carry k_sheep x rate / (feed per head x grassfed factor) sheep
+  per ha, whose meat, wool and live exports (products 'SHEEP - STUBBLE <WINTER|SUMMER> MEAT / WOOL / LEXP', one set per
+  stubble land use) count toward the sheep demand rows and whose emissions sit on the agriculture row. Per-head economics
+  and emission factors are the cell's sheep values (provisional).
+The rate file is built on the 2020-21 inputs, and the 2020-21 livestock map is calibrated with its stubble sheep: set True
+with INPUT_SET '2021'.
 '''
-STUBBLE_LAND_USES = ['Winter cereals', 'Summer cereals']  # The cereal land uses whose stubble sheep may graze when STUBBLE_DSE_FILE is set; unused when it is None.
+STUBBLE_LAND_USES = ['Winter cereals', 'Summer cereals']  # The cereal land uses whose stubble sheep graze when STUBBLE_GRAZING is True; unused when it is False.
 
 
 # ---------------------------------------------------------------------------- #
