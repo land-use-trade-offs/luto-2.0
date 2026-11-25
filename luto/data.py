@@ -158,18 +158,10 @@ class Data:
         print(f'Data Initialization at RES{settings.RESFACTOR}')
 
         self.YR_CAL_BASE = settings.YR_CAL_BASE  # The base year, i.e. where year index yr_idx == 0.
-        early = [yr for yr in settings.SIM_YEARS if yr <= self.YR_CAL_BASE]
-        if early:
-            raise ValueError(f"SIM_YEARS {early} are not after the base year YR_CAL_BASE = {self.YR_CAL_BASE}.")
-        if getattr(settings, 'INPUT_SET', '2010') == '2021' and settings.ECONOMICS_DOLLAR_YEAR != 2021:   # INPUT_SET: the input set, where the code has it
-            print(f"│   ⚠ WARNING: INPUT_SET '2021' reads FY2021-dollar economics, but ECONOMICS_DOLLAR_YEAR is "
-                  f"{settings.ECONOMICS_DOLLAR_YEAR}: the 2010-dollar constants are not rescaled to them.", flush=True)
-
-        if settings.INPUT_SET not in ('2010', '2021'):
-            raise ValueError(f"INPUT_SET must be '2010' or '2021', not {settings.INPUT_SET!r}.")
-        # TEMPORARY, until the base year is flipped to 2020-21: a file that differs between the input sets is chosen at its read
-        # line below, and its block-mean cache (input/_cache) carries this tag so the two sets never share a cache file
-        input_set_tag = '_2021' if settings.INPUT_SET == '2021' else ''
+        # TEMPORARY, until the base year is flipped to 2020-21: the inputs that describe the base year are chosen by YR_CAL_BASE
+        # at their read lines below, {base year: file}; a base year without inputs fails at the first of them. The block-mean
+        # cache (input/_cache) of such a file carries this tag, so the two bases never share a cache file
+        base_year_tag = {2010: '', 2021: '_2021'}[settings.YR_CAL_BASE]
 
         ###############################################################
         # Masking and spatial coarse graining.
@@ -184,7 +176,7 @@ class Data:
         self.MASK_LU_CODE = -1
 
         # Load LUMAP without resfactor
-        lumap_file = "Nick_build/livestock_map/lumap.nc" if settings.INPUT_SET == '2021' else "lumap.nc"
+        lumap_file = {2010: "lumap.nc", 2021: "Nick_build/livestock_map/lumap.nc"}[settings.YR_CAL_BASE]
         self.LUMAP_NO_RESFACTOR = xr.load_dataarray(Path(settings.INPUT_DIR) / lumap_file).astype(np.int8)       # 1D (ij flattend),  0-27 for land uses; -1 for non-agricultural land uses; All cells in Australia (land only)
 
         # NLUM mask.
@@ -280,12 +272,12 @@ class Data:
         #   Each table is read one column at a time: a chunk holds one column of every full-res cell, so a column is
         #   inflated whole and cut to the model cells (loading the whole table would hold every full-res column in
         #   memory). The cells are labelled 0 … NCELLS-1 (NCELLS is not set yet: the count of MASK).
-        agec_crops_file = "Nick_build/crop_economics/agec_crops.nc" if settings.INPUT_SET == '2021' else "agec_crops.nc"
+        agec_crops_file = {2010: "agec_crops.nc", 2021: "Nick_build/crop_economics/agec_crops.nc"}[settings.YR_CAL_BASE]
         with xr.open_dataset(Path(settings.INPUT_DIR) / agec_crops_file) as table:
-            self.AGEC_CROPS = self.get_resfactored_average(table['AGEC_CROPS'], f"agec_crops{input_set_tag}").set_xindex(['field', 'lm', 'lu'])
-        agec_lvstk_file = "Nick_build/livestock_economics/agec_lvstk.nc" if settings.INPUT_SET == '2021' else "agec_lvstk.nc"
+            self.AGEC_CROPS = self.get_resfactored_average(table['AGEC_CROPS'], f"agec_crops{base_year_tag}").set_xindex(['field', 'lm', 'lu'])
+        agec_lvstk_file = {2010: "agec_lvstk.nc", 2021: "Nick_build/livestock_economics/agec_lvstk.nc"}[settings.YR_CAL_BASE]
         with xr.open_dataset(Path(settings.INPUT_DIR) / agec_lvstk_file) as table:
-            self.AGEC_LVSTK = self.get_resfactored_average(table['AGEC_LVSTK'], f"agec_lvstk{input_set_tag}").set_xindex(['field', 'animal'])
+            self.AGEC_LVSTK = self.get_resfactored_average(table['AGEC_LVSTK'], f"agec_lvstk{base_year_tag}").set_xindex(['field', 'animal'])
         
         # Price multipliers for livestock and crops over the years.
         self.CROP_PRICE_MULTIPLIERS = pd.read_excel(Path(settings.INPUT_DIR) / "ag_price_multipliers.xlsx", sheet_name="AGEC_CROPS", index_col="Year")
@@ -537,7 +529,7 @@ class Data:
         self.NCELLS = self.REAL_AREA.sizes['cell']
         
         # Initial (2010) ag decision variable (X_mrj).
-        lmmap_file = "Nick_build/livestock_map/lmmap.nc" if settings.INPUT_SET == '2021' else "lmmap.nc"
+        lmmap_file = {2010: "lmmap.nc", 2021: "Nick_build/livestock_map/lmmap.nc"}[settings.YR_CAL_BASE]
         self.LMMAP_NO_RESFACTOR = xr.load_dataarray(Path(settings.INPUT_DIR) / lmmap_file)
         self.AG_L_MRJ = self.get_exact_resfactored_lumap_mrj()
         self.add_ag_dvars(self.YR_CAL_BASE, self.AG_L_MRJ)
@@ -589,9 +581,9 @@ class Data:
 
         #   (column, cell) at the model cells, the columns labelled (lm, lu, year)
         cci_name = "climate_change_impacts_" + settings.YIELD_RCP + "_CO2_FERT_" + settings.CO2_FERT.upper() + ".nc"
-        cci_file = f"Nick_build/cci_fill/{cci_name}" if settings.INPUT_SET == '2021' else cci_name
+        cci_file = {2010: cci_name, 2021: f"Nick_build/cci_fill/{cci_name}"}[settings.YR_CAL_BASE]
         with xr.open_dataset(Path(settings.INPUT_DIR) / cci_file) as table:
-            self.CLIMATE_CHANGE_IMPACT = self.get_resfactored_average(table['CLIMATE_CHANGE_IMPACT'], f"{Path(cci_name).stem}{input_set_tag}").set_xindex(['lm', 'lu', 'year'])
+            self.CLIMATE_CHANGE_IMPACT = self.get_resfactored_average(table['CLIMATE_CHANGE_IMPACT'], f"{Path(cci_name).stem}{base_year_tag}").set_xindex(['lm', 'lu', 'year'])
         
         # The impact files are multipliers relative to 2010 (CLIMATE_FILE_ANCHOR_YEAR): their years are {2020, 2050, 2080}
         # and 2010 is 1 by construction. They are re-anchored to the base year, so the multiplier is 1 at YR_CAL_BASE.
@@ -735,7 +727,7 @@ class Data:
 
         # The stocking calibration k per livestock type, in place of FEED_REQ: one layer per type over the model cells,
         # each cell carrying its SA2's k for that type. Without a file every type takes FEED_REQ (the model as before).
-        lvstk_k_file = 'Nick_build/livestock_map/lvstk_k.nc' if settings.INPUT_SET == '2021' else settings.LVSTK_K_FILE
+        lvstk_k_file = {2010: settings.LVSTK_K_FILE, 2021: 'Nick_build/livestock_map/lvstk_k.nc'}[settings.YR_CAL_BASE]
         if lvstk_k_file:
             lvstk_k = xr.load_dataset(Path(settings.INPUT_DIR) / lvstk_k_file)
             self.LVSTK_K = {
@@ -748,7 +740,7 @@ class Data:
         # Feed per head, the divisor of the stocking rate (quantity.get_yield_pot), in the unit the k above was calibrated with:
         # 2010-11 in DSE per head; 2020-21 in kg dry matter per head per day, the intake ratings written by the build beside its k
         # (read at full precision: they are the figures the k was fitted with)
-        if settings.INPUT_SET == '2021':
+        if settings.YR_CAL_BASE == 2021:
             self.FEED_PER_HEAD = pd.read_csv(
                 Path(settings.INPUT_DIR) / 'Nick_build/livestock_map/livestock_dse_ratings.csv', float_precision='round_trip'
             ).set_index('animal')['intake_kg_dm_day'].to_dict()
@@ -764,8 +756,8 @@ class Data:
         else:
             self.STUBBLE_DSE_HA = xr.DataArray(np.zeros(self.NCELLS, dtype=np.float32), dims=['cell'], coords={'cell': np.arange(self.NCELLS)})
 
-        pasture_file = "Nick_build/pasture_productivity/pasture_kg_dm_ha.nc" if settings.INPUT_SET == '2021' else "pasture_kg_dm_ha.nc"
-        self.PASTURE_KG_DM_HA = self.get_resfactored_average(xr.load_dataarray(Path(settings.INPUT_DIR) / pasture_file).astype(np.float32), f"pasture_kg_dm_ha{input_set_tag}")   # int16 on file
+        pasture_file = {2010: "pasture_kg_dm_ha.nc", 2021: "Nick_build/pasture_productivity/pasture_kg_dm_ha.nc"}[settings.YR_CAL_BASE]
+        self.PASTURE_KG_DM_HA = self.get_resfactored_average(xr.load_dataarray(Path(settings.INPUT_DIR) / pasture_file).astype(np.float32), f"pasture_kg_dm_ha{base_year_tag}")   # int16 on file
         self.SAFE_PUR_NATL = self.get_resfactored_average(xr.load_dataarray(Path(settings.INPUT_DIR) / "safe_pur_natl.nc"), "safe_pur_natl.nc")
         self.SAFE_PUR_MODL = self.get_resfactored_average(xr.load_dataarray(Path(settings.INPUT_DIR) / "safe_pur_modl.nc"), "safe_pur_modl.nc")
 
@@ -958,7 +950,7 @@ class Data:
 
         # Yield increases.
         if settings.PRODUCTIVITY_TREND == 'BAU':
-            yield_increase_file = "Nick_build/livestock_economics/yieldincreases_bau2022.csv" if settings.INPUT_SET == '2021' else "yieldincreases_bau2022.csv"
+            yield_increase_file = {2010: "yieldincreases_bau2022.csv", 2021: "Nick_build/livestock_economics/yieldincreases_bau2022.csv"}[settings.YR_CAL_BASE]
             fpath = Path(settings.INPUT_DIR) / yield_increase_file
             productivity_trend = pd.read_csv(fpath, header=[0, 1]).astype(np.float32)
             # The csv has no year column: row 0 is 2010 (multiplier 1.0, cumulative growth since then). The
@@ -1028,17 +1020,17 @@ class Data:
         # Load greenhouse gas emissions from agriculture
         #   (column, cell) at the model cells, the columns labelled (field, lm, lu) / (animal, field); the irrigated
         #   pasture emissions one variable per column over cell
-        agghg_crops_file = "Nick_build/crop_economics/agGHG_crops.nc" if settings.INPUT_SET == '2021' else "agGHG_crops.nc"
+        agghg_crops_file = {2010: "agGHG_crops.nc", 2021: "Nick_build/crop_economics/agGHG_crops.nc"}[settings.YR_CAL_BASE]
         with xr.open_dataset(Path(settings.INPUT_DIR) / agghg_crops_file) as table:
-            self.AGGHG_CROPS = self.get_resfactored_average(table['AGGHG_CROPS'], f"agGHG_crops{input_set_tag}").set_xindex(['field', 'lm', 'lu'])
-        agghg_lvstk_file = "Nick_build/ghg_factors/agGHG_lvstk.nc" if settings.INPUT_SET == '2021' else "agGHG_lvstk.nc"
+            self.AGGHG_CROPS = self.get_resfactored_average(table['AGGHG_CROPS'], f"agGHG_crops{base_year_tag}").set_xindex(['field', 'lm', 'lu'])
+        agghg_lvstk_file = {2010: "agGHG_lvstk.nc", 2021: "Nick_build/ghg_factors/agGHG_lvstk.nc"}[settings.YR_CAL_BASE]
         with xr.open_dataset(Path(settings.INPUT_DIR) / agghg_lvstk_file) as table:
-            self.AGGHG_LVSTK = self.get_resfactored_average(table['AGGHG_LVSTK'], f"agGHG_lvstk{input_set_tag}").set_xindex(['animal', 'field'])
+            self.AGGHG_LVSTK = self.get_resfactored_average(table['AGGHG_LVSTK'], f"agGHG_lvstk{base_year_tag}").set_xindex(['animal', 'field'])
         
-        agghg_irrpast_file = "Nick_build/ghg_factors/agGHG_irrpast.nc" if settings.INPUT_SET == '2021' else "agGHG_irrpast.nc"
+        agghg_irrpast_file = {2010: "agGHG_irrpast.nc", 2021: "Nick_build/ghg_factors/agGHG_irrpast.nc"}[settings.YR_CAL_BASE]
         agghg_irrpast = xr.load_dataset(Path(settings.INPUT_DIR) / agghg_irrpast_file)
         self.AGGHG_IRRPAST = xr.Dataset({                                     # the CO2E columns; CELL_ID and SA2_ID (ids) are not read
-            name: self.get_resfactored_average(agghg_irrpast[name].astype(np.float32), f'agGHG_irrpast_{name}{input_set_tag}')   # CO2E_KG_HA_HARVEST is int8 on file
+            name: self.get_resfactored_average(agghg_irrpast[name].astype(np.float32), f'agGHG_irrpast_{name}{base_year_tag}')   # CO2E_KG_HA_HARVEST is int8 on file
             for name in agghg_irrpast.data_vars if name.startswith('CO2E')
         })
 
@@ -1056,7 +1048,7 @@ class Data:
         # (lm, lu) at all; EXCLUDE_FRAC how much of it may: the share of the block's land-use cells (LUMASK, the cells
         # RESFACTOR 1 models) that are eligible, which caps the cell's ag upper bound (col_builder.get_trans_ub_ag_mrj).
         # At RESFACTOR 1 a cell is eligible or not, so the share is EXCLUDE itself.
-        x_mrj_file = "Nick_build/eligibility/x_mrj.nc" if settings.INPUT_SET == '2021' else "x_mrj.nc"
+        x_mrj_file = {2010: "x_mrj.nc", 2021: "Nick_build/eligibility/x_mrj.nc"}[settings.YR_CAL_BASE]
         x_mrj_full = xr.load_dataarray(Path(settings.INPUT_DIR) / x_mrj_file)                                       # (lm, cell, lu) over the FULL-RES cells, no cell coordinate
         if settings.RESFACTOR == 1:
             self.EXCLUDE = x_mrj_full.sel(lm=self.LANDMANS, lu=self.AGRICULTURAL_LANDUSES).isel(cell=self.MASK).values
@@ -1270,15 +1262,15 @@ class Data:
         )
 
         # Spatially explicit costs of a water licence per ML.
-        water_licence_file = "Nick_build/water_licence_price/water_licence_price.nc" if settings.INPUT_SET == '2021' else "water_licence_price.nc"
+        water_licence_file = {2010: "water_licence_price.nc", 2021: "Nick_build/water_licence_price/water_licence_price.nc"}[settings.YR_CAL_BASE]
         self.WATER_LICENCE_PRICE = self.get_resfactored_average(
             xr.load_dataarray(Path(settings.INPUT_DIR) / water_licence_file).astype(np.float32),   # int16 on file: a price, averaged as one; no NaN
-            f"water_licence_price{input_set_tag}",
+            f"water_licence_price{base_year_tag}",
         )
 
         # Spatially explicit costs of water delivery per ML.
-        water_delivery_file = "Nick_build/livestock_economics/water_delivery_price.nc" if settings.INPUT_SET == '2021' else "water_delivery_price.nc"
-        self.WATER_DELIVERY_PRICE = self.get_resfactored_average(xr.load_dataarray(Path(settings.INPUT_DIR) / water_delivery_file), f"water_delivery_price{input_set_tag}").fillna(0)
+        water_delivery_file = {2010: "water_delivery_price.nc", 2021: "Nick_build/livestock_economics/water_delivery_price.nc"}[settings.YR_CAL_BASE]
+        self.WATER_DELIVERY_PRICE = self.get_resfactored_average(xr.load_dataarray(Path(settings.INPUT_DIR) / water_delivery_file), f"water_delivery_price{base_year_tag}").fillna(0)
        
 
         # Water yields -- run off from a cell into catchment by deep-rooted, shallow-rooted, and natural land
@@ -1306,7 +1298,7 @@ class Data:
                 self.WATER_YIELD_OUTSIDE_LUTO_HIST[region_type] = water_region['OUTSIDE_LUTO_HIST_ML'].load()
         
         # Water use for domestic and industrial sectors.
-        water_use_domestic_file = "Nick_build/water_domestic/Water_Use_Domestic.csv" if settings.INPUT_SET == '2021' else "Water_Use_Domestic.csv"
+        water_use_domestic_file = {2010: "Water_Use_Domestic.csv", 2021: "Nick_build/water_domestic/Water_Use_Domestic.csv"}[settings.YR_CAL_BASE]
         water_use_domestic = pd.read_csv(Path(settings.INPUT_DIR) / water_use_domestic_file).query(f"REGION_TYPE == '{settings.WATER_REGION_DEF}'")
         self.WATER_USE_DOMESTIC = water_use_domestic.set_index('REGION_ID')['DOMESTIC_INDUSTRIAL_WATER_USE_ML'].to_dict()
 

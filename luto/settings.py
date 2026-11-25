@@ -38,22 +38,6 @@ INPUT_DIR = 'input'  # Folder of the model-ready input data, relative to the rep
 OUTPUT_DIR = 'output'  # Folder the runs are written to, one timestamped sub-folder per run.
 RAW_DATA = '../raw_data'  # Folder of the raw source data that dataprep.py turns into INPUT_DIR; not read during a run.
 
-INPUT_SET = '2010'
-'''
-The input set the base-year files come from. TEMPORARY: kept while the 2010-11 and 2020-21 bases are compared, removed when
-the base year is flipped to 2020-21.
-- '2010': every input from INPUT_DIR (the NLUM 2010-11 base).
-- '2021': 22 files are read from INPUT_DIR/Nick_build/<dataset>/ instead (land use and land management maps, eligibility,
-  crop and livestock economics, emission factors, pasture productivity, the filled climate change impact multipliers, water
-  delivery and licence prices, the productivity trend, domestic water use); every other input from INPUT_DIR. Each of them
-  is chosen at its own read line in luto/data.py (search for INPUT_SET there). The livestock numbers follow the input set
-  too, whatever LVSTK_K_FILE says: the per-type stocking k (Nick_build/livestock_map/lvstk_k.nc) and the feed per head it was
-  calibrated with (livestock_dse_ratings.csv beside it). Sheep grazing cereal stubble is its own switch, STUBBLE_GRAZING: the
-  2020-21 livestock map is calibrated with it, so set it True with '2021'. settings is never changed by Data.
-  The block-mean caches of the 22 files carry '_2021' in their name (input/_cache).
-'''
-
-
 # ---------------------------------------------------------------------------- #
 # Scenario parameters.                                                         #
 # ---------------------------------------------------------------------------- #
@@ -163,9 +147,21 @@ DYNAMIC_PRICE = True
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
 RESFACTOR = 5        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
-# The base year: the year the input maps, economics and factors describe (year index 0). Years are labelled by the
-# financial year they end (LUTO year Y = FY ending Y). Every simulated year must be after it. 2021 for the 2020-21 base.
 YR_CAL_BASE = 2010
+'''
+The base year: the year the input maps, economics and factors describe (year index 0). Years are labelled by the financial
+year they end (LUTO year Y = FY ending Y). Every year of SIM_YEARS is after it.
+TEMPORARY: a choice of two while the bases are compared; one base year once it is flipped to 2020-21.
+- 2010: every input from INPUT_DIR (the NLUM 2010-11 base).
+- 2021: the inputs that describe the base year are read from INPUT_DIR/Nick_build/<dataset>/ instead: 22 files (land use and
+  land management maps, eligibility, crop and livestock economics, emission factors, pasture productivity, the filled climate
+  change impact multipliers, water delivery and licence prices, the productivity trend, domestic water use), the per-type
+  stocking k (in place of LVSTK_K_FILE) and the feed per head it was calibrated with. Every other input is read from
+  INPUT_DIR as for 2010. Each is chosen at its own read line in luto/data.py, {base year: file}[YR_CAL_BASE]; their
+  block-mean caches carry '_2021' (input/_cache). The 2020-21 livestock map is calibrated with sheep grazing cereal stubble:
+  set STUBBLE_GRAZING = True with it.
+Any other year has no inputs: Data fails at the first of those read lines.
+'''
 
 # The step size for the temporal domain (years). For a 2021 base: [2022, 2023, 2024] + list(range(2025, 2051, 5)),
 # FY2022-24 annually (historical years, where the GHG rows are benchmarks), then every five years to 2050.
@@ -875,7 +871,7 @@ Sheep grazing cereal stubble, a co-product of the cereal land uses (STUBBLE_LAND
   stubble land use) count toward the sheep demand rows and whose emissions sit on the agriculture row. Per-head economics
   and emission factors are the cell's sheep values (provisional).
 The rate file is built on the 2020-21 inputs, and the 2020-21 livestock map is calibrated with its stubble sheep: set True
-with INPUT_SET '2021'.
+with YR_CAL_BASE = 2021.
 '''
 STUBBLE_LAND_USES = ['Winter cereals', 'Summer cereals']  # The cereal land uses whose stubble sheep graze when STUBBLE_GRAZING is True; unused when it is False.
 
