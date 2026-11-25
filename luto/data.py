@@ -36,6 +36,7 @@ import luto.economics.agricultural.water as ag_water
 
 from collections import defaultdict
 from collections.abc import MutableMapping
+from functools import cached_property
 from pathlib import Path
 from typing import Any, Literal, Optional
 from affine import Affine
@@ -998,18 +999,11 @@ class Data:
         
   
         # Boolean x_mrj matrix with allowed land uses j for each cell r under lm.
-        # When RESFACTOR > 1, average the block's land-use cells (LUMASK, the cells RESFACTOR 1 models); > 0 means eligible.
-        x_mrj_full = xr.load_dataarray(Path(settings.INPUT_DIR) / "x_mrj.nc")                                       # (lm, cell, lu) over the FULL-RES cells, no cell coordinate
         if settings.RESFACTOR == 1:
+            x_mrj_full = xr.load_dataarray(Path(settings.INPUT_DIR) / "x_mrj.nc")
             self.EXCLUDE = x_mrj_full.sel(lm=self.LANDMANS, lu=self.AGRICULTURAL_LANDUSES).isel(cell=self.MASK).values
         else:
-            self.EXCLUDE = np.stack([
-                np.stack([
-                    self.block_mean(x_mrj_full.sel(lm=lm, lu=lu).values & self.LUMASK)
-                    for lu in self.AGRICULTURAL_LANDUSES
-                ], axis=-1)
-                for lm in self.LANDMANS
-            ]) > 0
+            self.EXCLUDE = self.EXCLUDE_FRAC > 0
 
 
 
@@ -2188,6 +2182,21 @@ class Data:
         total = self.block_sum(arr)
         count = self.block_sum(~np.isnan(arr))
         return np.where(count > 0, total / np.maximum(count, 1), np.nan)
+
+
+    @cached_property
+    def EXCLUDE_FRAC(self) -> np.ndarray:
+        """Share of each block's land-use fine cells eligible for each (land management, land use)."""
+        if settings.RESFACTOR == 1:
+            return self.EXCLUDE
+        x_mrj_full = xr.load_dataarray(Path(settings.INPUT_DIR) / "x_mrj.nc")
+        return np.stack([
+            np.stack([
+                self.block_mean(x_mrj_full.sel(lm=lm, lu=lu).values & self.LUMASK)
+                for lu in self.AGRICULTURAL_LANDUSES
+            ], axis=-1)
+            for lm in self.LANDMANS
+        ]).astype(np.float32)
 
 
     def get_resfactored_lumap(self) -> np.ndarray:
