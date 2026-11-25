@@ -46,7 +46,7 @@ def get_env_plant_transitions_from_ag(
     # Hoist invariants outside the per-combo loop
     t_j        = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Environmental Plantings').values  # (N_AG_LUS,), NaN = prohibited
     est_mults  = data.EST_COST_MULTS[target_year]   # scalar
-    irr_scalar = settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[target_year]   # scalar
+    irr_scalar = settings.REMOVE_IRRIG_COST * data.DOLLAR_FACTOR * data.IRRIG_COST_MULTS[target_year]   # scalar
 
     result = {}
     for (from_m, from_j), cell_idx in mj_cell_map.items():
@@ -76,8 +76,8 @@ def get_rip_plant_transitions_from_ag(
     """{(from_m, from_j): $/cell/yr} to Riparian Plantings: establishment + T_MAT transition + irrigation removal + fencing."""
     t_j        = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Riparian Plantings').values
     est_mults  = data.EST_COST_MULTS[target_year]
-    irr_scalar = settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[target_year]
-    fence_scalar = settings.FENCING_COST_PER_M * data.FENCE_COST_MULTS[target_year]
+    irr_scalar = settings.REMOVE_IRRIG_COST * data.DOLLAR_FACTOR * data.IRRIG_COST_MULTS[target_year]
+    fence_scalar = settings.FENCING_COST_PER_M * data.DOLLAR_FACTOR * data.FENCE_COST_MULTS[target_year]
 
     result = {}
     for (from_m, from_j), cell_idx in mj_cell_map.items():
@@ -109,8 +109,8 @@ def get_sheep_agroforestry_transitions_from_ag(
     t_af_j       = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Sheep Agroforestry').values
     t_sheep_j    = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Sheep - modified land').values
     est_mults    = data.EST_COST_MULTS[target_year]
-    irr_scalar   = settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[target_year]
-    fence_scalar = settings.AF_FENCING_LENGTH_HA * settings.FENCING_COST_PER_M * data.FENCE_COST_MULTS[target_year]
+    irr_scalar   = settings.REMOVE_IRRIG_COST * data.DOLLAR_FACTOR * data.IRRIG_COST_MULTS[target_year]
+    fence_scalar = settings.AF_FENCING_LENGTH_HA * settings.FENCING_COST_PER_M * data.DOLLAR_FACTOR * data.FENCE_COST_MULTS[target_year]
 
     result = {}
     for (from_m, from_j), cell_idx in mj_cell_map.items():
@@ -144,8 +144,8 @@ def get_beef_agroforestry_transitions_from_ag(
     t_af_j       = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Beef Agroforestry').values
     t_beef_j     = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Beef - modified land').values
     est_mults    = data.EST_COST_MULTS[target_year]
-    irr_scalar   = settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[target_year]
-    fence_scalar = settings.AF_FENCING_LENGTH_HA * settings.FENCING_COST_PER_M * data.FENCE_COST_MULTS[target_year]
+    irr_scalar   = settings.REMOVE_IRRIG_COST * data.DOLLAR_FACTOR * data.IRRIG_COST_MULTS[target_year]
+    fence_scalar = settings.AF_FENCING_LENGTH_HA * settings.FENCING_COST_PER_M * data.DOLLAR_FACTOR * data.FENCE_COST_MULTS[target_year]
 
     result = {}
     for (from_m, from_j), cell_idx in mj_cell_map.items():
@@ -177,7 +177,7 @@ def get_carbon_plantings_block_from_ag(
     """{(from_m, from_j): $/cell/yr} to Carbon Plantings (Block): establishment + T_MAT transition + irrigation removal."""
     t_j        = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Carbon Plantings (Block)').values
     est_mults  = data.EST_COST_MULTS[target_year]
-    irr_scalar = settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[target_year]
+    irr_scalar = settings.REMOVE_IRRIG_COST * data.DOLLAR_FACTOR * data.IRRIG_COST_MULTS[target_year]
 
     result = {}
     for (from_m, from_j), cell_idx in mj_cell_map.items():
@@ -207,8 +207,8 @@ def get_sheep_carbon_plantings_belt_from_ag(
     t_cp_j       = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Sheep Carbon Plantings (Belt)').values
     t_sheep_j    = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Sheep - modified land').values
     est_mults    = data.EST_COST_MULTS[target_year]
-    irr_scalar   = settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[target_year]
-    fence_scalar = settings.CP_BELT_FENCING_LENGTH * settings.FENCING_COST_PER_M * data.FENCE_COST_MULTS[target_year]
+    irr_scalar   = settings.REMOVE_IRRIG_COST * data.DOLLAR_FACTOR * data.IRRIG_COST_MULTS[target_year]
+    fence_scalar = settings.CP_BELT_FENCING_LENGTH * settings.FENCING_COST_PER_M * data.DOLLAR_FACTOR * data.FENCE_COST_MULTS[target_year]
 
     result = {}
     for (from_m, from_j), cell_idx in mj_cell_map.items():
@@ -242,8 +242,8 @@ def get_beef_carbon_plantings_belt_from_ag(
     t_cp_j       = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Beef Carbon Plantings (Belt)').values
     t_beef_j     = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Beef - modified land').values
     est_mults    = data.EST_COST_MULTS[target_year]
-    irr_scalar   = settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[target_year]
-    fence_scalar = settings.CP_BELT_FENCING_LENGTH * settings.FENCING_COST_PER_M * data.FENCE_COST_MULTS[target_year]
+    irr_scalar   = settings.REMOVE_IRRIG_COST * data.DOLLAR_FACTOR * data.IRRIG_COST_MULTS[target_year]
+    fence_scalar = settings.CP_BELT_FENCING_LENGTH * settings.FENCING_COST_PER_M * data.DOLLAR_FACTOR * data.FENCE_COST_MULTS[target_year]
 
     result = {}
     for (from_m, from_j), cell_idx in mj_cell_map.items():
@@ -276,7 +276,7 @@ def get_destocked_from_ag(
     sources only, else 0) + irrigation removal. The removal cost is EP establishment × the habitat gain destocking buys, the
     same gap its biodiversity contribution is credited with: BIO_CONTRIBUTION_DESTOCKING - HCAS(from), floored at 0."""
     t_j_raw      = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Destocked - natural land').values
-    irr_scalar   = settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[target_year]
+    irr_scalar   = settings.REMOVE_IRRIG_COST * data.DOLLAR_FACTOR * data.IRRIG_COST_MULTS[target_year]
     HCAS_benefit_mult = {
         lu: max(0.0, float(settings.BIO_CONTRIBUTION_DESTOCKING) - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[lu])
         for lu in data.LU_LVSTK_NATURAL
@@ -387,7 +387,7 @@ def get_env_plantings_to_ag(
     # Hoist invariants outside the per-k loop
     base_ep_to_ag_t = data.EP2AG_TRANSITION_COSTS_HA * data.TRANS_COST_MULTS[target_year]  # (N_AG_LUS,)
     w_mrj = ag_water.get_wreq_matrices(data, target_year - data.YR_CAL_BASE)
-    irr_scalar = settings.NEW_IRRIG_COST * data.IRRIG_COST_MULTS[target_year]
+    irr_scalar = settings.NEW_IRRIG_COST * data.DOLLAR_FACTOR * data.IRRIG_COST_MULTS[target_year]
 
     result = {}
     for k, cell_idx in k_cell_map.items():
@@ -549,7 +549,7 @@ def get_destocked_to_ag_base(
         * settings.INCLUDE_WATER_LICENSE_COSTS
     ).astype(np.float32)
     new_irrig_r = tools.amortise(
-        settings.NEW_IRRIG_COST * data.IRRIG_COST_MULTS[target_year] * data.REAL_AREA.sel(cell=cell_idx).values
+        settings.NEW_IRRIG_COST * data.DOLLAR_FACTOR * data.IRRIG_COST_MULTS[target_year] * data.REAL_AREA.sel(cell=cell_idx).values
     ).astype(np.float32)
     water_mrj[1] += new_irrig_r[:, np.newaxis]
 

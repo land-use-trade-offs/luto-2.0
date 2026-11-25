@@ -581,32 +581,21 @@ water yield and if non-ag land uses are not reversible then a catchment may not 
 This is expected behaviour and the user must choose how to deal with it.
 """
 
-# The dollar year of the input economics (the financial year it ends): 2010 for the 2010-11 base files, 2021 for the
-# 2020-21 base files (FY2020-21 dollars). The cost constants below, the ag-management bundle costs, BECCS and the
-# renewable energy costs are in 2010 dollars and are rescaled by CPI_2010_TO_ECONOMICS: ABS CPI All groups
-# (A2325846C), financial-year mean, FY2021 81.6025 / FY2011 67.8725. The plantings establishment costs were converted
-# from 2021 to 2010 dollars by x 99.2 / 118.8 when built; EST_COST_2010_TO_ECONOMICS undoes that conversion.
-ECONOMICS_DOLLAR_YEAR = 2010
-CPI_2010_TO_ECONOMICS = {2010: 1, 2021: 81.6025 / 67.8725}[ECONOMICS_DOLLAR_YEAR]       # integer 1 at 2010: the constants keep their types
-EST_COST_2010_TO_ECONOMICS = {2010: 1, 2021: 118.8 / 99.2}[ECONOMICS_DOLLAR_YEAR]
-# The transition cost files (ag_tmatrix.npy, ag_to_destock_tmatrix.npy, ag_to_ep_tmatrix.npy, ep_to_ag_tmatrix.npy,
-# transition_cost_clearing_forest.npz) state no price year. ASSUMPTION: 2010 dollars, rescaled by the same CPI ratio.
-# If their price year is stated, set the factor for that year here.
-TRANSITION_COST_2010_TO_ECONOMICS = CPI_2010_TO_ECONOMICS
+# The cost constants of this file are in 2010 dollars: the code multiplies them by Data.DOLLAR_FACTOR where it uses them.
 
-# Cost of fencing per linear metre (2010 dollars x CPI_2010_TO_ECONOMICS)
-FENCING_COST_PER_M = 2 * CPI_2010_TO_ECONOMICS
+# Cost of fencing per linear metre
+FENCING_COST_PER_M = 2
 
 # Environmental Plantings Parameters
-EP_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR = 100 * CPI_2010_TO_ECONOMICS  # AUD per ha and year to maintain environmental plantings: their yearly cost in the objective.
+EP_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR = 100  # AUD per ha and year to maintain environmental plantings: their yearly cost in the objective.
 EP_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR = 0  # AUD per ha and year of ecosystem services credited to environmental plantings, subtracted from their yearly cost. 0 = none counted.
 
 # Carbon Plantings Block Parameters
-CP_BLOCK_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR = 100 * CPI_2010_TO_ECONOMICS  # AUD per ha and year to maintain carbon plantings (block): their yearly cost in the objective.
+CP_BLOCK_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR = 100  # AUD per ha and year to maintain carbon plantings (block): their yearly cost in the objective.
 CP_BLOCK_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR = 0  # AUD per ha and year of ecosystem services credited to carbon plantings (block), subtracted from their yearly cost. 0 = none counted.
 
 # Carbon Plantings Belt Parameters
-CP_BELT_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR = 100 * CPI_2010_TO_ECONOMICS  # AUD per ha and year to maintain the tree belts of farm forestry (carbon plantings, belt), on the tree share of the hectare.
+CP_BELT_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR = 100  # AUD per ha and year to maintain the tree belts of farm forestry (carbon plantings, belt), on the tree share of the hectare.
 CP_BELT_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR = 0  # AUD per ha and year of ecosystem services credited to the tree belts of farm forestry, subtracted from their yearly cost. 0 = none counted.
 
 CP_BELT_ROW_WIDTH = 20  # Width in metres of a tree belt of farm forestry (carbon plantings, belt).
@@ -616,14 +605,14 @@ cp_no_alleys_per_ha = 100 / (CP_BELT_ROW_WIDTH + CP_BELT_ROW_SPACING)
 CP_BELT_FENCING_LENGTH = 100 * cp_no_alleys_per_ha * 2     # Length (average) of fencing required per ha in metres
 
 # Riparian Planting Parameters
-RP_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR = 100 * CPI_2010_TO_ECONOMICS  # AUD per ha and year to maintain riparian plantings: their yearly cost in the objective.
+RP_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR = 100  # AUD per ha and year to maintain riparian plantings: their yearly cost in the objective.
 RP_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR = 0  # AUD per ha and year of ecosystem services credited to riparian plantings, subtracted from their yearly cost. 0 = none counted.
 
 RIPARIAN_PLANTING_BUFFER_WIDTH = 30  # Width in metres of the strip planted on each side of a stream. With the stream length of a cell it gives the share of the cell riparian plantings may take.
 RIPARIAN_PLANTING_TORTUOSITY_FACTOR = 0.5  # Scales the stream length of a cell into the length of fence riparian plantings need (2 sides x factor x stream length), which sets their fencing cost.
 
 # Agroforestry Parameters
-AF_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR = 100 * CPI_2010_TO_ECONOMICS  # AUD per ha and year to maintain the tree belts of agroforestry, on the tree share of the hectare.
+AF_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR = 100  # AUD per ha and year to maintain the tree belts of agroforestry, on the tree share of the hectare.
 AF_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR = 0  # AUD per ha and year of ecosystem services credited to the tree belts of agroforestry, subtracted from their yearly cost. 0 = none counted.
 
 AGROFORESTRY_ROW_WIDTH = 20  # Width in metres of a tree belt of agroforestry (environmental plantings, belt).
@@ -810,11 +799,11 @@ the rest of the simulation. This may be an unintended side effect.
 
 
 # The cost for removing and establishing irrigation infrastructure ($ per hectare)
-REMOVE_IRRIG_COST = 5000 * CPI_2010_TO_ECONOMICS
-NEW_IRRIG_COST = 10000 * CPI_2010_TO_ECONOMICS  # AUD per ha to set up irrigation when dryland becomes irrigated: part of the transition cost.
+REMOVE_IRRIG_COST = 5000
+NEW_IRRIG_COST = 10000  # AUD per ha to set up irrigation when dryland becomes irrigated: part of the transition cost.
 
 # Savanna burning cost per hectare per year ($/ha/yr)
-SAVBURN_COST_HA_YR = 10 * CPI_2010_TO_ECONOMICS
+SAVBURN_COST_HA_YR = 10
 
 # The minimum value an agricultural management variable must take for the write_output function to consider it being used on a cell
 AGRICULTURAL_MANAGEMENT_USE_THRESHOLD = 0.1
@@ -832,8 +821,8 @@ HIR_CEILING_PERCENTAGE = 0.8
 HIR_BASELINE = None
 
 # Maintainace cost for HIR
-BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100 * CPI_2010_TO_ECONOMICS  # AUD per ha and year to maintain human-induced regeneration on beef land.
-SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100 * CPI_2010_TO_ECONOMICS  # AUD per ha and year to maintain human-induced regeneration on sheep land.
+BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100  # AUD per ha and year to maintain human-induced regeneration on beef land.
+SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100  # AUD per ha and year to maintain human-induced regeneration on sheep land.
 
 
 

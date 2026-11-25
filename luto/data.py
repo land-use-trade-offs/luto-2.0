@@ -162,6 +162,10 @@ class Data:
         # at their read lines below, {base year: file}; a base year without inputs fails at the first of them. The block-mean
         # cache (input/_cache) of such a file carries this tag, so the two bases never share a cache file
         base_year_tag = {2010: '', 2021: '_2021'}[settings.YR_CAL_BASE]
+        # TEMPORARY too: the 2020-21 economics are in FY2020-21 dollars, while the cost constants of settings, the ag-management
+        # bundle costs, BECCS, the renewable costs and the transition cost files are in 2010 dollars. Each is multiplied by this
+        # factor where it is read or used: ABS CPI All groups (A2325846C), financial-year mean, FY2021 81.6025 / FY2011 67.8725
+        self.DOLLAR_FACTOR = {2010: 1, 2021: 81.6025 / 67.8725}[settings.YR_CAL_BASE]
 
         ###############################################################
         # Masking and spatial coarse graining.
@@ -1036,11 +1040,12 @@ class Data:
 
 
         # Raw transition cost matrix. In AUD/ha and ordered lexicographically.
-        # The transition cost files state no price year: taken as 2010 dollars (an ASSUMPTION) and rescaled by
-        # settings.TRANSITION_COST_2010_TO_ECONOMICS, here and for ag_to_ep, ep_to_ag and the clearing costs below.
-        self.AG_TMATRIX = np.load(Path(settings.INPUT_DIR) / "ag_tmatrix.npy") * settings.TRANSITION_COST_2010_TO_ECONOMICS
-        self.AG_TO_DESTOCKED_NATURAL_COSTS_HA = (np.load(Path(settings.INPUT_DIR) / "ag_to_destock_tmatrix.npy")
-                                                 * settings.TRANSITION_COST_2010_TO_ECONOMICS)
+        # The transition cost files state no price year: taken as 2010 dollars (an ASSUMPTION), here and for ag_to_ep, ep_to_ag
+        # and the clearing costs below.
+        self.AG_TMATRIX = np.load(Path(settings.INPUT_DIR) / "ag_tmatrix.npy") * self.DOLLAR_FACTOR
+        self.AG_TO_DESTOCKED_NATURAL_COSTS_HA = (
+            np.load(Path(settings.INPUT_DIR) / "ag_to_destock_tmatrix.npy") * self.DOLLAR_FACTOR
+        )
 
         
   
@@ -1073,7 +1078,7 @@ class Data:
         # Load plantings economic data
         est_cost = xr.load_dataset(Path(settings.INPUT_DIR) / "plantings_est_cost_ha.nc")
         est_cost = xr.Dataset({name: self.get_resfactored_average(est_cost[name], f'plantings_est_cost_ha_{name}') for name in est_cost.data_vars}).astype(np.float32)
-        est_cost = est_cost * np.float32(settings.EST_COST_2010_TO_ECONOMICS)   # converted from 2021 to 2010 dollars when built; undone for 2021-dollar economics
+        est_cost = est_cost * np.float32({2010: 1, 2021: 118.8 / 99.2}[settings.YR_CAL_BASE])   # converted from 2021 to 2010 dollars (x 99.2 / 118.8) when built; undone for the 2020-21 base
         self.EP_EST_COST_HA = est_cost['EP_EST_COST_HA']
         self.RP_EST_COST_HA = self.EP_EST_COST_HA.copy()  # Riparian plantings have the same establishment cost as environmental plantings
         self.AF_EST_COST_HA = self.EP_EST_COST_HA.copy()  # Agroforestry plantings have the same establishment cost as environmental plantings
@@ -1140,12 +1145,12 @@ class Data:
         # Agricultural land use to plantings raw transition costs:
         self.AG2EP_TRANSITION_COSTS_HA = np.load(
             Path(settings.INPUT_DIR) / "ag_to_ep_tmatrix.npy"
-        ) * settings.TRANSITION_COST_2010_TO_ECONOMICS  # shape: (28,); 2010 dollars assumed (see AG_TMATRIX)
+        ) * self.DOLLAR_FACTOR  # shape: (28,); 2010 dollars assumed (see AG_TMATRIX)
 
         # EP to agricultural land use transition costs:
         self.EP2AG_TRANSITION_COSTS_HA = np.load(
             Path(settings.INPUT_DIR) / "ep_to_ag_tmatrix.npy"
-        ) * settings.TRANSITION_COST_2010_TO_ECONOMICS  # shape: (28,); 2010 dollars assumed (see AG_TMATRIX)
+        ) * self.DOLLAR_FACTOR  # shape: (28,); 2010 dollars assumed (see AG_TMATRIX)
         
         
         ##############################################################
@@ -1169,7 +1174,7 @@ class Data:
         
         # Transition matrix of non-ag to unallocated-modified land (land clearing)
         with np.load(Path(settings.INPUT_DIR) / 'transition_cost_clearing_forest.npz') as z:   # 2010 dollars assumed (see AG_TMATRIX)
-            tmat_wood_clear = {k: z[k] * settings.TRANSITION_COST_2010_TO_ECONOMICS for k in z.files}
+            tmat_wood_clear = {k: z[k] * self.DOLLAR_FACTOR for k in z.files}
         
         tmat_clear_EP = tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']
         tmat_clear_RP = tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']
@@ -1565,7 +1570,7 @@ class Data:
         # self.SAVBURN_SEQ_CO2_TCO2E_HA = savburn['SAV_SEQ_CO2_TCO2E_HA']    # Additional carbon sequestration - carbon dioxide
 
         # Cost per hectare in dollars from settings
-        self.SAVBURN_COST_HA = settings.SAVBURN_COST_HA_YR
+        self.SAVBURN_COST_HA = settings.SAVBURN_COST_HA_YR * self.DOLLAR_FACTOR
 
 
 
@@ -1888,8 +1893,8 @@ class Data:
         })
 
         # Capture as DataArrays over the model cells
-        self.BECCS_COSTS_AUD_HA_YR = beccs['BECCS_COSTS_AUD_HA_YR'] * settings.CPI_2010_TO_ECONOMICS    # 2010 dollars
-        self.BECCS_REV_AUD_HA_YR = beccs['BECCS_REV_AUD_HA_YR'] * settings.CPI_2010_TO_ECONOMICS        # 2010 dollars
+        self.BECCS_COSTS_AUD_HA_YR = beccs['BECCS_COSTS_AUD_HA_YR'] * self.DOLLAR_FACTOR    # 2010 dollars
+        self.BECCS_REV_AUD_HA_YR = beccs['BECCS_REV_AUD_HA_YR'] * self.DOLLAR_FACTOR        # 2010 dollars
         self.BECCS_TCO2E_HA_YR = beccs['BECCS_TCO2E_HA_YR']
         self.BECCS_MWH_HA_YR = beccs['BECCS_MWH_HA_YR']
 
