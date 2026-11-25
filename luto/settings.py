@@ -158,8 +158,10 @@ TEMPORARY: a choice of two while the bases are compared; one base year once it i
   change impact multipliers, water delivery and licence prices, the productivity trend, domestic water use), the per-type
   stocking k (in place of LVSTK_K_FILE) and the feed per head it was calibrated with. Every other input is read from
   INPUT_DIR as for 2010. Each is chosen at its own read line in luto/data.py, {base year: file}[YR_CAL_BASE]; their
-  block-mean caches carry '_2021' (input/_cache). The 2020-21 livestock map is calibrated with sheep grazing cereal stubble:
-  set STUBBLE_GRAZING = True with it.
+  block-mean caches carry '_2021' (input/_cache).
+  A 2020-21 run sets three settings together: YR_CAL_BASE = 2021; SIM_YEARS after 2021, e.g. [2022, 2023, 2024] +
+  list(range(2025, 2051, 5)) (a year before the base year stops the run); and STUBBLE_GRAZING = True (the 2020-21 livestock
+  map is calibrated with sheep grazing cereal stubble).
 Any other year has no inputs: Data fails at the first of those read lines.
 '''
 

@@ -157,6 +157,8 @@ def run(
             active_data, resume_year = load_latest_checkpoint(Path(checkpoint_dir), active_data, save_dir)
 
         years = sorted(settings.SIM_YEARS)
+        if years[0] < active_data.YR_CAL_BASE:        # nothing else stops it: the first step would run backwards from the base year
+            raise ValueError(f"SIM_YEARS starts in {years[0]}, before the base year YR_CAL_BASE = {active_data.YR_CAL_BASE}.")
         if active_data.YR_CAL_BASE not in years:
             years.insert(0, active_data.YR_CAL_BASE)
 
