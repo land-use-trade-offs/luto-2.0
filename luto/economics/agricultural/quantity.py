@@ -91,13 +91,11 @@ def get_ccimpact(data, lu, lm, yr_idx):
         yr_cal = data.YR_CAL_BASE + yr_idx
 
         # Interpolate climate change damage for lu, lm, and year for each cell using a linear function.
-        anchor = data.CLIMATE_CHANGE_IMPACT_ANCHOR_YEAR          # The year the file's multipliers are relative to (2010)
-        xs = set(data.CLIMATE_CHANGE_IMPACT['year'].values.tolist())  # Returns set {2020, 2050, 2080}
-        xs.add(anchor)                                           # Adds the anchor year and returns set {2010, 2020, 2050, 2080}
-        xs = sorted(xs)                                          # Returns list and ensures sorted lowest to highest [2010, 2020, 2050, 2080]
-        yys = data.CLIMATE_CHANGE_IMPACT.sel(lm=lm, lu=lu).to_pandas().T.fillna(1)   # The (cell, year) columns, NaNs replaced with ones to avoid issues with calculating water use limits
-        yys.insert(0, str(anchor), 1)                            # Insert a new column for the anchor year with value of 1 to ensure no climate change impact there
-        yys = yys.astype(np.float32)
+        anchor = data.CLIMATE_CHANGE_IMPACT_ANCHOR_YEAR          # The year the multipliers are relative to (the base year)
+        yys = data.CLIMATE_CHANGE_IMPACT.sel(lm=lm, lu=lu).to_pandas().T.fillna(1)   # The (cell, year) columns {2020, 2050, 2080}, NaNs replaced with ones to avoid issues with calculating water use limits
+        yys[anchor] = 1                                          # The anchor year's multiplier is 1: no climate change impact there
+        xs = sorted(yys.columns)                                 # Knots lowest to highest, e.g. [2010, 2020, 2050, 2080] or [2020, 2021, 2050, 2080]
+        yys = yys[xs].astype(np.float32)
 
         # Create linear function f and interpolate climate change impact
         f = interp1d(xs, yys, kind='linear', fill_value='extrapolate')
@@ -161,17 +159,19 @@ def get_yield_pot(data, lvstype, vegtype, lm, yr_idx):
     return yield_pot
 
 
-def get_stubble_yield_pot(data, lu, lm):
+def get_stubble_yield_pot(data, lu, lm, yr_idx):
     """
     Return sheep grazing cereal stubble <unit: head/ha of cereal>: k_sheep x STUBBLE_DSE_HA / (feed per head (data.FEED_PER_HEAD) x grassfed
-    factor), the pasture basis with the stubble carrying rate (DSE per ha, annualised) in place of the pasture feed.
-    No irrigation factor and no climate multiplier. 0 without stubble grazing (settings.STUBBLE_GRAZING). Every stubble land use and lm has the
-    same cell values (`lu`, `lm` are kept for the callers, which loop over them).
+    factor), the pasture basis with the stubble carrying rate (DSE per ha, annualised) in place of the pasture feed,
+    times the cereal land use's own climate change impact multiplier in `yr_idx` (get_ccimpact of `lu`, `lm`). No
+    irrigation factor. 0 without stubble grazing (settings.STUBBLE_GRAZING). Every stubble land use and lm has the same
+    cell values apart from that multiplier.
     """
-    return data.LVSTK_K['SHEEP'].values * data.STUBBLE_DSE_HA.values / (data.FEED_PER_HEAD['SHEEP'] * GRASSFED_FACTOR['SHEEP'])
+    return (data.LVSTK_K['SHEEP'].values * data.STUBBLE_DSE_HA.values / (data.FEED_PER_HEAD['SHEEP'] * GRASSFED_FACTOR['SHEEP'])
+            * get_ccimpact(data, lu, lm, yr_idx))
 
 
-def get_quantity_stubble(data, pr, lm):
+def get_quantity_stubble(data, pr, lm, yr_idx):
     """Return the stubble-sheep yield of `pr` ('SHEEP - STUBBLE <LU> MEAT', 'WOOL' or 'LEXP', one set per stubble land
     use) <unit: t/cell>, per cell of its cereal land use: the sheep per-head quantities (F x Q, AGEC_LVSTK) times the
     stubble stocking rate."""
@@ -179,7 +179,7 @@ def get_quantity_stubble(data, pr, lm):
     lu = data.PR2LU_DICT[pr]
     agec = data.AGEC_LVSTK
     quantity = agec.sel(field=fq[0], animal='SHEEP').values * agec.sel(field=fq[1], animal='SHEEP').values
-    return np.nan_to_num(quantity * get_stubble_yield_pot(data, lu, lm) * data.REAL_AREA.values)   # a new array, writable (get_quantity scales it in place); no sheep data: 0
+    return np.nan_to_num(quantity * get_stubble_yield_pot(data, lu, lm, yr_idx) * data.REAL_AREA.values)   # a new array, writable (get_quantity scales it in place); no sheep data: 0
 
 
 def get_quantity_lvstk(data, pr, lm, yr_idx):
@@ -302,7 +302,7 @@ def get_quantity(data, pr, lm, yr_idx):
     elif pr in data.PR_LVSTK:
         q = get_quantity_lvstk(data, pr, lm, yr_idx)
     elif pr in data.PR_STUBBLE:
-        q = get_quantity_stubble(data, pr, lm)
+        q = get_quantity_stubble(data, pr, lm, yr_idx)
     elif pr in data.AGRICULTURAL_LANDUSES:              # Must be unallocated land use product, so return zeroes.
         q = np.zeros((data.NCELLS)).astype(np.float32)
     else:

@@ -65,7 +65,7 @@ def get_wreq_matrices(data, yr_idx) -> np.ndarray:
         if lu in data.LU_STUBBLE:                                         # drinking water of the sheep grazing its stubble
             for m, lm in enumerate(data.LANDMANS):
                 wr_drn = data.AGEC_LVSTK.sel(field='WR_DRN', animal='SHEEP').values
-                w_req_mrj[m, :, j] += np.nan_to_num(wr_drn * settings.LIVESTOCK_DRINKING_WATER * get_stubble_yield_pot(data, lu, lm))   # no sheep data: no stubble sheep
+                w_req_mrj[m, :, j] += np.nan_to_num(wr_drn * settings.LIVESTOCK_DRINKING_WATER * get_stubble_yield_pot(data, lu, lm, yr_idx))   # no sheep data: no stubble sheep
 
     w_req_mrj *= data.REAL_AREA.values[:, np.newaxis]                      # <unit: ML/ha> * <unit: ha/cell> -> <unit: ML/cell>
 

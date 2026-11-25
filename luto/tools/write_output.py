@@ -443,6 +443,9 @@ def write_outputs(data: Data):
         memory_thread.start()
         try:
             write_data(data)
+            if data.last_year is None:                                  # no solved year: the report reads solved years only
+                print("Data writing complete; no solved year, so no report.\n")
+                return
             print("Data writing complete, now creating report...\n")
             create_report(data)
         except Exception as e:
@@ -457,9 +460,15 @@ def write_outputs(data: Data):
 
 
 def write_data(data: Data):
-    years = [yr for yr in settings.SIM_YEARS if yr <= data.last_year]
+    # the solved years up to the last one stored (none in a run that solved no year), and the base year first when
+    # settings.WRITE_BASE_YEAR is on
+    solved = [yr for yr in settings.SIM_YEARS if data.last_year is not None and yr <= data.last_year]
+    years = ([data.YR_CAL_BASE] if settings.WRITE_BASE_YEAR else []) + solved
     paths = [f"{data.path}/out_{yr}" for yr in years]
     write_settings(data.path)
+    if not years:
+        print('No solved year and WRITE_BASE_YEAR is off: nothing to write beyond the settings.', flush=True)
+        return
 
     # Cap workers 
     max_workers = min(os.cpu_count(), 32)
@@ -499,8 +508,9 @@ def write_data(data: Data):
     #    workers). n_jobs is re-derived per tier so late tiers see the parent's current RSS (the
     #    accumulating magnitude lists), not a stale build-time value.
     tasks_by_peak = defaultdict(list)
-    tasks_by_peak[WRITE_FUNC_PEAK_MB['write_area_transition_start_end']].append(
-        delayed(write_area_transition_start_end)(data, paths[-1], years[-1]))
+    if years[-1] > data.YR_CAL_BASE:                                     # a start-to-end transition needs a solved year
+        tasks_by_peak[WRITE_FUNC_PEAK_MB['write_area_transition_start_end']].append(
+            delayed(write_area_transition_start_end)(data, paths[-1], years[-1]))
     for yr, p in zip(years, paths):
         for task, peak_mb in write_output_single_year(data, yr, p):
             tasks_by_peak[peak_mb].append(task)

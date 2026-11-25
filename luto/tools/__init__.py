@@ -297,7 +297,8 @@ def set_path() -> str:
         """Create a folder for storing outputs and return folder name."""
         years = [i for i in settings.SIM_YEARS]
         path = f"{settings.OUTPUT_DIR}/{read_timestamp()}_RF{settings.RESFACTOR}_{years[0]}-{years[-1]}"
-        paths = [path] + [f"{path}/out_{yr}" for yr in years]
+        out_years = ([settings.YR_CAL_BASE] if settings.WRITE_BASE_YEAR else []) + years   # the base year's folder when it is written
+        paths = [path] + [f"{path}/out_{yr}" for yr in out_years]
         
         for p in paths:
             Path(p).mkdir(exist_ok=True)
