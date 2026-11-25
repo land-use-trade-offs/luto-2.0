@@ -44,27 +44,6 @@ from scipy.sparse import coo_array
 from math import ceil
 
 
-# The climate change impact files are multipliers relative to this year (1 there, no column for it); Data re-anchors
-# them to YR_CAL_BASE. The productivity trend csv starts in this year too (row 0, multiplier 1).
-CLIMATE_FILE_ANCHOR_YEAR = 2010
-PRODUCTIVITY_FILE_FIRST_YEAR = 2010
-
-
-def climate_base_multiplier(column, years: list, base_year: int) -> np.ndarray:
-    """The climate change impact multiplier at `base_year` per cell, for one (lm, lu): linear between the knots around
-    it, the knots being CLIMATE_FILE_ANCHOR_YEAR (multiplier 1) and the files' `years`, with a missing value counted as
-    1 (as quantity.get_ccimpact counts it). `column(year)` returns that year's column, float64."""
-    knots = [CLIMATE_FILE_ANCHOR_YEAR] + sorted(years)
-    if not knots[0] < base_year < knots[-1]:
-        raise ValueError(f"YR_CAL_BASE {base_year} is outside the climate change impact years {knots}.")
-    hi = next(k for k in knots if k >= base_year)
-    lo = knots[knots.index(hi) - 1]
-    w = (base_year - lo) / (hi - lo)
-    m_lo = 1.0 if lo == CLIMATE_FILE_ANCHOR_YEAR else np.nan_to_num(column(lo), nan=1.0)
-    m_hi = np.nan_to_num(column(hi), nan=1.0)
-    return m_lo + (m_hi - m_lo) * w
-
-
 class SparseYears(MutableMapping):
     """{year: solution} as `Data` holds it for every solved year, the arrays kept sparse (2026-11-23).
 
@@ -589,10 +568,18 @@ class Data:
         with xr.open_dataset(Path(settings.INPUT_DIR) / cci_file) as table:
             self.CLIMATE_CHANGE_IMPACT = self.get_resfactored_average(table['CLIMATE_CHANGE_IMPACT'], f"{Path(cci_name).stem}{base_year_tag}").set_xindex(['lm', 'lu', 'year'])
         
-        # The impact files are multipliers relative to 2010 (CLIMATE_FILE_ANCHOR_YEAR): their years are {2020, 2050, 2080}
-        # and 2010 is 1 by construction. They are re-anchored to the base year, so the multiplier is 1 at YR_CAL_BASE.
-        self.CLIMATE_CHANGE_IMPACT = self.reanchor_climate_change_impact(self.CLIMATE_CHANGE_IMPACT)
-        self.CLIMATE_CHANGE_IMPACT_ANCHOR_YEAR = self.YR_CAL_BASE
+        # The impact files are multipliers relative to 2010: their years are {2020, 2050, 2080} and 2010 is 1 by construction.
+        # TEMPORARY, until the files are built relative to their own base year: for the 2020-21 base every column is divided by
+        # its (lm, lu)'s multiplier in 2021, linear between the file's 2020 and 2050 values, so the multiplier is 1 in 2021.
+        # A cell without a value keeps none.
+        if settings.YR_CAL_BASE == 2021:
+            columns = self.CLIMATE_CHANGE_IMPACT.indexes['column']                       # (lm, lu, year)
+            values = self.CLIMATE_CHANGE_IMPACT.values.astype(np.float64)
+            in_2020 = values[[columns.get_loc((lm, lu, 2020)) for lm, lu, _ in columns]]
+            in_2050 = values[[columns.get_loc((lm, lu, 2050)) for lm, lu, _ in columns]]
+            in_2021 = in_2020 + (in_2050 - in_2020) * ((2021 - 2020) / (2050 - 2020))
+            self.CLIMATE_CHANGE_IMPACT = self.CLIMATE_CHANGE_IMPACT.copy(data=(values / in_2021).astype(np.float32))
+        self.CLIMATE_CHANGE_IMPACT_ANCHOR_YEAR = self.YR_CAL_BASE                        # the year the multipliers are 1 in
 
         ###############################################################
         # Regional coverage layers, mainly for regional reporting.
@@ -958,10 +945,12 @@ class Data:
             fpath = Path(settings.INPUT_DIR) / yield_increase_file
             productivity_trend = pd.read_csv(fpath, header=[0, 1]).astype(np.float32)
             # The csv has no year column: row 0 is 2010 (multiplier 1.0, cumulative growth since then). The
-            # first year is a property of the file; the trend is re-anchored to the base year below.
-            productivity_trend.index = productivity_trend.index + PRODUCTIVITY_FILE_FIRST_YEAR  # Adjust year to absolute year
+            # first year is a property of the file, not of the model's base year.
+            productivity_trend.index = productivity_trend.index + 2010  # Adjust year to absolute year
             productivity_trend.index.name = 'Year'
-            productivity_trend = self.reanchor_productivity_trend(productivity_trend)
+            # TEMPORARY, until the file is built relative to its own base year: divided by its row at the base year, so the
+            # multiplier is 1 there (the 2010 row is all ones)
+            productivity_trend = productivity_trend / productivity_trend.loc[settings.YR_CAL_BASE]
             
             # Convert to xarray for easier accessing.
             self.PRODUCTIVITY_MUL_xr = (
@@ -977,7 +966,7 @@ class Data:
                 header=[0, 1],
                 index_col=0
             ).astype(np.float32)
-            productivity_trend = self.reanchor_productivity_trend(productivity_trend)
+            productivity_trend = productivity_trend / productivity_trend.loc[settings.YR_CAL_BASE]   # 1 at the base year, as for 'BAU'
 
             # Convert to xarray for easier accessing.
             self.PRODUCTIVITY_MUL_xr = (
@@ -2236,39 +2225,6 @@ class Data:
             except PermissionError:                           # Windows drives: another process has the finished cache open, and it stands
                 tmp_path.unlink(missing_ok=True)
         return result
-
-
-    def reanchor_productivity_trend(self, trend: pd.DataFrame) -> pd.DataFrame:
-        """
-        The productivity trend (yield multipliers by year) divided by its row at YR_CAL_BASE, so the multiplier is 1
-        at the base year, where the input yields are calibrated. At a 2010 base (PRODUCTIVITY_FILE_FIRST_YEAR) it is
-        returned unchanged.
-        """
-        if self.YR_CAL_BASE == PRODUCTIVITY_FILE_FIRST_YEAR:
-            return trend
-        if self.YR_CAL_BASE not in trend.index:
-            raise ValueError(f"The productivity trend has no row for YR_CAL_BASE {self.YR_CAL_BASE}.")
-        return (trend / trend.loc[self.YR_CAL_BASE]).astype(np.float32)
-
-
-    def reanchor_climate_change_impact(self, cci: xr.DataArray) -> xr.DataArray:
-        """
-        The climate change impact multipliers (column, cell), columns labelled (lm, lu, year), re-anchored to the base
-        year: every year column of an (lm, lu) divided by its multiplier at YR_CAL_BASE (climate_base_multiplier), so
-        the multiplier is 1 at the base year. Missing values stay missing (the NaN guard reads them). At a 2010 base
-        (CLIMATE_FILE_ANCHOR_YEAR) it is returned unchanged. Applied to the model cells' block means.
-        """
-        if self.YR_CAL_BASE == CLIMATE_FILE_ANCHOR_YEAR:
-            return cci
-        position = {label: i for i, label in enumerate(cci.indexes['column'])}
-        years = sorted({label[2] for label in position})
-        vals = cci.values.astype(np.float64)
-        out = vals.copy()
-        for lm, lu in sorted({label[:2] for label in position}):
-            base = climate_base_multiplier(lambda yr: vals[position[lm, lu, yr]], years, self.YR_CAL_BASE)
-            for yr in years:
-                out[position[lm, lu, yr]] = vals[position[lm, lu, yr]] / base
-        return cci.copy(data=out.astype(cci.dtype))
 
 
     def block_mean(self, arr: np.ndarray) -> np.ndarray:
