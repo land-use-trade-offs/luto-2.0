@@ -180,13 +180,13 @@ def get_base_nonag_rk(data: Data, base_year: int) -> np.ndarray:
     return data.non_ag_dvars[base_year]
 
 def get_trans_ub_ag_mrj(data: Data, base_year: int) -> np.ndarray:
-    """Ag target upper bound (ag2ag + nonag2ag), capped by the cell's eligible share (data.EXCLUDE_FRAC: a coarse cell
-    cannot hold more of (lm, lu) than its eligible fine cells; 0 or 1 at RESFACTOR 1, where the cap changes nothing), raised
-    to the base so a cell can always keep its base land use."""
+    """Ag target upper bound: what can reach (lm, lu) from the ag and the non-ag sources together (ag2ag + nonag2ag), capped
+    by the cell's eligible share (data.EXCLUDE_FRAC: a cell holds no more of (lm, lu) than its eligible fine cells), then
+    raised to the base so a cell can always keep its base land use. The cap is on the total, so it sits here, where the
+    two parts are first added. At RESFACTOR 1 the share is 0 or 1 and the cap changes nothing."""
     print('Getting agricultural target upper bounds...', flush=True)
     ub = (ag_transition.get_ag2ag_ub(data, base_year) + non_ag_transition.get_nonag2ag_ub(data, base_year))
-    if settings.RESFACTOR > 1:
-        ub = np.minimum(ub, data.EXCLUDE_FRAC)
+    ub = np.minimum(ub, data.EXCLUDE_FRAC)
     return tools.clamp_dvar_bound(ub, tools.get_base_held(data.ag_dvars[base_year]), np.inf, 'Ag ub raised to base')
 
 def get_trans_ub_nonag_rk(data: Data, base_year: int) -> np.ndarray:
