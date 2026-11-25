@@ -62,6 +62,55 @@ noise. **Coarse runs before and after the cap do not compare.**
 
 ---
 
+## 20261124 — a 1 % share floor (`SOLUTION_SHARE_FLOOR = 0.01`) on a crossover solution: about 6 % less Gurobi work, the same barrier iterations, 0.32 % less objective
+
+### TL;DR
+
+The idea (`docs/FUTURES.md`, 20261124): every share a solved year leaves in a cell becomes the next year's source
+(arcs, a node-balance row, for an irreversible land use a lower bound), so clearing the small ones
+(`post_solve.clear_specks`) should make the next year's model smaller and faster. Measured on one RES1 year: the model is
+1 % smaller and Gurobi does 6 % less work, the barrier takes the same number of iterations, and the year's objective is
+0.32 % lower. A crossover solution leaves few slivers. The floor is not worth switching on for speed; the amended
+irreversibility rule has to stand on modelling grounds alone.
+
+### Setup
+
+- Xinhao's Paper 2 scenario at RES1 with cell grouping and the single net GHG row, yearly steps; the 2033 state from a
+  run of the current code whose years were solved to an optimal vertex (GPU barrier, then Gurobi's crossover).
+- A: 2034 built from the 2033 state as solved. B: 2034 built from the same state after `clear_specks` at 0.01, which
+  cleared 8,803 ag shares (3.1 cell-fractions in all), 12,373 non-ag shares (95.2) and 1,801 ag-mgt shares, in 21,002
+  of 4,218,733 cells (0.5 %).
+- Each solved by Gurobi 13.0.3 alone, the whole model with the GHG row, homogeneous barrier, ScaleFlag 2, crossover
+  on, 24 threads, LUTO's tolerances; Gadi hugemem, two nodes (wall time not comparable; work units are).
+
+### Measured
+
+| 2034 | A (as solved) | B (1 % floor) | B vs A |
+|---|---|---|---|
+| full model: columns / rows / nonzeros | 99.31 M / 74.99 M / 483.1 M | 99.19 M / 74.97 M / 482.7 M | −0.12 % / −0.02 % / −0.07 % |
+| cell grouping: distinct keys / blobs | 82,826 / 256,987 | 80,241 / 254,629 | −3.1 % / −0.9 % |
+| grouped model: rows × columns, nonzeros | 8.49 M × 12.05 M, 57.44 M | 8.41 M × 11.91 M, 56.86 M | about −1 % |
+| after presolve; factor operations per iteration | 4.97 M × 8.17 M; 2.016e9 | 4.90 M × 8.04 M; 1.956e9 | −1.5 %; −3.0 % |
+| barrier iterations | 286 | 292 | +2 % |
+| barrier work units | 1,727 | 1,605 | **−7.0 %** |
+| total work units (with crossover) | 1,761 | 1,657 | **−5.9 %** |
+| wall time, solve (different nodes) | 2,651 s | 2,627 s | −1 % |
+| objective (million AUD) | 7,324.50 | 7,301.40 | **−0.32 %** |
+
+Both optimal at ScaleFlag 2. Peak memory 219.4 GB (A), 211.7 GB (B).
+
+### What it means
+
+- The gain is the model's size, not its difficulty: the barrier needs as many iterations with the slivers as without.
+  Slivers are therefore an unlikely cause of the GPU barrier's 5–10x iteration jump from 2027 in the same run (open).
+- The objective falls 0.32 % for changing 0.5 % of cells: more than the cleared shares account for. Not explained yet.
+- Not measured: a floor applied every year over many years (slivers could accumulate without it), and a run solved
+  without crossover, where the floor's own comment says it matters (barrier solutions leave millions of near-zero
+  shares).
+- One pair of runs; the deterministic measures (model size, iterations, work units) carry the comparison.
+
+---
+
 ## 20261123 — a RES1 step's work outside the solve: 22 min -> 13 min, every result the same
 
 ### TL;DR
