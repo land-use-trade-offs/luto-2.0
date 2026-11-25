@@ -36,7 +36,6 @@ import luto.economics.agricultural.water as ag_water
 
 from collections import defaultdict
 from collections.abc import MutableMapping
-from functools import cached_property
 from pathlib import Path
 from typing import Any, Literal, Optional
 from affine import Affine
@@ -998,11 +997,22 @@ class Data:
 
         
   
-        # Boolean x_mrj matrix with allowed land uses j for each cell r under lm.
+        # x_mrj: where land use j is allowed under lm, per full-res cell. EXCLUDE says whether a model cell may take
+        # (lm, lu) at all; EXCLUDE_FRAC how much of it may: the share of the block's land-use cells (LUMASK, the cells
+        # RESFACTOR 1 models) that are eligible, which caps the cell's ag upper bound (col_builder.get_trans_ub_ag_mrj).
+        # At RESFACTOR 1 a cell is eligible or not, so the share is EXCLUDE itself.
+        x_mrj_full = xr.load_dataarray(Path(settings.INPUT_DIR) / "x_mrj.nc")                                       # (lm, cell, lu) over the FULL-RES cells, no cell coordinate
         if settings.RESFACTOR == 1:
-            x_mrj_full = xr.load_dataarray(Path(settings.INPUT_DIR) / "x_mrj.nc")
             self.EXCLUDE = x_mrj_full.sel(lm=self.LANDMANS, lu=self.AGRICULTURAL_LANDUSES).isel(cell=self.MASK).values
+            self.EXCLUDE_FRAC = self.EXCLUDE
         else:
+            self.EXCLUDE_FRAC = np.stack([
+                np.stack([
+                    self.block_mean(x_mrj_full.sel(lm=lm, lu=lu).values & self.LUMASK)
+                    for lu in self.AGRICULTURAL_LANDUSES
+                ], axis=-1)
+                for lm in self.LANDMANS
+            ]).astype(np.float32)
             self.EXCLUDE = self.EXCLUDE_FRAC > 0
 
 
@@ -2182,21 +2192,6 @@ class Data:
         total = self.block_sum(arr)
         count = self.block_sum(~np.isnan(arr))
         return np.where(count > 0, total / np.maximum(count, 1), np.nan)
-
-
-    @cached_property
-    def EXCLUDE_FRAC(self) -> np.ndarray:
-        """Share of each block's land-use fine cells eligible for each (land management, land use)."""
-        if settings.RESFACTOR == 1:
-            return self.EXCLUDE
-        x_mrj_full = xr.load_dataarray(Path(settings.INPUT_DIR) / "x_mrj.nc")
-        return np.stack([
-            np.stack([
-                self.block_mean(x_mrj_full.sel(lm=lm, lu=lu).values & self.LUMASK)
-                for lu in self.AGRICULTURAL_LANDUSES
-            ], axis=-1)
-            for lm in self.LANDMANS
-        ]).astype(np.float32)
 
 
     def get_resfactored_lumap(self) -> np.ndarray:
