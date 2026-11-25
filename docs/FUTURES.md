@@ -5,6 +5,32 @@ Entries are in **descending date order** (newest first). Each entry stands on it
 
 ---
 
+## 20261125 — rebuild the climate change impact multipliers from GAEZ v5
+
+### TL;DR
+
+The yield climate-impact files (`climate_change_impacts_<rcp>_CO2_FERT_<ON|OFF>.nc`) are to be recalculated from
+GAEZ v5 (`N:\Data-Master\GAEZv5`), by Jinzhu. The files in use come from GAEZ v4 and hold a value only where the
+2010-11 land-use map made one relevant.
+
+### Why
+
+- The 2020-21 base puts land uses on cells where the GAEZ v4 file has no value. The 2020-21 input build closes the
+  gaps by borrowing: a cell without a value takes its SA2's, failing that its state's, failing that the national one
+  (`cci_fill.py`). For dry Beef on modified land that is 2.6 of 6.6 million cells in the worst year. A rebuild from
+  the source grids gives every cell its own value and makes the fill unnecessary.
+- The multipliers are relative to 2010. A rebuild can write them relative to the model's base year, so `Data` reads
+  them as they are and does no re-anchoring at load.
+- GAEZ v4 has no RCP 7.0 (SSP '370' reads 'rcp6p0'); check what GAEZ v5 offers.
+
+### To state when it is done
+
+Dense files (no NaN on land a land use may occupy), the base year the multipliers are relative to, the build script
+in `input/Nick_build/scripts/` with its `provenance.csv`, and a comparability note: runs before and after differ in
+yield.
+
+---
+
 ## 20261124 — clear small shares every year, and make irreversibility hold only above the floor
 
 ### TL;DR
