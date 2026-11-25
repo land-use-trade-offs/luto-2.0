@@ -5,6 +5,63 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20261125 — RES5 let 1.1 Mha of agriculture sit on land its fine cells exclude; the eligible-share cap (PR #236) removes it, at 3.5 % of the objective
+
+### TL;DR
+
+At `RESFACTOR > 1` a block was eligible for an agricultural (lm, lu) as soon as ONE of its fine cells was (`EXCLUDE`
+= the eligible share `> 0`), and its upper bound was then only what the block's base-year land could reach — up to
+the whole block. In one RES5 step to 2050 the model placed 1.10 Mha above what the eligible fine cells could hold.
+Nick's PR #236 keeps the share (`Data.EXCLUDE_FRAC`) and caps the ag upper bound by it. With the cap the excess is 0,
+the objective is 3.5 % lower, and about 4.6 Mha of agricultural land use moves. RES1 is unaffected except for float32
+noise. **Coarse runs before and after the cap do not compare.**
+
+### The two limits on an ag upper bound
+
+- **Source side (unchanged):** land moves only from what the cell held in the previous year — the reachable share,
+  `get_ag2ag_ub + get_nonag2ag_ub`.
+- **Target side (new at RESFACTOR > 1):** `x_mrj.nc` says per fine cell whether (lm, lu) is allowed. A block with 15 of
+  its 25 land-use cells eligible now holds at most 0.6 of that land use: `ub = min(reachable, eligible share)`, then
+  raised to the base-year share so held land can stay (`col_builder.get_trans_ub_ag_mrj`). The cap is on the total
+  from ag and non-ag sources, so it sits where the two are added. A product (reachable × share) would be too tight:
+  a block 50 % cropland and 60 % eligible may still convert all its cropland.
+
+### Measured (RES5, default settings, `CELL_GROUPING` off, one step 2010 → 2050; "before" = the cap made a no-op)
+
+| | before | after |
+|---|---|---|
+| eligible (lm, cell, lu) entries with a share below 1 | 94,928 of 1,441,891 (smallest 0.04) | the same |
+| ag upper bounds lowered / raised by the cap | | 99,707 of 1,258,471 / 0 |
+| model: rows × columns, nonzeros | 4,091,365 × 7,508,805, 33.06 M | the same |
+| barrier iterations; work units (total) | 121; 616 | 95; 460 |
+| objective (million AUD) | −177,990.3 | −184,295.8 (−3.5 %) |
+| ag allocation above max(eligible share, base share) | 1,099,307 ha in 1,124 entries | 0 ha |
+| GHG agriculture / LULUCF row, 2050 (Mt) | 58.80 / −206.10 | 58.18 / −206.36 (neither binds) |
+
+- Where the excess sat before: beef and dairy on modified land, winter legumes, winter oilseeds, sugar, hay.
+- 2050 land use, after against before: winter cereals +966 kha (+3.5 %), Destocked natural land +665 kha (+45 %),
+  unallocated modified land −625 kha (−7.6 %), beef on modified land −563 kha (−2.8 %), HIR - Beef −521 kha (−5.8 %),
+  winter legumes +223 kha (+11.8 %).
+- Nick's own figure over seven 5-year steps: 1.028 Mha above eligibility in 2050 → 56 ha.
+
+### Changes on top of Nick's PR
+
+- `EXCLUDE_FRAC` is a plain attribute set beside `EXCLUDE` in `Data.__init__`, from the one read of `x_mrj.nc` (it was a
+  `cached_property` that read the file again); at RESFACTOR 1 it is the `EXCLUDE` array itself.
+- The cap has no `if RESFACTOR > 1`. Where the share is 0 or 1 it only trims float32 noise: the summed bound is
+  1.0000001 on 10,592 entries (RES5, with the 0/1 flag in place of the share), which the cap makes 1.0; nothing else
+  changes, the bound being already 0 wherever `EXCLUDE` is False.
+
+### Not done, and limits
+
+- RES1 was not run. Its model changes by at most 1.2e-7 on bounds that summed to just above 1.
+- The cap is per (lm, lu): several land uses competing for the same eligible fine cells can together still exceed them.
+- Only agricultural land uses (`x_mrj` describes no other). The non-ag upper bounds and the ag-management options
+  (Savanna Burning +61 % against RES1, entry 20261119) are a separate matter.
+- Scripts and results: `jinzhu_inspect_code/Review_Nick_PR/script/test_pr236.py`, `output/pr236/`.
+
+---
+
 ## 20261123 — a RES1 step's work outside the solve: 22 min -> 13 min, every result the same
 
 ### TL;DR
