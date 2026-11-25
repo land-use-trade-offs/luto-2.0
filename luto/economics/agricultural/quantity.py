@@ -122,6 +122,12 @@ get_ccimpact.cache_clear = get_ccimpact.results.clear                    # as an
 DSE_PER_HEAD = {'BEEF': 8, 'SHEEP': 1.5, 'DAIRY': 17}
 GRASSFED_FACTOR = {'BEEF': 0.85, 'SHEEP': 0.85, 'DAIRY': 0.65}
 
+def get_feed_per_head(data, lvstype):
+    """Use the FY2021 build's intake in kg DM/head/day for the 2021 inputs."""
+    if settings.INPUT_SET == '2021':
+        return data.LVSTK_INTAKE_KG_DM_HEAD_DAY[lvstype]
+    return DSE_PER_HEAD[lvstype]
+
 
 def get_yield_pot(data, lvstype, vegtype, lm, yr_idx):
     """
@@ -139,7 +145,7 @@ def get_yield_pot(data, lvstype, vegtype, lm, yr_idx):
     """
 
     # Factors varying as a function of `lvstype`.
-    denominator = (365 * DSE_PER_HEAD[lvstype] * GRASSFED_FACTOR[lvstype])
+    denominator = (365 * get_feed_per_head(data, lvstype) * GRASSFED_FACTOR[lvstype])
 
     if vegtype not in ('natural land', 'modified land'):
         raise KeyError(f"Land cover type '{vegtype}' not identified.")
@@ -164,12 +170,12 @@ def get_yield_pot(data, lvstype, vegtype, lm, yr_idx):
 
 def get_stubble_yield_pot(data, lu, lm):
     """
-    Return sheep grazing cereal stubble <unit: head/ha of cereal>: k_sheep x STUBBLE_DSE_HA / (DSE per head x grassfed
+    Return sheep grazing cereal stubble <unit: head/ha of cereal>: k_sheep x STUBBLE_DSE_HA / (feed per head (get_feed_per_head) x grassfed
     factor), the pasture basis with the stubble carrying rate (DSE per ha, annualised) in place of the pasture feed.
     No irrigation factor and no climate multiplier. 0 without a stubble file. Every stubble land use and lm has the
     same cell values (`lu`, `lm` are kept for the callers, which loop over them).
     """
-    return data.LVSTK_K['SHEEP'].values * data.STUBBLE_DSE_HA.values / (DSE_PER_HEAD['SHEEP'] * GRASSFED_FACTOR['SHEEP'])
+    return data.LVSTK_K['SHEEP'].values * data.STUBBLE_DSE_HA.values / (get_feed_per_head(data, 'SHEEP') * GRASSFED_FACTOR['SHEEP'])
 
 
 def get_quantity_stubble(data, pr, lm):
