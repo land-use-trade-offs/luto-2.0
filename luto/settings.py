@@ -46,9 +46,10 @@ the base year is flipped to 2020-21.
 - '2021': 22 files are read from INPUT_DIR/Nick_build/<dataset>/ instead (land use and land management maps, eligibility,
   crop and livestock economics, emission factors, pasture productivity, the filled climate change impact multipliers, water
   delivery and licence prices, the productivity trend, domestic water use); every other input from INPUT_DIR. Each of them
-  is chosen at its own read line in luto/data.py (search for INPUT_SET there). LVSTK_K_FILE and STUBBLE_DSE_FILE, when None,
-  are set to the 2020-21 files at the top of Data.__init__; a value set by the user is kept. The stocking rate divides
-  by the NIR FY2021 intake ratings those files were calibrated at, read from Nick_build/livestock_map/livestock_dse_ratings.csv.
+  is chosen at its own read line in luto/data.py (search for INPUT_SET there). The livestock numbers follow the input set
+  too, whatever LVSTK_K_FILE and STUBBLE_DSE_FILE say: the per-type stocking k (Nick_build/livestock_map/lvstk_k.nc), the feed
+  per head it was calibrated with (livestock_dse_ratings.csv beside it) and sheep grazing cereal stubble, always on
+  (Nick_build/stubble_dse/stubble_dse_ha.nc). settings is never changed by Data.
   The block-mean caches of the 22 files carry '_2021' in their name (input/_cache).
 '''
 

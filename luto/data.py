@@ -36,7 +36,6 @@ import luto.economics.agricultural.water as ag_water
 
 from collections import defaultdict
 from collections.abc import MutableMapping
-from functools import cached_property
 from pathlib import Path
 from typing import Any, Literal, Optional
 from affine import Affine
@@ -97,18 +96,6 @@ class Data:
     Contains all data required for the LUTO model to run. Loads all data upon initialisation.
     """
 
-    @cached_property
-    def LVSTK_INTAKE_KG_DM_HEAD_DAY(self) -> dict[str, float]:
-        """Read the full-precision intake ratings used to build the 2020-21 stocking layers."""
-        path = Path(settings.INPUT_DIR) / 'Nick_build/livestock_map/livestock_dse_ratings.csv'      # a 2020-21 file only: read under INPUT_SET '2021'
-        ratings = pd.read_csv(path, usecols=['animal', 'intake_kg_dm_day'],
-                              dtype={'intake_kg_dm_day': float},
-                              float_precision='round_trip').set_index('animal')['intake_kg_dm_day']
-        if (not ratings.index.is_unique or set(ratings.index) != set(ag_quantity.DSE_PER_HEAD)
-                or not np.isfinite(ratings).all() or not (ratings > 0).all()):
-            raise ValueError(f"{path} must give one positive, finite intake rating each for BEEF, SHEEP and DAIRY.")
-        return ratings.to_dict()
-
     def __init__(self) -> None:
         """
         Sets up output containers (lumaps, lmmaps, etc) and loads all LUTO data, adjusted
@@ -156,15 +143,6 @@ class Data:
         # TEMPORARY, until the base year is flipped to 2020-21: a file that differs between the input sets is chosen at its read
         # line below, and its block-mean cache (input/_cache) carries this tag so the two sets never share a cache file
         input_set_tag = '_2021' if settings.INPUT_SET == '2021' else ''
-        if settings.INPUT_SET == '2021':
-            print(f"Livestock intake ratings from the FY2021 build: {self.LVSTK_INTAKE_KG_DM_HEAD_DAY}", flush=True)
-            # The 2020-21 livestock map is calibrated with the per-type k and carries stubble grazing: both file settings, when
-            # None, are set to their 2020-21 files; a value set by the user is kept
-            if settings.LVSTK_K_FILE is None:
-                settings.LVSTK_K_FILE = 'Nick_build/livestock_map/lvstk_k.nc'
-            if settings.STUBBLE_DSE_FILE is None:
-                settings.STUBBLE_DSE_FILE = 'Nick_build/stubble_dse/stubble_dse_ha.nc'
-            print(f"│   ├── INPUT_SET '2021': LVSTK_K_FILE = '{settings.LVSTK_K_FILE}', STUBBLE_DSE_FILE = '{settings.STUBBLE_DSE_FILE}'", flush=True)
 
         ###############################################################
         # Masking and spatial coarse graining.
@@ -395,7 +373,8 @@ class Data:
         # cereal columns carry sheep meat, wool and live exports into the sheep commodities' demand rows. One set per
         # stubble land use ('SHEEP - STUBBLE WINTER MEAT', ...), so each product has one land use and its quantity can
         # follow that land use's cells; the names never contain both words of a crop commodity.
-        self.LU_STUBBLE = settings.STUBBLE_LAND_USES if settings.STUBBLE_DSE_FILE else []
+        stubble_dse_file = 'Nick_build/stubble_dse/stubble_dse_ha.nc' if settings.INPUT_SET == '2021' else settings.STUBBLE_DSE_FILE   # 2020-21: always grazed
+        self.LU_STUBBLE = settings.STUBBLE_LAND_USES if stubble_dse_file else []
         self.LU2PR_STUBBLE = {lu: [f'SHEEP - STUBBLE {lu.split()[0].upper()} {x}' for x in ('LEXP', 'MEAT', 'WOOL')]
                               for lu in self.LU_STUBBLE}
         self.PR_STUBBLE = [pr for prs in self.LU2PR_STUBBLE.values() for pr in prs]
@@ -729,25 +708,32 @@ class Data:
 
         # The stocking calibration k per livestock type, in place of FEED_REQ: one layer per type over the model cells,
         # each cell carrying its SA2's k for that type. Without a file every type takes FEED_REQ (the model as before).
-        if settings.LVSTK_K_FILE:
-            lvstk_k = xr.load_dataset(Path(settings.INPUT_DIR) / settings.LVSTK_K_FILE)
+        lvstk_k_file = 'Nick_build/livestock_map/lvstk_k.nc' if settings.INPUT_SET == '2021' else settings.LVSTK_K_FILE
+        if lvstk_k_file:
+            lvstk_k = xr.load_dataset(Path(settings.INPUT_DIR) / lvstk_k_file)
             self.LVSTK_K = {
-                lvstype: self.get_resfactored_average(lvstk_k[lvstype], f'{Path(settings.LVSTK_K_FILE).stem}_{lvstype}').fillna(0)
+                lvstype: self.get_resfactored_average(lvstk_k[lvstype], f'{Path(lvstk_k_file).stem}_{lvstype}').fillna(0)
                 for lvstype in ('BEEF', 'SHEEP', 'DAIRY')
             }
         else:
             self.LVSTK_K = {lvstype: self.FEED_REQ for lvstype in ('BEEF', 'SHEEP', 'DAIRY')}
 
+        # Feed per head, the divisor of the stocking rate (quantity.get_yield_pot), in the unit the k above was calibrated with:
+        # 2010-11 in DSE per head; 2020-21 in kg dry matter per head per day, the intake ratings written by the build beside its k
+        # (read at full precision: they are the figures the k was fitted with)
+        if settings.INPUT_SET == '2021':
+            self.FEED_PER_HEAD = pd.read_csv(
+                Path(settings.INPUT_DIR) / 'Nick_build/livestock_map/livestock_dse_ratings.csv', float_precision='round_trip'
+            ).set_index('animal')['intake_kg_dm_day'].to_dict()
+        else:
+            self.FEED_PER_HEAD = {'BEEF': 8, 'SHEEP': 1.5, 'DAIRY': 17}
+
         # The stubble carrying rate <unit: DSE per ha, annualised>, read on every cell and applied on the cereal land uses
         # only (quantity.get_stubble_yield_pot); 0 where no file is given
-        if settings.STUBBLE_DSE_FILE:
-            # TODO: the file must already hold 0 on every cell without the sheep per-head data the stubble consumers read
-            #   (the sheep fields of agec_lvstk.nc, the sheep sources of agGHG_lvstk.nc, water_delivery_price.nc), so a cell
-            #   carries no stubble emissions without stubble production, revenue and cost. Build it from Nick's raw rate with
-            #   input/Nick_build/scripts/stubble_dse.py; Data no longer applies that rule (get_stubble_effective_rate, removed
-            #   2026-11-20). Nick's raw file is not here yet.
-            stubble_raw = xr.load_dataarray(Path(settings.INPUT_DIR) / settings.STUBBLE_DSE_FILE)
-            self.STUBBLE_DSE_HA = self.get_resfactored_average(stubble_raw, settings.STUBBLE_DSE_FILE)
+        if stubble_dse_file:
+            # Built by input/Nick_build/scripts/stubble_dse.py: 0 on every cell without the sheep per-head data, no NaN
+            stubble_raw = xr.load_dataarray(Path(settings.INPUT_DIR) / stubble_dse_file)
+            self.STUBBLE_DSE_HA = self.get_resfactored_average(stubble_raw, stubble_dse_file)
         else:
             self.STUBBLE_DSE_HA = xr.DataArray(np.zeros(self.NCELLS, dtype=np.float32), dims=['cell'], coords={'cell': np.arange(self.NCELLS)})
 
