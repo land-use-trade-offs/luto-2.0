@@ -198,7 +198,7 @@ def get_cost_stubble(data:Data, lu, lm, yr_idx):
     (quantity costs, drinking water delivery) at the stubble stocking rate. The area and fixed costs stay the crop's.
     Provisional: the per-head values are the cell's sheep values (AGEC_LVSTK), pending the livestock economics rebuild."""
     yr_cal = data.YR_CAL_BASE + yr_idx
-    head_ha = get_stubble_yield_pot(data, lu, lm, yr_idx)
+    head_ha = get_stubble_yield_pot(data, lu, lm)
     costs_q = data.AGEC_LVSTK.sel(field='QC', animal='SHEEP').values * head_ha * data.QC_COST_MULTS.loc[yr_cal, 'Sheep']
     costs_w = (data.AGEC_LVSTK.sel(field='WR_DRN', animal='SHEEP').values * settings.LIVESTOCK_DRINKING_WATER * head_ha
                * data.WATER_DELIVERY_PRICE.values * data.WP_COST_MULTS[yr_cal])

@@ -65,7 +65,7 @@ def get_rev_crop( data:Data         # Data object.
 
     # Sheep grazing the cereal stubble: the sheep revenue per head (as get_rev_lvstk) at the stubble stocking rate
     if lu in data.LU_STUBBLE:
-        stubble_head_cell = get_stubble_yield_pot(data, lu, lm, yr_idx) * data.REAL_AREA.values
+        stubble_head_cell = get_stubble_yield_pot(data, lu, lm) * data.REAL_AREA.values
         agec = data.AGEC_LVSTK
         for name, (f, q, p, cm) in {
             'Stubble sheep meat': ('F1', 'Q1', 'P1', 'sheep meat'),
