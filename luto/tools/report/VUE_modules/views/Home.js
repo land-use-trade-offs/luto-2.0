@@ -1010,7 +1010,7 @@ window.HomeView = {
           ['GHG_EMISSIONS_LIMITS', 'off: no limit. low or high: both limits are on. The level does not change the limits; it only picks the AusTIMES pathway of the demand multipliers and the carbon price.'],
           ['GHG_TARGETS_DICT', 'The AusTIMES pathway each level names.'],
           ['GHG_BENCHMARK_ROWS', 'Limits that are computed and reported but not imposed. Empty: both limits bind.'],
-          ['HIR_BASELINE', 'When set, the existing human-induced regeneration projects are taken out of what the model may count, as the inventory series already carry them. None: not applied.'],
+          ['HIR_EXISTING_PROJECTS', 'When on, the model cannot add regeneration on land already inside a registered project; its regeneration is always new. Off: existing projects are ignored.'],
           ['USE_GHG_SCOPE_1', 'True: only the direct on-farm emissions of crops and livestock are counted (scope 1, as in the national inventory). False: electricity and the making of fertiliser and chemicals are counted too.'],
           ['CARBON_EFFECTS_WINDOW', 'The years over which the carbon of a planting is averaged into a yearly rate: 50, 60, 70, 80 or 90.'],
           ['FIRE_RISK', 'Which estimate of fire loss discounts the carbon of trees and debris: low, med or high.'],

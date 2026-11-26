@@ -840,12 +840,6 @@ True:  the rate credited to registered HIR projects, one value per NRM region (t
 Land clearing and the unallocated to livestock-natural conversion read the natural-land stock either way.
 '''
 
-# Existing-HIR-project baseline on the two GHG rows. None = off. Otherwise a folder under INPUT_DIR built outside LUTO
-# (e.g. 'Nick_build/ag_mgt_caps'). LUTO's HIR then counts only above the regrowth (LULUCF row) and
-# destocking (AG row) of the existing ACCU HIR projects on their mapped cells, as its plantings count above the
-# plantings baseline: the NIR series already carry those projects.
-HIR_BASELINE = None
-
 # Whether the registered HIR projects (carbon credit register, to FY2024) take room from the model's HIR. The model's
 # HIR - Beef and HIR - Sheep are always NEW regeneration; existing projects are never part of the solution.
 # False: the projects are ignored. True: on a cell with project area on Beef / Sheep - natural land, new HIR is at most

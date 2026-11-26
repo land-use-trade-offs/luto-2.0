@@ -1696,7 +1696,7 @@ def create_new_dataset(refresh=False):
 
     # Observed ag-management adoption caps and the existing-HIR-project cells (CER register, CEA files, ABS 4627.0):
     # built outside LUTO (input/Nick_build/scripts/ag_mgt_caps.py) into input/Nick_build/ag_mgt_caps, where settings.AG_MANAGEMENT_OBSERVED_CAPS
-    # and settings.HIR_BASELINE point; nothing to build here.
+    # and settings.HIR_EXISTING_PROJECTS read; nothing to build here.
 
 
     # Complete processing and report back

@@ -204,8 +204,6 @@ the default settings. (The old net row in the 2010-base code binds hard: 73.9 â†
 - [ ] **Rule 5, fail loudly.**
   - `series_agriculture_exogenous.csv` missing â†’ 0 for every year.
   - The AG tolerance is NaN in years without one.
-  - The HIR baseline clips a project share above 1 with `np.minimum(..., 1.0)` (`get_hir_baseline_t`) instead of
-    raising.
   - The off-land energy part is found by the substring "energy" in `Emission Type` (`row_inputs.get_row_inputs`); the
     input file should carry the scope as a column.
 - [ ] **Rule 5, one quantity in one place.** The rows' left-hand side is computed three times: the row coefficients
