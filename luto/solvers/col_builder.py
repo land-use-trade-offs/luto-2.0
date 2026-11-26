@@ -71,6 +71,14 @@ def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSupport]:
     trans_lb_nonag_rk       = get_trans_lb_nonag_rk(data, base_year)                            # lower bound of every non-ag target: irreversible non-ag land uses lock in their base-year holding
     trans_lb_ag_man_mrj     = ag_transition.get_trans_lb_ag_man(data, base_year)   # lower bound of every ag-mgt entry: non-reversible options lock in last step's adoption
 
+    # A lock-in within the tolerance of its upper bound IS the upper bound. A cell full of an irreversible non-ag land
+    # use has ub = its base and lb = the base floor-truncated (get_non_ag_lb_matrices): a slot narrower than the
+    # feasibility tolerance, so the column is fixed in effect but not in form, and no presolve removes it. 78,554 such
+    # columns made cuOpt's barrier 5 times slower by 2046 (3,117 -> 611 iterations with them fixed; FINDINGS 20261126).
+    near_fixed = (trans_lb_nonag_rk > 0) & (trans_ub_nonag_rk - trans_lb_nonag_rk < settings.FEASIBILITY_TOLERANCE)
+    trans_lb_nonag_rk       = np.where(near_fixed, trans_ub_nonag_rk, trans_lb_nonag_rk)
+    print(f'└── NonAg lb within {settings.FEASIBILITY_TOLERANCE:g} of its ub set to the ub: {int(near_fixed.sum()):,} entries', flush=True)
+
     # ── 3. clamp base dvars to avoid errors during presolve ──
     """
     A base-year dvar can fall outside [lb, ub] by a solver tolerance, which presolve does not accept.
