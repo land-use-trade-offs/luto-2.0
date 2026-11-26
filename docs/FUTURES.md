@@ -5,6 +5,46 @@ Entries are in **descending date order** (newest first). Each entry stands on it
 
 ---
 
+## 20261126 — the biodiversity benefit of HIR: a recovery trend instead of all at once
+
+### TL;DR
+
+A cell under HIR (human-induced regeneration) counts its whole biodiversity gain from the year it is adopted. Real
+vegetation recovers over decades. We may want the gain to follow a recovery trend. Not planned: it needs a record of
+the year each cell entered HIR, a mechanism we do not want to build because of its complexity.
+
+### How it is now
+
+- **Biodiversity** (`economics/agricultural/biodiversity.py`, `get_beef_hir_effect_b_mrj` / `get_sheep_hir_effect_b_mrj`):
+  the gain is the score of unallocated natural land times the degradation gap of the grazing land use, less the
+  ceiling gap (`1 - HIR_CEILING_PERCENTAGE`). It has no time in it: the same amount in the year of adoption and in
+  every year after.
+- **Carbon** is different: a flat amount every year (the natural-land stock over `CARBON_EFFECTS_WINDOW`, or the
+  regional credit rate when the rate layer is on). So the two benefits of one option run on different clocks.
+- The plantings count their biodiversity the same way (all at once), so this is the model's convention, not HIR's alone.
+
+### Why it is not simple
+
+A recovery trend makes a cell's benefit depend on how long it has been under HIR. The model solves each year from the
+state of the year before and keeps no adoption year per cell. Carrying one means an age for every (cell, option), kept
+through partial adoption (a cell that is 30 % HIR in 2030 and 50 % in 2035 holds two ages) and through cell grouping.
+That is the complexity we want to avoid.
+
+### Cheaper routes to weigh first
+
+- A single discount on the gain (the share of full recovery reached on average over the planning horizon): no record
+  needed, the benefit stays one number per cell.
+- A gain that depends on the target year only (recovery counted from a fixed start year for all HIR): no per-cell
+  record, but it treats land adopted late as if adopted early.
+
+### To check alongside
+
+The ceiling gap is subtracted as a plain number (0.2) from a term in score units, where the carbon formula multiplies
+it by the cell's stock. On a cell with a low score the gain can be negative. Not measured yet; decide whether it is
+intended.
+
+---
+
 ## 20261126 — rebuild the demand file on the 2020-21 base
 
 ### TL;DR
