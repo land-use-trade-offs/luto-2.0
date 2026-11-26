@@ -380,18 +380,18 @@ window.SettingsNotes = {
       "True: the rate of regrowth measured from the registered regeneration projects (credits issued per hectare, by region), the same on every land use. Regions with no registered project have a rate of 0.",
     ],
   },
-  HIR_BASE_YEAR_PROJECTS: {
-    what: "Whether regeneration projects that already exist start the run as adopted.",
+  HIR_EXISTING_PROJECTS: {
+    what: "Whether regeneration projects that already exist take room from the regeneration the model can add.",
     detail: [
-      "None: nothing is adopted in the base year.",
-      "A folder name: the registered projects (up to the folder's baseline year) are adopted in the base year on the beef and sheep natural land they cover, and stay adopted in every year.",
+      "False: existing projects are ignored.",
+      "True: the model's regeneration is always new; on land already inside a registered project no more can be added.",
     ],
   },
   AG_MANAGEMENT_ADOPTION_ABOVE_BASE: {
     what: "Whether management options may be adopted beyond what is already adopted in the base year.",
     detail: [
       "True: the usual limits apply.",
-      "False: each option stays at most at its base-year adoption on every cell (existing regeneration projects; every other option at 0).",
+      "False: no option is adopted at all (nothing is adopted in the base year).",
     ],
   },
   HIR_BASELINE: {

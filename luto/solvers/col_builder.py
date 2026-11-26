@@ -333,6 +333,11 @@ def am_space(data: Data, feasible_ag_mrj: np.ndarray, mask_gbf2_solar: np.ndarra
         # set lower bounds for non-reversible options
         if not settings.AG_MANAGEMENTS_REVERSIBLE[am]:
             lb_smr[slot] = trans_lb_ag_man_mrj[am][:, :, j]                            # (lm, cell) of land use j
+        # registered HIR projects take room from new HIR (settings.HIR_EXISTING_PROJECTS): on a cell with project area,
+        # at most the land use's base-year share less the share under projects
+        if settings.HIR_EXISTING_PROJECTS and am in data.HIR_EXISTING_SHARE:
+            existing = data.HIR_EXISTING_SHARE[am]                                    # (lm, cell)
+            ub_smr[slot] = np.where(existing > 0, np.maximum(data.AG_L_MRJ[:, :, j] - existing, 0), ub_smr[slot])
         if base_am is not None:
             ub_smr[slot] = base_am[am][:, :, j]
             lb_smr[slot] = np.minimum(lb_smr[slot], ub_smr[slot])                     # never above the ub
