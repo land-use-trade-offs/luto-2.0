@@ -142,6 +142,12 @@ TECH_ADOPT_MULT = 1
 # file's last year, and an (option, land use) with no rows keeps its current limit.
 AG_MANAGEMENT_OBSERVED_CAPS = None
 
+# Whether ag-management adoption may rise above its base-year level. True (default): the usual limits apply.
+# False (calibration and gate runs): each option is held at most at its base-year adoption on every cell, in every
+# year; HIR at the existing projects (HIR_BASE_YEAR_PROJECTS), every other option at 0, since the base-year emission
+# factors, calibrated to the national inventory, already embody the base-year adoption of those options.
+AG_MANAGEMENT_ADOPTION_ABOVE_BASE = True
+
 # Set whether to use demand elasticity when calculating commodity prices
 DYNAMIC_PRICE = True
 
@@ -839,6 +845,13 @@ Land clearing and the unallocated to livestock-natural conversion read the natur
 # destocking (AG row) of the existing ACCU HIR projects on their mapped cells, as its plantings count above the
 # plantings baseline: the NIR series already carry those projects.
 HIR_BASELINE = None
+
+# Existing HIR projects as base-year management. None = off (no ag-management adoption in the base year). Otherwise a
+# folder under INPUT_DIR written by input/Nick_build/scripts/ag_mgt_caps.py (e.g. 'Nick_build/ag_mgt_caps_2021', the 2021-map run): the ACCU HIR projects registered up
+# to its baseline FY start as base-year adoption of HIR - Beef and HIR - Sheep on the cells of their Carbon Estimation
+# Areas whose base-year land use is the option's own (Beef or Sheep natural land), as the share of the cell inside the
+# projects (capped at the land use's share). Project area on other land uses is not adopted.
+HIR_BASE_YEAR_PROJECTS = None
 
 # Maintainace cost for HIR
 BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100  # AUD per ha and year to maintain human-induced regeneration on beef land.
