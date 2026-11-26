@@ -164,6 +164,22 @@ def get_cols(data: Data, base_year: int) -> tuple[xr.Dataset, ColSupport]:
     nonag_rk2col = np.full(valid_nonag_rk.shape, -1, dtype=np.int32)
     nonag_rk2col[col_space['cell'].values[nonag], col_space['k'].values[nonag]] = nonag
 
+    # ── 11. every arc's upper bound: its source's base ──
+    # The source-cap row (row_builder.get_source_cap_ag / _nonag: Σ out ≤ the source column's base) already bounds every
+    # arc by that base, so this changes no feasible point; it only puts the bound on the column instead of leaving it
+    # at inf. cuOpt's barrier does not derive it from the row (2046: 611 -> 556-561 iterations; the whole LP with the
+    # GHG row in it converged only with the arcs bounded; FINDINGS 20261126).
+    block, ub = col_space['block'].values, col_space['ub'].values
+    from_ag = np.flatnonzero((block == 'ag2ag') | (block == 'ag2nonag'))
+    source = ag_mrj2col[col_space['from_m'].values[from_ag], col_space['cell'].values[from_ag], col_space['from_j'].values[from_ag]]
+    assert (source >= 0).all(), 'an arc from an ag source without an ag column'
+    ub[from_ag] = col_space['base'].values[source]
+    from_nonag = np.flatnonzero(block == 'nonag2ag')
+    source = nonag_rk2col[col_space['cell'].values[from_nonag], col_space['from_k'].values[from_nonag]]
+    assert (source >= 0).all(), 'an arc from a non-ag source without a non-ag column'
+    ub[from_nonag] = col_space['base'].values[source]
+    print(f'└── Arc ub set to its source\'s base: {from_ag.size + from_nonag.size:,} arcs', flush=True)
+
     return col_space, ColSupport(
         valid_ag_mrj=valid_ag_mrj,
         valid_nonag_rk=valid_nonag_rk,
