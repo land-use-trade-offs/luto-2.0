@@ -347,6 +347,12 @@ def get_nonag2ag_ub_src(data: Data, base_dvar_rk: np.ndarray, from_k: int, cells
         data.T_MAT.sel(from_lu=data.NON_AGRICULTURAL_LANDUSES, to_lu=data.AGRICULTURAL_LANDUSES).values[from_k]
     )).astype(np.float32)                                               # (to_j,)
 
+    # An irreversible land use never leaves its cell: its lower bound holds the base (get_non_ag_lb_matrices; floor-
+    # truncated, so an arc out could carry only that granule). So it has no arc out. Such arcs, ~9 a cell and nearly
+    # fixed, made cuOpt's barrier 5-10 times slower once plantings spread (2027: 2,000 -> 389 iterations; FINDINGS 20261126).
+    if not settings.NON_AG_LAND_USES_REVERSIBLE[data.NON_AGRICULTURAL_LANDUSES[from_k]]:
+        reach_j[:] = 0.0
+
     # EXCLUDE × no-go, on this source's cells.
     allowed_mrj = get_ag_allowed_mrj(data, cells)
 
@@ -363,6 +369,11 @@ def get_nonag2ag_ub(data: Data, base_year: int) -> np.ndarray:
     t_kj = (~np.isnan(
         data.T_MAT.sel(from_lu=data.NON_AGRICULTURAL_LANDUSES, to_lu=data.AGRICULTURAL_LANDUSES).values
     )).astype(np.float32)                                               # (k, to_j)
+
+    # An irreversible land use never leaves its cell (get_nonag2ag_ub_src): it reaches no ag target.
+    for k, k_name in enumerate(data.NON_AGRICULTURAL_LANDUSES):
+        if not settings.NON_AG_LAND_USES_REVERSIBLE[k_name]:
+            t_kj[k, :] = 0.0
 
     # Reachable land share: sum base-year fractions of every non-ag source that can reach to_j.
     reach_frac_rj = (tools.get_base_held(data.non_ag_dvars[base_year]) @ t_kj).astype(np.float32)   # (NCELLS, to_j)
