@@ -45,14 +45,15 @@ intended.
 
 ---
 
-## 20261126 — rebuild the demand file on the 2020-21 base
+## 20261126 — a demand file that starts in 2020: work with Michalis on his 2020-onward demand model
 
 ### TL;DR
 
 `demand_projections.nc` is built on the 2010 base. On the 2020-21 inputs its 2021 level does not match what the
 base-year map produces, so a 2020-21 run needs `DEMAND_REANCHOR_TO_BASE_YEAR = True`, a temporary switch that scales
-each commodity's path by base-year production / the file's base-year demand. A demand file rebuilt on the 2020-21
-base removes the switch.
+each commodity's path by base-year production / the file's base-year demand. A demand file that starts in 2020
+removes the switch: work with Michalis to use his 2020-onward demand model. Measured effect of the mismatch:
+`docs/FINDINGS.md`, 20261126.
 
 ### Why
 
@@ -63,6 +64,14 @@ base removes the switch.
 - Demand then depends on the run's settings (`RESFACTOR`, `STUBBLE_GRAZING`, the yield settings), so two runs that
   differ in them do not face the same demand.
 - Off-land commodities stay on the file's path, so on-land and off-land demand stand on different bases.
+
+### With Michalis
+
+- His update of 2026-07-20 was not adopted: under `IMPORT_TREND = 'Trend'` imports exceed domestic use plus exports
+  for several commodities and demand goes negative (sheep meat −9.3 Mt in 2050 in the default scenario). Settle this
+  first.
+- Compare his 2020 and 2021 levels with the production of the 2020-21 map, commodity by commodity; each gap that
+  remains is either his or an input of ours to correct (sugar and rice first).
 
 ### To state when it is done
 

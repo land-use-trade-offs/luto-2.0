@@ -5,6 +5,99 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20261126 — the demand file does not fit the 2020-21 base: a run on it loses 489 billion AUD in its first step; re-anchoring is a stopgap, the fix is a demand model that starts in 2020
+
+### TL;DR
+
+LUTO's demand file (`demand_projections.nc`) was made for the 2010 base. It starts from what the 2010 land-use map
+produces and projects every year to 2100. A run on the 2020-21 base starts from the 2021 map, and the file's number
+for 2021 is still that projection from 2010: it was never matched to what the 2021 map produces. The two disagree by
+a factor of 0.32 to 2.50 per commodity. Left as it is, the first solved year has to close every gap at once.
+`DEMAND_REANCHOR_TO_BASE_YEAR = True` (PR #239) makes the run usable by taking 2021 as 1 and keeping only the file's
+trend. It is a stopgap. **The fix is to work with Michalis and use his demand model that starts in 2020.**
+
+### What the file is, and where it agrees with the map
+
+- Tonnes per commodity for every year 2010–2100 (domestic use, exports, imports, feed, and their total `PRODUCTION`,
+  which LUTO reads as the demand to meet), one table per scenario combination.
+- In **2010** the file equals the production of the 2010 map (within 1e-5 for most commodities): the demand model
+  starts there.
+- Its **2021** value is the demand model's projection eleven years on. Nothing ties it to the 2021 map.
+
+### The gap in 2021 (RES5, 2020-21 base, default settings)
+
+Production of the 2021 map over the file's demand in 2021, all 26 on-land commodities; the largest gaps:
+
+| Commodity | Production / demand |
+|---|---|
+| sheep live export | 0.32 |
+| rice | 0.55 |
+| sugar | 0.61 |
+| hay | 0.64 |
+| dairy | 0.72 |
+| winter cereals | 0.76 |
+| beef meat | 0.83 |
+| winter oilseeds | 1.37 |
+| nuts | 1.57 |
+| summer legumes | 2.50 |
+
+Winter cereals show the mechanism (million tonnes): the file has 41.2 in 2010 and 53.2 in 2021 (the demand model
+projected 29 % growth, mostly exports), while the 2021 map produces 40.4, about what the 2010 map did.
+
+### What it does to a run: one step 2021 → 2025 at RES5, with and without re-anchoring
+
+Both solved to optimal at the first attempt (the first years ever solved on the 2020-21 base).
+
+| | File demand | Re-anchored |
+|---|---|---|
+| Objective (profit) | −489 billion AUD | +5.2 billion AUD |
+| Barrier | 234 iterations, 1,086 s | 130 iterations, 621 s |
+| GHG agriculture row | binding | 0.45 Mt under the limit |
+| GHG LULUCF row | binding | 30.5 Mt under the limit |
+| Winter cereals (Mha; 29.7 in 2021) | 40.5 | 30.1 |
+| Beef - modified land (Mha; 44.4 in 2021) | 31.1 | 43.5 |
+| Sheep - modified land (Mha; 17.1 in 2021) | 11.9 | 14.8 |
+| Unallocated - natural land (Mha; 256.8 in 2021) | 252.9 | 256.7 |
+| HIR, beef + sheep (Mha) | 59.5 | 11.6 |
+| Destocked - natural land (Mha) | 1.4 | 0 |
+
+With the file's demand the model takes 18.6 Mha out of beef and sheep on modified land in four years (winter cereals
+alone gain 10.8 Mha), takes up 4 Mha of unallocated natural land and buys emission cuts on a huge scale to stay under
+both GHG rows. The crop increases match the demand ratios (winter
+cereals +36 % against a ratio of 0.76, sugar +61 % against 0.61, rice +75 % against 0.55): it is the demand level that
+drives them. Re-anchored, land use stays close to the 2021 map.
+
+### What re-anchoring is, and what it costs
+
+demand(year) = production of the 2021 map × file(year) / file(2021). The level comes from the map, the trend from the
+file. Off-land commodities keep the file's tonnes.
+
+- **Every later year is scaled by the same ratio.** Winter cereals in 2050: 58.7 million tonnes against the file's
+  77.3.
+- **It cannot tell why the map and the file disagree.** Either the projection ran ahead of what happened (then the
+  map is right and the scaling is correct), or the 2020-21 inputs under-produce, for example a yield map that is too
+  low (then the scaling hides the error by lowering demand). Sugar and rice at 0.55 to 0.61 are crops with good
+  statistics: a gap of 40 % there may be an input problem and is to be checked.
+- **Demand depends on the run.** Base-year production changes with `RESFACTOR`, `STUBBLE_GRAZING` and the yield
+  settings, so two runs that differ in them do not face the same demand.
+
+### What we need to do
+
+Work with Michalis to move LUTO onto his demand model that starts in 2020, so the demand's own starting year is the
+model's base year and no scaling is needed. Known obstacle from the last look at his update (the file of 2026-07-20,
+not adopted): under `IMPORT_TREND = 'Trend'` its imports exceed domestic use plus exports for several commodities, so
+demand goes negative (default scenario 2050: sheep meat −9.3 Mt; also citrus, pears, hay, tropical stone fruit, other
+non-cereal crops, cotton). To settle with him: that, the commodities whose 2020-21 level still differs from the map
+and why, and the off-land commodities. The to-do is in `docs/FUTURES.md`, 20261126.
+
+### Not checked in these two runs
+
+No outputs were written, no year after 2025 was solved, and production against demand was not read per commodity.
+In the re-anchored run two things are unexplained: Sheep - modified land falls 2.3 Mha (−14 %) although demand starts
+at the map's level, and 11.6 Mha of HIR and 19.7 Mha of AgTech EI are adopted while neither GHG row binds.
+
+---
+
 ## 20261126 — cuOpt's barrier slowed 5–10x from 2027 in a RES1 run: two causes in the model (dead arcs, near-fixed columns), both found and fixed in tests; the GHG row stays out of reach
 
 ### TL;DR
