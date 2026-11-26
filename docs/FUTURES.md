@@ -5,6 +5,33 @@ Entries are in **descending date order** (newest first). Each entry stands on it
 
 ---
 
+## 20261126 — rebuild the demand file on the 2020-21 base
+
+### TL;DR
+
+`demand_projections.nc` is built on the 2010 base. On the 2020-21 inputs its 2021 level does not match what the
+base-year map produces, so a 2020-21 run needs `DEMAND_REANCHOR_TO_BASE_YEAR = True`, a temporary switch that scales
+each commodity's path by base-year production / the file's base-year demand. A demand file rebuilt on the 2020-21
+base removes the switch.
+
+### Why
+
+- Measured at RES5 on the 2020-21 base (2026-11-26): production / demand in 2021 runs from 0.32 (sheep live export)
+  to 2.50 (summer legumes); 16 of the 26 on-land commodities are below 1 (dairy 0.72, sugar 0.61, rice 0.55).
+- With the switch on, demand is whatever the base-year inputs produce. An error in a yield or livestock map no
+  longer shows as a gap between production and demand; it lowers or raises demand instead.
+- Demand then depends on the run's settings (`RESFACTOR`, `STUBBLE_GRAZING`, the yield settings), so two runs that
+  differ in them do not face the same demand.
+- Off-land commodities stay on the file's path, so on-land and off-land demand stand on different bases.
+
+### To state when it is done
+
+The base year of the new file, its build script in `input/Nick_build/scripts/` with a `provenance.csv`, the remaining
+production / demand ratios at the base year (each explained), the removal of `DEMAND_REANCHOR_TO_BASE_YEAR` and of
+its block in `Data`, and a comparability note.
+
+---
+
 ## 20261125 — rebuild the climate change impact multipliers from GAEZ v5
 
 ### TL;DR
