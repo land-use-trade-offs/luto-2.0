@@ -763,23 +763,23 @@ def get_beef_hir_effect_g_mrj(data: Data, yr_idx, separate=False):
     regrowth = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
     destocking = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
 
-    # GHG abatement from Land Use Change: gross HIR regrowth (settings.HIR_RATE_FILE), the same on every land use and land
-    # management; without the file, the natural-land stock over the regrowth window (habitat-score gap less ceiling gap)
-    hir_rate = getattr(data, 'HIR_REGROWTH_T_CO2E_HA_PER_YR', None)
+    # GHG abatement from Land Use Change: the credit register's rate, the same on every land use and land management
+    # (settings.HIR_REGROWTH_FROM_CREDIT_REGISTER); otherwise the natural-land stock over the regrowth window
+    # (habitat-score gap less ceiling gap)
     for j_idx, lu in enumerate(land_uses):
-        if hir_rate is not None:
-            regrowth[:, :, j_idx] -= hir_rate * data.REAL_AREA.values
-            continue
-        regrowth[:, :, j_idx] -= (
-            (
-                data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR.values
-                * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[data.DESC2AGLU[lu]])
-            )
-            - (
-                data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR.values
-                * (1 - settings.HIR_CEILING_PERCENTAGE)
-            )
-        ) * data.REAL_AREA.values 
+        if settings.HIR_REGROWTH_FROM_CREDIT_REGISTER:
+            regrowth[:, :, j_idx] -= data.HIR_REGROWTH_T_CO2E_HA_PER_YR * data.REAL_AREA.values
+        else:
+            regrowth[:, :, j_idx] -= (
+                (
+                    data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR.values
+                    * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[data.DESC2AGLU[lu]])
+                )
+                - (
+                    data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR.values
+                    * (1 - settings.HIR_CEILING_PERCENTAGE)
+                )
+            ) * data.REAL_AREA.values
 
     # GHG abatement from livestock density reduction
     for lm_idx, lm in enumerate(data.LANDMANS):
@@ -795,23 +795,23 @@ def get_sheep_hir_effect_g_mrj(data: Data, yr_idx, separate=False):
     regrowth = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
     destocking = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
 
-    # GHG abatement from Land Use Change: gross HIR regrowth (settings.HIR_RATE_FILE), the same on every land use and land
-    # management; without the file, the natural-land stock over the regrowth window (habitat-score gap less ceiling gap)
-    hir_rate = getattr(data, 'HIR_REGROWTH_T_CO2E_HA_PER_YR', None)
+    # GHG abatement from Land Use Change: the credit register's rate, the same on every land use and land management
+    # (settings.HIR_REGROWTH_FROM_CREDIT_REGISTER); otherwise the natural-land stock over the regrowth window
+    # (habitat-score gap less ceiling gap)
     for j_idx, lu in enumerate(land_uses):
-        if hir_rate is not None:
-            regrowth[:, :, j_idx] -= hir_rate * data.REAL_AREA.values
-            continue
-        regrowth[:, :, j_idx] -= (
-            (
-                data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR.values
-                * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[data.DESC2AGLU[lu]])
-            )
-            - (
-                data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR.values
-                * (1 - settings.HIR_CEILING_PERCENTAGE)
-            )
-        ) * data.REAL_AREA.values 
+        if settings.HIR_REGROWTH_FROM_CREDIT_REGISTER:
+            regrowth[:, :, j_idx] -= data.HIR_REGROWTH_T_CO2E_HA_PER_YR * data.REAL_AREA.values
+        else:
+            regrowth[:, :, j_idx] -= (
+                (
+                    data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR.values
+                    * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[data.DESC2AGLU[lu]])
+                )
+                - (
+                    data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR.values
+                    * (1 - settings.HIR_CEILING_PERCENTAGE)
+                )
+            ) * data.REAL_AREA.values
         
     # GHG abatement from livestock density reduction
     for lm_idx, lm in enumerate(data.LANDMANS):

@@ -373,11 +373,11 @@ window.SettingsNotes = {
       "0.8 means regeneration reaches 80 % of the carbon and biodiversity gain of fully destocked natural land.",
     ],
   },
-  HIR_RATE_FILE: {
+  HIR_REGROWTH_FROM_CREDIT_REGISTER: {
     what: "Where the carbon that regeneration and destocked land regrow comes from.",
     detail: [
-      "None: the carbon stock of natural land, spread over the regrowth window.",
-      "A file name: the rate of regrowth measured from the registered regeneration projects (credits issued per hectare, by region), the same on every land use. Regions with no registered project have a rate of 0.",
+      "False: the carbon stock of natural land, spread over the regrowth window.",
+      "True: the rate of regrowth measured from the registered regeneration projects (credits issued per hectare, by region), the same on every land use. Regions with no registered project have a rate of 0.",
     ],
   },
   HIR_BASELINE: {

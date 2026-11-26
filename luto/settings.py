@@ -823,19 +823,15 @@ HIR_PRODUCTIVITY_CONTRIBUTION = 0.5
 # HIR celling factor, assuming HIR achienves x% of bio/GHG benefits of the Destocked - natural land land use
 HIR_CEILING_PERCENTAGE = 0.8
 
-HIR_RATE_FILE = None
+HIR_REGROWTH_FROM_CREDIT_REGISTER = False
 '''
-Per-cell HIR carbon rates. None (default): the regrowth carbon of HIR - Beef, HIR - Sheep and Destocked natural land is the
-natural-land carbon stock over CARBON_EFFECTS_WINDOW (HIR_CEILING_PERCENTAGE applies to HIR's share of it), as before.
-Otherwise a NetCDF file (relative to INPUT_DIR, or an absolute path, e.g. 'Nick_build/hir_layer/hir_rate_layer_gross.nc') with one value
-per full-resolution cell, built from the CER ACCU project register (mean FY2020-24 issuance per project; regional rate =
-issuance / CEA hectares by NRM region; regions with fewer than 3 mapped projects take their state's pooled rate):
-- HIR_RATE_ISSUANCE: ACCUs issued, t CO2e per ha per yr;
-- HIR_RATE: the same grossed up for the 5 per cent risk-of-reversal buffer and the permanence discount, t CO2e per ha per yr;
-  with the file set, this is the regrowth carbon of HIR - Beef, HIR - Sheep and Destocked natural land on the LULUCF row,
-  the same on every land use and land management (HIR_CEILING_PERCENTAGE then applies to biodiversity only);
-- HIR_ELIGIBLE: 1 in NRM regions with a mapped HIR project, 0 elsewhere (both rates 0 there).
-Land clearing and the unallocated to livestock-natural conversion still read the natural-land stock.
+Where the regrowth carbon of HIR - Beef, HIR - Sheep and Destocked natural land comes from.
+False: the natural-land carbon stock over CARBON_EFFECTS_WINDOW; HIR earns HIR_CEILING_PERCENTAGE of what Destocked
+       natural land does.
+True:  the rate credited to registered HIR projects, one value per NRM region (t CO2e per ha per yr, gross), read from
+       input/Nick_build/hir_layer/hir_rate_layer_gross.nc. Then HIR and Destocked natural land earn the same carbon,
+       HIR_CEILING_PERCENTAGE applies to biodiversity only, and a region without a registered project earns none.
+Land clearing and the unallocated to livestock-natural conversion read the natural-land stock either way.
 '''
 
 # Existing-HIR-project baseline on the two GHG rows. None = off. Otherwise a folder under INPUT_DIR built outside LUTO

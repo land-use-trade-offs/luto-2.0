@@ -358,19 +358,18 @@ def get_ghg_destocked_land(
     lumap_BASE_YR = data.lumaps[data.YR_CAL_BASE]
     penalty_ghg_r = np.zeros(data.NCELLS)
     
-    hir_rate = getattr(data, 'HIR_REGROWTH_T_CO2E_HA_PER_YR', None)
     for from_lu in data.LU_LVSTK_NATURAL:
-        if hir_rate is not None:                                         # gross HIR regrowth (settings.HIR_RATE_FILE)
+        if settings.HIR_REGROWTH_FROM_CREDIT_REGISTER:                   # the credit register's rate, as for HIR
             penalty_ghg_r[lumap_BASE_YR == from_lu] = (
-                -hir_rate[lumap_BASE_YR == from_lu]
+                -data.HIR_REGROWTH_T_CO2E_HA_PER_YR[lumap_BASE_YR == from_lu]
                 * data.REAL_AREA.values[lumap_BASE_YR == from_lu]
             )
-            continue
-        penalty_ghg_r[lumap_BASE_YR == from_lu] = (
-            data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR.sel(cell=lumap_BASE_YR == from_lu).values
-            * (data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[from_lu] - 1)
-            * data.REAL_AREA.values[lumap_BASE_YR == from_lu]
-        )
+        else:
+            penalty_ghg_r[lumap_BASE_YR == from_lu] = (
+                data.CO2E_STOCK_UNALL_NATURAL_TCO2_HA_PER_YR.sel(cell=lumap_BASE_YR == from_lu).values
+                * (data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[from_lu] - 1)
+                * data.REAL_AREA.values[lumap_BASE_YR == from_lu]
+            )
 
     if aggregate==True:
         return penalty_ghg_r
