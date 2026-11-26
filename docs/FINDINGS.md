@@ -125,8 +125,9 @@ the band rows' duals). The price search stays.
 
 **The route for a GPU run with a GHG cap (as of 2026-11-26):** the two fixes in the model build; the LP cuOpt solves
 has every arc bounded by its source's base (exact: the source-cap rows imply it); the price search (cuOpt's barrier on
-the LP without the GHG row, the row priced in the objective, the first price = the year before's GHG shadow price, stop
-at a loss bound of 1e-3 of the objective); then Gurobi's push (crossover from the mix of the two bracketing solves,
+the LP without the GHG row, the row priced in the objective, the first price = the median of the same year's GHG price
+in the runs at the same GHG level that have solved it, else the year before's GHG shadow price, stop at a loss bound
+of 1e-3 of the objective); then Gurobi's push (crossover from the mix of the two bracketing solves,
 both primal and dual starts) on the whole LP. A search solve of the run's 2046 LP then takes 556–561 iterations, ~7 min
 on an L40S and ~3 min on an H200 (3,000–3,800 iterations and 35–40 min before the fixes); 4–5 solves a year. Without a
 GHG row: one cuOpt solve and the push.
@@ -164,6 +165,37 @@ LP is (its iterations do not move: 296–420 on every LP below).
 With the dead-arc fix in the model build from 2046 (the near-fixed fix not applied), the run's search solves went from
 3,500–5,100 iterations (2044–45, 35–54 min on the L40S) to 1,060–1,370 in 2047–48 (11–13 min); whole years from 4.9 h
 (2045) to 1.5–2.6 h. 2046, built on the 2045 state that the old code had made, gained only 11 %.
+
+From 2010, with both fixes and the arcs bounded (Paper 2 run #1 `GHG_off_BIO_off_CUT_50`, started 2026-11-26, L40S;
+`jinzhu_inspect_code/Xinhao_paper2_runs`), cuOpt's iterations do not jump at 2027. The rerun above (#4, GHG high,
+built without the fixes to 2045) beside it; in 2028–2030 its GHG row did not bind, so both are one solve at price 0:
+
+| cuOpt iterations a solve | 2011–2020 | 2021–2026 | 2027 | 2028 | 2029 | 2030 |
+|---|---|---|---|---|---|---|
+| #1, both fixes, arcs bounded | 203–305 | 262–313 | **286** | **295** | **288** | **287** |
+| #4, no fix | 212–313 | 295–355 | 1,712–2,058 | 2,945 | 1,655 | 1,857 |
+
+The two runs differ in scenario (#4 has GBF2 high and its own states), so the columns compare the trend, not a pair of
+identical LPs. #1's whole year: 16–22 min, of which cuOpt 2–4 min and the push ~1 min; the rest is the build and the
+store (2020s: ~13 min a year), which no solver change touches.
+
+### Which change did what, and why Gurobi copes
+
+| Change (all exact: the feasible set is the same) | LP | cuOpt iterations |
+|---|---|---|
+| no arc out of an irreversible source | 2027, price 0 | ~2,000 → 389 |
+| near-fixed columns fixed (lb = ub) | 2046, price 591.6 | 3,117 → 611 |
+| every arc bounded by its source's base (`implied_ub`), on top of both | 2046, price 591.6 | 611 → 556–561 |
+| the same three, at price 0 | 2046 | 944 (arc fix only) → 471 |
+| the arcs bounded, the GHG row in the LP (split and weighted) | 2046, whole LP | primal stuck at −1.8e6 → converges, once (not repeatable) |
+
+The two fixes carry the gain in the search LPs; bounding the arcs adds ~10 % there, and matters most where the GHG row
+is in the LP. All three make explicit what the model already implies: an arc whose source cannot leave is no arc; a
+column with a slot under the tolerance is fixed; an arc's flow is at most its source's base (the source-cap row).
+Gurobi's barrier needs none of them (296–470 iterations on every LP, fixed or not). Its presolve is not the reason:
+PSLP removes as much as Gurobi's presolve, and neither removes the nonag2ag arcs (above). Gurobi copes in its barrier;
+how (bound handling, scaling, its treatment of near-fixed and free columns) was not looked into. cuOpt's barrier does
+not, so the model hands it the facts in explicit form.
 
 ### The GHG row in cuOpt (2027 and 2046, both fixes)
 
@@ -220,9 +252,11 @@ over its cap (20261123).
 - The fix moves the grouped objective UP by 0.12–0.13 % (2027: Gurobi 17,172.09 → 17,192.15; cuOpt 17,176.9 →
   17,198.5) although it only removes options — the cell grouping changes with the arcs (a blob's key holds its column
   types). To check on the full LP or a step's `grouping_<year>.csv` before it goes into `luto/`.
-- Neither fix is in `luto/` yet: the dead-arc fix is 11 lines in `luto/economics/non_agricultural/transitions.py`; the
-  near-fixed fix is to be written (lb = ub where 0 < ub − lb < `FEASIBILITY_TOLERANCE`, or no floor-truncation of an
-  irreversible lb below a full cell's ub).
+- Both fixes are in `luto/` (`jinzhu` 3bd9e325, the dead arcs, `non_agricultural/transitions.py`; cc5d82c6, the
+  near-fixed columns, `solvers/col_builder.get_cols`). The arcs' bound is not: it lives in the Paper 2 run driver
+  (`gpu_solve.implied_upper_bounds`, applied to the LP handed to cuOpt only). `col_builder` could give every arc
+  ub = its source's base instead of inf, so the column table carries no infinite bound for any engine; to be decided,
+  and checked identical on a RES5 step first.
 
 ---
 
