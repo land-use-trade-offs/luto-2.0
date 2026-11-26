@@ -1466,14 +1466,21 @@ class Data:
                       f"{bad.sizes['year']} year(s) from {bad['year'].min().item()}, min {bad.min().item():,.0f}", flush=True)
             self.DEMAND_C = self.DEMAND_C.clip(min=0)
 
-        # The demand-to-production report at the base year; with settings.DEMAND_REANCHOR_TO_BASE_YEAR each on-land
-        # commodity's demand path is multiplied by its ratio_applied (base-year production / base-year demand)
-        self.DEMAND_REANCHOR_REPORT = self.get_demand_reanchor_report()
+        # TEMPORARY, for the 2020-21 base (PR #239; docs/FUTURES.md, 20261126): the demand file is built on the 2010
+        # base, so its 2021 level does not match what the 2020-21 inputs produce. Each on-land commodity's path is
+        # multiplied by base-year production / the file's base-year demand: the level comes from the base-year map, the
+        # growth from the file.
         if settings.DEMAND_REANCHOR_TO_BASE_YEAR:
-            ratio = self.DEMAND_REANCHOR_REPORT['ratio_applied'].reindex(self.DEMAND_C['Commodity'].values)
-            self.DEMAND_C = self.DEMAND_C * xr.DataArray(ratio.to_numpy(), dims=['Commodity'], coords={'Commodity': self.DEMAND_C['Commodity']})
-            print(f"│   ├── Demand re-anchored to {self.YR_CAL_BASE} production: "
-                  f"{int((ratio != 1).sum())} of {len(ratio)} commodities scaled", flush=True)
+            base_year_production = xr.DataArray(
+                self.BASE_YR_production_t, dims=['Commodity'], coords={'Commodity': self.COMMODITIES}
+            ).sel(Commodity=self.DEMAND_C['Commodity'])
+            production_over_demand = base_year_production / self.DEMAND_C.sel(year=self.YR_CAL_BASE, drop=True)
+            if not (np.isfinite(production_over_demand) & (production_over_demand > 0)).all():      # nothing else stops it: a ratio of 0 would set the commodity's demand to 0 in every year
+                raise ValueError(f"No base-year production or no base-year demand, so no ratio to re-anchor with:\n{production_over_demand.to_pandas()}")
+            print(f"│   ├── Demand re-anchored to {self.YR_CAL_BASE} production; production / demand in {self.YR_CAL_BASE}:", flush=True)
+            for commodity, ratio in production_over_demand.to_pandas().items():
+                print(f"│   │   {commodity:<24}{ratio:8.3f}", flush=True)
+            self.DEMAND_C = self.DEMAND_C * production_over_demand
 
         # The demand the solver reads (row_inputs, the demand rows' rhs), float32 as it has always been
         self.DEMAND_C = self.DEMAND_C.astype(np.float32)
@@ -2159,24 +2166,6 @@ class Data:
         """
         self.ag_man_dvars[yr] = ag_man_dvars
                 
-
-
-    def get_demand_reanchor_report(self) -> pd.DataFrame:
-        """The demand-to-production report at the base year, one row per on-land commodity (DEMAND_C, before
-        re-anchoring): base-year production (BASE_YR_production_t, the base-year allocation's actual production, over
-        COMMODITIES), demand in the base year, their ratio, and the ratio re-anchoring applies (production / demand where
-        both are above 0; else 1, with a note, and the file's path is kept)."""
-        demand = self.DEMAND_C.sel(year=self.YR_CAL_BASE).to_pandas().astype(np.float64)
-        prod = pd.Series(np.asarray(self.BASE_YR_production_t, dtype=np.float64), index=self.COMMODITIES)
-        rep = pd.DataFrame({'production_t': prod.reindex(demand.index), 'demand_t': demand})
-        rep['production_over_demand'] = np.divide(rep['production_t'].to_numpy(), rep['demand_t'].to_numpy(),
-                                                  out=np.full(len(rep), np.nan), where=rep['demand_t'].to_numpy() > 0)
-        ok = (rep['production_t'] > 0) & (rep['demand_t'] > 0)
-        rep['ratio_applied'] = np.where(ok, rep['production_over_demand'], 1.0)
-        rep['note'] = np.where(ok, '', np.where(rep['demand_t'] > 0, 'no base-year production: file path kept',
-                                                 'no base-year demand: file path kept'))
-        rep.index.name = 'commodity'
-        return rep
 
 
     def get_exact_resfactored_lumap_mrj(self):
