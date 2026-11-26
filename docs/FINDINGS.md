@@ -5,6 +5,134 @@ Entries are in **descending date order** (newest first).
 
 ---
 
+## 20261126 — cuOpt's barrier slowed 5–10x from 2027 in a RES1 run: two causes in the model (dead arcs, near-fixed columns), both found and fixed in tests; the GHG row stays out of reach
+
+### TL;DR
+
+In a RES1 yearly run (Paper 2 settings: cell grouping, the single net GHG row, GPU price search: cuOpt's barrier on
+the LP without the GHG row, then Gurobi's push on the whole LP), cuOpt needed 210–355 barrier iterations a solve up to
+2026 and 1,500–5,100 from 2027, while Gurobi's barrier on the same LPs stayed at 230–470 every year. Two structures,
+both built up by irreversible non-ag land (plantings), cause it, and both can be removed without changing the LP:
+
+1. **Dead arcs.** Every non-ag land use but 'Destocked - natural land' is irreversible (`NON_AG_LAND_USES_REVERSIBLE`):
+   its lower bound holds its base share. Yet the column space gives each irreversible source ~9 arcs back to ag (T_MAT
+   allows them). They can carry only an arc in, or the lower bound's floor-truncation granule (< 1e-6). Removing them
+   (`get_nonag2ag_ub_src`, `get_nonag2ag_ub`: an irreversible source reaches no ag target) took 2027 from 1,981–2,053
+   to **389** iterations on the same 2026 state.
+2. **Near-fixed columns.** A cell full of a planting has ub = the base share and lb = the base floor-truncated
+   (`get_non_ag_lb_matrices`): a slot under 1e-6, below the feasibility tolerance — fixed in effect, not in form, so no
+   presolve removes it. By 2045 there were 78,554 such columns (11,997 from the 2025 state). Under a carbon price their
+   objective coefficients are large, and cuOpt crawls. Fixing them (lb = ub where 0 < ub − lb < 1e-6) took the run's
+   2046 LP at the search price from 3,117 to **611** iterations, the objective unchanged.
+
+The net GHG row itself cannot be given to cuOpt: with it in the LP, cuOpt fails at iteration 1 ("Search direction
+computation failed") in every year tried, both fixes or not. Splitting the row exactly by coefficient magnitude gets
+the primal to within 0.05 % of the optimum, but the dual diverges (the 14 orders of the row's coefficients move into
+the band rows' duals). The price search stays.
+
+**The route for a GPU run with a GHG cap (as of 2026-11-26):** the two fixes in the model build; the LP cuOpt solves
+has every arc bounded by its source's base (exact: the source-cap rows imply it); the price search (cuOpt's barrier on
+the LP without the GHG row, the row priced in the objective, the first price = the year before's GHG shadow price, stop
+at a loss bound of 1e-3 of the objective); then Gurobi's push (crossover from the mix of the two bracketing solves,
+both primal and dual starts) on the whole LP. A search solve of the run's 2046 LP then takes 556–561 iterations, ~7 min
+on an L40S and ~3 min on an H200 (3,000–3,800 iterations and 35–40 min before the fixes); 4–5 solves a year. Without a
+GHG row: one cuOpt solve and the push.
+
+### How it was found: a fast and a slow LP, one difference at a time
+
+A year's LP is set by the state (the year before's solution), the inputs (the year's data) and, in the search, the
+GHG price in the objective. Each was changed alone; Gurobi's barrier on the same LP was the yardstick of how hard the
+LP is (its iterations do not move: 296–420 on every LP below).
+
+| LP (cuOpt 26.08, H200; L40S counts in brackets) | iterations |
+|---|---|
+| 2026 (2025 state + 2026 inputs) | 343–346 (L40S 346) |
+| cross: 2025 state + 2027 inputs | 343–346 |
+| 2027 (2026 state + 2027 inputs) | 1,981–2,053 (L40S 1,712) |
+| 2027, nonag2ag arcs' ub set to 0 (arcs kept as columns) | 1,016 |
+| 2027, irreversible non-ag lower bounds set to 0 (not exact: irreversibility lost) | 351 |
+| **2027 rebuilt with no arc out of an irreversible source** | **389** |
+| 2046 with that fix (2045 state), price 0 / the search price 591.6 AUD/t | 944 / 3,117 |
+| cross: 2025 state + 2046 inputs, price 0 / 591.6 | 431 / 452 |
+| 2046, near-fixed columns' lower bounds freed, at 591.6 | 3,157 |
+| **2046, near-fixed columns fixed (lb = ub), at 591.6** | **611** (objective as before) |
+
+- The state, not the inputs, both times (the crosses solve fast). In 2046 neither the inputs nor the price alone slow
+  cuOpt; the state built up by 2045 does, and the price on it multiplies the count by 3.3.
+- Presolve: cuOpt's PSLP removes as much as Gurobi's (2027: 7.88 M × 10.92 M → 3.83 M × 6.44 M; Gurobi 3.96 M × 6.66 M).
+  Neither removes the nonag2ag arcs (22–26 % of them go, against 93–99.8 % of the other arcs): an arc out of a source
+  with a lower bound cannot be substituted out through its node-balance row. Gurobi copes in its barrier; cuOpt does not.
+- Freeing the near-fixed columns' lower bounds does nothing: once the arcs are gone a full cell's planting is fixed
+  implicitly either way (ub = base, node balance X = base + Σ in). A column fixed only implicitly, by a bound and a row
+  together, is what no presolve finds; fixing it explicitly lets PSLP drop it.
+
+### In the run
+
+With the dead-arc fix in the model build from 2046 (the near-fixed fix not applied), the run's search solves went from
+3,500–5,100 iterations (2044–45, 35–54 min on the L40S) to 1,060–1,370 in 2047–48 (11–13 min); whole years from 4.9 h
+(2045) to 1.5–2.6 h. 2046, built on the 2045 state that the old code had made, gained only 11 %.
+
+### The GHG row in cuOpt (2027 and 2046, both fixes)
+
+| LP with the GHG row | result |
+|---|---|
+| as built | NumericalError at iteration 1; 390–430 s before it (100 s without the row) |
+| the row split exactly into 3- or 2-order magnitude bands, chained (no row spans more than ~3 orders) | primal 23,790–23,802 against the optimum 23,811.2; dual infeasibility 1e100–1e164; NumericalError at 1,100–1,580 |
+
+The row has 6.85 M entries spanning 8e-12 to 1.2e3, positive and negative. Any exact split leaves each band row's
+dual at (the GHG price) × (the band's scale), so the spread moves from the matrix into the duals. Two more steps make
+the whole LP converge in cuOpt, though slowly:
+
+| 2046, the whole LP (both fixes) | cuOpt (L40S) |
+|---|---|
+| bands weighted by their coefficient sum Σ\|a\| (the many small coefficients add up: the bands ≥ 1e-6 span 263 to 6.5e5), the 38 K entries under 1e-6 left out and the cap tightened by the most they can add (0.0163 in the row's units, ~4,700 tCO2e, 2e-5 of the cap) | the dual no longer diverges (infeasibility 1e-7–6e-3), but the primal sticks at −1.8e6 and the dual objective climbs to 4.6e13 |
+| the same, and every arc bounded by its source's base (the column table leaves arcs at ub = inf; every all-positive `<` row implies x_j ≤ rhs / a_j — the source-cap rows give the arcs their bound; exact) | **converges normally** (primal / dual infeasibility 1e-10 / 1e-12): primal 23,788 at 2,014 iterations against the optimum 23,811.2, but the dual crawls (dual objective 2.8e5 at 2,014, 1,585 s) |
+
+Gurobi does no better on the whole LP: its barrier hit 3,600 s at 506 iterations as built and at 412 split (hugemem,
+24 cores), against 330–420 iterations to optimality on the priced LP. The GHG row as a constraint makes the LP hard
+for both solvers; the price search, which moves it into the objective, is itself the remedy (the attempts that
+failed: the next section).
+
+The 38 K entries left out are a conservative approximation (every solution still meets the original cap), unlike the
+retired `SOLVER_COEFF_MIN` drop, which dropped entries under 1e-4 in every row with no compensation and put GHG 2–5 Mt
+over its cap (20261123).
+
+### What did not work (all on the run's 2046 LP unless said; cuOpt 26.08)
+
+| Tried | Result |
+|---|---|
+| The whole LP, the GHG row as built (2027, 2046, with or without the fixes) | NumericalError at iteration 1 |
+| The GHG row split exactly into 2- or 3-order magnitude bands, chained; by sign as well | primal 23,790–23,802 (optimum 23,811.2), dual diverges to 1e100–1e237, NumericalError at 1,100–1,580 |
+| Bands weighted by their coefficient sum, the bands under 1e-6 dropped (cap tightened), arcs at ub = inf | dual stable, but the primal stuck at −1.8e6 (stopped at 1,158) |
+| The same with the arcs bounded (`implied_ub`) | converges normally on the L40S once (primal 23,799 at the 40-min limit, the dual objective still 1.7e5), the dual blew up at the end of a second L40S run (iteration 1,598) and from iteration ~900 on an H200 (NumericalError at 2,168): not repeatable, not usable |
+| cuOpt's primal of that solve as the start of Gurobi's push, primal only | Gurobi discarded it ("LP warm-start: discard start vectors": an LP warm start needs primal and dual) and solved from scratch |
+| Gurobi's barrier on the whole LP, as built / every row spanning > 1e3 split | time limit 3,600 s at 506 / 412 iterations (hugemem, 24 cores) |
+| Freeing the irreversible lower bounds (2046, price 591.6) | 3,157 iterations (no gain); in 2027 351 but not exact (irreversibility lost) |
+| The search's first price from the last two years' trend (replayed on 2044–2050) | 36 solves against 37: the price does not move steadily (2046 fell) |
+
+### Other measurements
+
+- The price search's stop rule (replayed on the run's own 2044–2050 solves, which the replay reproduces exactly):
+  loss bound 1e-4 → 1e-3, 37 → 31 solves; the mixed price moves by at most 1.6 AUD/t and the push restores the exact
+  optimum. Bounding the arcs in the priced LP (both fixes in): 611 → 556–561 iterations at 591.6; at price 0, 944 (arc fix
+  only) → 471 (both fixes, arcs bounded).
+- H200 against the L40S, the same cuOpt LP: 2026 136 / 217 s, 2027 431 / 773 s, 2034 657 / 1,382 s — ~2x per solve,
+  the same iteration counts (~0.17 against ~0.35–0.45 s an iteration).
+- A search year's time (2047, fixed, 90.7 min): build 10.6 min (cell grouping 3.5 of it), six cuOpt solves 72 min
+  (each ~100 s of setup before its first iteration: PSLP 17 s and the factorisation analysis, repeated on the same
+  matrix every solve), push 3 min, store 5 min.
+
+### Open
+
+- The fix moves the grouped objective UP by 0.12–0.13 % (2027: Gurobi 17,172.09 → 17,192.15; cuOpt 17,176.9 →
+  17,198.5) although it only removes options — the cell grouping changes with the arcs (a blob's key holds its column
+  types). To check on the full LP or a step's `grouping_<year>.csv` before it goes into `luto/`.
+- Neither fix is in `luto/` yet: the dead-arc fix is 11 lines in `luto/economics/non_agricultural/transitions.py`; the
+  near-fixed fix is to be written (lb = ub where 0 < ub − lb < `FEASIBILITY_TOLERANCE`, or no floor-truncation of an
+  irreversible lb below a full cell's ub).
+
+---
+
 ## 20261125 — RES5 let 1.1 Mha of agriculture sit on land its fine cells exclude; the eligible-share cap (PR #236) removes it, at 3.5 % of the objective
 
 ### TL;DR
