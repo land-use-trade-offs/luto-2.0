@@ -65,6 +65,14 @@ FEED_EFFICIENCY = 'BAU'              # 'BAU' or 'High'
 # Set the demand and supply multipliers
 APPLY_DEMAND_MULTIPLIERS = True     # True or False. Whether to apply demand multipliers from AusTIME model.
 
+# Whether each on-land commodity's demand path is re-anchored to LUTO's base-year production: the path is multiplied by
+# base-year production / demand in the base year, so it equals production there and keeps the file's growth after it.
+# A commodity with no base-year demand or production keeps the file's path (listed in Data.DEMAND_REANCHOR_REPORT, the
+# demand-to-production report at the base year, built whatever the setting). Off-land commodities are not re-anchored
+# (LUTO does not produce them). When True, the report is also written to the run's output folder as
+# demand_to_production_report_<base year>.csv.
+DEMAND_REANCHOR_TO_BASE_YEAR = False
+
 # Productivity trend; 
 PRODUCTIVITY_TREND = 'BAU'           # 'BAU', 'LOW', 'MEDIUM', 'HIGH', 'VERY_HIGH'
 
