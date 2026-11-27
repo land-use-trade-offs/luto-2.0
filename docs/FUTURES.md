@@ -5,6 +5,42 @@ Entries are in **descending date order** (newest first). Each entry stands on it
 
 ---
 
+## 20261127 — the AusTIMES demand multipliers are not carried to the 2020-21 base
+
+### TL;DR
+
+The demand of sugar, winter cereals and winter oilseeds is multiplied by a pathway from the AusTIMES energy model
+(`APPLY_DEMAND_MULTIPLIERS`, default True). We do not want this on the 2020-21 base. For now a 2020-21 run sets
+`APPLY_DEMAND_MULTIPLIERS = False` and a 2010 run keeps the default; when the base year is flipped to 2020-21 the
+switch and its code are deleted.
+
+### How it is now
+
+- `luto/data.py` reads `input/AusTIMES_demand_multiplier.xlsx` (sheet `1.8C Demand` or `1.5C Demand`, chosen by
+  `GHG_EMISSIONS_LIMITS` through `GHG_TARGETS_DICT`) and multiplies `DEMAND_C` by it.
+- Three commodities are touched: sugar, winter cereals (the workbook's sorghum column) and winter oilseeds (canola).
+  The workbook's cottonseed column is dropped.
+- The multipliers are 1 up to 2025 and rise after: on 'low', sugar 1.21 in 2035 and 1.34 in 2050, winter cereals 1.23
+  and winter oilseeds 1.48 in 2050; on 'high', sugar 1.78 in 2040.
+- They are most of sugar's growth. On the 2020-21 base with demand re-anchored (RES5), sugar demand is 31.0 Mt in 2021
+  and, in 2050, 43.2 Mt with the 'low' multiplier against 32.2 Mt without it.
+
+### To do
+
+1. Now: every 2020-21 run sets `APPLY_DEMAND_MULTIPLIERS = False` (listed with the other 2020-21 settings in the
+   docstring of `YR_CAL_BASE` in `luto/settings.py`).
+2. At the flip to the 2020-21 base: delete `APPLY_DEMAND_MULTIPLIERS`, the workbook read and the multiplier block in
+   `luto/data.py`. Keep `GHG_TARGETS_DICT`: the carbon price (`CARBON_PRICES_FIELD = 'AS_GHG'`) still reads it.
+3. With the demand file that starts in 2020 (entry 20261126): the working assumption is that it needs no such
+   multiplier. To confirm with Michalis: the multipliers stand for the extra crop demand of the energy pathway
+   (AusTIMES), so they are needed only if the new demand model leaves that demand out and we still want it.
+
+### Noted, not changed
+
+Sorghum is a summer cereal, but its multiplier is laid on winter cereals. It stays as it is on the 2010 base.
+
+---
+
 ## 20261126 — the biodiversity benefit of HIR: a recovery trend instead of all at once
 
 ### TL;DR

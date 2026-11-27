@@ -62,8 +62,11 @@ IMPORT_TREND    = 'Trend'            # 'Static' (assumes 2010 shares of imports 
 WASTE           = 1                  # 1 for full waste, 0.5 for half waste
 FEED_EFFICIENCY = 'BAU'              # 'BAU' or 'High'
 
-# Set the demand and supply multipliers
-APPLY_DEMAND_MULTIPLIERS = True     # True or False. Whether to apply demand multipliers from AusTIME model.
+# Whether the demand of sugar, winter cereals and winter oilseeds is multiplied by the AusTIMES pathway of the GHG limit
+# (INPUT_DIR/AusTIMES_demand_multiplier.xlsx: 1 up to 2025, then rising, e.g. sugar x 1.34 by 2050 on 'low').
+# TEMPORARY, for the 2010 base only: set False with YR_CAL_BASE = 2021; removed once the base is flipped to 2020-21
+# (docs/FUTURES.md, 20261127).
+APPLY_DEMAND_MULTIPLIERS = True
 
 # TEMPORARY, for the 2020-21 base (docs/FUTURES.md, 20261126). Whether each on-land commodity's demand path is
 # multiplied by base-year production / the demand file's base-year value: demand then equals production in the base
@@ -172,9 +175,14 @@ TEMPORARY: a choice of two while the bases are compared; one base year once it i
   stocking k (in place of LVSTK_K_FILE) and the feed per head it was calibrated with. Every other input is read from
   INPUT_DIR as for 2010. Each is chosen at its own read line in luto/data.py, {base year: file}[YR_CAL_BASE]; their
   block-mean caches carry '_2021' (input/_cache).
-  A 2020-21 run sets three settings together: YR_CAL_BASE = 2021; SIM_YEARS after 2021, e.g. [2022, 2023, 2024] +
-  list(range(2025, 2051, 5)) (a year before the base year stops the run); and STUBBLE_GRAZING = True (the 2020-21 livestock
-  map is calibrated with sheep grazing cereal stubble).
+  A 2020-21 run sets six settings together:
+    YR_CAL_BASE = 2021
+    SIM_YEARS after 2021, e.g. [2022, 2023, 2024] + list(range(2025, 2051, 5)) (a year before the base year stops the run)
+    STUBBLE_GRAZING = True                 (the 2020-21 livestock map is calibrated with sheep grazing cereal stubble)
+    DEMAND_REANCHOR_TO_BASE_YEAR = True    (the demand file is built on the 2010 base)
+    APPLY_DEMAND_MULTIPLIERS = False       (the AusTIMES demand multipliers are not carried to the 2020-21 base)
+    HIR_EXISTING_PROJECTS = True           (the registered HIR projects close their land to new HIR)
+  A 2010 run sets none of them: it takes the old inputs and every default.
 Any other year has no inputs: Data fails at the first of those read lines.
 '''
 
