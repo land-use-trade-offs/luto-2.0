@@ -763,12 +763,12 @@ def get_beef_hir_effect_g_mrj(data: Data, yr_idx, separate=False):
     regrowth = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
     destocking = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
 
-    # GHG abatement from Land Use Change: the credit register's rate, the same on every land use and land management
-    # (settings.HIR_REGROWTH_FROM_CREDIT_REGISTER); otherwise the natural-land stock over the regrowth window
+    # GHG abatement from Land Use Change: HIR's share (settings.HIR_SHARE_OF_REGISTER_RATE) of the credit register's rate,
+    # the same on every land use and land management (settings.HIR_REGROWTH_FROM_CREDIT_REGISTER); otherwise the natural-land stock over the regrowth window
     # (habitat-score gap less ceiling gap)
     for j_idx, lu in enumerate(land_uses):
         if settings.HIR_REGROWTH_FROM_CREDIT_REGISTER:
-            regrowth[:, :, j_idx] -= data.HIR_REGROWTH_T_CO2E_HA_PER_YR * data.REAL_AREA.values
+            regrowth[:, :, j_idx] -= data.HIR_REGROWTH_T_CO2E_HA_PER_YR * settings.HIR_SHARE_OF_REGISTER_RATE * data.REAL_AREA.values
         else:
             regrowth[:, :, j_idx] -= (
                 (
@@ -795,12 +795,12 @@ def get_sheep_hir_effect_g_mrj(data: Data, yr_idx, separate=False):
     regrowth = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
     destocking = np.zeros((data.NLMS, data.NCELLS, len(land_uses)), dtype=np.float32)
 
-    # GHG abatement from Land Use Change: the credit register's rate, the same on every land use and land management
-    # (settings.HIR_REGROWTH_FROM_CREDIT_REGISTER); otherwise the natural-land stock over the regrowth window
+    # GHG abatement from Land Use Change: HIR's share (settings.HIR_SHARE_OF_REGISTER_RATE) of the credit register's rate,
+    # the same on every land use and land management (settings.HIR_REGROWTH_FROM_CREDIT_REGISTER); otherwise the natural-land stock over the regrowth window
     # (habitat-score gap less ceiling gap)
     for j_idx, lu in enumerate(land_uses):
         if settings.HIR_REGROWTH_FROM_CREDIT_REGISTER:
-            regrowth[:, :, j_idx] -= data.HIR_REGROWTH_T_CO2E_HA_PER_YR * data.REAL_AREA.values
+            regrowth[:, :, j_idx] -= data.HIR_REGROWTH_T_CO2E_HA_PER_YR * settings.HIR_SHARE_OF_REGISTER_RATE * data.REAL_AREA.values
         else:
             regrowth[:, :, j_idx] -= (
                 (

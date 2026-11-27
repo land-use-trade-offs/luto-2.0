@@ -850,6 +850,13 @@ True:  the rate credited to registered HIR projects, one value per NRM region (t
 Land clearing and the unallocated to livestock-natural conversion read the natural-land stock either way.
 '''
 
+# The share of the credit register's regrowth rate that HIR - Beef and HIR - Sheep earn, read only with
+# HIR_REGROWTH_FROM_CREDIT_REGISTER = True; Destocked natural land always earns the full rate.
+# 1.0: HIR earns the same as Destocked natural land (as the rate layer was first used).
+# 0.5: HIR earns half, the share of the stock it removes (1 - HIR_PRODUCTIVITY_CONTRIBUTION), so it earns less than
+#      land that is fully destocked.
+HIR_SHARE_OF_REGISTER_RATE = 1.0
+
 # Whether the registered HIR projects (carbon credit register, to FY2024) take room from the model's HIR. The model's
 # HIR - Beef and HIR - Sheep are always NEW regeneration; existing projects are never part of the solution.
 # False: the projects are ignored. True: on a cell with project area on Beef / Sheep - natural land, new HIR is at most

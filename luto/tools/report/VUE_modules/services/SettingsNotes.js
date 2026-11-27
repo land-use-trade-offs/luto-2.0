@@ -387,6 +387,14 @@ window.SettingsNotes = {
       "True: the model's regeneration is always new; on land already inside a registered project no more can be added.",
     ],
   },
+  HIR_SHARE_OF_REGISTER_RATE: {
+    what: "How much of the registered-project regrowth rate regeneration earns, beside fully destocked land.",
+    detail: [
+      "1: regeneration earns the same carbon per hectare as destocked land.",
+      "0.5: it earns half, because it removes half of the livestock.",
+      "Only used when the registered-project rate is on.",
+    ],
+  },
   AG_MANAGEMENT_ADOPTION_ABOVE_BASE: {
     what: "Whether management options may be adopted beyond what is already adopted in the base year.",
     detail: [

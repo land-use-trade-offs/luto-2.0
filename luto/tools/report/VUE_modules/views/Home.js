@@ -1011,6 +1011,7 @@ window.HomeView = {
           ['GHG_TARGETS_DICT', 'The AusTIMES pathway each level names.'],
           ['GHG_BENCHMARK_ROWS', 'Limits that are computed and reported but not imposed. Empty: both limits bind.'],
           ['HIR_EXISTING_PROJECTS', 'When on, the model cannot add regeneration on land already inside a registered project; its regeneration is always new. Off: existing projects are ignored.'],
+          ['HIR_SHARE_OF_REGISTER_RATE', 'The share of the registered-project regrowth rate that regeneration earns; destocked land earns all of it. 1: the same; 0.5: half, as regeneration removes half of the livestock.'],
           ['USE_GHG_SCOPE_1', 'True: only the direct on-farm emissions of crops and livestock are counted (scope 1, as in the national inventory). False: electricity and the making of fertiliser and chemicals are counted too.'],
           ['CARBON_EFFECTS_WINDOW', 'The years over which the carbon of a planting is averaged into a yearly rate: 50, 60, 70, 80 or 90.'],
           ['FIRE_RISK', 'Which estimate of fire loss discounts the carbon of trees and debris: low, med or high.'],
