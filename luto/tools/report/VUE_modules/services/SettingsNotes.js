@@ -377,7 +377,7 @@ window.SettingsNotes = {
     what: "Where the carbon that regeneration and destocked land regrow comes from.",
     detail: [
       "False: the carbon stock of natural land, spread over the regrowth window.",
-      "True: the rate of regrowth measured from the registered regeneration projects (credits issued per hectare, by region), the same on every land use. Regions with no registered project have a rate of 0.",
+      "True: the rate of regrowth measured from the registered regeneration projects (credits issued per hectare, by region), the same on every land use. A region with no registered project has no measured rate, so no regeneration can be added there.",
     ],
   },
   HIR_EXISTING_PROJECTS: {

@@ -836,7 +836,9 @@ False: the natural-land carbon stock over CARBON_EFFECTS_WINDOW; HIR earns HIR_C
        natural land does.
 True:  the rate credited to registered HIR projects, one value per NRM region (t CO2e per ha per yr, gross), read from
        input/Nick_build/hir_layer/hir_rate_layer_gross.nc. Then HIR and Destocked natural land earn the same carbon,
-       HIR_CEILING_PERCENTAGE applies to biodiversity only, and a region without a registered project earns none.
+       HIR_CEILING_PERCENTAGE applies to biodiversity only. A region without a registered project has a rate of 0,
+       which means no estimate: HIR - Beef and HIR - Sheep cannot be adopted there (col_builder.am_space); Destocked
+       natural land can, and earns no regrowth carbon.
 Land clearing and the unallocated to livestock-natural conversion read the natural-land stock either way.
 '''
 

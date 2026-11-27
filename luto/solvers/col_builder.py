@@ -338,6 +338,9 @@ def am_space(data: Data, feasible_ag_mrj: np.ndarray, mask_gbf2_solar: np.ndarra
         if settings.HIR_EXISTING_PROJECTS and am in data.HIR_EXISTING_SHARE:
             existing = data.HIR_EXISTING_SHARE[am]                                    # (lm, cell)
             ub_smr[slot] = np.where(existing > 0, np.maximum(data.AG_L_MRJ[:, :, j] - existing, 0), ub_smr[slot])
+        # with the credit register's regrowth rate, a rate of 0 is a region with no estimate: no HIR there
+        if settings.HIR_REGROWTH_FROM_CREDIT_REGISTER and am in ('HIR - Beef', 'HIR - Sheep'):
+            ub_smr[slot][:, data.HIR_REGROWTH_T_CO2E_HA_PER_YR == 0] = 0
         if base_am is not None:
             ub_smr[slot] = base_am[am][:, :, j]
             lb_smr[slot] = np.minimum(lb_smr[slot], ub_smr[slot])                     # never above the ub
