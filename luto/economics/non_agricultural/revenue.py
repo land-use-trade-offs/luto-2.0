@@ -21,6 +21,7 @@ import numpy as np
 from luto.settings import NON_AG_LAND_USES
 import luto.settings as settings
 from luto.data import Data
+from luto.economics.non_agricultural.ghg import get_ghg_destocked_land
 
 
 def get_rev_env_plantings(data: Data, yr_cal: int) -> np.ndarray:
@@ -234,12 +235,19 @@ def get_rev_beccs(data: Data, yr_cal: int) -> np.ndarray:
     return base_rev + np.nan_to_num(data.BECCS_TCO2E_HA_YR.values) * data.REAL_AREA.values * data.get_carbon_price_by_year(yr_cal)
 
 
-def get_rev_destocked(data: Data, ag_r_mrj: np.ndarray) -> np.ndarray:
+def get_rev_destocked(data: Data, yr_cal: int, ag_r_mrj: np.ndarray) -> np.ndarray:
     """
+    The revenue of unallocated natural land, plus the carbon revenue of the regrowth with settings.HIR_CARBON_REVENUE:
+    tonnes x the year's carbon price on the cells where `get_ghg_destocked_land` counts regrowth (livestock natural
+    land in the base year). The tonnes are the credits issued per ha x the cell's area with the credit register's
+    rate, otherwise the regrowth the GHG row counts.
+
     Parameters
     ----------
     data: object/module
         Data object or module with fields like in `luto.data`.
+    yr_cal: int
+        The year (carbon price).
     ag_r_mrj: np.ndarray
         Agricultural revenue matrix.
 
@@ -248,7 +256,15 @@ def get_rev_destocked(data: Data, ag_r_mrj: np.ndarray) -> np.ndarray:
     np.ndarray
     """
     unallocated_j = data.DESC2AGLU['Unallocated - natural land']
-    return ag_r_mrj[0, :, unallocated_j]
+    revenue = ag_r_mrj[0, :, unallocated_j]
+    if settings.HIR_CARBON_REVENUE:
+        if settings.HIR_REGROWTH_FROM_CREDIT_REGISTER:
+            was_livestock_natural = np.isin(data.lumaps[data.YR_CAL_BASE], data.LU_LVSTK_NATURAL)
+            revenue_t = np.where(was_livestock_natural, data.HIR_ISSUANCE_T_CO2E_HA_PER_YR * data.REAL_AREA.values, 0)
+        else:
+            revenue_t = -get_ghg_destocked_land(data)
+        revenue = revenue + revenue_t * data.get_carbon_price_by_year(yr_cal)
+    return revenue
 
 
 def get_rev_matrix(data: Data, yr_cal: int, ag_r_mrj) -> np.ndarray:
@@ -274,7 +290,7 @@ def get_rev_matrix(data: Data, yr_cal: int, ag_r_mrj) -> np.ndarray:
         get_rev_sheep_carbon_plantings_belt(data, yr_cal, ag_r_mrj, cp_belt_x_r),
         get_rev_beef_carbon_plantings_belt(data, yr_cal, ag_r_mrj, cp_belt_x_r),
         get_rev_beccs(data, yr_cal),
-        get_rev_destocked(data, ag_r_mrj),
+        get_rev_destocked(data, yr_cal, ag_r_mrj),
     ]
 
     return np.concatenate(

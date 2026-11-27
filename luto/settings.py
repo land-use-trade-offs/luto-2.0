@@ -854,7 +854,7 @@ Land clearing and the unallocated to livestock-natural conversion read the natur
 # HIR_REGROWTH_FROM_CREDIT_REGISTER = True; Destocked natural land always earns the full rate.
 # 1.0: HIR earns the same as Destocked natural land (as the rate layer was first used).
 # 0.5: HIR earns half, the share of the stock it removes (1 - HIR_PRODUCTIVITY_CONTRIBUTION), so it earns less than
-#      land that is fully destocked.
+#      land that is fully destocked. The same share applies to the credits HIR earns carbon revenue on.
 HIR_SHARE_OF_REGISTER_RATE = 1.0
 
 # Whether the registered HIR projects (carbon credit register, to FY2024) take room from the model's HIR. The model's
@@ -863,6 +863,13 @@ HIR_SHARE_OF_REGISTER_RATE = 1.0
 # the land use's base-year share of the cell less the share under projects. Read from
 # input/Nick_build/ag_mgt_caps/hir_project_cells.csv. The 2020-21 stocking rates are built with no HIR in the base year.
 HIR_EXISTING_PROJECTS = False
+
+# Whether HIR - Beef, HIR - Sheep and Destocked natural land earn carbon revenue on their regrowth (tonnes x the year's
+# carbon price, added to their revenue in the objective), as the plantings, BECCS and savanna burning do.
+# False: no carbon revenue. True: the tonnes are, with HIR_REGROWTH_FROM_CREDIT_REGISTER = False, the regrowth the GHG
+# row counts (the natural-land stock formula); with it True, the credits issued (HIR_RATE_ISSUANCE of the rate file:
+# the gross rate less the scheme's buffer and permanence discount, 0.75 to 0.95 of it). No revenue at a carbon price of 0.
+HIR_CARBON_REVENUE = False
 
 # Maintainace cost for HIR
 BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 100  # AUD per ha and year to maintain human-induced regeneration on beef land.

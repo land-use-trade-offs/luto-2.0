@@ -395,6 +395,13 @@ window.SettingsNotes = {
       "Only used when the registered-project rate is on.",
     ],
   },
+  HIR_CARBON_REVENUE: {
+    what: "Whether regeneration and destocked land earn carbon income on the carbon they regrow.",
+    detail: [
+      "False: no carbon income for these two options.",
+      "True: they earn the carbon price on their regrowth, as plantings do. With the registered-project rate on, the tonnes that earn income are the credits issued, a little less than the regrowth counted.",
+    ],
+  },
   AG_MANAGEMENT_ADOPTION_ABOVE_BASE: {
     what: "Whether management options may be adopted beyond what is already adopted in the base year.",
     detail: [

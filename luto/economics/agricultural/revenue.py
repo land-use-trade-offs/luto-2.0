@@ -29,7 +29,7 @@ import luto.settings as settings
 
 from luto.data import Data
 from luto.economics.agricultural.quantity import get_yield_pot, get_quantity, lvs_veg_types, get_quantity_renewable, get_exist_renewable_capacity, get_stubble_yield_pot
-from luto.economics.agricultural.ghg import get_savanna_burning_effect_g_mrj
+from luto.economics.agricultural.ghg import get_savanna_burning_effect_g_mrj, get_beef_hir_effect_g_mrj, get_sheep_hir_effect_g_mrj
 from functools import lru_cache
 
 def get_rev_crop( data:Data         # Data object.
@@ -417,9 +417,10 @@ def get_biochar_effect_r_mrj(data:Data, r_mrj, yr_idx):
 
 
 
-def get_beef_hir_effect_r_mrj(data: Data, r_mrj):
+def get_beef_hir_effect_r_mrj(data: Data, r_mrj, yr_idx: int):
     """
-    Applies the effects of using HIR to the beef revenue data
+    Applies the effects of using HIR to the beef revenue data: the livestock revenue lost with the stock, plus
+    the carbon revenue of the regrowth with settings.HIR_CARBON_REVENUE
     """
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
@@ -435,12 +436,23 @@ def get_beef_hir_effect_r_mrj(data: Data, r_mrj):
         j = lu_codes[lu_idx]
         r_mrj_effect[:, :, lu_idx] = r_mrj[:, :, j] * (settings.HIR_PRODUCTIVITY_CONTRIBUTION - 1)
 
+    # Carbon revenue on the regrowth (settings.HIR_CARBON_REVENUE): tonnes x the year's carbon price. The tonnes are, with
+    # the credit register's rate, HIR's share of the credits issued per ha x the cell's area (the same on every lm and
+    # land use); otherwise the regrowth the GHG row counts, as savanna burning earns it on its abatement
+    if settings.HIR_CARBON_REVENUE:
+        if settings.HIR_REGROWTH_FROM_CREDIT_REGISTER:
+            revenue_t = (data.HIR_ISSUANCE_T_CO2E_HA_PER_YR * settings.HIR_SHARE_OF_REGISTER_RATE * data.REAL_AREA.values)[None, :, None]
+        else:
+            revenue_t = -get_beef_hir_effect_g_mrj(data, yr_idx, separate=True)['Regrowth carbon']
+        r_mrj_effect += revenue_t * data.get_carbon_price_by_yr_idx(yr_idx)
+
     return r_mrj_effect
 
 
-def get_sheep_hir_effect_r_mrj(data: Data, r_mrj):
+def get_sheep_hir_effect_r_mrj(data: Data, r_mrj, yr_idx: int):
     """
-    Applies the effects of using HIR to the sheep revenue data
+    Applies the effects of using HIR to the sheep revenue data: the livestock revenue lost with the stock, plus
+    the carbon revenue of the regrowth with settings.HIR_CARBON_REVENUE
     """
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
@@ -456,7 +468,18 @@ def get_sheep_hir_effect_r_mrj(data: Data, r_mrj):
         j = lu_codes[lu_idx]
         r_mrj_effect[:, :, lu_idx] = r_mrj[:, :, j] * (settings.HIR_PRODUCTIVITY_CONTRIBUTION - 1)
 
+    # Carbon revenue on the regrowth (settings.HIR_CARBON_REVENUE): tonnes x the year's carbon price. The tonnes are, with
+    # the credit register's rate, HIR's share of the credits issued per ha x the cell's area (the same on every lm and
+    # land use); otherwise the regrowth the GHG row counts, as savanna burning earns it on its abatement
+    if settings.HIR_CARBON_REVENUE:
+        if settings.HIR_REGROWTH_FROM_CREDIT_REGISTER:
+            revenue_t = (data.HIR_ISSUANCE_T_CO2E_HA_PER_YR * settings.HIR_SHARE_OF_REGISTER_RATE * data.REAL_AREA.values)[None, :, None]
+        else:
+            revenue_t = -get_sheep_hir_effect_g_mrj(data, yr_idx, separate=True)['Regrowth carbon']
+        r_mrj_effect += revenue_t * data.get_carbon_price_by_yr_idx(yr_idx)
+
     return r_mrj_effect
+
 
 def get_utility_solar_pv_effect_r_mrj(data: Data, r_mrj, yr_idx):
     """
@@ -615,8 +638,8 @@ def get_agricultural_management_revenue_matrices(data:Data, r_mrj, yr_idx: int) 
     ag_man_r_mrj['Savanna Burning'] = get_savanna_burning_effect_r_mrj(data, yr_idx)                       
     ag_man_r_mrj['AgTech EI'] = get_agtech_ei_effect_r_mrj(data, r_mrj, yr_idx)                            
     ag_man_r_mrj['Biochar'] = get_biochar_effect_r_mrj(data, r_mrj, yr_idx)                                
-    ag_man_r_mrj['HIR - Beef'] = get_beef_hir_effect_r_mrj(data, r_mrj)                                    
-    ag_man_r_mrj['HIR - Sheep'] = get_sheep_hir_effect_r_mrj(data, r_mrj)
+    ag_man_r_mrj['HIR - Beef'] = get_beef_hir_effect_r_mrj(data, r_mrj, yr_idx)                                    
+    ag_man_r_mrj['HIR - Sheep'] = get_sheep_hir_effect_r_mrj(data, r_mrj, yr_idx)
     ag_man_r_mrj['Utility Solar PV'] = get_utility_solar_pv_effect_r_mrj(data, r_mrj, yr_idx)
     ag_man_r_mrj['Onshore Wind'] = get_onshore_wind_effect_r_mrj(data, r_mrj, yr_idx)
 

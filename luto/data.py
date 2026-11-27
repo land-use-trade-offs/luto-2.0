@@ -1338,6 +1338,9 @@ class Data:
         if settings.HIR_REGROWTH_FROM_CREDIT_REGISTER:
             with xr.open_dataset(Path(settings.INPUT_DIR) / 'Nick_build/hir_layer/hir_rate_layer_gross.nc') as hir_rates:
                 self.HIR_REGROWTH_T_CO2E_HA_PER_YR = self.get_resfactored_average(hir_rates['HIR_RATE'], 'hir_rate_layer_gross_HIR_RATE').values
+                # the credits issued (t CO2e/ha/yr; the gross rate less the scheme's discounts): the tonnes HIR and Destocked natural
+                # land earn carbon revenue on with settings.HIR_CARBON_REVENUE
+                self.HIR_ISSUANCE_T_CO2E_HA_PER_YR = self.get_resfactored_average(hir_rates['HIR_RATE_ISSUANCE'], 'hir_rate_layer_gross_HIR_RATE_ISSUANCE').values
         
         
         ###############################################################
