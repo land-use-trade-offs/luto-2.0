@@ -34,5 +34,14 @@ input/Nick_build/
 | `ghg_targets.py` | `ghg_targets/`: the split GHG target series (NIR 2024, DCCEEW 2025) | `python input/Nick_build/scripts/ghg_targets.py --out input/Nick_build/ghg_targets --scope-matrix input/Nick_build/ghg_targets/scope_matrix.csv [--cache DIR]` | pandas, openpyxl |
 | `ag_mgt_caps.py` | `ag_mgt_caps/`: observed ag-management adoption caps, existing HIR project cells (CER register, CEA files, ABS 4627.0) | `python input/Nick_build/scripts/ag_mgt_caps.py --out input/Nick_build/ag_mgt_caps --input input --cache input/Nick_build/ag_mgt_caps_cache` | numpy, pandas, xarray, geopandas, rasterio, shapely, xlrd (pandas reads the ABS `.xls` with it) |
 | `stubble_dse.py` | `stubble_dse/`: the stubble carrying rate LUTO reads (`STUBBLE_DSE_FILE`): Nick's raw rate, 0 on cells without sheep per-head data | `python input/Nick_build/scripts/stubble_dse.py --raw <Nick's raw file> --input input --out input/Nick_build/stubble_dse` | numpy, xarray |
+| `compare_inputs.py` | `compare_inputs/`: comparison tables of the 2010-base inputs, the 2021-base products and public reference data (builds no model input) | `python input/Nick_build/scripts/compare_inputs.py --input input/Nick_build/inherited_2010 --base2021 input/Nick_build --out input/Nick_build/compare_inputs --cache input/Nick_build/_cache [--offline] [--live-check] [--source NAME=PATH] [--source-dir DIR]` | numpy, pandas, numexpr, PyTables, openpyxl, xlrd, rasterio, scipy |
+
+The 2020-21 inputs build in this order (each step reads the folders of earlier steps): 1 `ag_mgt_caps` (2010 map),
+2 `nlum_map`, 3 `pasture_productivity`, 4 `livestock_map`, 5 `eligibility`, 6 `ghg_factors`, 7 `ag_mgt_caps_2021`,
+8 `hir_layer`, 9 `clearing_layer`, 10 `crop_economics`, 11 `livestock_economics`, 12 `cci_fill`, 13 `water_domestic`,
+14 `water_licence_price`, 15 `stubble_dse` (`--raw livestock_map/stubble_dse_ha.nc`; `--input` a staging folder of links to
+`livestock_economics/agec_lvstk.nc`, `livestock_economics/water_delivery_price.nc`, `ghg_factors/agGHG_lvstk.nc`),
+16 `compare_inputs` (tables only). The 2021-base scripts read old-format 2010-build files from `inherited_2010/` until their
+readers are ported to NetCDF.
 
 `stubble_dse/` is not built: Nick's raw stubble rate is not here yet. `ag_mgt_caps/` is not built at present: the CER register no longer matches the script's sha256 pin.
