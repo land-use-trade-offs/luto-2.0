@@ -22,8 +22,14 @@ Outputs (into --out):
 Run as a plain script from the repo root (no luto imports):
 
     python input/Nick_build/scripts/ag_mgt_caps.py --out input/Nick_build/ag_mgt_caps --input input --cache input/Nick_build/ag_mgt_caps_cache
+    python input/Nick_build/scripts/ag_mgt_caps.py --out input/Nick_build/ag_mgt_caps_2021 --input input
+        --lumap input/Nick_build/livestock_map/lumap.nc --base-year 2021 --cache input/Nick_build/ag_mgt_caps_cache
 
---input is LUTO's input folder, for NLUM_2010-11_mask.tif, lumap.nc, real_area.nc and ag_landuses.csv.
+--input is LUTO's input folder, for NLUM_2010-11_mask.tif, real_area.nc, ag_landuses.csv and (without --lumap) lumap.nc.
+--lumap is the land-use map of the run's base year (--base-year): the 2010 map (default, input/lumap.nc) or the 2021 map of
+livestock_map.py (input/Nick_build/livestock_map/lumap.nc). Any other map is refused, by dataset content sha256. The map
+enters only the HIR rows of caps.csv (project area on the option's land use / land-use area); the project cells, projects,
+scaling and manifest do not depend on it.
 Dependencies: pandas, numpy, geopandas (pyogrio, pyarrow), shapely, rasterio, xlrd (all in requirements.yml).
 Output is deterministic.
 """
@@ -56,6 +62,11 @@ SOURCE_DATES = {
     'CER': '2026-09-28 (retrieval date; the register is a live file with no version stamp)',
     'ABS': '2018-06-26 (release date, 46270DO001_201617 Contents sheet)',
 }
+# land-use map of each base year, by dataset content (sha256 of dtype, shape and array bytes, as content_sha below):
+# 2010, input/lumap.nc (the same values as the 2010 build's lumap.h5); 2021, livestock_map.py's lumap.nc (the value its
+# provenance.csv records, and hir_layer.py's pin)
+LUMAP_CONTENT_SHA = {2010: '615a598c8ca8bde4c2b42fe520170d970b0e7c2ebd9a77e31d5ada175c46b960',
+                     2021: '075aae2ba6d6e2f8bd928ca59264a31e69d575855e3bff4fe75611250acc61f2'}
 
 # ----------------------------------------------------------------------------- design constants
 HIR_METHOD = 'Human-Induced Regeneration'   # all three compilations of the 2013 determination
@@ -78,6 +89,11 @@ ABS_BIOCHAR = 'Soil management - Soil enhancer use - Biochar - Area applied to (
 
 def sha(b):
     return hashlib.sha256(b).hexdigest()
+
+
+def content_sha(a):
+    a = np.ascontiguousarray(a)
+    return sha(f'{a.dtype.str}|{a.shape}|'.encode() + a.tobytes())
 
 
 def fetch(url, cache, name=None):
@@ -170,9 +186,19 @@ def cea_cells(geoms, transform, shape, land_index):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--out', required=True, help='output folder (e.g. input/ag_mgt_caps)')
-    ap.add_argument('--input', required=True, help="LUTO input folder (NLUM mask, lumap.nc, real_area.nc, ag_landuses.csv)")
+    ap.add_argument('--input', required=True, help="LUTO input folder (NLUM mask, real_area.nc, ag_landuses.csv; lumap.nc without --lumap)")
     ap.add_argument('--cache', default=None, help='directory to cache downloaded files in')
+    ap.add_argument('--lumap', default=None, help="the lumap.nc of the run's base year (default: lumap.nc in --input); "
+                    'refused unless it is that map')
+    ap.add_argument('--base-year', type=int, choices=(2010, 2021), default=2010,
+                    help='base year of the run: 2010 (the 2010 map) or 2021 (the 2021 map of livestock_map.py)')
     a = ap.parse_args()
+    lumap_path = Path(a.lumap) if a.lumap else Path(a.input) / 'lumap.nc'
+    lumap = xr.load_dataarray(lumap_path).values
+    lumap_sha = content_sha(lumap)
+    if lumap_sha != LUMAP_CONTENT_SHA[a.base_year]:
+        raise SystemExit(f'{lumap_path} has content sha256 {lumap_sha}, not the {a.base_year} map '
+                         f'({LUMAP_CONTENT_SHA[a.base_year]}); refusing to run')
     Path(a.out).mkdir(parents=True, exist_ok=True)
 
     # ---- LUTO grid: NLUM land cells in np.nonzero order, their base-year land use and real area ----
@@ -180,12 +206,11 @@ def main():
         nlum, transform, crs = r.read(1), r.transform, r.crs
     land_index = np.full(nlum.shape, -1, np.int64)
     land_index[np.nonzero(nlum == 1)] = np.arange(int((nlum == 1).sum()))
-    lumap = xr.load_dataarray(Path(a.input) / 'lumap.nc').values
     real_area = xr.load_dataarray(Path(a.input) / 'real_area.nc').values
     ag_lus = open(Path(a.input) / 'ag_landuses.csv').read().split('\n')
     ag_lus = [lu.strip() for lu in ag_lus if lu.strip()]
     if len(lumap) != len(real_area) or len(lumap) != land_index.max() + 1:
-        raise SystemExit('lumap.nc, real_area.nc and the NLUM mask disagree on the number of land cells.')
+        raise SystemExit('The land-use map, real_area.nc and the NLUM mask disagree on the number of land cells.')
 
     # ---- ABS 4627.0: Table 1 Australia, items by 'Commodity description', values in 'Estimate' ----
     abs_raw = pinned('abs_4627_raw', fetch(ABS_4627_URL, a.cache, 'abs_4627_2016-17.xls'))
@@ -259,6 +284,8 @@ def main():
          ['source', f'CER CEA mapping files ({len(manifest)} HIR projects)', 'cea_manifest.csv', sha(canon),
           'sha256 of sorted project_id,url,sha256 lines', SOURCE_DATES['CER']],
          ['source', 'ABS 4627.0 2016-17, Table 1 Australia', ABS_4627_URL, sha(abs_raw), 'sha256 of raw file', SOURCE_DATES['ABS']],
+         ['map', f'lumap.nc, {a.base_year} base year', lumap_path.as_posix(), lumap_sha,
+          'dataset content sha256 (dtype, shape and array bytes), pinned per base year', ''],
          ['script', 'input/Nick_build/scripts/ag_mgt_caps.py', '', sha(me), 'sha256 of script', '']]
     for f in sorted(f.name for f in Path(a.out).iterdir() if f.suffix == '.csv' and f.name != 'provenance.csv'):
         P.append(['output', f, '', sha(open(Path(a.out) / f, 'rb').read()), 'sha256', ''])
